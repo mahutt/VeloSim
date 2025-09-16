@@ -5,10 +5,13 @@ labels: task
 assignees: ""
 ---
 
-### :bookmark: Summary:
+### Summary:
 
 [Summary of the task]
 
-### :page_with_curl: Description:
+### Description:
 
 [Detailed description of the task]
+
+-----------------------------------------------------------
+**Estimated Ideal Time:** [Estimated time to complete the task]

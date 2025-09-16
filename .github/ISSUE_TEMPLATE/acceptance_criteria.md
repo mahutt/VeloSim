@@ -5,7 +5,7 @@ labels: acceptance-criteria
 assignees: ""
 ---
 
-### :white_check_mark: Acceptance Criteria
+### Acceptance Criteria
 
 - Scenario [The name for the behavior that will be described]
 - Given [The setup conditions of the scenario]

@@ -5,35 +5,35 @@ labels: bug
 assignees: ""
 ---
 
-### :bug: Bug Description:
+### Bug Description:
 
 [Detailed description of the bug]
 
-### :repeat: Steps to Reproduce:
+### Steps to Reproduce:
 
 1.
 2.
 3.
 
-### :white_check_mark: Expected Behavior:
+### Expected Behavior:
 
 [Describe what you expected to happen]
 
-### :x: Actual Behavior:
+### Actual Behavior:
 
 [Describe what actually happened]
 
-### :link: Related Links
+### Related Links
 
 Related PR: #[PR nb]
 
-### :bulb: Possible Solutions
+### Possible Solutions
 
 [Describe possible solutions. Delete section if empty]
 
 ### Additional Information:
-[Optional sections. Delete those note needed.]
+[Optional sections. Delete those not needed.]
 
-**:camera: Screenshots / Code Snippets / Stack Traces**
+**Screenshots / Code Snippets / Stack Traces**
 
-**:computer: Environment**
+**Environment**

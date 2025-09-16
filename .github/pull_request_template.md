@@ -1,11 +1,11 @@
-### :bookmark: Proposed Changes:
+### Proposed Changes:
 [Brief description of the changes made in this pull request]
 
-### :clipboard: Details:
+### Details:
 - [Detail 1]
 
-### :link: Related Issues:
+### Related Issues:
 - Resolves #[Issue nb]
 
-### :camera: Screenshot:
+### Screenshot:
 [Optional section. Add UI/code screenshots if needed.]

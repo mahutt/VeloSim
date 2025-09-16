@@ -5,7 +5,13 @@ labels: story
 assignees: ""
 ---
 
-### :closed_book: Story Summary:
+### Story Summary:
 
 As [a user persona], I want [to perform this action] so that [I can accomplish this goal].
 
+-----------------------------------------------------------
+**Story Points:** 
+
+**Priority:**
+
+**Risk Level:**
