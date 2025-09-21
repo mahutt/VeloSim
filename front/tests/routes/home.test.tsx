@@ -2,10 +2,10 @@ import { expect, test } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import Home, { meta } from '~/routes/home';
 
-test('home pages loads 2 links', async () => {
+test('home pages loads 1 button', async () => {
   render(<Home />);
 
-  expect(screen.getAllByRole('link')).toHaveLength(2);
+  expect(screen.getAllByRole('button')).toHaveLength(1);
 });
 
 test('meta function sets all fields', () => {
