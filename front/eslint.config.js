@@ -19,8 +19,6 @@ export default defineConfig([
         version: 'detect',
       },
     },
-    rules: {
-      'react/react-in-jsx-scope': 'off',
-    },
   },
+  pluginReact.configs.flat['jsx-runtime'],
 ]);
