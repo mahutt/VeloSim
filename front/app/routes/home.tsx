@@ -1,12 +1,16 @@
-import { Welcome } from '../welcome/welcome';
+import { Button } from '~/components/ui/button';
 
 export function meta() {
   return [
-    { title: 'New React Router App' },
-    { name: 'description', content: 'Welcome to React Router!' },
+    { title: 'VeloSim' },
+    { name: 'description', content: 'Welcome to VeloSim!' },
   ];
 }
 
 export default function Home() {
-  return <Welcome />;
+  return (
+    <main className="flex min-h-screen flex-col items-center justify-center">
+      <Button>Start simulation</Button>
+    </main>
+  );
 }
