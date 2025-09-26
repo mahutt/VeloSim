@@ -1,0 +1,48 @@
+name: Backend CI
+
+on:
+  workflow_call:
+
+jobs:
+  # Backend Tests
+  backend-tests:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e .[dev]
+
+      - name: Lint with flake8
+        run: |
+          flake8 back
+
+      - name: Check formatting with black
+        run: |
+          black --check back
+
+      - name: Type check with mypy
+        run: |
+          mypy back
+
+      - name: Run tests with pytest
+        run: |
+          pytest back --cov=back --cov-report=term-missing --cov-report=xml --cov-fail-under=70
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v5.5.1
+        with:
+          files: ./coverage.xml
+          flags: backend
+          name: backend-coverage
+          fail_ci_if_error: false
+        env:
+          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}

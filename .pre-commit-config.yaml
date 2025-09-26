@@ -1,0 +1,70 @@
+default_language_version:
+  python: python3.11
+
+repos:
+  # Python hooks
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.6.0
+    hooks:
+      - id: trailing-whitespace
+      - id: end-of-file-fixer
+      - id: check-yaml
+      - id: check-added-large-files
+      - id: check-merge-conflict
+      - id: debug-statements
+
+  - repo: https://github.com/psf/black
+    rev: 23.7.0
+    hooks:
+      - id: black
+        files: ^(back|sim)/.*\.py$
+        args: [--line-length=88]
+
+  - repo: https://github.com/pycqa/flake8
+    rev: 6.0.0
+    hooks:
+      - id: flake8
+        files: ^(back|sim)/.*\.py$
+        args: [--max-line-length=88]
+
+  - repo: https://github.com/pre-commit/mirrors-mypy
+    rev: v1.5.1
+    hooks:
+      - id: mypy
+        files: ^(back|sim)/.*\.py$
+        additional_dependencies: [types-requests]
+        args: [--ignore-missing-imports]
+
+  # Frontend hooks
+  - repo: local
+    hooks:
+      - id: prettier-frontend
+        name: Prettier (Frontend)
+        entry: bash -c 'cd front && npx prettier --write "${@#front/}"' --
+        language: system
+        files: ^front/.*\.(js|jsx|ts|tsx|json|css|md)$
+        pass_filenames: true
+
+      - id: eslint-frontend
+        name: ESLint (Frontend)
+        entry: bash -c 'cd front && npx eslint --fix "${@#front/}"' --
+        language: system
+        files: ^front/.*\.(js|jsx|ts|tsx)$
+        pass_filenames: true
+
+  # Custom hooks for commit message validation and license headers
+  - repo: local
+    hooks:
+      - id: validate-license-headers
+        name: MIT License Header Validation
+        entry: python scripts/validate_license_headers.py
+        language: system
+        files: \.(py|js|jsx|ts|tsx)$
+        pass_filenames: false
+
+      - id: validate-commit-message
+        name: Validate Commit Message (Conventional + Issue Number)
+        entry: python scripts/validate_commit_wrapper.py
+        language: system
+        stages: [commit-msg]
+        pass_filenames: true

@@ -1,0 +1,78 @@
+name: Frontend CI
+
+on:
+  workflow_call:
+
+jobs:
+  # Frontend Tests
+  frontend-tests:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Use Node.js 20.x
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20.x
+          cache: "npm"
+          cache-dependency-path: front/package-lock.json
+
+      - name: Install dependencies
+        working-directory: ./front
+        run: npm ci
+
+      - name: Type check
+        working-directory: ./front
+        run: npm run typecheck
+
+      - name: Lint
+        working-directory: ./front
+        run: npm run lint
+
+      - name: Format check
+        working-directory: ./front
+        run: npx prettier --check app/**/*.{js,jsx,ts,tsx,json,css,md} --no-error-on-unmatched-pattern
+
+      - name: Run tests with coverage
+        working-directory: ./front
+        run: npm run coverage
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v5.5.1
+        with:
+          files: ./front/coverage/coverage-final.json
+          flags: frontend
+          name: frontend-coverage
+          fail_ci_if_error: false
+        env:
+          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+
+  # Build Test
+  frontend-build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Use Node.js 20.x
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20.x
+          cache: "npm"
+          cache-dependency-path: front/package-lock.json
+
+      - name: Install dependencies
+        working-directory: ./front
+        run: npm ci
+
+      - name: Build
+        working-directory: ./front
+        run: npm run build
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-build
+          path: front/build/
+          retention-days: 7
