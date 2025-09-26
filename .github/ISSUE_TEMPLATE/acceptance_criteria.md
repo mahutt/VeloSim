@@ -1,6 +1,6 @@
 ---
 name: Acceptance Criteria
-about: Acceptance Criteria of a User Story. 
+about: Acceptance Criteria of a User Story.
 labels: acceptance-criteria
 assignees: ""
 ---

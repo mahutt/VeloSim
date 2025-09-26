@@ -1,0 +1,19 @@
+{
+    "name": "velosim",
+    "version": "1.0.0",
+    "description": "VeloSim monorepo workspace scripts",
+    "scripts": {
+        "test": "python -m pytest",
+        "test:coverage": "python -m pytest --cov=back --cov=sim --cov-report=html",
+        "lint": "flake8 back sim && black --check back sim && mypy back sim",
+        "lint:fix": "black back sim",
+        "format": "npm run lint:fix",
+        "setup": "pip install -e .[dev] && pre-commit install && cd front && npm install && cd ..",
+        "clean": "rimraf coverage_html/ .pytest_cache/ .mypy_cache/ front/coverage/ front/node_modules/",
+        "ci:test": "npm run lint && npm run test:coverage"
+    },
+    "devDependencies": {
+        "concurrently": "^8.2.0",
+        "rimraf": "^5.0.0"
+    }
+}

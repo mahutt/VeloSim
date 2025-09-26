@@ -1,0 +1,26 @@
+name: License Header Validation
+
+on:
+  workflow_call:
+
+jobs:
+  validate-license-headers:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.11"
+
+      - name: Validate MIT license headers
+        run: python scripts/validate_license_headers.py
+
+      - name: Report results
+        if: failure()
+        run: |
+          echo "❌ License header validation failed!"
+          echo "Please add the MIT license header to the top of all source files."
+          echo "See the validation script output above for specific files that need headers."

@@ -1,0 +1,149 @@
+name: CI Orchestration
+
+on:
+  pull_request:
+    branches: [main]
+
+jobs:
+  analyze-changes:
+    runs-on: ubuntu-latest
+    outputs:
+      branch-type: ${{ steps.check-branch.outputs.branch-type }}
+      is-valid: ${{ steps.check-branch.outputs.is-valid }}
+      backend-changed: ${{ steps.check-changes.outputs.backend-changed }}
+      frontend-changed: ${{ steps.check-changes.outputs.frontend-changed }}
+      simulation-changed: ${{ steps.check-changes.outputs.simulation-changed }}
+      run-license-check: ${{ steps.check-changes.outputs.run-license-check }}
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Check branch naming convention
+        id: check-branch
+        run: |
+          BRANCH_NAME="${{ github.head_ref }}"
+          echo "Branch name: $BRANCH_NAME"
+
+          if [[ "$BRANCH_NAME" =~ ^feature/.+ ]]; then
+            echo "branch-type=feature" >> $GITHUB_OUTPUT
+            echo "is-valid=true" >> $GITHUB_OUTPUT
+            echo "✅ Valid feature branch: $BRANCH_NAME"
+          elif [[ "$BRANCH_NAME" =~ ^bugfix/.+ ]]; then
+            echo "branch-type=bugfix" >> $GITHUB_OUTPUT
+            echo "is-valid=true" >> $GITHUB_OUTPUT
+            echo "✅ Valid bugfix branch: $BRANCH_NAME"
+          elif [[ "$BRANCH_NAME" =~ ^ci/.+ ]]; then
+            echo "branch-type=ci" >> $GITHUB_OUTPUT
+            echo "is-valid=true" >> $GITHUB_OUTPUT
+            echo "✅ Valid CI/infrastructure branch: $BRANCH_NAME"
+          elif [[ "$BRANCH_NAME" =~ ^docs/.+ ]]; then
+            echo "branch-type=docs" >> $GITHUB_OUTPUT
+            echo "is-valid=true" >> $GITHUB_OUTPUT
+            echo "✅ Valid documentation branch: $BRANCH_NAME"
+          else
+            echo "branch-type=invalid" >> $GITHUB_OUTPUT
+            echo "is-valid=false" >> $GITHUB_OUTPUT
+            echo "❌ Invalid branch name: $BRANCH_NAME"
+            echo "Branch name must start with 'feature/', 'bugfix/', 'ci/', or 'docs/'"
+            exit 1
+          fi
+
+      - name: Analyze changed files
+        id: check-changes
+        run: |
+          # Get changed files between this branch and main
+          CHANGED_FILES=$(git diff --name-only origin/main...HEAD)
+          echo "Changed files:"
+          echo "$CHANGED_FILES"
+          echo ""
+
+          # Check for backend changes
+          BACKEND_CHANGED="false"
+          if echo "$CHANGED_FILES" | grep -E "^(back/|pyproject\.toml|\.github/workflows/backend-ci\.yml)" > /dev/null; then
+            BACKEND_CHANGED="true"
+            echo "🔍 Backend files changed"
+          fi
+
+          # Check for frontend changes
+          FRONTEND_CHANGED="false"
+          if echo "$CHANGED_FILES" | grep -E "^(front/|\.github/workflows/frontend-ci\.yml)" > /dev/null; then
+            FRONTEND_CHANGED="true"
+            echo "🔍 Frontend files changed"
+          fi
+
+          # Check for simulation changes
+          SIMULATION_CHANGED="false"
+          if echo "$CHANGED_FILES" | grep -E "^(sim/|\.github/workflows/simulation-ci\.yml)" > /dev/null; then
+            SIMULATION_CHANGED="true"
+            echo "🔍 Simulation files changed"
+          fi
+
+          # License check runs when source code files are changed
+          RUN_LICENSE_CHECK="false"
+          if echo "$CHANGED_FILES" | grep -E "\.(py|js|jsx|ts|tsx)$" > /dev/null; then
+            RUN_LICENSE_CHECK="true"
+            echo "🔍 Source files changed - license validation required"
+          fi
+
+          # Set outputs
+          echo "backend-changed=$BACKEND_CHANGED" >> $GITHUB_OUTPUT
+          echo "frontend-changed=$FRONTEND_CHANGED" >> $GITHUB_OUTPUT
+          echo "simulation-changed=$SIMULATION_CHANGED" >> $GITHUB_OUTPUT
+          echo "run-license-check=$RUN_LICENSE_CHECK" >> $GITHUB_OUTPUT
+
+      - name: CI Summary
+        run: |
+          echo "## CI Analysis Results" >> $GITHUB_STEP_SUMMARY
+          echo "- **Branch**: \`${{ github.head_ref }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- **Type**: \`${{ steps.check-branch.outputs.branch-type }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- **Valid**: ${{ steps.check-branch.outputs.is-valid }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          echo "### Changed Components:" >> $GITHUB_STEP_SUMMARY
+          if [[ "${{ steps.check-changes.outputs.backend-changed }}" == "true" ]]; then
+            echo "🔍 **Backend** - Will run Python CI" >> $GITHUB_STEP_SUMMARY
+          fi
+          if [[ "${{ steps.check-changes.outputs.frontend-changed }}" == "true" ]]; then
+            echo "� **Frontend** - Will run Node.js CI" >> $GITHUB_STEP_SUMMARY
+          fi
+          if [[ "${{ steps.check-changes.outputs.simulation-changed }}" == "true" ]]; then
+            echo "🔍 **Simulation** - Will run Python CI" >> $GITHUB_STEP_SUMMARY
+          fi
+          if [[ "${{ steps.check-changes.outputs.run-license-check }}" == "true" ]]; then
+            echo "� **License Headers** - Will validate MIT headers" >> $GITHUB_STEP_SUMMARY
+          fi
+
+          # Show if no CI will run
+          if [[ "${{ steps.check-changes.outputs.backend-changed }}" == "false" && \
+                "${{ steps.check-changes.outputs.frontend-changed }}" == "false" && \
+                "${{ steps.check-changes.outputs.simulation-changed }}" == "false" && \
+                "${{ steps.check-changes.outputs.run-license-check }}" == "false" ]]; then
+            echo "⏭️ **No CI workflows** will run - no relevant files changed" >> $GITHUB_STEP_SUMMARY
+          fi
+
+  # Trigger CI workflows based on changed files
+  trigger-backend-ci:
+    needs: analyze-changes
+    if: needs.analyze-changes.outputs.backend-changed == 'true'
+    uses: ./.github/workflows/backend-ci.yml
+    secrets: inherit
+
+  trigger-frontend-ci:
+    needs: analyze-changes
+    if: needs.analyze-changes.outputs.frontend-changed == 'true'
+    uses: ./.github/workflows/frontend-ci.yml
+    secrets: inherit
+
+  trigger-simulation-ci:
+    needs: analyze-changes
+    if: needs.analyze-changes.outputs.simulation-changed == 'true'
+    uses: ./.github/workflows/simulation-ci.yml
+    secrets: inherit
+
+  # License validation runs when any source code files are changed
+  validate-license-headers:
+    needs: analyze-changes
+    if: needs.analyze-changes.outputs.run-license-check == 'true'
+    uses: ./.github/workflows/license-validation.yml

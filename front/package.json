@@ -8,10 +8,12 @@
     "start": "react-router-serve ./build/server/index.js",
     "typecheck": "react-router typegen && tsc",
     "format": "prettier --write app/**/*.{js,jsx,ts,tsx,json,css,md} --no-error-on-unmatched-pattern",
+    "format:check": "prettier --check app/**/*.{js,jsx,ts,tsx,json,css,md} --no-error-on-unmatched-pattern",
     "lint": "eslint app/",
     "lint:fix": "eslint app/ --fix",
     "test": "vitest",
-    "coverage": "vitest run --coverage"
+    "coverage": "vitest run --coverage",
+    "coverage:open": "npm run coverage && npx open-cli coverage/index.html"
   },
   "dependencies": {
     "@radix-ui/react-slot": "^1.2.3",
