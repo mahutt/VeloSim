@@ -103,7 +103,7 @@ npm run dev:frontend
 - **Testing**: pytest with coverage reporting
 - **Linting**: flake8 for style, mypy for type checking
 - **Formatting**: black with 88 character line length
-- **Coverage**: HTML reports generated in `coverage_html/` (gitignored)
+- **Coverage**: HTML reports generated in `coverage_html/`
 
 ### JavaScript/TypeScript (Frontend)
 
@@ -111,7 +111,7 @@ npm run dev:frontend
 - **Linting**: ESLint with TypeScript and React rules
 - **Formatting**: Prettier for consistent code style
 - **Type Checking**: TypeScript with strict configuration
-- **Coverage**: HTML reports generated in `front/coverage/` (gitignored)
+- **Coverage**: HTML reports generated in `front/coverage/`
 - **Build Tool**: Vite with React Router for SSR capabilities
 
 ### Git Workflow
@@ -126,8 +126,6 @@ The project uses pre-commit hooks that automatically run on each commit:
 - **Commit message validation**: Angular convention + issue number requirement
 
 #### Commit Message Format
-
-Follow Angular commit convention with required issue number:
 
 ```
 type(scope): description #123
@@ -167,15 +165,7 @@ git checkout -b ci/789-add-coverage-checks
 git checkout -b docs/101-update-api-documentation
 ```
 
-**Why this structure:**
-
-- **Traceability**: Issue number links branch to specific GitHub issue
-- **Clarity**: Hyphen-separated names are readable and consistent
-- **Organization**: Easy to filter branches by type and issue number
-
-#### Smart CI/CD Pipeline
-
-GitHub Actions run **intelligently** based on **changed files**, not branch names:
+#### CI/CD Pipeline
 
 - **Backend CI** (`backend-ci.yml`) - Runs when:
   - `back/` directory files change
@@ -189,13 +179,6 @@ GitHub Actions run **intelligently** based on **changed files**, not branch name
   - Simulation CI workflow file changes
 - **License Validation** - Runs when:
   - Source files (`.py`, `.js`, `.jsx`, `.ts`, `.tsx`) change
-  - Only for `feature/` and `bugfix/` branches
-
-**Benefits:**
-
-- ✅ No unnecessary CI runs
-- ✅ Faster feedback on relevant changes only
-- ✅ Efficient resource usage
 
 ## Development Workflow
 
@@ -206,13 +189,8 @@ GitHub Actions run **intelligently** based on **changed files**, not branch name
    git checkout -b bugfix/fix-critical-bug    # For bug fixes
    git checkout -b ci/improve-workflows       # For CI changes
    git checkout -b docs/update-api-docs       # For documentation
-   ```
-
    git checkout -b ci/feature-name # For CI/infrastructure
    git checkout -b docs/feature-name # For documentation
-
-   ```
-
    ```
 
 2. **Make changes** following the code standards
