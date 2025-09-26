@@ -1,4 +1,3 @@
-// import type { LngLatLike } from 'mapbox-gl';
 import { vi } from 'vitest';
 
 type eventType = 'move';
