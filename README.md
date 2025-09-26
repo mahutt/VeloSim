@@ -147,7 +147,9 @@ Examples:
 
 #### Branch Naming Convention
 
-All branches must follow one of these naming conventions:
+All branches must follow the structured naming convention:
+
+**Format:** `[prefix]/[issue-number]-[hyphen-separated-name]`
 
 **Branch Prefixes:**
 
@@ -156,14 +158,20 @@ All branches must follow one of these naming conventions:
 - `ci/` - CI/CD and infrastructure changes
 - `docs/` - Documentation only changes
 
-Examples:
+**Examples:**
 
 ```bash
-git checkout -b feature/user-authentication
-git checkout -b bugfix/fix-memory-leak
-git checkout -b ci/add-coverage-checks
-git checkout -b docs/update-readme
+git checkout -b feature/123-user-authentication
+git checkout -b bugfix/456-fix-memory-leak
+git checkout -b ci/789-add-coverage-checks
+git checkout -b docs/101-update-api-documentation
 ```
+
+**Why this structure:**
+
+- **Traceability**: Issue number links branch to specific GitHub issue
+- **Clarity**: Hyphen-separated names are readable and consistent
+- **Organization**: Easy to filter branches by type and issue number
 
 #### Smart CI/CD Pipeline
 
