@@ -22,9 +22,24 @@
  * SOFTWARE.
  */
 
-import { type RouteConfig, index, route } from '@react-router/dev/routes';
+import { expect, test } from 'vitest';
+import { render, screen } from '@testing-library/react';
+import Simulation, { meta } from '~/routes/simulation';
+import { createRoutesStub } from 'react-router';
 
-export default [
-  index('routes/home.tsx'),
-  route('simulation', 'routes/simulation.tsx'),
-] satisfies RouteConfig;
+test('meta function sets all fields', () => {
+  const metaInfo = meta();
+  expect(metaInfo[0].title).toBeDefined();
+});
+
+test('simulation page loads the map container', async () => {
+  const Stub = createRoutesStub([
+    {
+      path: '/simulation',
+      Component: Simulation,
+    },
+  ]);
+
+  render(<Stub initialEntries={['/simulation']} />);
+  expect(screen.getByTestId('map-container')).toBeInTheDocument();
+});

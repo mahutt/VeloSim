@@ -22,6 +22,7 @@
  * SOFTWARE.
  */
 
+import { Link } from 'react-router';
 import { Button } from '~/components/ui/button';
 
 export function meta() {
@@ -34,7 +35,9 @@ export function meta() {
 export default function Home() {
   return (
     <main className="flex min-h-screen flex-col items-center justify-center">
-      <Button>Start simulation</Button>
+      <Link to="/simulation">
+        <Button>Start simulation</Button>
+      </Link>
     </main>
   );
 }

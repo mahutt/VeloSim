@@ -116,6 +116,7 @@ EXCLUDED_PATHS = {
     'node_modules',
     '.git',
     '.venv',  # Virtual environment directory
+    '.react-router',  # React Router cache directory
 
     # Package files
     '__pycache__',
