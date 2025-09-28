@@ -35,22 +35,22 @@ class Station:
 
         # starting the process for periodic station operations
         self.action = env.process(self.run())
-        
+
     def addTask(self, task):
         self.tasks.append(task)
 
     def removeTask(self, task):
         if task in self.tasks:
             self.tasks.remove(task)
-                    
+            
     def getTaskCount(self) -> int:
         return len(self.tasks)
-            
+
     def getStationPosition(self) -> Position: 
         return self.position
-            
+
+    # continous process that runs throughout the simulation        
     def run(self):
-        # continous process that runs throughout the simulation
-       while True:
-           # replace with periodic operations later on
-           yield self.env.timeout(1)
+        # replace with periodic operations later on
+        while True:
+            yield self.env.timeout(1)
