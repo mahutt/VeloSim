@@ -8,8 +8,6 @@
 
 **VeloSim** is an open-source network simulation platform that enables job dispatchers to manage distributed resources in dynamic environments, built with a Python backend/simulation engine and a modern JavaScript frontend.
 
-</div>
-
 ## Project Structure
 
 ```

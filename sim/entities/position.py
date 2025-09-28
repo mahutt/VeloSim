@@ -23,20 +23,32 @@ SOFTWARE.
 """
 
 from datetime import datetime
+from typing import Tuple
+
 
 class Position:
-    def __init__(self, latitude: float, longitude: float, timestamp: str | None = None):
+    def __init__(
+        self, latitude: float, longitude: float, timestamp: str | None = None
+    ) -> None:
         self.latitude = latitude
         self.longitude = longitude
-        self.timestamp = timestamp if timestamp is not None else datetime.now().isoformat()
+        self.timestamp = (
+            timestamp if timestamp is not None else datetime.now().isoformat()
+        )
 
-    def getPosition(self):
+    def getPosition(self) -> Tuple[float, float]:
         return (self.latitude, self.longitude)
 
-    def setPosition(self, latitude: float, longitude: float, timestamp: str | None = None):
+    def setPosition(
+        self, latitude: float, longitude: float, timestamp: str | None = None
+    ) -> None:
         self.latitude = latitude
         self.longitude = longitude
-        self.timestamp = timestamp if timestamp is not None else datetime.now().isoformat()
+        self.timestamp = (
+            timestamp if timestamp is not None else datetime.now().isoformat()
+        )
 
-    def updateTimestamp(self, timestamp: str | None = None):
-        self.timestamp = timestamp if timestamp is not None else datetime.now().isoformat()
+    def updateTimestamp(self, timestamp: str | None = None) -> None:
+        self.timestamp = (
+            timestamp if timestamp is not None else datetime.now().isoformat()
+        )

@@ -25,32 +25,44 @@ SOFTWARE.
 import simpy
 from position import Position
 
+
 class Station:
-    def __init__(self, env: simpy.Environment, station_id, name: str, position: Position, tasks: list = None):
+    def __init__(
+        self,
+        env: simpy.Environment,
+        station_id: int,
+        name: str,
+        position: Position,
+        tasks: list[int] | None = None,  # change to list of Task entities later on
+    ) -> None:
         self.env = env
         self.id = station_id
         self.name = name
-        self.position = position  
-        self.tasks = tasks if tasks is not None else [] # list of tasks assigned to a given station
+        self.position = position
+        self.tasks = (
+            tasks if tasks is not None else []
+        )  # list of tasks assigned to a given station
 
         # starting the process for periodic station operations
         self.action = env.process(self.run())
 
-    def addTask(self, task):
-        self.tasks.append(task)
+    # use Task entity instead of task_id once implemented
+    def addTask(self, task_id: int) -> None:
+        self.tasks.append(task_id)
 
-    def removeTask(self, task):
-        if task in self.tasks:
-            self.tasks.remove(task)
-            
+    # use Task entity instead of task_id once implemented
+    def removeTask(self, task_id: int) -> None:
+        if task_id in self.tasks:
+            self.tasks.remove(task_id)
+
     def getTaskCount(self) -> int:
         return len(self.tasks)
 
-    def getStationPosition(self) -> Position: 
+    def getStationPosition(self) -> Position:
         return self.position
 
-    # continous process that runs throughout the simulation        
-    def run(self):
+    # continous process that runs throughout the simulation
+    def run(self):  # type: ignore[no-untyped-def]
         # replace with periodic operations later on
         while True:
             yield self.env.timeout(1)
