@@ -26,25 +26,31 @@ import simpy
 from position import Position
 
 class Station:
-    def __init__(self, env: simpy.Environment, station_id, name: str, position: Position, taskCount: int = 0):
+    def __init__(self, env: simpy.Environment, station_id, name: str, position: Position, tasks: list = None):
         self.env = env
         self.id = station_id
         self.name = name
         self.position = position  
-        self.taskCount = taskCount
+        self.tasks = tasks if tasks is not None else [] # list of tasks assigned to a given station
 
-    def incrementTaskCount(self):
-        self.taskCount += 1
+        # starting the process for periodic station operations
+        self.action = env.process(self.run())
+        
+    def addTask(self, task):
+        self.tasks.append(task)
 
-    def decrementTaskCount(self):
-        if self.taskCount > 0:
-            self.taskCount -= 1
+    def removeTask(self, task):
+        if task in self.tasks:
+            self.tasks.remove(task)
                     
-    def updateTaskCount(self, taskCount):
-        self.taskCount = taskCount
+    def getTaskCount(self) -> int:
+        return len(self.tasks)
             
     def getStationPosition(self) -> Position: 
         return self.position
             
-
-            
+    def run(self):
+        # continous process that runs throughout the simulation
+       while True:
+           # replace with periodic operations later on
+           yield self.env.timeout(1)
