@@ -22,9 +22,20 @@
  * SOFTWARE.
  */
 
-import { type RouteConfig, index, route } from '@react-router/dev/routes';
+import 'mapbox-gl/dist/mapbox-gl.css';
+import MapContainer from '~/components/map/map-container';
+import { MapProvider } from '~/providers/map-provider';
 
-export default [
-  index('routes/home.tsx'),
-  route('simulation', 'routes/simulation.tsx'),
-] satisfies RouteConfig;
+export function meta() {
+  return [{ title: 'Simulation' }];
+}
+
+export default function Simulation() {
+  return (
+    <>
+      <MapProvider>
+        <MapContainer />
+      </MapProvider>
+    </>
+  );
+}

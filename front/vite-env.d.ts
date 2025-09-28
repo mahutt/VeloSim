@@ -22,9 +22,16 @@
  * SOFTWARE.
  */
 
-import { type RouteConfig, index, route } from '@react-router/dev/routes';
+/// <reference types="vite/client" />
 
-export default [
-  index('routes/home.tsx'),
-  route('simulation', 'routes/simulation.tsx'),
-] satisfies RouteConfig;
+interface ViteTypeOptions {
+  strictImportMetaEnv: unknown;
+}
+
+interface ImportMetaEnv {
+  readonly VITE_MAPBOX_ACCESS_TOKEN: string;
+}
+
+interface ImportMeta {
+  readonly env: ImportMetaEnv;
+}

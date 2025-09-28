@@ -22,9 +22,44 @@
  * SOFTWARE.
  */
 
-import { type RouteConfig, index, route } from '@react-router/dev/routes';
+import { vi } from 'vitest';
 
-export default [
-  index('routes/home.tsx'),
-  route('simulation', 'routes/simulation.tsx'),
-] satisfies RouteConfig;
+type eventType = 'move';
+
+export class MockMap {
+  static instance: undefined | MockMap;
+  private container: string | HTMLElement;
+  private center: [number, number];
+  private zoom: number;
+  private style: string;
+  private callBacks: Record<eventType, () => void> = { move: () => {} };
+  constructor({
+    container,
+    center,
+    zoom,
+    style,
+  }: {
+    container: string | HTMLElement;
+    center: [number, number];
+    zoom: number;
+    style: string;
+  }) {
+    MockMap.instance = this;
+    this.center = center;
+    this.zoom = zoom;
+    this.style = style;
+    this.container = container;
+  }
+  on = vi.fn((type: eventType, cb: () => void) => {
+    this.callBacks[type] = cb;
+  });
+  remove = vi.fn();
+  getCenter = vi.fn(() => this.center);
+  getZoom = vi.fn(() => this.zoom);
+  move = () => {
+    this.callBacks['move']();
+  };
+  static clear() {
+    MockMap.instance = undefined;
+  }
+}

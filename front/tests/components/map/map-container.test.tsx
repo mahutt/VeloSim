@@ -22,9 +22,12 @@
  * SOFTWARE.
  */
 
-import { type RouteConfig, index, route } from '@react-router/dev/routes';
+import { expect, test } from 'vitest';
+import { render } from '@testing-library/react';
+import MapContainer from '~/components/map/map-container';
 
-export default [
-  index('routes/home.tsx'),
-  route('simulation', 'routes/simulation.tsx'),
-] satisfies RouteConfig;
+test('map container render should fail without a map provider', async () => {
+  expect(() => {
+    render(<MapContainer />);
+  }).toThrow('useMap must be used within a MapProvider');
+});

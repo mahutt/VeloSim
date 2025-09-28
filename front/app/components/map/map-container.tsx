@@ -22,9 +22,16 @@
  * SOFTWARE.
  */
 
-import { type RouteConfig, index, route } from '@react-router/dev/routes';
+import { useMap } from '~/providers/map-provider';
 
-export default [
-  index('routes/home.tsx'),
-  route('simulation', 'routes/simulation.tsx'),
-] satisfies RouteConfig;
+export default function MapContainer() {
+  const { mapContainerRef } = useMap();
+  return (
+    <div
+      id="map-container"
+      data-testid="map-container"
+      className="h-screen w-full"
+      ref={mapContainerRef}
+    />
+  );
+}
