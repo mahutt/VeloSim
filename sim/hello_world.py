@@ -24,7 +24,6 @@ SOFTWARE.
 
 from typing import Optional
 
-
 # Simple Hello World module for simulation
 
 

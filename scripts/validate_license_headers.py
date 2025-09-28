@@ -152,11 +152,18 @@ def check_license_header(file_path: Path) -> bool:
 
         # For Python files, check if it starts with the docstring
         if header_type == 'python':
+            # Handle shebang line - skip it if present
+            content_to_check = content
+            if content.startswith('#!'):
+                first_newline = content.find('\n')
+                if first_newline != -1:
+                    content_to_check = content[first_newline + 1:].lstrip()
+
             # Extract the first docstring or comment block
-            if content.startswith('"""'):
-                end_pos = content.find('"""', 3)
+            if content_to_check.startswith('"""'):
+                end_pos = content_to_check.find('"""', 3)
                 if end_pos != -1:
-                    actual_header = content[:end_pos + 3]
+                    actual_header = content_to_check[:end_pos + 3]
                     normalized_actual = normalize_whitespace(actual_header)
                     return normalized_expected in normalized_actual or normalized_actual in normalized_expected
 
