@@ -30,13 +30,15 @@ class Station:
     def __init__(
         self,
         env: simpy.Environment,
-        station_id: int,
+        stationId: int,
         name: str,
         position: Position,
-        tasks: list[int] | None = None,  # change to list of Task entities later on
+        tasks: (
+            list[int] | None
+        ) = None,  # TODO: change to list of Task entities once implemented
     ) -> None:
         self.env = env
-        self.id = station_id
+        self.id = stationId
         self.name = name
         self.position = position
         self.tasks = (
@@ -46,14 +48,14 @@ class Station:
         # starting the process for periodic station operations
         self.action = env.process(self.run())
 
-    # use Task entity instead of task_id once implemented
-    def addTask(self, task_id: int) -> None:
-        self.tasks.append(task_id)
+    # TODO: use Task entity instead of taskId once implemented
+    def addTask(self, taskId: int) -> None:
+        self.tasks.append(taskId)
 
-    # use Task entity instead of task_id once implemented
-    def removeTask(self, task_id: int) -> None:
-        if task_id in self.tasks:
-            self.tasks.remove(task_id)
+    # TODO: use Task entity instead of taskId once implemented
+    def removeTask(self, taskId: int) -> None:
+        if taskId in self.tasks:
+            self.tasks.remove(taskId)
 
     def getTaskCount(self) -> int:
         return len(self.tasks)
@@ -63,6 +65,6 @@ class Station:
 
     # continous process that runs throughout the simulation
     def run(self):  # type: ignore[no-untyped-def]
-        # replace with periodic operations later on
+        # TODO: replace with periodic operations
         while True:
             yield self.env.timeout(1)
