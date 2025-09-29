@@ -52,6 +52,9 @@ omit = [
     "*/node_modules/*",
     "*/venv/*",
     "*/.venv/*",
+    "front/*",
+    "scripts/*",
+    "admin/*",
 ]
 
 [tool.coverage.report]
