@@ -29,11 +29,11 @@ from sim.entities.station import Station
 
 
 class TestStation:
-    @pytest.fixture  # type: ignore[misc]
+    @pytest.fixture
     def defaultPosition(self) -> Position:
         return Position(45.5017, -73.5673)
 
-    @pytest.fixture  # type: ignore[misc]
+    @pytest.fixture
     def simpyEnv(self) -> simpy.Environment:
         return simpy.Environment()
 
