@@ -24,21 +24,20 @@ SOFTWARE.
 
 import pytest
 import simpy
-from sim.entities.position import Position
 from sim.entities.station import Station
 
 
 class TestStation:
     @pytest.fixture
-    def defaultPosition(self) -> Position:
-        return Position(45.5017, -73.5673)
+    def defaultPosition(self) -> list[float]:
+        return [45.5017, -73.5673]  # [latitude, longitude]
 
     @pytest.fixture
     def simpyEnv(self) -> simpy.Environment:
         return simpy.Environment()
 
     def testStationCreation(
-        self, simpyEnv: simpy.Environment, defaultPosition: Position
+        self, simpyEnv: simpy.Environment, defaultPosition: list[float]
     ) -> None:
         stationId = 1
         name = "Test Station Name"
@@ -53,7 +52,7 @@ class TestStation:
         assert station.action is not None
 
     def testStationCreationWithTasks(
-        self, simpyEnv: simpy.Environment, defaultPosition: Position
+        self, simpyEnv: simpy.Environment, defaultPosition: list[float]
     ) -> None:
         stationId = 2
         name = "Station with Tasks"
@@ -68,7 +67,7 @@ class TestStation:
         assert len(station.tasks) == 3
 
     def testAddTask(
-        self, simpyEnv: simpy.Environment, defaultPosition: Position
+        self, simpyEnv: simpy.Environment, defaultPosition: list[float]
     ) -> None:
         station = Station(simpyEnv, 1, "Test Station", defaultPosition)
 
@@ -86,7 +85,7 @@ class TestStation:
         assert len(station.tasks) == 3
 
     def testRemoveTask(
-        self, simpyEnv: simpy.Environment, defaultPosition: Position
+        self, simpyEnv: simpy.Environment, defaultPosition: list[float]
     ) -> None:
         initialTasks = [1, 2, 3, 4]
         station = Station(
@@ -105,9 +104,8 @@ class TestStation:
         assert len(station.tasks) == 2
 
     def testRemoveNonexistentTask(
-        self, simpyEnv: simpy.Environment, defaultPosition: Position
+        self, simpyEnv: simpy.Environment, defaultPosition: list[float]
     ) -> None:
-        """Test removing non-existent tasks from a station."""
         initialTasks = [1, 2, 3]
         station = Station(
             simpyEnv, 1, "Test Station", defaultPosition, initialTasks.copy()
@@ -120,7 +118,7 @@ class TestStation:
         assert len(station.tasks) == 3
 
     def testGetCount(
-        self, simpyEnv: simpy.Environment, defaultPosition: Position
+        self, simpyEnv: simpy.Environment, defaultPosition: list[float]
     ) -> None:
         station = Station(simpyEnv, 1, "Empty Station", defaultPosition)
         assert station.getTaskCount() == 0
@@ -137,11 +135,11 @@ class TestStation:
         assert station.getTaskCount() == 1
 
     def testGetStationPosition(
-        self, simpyEnv: simpy.Environment, defaultPosition: Position
+        self, simpyEnv: simpy.Environment, defaultPosition: list[float]
     ) -> None:
         station = Station(simpyEnv, 1, "Test Station", defaultPosition)
 
         returnedPosition = station.getStationPosition()
         assert returnedPosition == defaultPosition
-        assert returnedPosition.latitude == defaultPosition.latitude
-        assert returnedPosition.longitude == defaultPosition.longitude
+        assert returnedPosition[0] == defaultPosition[0]  # latitude
+        assert returnedPosition[1] == defaultPosition[1]  # longitude
