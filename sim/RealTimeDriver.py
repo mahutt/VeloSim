@@ -48,23 +48,23 @@ class RealTimeDriver:
 
     def _load_config(self) -> dict[str, Any]:
         """Load configuration from config.json file."""
-        config_path = os.path.join(os.path.dirname(__file__), 'config.json')
+        config_path = os.path.join(os.path.dirname(__file__), "config.json")
         try:
-            with open(config_path, 'r') as file:
+            with open(config_path, "r") as file:
                 config = json.load(file)
-                return cast(dict[str, Any], config.get('simulation', {}))
+                return cast(dict[str, Any], config.get("simulation", {}))
         except (FileNotFoundError, json.JSONDecodeError) as e:
             print(f"Warning: Could not load config.json, using hardcoded defaults: {e}")
             # Fallback to hardcoded defaults if config file is unavailable
             return {
                 # Default 1-1 real second per sim second
-                'default_real_time_factor': 1.0,
+                "default_real_time_factor": 1.0,
                 # Default No lag reporting
-                'default_strict_mode': False,
+                "default_strict_mode": False,
                 # Default Sim run time is 1 sim hour
-                'default_until_time': 3600.0,
+                "default_until_time": 3600.0,
                 # Default delay for recalculating remaining wall time is 2 ms
-                'default_sleep_interval': 0.002
+                "default_sleep_interval": 0.002,
             }
 
     def __init__(
@@ -78,16 +78,18 @@ class RealTimeDriver:
         self.config = self._load_config()
         self.simEnv = simEnv
         self.realTimeFactor = (
-            realTimeFactor if realTimeFactor is not None
-            else self.config.get('default_real_time_factor', 1.0)
+            realTimeFactor
+            if realTimeFactor is not None
+            else self.config.get("default_real_time_factor", 1.0)
         )
         self.strict = (
-            strict if strict is not None
-            else self.config.get('default_strict_mode', False)
+            strict
+            if strict is not None
+            else self.config.get("default_strict_mode", False)
         )
         self.running = True
         self.lag: Optional[float] = None
-        self.sleep_interval = self.config.get('default_sleep_interval', 0.002)
+        self.sleep_interval = self.config.get("default_sleep_interval", 0.002)
 
     def resetPacingRefs(self) -> None:
         self.wallStartTime = time.perf_counter()
@@ -98,12 +100,13 @@ class RealTimeDriver:
         self.realTimeFactor = factor
 
     def runUntil(
-        self, until: Optional[float] = None,
-        stepCallback: Optional[Callable[[], None]] = None
+        self,
+        until: Optional[float] = None,
+        stepCallback: Optional[Callable[[], None]] = None,
     ) -> None:
         # Use config default if until is not specified
         if until is None:
-            until = self.config.get('default_until_time', 3600.0)
+            until = self.config.get("default_until_time", 3600.0)
         self.resetPacingRefs()
         # Sim loop that controls the time real time (aka wall time) between sim steps
         while True:
