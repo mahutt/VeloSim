@@ -30,7 +30,7 @@ from sim.entities.station import Station
 class TestStation:
     @pytest.fixture
     def defaultPosition(self) -> list[float]:
-        return [45.5017, -73.5673]  # [latitude, longitude]
+        return [-73.5673, 45.5017]  # [longitude, latitude]
 
     @pytest.fixture
     def simpyEnv(self) -> simpy.Environment:
@@ -141,5 +141,5 @@ class TestStation:
 
         returnedPosition = station.getStationPosition()
         assert returnedPosition == defaultPosition
-        assert returnedPosition[0] == defaultPosition[0]  # latitude
-        assert returnedPosition[1] == defaultPosition[1]  # longitude
+        assert returnedPosition[0] == defaultPosition[0]  # longitude
+        assert returnedPosition[1] == defaultPosition[1]  # latitude

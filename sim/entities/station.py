@@ -31,7 +31,7 @@ class Station:
         env: simpy.Environment,
         stationId: int,
         name: str,
-        position: list[float],  # [latitude, longitude]
+        position: list[float],  # [longitude, latitude]
         tasks: (
             list[int] | None
         ) = None,  # TODO: change to list of Task entities once implemented
