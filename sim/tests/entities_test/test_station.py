@@ -25,19 +25,20 @@ SOFTWARE.
 import pytest
 import simpy
 from sim.entities.station import Station
+from sim.entities.position import Position
 
 
 class TestStation:
     @pytest.fixture
-    def defaultPosition(self) -> list[float]:
-        return [-73.5673, 45.5017]  # [longitude, latitude]
+    def defaultPosition(self) -> Position:
+        return Position([-73.5673, 45.5017])  # [longitude, latitude]
 
     @pytest.fixture
     def simpyEnv(self) -> simpy.Environment:
         return simpy.Environment()
 
     def testStationCreation(
-        self, simpyEnv: simpy.Environment, defaultPosition: list[float]
+        self, simpyEnv: simpy.Environment, defaultPosition: Position
     ) -> None:
         stationId = 1
         name = "Test Station Name"
@@ -52,7 +53,7 @@ class TestStation:
         assert station.action is not None
 
     def testStationCreationWithTasks(
-        self, simpyEnv: simpy.Environment, defaultPosition: list[float]
+        self, simpyEnv: simpy.Environment, defaultPosition: Position
     ) -> None:
         stationId = 2
         name = "Station with Tasks"
@@ -67,7 +68,7 @@ class TestStation:
         assert len(station.tasks) == 3
 
     def testAddTask(
-        self, simpyEnv: simpy.Environment, defaultPosition: list[float]
+        self, simpyEnv: simpy.Environment, defaultPosition: Position
     ) -> None:
         station = Station(simpyEnv, 1, "Test Station", defaultPosition)
 
@@ -85,7 +86,7 @@ class TestStation:
         assert len(station.tasks) == 3
 
     def testRemoveTask(
-        self, simpyEnv: simpy.Environment, defaultPosition: list[float]
+        self, simpyEnv: simpy.Environment, defaultPosition: Position
     ) -> None:
         initialTasks = [1, 2, 3, 4]
         station = Station(
@@ -104,7 +105,7 @@ class TestStation:
         assert len(station.tasks) == 2
 
     def testRemoveNonexistentTask(
-        self, simpyEnv: simpy.Environment, defaultPosition: list[float]
+        self, simpyEnv: simpy.Environment, defaultPosition: Position
     ) -> None:
         initialTasks = [1, 2, 3]
         station = Station(
@@ -118,7 +119,7 @@ class TestStation:
         assert len(station.tasks) == 3
 
     def testGetCount(
-        self, simpyEnv: simpy.Environment, defaultPosition: list[float]
+        self, simpyEnv: simpy.Environment, defaultPosition: Position
     ) -> None:
         station = Station(simpyEnv, 1, "Empty Station", defaultPosition)
         assert station.getTaskCount() == 0
@@ -135,11 +136,10 @@ class TestStation:
         assert station.getTaskCount() == 1
 
     def testGetStationPosition(
-        self, simpyEnv: simpy.Environment, defaultPosition: list[float]
+        self, simpyEnv: simpy.Environment, defaultPosition: Position
     ) -> None:
         station = Station(simpyEnv, 1, "Test Station", defaultPosition)
 
         returnedPosition = station.getStationPosition()
         assert returnedPosition == defaultPosition
-        assert returnedPosition[0] == defaultPosition[0]  # longitude
-        assert returnedPosition[1] == defaultPosition[1]  # latitude
+        assert returnedPosition.getPosition() == [-73.5673, 45.5017]

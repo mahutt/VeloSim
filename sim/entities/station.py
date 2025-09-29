@@ -23,6 +23,7 @@ SOFTWARE.
 """
 
 import simpy
+from .position import Position
 
 
 class Station:
@@ -31,7 +32,7 @@ class Station:
         env: simpy.Environment,
         stationId: int,
         name: str,
-        position: list[float],  # [longitude, latitude]
+        position: Position,  # [longitude, latitude]
         tasks: (
             list[int] | None
         ) = None,  # TODO: change to list of Task entities once implemented
@@ -59,7 +60,7 @@ class Station:
     def getTaskCount(self) -> int:
         return len(self.tasks)
 
-    def getStationPosition(self) -> list[float]:
+    def getStationPosition(self) -> Position:
         return self.position
 
     # continous process that runs throughout the simulation
