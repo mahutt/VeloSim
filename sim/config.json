@@ -1,0 +1,8 @@
+{
+  "simulation": {
+    "default_until_time": 3600, 
+    "default_real_time_factor": 1.0,
+    "default_strict_mode": false,
+    "default_sleep_interval": 0.002
+  }
+}
