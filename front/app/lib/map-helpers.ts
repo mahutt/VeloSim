@@ -22,23 +22,49 @@
  * SOFTWARE.
  */
 
-import 'mapbox-gl/dist/mapbox-gl.css';
-import MapContainer from '~/components/map/map-container';
-import { MapProvider } from '~/providers/map-provider';
-import { SimulationProvider } from '~/providers/simulation-provider';
-
-export function meta() {
-  return [{ title: 'Simulation' }];
+export enum MapSource {
+  Stations = 'stations',
 }
 
-export default function Simulation() {
-  return (
-    <>
-      <MapProvider>
-        <SimulationProvider>
-          <MapContainer />
-        </SimulationProvider>
-      </MapProvider>
-    </>
-  );
+// Setup helpers
+
+export function loadMapImages(map: mapboxgl.Map) {
+  map.loadImage('/station.png', async (error, image) => {
+    if (error) throw error;
+    map.addImage('station-marker', image!);
+  });
+}
+
+export function initializeMapSources(map: mapboxgl.Map) {
+  Object.values(MapSource).forEach((source) => {
+    map.addSource(source, {
+      type: 'geojson',
+      data: {
+        type: 'FeatureCollection',
+        features: [],
+      },
+    });
+  });
+}
+
+export function setMapLayers(map: mapboxgl.Map) {
+  map.addLayer({
+    id: 'stations',
+    type: 'symbol',
+    source: 'stations',
+    layout: {
+      'icon-image': 'station-marker',
+      'icon-allow-overlap': true,
+    },
+  });
+}
+
+// Setters
+
+export function setMapSource(
+  source: MapSource,
+  data: GeoJSON.GeoJSON,
+  map: mapboxgl.Map
+) {
+  (map.getSource(source) as mapboxgl.GeoJSONSource).setData(data);
 }

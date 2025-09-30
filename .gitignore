@@ -18,7 +18,6 @@ dist/
 downloads/
 eggs/
 .eggs/
-lib/
 lib64/
 parts/
 sdist/
@@ -253,10 +252,6 @@ out
 
 # Nuxt.js build / generate output
 .nuxt
-
-# Gatsby files
-.cache/
-public
 
 # vuepress build output
 .vuepress/dist

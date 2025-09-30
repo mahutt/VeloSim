@@ -28,9 +28,15 @@ import {
   useContext,
   useEffect,
   useRef,
+  useState,
   type ReactNode,
   type RefObject,
 } from 'react';
+import {
+  initializeMapSources,
+  loadMapImages,
+  setMapLayers,
+} from '~/lib/map-helpers';
 
 export const INITIAL_CENTER = [-73.57776, 45.48944] as [number, number];
 export const INITIAL_ZOOM = 10.12;
@@ -38,6 +44,7 @@ export const INITIAL_ZOOM = 10.12;
 type MapContextType = {
   mapRef: RefObject<mapboxgl.Map | null>;
   mapContainerRef: RefObject<HTMLDivElement | null>;
+  mapLoaded: boolean;
 };
 
 const MapContext = createContext<MapContextType | undefined>(undefined);
@@ -45,6 +52,7 @@ const MapContext = createContext<MapContextType | undefined>(undefined);
 export const MapProvider = ({ children }: { children: ReactNode }) => {
   const mapRef = useRef<mapboxgl.Map | null>(null);
   const mapContainerRef = useRef<HTMLDivElement | null>(null);
+  const [mapLoaded, setMapLoaded] = useState(false);
 
   useEffect(() => {
     if (!mapContainerRef.current) return;
@@ -56,13 +64,21 @@ export const MapProvider = ({ children }: { children: ReactNode }) => {
       style: 'mapbox://styles/mahutt/cmfzpcwen001q01sd8d645h3b',
     });
 
+    mapRef.current.on('load', () => {
+      if (!mapRef.current) return;
+      loadMapImages(mapRef.current);
+      initializeMapSources(mapRef.current);
+      setMapLayers(mapRef.current);
+      setMapLoaded(true);
+    });
+
     return () => {
       mapRef.current?.remove();
     };
   }, []);
 
   return (
-    <MapContext.Provider value={{ mapRef, mapContainerRef }}>
+    <MapContext.Provider value={{ mapRef, mapContainerRef, mapLoaded }}>
       {children}
     </MapContext.Provider>
   );

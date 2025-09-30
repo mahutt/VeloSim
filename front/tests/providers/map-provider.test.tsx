@@ -22,7 +22,7 @@
  * SOFTWARE.
  */
 
-import { expect, test } from 'vitest';
+import { expect, test, vi } from 'vitest';
 import { render } from '@testing-library/react';
 import {
   INITIAL_CENTER,
@@ -31,6 +31,20 @@ import {
 } from '~/providers/map-provider';
 import { MockMap } from 'tests/mocks';
 import MapContainer from '~/components/map/map-container';
+import {
+  initializeMapSources,
+  loadMapImages,
+  setMapLayers,
+} from '~/lib/map-helpers';
+
+// Mocking setup map helpers that are called by MapProvider
+vi.mock('~/lib/map-helpers.ts', () => {
+  return {
+    loadMapImages: vi.fn(),
+    initializeMapSources: vi.fn(),
+    setMapLayers: vi.fn(),
+  };
+});
 
 test('map provider instantiates mapboxgl Map instance in presence of map container', async () => {
   render(
@@ -52,4 +66,21 @@ test("map provider doesn't instantiate mapboxgl Map instance without map contain
   );
   const map = MockMap.instance;
   expect(map).toBeUndefined();
+});
+
+test('on-load callback sets mapLoaded to true', async () => {
+  render(
+    <MapProvider>
+      <MapContainer />
+    </MapProvider>
+  );
+
+  expect(MockMap.instance).toBeDefined();
+  const map = MockMap.instance!;
+  expect(map.callBacks.load).toBeDefined();
+  map.callBacks.load();
+
+  expect(loadMapImages).toHaveBeenCalledWith(map);
+  expect(initializeMapSources).toHaveBeenCalledWith(map);
+  expect(setMapLayers).toHaveBeenCalledWith(map);
 });

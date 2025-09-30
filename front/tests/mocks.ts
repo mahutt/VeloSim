@@ -24,7 +24,7 @@
 
 import { vi } from 'vitest';
 
-type eventType = 'move';
+type eventType = 'load' | 'move';
 
 export class MockMap {
   static instance: undefined | MockMap;
@@ -32,7 +32,10 @@ export class MockMap {
   private center: [number, number];
   private zoom: number;
   private style: string;
-  private callBacks: Record<eventType, () => void> = { move: () => {} };
+  public callBacks: Record<eventType, () => void> = {
+    move: () => {},
+    load: () => {},
+  };
   constructor({
     container,
     center,
@@ -59,7 +62,20 @@ export class MockMap {
   move = () => {
     this.callBacks['move']();
   };
+  loadImage = vi.fn();
+  addImage = vi.fn();
+  addSource = vi.fn();
+  addLayer = vi.fn();
+  getSource = vi.fn();
   static clear() {
     MockMap.instance = undefined;
+  }
+  static createRandomInstance() {
+    MockMap.instance = new MockMap({
+      container: 'container',
+      center: [Math.random() * 100, Math.random() * 100],
+      zoom: Math.random() * 20,
+      style: 'style',
+    });
   }
 }
