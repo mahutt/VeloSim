@@ -146,7 +146,10 @@ class RealTimeDriver:
                     break
                 # Calculate lag if strict mode is on
                 if self.strict:
+
                     current_sim_seconds_passed = self.simEnv.now - self.simStartTime
+                    # Same calculation and logic as the target wall time.
+                    # Positive lag = we're behind schedule, negative = ahead
                     expected_wall_time = (
                         self.wallStartTime
                         + current_sim_seconds_passed * self.realTimeFactor
@@ -156,7 +159,6 @@ class RealTimeDriver:
                     self.lag = lag
 
                     self.recordLag()
-                    # Positive lag = we're behind schedule, negative = ahead
                     # TODO: record/report lag metrics if needed
 
     def pause(self) -> None:
