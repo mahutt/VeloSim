@@ -23,7 +23,19 @@ SOFTWARE.
 """
 
 
+import threading
+from typing import Dict, TypedDict
+
+
+class RunInfo(TypedDict):
+    thread: threading.Thread
+    stop: threading.Event
+
+
 class Simulator:
+    def __init__(self) -> None:
+        self.threadPool: Dict[str, RunInfo] = {}
+
     def start(self) -> None:
         return
 
