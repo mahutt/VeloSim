@@ -39,7 +39,7 @@ class RunInfo(TypedDict):
 class Simulator:
     def __init__(self) -> None:
         self.thread_pool: Dict[str, RunInfo] = {}
-        self.thread_poop_lock = threading.Lock()
+        self.thread_pool_lock = threading.Lock()
 
     def start(self, input_parameters: InputParameter) -> str:
         run_id = str(uuid.uuid4())  # threadID / SIM ID
@@ -59,7 +59,7 @@ class Simulator:
 
         t = threading.Thread(target=sim_loop, name=f"SIM-{run_id}", daemon=True)
 
-        with self.thread_poop_lock:
+        with self.thread_pool_lock:
             if run_id in self.thread_pool:
                 raise RuntimeError(f"Run id already present: {run_id}")
             self.thread_pool[run_id] = {"thread": t, "stop": stop_flag}
@@ -68,7 +68,7 @@ class Simulator:
         return run_id
 
     def stop(self, sim_id: str, join_timeout: float | None = 2.0) -> None:
-        with self.thread_poop_lock:
+        with self.thread_pool_lock:
             rec = self.thread_pool.get(sim_id)
 
         if rec is None:
@@ -77,7 +77,7 @@ class Simulator:
         rec["stop"].set()
         rec["thread"].join(timeout=join_timeout)
 
-        with self.thread_poop_lock:
+        with self.thread_pool_lock:
             current = self.thread_pool.get(sim_id)
             if current is rec and not rec["thread"].is_alive():
                 self.thread_pool.pop(sim_id, None)
@@ -89,7 +89,7 @@ class Simulator:
         raise NotImplementedError("status() not implemented yet")
 
     def stop_all(self, *, join_timeout_per_thread: float | None = 2.0) -> None:
-        with self.thread_poop_lock:
+        with self.thread_pool_lock:
             ids = list(self.thread_pool.keys())
         for sim_id in ids:
             try:
