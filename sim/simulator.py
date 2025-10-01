@@ -39,6 +39,7 @@ class RunInfo(TypedDict):
 class Simulator:
     def __init__(self) -> None:
         self.threadPool: Dict[str, RunInfo] = {}
+        self.threadPool_lock = threading.Lock()
 
     def start(self, inputParams: InputParameter) -> str:
         run_id = str(uuid.uuid4())  # threadID / SIM ID
@@ -49,30 +50,37 @@ class Simulator:
                 simpy.Environment()
             )  # Created for later use (So we can pass to the controller)
 
-            print(env)  # Keeps linter happy. (temporary)
+            _ = env  # Keeps linter happy. (temporary)
 
             while not stop_flag.is_set():  # Run until stop is called!
                 print(f"Hello From Simulator: [{run_id}]")
                 time.sleep(1)
             print(f"[{run_id}] stopped.")
 
-        t = threading.Thread(target=sim_loop, name=f"SIM-{run_id}")
-        t.start()
-        self.threadPool[run_id] = {"thread": t, "stop": stop_flag}
+        t = threading.Thread(target=sim_loop, name=f"SIM-{run_id}", daemon=True)
+
+        with self.threadPool_lock:
+            if run_id in self.threadPool:
+                raise RuntimeError(f"Run id already present: {run_id}")
+            self.threadPool[run_id] = {"thread": t, "stop": stop_flag}
+            t.start()
+
         return run_id
 
-    def stop(self, sim_id: str) -> None:
-        sim_thread = self.threadPool.get(sim_id)
+    def stop(self, sim_id: str, join_timeout: float | None = 2.0) -> None:
+        with self.threadPool_lock:
+            rec = self.threadPool.get(sim_id)
 
-        if not sim_thread:  # if the sim thread does not exist do nothing
-            return
+        if rec is None:
+            return  # Unknown/Thread is already closed.
 
-        sim_thread[
-            "stop"
-        ].set()  # Set Stop Flag to True so we do not run the thread anymore.
-        sim_thread["thread"].join(timeout=2.0)  # wait for shutdown
-        if not sim_thread["thread"].is_alive():
-            self.threadPool.pop(sim_id, None)
+        rec["stop"].set()
+        rec["thread"].join(timeout=join_timeout)
+
+        with self.threadPool_lock:
+            current = self.threadPool.get(sim_id)
+            if current is rec and not rec["thread"].is_alive():
+                self.threadPool.pop(sim_id, None)
 
     def pause(self) -> None:
         raise NotImplementedError("pause() not implemented yet")

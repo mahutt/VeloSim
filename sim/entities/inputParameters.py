@@ -23,5 +23,6 @@ SOFTWARE.
 """
 
 
+# This class is a placeholder for when we define input params later down in the project.
 class InputParameter:
     temp = 0
