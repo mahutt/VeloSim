@@ -24,7 +24,10 @@ SOFTWARE.
 
 
 import threading
+import time
 from typing import Dict, TypedDict
+import uuid
+import simpy
 
 
 class RunInfo(TypedDict):
@@ -36,8 +39,26 @@ class Simulator:
     def __init__(self) -> None:
         self.threadPool: Dict[str, RunInfo] = {}
 
-    def start(self) -> None:
-        return
+    def start(self) -> str:
+        run_id = str(uuid.uuid4())  # threadID / SIM ID
+        stop_flag = threading.Event()
+
+        def sim_loop() -> None:
+            env = (
+                simpy.Environment()
+            )  # Created for later use (So we can pass to the controller)
+
+            print(env)  # Keeps linter happy. (temporary)
+
+            while not stop_flag.is_set():  # Run until stop is called!
+                print(f"Hello From Simulator: [{run_id}]")
+                time.sleep(1)
+            print(f"[{run_id}] stopped.")
+
+        t = threading.Thread(target=sim_loop, name=f"SIM-{run_id}")
+        t.start()
+        self.threadPool[run_id] = {"thread": t, "stop": stop_flag}
+        return run_id
 
     def stop(self) -> None:
         return
