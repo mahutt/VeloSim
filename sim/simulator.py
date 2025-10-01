@@ -29,6 +29,8 @@ from typing import Dict, TypedDict
 import uuid
 import simpy
 
+from sim.entities.inputParamters import InputParamter
+
 
 class RunInfo(TypedDict):
     thread: threading.Thread
@@ -39,7 +41,7 @@ class Simulator:
     def __init__(self) -> None:
         self.threadPool: Dict[str, RunInfo] = {}
 
-    def start(self) -> str:
+    def start(self, inputParams: InputParamter) -> str:
         run_id = str(uuid.uuid4())  # threadID / SIM ID
         stop_flag = threading.Event()
 

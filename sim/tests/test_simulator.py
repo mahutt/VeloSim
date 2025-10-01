@@ -32,8 +32,11 @@ from _pytest.capture import CaptureFixture
 from _pytest.monkeypatch import MonkeyPatch
 
 # Import the module so we can monkeypatch its time.sleep
+from sim.entities.inputParamters import InputParamter
 import sim.simulator as simulator_mod
 from sim.simulator import Simulator
+
+params = InputParamter()
 
 
 @pytest.fixture
@@ -56,7 +59,7 @@ def test_start_creates_thread_and_emits_output(
     original_sleep = simulator_mod.time.sleep
     try:
         monkeypatch.setattr(simulator_mod.time, "sleep", lambda _: original_sleep(0.05))
-        sim_id = sim.start()
+        sim_id = sim.start(params)
 
         # Basic sanity on returned id
         uuid.UUID(sim_id)  # should not raise
@@ -89,7 +92,7 @@ def test_stop_removes_thread_from_pool(
     # Make loop faster
     monkeypatch.setattr(simulator_mod.time, "sleep", lambda _: None)
 
-    sim_id = sim.start()
+    sim_id = sim.start(params)
     assert sim_id in sim.threadPool
     t = sim.threadPool[sim_id]["thread"]
     assert isinstance(t, threading.Thread) and t.is_alive()
@@ -111,8 +114,8 @@ def test_multiple_parallel_sims(
 ) -> None:
     monkeypatch.setattr(simulator_mod.time, "sleep", lambda _: None)
 
-    a = sim.start()
-    b = sim.start()
+    a = sim.start(params)
+    b = sim.start(params)
     assert a != b
     assert a in sim.threadPool and b in sim.threadPool
     assert sim.threadPool[a]["thread"].is_alive()

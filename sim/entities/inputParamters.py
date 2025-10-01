@@ -22,20 +22,6 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 """
 
-# sim/main.py
-from sim.entities.inputParamters import InputParamter
-from simulator import Simulator  # relative import within the package
 
-params = InputParamter()
-
-if __name__ == "__main__":
-    import time
-
-    sim = Simulator()
-    r1 = sim.start(params)
-    r2 = sim.start(params)
-    time.sleep(3)
-    sim.stop(r1)
-    time.sleep(1)
-    sim.stop(r2)
-    print("Done.")
+class InputParamter:
+    temp = 0
