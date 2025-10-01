@@ -29,6 +29,7 @@ import uuid
 import simpy
 
 from sim.entities.inputParameters import InputParameter
+from sim.entities.request_type import RequestType
 
 
 class RunInfo(TypedDict):
@@ -86,6 +87,16 @@ class Simulator:
         raise NotImplementedError("pause() not implemented yet")
 
     def status(self) -> None:
+        raise NotImplementedError("status() not implemented yet")
+
+    def send_request(self, request_type: RequestType) -> None:
+        raise NotImplementedError("send_request() not implemented yet")
+
+    # For later use, we will be implementing a stream
+    # type for continuous communication between BE and SIM (i.e. Frames)
+    def get_stream(
+        self,
+    ) -> None:
         raise NotImplementedError("status() not implemented yet")
 
     def stop_all(self, *, join_timeout_per_thread: float | None = 2.0) -> None:
