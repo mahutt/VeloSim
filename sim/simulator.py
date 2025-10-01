@@ -74,7 +74,7 @@ class Simulator:
             self.threadPool.pop(sim_id, None)
 
     def pause(self) -> None:
-        return
+        raise NotImplementedError("pause() not implemented yet")
 
     def status(self) -> None:
-        return
+        raise NotImplementedError("pause() not implemented yet")
