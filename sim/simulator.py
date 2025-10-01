@@ -97,7 +97,7 @@ class Simulator:
     def get_stream(
         self,
     ) -> None:
-        raise NotImplementedError("status() not implemented yet")
+        raise NotImplementedError("get_stream() not implemented yet")
 
     def stop_all(self, *, join_timeout_per_thread: float | None = 2.0) -> None:
         with self.thread_pool_lock:

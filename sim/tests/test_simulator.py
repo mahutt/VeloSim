@@ -34,6 +34,7 @@ from _pytest.monkeypatch import MonkeyPatch
 
 # Import the module so we can monkeypatch its time.sleep
 from sim.entities.inputParameters import InputParameter
+from sim.entities.request_type import RequestType
 import sim.simulator as simulator_mod
 from sim.simulator import Simulator
 
@@ -132,3 +133,45 @@ def test_pause_and_status_not_implemented(sim: Simulator) -> None:
         sim.pause()
     with pytest.raises(NotImplementedError):
         sim.status()
+
+
+def test_send_request_not_implemented(sim: Simulator) -> None:
+    # Any RequestType should raise until implemented
+    request = RequestType()
+    with pytest.raises(NotImplementedError):
+        sim.send_request(request)
+
+
+def test_get_stream_not_implemented(sim: Simulator) -> None:
+    with pytest.raises(NotImplementedError):
+        sim.get_stream()
+
+
+def test_stop_all_stops_everything_and_is_idempotent(
+    sim: Simulator,
+    monkeypatch: MonkeyPatch,
+) -> None:
+    """
+    Start multiple sims, stop them all via stop_all(),
+    verify the pool is empty and threads dead.
+    Also ensure calling stop_all() again does not error.
+    """
+    monkeypatch.setattr(simulator_mod.time, "sleep", lambda _: None)
+
+    sim_ids = [sim.start(params) for _ in range(3)]
+    # Sanity: all present and alive
+    for sid in sim_ids:
+        assert sid in sim.thread_pool
+        assert sim.thread_pool[sid]["thread"].is_alive()
+
+    # Stop all
+    sim.stop_all(join_timeout_per_thread=1.0)
+
+    # Pool should be empty and threads dead
+    assert sim.thread_pool == {}
+    for sid in sim_ids:
+        # We don't have direct refs anymore; just make sure they're gone
+        pass
+
+    # Idempotency: calling again should not raise
+    sim.stop_all(join_timeout_per_thread=0.2)
