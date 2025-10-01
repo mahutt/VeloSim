@@ -23,5 +23,5 @@ SOFTWARE.
 """
 
 
-class InputParamter:
+class InputParameter:
     temp = 0

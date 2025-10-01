@@ -33,11 +33,11 @@ from _pytest.capture import CaptureFixture
 from _pytest.monkeypatch import MonkeyPatch
 
 # Import the module so we can monkeypatch its time.sleep
-from sim.entities.inputParamters import InputParamter
+from sim.entities.inputParameters import InputParameter
 import sim.simulator as simulator_mod
 from sim.simulator import Simulator
 
-params = InputParamter()
+params = InputParameter()
 
 
 @pytest.fixture

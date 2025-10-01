@@ -28,7 +28,7 @@ from typing import Dict, TypedDict
 import uuid
 import simpy
 
-from sim.entities.inputParamters import InputParamter
+from sim.entities.inputParameters import InputParameter
 
 
 class RunInfo(TypedDict):
@@ -40,7 +40,7 @@ class Simulator:
     def __init__(self) -> None:
         self.threadPool: Dict[str, RunInfo] = {}
 
-    def start(self, inputParams: InputParamter) -> str:
+    def start(self, inputParams: InputParameter) -> str:
         run_id = str(uuid.uuid4())  # threadID / SIM ID
         stop_flag = threading.Event()
 
@@ -78,4 +78,4 @@ class Simulator:
         raise NotImplementedError("pause() not implemented yet")
 
     def status(self) -> None:
-        raise NotImplementedError("pause() not implemented yet")
+        raise NotImplementedError("status() not implemented yet")
