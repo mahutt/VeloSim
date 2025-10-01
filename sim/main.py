@@ -23,10 +23,10 @@ SOFTWARE.
 """
 
 # sim/main.py
-from sim.entities.inputParamters import InputParamter
+from sim.entities.inputParameters import InputParameter
 from .simulator import Simulator
 
-params = InputParamter()
+params = InputParameter()
 
 if __name__ == "__main__":
     import time
