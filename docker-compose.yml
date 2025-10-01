@@ -1,0 +1,26 @@
+version: "3.8"
+
+services:
+  postgres:
+    image: postgres:15-alpine
+    container_name: velosim-postgres
+    environment:
+      POSTGRES_USER: velosim
+      POSTGRES_PASSWORD: velosim
+      POSTGRES_DB: velosim
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./back/database/init.sql:/docker-entrypoint-initdb.d/init.sql
+      - ./back/alembic/seeds:/docker-entrypoint-initdb.d/seeds
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U velosim"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  postgres_data:
+    driver: local

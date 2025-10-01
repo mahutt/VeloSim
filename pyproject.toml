@@ -19,7 +19,15 @@ classifiers = [
     "Programming Language :: Python :: 3.11",
 ]
 dependencies = [
-    "simpy>=4.0.0"
+    "simpy>=4.0.0",
+    "fastapi>=0.104.0",
+    "uvicorn[standard]>=0.24.0",
+    "sqlalchemy>=2.0.0",
+    "psycopg2-binary>=2.9.0",
+    "python-dotenv>=1.0.0",
+    "pydantic>=2.5.0",
+    "pydantic-settings>=2.1.0",
+    "alembic>=1.13.0",
 ]
 
 [project.optional-dependencies]
@@ -31,6 +39,7 @@ dev = [
     "flake8>=6.0.0",
     "mypy>=1.0.0",
     "pre-commit>=3.0.0",
+    "httpx>=0.24.0",
 ]
 
 [tool.setuptools.packages.find]
@@ -57,6 +66,7 @@ omit = [
     "front/*",
     "scripts/*",
     "admin/*",
+    "*/alembic/env.py",
 ]
 
 [tool.coverage.report]
@@ -95,13 +105,16 @@ extend-exclude = '''
   | \.venv
   | build
   | dist
+  | back/alembic/versions
+  | back/\.venv
+  | sim/\.venv
 )/
 '''
 
 [tool.flake8]
 max-line-length = 88
 extend-ignore = ["E203", "W503"]
-exclude = [".git", "__pycache__", "build", "dist", ".venv"]
+exclude = [".git", "__pycache__", "build", "dist", ".venv", "back/alembic/versions", "back/.venv", "sim/.venv"]
 
 [tool.mypy]
 python_version = "3.11"
@@ -117,3 +130,19 @@ warn_unused_ignores = true
 warn_no_return = true
 warn_unreachable = true
 strict_equality = true
+exclude = ["back/alembic/versions/", "back/.venv/", "sim/.venv/"]
+explicit_package_bases = true
+namespace_packages = true
+mypy_path = "back"
+packages = ["back"]
+
+[[tool.mypy.overrides]]
+module = [
+    "alembic.*",
+    "sqlalchemy.*",
+    "fastapi.*",
+    "pydantic.*",
+    "uvicorn.*",
+    "simpy.*"
+]
+ignore_missing_imports = true
