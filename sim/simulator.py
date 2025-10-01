@@ -87,3 +87,12 @@ class Simulator:
 
     def status(self) -> None:
         raise NotImplementedError("status() not implemented yet")
+
+    def stop_all(self, *, join_timeout_per_thread: float | None = 2.0) -> None:
+        with self.threadPool_lock:
+            ids = list(self.threadPool.keys())
+        for sim_id in ids:
+            try:
+                self.stop(sim_id, join_timeout=join_timeout_per_thread)
+            except Exception:
+                pass  # it should still allow to kill all other threads.
