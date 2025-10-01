@@ -21,3 +21,17 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 """
+
+
+class Simulator:
+    def start(self) -> None:
+        return
+
+    def stop(self) -> None:
+        return
+
+    def pause(self) -> None:
+        return
+
+    def status(self) -> None:
+        return
