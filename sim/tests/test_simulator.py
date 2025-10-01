@@ -75,13 +75,13 @@ def test_start_creates_thread_and_emits_output(
         assert f"[{sim_id}] stopped." in out
 
         # Thread should be gone from pool
-        assert sim_id not in sim.threadPool
+        assert sim_id not in sim.thread_pool
     finally:
         # Best-effort cleanup in case of failure above
-        for sid, info in list(sim.threadPool.items()):
+        for sid, info in list(sim.thread_pool.items()):
             info["stop"].set()
             info["thread"].join(timeout=2.0)
-            sim.threadPool.pop(sid, None)
+            sim.thread_pool.pop(sid, None)
         # restore sleep
         monkeypatch.setattr(simulator_mod.time, "sleep", original_sleep)
 
@@ -94,13 +94,13 @@ def test_stop_removes_thread_from_pool(
     monkeypatch.setattr(simulator_mod.time, "sleep", lambda _: None)
 
     sim_id = sim.start(params)
-    assert sim_id in sim.threadPool
-    t = sim.threadPool[sim_id]["thread"]
+    assert sim_id in sim.thread_pool
+    t = sim.thread_pool[sim_id]["thread"]
     assert isinstance(t, threading.Thread) and t.is_alive()
 
     sim.stop(sim_id)
 
-    assert sim_id not in sim.threadPool
+    assert sim_id not in sim.thread_pool
     assert not t.is_alive()
 
 
@@ -118,13 +118,13 @@ def test_multiple_parallel_sims(
     a = sim.start(params)
     b = sim.start(params)
     assert a != b
-    assert a in sim.threadPool and b in sim.threadPool
-    assert sim.threadPool[a]["thread"].is_alive()
-    assert sim.threadPool[b]["thread"].is_alive()
+    assert a in sim.thread_pool and b in sim.thread_pool
+    assert sim.thread_pool[a]["thread"].is_alive()
+    assert sim.thread_pool[b]["thread"].is_alive()
 
     sim.stop(a)
     sim.stop(b)
-    assert a not in sim.threadPool and b not in sim.threadPool
+    assert a not in sim.thread_pool and b not in sim.thread_pool
 
 
 def test_pause_and_status_not_implemented(sim: Simulator) -> None:
