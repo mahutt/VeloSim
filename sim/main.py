@@ -24,7 +24,7 @@ SOFTWARE.
 
 # sim/main.py
 from sim.entities.inputParamters import InputParamter
-from simulator import Simulator  # relative import within the package
+from .simulator import Simulator
 
 params = InputParamter()
 
