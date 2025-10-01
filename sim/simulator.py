@@ -60,8 +60,18 @@ class Simulator:
         self.threadPool[run_id] = {"thread": t, "stop": stop_flag}
         return run_id
 
-    def stop(self) -> None:
-        return
+    def stop(self, sim_id: str) -> None:
+        sim_thread = self.threadPool.get(sim_id)
+
+        if not sim_thread:  # if the sim thread does not exist do nothing
+            return
+
+        sim_thread[
+            "stop"
+        ].set()  # Set Stop Flag to True so we do not run the thread anymore.
+        sim_thread["thread"].join(timeout=2.0)  # wait for shutdown
+        if not sim_thread["thread"].is_alive():
+            self.threadPool.pop(sim_id, None)
 
     def pause(self) -> None:
         return
