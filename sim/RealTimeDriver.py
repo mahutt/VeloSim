@@ -40,7 +40,6 @@ from typing import Optional, Callable, Any, cast
 
 
 class RealTimeDriver:
-
     # Keeps track of the actual time a simulation was started at for pacing
     wallStartTime: float
     # Keeps track of the simulation start for pacing
@@ -136,7 +135,6 @@ class RealTimeDriver:
 
                 # Allow the simpy environment to step when target wall time is reached
                 try:
-
                     # Callback function, presumably to emit frames, called per step
                     if stepCallback:
                         stepCallback()
@@ -146,7 +144,6 @@ class RealTimeDriver:
                     break
                 # Calculate lag if strict mode is on
                 if self.strict:
-
                     current_sim_seconds_passed = self.simEnv.now - self.simStartTime
                     # Same calculation and logic as the target wall time.
                     # Positive lag = we're behind schedule, negative = ahead
