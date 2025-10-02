@@ -25,7 +25,7 @@ SOFTWARE.
 from typing import TYPE_CHECKING
 from sqlalchemy import String, Float
 from sqlalchemy.orm import Mapped, mapped_column
-from database.session import Base
+from back.database.session import Base
 
 if TYPE_CHECKING:
     pass

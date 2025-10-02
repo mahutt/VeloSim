@@ -38,8 +38,9 @@ from sqlalchemy.orm import sessionmaker, Session
 # Add the back directory to Python path for relative imports
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-from main import app  # noqa: E402
-from database.session import get_db, Base  # noqa: E402
+from back.main import app  # noqa: E402
+from back.database.session import get_db, Base  # noqa: E402
+import back.models  # noqa: F401, E402
 
 # Test database URL (use in-memory SQLite for tests)
 SQLALCHEMY_TEST_DATABASE_URL = "sqlite:///./test.db"
@@ -51,10 +52,14 @@ TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engin
 
 
 def override_get_db() -> Generator[Session, None, None]:
-    """Override database dependency for testing."""
+    """Override database dependency for testing with proper transaction management."""
+    db = TestingSessionLocal()
     try:
-        db = TestingSessionLocal()
         yield db
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise
     finally:
         db.close()
 

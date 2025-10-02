@@ -26,7 +26,7 @@ from typing import Generator
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, Session, DeclarativeBase
 
-from core.config import settings
+from back.core.config import settings
 
 
 class Base(DeclarativeBase):
@@ -46,9 +46,13 @@ SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 
 def get_db() -> Generator[Session, None, None]:
-    """Get database session (for future use with dependency injection)."""
+    """Get database session with automatic transaction management."""
     db = SessionLocal()
     try:
         yield db
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise
     finally:
         db.close()
