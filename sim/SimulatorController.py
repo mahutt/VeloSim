@@ -39,7 +39,10 @@ class SimulatorController:
         # TODO Initialise frame emitter here
 
     def start(self, simTime: int) -> None:
-        pass
+        # TODO process initial entities into the sim env
+
+        self.sim_thread = threading.Thread(target=self.realTimeDriver.runUntil,args=(simTime,self.emit_frame))
+        self.sim_thread.start()
 
     def stop(self) -> None:
         pass
@@ -54,4 +57,7 @@ class SimulatorController:
         self.realTimeDriver.setRealTimeFactor(factor)
 
     def subscribe_to_frames(self) -> None:
+        pass
+
+    def emit_frame(self) -> None:
         pass
