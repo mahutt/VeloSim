@@ -26,8 +26,8 @@ from typing import List, Optional, Tuple
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 
-from models.station import Station
-from schemas.station import StationCreate, StationUpdate
+from back.models.station import Station
+from back.schemas.station import StationCreate, StationUpdate
 
 
 class StationCRUD:
@@ -35,16 +35,15 @@ class StationCRUD:
 
     def create(self, db: Session, station_data: StationCreate) -> Station:
         """Create a new station."""
-        with db.begin(nested=True):
-            db_station = Station(
-                name=station_data.name,
-                longitude=station_data.longitude,
-                latitude=station_data.latitude,
-            )
-            db.add(db_station)
-            db.flush()
-            db.refresh(db_station)
-            return db_station
+        db_station = Station(
+            name=station_data.name,
+            longitude=station_data.longitude,
+            latitude=station_data.latitude,
+        )
+        db.add(db_station)
+        db.flush()
+        db.refresh(db_station)
+        return db_station
 
     def get(self, db: Session, station_id: int) -> Optional[Station]:
         """Get a station by ID."""
@@ -66,29 +65,27 @@ class StationCRUD:
         self, db: Session, station_id: int, station_data: StationUpdate
     ) -> Optional[Station]:
         """Update a station."""
-        with db.begin(nested=True):
-            db_station = self.get(db, station_id)
-            if not db_station:
-                return None
+        db_station = self.get(db, station_id)
+        if not db_station:
+            return None
 
-            update_data = station_data.model_dump(exclude_unset=True)
-            for field, value in update_data.items():
-                setattr(db_station, field, value)
+        update_data = station_data.model_dump(exclude_unset=True)
+        for field, value in update_data.items():
+            setattr(db_station, field, value)
 
-            db.flush()
-            db.refresh(db_station)
-            return db_station
+        db.flush()
+        db.refresh(db_station)
+        return db_station
 
     def delete(self, db: Session, station_id: int) -> bool:
         """Delete a station."""
-        with db.begin(nested=True):
-            db_station = self.get(db, station_id)
-            if not db_station:
-                return False
+        db_station = self.get(db, station_id)
+        if not db_station:
+            return False
 
-            db.delete(db_station)
-            db.flush()
-            return True
+        db.delete(db_station)
+        db.flush()
+        return True
 
 
 # Create a singleton instance

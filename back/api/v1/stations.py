@@ -26,9 +26,9 @@ import math
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
-from database.session import get_db
-from crud.station import station_crud
-from schemas.station import (
+from back.database.session import get_db
+from back.crud.station import station_crud
+from back.schemas.station import (
     StationCreate,
     StationUpdate,
     StationResponse,

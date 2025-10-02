@@ -23,8 +23,8 @@ SOFTWARE.
 """
 
 from sqlalchemy.orm import Session
-from crud.station import station_crud
-from schemas.station import StationCreate, StationUpdate
+from back.crud.station import station_crud
+from back.schemas.station import StationCreate, StationUpdate
 
 
 class TestStationCRUD:

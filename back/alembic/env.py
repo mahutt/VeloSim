@@ -39,13 +39,13 @@ sys.path.insert(0, project_root)
 sys.path.insert(0, back_dir)
 
 # Import the base from our application
-from database.session import Base  # noqa: E402
+from back.database.session import Base  # noqa: E402
 
 # Import settings for database URL
-from core.config import settings  # noqa: E402
+from back.core.config import settings  # noqa: E402
 
 # Import all models so they are registered with Base.metadata
-import models  # noqa: F401, E402
+import back.models  # noqa: F401, E402
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.

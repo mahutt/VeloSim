@@ -26,8 +26,8 @@ from typing import Dict
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from core.config import settings
-from api.v1 import api_router
+from back.core.config import settings
+from back.api.v1 import api_router
 
 # Create FastAPI application
 app = FastAPI(
