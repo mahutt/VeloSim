@@ -77,14 +77,14 @@ class TestResource:
     ) -> None:
         position = resource.get_resource_position()
         assert position == default_position
-        assert position.getPosition() == [-73.5673, 45.5017]
+        assert position.get_position() == [-73.5673, 45.5017]
 
     def test_set_resource_position(self, resource: Resource) -> None:
         new_position = Position([-74.0000, 40.5017])
         resource.set_resource_position(new_position)
 
         assert resource.get_resource_position() == new_position
-        assert resource.position.getPosition() == [-74.0000, 40.5017]
+        assert resource.position.get_position() == [-74.0000, 40.5017]
 
     def test_assign_task(self, resource: Resource) -> None:
         initial_count = resource.get_task_count()

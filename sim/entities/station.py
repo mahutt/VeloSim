@@ -30,7 +30,7 @@ class Station:
     def __init__(
         self,
         env: simpy.Environment,
-        stationId: int,
+        station_id: int,
         name: str,
         position: Position,  # [longitude, latitude]
         tasks: (
@@ -38,7 +38,7 @@ class Station:
         ) = None,  # TODO: change to list of Task entities once implemented
     ) -> None:
         self.env = env
-        self.id = stationId
+        self.id = station_id
         self.name = name
         self.position = position
         self.tasks = (
@@ -48,19 +48,19 @@ class Station:
         # starting the process for periodic station operations
         self.action = env.process(self.run())
 
-    # TODO: use Task entity instead of taskId once implemented
-    def addTask(self, taskId: int) -> None:
-        self.tasks.append(taskId)
+    # TODO: use Task entity instead of task_id once implemented
+    def add_task(self, task_id: int) -> None:
+        self.tasks.append(task_id)
 
-    # TODO: use Task entity instead of taskId once implemented
-    def removeTask(self, taskId: int) -> None:
-        if taskId in self.tasks:
-            self.tasks.remove(taskId)
+    # TODO: use Task entity instead of task_id once implemented
+    def remove_task(self, task_id: int) -> None:
+        if task_id in self.tasks:
+            self.tasks.remove(task_id)
 
-    def getTaskCount(self) -> int:
+    def get_task_count(self) -> int:
         return len(self.tasks)
 
-    def getStationPosition(self) -> Position:
+    def get_station_position(self) -> Position:
         return self.position
 
     # continous process that runs throughout the simulation
