@@ -22,44 +22,40 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 """
 
-from typing import TYPE_CHECKING, List
-from sqlalchemy import String, Float
+from typing import TYPE_CHECKING
+from sqlalchemy import DateTime, Enum, ForeignKey, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
+from back.models import StationTaskType, TaskStatus
 from back.database.session import Base
 
 if TYPE_CHECKING:
-    from .station_task import StationTask
+    from .station import Station
 
 
-class Station(Base):
-    """Station model for bike sharing stations."""
+class StationTask(Base):
+    """Model to represent tasks that must be done to a specific bike (as opposed to
+    tasks to maintain the station itself).
+    """
 
-    __tablename__ = "stations"
+    __tablename__ = "station_tasks"
 
     id: Mapped[int] = mapped_column(primary_key=True, index=True)
-    name: Mapped[str] = mapped_column(String(100), nullable=False, index=True)
-    longitude: Mapped[float] = mapped_column(Float, nullable=False)
-    latitude: Mapped[float] = mapped_column(Float, nullable=False)
-    # Use string to avoid circular import of back-populated field
-    tasks: Mapped[List["StationTask"]] = relationship(
-        "StationTask", back_populates="station"
+    type: Mapped[StationTaskType] = mapped_column(Enum(StationTaskType), nullable=False)
+    status: Mapped[TaskStatus] = mapped_column(
+        Enum(TaskStatus), nullable=False, default=TaskStatus.UNASSIGNED
     )
+    date_created: Mapped[DateTime] = mapped_column(
+        DateTime, nullable=False, server_default=func.now()
+    )
+    date_updated: Mapped[DateTime] = mapped_column(
+        DateTime, nullable=False, server_default=func.now(), onupdate=func.now()
+    )
+    station_id: Mapped[int] = mapped_column(ForeignKey("stations.id"), nullable=False)
+    station: Mapped["Station"] = relationship("Station", back_populates="tasks")
 
     def __repr__(self) -> str:
         return (
-            f"<Station(id={self.id}, name='{self.name}', "
-            f"position=[{self.longitude}, {self.latitude}])>"
+            f"<StationTask(id={self.id}, type={self.type}, status={self.status}, "
+            f"station_id={self.station_id}, date_created={self.date_created}, "
+            f"date_updated={self.date_updated})>"
         )
-
-    @property
-    def position(self) -> list[float]:
-        """Get position as [longitude, latitude] to match sim model."""
-        return [self.longitude, self.latitude]
-
-    @position.setter
-    def position(self, pos: list[float]) -> None:
-        """Set position from [longitude, latitude] list."""
-        if len(pos) != 2:
-            raise ValueError("Position must be [longitude, latitude]")
-        self.longitude = pos[0]
-        self.latitude = pos[1]

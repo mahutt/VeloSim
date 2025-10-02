@@ -22,10 +22,33 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 """
 
-# Import all models here to ensure they are registered with SQLAlchemy
-from .station import Station
-from .task_status import TaskStatus
-from .station_task_type import StationTaskType
-from .station_task import StationTask
+from pydantic import BaseModel, Field
+from back.models import StationTaskType, TaskStatus
 
-__all__ = ["Station", "TaskStatus", "StationTaskType", "StationTask"]
+
+class StationTaskBase(BaseModel):
+    """Base schema for station tasks."""
+
+    type: StationTaskType = Field(..., description="Type of station task")
+    station_id: int = Field(..., description="ID of the related station")
+
+
+class StationTaskCreate(StationTaskBase):
+    """Schema for creating a station task."""
+
+    pass
+
+
+class StationTaskUpdate(BaseModel):
+    """Schema for updating a station task."""
+
+    status: TaskStatus = Field(..., description="New task completion status")
+
+
+class StationTaskResponse(BaseModel):
+    """Schema for station task responses."""
+
+    id: int = Field(..., description="Station task ID")
+    status: TaskStatus = Field(..., description="Task completion status")
+    date_created: str = Field(..., description="Creation timestamp")
+    date_updated: str = Field(..., description="Last update timestamp")

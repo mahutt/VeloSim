@@ -22,10 +22,8 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 """
 
-# Import all models here to ensure they are registered with SQLAlchemy
-from .station import Station
-from .task_status import TaskStatus
-from .station_task_type import StationTaskType
-from .station_task import StationTask
+from enum import Enum
 
-__all__ = ["Station", "TaskStatus", "StationTaskType", "StationTask"]
+
+class StationTaskType(Enum):
+    BATTERY_SWAP = "battery_swap"
