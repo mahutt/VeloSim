@@ -35,6 +35,10 @@ def find_python_directories(root_path: Path) -> Set[Path]:
 
     def has_python_content(directory: Path) -> bool:
         """Check if directory has Python files or subdirectories with Python files."""
+        # Skip alembic versions directory (contains auto-generated migration files)
+        if 'alembic' in directory.parts and 'versions' in directory.parts:
+            return False
+
         # Check for .py files in current directory
         if any(f.suffix == '.py' for f in directory.iterdir() if f.is_file()):
             return True

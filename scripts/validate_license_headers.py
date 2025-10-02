@@ -113,6 +113,7 @@ EXCLUDED_PATHS = {
     'build',
     'coverage',
     'coverage_html',
+    'htmlcov',  # HTML coverage reports
     'node_modules',
     '.git',
     '.venv',  # Virtual environment directory
@@ -122,6 +123,13 @@ EXCLUDED_PATHS = {
     '__pycache__',
     '.pytest_cache',
     'velosim.egg-info',
+
+    # Migration directories (auto-generated files)
+    'versions',  # Alembic versions directory
+    'alembic/versions',  # Full path
+
+    # Python package init files
+    '__init__.py',  # All __init__.py files
 
     # Special files
     '__init__.py'  # Often just contain imports
@@ -169,10 +177,17 @@ def check_license_header(file_path: Path) -> bool:
 
         # For JavaScript/TypeScript files, check if it starts with the comment block
         elif header_type == 'javascript':
-            if content.startswith('/**'):
-                end_pos = content.find('*/', 3)
+            # Handle shebang line - skip it if present
+            content_to_check = content
+            if content.startswith('#!'):
+                first_newline = content.find('\n')
+                if first_newline != -1:
+                    content_to_check = content[first_newline + 1:].lstrip()
+
+            if content_to_check.startswith('/**'):
+                end_pos = content_to_check.find('*/', 3)
                 if end_pos != -1:
-                    actual_header = content[:end_pos + 2]
+                    actual_header = content_to_check[:end_pos + 2]
                     normalized_actual = normalize_whitespace(actual_header)
                     return normalized_expected in normalized_actual or normalized_actual in normalized_expected
 

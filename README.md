@@ -74,9 +74,6 @@ VeloSim/
 > Windows: `.venv\Scripts\activate` | macOS/Linux: `source .venv/bin/activate`
 
 ```bash
-# Install all dependencies
-npm run install:all
-
 # Run all tests
 npm run test
 
@@ -88,12 +85,6 @@ npm run lint
 
 # Format all code
 npm run format
-
-# Build frontend
-npm run build
-
-# Start frontend development server
-npm run dev:frontend
 ```
 
 ## Code Quality & Standards
@@ -189,8 +180,6 @@ git checkout -b docs/101-update-api-documentation
    git checkout -b bugfix/fix-critical-bug    # For bug fixes
    git checkout -b ci/improve-workflows       # For CI changes
    git checkout -b docs/update-api-docs       # For documentation
-   git checkout -b ci/feature-name # For CI/infrastructure
-   git checkout -b docs/feature-name # For documentation
    ```
 
 2. **Make changes** following the code standards
@@ -230,6 +219,19 @@ pre-commit run --all-files
 3. Include tests for new features
 4. Use descriptive commit messages with issue numbers
 5. Keep PRs focused and atomic
+
+### API Documentation (Live)
+
+- **Swagger UI**: http://localhost:8000/api/docs (when backend is running)
+- **ReDoc**: http://localhost:8000/api/redoc (alternative API docs)
+
+### Database & Migrations
+
+For database operations, see the [Backend README](back/README.md#database-operations) which includes:
+
+- Cross-platform migration commands (`npm run db:*`)
+- Docker-based setup to avoid Windows networking issues
+- Complete migration workflow documentation
 
 ## License
 

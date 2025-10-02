@@ -18,6 +18,7 @@ repos:
     hooks:
       - id: black
         files: ^(back|sim)/.*\.py$
+        exclude: ^back/alembic/.*\.py$
         args: [--line-length=88]
 
   - repo: https://github.com/pycqa/flake8
@@ -25,15 +26,26 @@ repos:
     hooks:
       - id: flake8
         files: ^(back|sim)/.*\.py$
+        exclude: ^back/alembic/.*\.py$
         args: [--max-line-length=88]
 
   - repo: https://github.com/pre-commit/mirrors-mypy
-    rev: v1.5.1
+    rev: v1.18.2
     hooks:
       - id: mypy
         files: ^(back|sim)/.*\.py$
-        additional_dependencies: [types-requests, pytest]
-        args: [--ignore-missing-imports]
+        exclude: ^back/alembic/.*\.py$
+        additional_dependencies:
+          [
+            types-requests,
+            pytest,
+            pydantic,
+            pydantic-settings,
+            python-dotenv,
+            sqlalchemy,
+            fastapi,
+          ]
+        args: [--config-file=pyproject.toml]
 
   # Frontend hooks
   - repo: local
@@ -57,28 +69,28 @@ repos:
     hooks:
       - id: validate-license-headers
         name: MIT License Header Validation
-        entry: python scripts/validate_license_headers.py
+        entry: bash -c 'if [ -f .venv/bin/python ]; then .venv/bin/python scripts/validate_license_headers.py; elif [ -f .venv/Scripts/python.exe ]; then .venv/Scripts/python.exe scripts/validate_license_headers.py; else python scripts/validate_license_headers.py; fi'
         language: system
         files: \.(py|js|jsx|ts|tsx)$
         pass_filenames: false
 
       - id: validate-init-files
         name: Python __init__.py Files Validation
-        entry: python scripts/validate_init_files.py
+        entry: bash -c 'if [ -f .venv/bin/python ]; then .venv/bin/python scripts/validate_init_files.py; elif [ -f .venv/Scripts/python.exe ]; then .venv/Scripts/python.exe scripts/validate_init_files.py; else python scripts/validate_init_files.py; fi'
         language: system
         files: ^(back|sim)/.*\.py$
         pass_filenames: false
 
       - id: validate-branch-name
         name: Branch Naming Convention Validation
-        entry: python scripts/validate_branch_name.py
+        entry: bash -c 'if [ -f .venv/bin/python ]; then .venv/bin/python scripts/validate_branch_name.py; elif [ -f .venv/Scripts/python.exe ]; then .venv/Scripts/python.exe scripts/validate_branch_name.py; else python scripts/validate_branch_name.py; fi'
         language: system
         always_run: true
         pass_filenames: false
 
       - id: validate-commit-message
         name: Validate Commit Message (Conventional + Issue Number)
-        entry: python scripts/validate_commit_wrapper.py
+        entry: bash -c 'if [ -f .venv/bin/python ]; then .venv/bin/python scripts/validate_commit_wrapper.py "$@"; elif [ -f .venv/Scripts/python.exe ]; then .venv/Scripts/python.exe scripts/validate_commit_wrapper.py "$@"; else python scripts/validate_commit_wrapper.py "$@"; fi' --
         language: system
         stages: [commit-msg]
         pass_filenames: true

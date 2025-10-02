@@ -1,4 +1,4 @@
 [flake8]
 max-line-length = 88
 extend-ignore = E203,W503,E712
-exclude = .git,__pycache__,build,dist,.venv
+exclude = .git,__pycache__,build,dist,.venv,back/alembic/versions,back/.venv,sim/.venv
