@@ -27,8 +27,8 @@ class Position:
     def __init__(self, position: list[float]) -> None:  # [longitude, latitude]
         self.position = position
 
-    def getPosition(self) -> list[float]:
+    def get_position(self) -> list[float]:
         return self.position
 
-    def setPosition(self, position: list[float]) -> None:
+    def set_position(self, position: list[float]) -> None:
         self.position = position

@@ -28,13 +28,13 @@ from sim.entities.position import Position
 
 class TestPosition:
     @pytest.fixture
-    def defaultPosition(self) -> Position:
+    def default_position(self) -> Position:
         return Position([-73.5673, 45.5017])  # [longitude, latitude]
 
-    def testPositionCreation(self, defaultPosition: Position) -> None:
-        assert defaultPosition.getPosition() == [-73.5673, 45.5017]
+    def test_position_creation(self, default_position: Position) -> None:
+        assert default_position.get_position() == [-73.5673, 45.5017]
 
-    def testSetPosition(self, defaultPosition: Position) -> None:
-        newPosition = [-74.0000, 40.7128]
-        defaultPosition.setPosition(newPosition)
-        assert defaultPosition.getPosition() == newPosition
+    def test_set_position(self, default_position: Position) -> None:
+        new_position = [-74.0000, 40.7128]
+        default_position.set_position(new_position)
+        assert default_position.get_position() == new_position

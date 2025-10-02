@@ -26,45 +26,58 @@ import simpy
 from .position import Position
 
 
-class Station:
+class Resource:
+    # @TODO: add attribute for route once Route entity is implemented
     def __init__(
         self,
         env: simpy.Environment,
-        station_id: int,
-        name: str,
+        resource_id: int,
         position: Position,  # [longitude, latitude]
-        tasks: (
+        task_list: (
             list[int] | None
-        ) = None,  # TODO: change to list of Task entities once implemented
+        ) = None,  # TODO: change from list of task_id (int) to list of Task entities
     ) -> None:
         self.env = env
-        self.id = station_id
-        self.name = name
+        self.id = resource_id
         self.position = position
-        self.tasks = (
-            tasks if tasks is not None else []
-        )  # list of tasks assigned to a given station
+        self.task_list = task_list if task_list is not None else []
+        self.has_updated = False  # flag to track if a resource was updated
 
-        # starting the process for periodic station operations
+        # starting the process for periodic resource operations
         self.action = env.process(self.run())
 
-    # TODO: use Task entity instead of task_id once implemented
-    def add_task(self, task_id: int) -> None:
-        self.tasks.append(task_id)
+    def get_resource_position(self) -> Position:
+        return self.position
+
+    def set_resource_position(self, position: Position) -> None:
+        self.position = position
 
     # TODO: use Task entity instead of task_id once implemented
-    def remove_task(self, task_id: int) -> None:
-        if task_id in self.tasks:
-            self.tasks.remove(task_id)
+    def assign_task(self, task_id: int) -> None:
+        self.task_list.append(task_id)
+
+    # TODO: use Task entity instead of task_id once implemented
+    def unassign_task(self, task_id: int) -> None:
+        if task_id in self.task_list:
+            self.task_list.remove(task_id)
+
+    def service_task(self, task_id: int) -> None:
+        # @TODO: serviceTask has to update the status/current state of the task
+        # e.g. task status complete, or task current state closed
+        # this would require the Task entity to be implemented
+        self.unassign_task(task_id)
 
     def get_task_count(self) -> int:
-        return len(self.tasks)
+        return len(self.task_list)
 
-    def get_station_position(self) -> Position:
-        return self.position
+    def get_task_list(self) -> list[int]:
+        return self.task_list
+
+    def clear_update(self) -> None:
+        self.has_updated = False
 
     # continous process that runs throughout the simulation
     def run(self):  # type: ignore[no-untyped-def]
-        # TODO: replace with periodic operations
         while True:
+            # @TODO: replace with actual periodic logic
             yield self.env.timeout(1)
