@@ -41,6 +41,7 @@ class Resource:
         self.id = resource_id
         self.position = position
         self.task_list = task_list if task_list is not None else []
+        self.has_updated = False  # flag to track if a resource was updated
 
         # starting the process for periodic resource operations
         self.action = env.process(self.run())
@@ -71,6 +72,9 @@ class Resource:
 
     def get_task_list(self) -> list[int]:
         return self.task_list
+
+    def clear_update(self) -> None:
+        self.has_updated = False
 
     # continous process that runs throughout the simulation
     def run(self):  # type: ignore[no-untyped-def]

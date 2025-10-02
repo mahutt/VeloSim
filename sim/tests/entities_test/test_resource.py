@@ -58,6 +58,7 @@ class TestResource:
         assert resource.id == 1
         assert resource.position == default_position
         assert resource.task_list == []
+        assert resource.has_updated == False
         assert resource.action is not None
 
     def test_resource_initialization_with_task_list(
@@ -70,6 +71,7 @@ class TestResource:
         assert resource.id == 2
         assert resource.position == default_position
         assert resource.task_list == task_list
+        assert resource.has_updated == False
         assert resource.action is not None
 
     def test_get_resource_position(
@@ -191,3 +193,12 @@ class TestResource:
         resource.unassign_task(401)
         assert resource.get_task_count() == 1
         assert resource.get_task_list() == [403]
+
+    def test_clear_update(self, resource: Resource) -> None:
+        assert resource.has_updated == False
+
+        resource.has_updated = True
+        assert resource.has_updated == True
+
+        resource.clear_update()
+        assert resource.has_updated == False
