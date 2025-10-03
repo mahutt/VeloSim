@@ -35,9 +35,13 @@ import { MockMap } from 'tests/mocks';
 test('loadMapImages loads all necessary images', () => {
   MockMap.createRandomInstance();
   loadMapImages(MockMap.instance! as unknown as mapboxgl.Map);
-  expect(MockMap.instance?.loadImage).toHaveBeenCalledTimes(1);
+  expect(MockMap.instance?.loadImage).toHaveBeenCalledTimes(2);
   expect(MockMap.instance?.loadImage).toHaveBeenCalledWith(
     '/station.png',
+    expect.any(Function)
+  );
+  expect(MockMap.instance?.loadImage).toHaveBeenCalledWith(
+    '/resource.png',
     expect.any(Function)
   );
 });
@@ -59,19 +63,38 @@ test('initializeMapSources adds all required sources', () => {
       features: [],
     },
   });
+
+  // Should add the resources source with correct configuration
+  expect(MockMap.instance?.addSource).toHaveBeenCalledWith('resources', {
+    type: 'geojson',
+    data: {
+      type: 'FeatureCollection',
+      features: [],
+    },
+  });
 });
 
 test('setMapLayers adds stations layer with correct configuration', () => {
   MockMap.createRandomInstance();
   setMapLayers(MockMap.instance! as unknown as mapboxgl.Map);
 
-  expect(MockMap.instance?.addLayer).toHaveBeenCalledTimes(1);
+  expect(MockMap.instance?.addLayer).toHaveBeenCalledTimes(2);
   expect(MockMap.instance?.addLayer).toHaveBeenCalledWith({
     id: 'stations',
     type: 'symbol',
     source: 'stations',
     layout: {
       'icon-image': 'station-marker',
+      'icon-allow-overlap': true,
+    },
+  });
+
+  expect(MockMap.instance?.addLayer).toHaveBeenCalledWith({
+    id: 'resources',
+    type: 'symbol',
+    source: 'resources',
+    layout: {
+      'icon-image': 'resource-marker',
       'icon-allow-overlap': true,
     },
   });
