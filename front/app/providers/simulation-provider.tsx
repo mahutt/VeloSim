@@ -32,11 +32,18 @@ import {
 
 import { useMap } from './map-provider';
 import { MapSource, setMapSource } from '~/lib/map-helpers';
+import api from '~/api';
+import type {
+  GetStationsResponse,
+  Station,
+  ResourcePosition,
+  ResourceRoute,
+} from '~/types';
+import { adaptStationsToGeoJSON } from '~/lib/geojson-adapters';
 import { interpolatePosition } from '~/lib/animation-helpers';
-import type { ResourcePosition, ResourceRoute } from '../types';
 
 type SimulationContextType = {
-  state: React.RefObject<GeoJSON.GeoJSON | null>;
+  state: React.RefObject<Station[]>;
 };
 
 const SimulationContext = createContext<SimulationContextType | undefined>(
@@ -45,7 +52,7 @@ const SimulationContext = createContext<SimulationContextType | undefined>(
 
 export const SimulationProvider = ({ children }: { children: ReactNode }) => {
   const { mapRef, mapLoaded } = useMap();
-  const state = useRef<GeoJSON.GeoJSON | null>(null);
+  const state = useRef<Station[]>([]);
   const resourcePositionsRef = useRef<ResourcePosition[]>([]);
   const routesRef = useRef<ResourceRoute[]>([]);
   const animationFrameRef = useRef<number>(0);
@@ -55,11 +62,19 @@ export const SimulationProvider = ({ children }: { children: ReactNode }) => {
     if (!mapLoaded) return;
 
     // Load stations
-    fetch('/placeholder-data/stations.geojson')
-      .then((res) => res.json())
-      .then((data) => {
-        state.current = data;
-        setMapSource(MapSource.Stations, data, mapRef.current!);
+    api
+      .get<GetStationsResponse>('/stations')
+      .then((response) => {
+        const stations = response.data.stations;
+        state.current = stations;
+        setMapSource(
+          MapSource.Stations,
+          adaptStationsToGeoJSON(stations),
+          mapRef.current!
+        );
+      })
+      .catch((error) => {
+        console.error('Error fetching stations:', error);
       });
 
     // Load and animate resources

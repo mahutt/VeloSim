@@ -22,37 +22,16 @@
  * SOFTWARE.
  */
 
-// Entity types
+import axios from 'axios';
 
-export interface Station {
-  id: number;
-  name: string;
-  position: [number, number]; // [longitude, latitude]
-}
+const API_VERSION = 'v1';
 
-// API response types
+const api = axios.create({
+  baseURL: `${import.meta.env.VITE_BACKEND_URL}/api/${API_VERSION}`,
+  headers: {
+    'Content-Type': 'application/json',
+  },
+  withCredentials: true,
+});
 
-interface PaginatedResponse {
-  total: number;
-  page: number;
-  per_page: number;
-  total_pages: number;
-}
-
-export interface GetStationsResponse extends PaginatedResponse {
-  stations: Station[];
-}
-
-// Resource route
-export interface ResourceRoute {
-  id: string;
-  coordinates: [number, number][];
-}
-
-// Current position of a resource
-export interface ResourcePosition {
-  id: string;
-  position: [number, number];
-  currentWaypointIndex: number;
-  progress: number;
-}
+export default api;

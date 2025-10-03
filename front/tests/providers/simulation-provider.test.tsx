@@ -24,7 +24,7 @@
 
 /* Test here have been developed with the help of GitHub Copilot */
 
-import { expect, test, vi, beforeEach } from 'vitest';
+import { expect, test, vi, beforeEach, type Mock } from 'vitest';
 import { render, waitFor, act } from '@testing-library/react';
 import {
   SimulationProvider,
@@ -34,6 +34,18 @@ import { MapProvider } from '~/providers/map-provider';
 import { MockMap } from 'tests/mocks';
 import MapContainer from '~/components/map/map-container';
 import { setMapSource, MapSource } from '~/lib/map-helpers';
+import type { GetStationsResponse, Station } from '~/types';
+import api from '~/api';
+import { adaptStationsToGeoJSON } from '~/lib/geojson-adapters';
+
+// Mock the API module
+vi.mock('~/api', () => {
+  return {
+    default: {
+      get: vi.fn(),
+    },
+  };
+});
 
 // Mock the map-helpers module
 vi.mock('~/lib/map-helpers.ts', () => {
@@ -64,17 +76,63 @@ const TestComponent = () => {
 };
 
 // Sample GeoJSON data for testing
-const mockStationsData = {
-  type: 'FeatureCollection' as const,
-  features: [
+const mockGetStationsResponse: GetStationsResponse = {
+  stations: [
     {
-      type: 'Feature' as const,
-      geometry: {
-        type: 'Point' as const,
-        coordinates: [-73.57776, 45.48944],
-      },
+      id: 1,
+      name: 'Metcalfe / de Maisonneuve',
+      position: [-73.57314596652985, 45.501375027330134],
+    },
+    {
+      id: 2,
+      name: 'Sanguinet / de Maisonneuve',
+      position: [-73.56261849403381, 45.51344071811516],
+    },
+    {
+      id: 3,
+      name: 'St-Denis / Ste-Catherine',
+      position: [-73.5639146839003, 45.510079193884],
+    },
+    {
+      id: 4,
+      name: 'St-André / Ontario',
+      position: [-73.56353, 45.521889],
+    },
+    {
+      id: 5,
+      name: 'St-André / de Maisonneuve',
+      position: [-73.55974848376083, 45.517085960784755],
+    },
+    {
+      id: 6,
+      name: 'de la Commune / des Soeurs-Grises',
+      position: [-73.55273187160492, 45.49798647260488],
+    },
+    {
+      id: 7,
+      name: 'Notre-Dame / St-Gabriel',
+      position: [-73.55504930019379, 45.50711760282556],
+    },
+    {
+      id: 8,
+      name: 'de la Commune / Place Jacques-Cartier',
+      position: [-73.55183601379395, 45.50761009451047],
+    },
+    {
+      id: 9,
+      name: 'de Maisonneuve / Mansfield (sud)',
+      position: [-73.57346534729004, 45.502053864057466],
+    },
+    {
+      id: 10,
+      name: "Métro Place-d'Armes (St-Urbain / Viger)",
+      position: [-73.5596989095211, 45.50632340391333],
     },
   ],
+  total: 10,
+  page: 1,
+  per_page: 20,
+  total_pages: 1,
 };
 
 // Sample GeoJSON data for resources
@@ -141,20 +199,19 @@ test('simulation provider provides context with initial state', () => {
     </MapProvider>
   );
 
-  expect(getByTestId('test-component')).toHaveTextContent('no-data');
+  expect(getByTestId('test-component')).toHaveTextContent('data-loaded');
 });
 
 test('simulation provider fetches stations data when map is loaded', async () => {
   // Mock successful fetch response
-  mockFetch
-    .mockResolvedValueOnce({
-      ok: true,
-      json: () => Promise.resolve(mockStationsData),
-    })
-    .mockResolvedValueOnce({
-      ok: true,
-      json: () => Promise.resolve(mockResourceRoutesData),
-    });
+  (api.get as Mock).mockResolvedValueOnce({
+    data: mockGetStationsResponse,
+  });
+
+  mockFetch.mockResolvedValueOnce({
+    ok: true,
+    json: () => Promise.resolve(mockResourceRoutesData),
+  });
 
   render(
     <MapProvider>
@@ -176,32 +233,29 @@ test('simulation provider fetches stations data when map is loaded', async () =>
 
   // Wait for the fetch to complete and state to update
   await waitFor(() => {
-    expect(mockFetch).toHaveBeenCalledWith(
-      '/placeholder-data/stations.geojson'
-    );
+    expect(api.get).toHaveBeenCalledWith('/stations');
   });
 
   await waitFor(() => {
     expect(setMapSource).toHaveBeenCalledWith(
       MapSource.Stations,
-      mockStationsData,
+      adaptStationsToGeoJSON(mockGetStationsResponse.stations),
       map
     );
   });
 });
 
 test('simulation provider updates state ref when data is successfully fetched', async () => {
-  mockFetch
-    .mockResolvedValueOnce({
-      ok: true,
-      json: () => Promise.resolve(mockStationsData),
-    })
-    .mockResolvedValueOnce({
-      ok: true,
-      json: () => Promise.resolve(mockResourceRoutesData),
-    });
+  (api.get as Mock).mockResolvedValueOnce({
+    data: mockGetStationsResponse,
+  });
 
-  let stateRef: React.RefObject<GeoJSON.GeoJSON | null> | null = null;
+  mockFetch.mockResolvedValueOnce({
+    ok: true,
+    json: () => Promise.resolve(mockResourceRoutesData),
+  });
+
+  let stateRef: React.RefObject<Station[]> | null = null;
 
   const StateCapture = () => {
     const { state } = useSimulation();
@@ -224,26 +278,23 @@ test('simulation provider updates state ref when data is successfully fetched', 
   });
 
   await waitFor(() => {
-    expect(mockFetch).toHaveBeenCalledWith(
-      '/placeholder-data/stations.geojson'
-    );
+    expect(api.get).toHaveBeenCalledWith('/stations');
   });
 
   await waitFor(() => {
-    expect(stateRef?.current).toEqual(mockStationsData);
+    expect(stateRef?.current).toEqual(mockGetStationsResponse.stations);
   });
 });
 
 test('simulation provider updates resource positions via animation loop', async () => {
-  mockFetch
-    .mockResolvedValueOnce({
-      ok: true,
-      json: () => Promise.resolve(mockStationsData),
-    })
-    .mockResolvedValueOnce({
-      ok: true,
-      json: () => Promise.resolve(mockResourceRoutesData),
-    });
+  (api.get as Mock).mockResolvedValueOnce({
+    data: mockGetStationsResponse,
+  });
+
+  mockFetch.mockResolvedValueOnce({
+    ok: true,
+    json: () => Promise.resolve(mockResourceRoutesData),
+  });
 
   const mockGeoJSONSource = {
     setData: vi.fn(),
@@ -265,7 +316,9 @@ test('simulation provider updates resource positions via animation loop', async 
   });
 
   await waitFor(() => {
-    expect(mockFetch).toHaveBeenCalledTimes(2);
+    expect(mockFetch).toHaveBeenCalledWith(
+      '/placeholder-data/resource-routes.geojson'
+    );
   });
 
   // Wait for animation loop to call setMapSource at least once

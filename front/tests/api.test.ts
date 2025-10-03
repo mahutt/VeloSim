@@ -22,37 +22,11 @@
  * SOFTWARE.
  */
 
-// Entity types
+import { describe, it, expect } from 'vitest';
+import api from '../app/api';
 
-export interface Station {
-  id: number;
-  name: string;
-  position: [number, number]; // [longitude, latitude]
-}
-
-// API response types
-
-interface PaginatedResponse {
-  total: number;
-  page: number;
-  per_page: number;
-  total_pages: number;
-}
-
-export interface GetStationsResponse extends PaginatedResponse {
-  stations: Station[];
-}
-
-// Resource route
-export interface ResourceRoute {
-  id: string;
-  coordinates: [number, number][];
-}
-
-// Current position of a resource
-export interface ResourcePosition {
-  id: string;
-  position: [number, number];
-  currentWaypointIndex: number;
-  progress: number;
-}
+describe('API Configuration', () => {
+  it('should create axios instance with correct base configuration', () => {
+    expect(api.defaults.headers['Content-Type']).toBe('application/json');
+  });
+});
