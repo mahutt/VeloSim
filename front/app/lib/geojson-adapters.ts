@@ -22,17 +22,23 @@
  * SOFTWARE.
  */
 
-/// <reference types="vite/client" />
+import type { Station } from '~/types';
 
-interface ViteTypeOptions {
-  strictImportMetaEnv: unknown;
-}
-
-interface ImportMetaEnv {
-  readonly VITE_MAPBOX_ACCESS_TOKEN: string;
-  readonly VITE_BACKEND_URL: string;
-}
-
-interface ImportMeta {
-  readonly env: ImportMetaEnv;
+export function adaptStationsToGeoJSON(
+  stations: Station[]
+): GeoJSON.FeatureCollection {
+  return {
+    type: 'FeatureCollection',
+    features: stations.map((station) => ({
+      type: 'Feature',
+      properties: {
+        id: station.id,
+        name: station.name,
+      },
+      geometry: {
+        type: 'Point',
+        coordinates: station.position,
+      },
+    })),
+  };
 }

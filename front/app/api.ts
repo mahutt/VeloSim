@@ -22,17 +22,16 @@
  * SOFTWARE.
  */
 
-/// <reference types="vite/client" />
+import axios from 'axios';
 
-interface ViteTypeOptions {
-  strictImportMetaEnv: unknown;
-}
+const API_VERSION = 'v1';
 
-interface ImportMetaEnv {
-  readonly VITE_MAPBOX_ACCESS_TOKEN: string;
-  readonly VITE_BACKEND_URL: string;
-}
+const api = axios.create({
+  baseURL: `${import.meta.env.VITE_BACKEND_URL}/api/${API_VERSION}`,
+  headers: {
+    'Content-Type': 'application/json',
+  },
+  withCredentials: true,
+});
 
-interface ImportMeta {
-  readonly env: ImportMetaEnv;
-}
+export default api;
