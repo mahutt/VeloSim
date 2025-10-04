@@ -29,7 +29,7 @@ from pyrosm import get_data
 import networkx as nx
 import geopandas as gpd
 from pandas import Series
-from shapely.geometry import Point
+from shapely.geometry import Point, LineString
 
 
 class OSMConnection:
@@ -160,26 +160,61 @@ class OSMConnection:
         print("route could not be created between the two nodes")
         return []
 
+    # creates new node object
+    def create_node(self, id: int, lng: float, lat: float) -> Optional[Series]:
+        try:
+            geometry = Point(lng, lat)
+            node_data = {
+                "id": id,
+                "lon": lng,
+                "lat": lat,
+                "timestamp": 0,
+                "visible": False,
+                "version": 0,
+                "tags": None,
+                "changeset": 0,
+                "geometry": geometry,
+            }
 
-"""
-if __name__ == "__main__":
-    # start = time.perf_counter()
-    conn = OSMConnection()
-    # print(f'connected and roads: {time.perf_counter() - start}')
-    #print(f"{conn.get_node_geometry(conn.get_all_nodes().iloc[0])}")
-    # conn.create_networkx_graph()  # ~40sec
-    #print(f'graph network: {time.perf_counter() - start}')
-    #conn.get_edge_intersections(conn.get_all_edges().iloc[0])
-    #print(f'intersection: {time.perf_counter() - start}')
-    #node = conn.coordinates_to_nearest_node(-73.84, 45.44)
-    #print(type(node))
-    #print(node)
-    #print(node['lat'])
-    #print(f'coordinates: {time.perf_counter() - start}')
-    #node1 = conn.get_all_nodes().iloc[0]
-    #node2 = conn.get_all_nodes().iloc[5]
-    #route = conn.shortest_path(node1, node2, conn.get_graph())
-    #print(len(route))
-    #print(f'path: {time.perf_counter() - start}')
-    #node_id = conn.get_node_by_id(route[0])
-    #print(conn.get_node_by_id(route[1]))"""
+            new_node: Series = Series(node_data)
+            return new_node
+        except Exception as e:
+            print(f"Node creation failed: {e}")
+            return None
+
+    # creates new edge object
+    def create_edge(
+        self,
+        id: int,
+        name: str,  # name of street
+        start_node: Series,
+        end_node: Series,
+        length: float,  # length of road
+        oneway: bool,  # oneway -> true, two ways -> false
+        maxspeed: int,
+    ) -> Optional[Series]:
+        try:
+            directions = "yes" if oneway else "no"
+
+            start_point: Point = self.get_node_geometry(start_node)
+            end_point: Point = self.get_node_geometry(end_node)
+            geometry = LineString(
+                [[start_point.x, start_point.y], [end_point.x, end_point.y]]
+            )
+
+            edge_data = {
+                "id": id,
+                "name": name,
+                "u": start_node["id"],
+                "v": end_node["id"],
+                "length": length,
+                "oneway": directions,
+                "maxspeed": maxspeed,
+                "geometry": geometry,
+            }
+
+            new_edge: Series = Series(edge_data)
+            return new_edge
+        except Exception as e:
+            print(f"Edge creation failed: {e}")
+            return None
