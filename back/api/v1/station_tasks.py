@@ -67,12 +67,12 @@ def create_station_task(
 
 @router.get("/", response_model=StationTaskListResponse)
 def get_station_tasks(
-    station_id: int
-    | None = Query(
+    station_id: int | None = Query(
         None, description="Filter tasks by a specific station ID", alias="stationId"
     ),
-    task_status: TaskStatus
-    | None = Query(None, description="Filter tasks by status", alias="taskStatus"),
+    task_status: TaskStatus | None = Query(
+        None, description="Filter tasks by status", alias="taskStatus"
+    ),
     skip: int = Query(0, ge=0, description="Number of stations to skip"),
     limit: int = Query(10, ge=1, le=100, description="Number of stations to retrieve"),
     db: Session = Depends(get_db),
