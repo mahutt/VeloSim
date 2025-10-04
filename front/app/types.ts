@@ -43,16 +43,16 @@ export interface GetStationsResponse extends PaginatedResponse {
   stations: Station[];
 }
 
-// Resource route
-export interface ResourceRoute {
+// Route types
+
+export interface Route {
   id: string;
-  coordinates: [number, number][];
+  coordinates: [number, number][]; // Complete road geometry
 }
 
-// Current position of a resource
+// Position update
 export interface ResourcePosition {
-  id: string;
+  resourceId: string;
   position: [number, number];
-  currentWaypointIndex: number;
-  progress: number;
+  routeId: string;
 }
