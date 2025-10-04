@@ -58,8 +58,11 @@ npm run db:current
 # Apply pending migrations
 npm run db:upgrade
 
-# Seed database with initial station data
+# Seed database with initial data
 npm run db:seed
+
+# OR: Complete database reset (drop, migrate, seed)
+npm run db:dropseed
 ```
 
 #### Migration Commands
@@ -77,6 +80,9 @@ npm run db:upgrade
 
 # Seed database with initial data
 npm run db:seed
+
+# Complete database reset (drop, migrate, seed)
+npm run db:dropseed
 
 # Rollback last migration
 npm run db:downgrade

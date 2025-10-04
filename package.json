@@ -8,7 +8,7 @@
         "test:coverage-check": "coverage run --source=back,sim -m pytest && coverage report --fail-under=70",
         "lint": "flake8 back sim && black --check back sim && mypy back sim",
         "lint:fix": "black back sim",
-        "format": "npm run lint:fix",
+        "format": "npm run lint:fix && cd front && npm run format && cd ..",
         "validate:init": "python scripts/validate_init_files.py",
         "validate:licenses": "python scripts/validate_license_headers.py",
         "validate:branch": "python scripts/validate_branch_name.py",
@@ -27,11 +27,7 @@
         "db:downgrade": "node scripts/db-migrate.js downgrade",
         "db:history": "node scripts/db-migrate.js history",
         "db:seed": "node scripts/db-migrate.js seed",
-        "db:migrate": "npm run db:upgrade",
-        "db:migrate:create": "npm run db:generate",
-        "db:migrate:undo": "npm run db:downgrade",
-        "db:migrate:status": "npm run db:current",
-        "db:migrate:history": "npm run db:history"
+        "db:dropseed": "node scripts/db-migrate.js dropseed"
     },
     "devDependencies": {
         "concurrently": "^8.2.0",
