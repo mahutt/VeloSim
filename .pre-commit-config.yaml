@@ -44,6 +44,10 @@ repos:
             python-dotenv,
             sqlalchemy,
             fastapi,
+            types-networkx,
+            pandas-stubs,
+            types-shapely,
+            types-geopandas,
           ]
         args: [--config-file=pyproject.toml]
 
