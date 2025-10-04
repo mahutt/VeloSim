@@ -70,7 +70,7 @@ const TestComponent = () => {
   const { state } = useSimulation();
   return (
     <div data-testid="test-component">
-      {state.current ? 'data-loaded' : 'no-data'}
+      {state.current.length > 0 ? 'data-loaded' : 'no-data'}
     </div>
   );
 };
@@ -135,7 +135,7 @@ const mockGetStationsResponse: GetStationsResponse = {
   total_pages: 1,
 };
 
-// Sample GeoJSON data for resources
+// Sample resource routes GeoJSON data
 const mockResourceRoutesData = {
   type: 'FeatureCollection' as const,
   features: [
@@ -199,11 +199,11 @@ test('simulation provider provides context with initial state', () => {
     </MapProvider>
   );
 
-  expect(getByTestId('test-component')).toHaveTextContent('data-loaded');
+  expect(getByTestId('test-component')).toHaveTextContent('no-data');
 });
 
 test('simulation provider fetches stations data when map is loaded', async () => {
-  // Mock successful fetch response
+  //Mock successful API response
   (api.get as Mock).mockResolvedValueOnce({
     data: mockGetStationsResponse,
   });
@@ -286,7 +286,7 @@ test('simulation provider updates state ref when data is successfully fetched', 
   });
 });
 
-test('simulation provider updates resource positions via animation loop', async () => {
+test('simulation provider loads resource routes', async () => {
   (api.get as Mock).mockResolvedValueOnce({
     data: mockGetStationsResponse,
   });
@@ -295,10 +295,6 @@ test('simulation provider updates resource positions via animation loop', async 
     ok: true,
     json: () => Promise.resolve(mockResourceRoutesData),
   });
-
-  const mockGeoJSONSource = {
-    setData: vi.fn(),
-  };
 
   render(
     <MapProvider>
@@ -309,8 +305,68 @@ test('simulation provider updates resource positions via animation loop', async 
   );
 
   const map = MockMap.instance!;
-  map.getSource = vi.fn().mockReturnValue(mockGeoJSONSource);
+  act(() => {
+    map.callBacks.load();
+  });
 
+  await waitFor(() => {
+    expect(mockFetch).toHaveBeenCalledWith(
+      '/placeholder-data/resource-routes.geojson'
+    );
+  });
+});
+
+test('simulation provider starts animation loop', async () => {
+  (api.get as Mock).mockResolvedValueOnce({
+    data: mockGetStationsResponse,
+  });
+
+  mockFetch.mockResolvedValueOnce({
+    ok: true,
+    json: () => Promise.resolve(mockResourceRoutesData),
+  });
+
+  const requestAnimationFrameSpy = vi.spyOn(window, 'requestAnimationFrame');
+
+  render(
+    <MapProvider>
+      <SimulationProvider>
+        <MapContainer />
+      </SimulationProvider>
+    </MapProvider>
+  );
+
+  const map = MockMap.instance!;
+  act(() => {
+    map.callBacks.load();
+  });
+
+  await waitFor(() => {
+    expect(requestAnimationFrameSpy).toHaveBeenCalled();
+  });
+
+  requestAnimationFrameSpy.mockRestore();
+});
+
+test('simulation provider updates resource positions', async () => {
+  (api.get as Mock).mockResolvedValueOnce({
+    data: mockGetStationsResponse,
+  });
+
+  mockFetch.mockResolvedValueOnce({
+    ok: true,
+    json: () => Promise.resolve(mockResourceRoutesData),
+  });
+
+  render(
+    <MapProvider>
+      <SimulationProvider>
+        <MapContainer />
+      </SimulationProvider>
+    </MapProvider>
+  );
+
+  const map = MockMap.instance!;
   act(() => {
     map.callBacks.load();
   });
@@ -321,7 +377,6 @@ test('simulation provider updates resource positions via animation loop', async 
     );
   });
 
-  // Wait for animation loop to call setMapSource at least once
   await waitFor(
     () => {
       expect(setMapSource).toHaveBeenCalledWith(
@@ -332,4 +387,43 @@ test('simulation provider updates resource positions via animation loop', async 
     },
     { timeout: 100 }
   );
+});
+
+test('simulation provider cleans up on unmount', async () => {
+  (api.get as Mock).mockResolvedValueOnce({
+    data: mockGetStationsResponse,
+  });
+
+  mockFetch.mockResolvedValueOnce({
+    ok: true,
+    json: () => Promise.resolve(mockResourceRoutesData),
+  });
+
+  const cancelAnimationFrameSpy = vi.spyOn(window, 'cancelAnimationFrame');
+  const clearIntervalSpy = vi.spyOn(window, 'clearInterval');
+
+  const { unmount } = render(
+    <MapProvider>
+      <SimulationProvider>
+        <MapContainer />
+      </SimulationProvider>
+    </MapProvider>
+  );
+
+  const map = MockMap.instance!;
+  act(() => {
+    map.callBacks.load();
+  });
+
+  await waitFor(() => {
+    expect(mockFetch).toHaveBeenCalled();
+  });
+
+  unmount();
+
+  expect(cancelAnimationFrameSpy).toHaveBeenCalled();
+  expect(clearIntervalSpy).toHaveBeenCalled();
+
+  cancelAnimationFrameSpy.mockRestore();
+  clearIntervalSpy.mockRestore();
 });
