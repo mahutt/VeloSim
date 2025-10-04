@@ -38,7 +38,7 @@ case "$1" in
         ;;
     "seed")
         echo "🌱 Seeding database with initial data..."
-        psql -h localhost -p 5433 -U velosim -d velosim -f alembic/seeds/stations.sql
+        psql -h localhost -p 5433 -U velosim -d velosim -f alembic/seeds/stations.sql -f alembic/seeds/station_tasks.sql
         if [ $? -eq 0 ]; then
             echo "✅ Database seeded successfully"
         else

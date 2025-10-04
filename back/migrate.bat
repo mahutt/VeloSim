@@ -104,7 +104,7 @@ if "%COMMAND%"=="init" (
 
 if "%COMMAND%"=="seed" (
     echo [INFO] Seeding database with initial data...
-    psql -h localhost -p 5433 -U velosim -d velosim -f alembic\seeds\stations.sql
+    psql -h localhost -p 5433 -U velosim -d velosim -f alembic\seeds\stations.sql -f alembic\seeds\station_tasks.sql
     if errorlevel 1 (
         echo [ERROR] Database seeding failed
         exit /b 1
