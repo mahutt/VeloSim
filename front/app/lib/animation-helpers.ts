@@ -22,18 +22,18 @@
  * SOFTWARE.
  */
 
-/**
- * Interpolates position between two points
- * Currently uses simple linear interpolation
- * TODO: Upgrade to route-following interpolation when simulation format is finalized
- */
-export function interpolatePosition(
-  start: [number, number],
-  end: [number, number],
+export function interpolateAlongRoute(
+  routeGeometry: [number, number][],
+  oldPosition: [number, number],
+  newPosition: [number, number],
   progress: number
 ): [number, number] {
+  // TODO (#21): Upgrade to use Turf.js for road-following interpolation
+  // - Use turf.nearestPointOnLine() to snap positions to route geometry
+  // - Use turf.along() to get points along actual road LineString
+  // - Ensures resources follow roads instead of straight-line movement
   return [
-    start[0] + (end[0] - start[0]) * progress,
-    start[1] + (end[1] - start[1]) * progress,
+    oldPosition[0] + (newPosition[0] - oldPosition[0]) * progress,
+    oldPosition[1] + (newPosition[1] - oldPosition[1]) * progress,
   ];
 }
