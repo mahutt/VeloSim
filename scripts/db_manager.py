@@ -34,10 +34,20 @@ from urllib.parse import urlparse
 back_dir = Path(__file__).parent.parent / "back"
 sys.path.insert(0, str(back_dir))
 
+# Try to get database configuration
+DATABASE_URL = None
 try:
     from core.config import settings
-except ImportError:
-    print("ERROR [velosim.db_manager] Could not import settings. Make sure the back/ directory exists and contains core/config.py")
+    DATABASE_URL = settings.DATABASE_URL
+    print(f"INFO  [velosim.db_manager] Loaded settings from core.config")
+except ImportError as e:
+    print(f"WARN  [velosim.db_manager] Could not import settings: {e}")
+    # Fallback to environment variable or default
+    DATABASE_URL = os.getenv('DATABASE_URL', 'postgresql://velosim:velosim@localhost:5433/velosim')
+    print(f"INFO  [velosim.db_manager] Using fallback DATABASE_URL from environment or default")
+
+if not DATABASE_URL:
+    print("ERROR [velosim.db_manager] No DATABASE_URL found in settings or environment")
     sys.exit(1)
 
 
@@ -77,7 +87,7 @@ def run_command(cmd: list, check: bool = True, capture: bool = False) -> subproc
 
 def run_psql_command(sql: str, db_name: str = None) -> bool:
     """Run a PostgreSQL command using the configured database."""
-    db_config = parse_database_url(settings.DATABASE_URL)
+    db_config = parse_database_url(DATABASE_URL)
 
     # Use specified database or default to postgres for admin operations
     target_db = db_name or db_config['database']
@@ -124,7 +134,7 @@ def seed_database():
 
     print(f"INFO  [velosim.db_manager] Found {len(seed_files)} seed file(s): {[f.name for f in seed_files]}")
 
-    db_config = parse_database_url(settings.DATABASE_URL)
+    db_config = parse_database_url(DATABASE_URL)
 
     # Set password environment variable if provided
     env = os.environ.copy()
@@ -158,7 +168,7 @@ def seed_database():
     return True
 def drop_database():
     """Drop the target database."""
-    db_config = parse_database_url(settings.DATABASE_URL)
+    db_config = parse_database_url(DATABASE_URL)
     target_db = db_config['database']
 
     print(f"INFO  [velosim.db_manager] Dropping database: {target_db}")
@@ -185,7 +195,7 @@ def drop_database():
 
 def create_database():
     """Create the target database."""
-    db_config = parse_database_url(settings.DATABASE_URL)
+    db_config = parse_database_url(DATABASE_URL)
     target_db = db_config['database']
 
     print(f"INFO  [velosim.db_manager] Creating database: {target_db}")
@@ -243,7 +253,7 @@ def main():
     args = parser.parse_args()
 
     print(f"INFO  [velosim.db_manager] VeloSim Database Tool - {args.command}")
-    print(f"INFO  [velosim.db_manager] Using DATABASE_URL: {settings.DATABASE_URL}")
+    print(f"INFO  [velosim.db_manager] Using DATABASE_URL: {DATABASE_URL}")
 
     success = False
 

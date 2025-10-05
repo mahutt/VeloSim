@@ -109,7 +109,16 @@ if "%COMMAND%"=="init" (
 
 if "%COMMAND%"=="seed" (
     echo INFO  [velosim.migrate] Seeding database with initial data...
-    python "..\scripts\db_manager.py" seed
+
+    REM Check if we're in a virtual environment
+    if defined VIRTUAL_ENV (
+        echo INFO  [velosim.migrate] Using virtual environment: %VIRTUAL_ENV%
+        "%VIRTUAL_ENV%\Scripts\python.exe" "..\scripts\db_manager.py" seed
+    ) else (
+        echo INFO  [velosim.migrate] No virtual environment detected, using system python
+        python "..\scripts\db_manager.py" seed
+    )
+
     if errorlevel 1 (
         echo ERROR [velosim.migrate] Database seeding failed
         exit /b 1
@@ -120,7 +129,16 @@ if "%COMMAND%"=="seed" (
 
 if "%COMMAND%"=="dropseed" (
     echo INFO  [velosim.migrate] Dropping database, running migrations, and seeding...
-    python "..\scripts\db_manager.py" dropseed
+
+    REM Check if we're in a virtual environment
+    if defined VIRTUAL_ENV (
+        echo INFO  [velosim.migrate] Using virtual environment: %VIRTUAL_ENV%
+        "%VIRTUAL_ENV%\Scripts\python.exe" "..\scripts\db_manager.py" dropseed
+    ) else (
+        echo INFO  [velosim.migrate] No virtual environment detected, using system python
+        python "..\scripts\db_manager.py" dropseed
+    )
+
     if errorlevel 1 (
         echo ERROR [velosim.migrate] Database reset failed
         exit /b 1
