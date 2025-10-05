@@ -129,8 +129,8 @@ async function main() {
         console.error('ERROR [velosim.db_migrate] migrate.bat not found in scripts directory');
         process.exit(1);
       }
-      cmd = batchScript;
-      cmdArgs = [command, ...args];
+      cmd = 'cmd.exe';
+      cmdArgs = ['/c', `"${batchScript}"`, command, ...args];
     } else {
       // Use shell script on Unix-like systems
       const shellScript = path.join(process.cwd(), 'scripts', 'migrate.sh');
