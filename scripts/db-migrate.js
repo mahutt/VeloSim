@@ -46,11 +46,12 @@ const commands = {
   'downgrade': 'Rollback last migration',
   'history': 'Show migration history',
   'seed': 'Seed database with initial station data',
+  'dropseed': 'Drop database, run migrations, and seed data (fixes enum issues)',
   'status': 'Alias for current'
 };
 
 function showHelp() {
-  console.log('🗃️  VeloSim Database Migration Tool\n');
+  console.log('INFO  [velosim.db_migrate] VeloSim Database Migration Tool\n');
   console.log('Usage: npm run db:<command> [arguments]\n');
   console.log('Available commands:');
   Object.entries(commands).forEach(([cmd, desc]) => {
@@ -61,12 +62,13 @@ function showHelp() {
   console.log('  npm run db:generate "Add stations table"');
   console.log('  npm run db:upgrade');
   console.log('  npm run db:seed');
-  console.log('\nNote: Uses direct Alembic commands with PostgreSQL on port 5433');
+  console.log('  npm run db:dropseed');
+  console.log('\nNote: Uses .env DATABASE_URL configuration for database connections');
 }
 
 function runCommand(cmd, args = [], options = {}) {
   return new Promise((resolve, reject) => {
-    console.log(`Running: ${cmd} ${args.join(' ')}`);
+    console.log(`INFO  [velosim.db_migrate] Running: ${cmd} ${args.join(' ')}`);
 
     const child = spawn(cmd, args, {
       stdio: 'inherit',
@@ -97,8 +99,8 @@ async function main() {
   }
 
   // Validate command
-  if (!commands[command] && command !== 'downgrade') {
-    console.error(`❌ Unknown command: ${command}`);
+  if (!commands[command] && command !== 'downgrade' && command !== 'dropseed') {
+    console.error(`ERROR [velosim.db_migrate] Unknown command: ${command}`);
     showHelp();
     process.exit(1);
   }
@@ -106,14 +108,14 @@ async function main() {
   // Check if we're in the root directory
   const packageJsonPath = path.join(process.cwd(), 'package.json');
   if (!fs.existsSync(packageJsonPath)) {
-    console.error('❌ This script must be run from the project root directory');
+    console.error('ERROR [velosim.db_migrate] This script must be run from the project root directory');
     process.exit(1);
   }
 
   // Change to back directory for migration commands
   const backDir = path.join(process.cwd(), 'back');
   if (!fs.existsSync(backDir)) {
-    console.error('❌ Back directory not found. Make sure you\'re in the VeloSim root directory.');
+    console.error('ERROR [velosim.db_migrate] Back directory not found. Make sure you\'re in the VeloSim root directory.');
     process.exit(1);
   }
 
@@ -122,18 +124,18 @@ async function main() {
 
     if (isWindows) {
       // Use batch file on Windows
-      const batchScript = path.join(backDir, 'migrate.bat');
+      const batchScript = path.join(process.cwd(), 'scripts', 'migrate.bat');
       if (!fs.existsSync(batchScript)) {
-        console.error('❌ migrate.bat not found in back directory');
+        console.error('ERROR [velosim.db_migrate] migrate.bat not found in scripts directory');
         process.exit(1);
       }
-      cmd = batchScript;
-      cmdArgs = [command, ...args];
+      cmd = 'cmd.exe';
+      cmdArgs = ['/c', `"${batchScript}"`, command, ...args];
     } else {
       // Use shell script on Unix-like systems
-      const shellScript = path.join(backDir, 'migrate.sh');
+      const shellScript = path.join(process.cwd(), 'scripts', 'migrate.sh');
       if (!fs.existsSync(shellScript)) {
-        console.error('❌ migrate.sh not found in back directory');
+        console.error('ERROR [velosim.db_migrate] migrate.sh not found in scripts directory');
         process.exit(1);
       }
       cmd = 'bash';
@@ -143,33 +145,33 @@ async function main() {
     // Special handling for generate command that needs a message
     if (command === 'generate') {
       if (args.length === 0) {
-        console.error('❌ Generate command requires a migration message');
+        console.error('ERROR [velosim.db_migrate] Generate command requires a migration message');
         console.log('Example: npm run db:generate "Add stations table"');
         process.exit(1);
       }
     }
 
-    console.log(`🐳 Running migration command: ${command}`);
-    console.log(`📁 Working directory: ${backDir}`);
-    console.log(`💻 Platform: ${isWindows ? 'Windows (using migrate.bat)' : 'Unix-like (using migrate.sh)'}\n`);
+    console.log(`INFO  [velosim.db_migrate] Running migration command: ${command}`);
+    console.log(`INFO  [velosim.db_migrate] Using scripts from: scripts/`);
+    console.log(`INFO  [velosim.db_migrate] Platform: ${isWindows ? 'Windows (using migrate.bat)' : 'Unix-like (using migrate.sh)'}\n`);
 
-    await runCommand(cmd, cmdArgs, { cwd: backDir });
-    console.log(`\n✅ Migration command completed successfully!`);
+    await runCommand(cmd, cmdArgs, { cwd: process.cwd() });
+    console.log(`\nINFO  [velosim.db_migrate] Migration command completed successfully!`);
 
   } catch (error) {
-    console.error(`\n❌ Migration command failed: ${error.message}`);
+    console.error(`\nERROR [velosim.db_migrate] Migration command failed: ${error.message}`);
     process.exit(1);
   }
 }
 
 // Handle unhandled promise rejections
 process.on('unhandledRejection', (reason, promise) => {
-  console.error('❌ Unhandled Rejection at:', promise, 'reason:', reason);
+  console.error('ERROR [velosim.db_migrate] Unhandled Rejection at:', promise, 'reason:', reason);
   process.exit(1);
 });
 
 // Run the main function
 main().catch((error) => {
-  console.error('❌ Fatal error:', error);
+  console.error('ERROR [velosim.db_migrate] Fatal error:', error);
   process.exit(1);
 });
