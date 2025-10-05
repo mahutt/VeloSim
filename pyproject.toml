@@ -46,6 +46,7 @@ dev = [
     "types-networkx>=3.0.0",
     "pandas-stubs>=2.0.0",
     "types-shapely>=2.0.0",
+    "types-geopandas>=1.1.1"
 ]
 
 [tool.setuptools.packages.find]
