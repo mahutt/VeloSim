@@ -321,7 +321,35 @@ def test_create_node_success(
 @patch("sim.DAO.OSMConnection.OSMConnection._initialize_osm_data_file")
 @patch("sim.DAO.OSMConnection.OSMConnection._get_drivable_network")
 @patch("sim.DAO.OSMConnection.OSMConnection.create_networkx_graph")
-def test_create_edge(
+@patch("sim.DAO.OSMConnection.Point")
+@patch("builtins.print")
+def test_create_node_fail(
+    mock_print: MagicMock,
+    mock_point: MagicMock,
+    mock_create_graph: MagicMock,
+    mock_get_drivable_network: MagicMock,
+    mock_init_file: MagicMock,
+) -> None:
+    # Arrange
+    instance = OSMConnection()
+    mock_init_file.assert_called_once()
+    mock_get_drivable_network.assert_called_once()
+    mock_create_graph.assert_called_once()
+
+    mock_point.side_effect = ValueError("Invalid Coordinates")
+
+    # Act
+    node = instance.create_node(1, 2.2, 4.2)
+
+    # Assert
+    assert node is None
+    mock_print.assert_called_once_with("Node creation failed: Invalid Coordinates")
+
+
+@patch("sim.DAO.OSMConnection.OSMConnection._initialize_osm_data_file")
+@patch("sim.DAO.OSMConnection.OSMConnection._get_drivable_network")
+@patch("sim.DAO.OSMConnection.OSMConnection.create_networkx_graph")
+def test_create_edge_success(
     mock_create_graph: MagicMock,
     mock_get_drivable_network: MagicMock,
     mock_init_file: MagicMock,
@@ -334,7 +362,7 @@ def test_create_edge(
 
     point = Point(-73.591378, 45.591513)
     node_data = {
-        "id": "1",
+        "id": 1,
         "lon": -73.591378,
         "lat": 45.591513,
         "timestamp": 0,
@@ -354,3 +382,195 @@ def test_create_edge(
     # Assert
     assert isinstance(edge, Series)
     assert edge.geometry == linestring
+
+
+@patch("sim.DAO.OSMConnection.OSMConnection._initialize_osm_data_file")
+@patch("sim.DAO.OSMConnection.OSMConnection._get_drivable_network")
+@patch("sim.DAO.OSMConnection.OSMConnection.create_networkx_graph")
+@patch("sim.DAO.OSMConnection.LineString")
+@patch("builtins.print")
+def test_create_edge_fail(
+    mock_print: MagicMock,
+    mock_linestring: MagicMock,
+    mock_create_graph: MagicMock,
+    mock_get_drivable_network: MagicMock,
+    mock_init_file: MagicMock,
+) -> None:
+    # Arrange
+    instance = OSMConnection()
+    mock_init_file.assert_called_once()
+    mock_get_drivable_network.assert_called_once()
+    mock_create_graph.assert_called_once()
+
+    point = Point(-73.591378, 45.591513)
+    node_data = {
+        "id": 1,
+        "lon": 2.2,
+        "lat": 5.4,
+        "timestamp": 0,
+        "visible": False,
+        "version": 0,
+        "tags": None,
+        "changeset": 0,
+        "geometry": point,
+    }
+    node1 = Series(node_data)
+    node2 = Series(node_data)
+
+    mock_linestring.side_effect = ValueError("Invalid LineString")
+
+    # Act
+    edge = instance.create_edge(1, "Bad Street", node1, node2, 20, False, 30)
+
+    # Assert
+    assert edge is None
+    mock_print.assert_called_once_with("Edge creation failed: Invalid LineString")
+
+
+@patch("sim.DAO.OSMConnection.nx.shortest_path")
+@patch("sim.DAO.OSMConnection.OSMConnection._initialize_osm_data_file")
+@patch("sim.DAO.OSMConnection.OSMConnection._get_drivable_network")
+@patch("sim.DAO.OSMConnection.OSMConnection.create_networkx_graph")
+def test_shortest_path_success(
+    mock_create_graph: MagicMock,
+    mock_get_drivable_network: MagicMock,
+    mock_init_file: MagicMock,
+    mock_shortest_path: MagicMock,
+) -> None:
+    # Arrange
+    instance = OSMConnection()
+    mock_init_file.assert_called_once()
+    mock_get_drivable_network.assert_called_once()
+    mock_create_graph.assert_called_once()
+
+    mock_shortest_path.return_value = [1, 2]
+
+    point = Point(-73.591378, 45.591513)
+    node_data = {
+        "id": 1,
+        "lon": -73.591378,
+        "lat": 45.591513,
+        "timestamp": 0,
+        "visible": False,
+        "version": 0,
+        "tags": None,
+        "changeset": 0,
+        "geometry": point,
+    }
+    node1 = Series(node_data)
+    point2 = Point(-73.59159230853888, 45.59260120932741)
+    node_data2 = {
+        "id": 2,
+        "lon": -73.59159230853888,
+        "lat": 45.59260120932741,
+        "timestamp": 0,
+        "visible": False,
+        "version": 0,
+        "tags": None,
+        "changeset": 0,
+        "geometry": point2,
+    }
+    node2 = Series(node_data2)
+    sample_graph: nx.MultiDiGraph = nx.MultiDiGraph()
+    del node_data["id"]
+    del node_data2["id"]
+    sample_graph.add_node(1, **node_data)
+    sample_graph.add_node(2, **node_data2)
+    sample_graph.add_edge(1, 2, key=0, weight=1.0)
+
+    # Act
+    route = instance.shortest_path(node1, node2, sample_graph)
+
+    # Assert
+    mock_shortest_path.assert_called_once_with(sample_graph, 1, 2, weight="length")
+    assert route == [1, 2]
+
+
+@patch("builtins.print")
+@patch("sim.DAO.OSMConnection.nx.shortest_path")
+@patch("sim.DAO.OSMConnection.OSMConnection._initialize_osm_data_file")
+@patch("sim.DAO.OSMConnection.OSMConnection._get_drivable_network")
+@patch("sim.DAO.OSMConnection.OSMConnection.create_networkx_graph")
+def test_shortest_path_fail(
+    mock_create_graph: MagicMock,
+    mock_get_drivable_network: MagicMock,
+    mock_init_file: MagicMock,
+    mock_shortest_path: MagicMock,
+    mock_print: MagicMock,
+) -> None:
+    # Arrange
+    instance = OSMConnection()
+    mock_init_file.assert_called_once()
+    mock_get_drivable_network.assert_called_once()
+    mock_create_graph.assert_called_once()
+
+    point = Point(-73.591378, 45.591513)
+    node_data = {
+        "id": 3,  # Create node with id not in graph
+        "lon": -73.591378,
+        "lat": 45.591513,
+        "timestamp": 0,
+        "visible": False,
+        "version": 0,
+        "tags": None,
+        "changeset": 0,
+        "geometry": point,
+    }
+    node1 = Series(node_data)
+    point2 = Point(-73.59159230853888, 45.59260120932741)
+    node_data2 = {
+        "id": 2,
+        "lon": -73.59159230853888,
+        "lat": 45.59260120932741,
+        "timestamp": 0,
+        "visible": False,
+        "version": 0,
+        "tags": None,
+        "changeset": 0,
+        "geometry": point2,
+    }
+    node2 = Series(node_data2)
+    sample_graph: nx.MultiDiGraph = nx.MultiDiGraph()
+    del node_data["id"]
+    del node_data2["id"]
+    sample_graph.add_node(1, **node_data)
+    sample_graph.add_node(2, **node_data2)
+    sample_graph.add_edge(1, 2, key=0, weight=1.0)
+
+    # Act
+    route = instance.shortest_path(node1, node2, sample_graph)
+
+    # Assert
+    mock_shortest_path.assert_not_called()
+    mock_print.assert_called_once_with(
+        "route could not be created between the two nodes"
+    )
+    assert route == []
+
+
+@patch("sim.DAO.OSMConnection.OSMConnection._initialize_osm_data_file")
+@patch("sim.DAO.OSMConnection.OSMConnection._get_drivable_network")
+@patch("sim.DAO.OSMConnection.OSMConnection.create_networkx_graph")
+def test_coordinates_to_nearest_node(
+    mock_create_graph: MagicMock,
+    mock_get_drivable_network: MagicMock,
+    mock_init_file: MagicMock,
+) -> None:
+    # Arrange
+    instance = OSMConnection()
+    mock_init_file.assert_called_once()
+    mock_get_drivable_network.assert_called_once()
+    mock_create_graph.assert_called_once()
+
+    point1 = Point(-73.591378, 45.591513)
+    point2 = Point(-73.59159230853888, 45.59260120932741)
+    mock_nodes = gpd.GeoDataFrame(
+        {"id": [1, 2], "lon": [point1.x, point2.x], "lat": [point1.y, point2.y]},
+        geometry=[point1, point2],
+        crs="EPSG:4326",
+    )
+    instance._nodes = mock_nodes
+
+    node = instance.coordinates_to_nearest_node(-73.591450, 45.591644)
+
+    assert not node.empty
