@@ -220,18 +220,11 @@ pre-commit run --all-files
 4. Use descriptive commit messages with issue numbers
 5. Keep PRs focused and atomic
 
-### API Documentation (Live)
+## 📚 Documentation Links
 
-- **Swagger UI**: http://localhost:8000/api/docs (when backend is running)
-- **ReDoc**: http://localhost:8000/api/redoc (alternative API docs)
-
-### Database & Migrations
-
-For database operations, see the [Backend README](back/README.md#database-operations) which includes:
-
-- Cross-platform migration commands (`npm run db:*`)
-- Docker-based setup to avoid Windows networking issues
-- Complete migration workflow documentation
+- **[Backend Documentation](back/DEVELOPMENT.md)**
+- **[Frontend Documentation](front/README.md)**
+- **[Simulation Documentation](sim/README.md)**
 
 ## License
 
