@@ -22,12 +22,23 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 """
 
+import pytest
 from unittest.mock import patch, MagicMock
 from sim.DAO.OSMConnection import OSMConnection
 import geopandas as gpd
 import networkx as nx
 from pandas import Series
 from shapely.geometry import Point, LineString
+from typing import Generator
+
+
+@pytest.fixture(autouse=True)
+def reset_singleton() -> Generator[None, None, None]:
+    # Reset before each test
+    OSMConnection.reset_instance()
+    yield
+    # Cleanup after test
+    OSMConnection.reset_instance()
 
 
 @patch("os.makedirs")
@@ -51,7 +62,7 @@ def test_osmconnection_initialization_methods_called(
     # Act
     instance = OSMConnection()
 
-    # Assert <-
+    # Assert
     mock_exists.assert_called_once_with("sim/DAO/OSMData")
     # makedirs called since folder "not found"
     mock_makedirs.assert_called_once_with("sim/DAO/OSMData")
@@ -86,7 +97,7 @@ def test_osmconnection_initialization_folder_exists(
     # Act
     OSMConnection()
 
-    # Assert <-
+    # Assert
     mock_exists.assert_called_once_with("sim/DAO/OSMData")
     # makedirs not called since folder existed
     mock_makedirs.assert_not_called()

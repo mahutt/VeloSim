@@ -23,7 +23,7 @@ SOFTWARE.
 """
 
 import os
-from typing import Optional
+from typing import Optional, Self
 from pyrosm import OSM  # type: ignore
 from pyrosm import get_data
 import networkx as nx
@@ -32,8 +32,19 @@ from pandas import Series
 from shapely.geometry import Point, LineString
 
 
-class OSMConnection:
+class OSMConnection(object):
+    __instance = None
+
+    def __new__(cls) -> Self:
+        if cls.__instance is None:
+            cls.__instance = super(OSMConnection, cls).__new__(cls)
+            cls.__instance.__initialized = False
+        return cls.__instance
+
     def __init__(self) -> None:
+        if self.__initialized:
+            return
+        self.__initialized: bool = True
         self._osm: OSM = None  # OSM parser object
         self._nodes: gpd.GeoDataFrame = gpd.GeoDataFrame()  # intersections
         self._edges: gpd.GeoDataFrame = gpd.GeoDataFrame()  # roads
@@ -218,3 +229,7 @@ class OSMConnection:
         except Exception as e:
             print(f"Edge creation failed: {e}")
             return None
+
+    @classmethod
+    def reset_instance(cls) -> None:  # for testing
+        cls.__instance = None
