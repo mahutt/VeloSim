@@ -104,7 +104,7 @@ Implement database operations:
 from typing import List, Optional
 from sqlalchemy.orm import Session
 from sqlalchemy import func
-from back.models.station import Station
+from back.models import Station
 from back.schemas.station import StationCreate, StationUpdate
 
 class StationCRUD:

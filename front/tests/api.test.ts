@@ -22,17 +22,11 @@
  * SOFTWARE.
  */
 
-/// <reference types="vite/client" />
+import { describe, it, expect } from 'vitest';
+import api from '../app/api';
 
-interface ViteTypeOptions {
-  strictImportMetaEnv: unknown;
-}
-
-interface ImportMetaEnv {
-  readonly VITE_MAPBOX_ACCESS_TOKEN: string;
-  readonly VITE_BACKEND_URL: string;
-}
-
-interface ImportMeta {
-  readonly env: ImportMetaEnv;
-}
+describe('API Configuration', () => {
+  it('should create axios instance with correct base configuration', () => {
+    expect(api.defaults.headers['Content-Type']).toBe('application/json');
+  });
+});

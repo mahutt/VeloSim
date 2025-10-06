@@ -22,10 +22,18 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 """
 
-# Import all models here to ensure they are registered with SQLAlchemy
-from .station import Station
-from .task_status import TaskStatus
-from .station_task_type import StationTaskType
-from .station_task import StationTask
+from enum import Enum
 
-__all__ = ["Station", "TaskStatus", "StationTaskType", "StationTask"]
+
+class TaskStatus(Enum):
+    UNASSIGNED = "unassigned"
+    ASSIGNED = "assigned"
+    IN_PROGRESS = "in_progress"
+    COMPLETED = "completed"
+    ABANDONED = "abandoned"
+
+    @property
+    def is_open(self) -> bool:
+        if self.value == "completed" or self.value == "abandoned":
+            return False
+        return True

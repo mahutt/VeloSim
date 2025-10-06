@@ -24,14 +24,22 @@
 
 export enum MapSource {
   Stations = 'stations',
+  Resources = 'resources',
 }
 
 // Setup helpers
 
 export function loadMapImages(map: mapboxgl.Map) {
+  // Load station image
   map.loadImage('/station.png', async (error, image) => {
     if (error) throw error;
     map.addImage('station-marker', image!);
+  });
+
+  // Load resource image
+  map.loadImage('/resource.png', async (error, image) => {
+    if (error) throw error;
+    map.addImage('resource-marker', image!);
   });
 }
 
@@ -48,12 +56,24 @@ export function initializeMapSources(map: mapboxgl.Map) {
 }
 
 export function setMapLayers(map: mapboxgl.Map) {
+  // Add layers for stations
   map.addLayer({
     id: 'stations',
     type: 'symbol',
     source: 'stations',
     layout: {
       'icon-image': 'station-marker',
+      'icon-allow-overlap': true,
+    },
+  });
+
+  // Add layers for resources
+  map.addLayer({
+    id: 'resources',
+    type: 'symbol',
+    source: 'resources',
+    layout: {
+      'icon-image': 'resource-marker',
       'icon-allow-overlap': true,
     },
   });

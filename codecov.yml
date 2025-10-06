@@ -46,17 +46,40 @@ flags:
   backend:
     paths:
       - back/
-    carryforward: false
+    carryforward: true
 
   simulation:
     paths:
       - sim/
-    carryforward: false
+    carryforward: true
 
   frontend:
     paths:
       - front/app/
-    carryforward: false
+    carryforward: true
+
+component_management:
+  individual_components:
+    - component_id: backend_component
+      name: Backend
+      flag_regexes:
+        - ^backend$
+      paths:
+        - back/**
+
+    - component_id: frontend_component
+      name: Frontend
+      flag_regexes:
+        - ^frontend$
+      paths:
+        - front/app/**
+
+    - component_id: simulation_component
+      name: Simulation
+      flag_regexes:
+        - ^simulation$
+      paths:
+        - sim/**
 
 comment: false
 

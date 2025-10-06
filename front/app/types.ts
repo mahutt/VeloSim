@@ -22,17 +22,37 @@
  * SOFTWARE.
  */
 
-/// <reference types="vite/client" />
+// Entity types
 
-interface ViteTypeOptions {
-  strictImportMetaEnv: unknown;
+export interface Station {
+  id: number;
+  name: string;
+  position: [number, number]; // [longitude, latitude]
 }
 
-interface ImportMetaEnv {
-  readonly VITE_MAPBOX_ACCESS_TOKEN: string;
-  readonly VITE_BACKEND_URL: string;
+// API response types
+
+interface PaginatedResponse {
+  total: number;
+  page: number;
+  per_page: number;
+  total_pages: number;
 }
 
-interface ImportMeta {
-  readonly env: ImportMetaEnv;
+export interface GetStationsResponse extends PaginatedResponse {
+  stations: Station[];
+}
+
+// Route types
+
+export interface Route {
+  id: string;
+  coordinates: [number, number][]; // Complete road geometry
+}
+
+// Position update
+export interface ResourcePosition {
+  resourceId: string;
+  position: [number, number];
+  routeId: string;
 }
