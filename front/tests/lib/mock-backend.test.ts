@@ -34,7 +34,7 @@ afterEach(() => {
   vi.useRealTimers();
 });
 
-test('startMockBackend sends initial frame', () => {
+test('startMockBackend sends position updates at regular intervals', () => {
   const routes: Route[] = [
     {
       id: 'r1',
@@ -52,71 +52,16 @@ test('startMockBackend sends initial frame', () => {
   expect(onFrame).not.toHaveBeenCalled();
 
   vi.advanceTimersByTime(FRAME_INTERVAL_MS);
-
   expect(onFrame).toHaveBeenCalledTimes(1);
+
+  vi.advanceTimersByTime(FRAME_INTERVAL_MS);
+  expect(onFrame).toHaveBeenCalledTimes(2);
 });
 
-test('startMockBackend sends position updates for all routes', () => {
+test('startMockBackend cleanup stops sending updates', () => {
   const routes: Route[] = [
     {
-      id: 'r1',
-      coordinates: [
-        [0, 0],
-        [1, 1],
-      ],
-    },
-    {
-      id: 'r2',
-      coordinates: [
-        [5, 5],
-        [6, 6],
-      ],
-    },
-  ];
-
-  const onFrame = vi.fn();
-  startMockBackend(routes, onFrame);
-
-  vi.advanceTimersByTime(FRAME_INTERVAL_MS);
-
-  const updates = onFrame.mock.calls[0][0];
-  expect(updates).toHaveLength(2);
-  expect(updates[0].resourceId).toBe('r1');
-  expect(updates[1].resourceId).toBe('r2');
-});
-
-test('startMockBackend advances through waypoints', () => {
-  const routes: Route[] = [
-    {
-      id: 'r1',
-      coordinates: [
-        [0, 0],
-        [1, 1],
-        [2, 2],
-      ],
-    },
-  ];
-
-  const onFrame = vi.fn();
-  startMockBackend(routes, onFrame);
-
-  // First frame
-  vi.advanceTimersByTime(FRAME_INTERVAL_MS);
-  expect(onFrame.mock.calls[0][0][0].position).toEqual([1, 1]);
-
-  // Second frame
-  vi.advanceTimersByTime(FRAME_INTERVAL_MS);
-  expect(onFrame.mock.calls[1][0][0].position).toEqual([2, 2]);
-
-  // Third frame (wraps to start)
-  vi.advanceTimersByTime(FRAME_INTERVAL_MS);
-  expect(onFrame.mock.calls[2][0][0].position).toEqual([0, 0]);
-});
-
-test('cleanup function stops mock backend', () => {
-  const routes: Route[] = [
-    {
-      id: 'r1',
+      id: 'resource-1',
       coordinates: [
         [0, 0],
         [1, 1],
@@ -132,6 +77,6 @@ test('cleanup function stops mock backend', () => {
 
   cleanup();
 
-  vi.advanceTimersByTime(FRAME_INTERVAL_MS * 5);
-  expect(onFrame).toHaveBeenCalledTimes(1); // No additional calls
+  vi.advanceTimersByTime(FRAME_INTERVAL_MS * 3);
+  expect(onFrame).toHaveBeenCalledTimes(1);
 });

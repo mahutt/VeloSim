@@ -21,7 +21,6 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
  */
-
 import {
   createContext,
   useContext,
@@ -29,7 +28,6 @@ import {
   useRef,
   type ReactNode,
 } from 'react';
-
 import { useMap } from './map-provider';
 import { MapSource, setMapSource } from '~/lib/map-helpers';
 import api from '~/api';
@@ -42,43 +40,36 @@ import type {
 import { adaptStationsToGeoJSON } from '~/lib/geojson-adapters';
 import { interpolateAlongRoute } from '~/lib/animation-helpers';
 import { startMockBackend, FRAME_INTERVAL_MS } from '~/lib/mock-backend';
-
 type SimulationContextType = {
   state: React.RefObject<Station[]>;
 };
-
 const SimulationContext = createContext<SimulationContextType | undefined>(
   undefined
 );
-
 export const SimulationProvider = ({ children }: { children: ReactNode }) => {
   const { mapRef, mapLoaded } = useMap();
   const state = useRef<Station[]>([]);
-
   // Route geometries (received once, stored for interpolation)
   const routeGeometriesRef = useRef<Map<string, [number, number][]>>(new Map());
 
   // Position tracking for each resource
+  const frameStartPositionsRef = useRef<Map<string, [number, number]>>(
+    new Map()
+  );
   const currentPositionsRef = useRef<Map<string, [number, number]>>(new Map());
   const targetPositionsRef = useRef<Map<string, [number, number]>>(new Map());
   const resourceRoutesRef = useRef<Map<string, string>>(new Map());
-
   // Global frame timing
   const lastFrameTimeRef = useRef<number>(0);
-
   // Animation and cleanup refs
   const animationFrameRef = useRef<number>(0);
   const stopMockBackendRef = useRef<(() => void) | null>(null);
-
   useEffect(() => {
     if (!mapLoaded) return;
-
     loadStations();
     loadAndAnimateResources();
-
     return cleanup;
   }, [mapLoaded]);
-
   const loadStations = () => {
     api
       .get<GetStationsResponse>('/stations')
@@ -95,7 +86,6 @@ export const SimulationProvider = ({ children }: { children: ReactNode }) => {
         console.error('Error fetching stations:', error);
       });
   };
-
   const loadAndAnimateResources = () => {
     fetch('/placeholder-data/resource-routes.geojson')
       .then((res) => res.json())
@@ -107,12 +97,10 @@ export const SimulationProvider = ({ children }: { children: ReactNode }) => {
             number,
           ][],
         }));
-
         // Store route geometries for interpolation
         routes.forEach((route) => {
           routeGeometriesRef.current.set(route.id, route.coordinates);
         });
-
         initializeResourcePositions(routes);
         startAnimation();
         startBackendSimulation(routes);
@@ -121,48 +109,54 @@ export const SimulationProvider = ({ children }: { children: ReactNode }) => {
         console.error('Error loading resource routes:', error);
       });
   };
-
   const initializeResourcePositions = (routes: Route[]) => {
     routes.forEach((route) => {
       const startPos = route.coordinates[0];
       currentPositionsRef.current.set(route.id, startPos);
+      frameStartPositionsRef.current.set(route.id, startPos);
       targetPositionsRef.current.set(route.id, startPos);
       resourceRoutesRef.current.set(route.id, route.id);
     });
   };
-
   const startBackendSimulation = (routes: Route[]) => {
     stopMockBackendRef.current = startMockBackend(routes, handleFrameUpdate);
   };
-
   /**
    * TO-DO: Handle position updates from backend frame
    * In #21, this becomes the websocket message handler
    */
   const handleFrameUpdate = (updates: ResourcePosition[]) => {
     updates.forEach((update) => {
+      // Capture where the resource is right now
+      const currentAnimatedPos = currentPositionsRef.current.get(
+        update.resourceId
+      );
+
+      // This becomes the start position for the next interpolation
+      if (currentAnimatedPos) {
+        frameStartPositionsRef.current.set(
+          update.resourceId,
+          currentAnimatedPos
+        );
+      }
+
+      // Set new target
       targetPositionsRef.current.set(update.resourceId, update.position);
       resourceRoutesRef.current.set(update.resourceId, update.routeId);
     });
-
     // Reset global frame timer when new frame arrives
     lastFrameTimeRef.current = performance.now();
   };
-
   const startAnimation = () => {
     lastFrameTimeRef.current = performance.now();
-
     const animate = (currentTime: number) => {
       updateResourcePositions(currentTime);
       animationFrameRef.current = requestAnimationFrame(animate);
     };
-
     animationFrameRef.current = requestAnimationFrame(animate);
   };
-
   const updateResourcePositions = (currentTime: number) => {
     const timeSinceLastFrame = currentTime - lastFrameTimeRef.current;
-
     // Clamped to 1.0 to avoid overshooting if frames are delayed
     const globalProgress = Math.min(
       timeSinceLastFrame / FRAME_INTERVAL_MS,
@@ -171,26 +165,24 @@ export const SimulationProvider = ({ children }: { children: ReactNode }) => {
 
     const features: GeoJSON.Feature[] = [];
 
-    currentPositionsRef.current.forEach((currentPos, resourceId) => {
+    frameStartPositionsRef.current.forEach((startPos, resourceId) => {
       const targetPos = targetPositionsRef.current.get(resourceId);
       const routeId = resourceRoutesRef.current.get(resourceId);
 
       if (!targetPos || !routeId) return;
-
       const routeGeometry = routeGeometriesRef.current.get(routeId);
       if (!routeGeometry) return;
 
-      // Interpolate position along route geometry
+      // Interpolate from frame start to target
       const interpolatedPos = interpolateAlongRoute(
         routeGeometry,
-        currentPos,
-        targetPos,
-        globalProgress
+        startPos, // Where we were when frame arrive
+        targetPos, // Where backend says we should be
+        globalProgress // Only this changes: 0→1 over 1 second
       );
 
       // Update current position for next frame
       currentPositionsRef.current.set(resourceId, interpolatedPos);
-
       features.push({
         type: 'Feature',
         geometry: {
@@ -200,15 +192,12 @@ export const SimulationProvider = ({ children }: { children: ReactNode }) => {
         properties: { id: resourceId },
       });
     });
-
     const geojson: GeoJSON.FeatureCollection = {
       type: 'FeatureCollection',
       features,
     };
-
     setMapSource(MapSource.Resources, geojson, mapRef.current!);
   };
-
   const cleanup = () => {
     if (animationFrameRef.current) {
       cancelAnimationFrame(animationFrameRef.current);
@@ -217,14 +206,12 @@ export const SimulationProvider = ({ children }: { children: ReactNode }) => {
       stopMockBackendRef.current();
     }
   };
-
   return (
     <SimulationContext.Provider value={{ state }}>
       {children}
     </SimulationContext.Provider>
   );
 };
-
 export const useSimulation = (): SimulationContextType => {
   const context = useContext(SimulationContext);
   if (!context) {
