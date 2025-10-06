@@ -22,37 +22,18 @@
  * SOFTWARE.
  */
 
-// Entity types
-
-export interface Station {
-  id: number;
-  name: string;
-  position: [number, number]; // [longitude, latitude]
-}
-
-// API response types
-
-interface PaginatedResponse {
-  total: number;
-  page: number;
-  per_page: number;
-  total_pages: number;
-}
-
-export interface GetStationsResponse extends PaginatedResponse {
-  stations: Station[];
-}
-
-// Route types
-
-export interface Route {
-  id: string;
-  coordinates: [number, number][]; // Complete road geometry
-}
-
-// Position update
-export interface ResourcePosition {
-  resourceId: string;
-  position: [number, number];
-  routeId: string;
+export function interpolateAlongRoute(
+  routeGeometry: [number, number][],
+  oldPosition: [number, number],
+  newPosition: [number, number],
+  progress: number
+): [number, number] {
+  // TODO (#21): Upgrade to use Turf.js for road-following interpolation
+  // - Use turf.nearestPointOnLine() to snap positions to route geometry
+  // - Use turf.along() to get points along actual road LineString
+  // - Ensures resources follow roads instead of straight-line movement
+  return [
+    oldPosition[0] + (newPosition[0] - oldPosition[0]) * progress,
+    oldPosition[1] + (newPosition[1] - oldPosition[1]) * progress,
+  ];
 }
