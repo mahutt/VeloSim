@@ -87,4 +87,3 @@ services:
     restart: unless-stopped
     networks:
       - velosim-net
-#velosim Grafana API token: glc_eyJvIjoiMTU0Mzg0OCIsIm4iOiJzdGFjay0xMzg2ODg3LWhsLXJlYWQtdmVsb3NpbSIsImsiOiJIcDM5MDYxd3pEcGx0NjJ3MjVOelRaSzIiLCJtIjp7InIiOiJwcm9kLWNhLWVhc3QtMCJ9fQ==
