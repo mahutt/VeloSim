@@ -1,6 +1,15 @@
 version: "3.8"
 
+networks:
+  velosim-net:
+    driver: bridge
+
+volumes:
+  postgres_data:
+    driver: local
+
 services:
+  # --- Postgres ---
   postgres:
     image: postgres:15-alpine
     container_name: velosim-postgres
@@ -20,7 +29,62 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+    networks:
+      - velosim-net
 
-volumes:
-  postgres_data:
-    driver: local
+  # --- Loki ---
+  loki:
+    image: grafana/loki:2.9.0
+    container_name: velosim-loki
+    ports:
+      - "3100:3100"
+    volumes:
+      - ./back/logging/loki-config.yaml:/etc/loki/local-config.yaml
+      - ./back/logging/loki/chunks:/loki/chunks
+      - ./back/logging/loki/index:/loki/index
+      - ./back/logging/loki/cache:/loki/cache
+      - ./back/logging/loki/wal:/loki/wal
+      - ./back/logging/loki/compactor:/loki/compactor
+    command: -config.file=/etc/loki/local-config.yaml
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:3100/ready || exit 1"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    networks:
+      - velosim-net
+
+  # --- Grafana ---
+  grafana:
+    image: grafana/grafana:11.0.0
+    container_name: velosim-grafana
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+      # Preconfigure a local Loki datasource pointing to our Loki container
+      - GF_DATASOURCES_LOKI_NAME=Loki
+      - GF_DATASOURCES_LOKI_TYPE=loki
+      - GF_DATASOURCES_LOKI_URL=http://loki:3100
+      - GF_DATASOURCES_LOKI_ACCESS=proxy
+      - GF_DATASOURCES_LOKI_BASIC_AUTH=false
+    depends_on:
+      loki:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - velosim-net
+
+  # --- Grafana Alloy ---
+  grafana-alloy:
+    image: grafana/alloy:latest
+    container_name: velosim-alloy
+    volumes:
+      - ./back/logging/config.alloy:/etc/alloy/config.alloy
+    command: ["run", "/etc/alloy/config.alloy"]
+    restart: unless-stopped
+    networks:
+      - velosim-net
+#velosim Grafana API token: glc_eyJvIjoiMTU0Mzg0OCIsIm4iOiJzdGFjay0xMzg2ODg3LWhsLXJlYWQtdmVsb3NpbSIsImsiOiJIcDM5MDYxd3pEcGx0NjJ3MjVOelRaSzIiLCJtIjp7InIiOiJwcm9kLWNhLWVhc3QtMCJ9fQ==

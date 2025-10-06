@@ -1,0 +1,14 @@
+loki.write "grafanacloud" {
+  endpoint {
+    url = "https://logs-prod-018.grafana.net/loki/api/v1/push"
+    basic_auth {
+      username = "1344681"
+      password = "glc_eyJvIjoiMTU0Mzg0OCIsIm4iOiJzdGFjay0xMzg2ODg3LWhsLXJlYWQtdmVsb3NpbSIsImsiOiJIcDM5MDYxd3pEcGx0NjJ3MjVOelRaSzIiLCJtIjp7InIiOiJwcm9kLWNhLWVhc3QtMCJ9fQ=="
+    }
+  }
+}
+
+source "file" "project_logs" {
+  path = "/etc/alloy/logs/project.log"   # path inside container
+  labels = { job = "velosim-test" }      # label for querying in Grafana
+}
