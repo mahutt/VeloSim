@@ -23,6 +23,7 @@ SOFTWARE.
 """
 
 from typing import List
+from sim.entities.frame import Frame
 from sim.utils.publisher import Publisher
 from sim.utils.subscriber import Subscriber
 
@@ -36,4 +37,9 @@ class FrameEmitter(Publisher):
             self.subscribers.append(sub)
 
     def detach(self, sub: Subscriber) -> None:
-        pass
+        if sub in self.subscribers:
+            self.subscribers.remove(sub)
+
+    def notify(self, frame: Frame) -> None:
+        for subs in self.subscribers:
+            subs.on_frame(frame)
