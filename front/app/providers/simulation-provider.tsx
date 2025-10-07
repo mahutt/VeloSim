@@ -44,6 +44,7 @@ import type {
 import { adaptStationsToGeoJSON } from '~/lib/geojson-adapters';
 import { interpolateAlongRoute } from '~/lib/animation-helpers';
 import { startMockBackend, FRAME_INTERVAL_MS } from '~/lib/mock-backend';
+import { setupMapClickHandlers } from '~/lib/map-click-handlers';
 
 type SimulationContextType = {
   state: React.RefObject<Station[]>;
@@ -109,6 +110,10 @@ export const SimulationProvider = ({ children }: { children: ReactNode }) => {
         console.error('Error loading resource routes:', error);
       });
 
+    // Set up map click handlers for selection
+    setupMapClickHandlers(mapRef.current!, setSelectedItem);
+
+    // Cleanup on unmount
     return cleanup;
   }, [mapLoaded]);
 

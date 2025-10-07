@@ -34,7 +34,7 @@ import { MapProvider } from '~/providers/map-provider';
 import { MockMap } from 'tests/mocks';
 import MapContainer from '~/components/map/map-container';
 import { setMapSource, MapSource } from '~/lib/map-helpers';
-import type { GetStationsResponse, Station } from '~/types';
+import type { GetStationsResponse, Station, SelectedItem } from '~/types';
 import api from '~/api';
 import { adaptStationsToGeoJSON } from '~/lib/geojson-adapters';
 
@@ -426,4 +426,89 @@ test('simulation provider cleans up on unmount', async () => {
 
   cancelAnimationFrameSpy.mockRestore();
   clearIntervalSpy.mockRestore();
+});
+
+test('simulation provider provides selection state', () => {
+  (api.get as Mock).mockResolvedValueOnce({
+    data: mockGetStationsResponse,
+  });
+
+  mockFetch.mockResolvedValueOnce({
+    ok: true,
+    json: () => Promise.resolve(mockResourceRoutesData),
+  });
+
+  let selectedItem: SelectedItem | null | undefined;
+  let setSelectedItem: ((item: SelectedItem | null) => void) | undefined;
+
+  const TestComponent = () => {
+    const context = useSimulation();
+    selectedItem = context.selectedItem;
+    setSelectedItem = context.setSelectedItem;
+    return null;
+  };
+
+  render(
+    <MapProvider>
+      <SimulationProvider>
+        <MapContainer />
+        <TestComponent />
+      </SimulationProvider>
+    </MapProvider>
+  );
+
+  expect(selectedItem).toBeNull();
+  expect(setSelectedItem).toBeDefined();
+});
+
+test('simulation provider allows updating selection state', () => {
+  (api.get as Mock).mockResolvedValueOnce({
+    data: mockGetStationsResponse,
+  });
+
+  mockFetch.mockResolvedValueOnce({
+    ok: true,
+    json: () => Promise.resolve(mockResourceRoutesData),
+  });
+
+  const TestComponent = () => {
+    const { selectedItem, setSelectedItem } = useSimulation();
+
+    return (
+      <div>
+        <div data-testid="selected-id">
+          {selectedItem ? selectedItem.id : 'none'}
+        </div>
+        <button
+          onClick={() =>
+            setSelectedItem({
+              type: 'station',
+              id: 'test-station',
+              position: [0, 0],
+              properties: {},
+            })
+          }
+        >
+          Select
+        </button>
+      </div>
+    );
+  };
+
+  const { getByTestId, getByText } = render(
+    <MapProvider>
+      <SimulationProvider>
+        <MapContainer />
+        <TestComponent />
+      </SimulationProvider>
+    </MapProvider>
+  );
+
+  expect(getByTestId('selected-id')).toHaveTextContent('none');
+
+  act(() => {
+    getByText('Select').click();
+  });
+
+  expect(getByTestId('selected-id')).toHaveTextContent('test-station');
 });
