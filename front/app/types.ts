@@ -50,9 +50,9 @@ export interface Route {
   coordinates: [number, number][]; // Complete road geometry
 }
 
-// Position update
-export interface ResourcePosition {
-  resourceId: string;
+// Resource types
+export interface Resource {
+  id: string;
   position: [number, number];
   routeId: string;
 }
@@ -62,7 +62,5 @@ export type SelectedItemType = 'station' | 'resource';
 
 export interface SelectedItem {
   type: SelectedItemType;
-  id: string;
-  position: [number, number];
-  properties: Record<string, unknown>;
+  value: Station | Resource;
 }
