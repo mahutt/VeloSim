@@ -22,6 +22,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 """
 
+import threading
 from typing import List
 from sim.entities.frame import Frame
 from sim.utils.publisher import Publisher
@@ -29,17 +30,26 @@ from sim.utils.subscriber import Subscriber
 
 
 class FrameEmitter(Publisher):
-    def __init__(self) -> None:
-        self.subscribers: List[Subscriber] = []
+    def __init__(self, simId: str, subscribers: List[Subscriber]) -> None:
+        self.subscribers = subscribers
+        self.simId = simId
+        self._lock = threading.Lock()
 
     def attach(self, sub: Subscriber) -> None:
-        if sub not in self.subscribers:
-            self.subscribers.append(sub)
+        with self._lock:
+            if sub not in self.subscribers:
+                self.subscribers.append(sub)
 
     def detach(self, sub: Subscriber) -> None:
-        if sub in self.subscribers:
-            self.subscribers.remove(sub)
+        with self._lock:
+            if sub in self.subscribers:
+                self.subscribers.remove(sub)
 
     def notify(self, frame: Frame) -> None:
-        for subs in self.subscribers:
+        with self._lock:
+            live_subscribers = list(
+                self.subscribers
+            )  # Taking live subs to prevent deadlock.
+
+        for subs in live_subscribers:
             subs.on_frame(frame)

@@ -24,17 +24,21 @@ SOFTWARE.
 
 import threading
 import time
-from typing import Dict, TypedDict
+from typing import Dict, List, TypedDict
 import uuid
 import simpy
 
+from sim.entities.frame import Frame
 from sim.entities.inputParameters import InputParameter
 from sim.entities.request_type import RequestType
+from sim.frame_emitter import FrameEmitter
+from sim.utils.subscriber import Subscriber
 
 
 class RunInfo(TypedDict):
     thread: threading.Thread
     stop: threading.Event
+    emitter: FrameEmitter
 
 
 class Simulator:
@@ -42,18 +46,25 @@ class Simulator:
         self.thread_pool: Dict[str, RunInfo] = {}
         self.thread_pool_lock = threading.Lock()
 
-    def start(self, input_parameters: InputParameter) -> str:
+    def start(
+        self, input_parameters: InputParameter, subscribers: List[Subscriber]
+    ) -> str:
         run_id = str(uuid.uuid4())  # threadID / SIM ID
         stop_flag = threading.Event()
+        emitter = FrameEmitter(run_id, subscribers)
 
         def sim_loop() -> None:
-            env = (
-                simpy.Environment()
-            )  # Created for later use (So we can pass to the controller)
-
+            env = simpy.Environment()
             _ = env  # Keeps linter happy. (temporary)
+            global_seq = 0
 
             while not stop_flag.is_set():  # Run until stop is called!
+                frame = Frame(
+                    seq_numb=global_seq,
+                    payload="This is my current info... beep boop beep boop",
+                )
+                global_seq += 1
+                emitter.notify(frame)
                 print(f"Hello From Simulator: [{run_id}]")
                 time.sleep(1)
             print(f"[{run_id}] stopped.")
@@ -63,7 +74,11 @@ class Simulator:
         with self.thread_pool_lock:
             if run_id in self.thread_pool:
                 raise RuntimeError(f"Run id already present: {run_id}")
-            self.thread_pool[run_id] = {"thread": t, "stop": stop_flag}
+            self.thread_pool[run_id] = {
+                "thread": t,
+                "stop": stop_flag,
+                "emitter": emitter,
+            }
             t.start()
 
         return run_id

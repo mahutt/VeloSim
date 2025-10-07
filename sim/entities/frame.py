@@ -21,11 +21,18 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 """
+import time
 
 
-# This class is a placeholder for when we define
-# what a frame will be later down in the project.
 class Frame:
-    seq_number: int
-    timestamp_ms: int
-    payload: str
+    def __init__(self, seq_numb: int, payload: str) -> None:
+        self.seq_number = seq_numb
+        self.timestamp_ms = int(time.time() * 1000)
+        self.payload = payload
+
+    def __repr__(self) -> str:  # ToString method.
+        return (
+            f"Frame(seq={self.seq_number}, "
+            f"timestamp={self.timestamp_ms}, "
+            f"payload={self.payload})"
+        )
