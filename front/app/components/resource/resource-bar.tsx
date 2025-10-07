@@ -22,25 +22,35 @@
  * SOFTWARE.
  */
 
-import 'mapbox-gl/dist/mapbox-gl.css';
-import MapContainer from '~/components/map/map-container';
-import { MapProvider } from '~/providers/map-provider';
-import { SimulationProvider } from '~/providers/simulation-provider';
-import ResourceBar from '~/components/resource/resource-bar';
+import { ResourceItem } from './resource-item';
 
-export function meta() {
-  return [{ title: 'Simulation' }];
-}
+export default function ResourceBar() {
+  const placeholderResources = [
+    '1',
+    '2',
+    '3',
+    '4',
+    '5',
+    '6',
+    '7',
+    '8',
+    '9',
+    '10',
+  ];
 
-export default function Simulation() {
   return (
-    <>
-      <MapProvider>
-        <SimulationProvider>
-          <MapContainer />
-          <ResourceBar />
-        </SimulationProvider>
-      </MapProvider>
-    </>
+    <div className="absolute top-4 right-4 w-60 bg-gray-300 shadow rounded p-4">
+      <div className="space-y-2">
+        {placeholderResources.map((id) => (
+          <ResourceItem
+            key={id}
+            id={id}
+            onSelect={(id) => console.log(id)}
+            // logging the selection for now
+            // can replace with modal or other action later
+          />
+        ))}
+      </div>
+    </div>
   );
 }
