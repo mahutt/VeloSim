@@ -51,7 +51,7 @@ class Simulator:
     ) -> str:
         run_id = str(uuid.uuid4())  # threadID / SIM ID
         stop_flag = threading.Event()
-        emitter = FrameEmitter(run_id, subscribers)
+        emitter = FrameEmitter(run_id)
 
         for sub in subscribers:
             emitter.attach(sub)
