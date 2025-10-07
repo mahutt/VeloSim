@@ -24,8 +24,7 @@ SOFTWARE.
 
 from typing import List, Optional, Tuple
 from sqlalchemy.orm import Session
-from sqlalchemy import func
-from back.models import StationTask
+from back.models import StationTask, TaskStatus
 from back.schemas.station_task import StationTaskCreate, StationTaskUpdate
 
 
@@ -49,12 +48,31 @@ class StationTaskCRUD:
         return db.query(StationTask).filter(StationTask.id == task_id).first()
 
     def get_all(
-        self, db: Session, skip: int = 0, limit: int = 100
+        self,
+        db: Session,
+        station_id: Optional[int] = None,
+        task_status: Optional[TaskStatus] = None,
+        skip: int = 0,
+        limit: int = 10,
     ) -> Tuple[List[StationTask], int]:
-        """Get all station tasks with pagination."""
-        total = db.query(func.count(StationTask.id)).scalar() or 0
-        tasks = db.query(StationTask).offset(skip).limit(limit).all()
-        return tasks, total
+        """Get all station tasks with optional filters and pagination."""
+
+        # Build the base query
+        query = db.query(StationTask)
+
+        # Apply filters conditionally
+        if station_id is not None:
+            query = query.filter(StationTask.station_id == station_id)
+        if task_status is not None:
+            query = query.filter(StationTask.status == task_status)
+
+        # Get total count for pagination
+        total = query.count()
+
+        # Apply pagination
+        station_tasks = query.offset(skip).limit(limit).all()
+
+        return station_tasks, total
 
     def update(
         self, db: Session, task_id: int, station_task_data: StationTaskUpdate
