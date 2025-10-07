@@ -22,51 +22,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 """
 
-# Import all schemas here for easy access
-from .station import (
-    PositionSchema,
-    StationBase,
-    StationCreate,
-    StationUpdate,
-    StationResponse,
-    StationListResponse,
-)
-from .station_task import (
-    StationTaskBase,
-    StationTaskCreate,
-    StationTaskUpdate,
-    StationTaskResponse,
-    StationTaskType,
-    StationTaskListResponse,
-)
-from .resource import (
-    ResourceBase,
-    ResourceCreate,
-    ResourceListResponse,
-    ResourceResponse,
-    ResourceTaskAssign,
-    ResourceTaskUnassign,
-    ResourceUpdate,
-)
+# Import all validators here for easy access
+from .validators import validate_longitude, validate_latitude
 
-__all__ = [
-    "PositionSchema",
-    "StationBase",
-    "StationCreate",
-    "StationUpdate",
-    "StationResponse",
-    "StationListResponse",
-    "StationTaskBase",
-    "StationTaskCreate",
-    "StationTaskUpdate",
-    "StationTaskResponse",
-    "StationTaskType",
-    "StationTaskListResponse",
-    "ResourceBase",
-    "ResourceCreate",
-    "ResourceListResponse",
-    "ResourceResponse",
-    "ResourceTaskAssign",
-    "ResourceTaskUnassign",
-    "ResourceUpdate",
-]
+__all__ = ["validate_longitude", "validate_latitude"]

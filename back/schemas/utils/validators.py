@@ -22,51 +22,18 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 """
 
-# Import all schemas here for easy access
-from .station import (
-    PositionSchema,
-    StationBase,
-    StationCreate,
-    StationUpdate,
-    StationResponse,
-    StationListResponse,
-)
-from .station_task import (
-    StationTaskBase,
-    StationTaskCreate,
-    StationTaskUpdate,
-    StationTaskResponse,
-    StationTaskType,
-    StationTaskListResponse,
-)
-from .resource import (
-    ResourceBase,
-    ResourceCreate,
-    ResourceListResponse,
-    ResourceResponse,
-    ResourceTaskAssign,
-    ResourceTaskUnassign,
-    ResourceUpdate,
-)
+from typing import Any
 
-__all__ = [
-    "PositionSchema",
-    "StationBase",
-    "StationCreate",
-    "StationUpdate",
-    "StationResponse",
-    "StationListResponse",
-    "StationTaskBase",
-    "StationTaskCreate",
-    "StationTaskUpdate",
-    "StationTaskResponse",
-    "StationTaskType",
-    "StationTaskListResponse",
-    "ResourceBase",
-    "ResourceCreate",
-    "ResourceListResponse",
-    "ResourceResponse",
-    "ResourceTaskAssign",
-    "ResourceTaskUnassign",
-    "ResourceUpdate",
-]
+
+def validate_longitude(v: Any) -> float:
+    """Validate that longitude is between -180 and 180."""
+    if not -180 <= v <= 180:
+        raise ValueError("Longitude must be between -180 and 180")
+    return float(v)
+
+
+def validate_latitude(v: Any) -> float:
+    """Validate that latitude is between -90 and 90."""
+    if not -90 <= v <= 90:
+        raise ValueError("Latitude must be between -90 and 90")
+    return float(v)

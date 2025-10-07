@@ -22,51 +22,10 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 """
 
-# Import all schemas here for easy access
-from .station import (
-    PositionSchema,
-    StationBase,
-    StationCreate,
-    StationUpdate,
-    StationResponse,
-    StationListResponse,
-)
-from .station_task import (
-    StationTaskBase,
-    StationTaskCreate,
-    StationTaskUpdate,
-    StationTaskResponse,
-    StationTaskType,
-    StationTaskListResponse,
-)
-from .resource import (
-    ResourceBase,
-    ResourceCreate,
-    ResourceListResponse,
-    ResourceResponse,
-    ResourceTaskAssign,
-    ResourceTaskUnassign,
-    ResourceUpdate,
-)
+from enum import Enum
 
-__all__ = [
-    "PositionSchema",
-    "StationBase",
-    "StationCreate",
-    "StationUpdate",
-    "StationResponse",
-    "StationListResponse",
-    "StationTaskBase",
-    "StationTaskCreate",
-    "StationTaskUpdate",
-    "StationTaskResponse",
-    "StationTaskType",
-    "StationTaskListResponse",
-    "ResourceBase",
-    "ResourceCreate",
-    "ResourceListResponse",
-    "ResourceResponse",
-    "ResourceTaskAssign",
-    "ResourceTaskUnassign",
-    "ResourceUpdate",
-]
+
+class ResourceType(Enum):
+    VEHICLE_DRIVER = "vehicle_driver"
+    # Each resource combines a driver and a vehicle, since they are always
+    # paired in this context.

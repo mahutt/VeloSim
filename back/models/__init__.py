@@ -27,5 +27,14 @@ from .station import Station
 from .task_status import TaskStatus
 from .station_task_type import StationTaskType
 from .station_task import StationTask
+from .resource import Resource
+from .resource_type import ResourceType
 
-__all__ = ["Station", "TaskStatus", "StationTaskType", "StationTask"]
+__all__ = [
+    "Station",
+    "TaskStatus",
+    "StationTaskType",
+    "StationTask",
+    "Resource",
+    "ResourceType",
+]

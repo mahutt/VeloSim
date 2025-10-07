@@ -25,6 +25,8 @@ SOFTWARE.
 from typing import List, Optional, Any
 from pydantic import BaseModel, Field, field_validator, ConfigDict, computed_field
 
+from back.schemas.utils import validate_longitude, validate_latitude
+
 
 class PositionSchema(BaseModel):
     """Schema for position data [longitude, latitude]."""
@@ -34,17 +36,13 @@ class PositionSchema(BaseModel):
 
     @field_validator("longitude")
     @classmethod
-    def validate_longitude(cls, v: Any) -> float:
-        if not -180 <= v <= 180:
-            raise ValueError("Longitude must be between -180 and 180")
-        return float(v)
+    def check_longitude(cls, v: Any) -> float:
+        return validate_longitude(v)
 
     @field_validator("latitude")
     @classmethod
-    def validate_latitude(cls, v: Any) -> float:
-        if not -90 <= v <= 90:
-            raise ValueError("Latitude must be between -90 and 90")
-        return float(v)
+    def check_latitude(cls, v: Any) -> float:
+        return validate_latitude(v)
 
 
 class StationBase(BaseModel):
@@ -56,17 +54,13 @@ class StationBase(BaseModel):
 
     @field_validator("longitude")
     @classmethod
-    def validate_longitude(cls, v: Any) -> float:
-        if not -180 <= v <= 180:
-            raise ValueError("Longitude must be between -180 and 180")
-        return float(v)
+    def check_longitude(cls, v: Any) -> float:
+        return validate_longitude(v)
 
     @field_validator("latitude")
     @classmethod
-    def validate_latitude(cls, v: Any) -> float:
-        if not -90 <= v <= 90:
-            raise ValueError("Latitude must be between -90 and 90")
-        return float(v)
+    def check_latitude(cls, v: Any) -> float:
+        return validate_latitude(v)
 
 
 class StationCreate(StationBase):
@@ -86,17 +80,17 @@ class StationUpdate(BaseModel):
 
     @field_validator("longitude")
     @classmethod
-    def validate_longitude(cls, v: Any) -> Optional[float]:
-        if v is not None and not -180 <= v <= 180:
-            raise ValueError("Longitude must be between -180 and 180")
-        return float(v) if v is not None else None
+    def check_optional_longitude(cls, v: Any) -> Optional[float]:
+        if v is not None:
+            return validate_longitude(v)
+        return None
 
     @field_validator("latitude")
     @classmethod
-    def validate_latitude(cls, v: Any) -> Optional[float]:
-        if v is not None and not -90 <= v <= 90:
-            raise ValueError("Latitude must be between -90 and 90")
-        return float(v) if v is not None else None
+    def check_optional_latitude(cls, v: Any) -> Optional[float]:
+        if v is not None:
+            return validate_latitude(v)
+        return None
 
 
 class StationResponse(BaseModel):
