@@ -50,9 +50,18 @@ export interface Route {
   coordinates: [number, number][]; // Complete road geometry
 }
 
+// Resource types
 export interface Resource {
-  resourceId: string;
+  id: string;
   position: [number, number];
   taskList: number[]; // list of task IDs
   routeId: string;
+}
+
+// Selection types
+export type SelectedItemType = 'station' | 'resource';
+
+export interface SelectedItem {
+  type: SelectedItemType;
+  value: Station | Resource;
 }

@@ -22,7 +22,7 @@
  * SOFTWARE.
  */
 
-import type { Route, ResourcePosition } from '~/types';
+import type { Route, Resource } from '~/types';
 
 // Backend sends position updates every 1 second
 export const FRAME_INTERVAL_MS = 1000;
@@ -32,14 +32,14 @@ export const FRAME_INTERVAL_MS = 1000;
  */
 export function startMockBackend(
   routes: Route[],
-  onFrame: (updates: ResourcePosition[]) => void
+  onFrame: (updates: Resource[]) => void
 ): () => void {
   // Track waypoint progression
   const waypointIndices = new Map<string, number>();
   routes.forEach((route) => waypointIndices.set(route.id, 0));
 
   const intervalId = window.setInterval(() => {
-    const updates: ResourcePosition[] = [];
+    const updates: Resource[] = [];
 
     routes.forEach((route) => {
       const currentIndex = waypointIndices.get(route.id)!;
@@ -50,7 +50,7 @@ export function startMockBackend(
 
       // Send position update
       updates.push({
-        resourceId: route.id,
+        id: route.id,
         position: position,
         routeId: route.id,
       });

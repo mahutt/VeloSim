@@ -28,61 +28,61 @@ import type { Resource } from '~/types';
 export default function ResourceBar() {
   const placeholderResources: Resource[] = [
     {
-      resourceId: '1',
+      id: '1',
       position: [-74.006, 40.7128],
       taskList: [101, 102],
       routeId: '',
     },
     {
-      resourceId: '2',
+      id: '2',
       position: [-74.0059, 40.7138],
       taskList: [103],
       routeId: '',
     },
     {
-      resourceId: '3',
+      id: '3',
       position: [-74.0055, 40.7148],
       taskList: [],
       routeId: '',
     },
     {
-      resourceId: '4',
+      id: '4',
       position: [-74.0045, 40.7158],
       taskList: [104, 105, 106],
       routeId: '',
     },
     {
-      resourceId: '5',
+      id: '5',
       position: [-74.0035, 40.7168],
       taskList: [107],
       routeId: '',
     },
     {
-      resourceId: '6',
+      id: '6',
       position: [-74.0025, 40.7178],
       taskList: [108, 109],
       routeId: '',
     },
     {
-      resourceId: '7',
+      id: '7',
       position: [-74.0015, 40.7188],
       taskList: [],
       routeId: '',
     },
     {
-      resourceId: '8',
+      id: '8',
       position: [-74.0005, 40.7198],
       taskList: [110],
       routeId: '',
     },
     {
-      resourceId: '9',
+      id: '9',
       position: [-73.9995, 40.7208],
       taskList: [111, 112],
       routeId: '',
     },
     {
-      resourceId: '10',
+      id: '10',
       position: [-73.9985, 40.7218],
       taskList: [113],
       routeId: '',
@@ -94,8 +94,8 @@ export default function ResourceBar() {
       <div className="space-y-2">
         {placeholderResources.map((resource) => (
           <ResourceItem
-            key={resource.resourceId}
-            resourceId={resource.resourceId}
+            key={resource.id}
+            resourceId={resource.id}
             resource={resource}
             onSelect={(resourceId) => console.log(resourceId)}
             // logging the selection for now
