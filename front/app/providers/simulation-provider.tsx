@@ -27,6 +27,7 @@ import {
   useContext,
   useEffect,
   useRef,
+  useState,
   type ReactNode,
 } from 'react';
 
@@ -38,6 +39,7 @@ import type {
   Station,
   Route,
   ResourcePosition,
+  SelectedItem,
 } from '~/types';
 import { adaptStationsToGeoJSON } from '~/lib/geojson-adapters';
 import { interpolateAlongRoute } from '~/lib/animation-helpers';
@@ -45,6 +47,8 @@ import { startMockBackend, FRAME_INTERVAL_MS } from '~/lib/mock-backend';
 
 type SimulationContextType = {
   state: React.RefObject<Station[]>;
+  selectedItem: SelectedItem | null;
+  setSelectedItem: (item: SelectedItem | null) => void;
 };
 
 const SimulationContext = createContext<SimulationContextType | undefined>(
@@ -54,6 +58,9 @@ const SimulationContext = createContext<SimulationContextType | undefined>(
 export const SimulationProvider = ({ children }: { children: ReactNode }) => {
   const { mapRef, mapLoaded } = useMap();
   const state = useRef<Station[]>([]);
+
+  // Selection state
+  const [selectedItem, setSelectedItem] = useState<SelectedItem | null>(null);
 
   // Route geometries (received once, stored for interpolation)
   const routeGeometriesRef = useRef<Map<string, [number, number][]>>(new Map());
@@ -241,7 +248,9 @@ export const SimulationProvider = ({ children }: { children: ReactNode }) => {
   };
 
   return (
-    <SimulationContext.Provider value={{ state }}>
+    <SimulationContext.Provider
+      value={{ state, selectedItem, setSelectedItem }}
+    >
       {children}
     </SimulationContext.Provider>
   );
