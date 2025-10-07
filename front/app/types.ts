@@ -56,3 +56,13 @@ export interface ResourcePosition {
   position: [number, number];
   routeId: string;
 }
+
+// Selection types
+export type SelectedItemType = 'station' | 'resource';
+
+export interface SelectedItem {
+  type: SelectedItemType;
+  id: string;
+  position: [number, number];
+  properties: Record<string, unknown>;
+}
