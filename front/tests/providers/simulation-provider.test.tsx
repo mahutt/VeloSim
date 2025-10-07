@@ -54,6 +54,7 @@ vi.mock('~/lib/map-helpers.ts', () => {
     initializeMapSources: vi.fn(),
     setMapLayers: vi.fn(),
     setMapSource: vi.fn(),
+    setupMapClickHandlers: vi.fn(),
     MapSource: {
       Stations: 'stations',
       Resources: 'resources',
@@ -476,26 +477,28 @@ test('simulation provider allows updating selection state', () => {
 
     return (
       <div>
-        <div data-testid="selected-id">
-          {selectedItem ? selectedItem.id : 'none'}
+        <div data-testid="selected-item">
+          {selectedItem ? JSON.stringify(selectedItem) : 'null'}
         </div>
         <button
+          data-testid="select-station"
           onClick={() =>
             setSelectedItem({
               type: 'station',
-              id: 'test-station',
-              position: [0, 0],
-              properties: {},
+              value: mockGetStationsResponse.stations[0],
             })
           }
         >
-          Select
+          Select Station
+        </button>
+        <button data-testid="deselect" onClick={() => setSelectedItem(null)}>
+          Deselect
         </button>
       </div>
     );
   };
 
-  const { getByTestId, getByText } = render(
+  const { getByTestId } = render(
     <MapProvider>
       <SimulationProvider>
         <MapContainer />
@@ -504,11 +507,22 @@ test('simulation provider allows updating selection state', () => {
     </MapProvider>
   );
 
-  expect(getByTestId('selected-id')).toHaveTextContent('none');
+  expect(getByTestId('selected-item')).toHaveTextContent('null');
 
   act(() => {
-    getByText('Select').click();
+    getByTestId('select-station').click();
   });
 
-  expect(getByTestId('selected-id')).toHaveTextContent('test-station');
+  expect(getByTestId('selected-item')).toHaveTextContent(
+    JSON.stringify({
+      type: 'station',
+      value: mockGetStationsResponse.stations[0],
+    })
+  );
+
+  act(() => {
+    getByTestId('deselect').click();
+  });
+
+  expect(getByTestId('selected-item')).toHaveTextContent('null');
 });

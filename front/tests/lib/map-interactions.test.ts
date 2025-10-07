@@ -23,10 +23,11 @@
  */
 
 import { expect, test, vi } from 'vitest';
-import { setupMapClickHandlers } from '~/lib/map-click-handlers';
+import { setupMapClickHandlers } from '~/lib/map-interactions';
 import type { Map as MapboxMap } from 'mapbox-gl';
+import { MapSource } from '~/lib/map-helpers';
 
-test('setupMapClickHandlers registers all event listeners', () => {
+test('setupMapClickHandlers registers event listeners', () => {
   const mockMap = {
     on: vi.fn(),
     getCanvas: vi.fn(() => ({ style: { cursor: '' } })),
@@ -36,41 +37,32 @@ test('setupMapClickHandlers registers all event listeners', () => {
   const onItemSelect = vi.fn();
   setupMapClickHandlers(mockMap, onItemSelect);
 
-  expect(mockMap.on).toHaveBeenCalledTimes(7);
-  expect(mockMap.on).toHaveBeenCalledWith(
-    'click',
-    'stations',
-    expect.any(Function)
-  );
-  expect(mockMap.on).toHaveBeenCalledWith(
-    'click',
-    'resources',
-    expect.any(Function)
-  );
+  // Should register 1 click + 4 cursor listeners (2 layers * 2 events)
+  expect(mockMap.on).toHaveBeenCalledTimes(5);
   expect(mockMap.on).toHaveBeenCalledWith('click', expect.any(Function));
   expect(mockMap.on).toHaveBeenCalledWith(
     'mouseenter',
-    'stations',
+    MapSource.Stations,
     expect.any(Function)
   );
   expect(mockMap.on).toHaveBeenCalledWith(
     'mouseleave',
-    'stations',
+    MapSource.Stations,
     expect.any(Function)
   );
   expect(mockMap.on).toHaveBeenCalledWith(
     'mouseenter',
-    'resources',
+    MapSource.Resources,
     expect.any(Function)
   );
   expect(mockMap.on).toHaveBeenCalledWith(
     'mouseleave',
-    'resources',
+    MapSource.Resources,
     expect.any(Function)
   );
 });
 
-test('station click calls onItemSelect with correct data', () => {
+test('clicking station calls onItemSelect with wrapped station data', () => {
   const handlers: Record<string, (event: unknown) => void> = {};
   const mockMap = {
     on: vi.fn(
@@ -87,34 +79,31 @@ test('station click calls onItemSelect with correct data', () => {
       }
     ),
     getCanvas: vi.fn(() => ({ style: { cursor: '' } })),
-    queryRenderedFeatures: vi.fn(() => []),
+    queryRenderedFeatures: vi.fn(() => [
+      {
+        layer: { id: MapSource.Stations },
+        geometry: { type: 'Point', coordinates: [-73.5, 45.5] },
+        properties: { id: 123, name: 'Test Station' },
+      },
+    ]),
   } as unknown as MapboxMap;
 
   const onItemSelect = vi.fn();
   setupMapClickHandlers(mockMap, onItemSelect);
 
-  const mockEvent = {
-    features: [
-      {
-        geometry: { type: 'Point', coordinates: [-73.5, 45.5] },
-        properties: { id: '123', name: 'Test Station' },
-      },
-    ],
-    originalEvent: { stopPropagation: vi.fn() },
-  };
-
-  handlers['click-stations'](mockEvent);
+  handlers['click']({ point: { x: 100, y: 100 } });
 
   expect(onItemSelect).toHaveBeenCalledWith({
     type: 'station',
-    id: '123',
-    position: [-73.5, 45.5],
-    properties: { id: '123', name: 'Test Station' },
+    value: {
+      id: 123,
+      name: 'Test Station',
+      position: [-73.5, 45.5],
+    },
   });
-  expect(mockEvent.originalEvent.stopPropagation).toHaveBeenCalled();
 });
 
-test('station click with no features does nothing', () => {
+test('clicking resource calls onItemSelect with wrapped resource data', () => {
   const handlers: Record<string, (event: unknown) => void> = {};
   const mockMap = {
     on: vi.fn(
@@ -131,61 +120,72 @@ test('station click with no features does nothing', () => {
       }
     ),
     getCanvas: vi.fn(() => ({ style: { cursor: '' } })),
-    queryRenderedFeatures: vi.fn(() => []),
-  } as unknown as MapboxMap;
-
-  const onItemSelect = vi.fn();
-  setupMapClickHandlers(mockMap, onItemSelect);
-
-  handlers['click-stations']({ features: [] });
-
-  expect(onItemSelect).not.toHaveBeenCalled();
-});
-
-test('station click handles missing properties', () => {
-  const handlers: Record<string, (event: unknown) => void> = {};
-  const mockMap = {
-    on: vi.fn(
-      (
-        event: string,
-        layerOrHandler: string | ((e: unknown) => void),
-        handler?: (e: unknown) => void
-      ) => {
-        if (typeof layerOrHandler === 'function') {
-          handlers[event] = layerOrHandler;
-        } else if (handler) {
-          handlers[`${event}-${layerOrHandler}`] = handler;
-        }
-      }
-    ),
-    getCanvas: vi.fn(() => ({ style: { cursor: '' } })),
-    queryRenderedFeatures: vi.fn(() => []),
-  } as unknown as MapboxMap;
-
-  const onItemSelect = vi.fn();
-  setupMapClickHandlers(mockMap, onItemSelect);
-
-  const mockEvent = {
-    features: [
+    queryRenderedFeatures: vi.fn(() => [
       {
+        layer: { id: MapSource.Resources },
+        geometry: { type: 'Point', coordinates: [-73.6, 45.6] },
+        properties: { id: 'resource-1', routeId: 'route-1' },
+      },
+    ]),
+  } as unknown as MapboxMap;
+
+  const onItemSelect = vi.fn();
+  setupMapClickHandlers(mockMap, onItemSelect);
+
+  handlers['click']({ point: { x: 100, y: 100 } });
+
+  expect(onItemSelect).toHaveBeenCalledWith({
+    type: 'resource',
+    value: {
+      id: 'resource-1',
+      position: [-73.6, 45.6],
+      routeId: 'route-1',
+    },
+  });
+});
+
+test('clicking station with missing properties uses defaults', () => {
+  const handlers: Record<string, (event: unknown) => void> = {};
+  const mockMap = {
+    on: vi.fn(
+      (
+        event: string,
+        layerOrHandler: string | ((e: unknown) => void),
+        handler?: (e: unknown) => void
+      ) => {
+        if (typeof layerOrHandler === 'function') {
+          handlers[event] = layerOrHandler;
+        } else if (handler) {
+          handlers[`${event}-${layerOrHandler}`] = handler;
+        }
+      }
+    ),
+    getCanvas: vi.fn(() => ({ style: { cursor: '' } })),
+    queryRenderedFeatures: vi.fn(() => [
+      {
+        layer: { id: MapSource.Stations },
         geometry: { type: 'Point', coordinates: [-73.5, 45.5] },
         properties: undefined,
       },
-    ],
-    originalEvent: { stopPropagation: vi.fn() },
-  };
+    ]),
+  } as unknown as MapboxMap;
 
-  handlers['click-stations'](mockEvent);
+  const onItemSelect = vi.fn();
+  setupMapClickHandlers(mockMap, onItemSelect);
+
+  handlers['click']({ point: { x: 100, y: 100 } });
 
   expect(onItemSelect).toHaveBeenCalledWith({
     type: 'station',
-    id: 'undefined',
-    position: [-73.5, 45.5],
-    properties: {},
+    value: {
+      id: NaN,
+      name: '',
+      position: [-73.5, 45.5],
+    },
   });
 });
 
-test('resource click calls onItemSelect with correct data', () => {
+test('clicking resource with missing properties uses defaults', () => {
   const handlers: Record<string, (event: unknown) => void> = {};
   const mockMap = {
     on: vi.fn(
@@ -202,101 +202,27 @@ test('resource click calls onItemSelect with correct data', () => {
       }
     ),
     getCanvas: vi.fn(() => ({ style: { cursor: '' } })),
-    queryRenderedFeatures: vi.fn(() => []),
-  } as unknown as MapboxMap;
-
-  const onItemSelect = vi.fn();
-  setupMapClickHandlers(mockMap, onItemSelect);
-
-  const mockEvent = {
-    features: [
+    queryRenderedFeatures: vi.fn(() => [
       {
-        geometry: { type: 'Point', coordinates: [-73.6, 45.6] },
-        properties: { id: 'resource-1' },
-      },
-    ],
-    originalEvent: { stopPropagation: vi.fn() },
-  };
-
-  handlers['click-resources'](mockEvent);
-
-  expect(onItemSelect).toHaveBeenCalledWith({
-    type: 'resource',
-    id: 'resource-1',
-    position: [-73.6, 45.6],
-    properties: { id: 'resource-1' },
-  });
-  expect(mockEvent.originalEvent.stopPropagation).toHaveBeenCalled();
-});
-
-test('resource click with no features does nothing', () => {
-  const handlers: Record<string, (event: unknown) => void> = {};
-  const mockMap = {
-    on: vi.fn(
-      (
-        event: string,
-        layerOrHandler: string | ((e: unknown) => void),
-        handler?: (e: unknown) => void
-      ) => {
-        if (typeof layerOrHandler === 'function') {
-          handlers[event] = layerOrHandler;
-        } else if (handler) {
-          handlers[`${event}-${layerOrHandler}`] = handler;
-        }
-      }
-    ),
-    getCanvas: vi.fn(() => ({ style: { cursor: '' } })),
-    queryRenderedFeatures: vi.fn(() => []),
-  } as unknown as MapboxMap;
-
-  const onItemSelect = vi.fn();
-  setupMapClickHandlers(mockMap, onItemSelect);
-
-  handlers['click-resources']({ features: [] });
-
-  expect(onItemSelect).not.toHaveBeenCalled();
-});
-
-test('resource click handles missing properties', () => {
-  const handlers: Record<string, (event: unknown) => void> = {};
-  const mockMap = {
-    on: vi.fn(
-      (
-        event: string,
-        layerOrHandler: string | ((e: unknown) => void),
-        handler?: (e: unknown) => void
-      ) => {
-        if (typeof layerOrHandler === 'function') {
-          handlers[event] = layerOrHandler;
-        } else if (handler) {
-          handlers[`${event}-${layerOrHandler}`] = handler;
-        }
-      }
-    ),
-    getCanvas: vi.fn(() => ({ style: { cursor: '' } })),
-    queryRenderedFeatures: vi.fn(() => []),
-  } as unknown as MapboxMap;
-
-  const onItemSelect = vi.fn();
-  setupMapClickHandlers(mockMap, onItemSelect);
-
-  const mockEvent = {
-    features: [
-      {
+        layer: { id: MapSource.Resources },
         geometry: { type: 'Point', coordinates: [-73.6, 45.6] },
         properties: undefined,
       },
-    ],
-    originalEvent: { stopPropagation: vi.fn() },
-  };
+    ]),
+  } as unknown as MapboxMap;
 
-  handlers['click-resources'](mockEvent);
+  const onItemSelect = vi.fn();
+  setupMapClickHandlers(mockMap, onItemSelect);
+
+  handlers['click']({ point: { x: 100, y: 100 } });
 
   expect(onItemSelect).toHaveBeenCalledWith({
     type: 'resource',
-    id: 'undefined',
-    position: [-73.6, 45.6],
-    properties: {},
+    value: {
+      id: 'undefined',
+      position: [-73.6, 45.6],
+      routeId: '',
+    },
   });
 });
 
@@ -327,40 +253,12 @@ test('clicking empty map area deselects item', () => {
 
   expect(mockMap.queryRenderedFeatures).toHaveBeenCalledWith(
     { x: 100, y: 100 },
-    { layers: ['stations', 'resources'] }
+    { layers: [MapSource.Stations, MapSource.Resources] }
   );
   expect(onItemSelect).toHaveBeenCalledWith(null);
 });
 
-test('clicking map does not deselect if feature exists', () => {
-  const handlers: Record<string, (event: unknown) => void> = {};
-  const mockMap = {
-    on: vi.fn(
-      (
-        event: string,
-        layerOrHandler: string | ((e: unknown) => void),
-        handler?: (e: unknown) => void
-      ) => {
-        if (typeof layerOrHandler === 'function') {
-          handlers[event] = layerOrHandler;
-        } else if (handler) {
-          handlers[`${event}-${layerOrHandler}`] = handler;
-        }
-      }
-    ),
-    getCanvas: vi.fn(() => ({ style: { cursor: '' } })),
-    queryRenderedFeatures: vi.fn(() => [{ id: 'some-feature' }]),
-  } as unknown as MapboxMap;
-
-  const onItemSelect = vi.fn();
-  setupMapClickHandlers(mockMap, onItemSelect);
-
-  handlers['click']({ point: { x: 100, y: 100 } });
-
-  expect(onItemSelect).not.toHaveBeenCalled();
-});
-
-test('mouseenter and mouseleave change cursor', () => {
+test('mouseenter and mouseleave change cursor for all layers', () => {
   const handlers: Record<string, () => void> = {};
   const canvas = { style: { cursor: '' } };
   const mockMap = {

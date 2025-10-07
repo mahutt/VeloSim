@@ -38,13 +38,13 @@ import type {
   GetStationsResponse,
   Station,
   Route,
-  ResourcePosition,
+  Resource,
   SelectedItem,
 } from '~/types';
 import { adaptStationsToGeoJSON } from '~/lib/geojson-adapters';
 import { interpolateAlongRoute } from '~/lib/animation-helpers';
 import { startMockBackend, FRAME_INTERVAL_MS } from '~/lib/mock-backend';
-import { setupMapClickHandlers } from '~/lib/map-click-handlers';
+import { setupMapClickHandlers } from '~/lib/map-interactions';
 
 type SimulationContextType = {
   state: React.RefObject<Station[]>;
@@ -155,23 +155,18 @@ export const SimulationProvider = ({ children }: { children: ReactNode }) => {
    * TO-DO: Handle position updates from backend frame
    * In #21, this becomes the websocket message handler
    */
-  const handleFrameUpdate = (updates: ResourcePosition[]) => {
+  const handleFrameUpdate = (updates: Resource[]) => {
     updates.forEach((update) => {
       // Capture current animated position as start for next interpolation
-      const currentAnimatedPos = currentPositionsRef.current.get(
-        update.resourceId
-      );
+      const currentAnimatedPos = currentPositionsRef.current.get(update.id);
 
       if (currentAnimatedPos) {
-        frameStartPositionsRef.current.set(
-          update.resourceId,
-          currentAnimatedPos
-        );
+        frameStartPositionsRef.current.set(update.id, currentAnimatedPos);
       }
 
       // Set new target position from backend
-      targetPositionsRef.current.set(update.resourceId, update.position);
-      resourceRoutesRef.current.set(update.resourceId, update.routeId);
+      targetPositionsRef.current.set(update.id, update.position);
+      resourceRoutesRef.current.set(update.id, update.routeId);
     });
 
     // Reset global frame timer when new frame arrives
