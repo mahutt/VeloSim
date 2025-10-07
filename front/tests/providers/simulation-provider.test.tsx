@@ -56,16 +56,21 @@ vi.mock('~/lib/map-helpers.ts', () => {
     setMapSource: vi.fn(),
     MapSource: {
       Stations: 'stations',
+      Resources: 'resources',
     },
   };
 });
+
+// Mock the fetch API
+const mockFetch = vi.fn();
+global.fetch = mockFetch;
 
 // Test component to access the simulation context
 const TestComponent = () => {
   const { state } = useSimulation();
   return (
     <div data-testid="test-component">
-      {state.current ? 'data-loaded' : 'no-data'}
+      {state.current.length > 0 ? 'data-loaded' : 'no-data'}
     </div>
   );
 };
@@ -130,6 +135,25 @@ const mockGetStationsResponse: GetStationsResponse = {
   total_pages: 1,
 };
 
+// Sample resource routes GeoJSON data
+const mockResourceRoutesData = {
+  type: 'FeatureCollection' as const,
+  features: [
+    {
+      type: 'Feature' as const,
+      properties: { id: 'resource-1' },
+      geometry: {
+        type: 'LineString' as const,
+        coordinates: [
+          [-73.57776, 45.48944],
+          [-73.56776, 45.49944],
+          [-73.55776, 45.50944],
+        ],
+      },
+    },
+  ],
+};
+
 beforeEach(() => {
   vi.clearAllMocks();
 });
@@ -175,13 +199,18 @@ test('simulation provider provides context with initial state', () => {
     </MapProvider>
   );
 
-  expect(getByTestId('test-component')).toHaveTextContent('data-loaded');
+  expect(getByTestId('test-component')).toHaveTextContent('no-data');
 });
 
 test('simulation provider fetches stations data when map is loaded', async () => {
-  // Mock successful fetch response
+  //Mock successful API response
   (api.get as Mock).mockResolvedValueOnce({
     data: mockGetStationsResponse,
+  });
+
+  mockFetch.mockResolvedValueOnce({
+    ok: true,
+    json: () => Promise.resolve(mockResourceRoutesData),
   });
 
   render(
@@ -221,6 +250,11 @@ test('simulation provider updates state ref when data is successfully fetched', 
     data: mockGetStationsResponse,
   });
 
+  mockFetch.mockResolvedValueOnce({
+    ok: true,
+    json: () => Promise.resolve(mockResourceRoutesData),
+  });
+
   let stateRef: React.RefObject<Station[]> | null = null;
 
   const StateCapture = () => {
@@ -250,4 +284,146 @@ test('simulation provider updates state ref when data is successfully fetched', 
   await waitFor(() => {
     expect(stateRef?.current).toEqual(mockGetStationsResponse.stations);
   });
+});
+
+test('simulation provider loads resource routes', async () => {
+  (api.get as Mock).mockResolvedValueOnce({
+    data: mockGetStationsResponse,
+  });
+
+  mockFetch.mockResolvedValueOnce({
+    ok: true,
+    json: () => Promise.resolve(mockResourceRoutesData),
+  });
+
+  render(
+    <MapProvider>
+      <SimulationProvider>
+        <MapContainer />
+      </SimulationProvider>
+    </MapProvider>
+  );
+
+  const map = MockMap.instance!;
+  act(() => {
+    map.callBacks.load();
+  });
+
+  await waitFor(() => {
+    expect(mockFetch).toHaveBeenCalledWith(
+      '/placeholder-data/resource-routes.geojson'
+    );
+  });
+});
+
+test('simulation provider starts animation loop', async () => {
+  (api.get as Mock).mockResolvedValueOnce({
+    data: mockGetStationsResponse,
+  });
+
+  mockFetch.mockResolvedValueOnce({
+    ok: true,
+    json: () => Promise.resolve(mockResourceRoutesData),
+  });
+
+  const requestAnimationFrameSpy = vi.spyOn(window, 'requestAnimationFrame');
+
+  render(
+    <MapProvider>
+      <SimulationProvider>
+        <MapContainer />
+      </SimulationProvider>
+    </MapProvider>
+  );
+
+  const map = MockMap.instance!;
+  act(() => {
+    map.callBacks.load();
+  });
+
+  await waitFor(() => {
+    expect(requestAnimationFrameSpy).toHaveBeenCalled();
+  });
+
+  requestAnimationFrameSpy.mockRestore();
+});
+
+test('simulation provider updates resource positions', async () => {
+  (api.get as Mock).mockResolvedValueOnce({
+    data: mockGetStationsResponse,
+  });
+
+  mockFetch.mockResolvedValueOnce({
+    ok: true,
+    json: () => Promise.resolve(mockResourceRoutesData),
+  });
+
+  render(
+    <MapProvider>
+      <SimulationProvider>
+        <MapContainer />
+      </SimulationProvider>
+    </MapProvider>
+  );
+
+  const map = MockMap.instance!;
+  act(() => {
+    map.callBacks.load();
+  });
+
+  await waitFor(() => {
+    expect(mockFetch).toHaveBeenCalledWith(
+      '/placeholder-data/resource-routes.geojson'
+    );
+  });
+
+  await waitFor(
+    () => {
+      expect(setMapSource).toHaveBeenCalledWith(
+        MapSource.Resources,
+        expect.any(Object),
+        map
+      );
+    },
+    { timeout: 100 }
+  );
+});
+
+test('simulation provider cleans up on unmount', async () => {
+  (api.get as Mock).mockResolvedValueOnce({
+    data: mockGetStationsResponse,
+  });
+
+  mockFetch.mockResolvedValueOnce({
+    ok: true,
+    json: () => Promise.resolve(mockResourceRoutesData),
+  });
+
+  const cancelAnimationFrameSpy = vi.spyOn(window, 'cancelAnimationFrame');
+  const clearIntervalSpy = vi.spyOn(window, 'clearInterval');
+
+  const { unmount } = render(
+    <MapProvider>
+      <SimulationProvider>
+        <MapContainer />
+      </SimulationProvider>
+    </MapProvider>
+  );
+
+  const map = MockMap.instance!;
+  act(() => {
+    map.callBacks.load();
+  });
+
+  await waitFor(() => {
+    expect(mockFetch).toHaveBeenCalled();
+  });
+
+  unmount();
+
+  expect(cancelAnimationFrameSpy).toHaveBeenCalled();
+  expect(clearIntervalSpy).toHaveBeenCalled();
+
+  cancelAnimationFrameSpy.mockRestore();
+  clearIntervalSpy.mockRestore();
 });

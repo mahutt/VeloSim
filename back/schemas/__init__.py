@@ -31,6 +31,13 @@ from .station import (
     StationResponse,
     StationListResponse,
 )
+from .station_task import (
+    StationTaskBase,
+    StationTaskCreate,
+    StationTaskUpdate,
+    StationTaskResponse,
+    StationTaskType,
+)
 
 __all__ = [
     "PositionSchema",
@@ -39,4 +46,9 @@ __all__ = [
     "StationUpdate",
     "StationResponse",
     "StationListResponse",
+    "StationTaskBase",
+    "StationTaskCreate",
+    "StationTaskUpdate",
+    "StationTaskResponse",
+    "StationTaskType",
 ]
