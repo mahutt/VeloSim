@@ -37,7 +37,7 @@ afterEach(() => {
 test('startMockBackend sends position updates at regular intervals', () => {
   const routes: Route[] = [
     {
-      id: 'r1',
+      id: 1,
       coordinates: [
         [0, 0],
         [1, 1],
@@ -61,7 +61,7 @@ test('startMockBackend sends position updates at regular intervals', () => {
 test('startMockBackend cleanup stops sending updates', () => {
   const routes: Route[] = [
     {
-      id: 'resource-1',
+      id: 1,
       coordinates: [
         [0, 0],
         [1, 1],

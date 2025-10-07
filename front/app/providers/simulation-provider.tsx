@@ -34,12 +34,13 @@ import {
 import { useMap } from './map-provider';
 import { MapSource, setMapSource } from '~/lib/map-helpers';
 import api from '~/api';
-import type {
-  GetStationsResponse,
-  Station,
-  Route,
-  Resource,
-  SelectedItem,
+import {
+  type GetStationsResponse,
+  type Station,
+  type Route,
+  type Resource,
+  type SelectedItem,
+  SelectedItemType,
 } from '~/types';
 import { adaptStationsToGeoJSON } from '~/lib/geojson-adapters';
 import { interpolateAlongRoute } from '~/lib/animation-helpers';
@@ -47,7 +48,7 @@ import { startMockBackend, FRAME_INTERVAL_MS } from '~/lib/mock-backend';
 import { setupMapClickHandlers } from '~/lib/map-interactions';
 
 type SimulationContextType = {
-  state: React.RefObject<Station[]>;
+  stationsRef: React.RefObject<Map<number, Station>>;
   selectedItem: SelectedItem | null;
   setSelectedItem: (item: SelectedItem | null) => void;
 };
@@ -58,21 +59,22 @@ const SimulationContext = createContext<SimulationContextType | undefined>(
 
 export const SimulationProvider = ({ children }: { children: ReactNode }) => {
   const { mapRef, mapLoaded } = useMap();
-  const state = useRef<Station[]>([]);
+  const stationsRef = useRef<Map<number, Station>>(new Map());
+  const resourcesRef = useRef<Map<number, Resource>>(new Map());
 
   // Selection state
   const [selectedItem, setSelectedItem] = useState<SelectedItem | null>(null);
 
   // Route geometries (received once, stored for interpolation)
-  const routeGeometriesRef = useRef<Map<string, [number, number][]>>(new Map());
+  const routeGeometriesRef = useRef<Map<number, [number, number][]>>(new Map());
 
   // Position tracking for each resource
-  const frameStartPositionsRef = useRef<Map<string, [number, number]>>(
+  const frameStartPositionsRef = useRef<Map<number, [number, number]>>(
     new Map()
   );
-  const currentPositionsRef = useRef<Map<string, [number, number]>>(new Map());
-  const targetPositionsRef = useRef<Map<string, [number, number]>>(new Map());
-  const resourceRoutesRef = useRef<Map<string, string>>(new Map());
+  const currentPositionsRef = useRef<Map<number, [number, number]>>(new Map());
+  const targetPositionsRef = useRef<Map<number, [number, number]>>(new Map());
+  const resourceRoutesRef = useRef<Map<number, number>>(new Map());
 
   // Global frame timing (shared by all resources)
   const lastFrameTimeRef = useRef<number>(0);
@@ -89,6 +91,15 @@ export const SimulationProvider = ({ children }: { children: ReactNode }) => {
     fetch('/placeholder-data/resource-routes.geojson')
       .then((res) => res.json())
       .then((data: GeoJSON.FeatureCollection) => {
+        data.features.forEach((feature) => {
+          const id = Number(feature.properties!.id);
+          resourcesRef.current.set(id, {
+            id,
+            position: [0, 0],
+            routeId: id,
+          });
+          console.log(resourcesRef.current);
+        });
         const routes: Route[] = data.features.map((feature) => ({
           id: feature.properties?.id,
           coordinates: (feature.geometry as GeoJSON.LineString).coordinates as [
@@ -111,19 +122,47 @@ export const SimulationProvider = ({ children }: { children: ReactNode }) => {
       });
 
     // Set up map click handlers for selection
-    setupMapClickHandlers(mapRef.current!, setSelectedItem);
+    setupMapClickHandlers(mapRef.current!, (item) => {
+      if (!item) {
+        setSelectedItem(null);
+        return;
+      }
+      const { type, id } = item;
+      if (type === SelectedItemType.Station) {
+        const station = stationsRef.current.get(id);
+        if (!station) throw new Error('Selected station not found: ' + id);
+        setSelectedItem({ type, value: station });
+      } else if (type === SelectedItemType.Resource) {
+        console.log(id);
+        const resource = resourcesRef.current.get(id);
+        if (!resource) throw new Error('Selected resource not found: ' + id);
+        setSelectedItem({ type, value: resource });
+      }
+    });
 
     // Cleanup on unmount
     return cleanup;
   }, [mapLoaded]);
+
+  // TODO: Remove useEffect when UI is implemented
+  useEffect(() => {
+    console.log('Selected item changed:', selectedItem);
+  }, [selectedItem]);
 
   // Load station data from backend API
   const loadStations = () => {
     api
       .get<GetStationsResponse>('/stations')
       .then((response) => {
-        const stations = response.data.stations;
-        state.current = stations;
+        const stations = response.data.stations.map((station) => ({
+          ...station,
+          tasks: [], // Initialize empty tasks array until API supports it
+        }));
+
+        stations.forEach((station) => {
+          stationsRef.current.set(station.id, station);
+        });
+
         setMapSource(
           MapSource.Stations,
           adaptStationsToGeoJSON(stations),
@@ -249,7 +288,7 @@ export const SimulationProvider = ({ children }: { children: ReactNode }) => {
 
   return (
     <SimulationContext.Provider
-      value={{ state, selectedItem, setSelectedItem }}
+      value={{ stationsRef, selectedItem, setSelectedItem }}
     >
       {children}
     </SimulationContext.Provider>

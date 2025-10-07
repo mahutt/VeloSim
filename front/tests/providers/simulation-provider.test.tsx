@@ -34,7 +34,7 @@ import { MapProvider } from '~/providers/map-provider';
 import { MockMap } from 'tests/mocks';
 import MapContainer from '~/components/map/map-container';
 import { setMapSource, MapSource } from '~/lib/map-helpers';
-import type { GetStationsResponse, Station, SelectedItem } from '~/types';
+import { type Station, type SelectedItem, SelectedItemType } from '~/types';
 import api from '~/api';
 import { adaptStationsToGeoJSON } from '~/lib/geojson-adapters';
 
@@ -48,17 +48,14 @@ vi.mock('~/api', () => {
 });
 
 // Mock the map-helpers module
-vi.mock('~/lib/map-helpers.ts', () => {
+vi.mock('~/lib/map-helpers.ts', async (importOriginal) => {
   return {
+    ...(await importOriginal<typeof import('~/lib/map-helpers.ts')>()),
     loadMapImages: vi.fn(),
     initializeMapSources: vi.fn(),
     setMapLayers: vi.fn(),
     setMapSource: vi.fn(),
     setupMapClickHandlers: vi.fn(),
-    MapSource: {
-      Stations: 'stations',
-      Resources: 'resources',
-    },
   };
 });
 
@@ -68,68 +65,78 @@ global.fetch = mockFetch;
 
 // Test component to access the simulation context
 const TestComponent = () => {
-  const { state } = useSimulation();
+  const { stationsRef } = useSimulation();
   return (
     <div data-testid="test-component">
-      {state.current.length > 0 ? 'data-loaded' : 'no-data'}
+      {stationsRef.current.size > 0 ? 'data-loaded' : 'no-data'}
     </div>
   );
 };
 
 // Sample GeoJSON data for testing
-const mockGetStationsResponse: GetStationsResponse = {
+const mockGetStationsResponse = {
   stations: [
     {
       id: 1,
       name: 'Metcalfe / de Maisonneuve',
       position: [-73.57314596652985, 45.501375027330134],
+      tasks: [],
     },
     {
       id: 2,
       name: 'Sanguinet / de Maisonneuve',
       position: [-73.56261849403381, 45.51344071811516],
+      tasks: [],
     },
     {
       id: 3,
       name: 'St-Denis / Ste-Catherine',
       position: [-73.5639146839003, 45.510079193884],
+      tasks: [],
     },
     {
       id: 4,
       name: 'St-André / Ontario',
       position: [-73.56353, 45.521889],
+      tasks: [],
     },
     {
       id: 5,
       name: 'St-André / de Maisonneuve',
       position: [-73.55974848376083, 45.517085960784755],
+      tasks: [],
     },
     {
       id: 6,
       name: 'de la Commune / des Soeurs-Grises',
       position: [-73.55273187160492, 45.49798647260488],
+      tasks: [],
     },
     {
       id: 7,
       name: 'Notre-Dame / St-Gabriel',
       position: [-73.55504930019379, 45.50711760282556],
+      tasks: [],
     },
     {
       id: 8,
       name: 'de la Commune / Place Jacques-Cartier',
       position: [-73.55183601379395, 45.50761009451047],
+      tasks: [],
     },
     {
       id: 9,
       name: 'de Maisonneuve / Mansfield (sud)',
       position: [-73.57346534729004, 45.502053864057466],
+      tasks: [],
     },
     {
       id: 10,
       name: "Métro Place-d'Armes (St-Urbain / Viger)",
       position: [-73.5596989095211, 45.50632340391333],
+      tasks: [],
     },
-  ],
+  ] as Station[],
   total: 10,
   page: 1,
   per_page: 20,
@@ -246,7 +253,7 @@ test('simulation provider fetches stations data when map is loaded', async () =>
   });
 });
 
-test('simulation provider updates state ref when data is successfully fetched', async () => {
+test('simulation provider updates stations ref when data is successfully fetched', async () => {
   (api.get as Mock).mockResolvedValueOnce({
     data: mockGetStationsResponse,
   });
@@ -256,11 +263,11 @@ test('simulation provider updates state ref when data is successfully fetched', 
     json: () => Promise.resolve(mockResourceRoutesData),
   });
 
-  let stateRef: React.RefObject<Station[]> | null = null;
+  let stationsRef: React.RefObject<Map<number, Station>> | undefined;
 
   const StateCapture = () => {
-    const { state } = useSimulation();
-    stateRef = state;
+    const { stationsRef: stationsRefFromHook } = useSimulation();
+    stationsRef = stationsRefFromHook;
     return null;
   };
 
@@ -283,7 +290,7 @@ test('simulation provider updates state ref when data is successfully fetched', 
   });
 
   await waitFor(() => {
-    expect(stateRef?.current).toEqual(mockGetStationsResponse.stations);
+    expect(stationsRef?.current.size).toBe(10);
   });
 });
 
@@ -484,7 +491,7 @@ test('simulation provider allows updating selection state', () => {
           data-testid="select-station"
           onClick={() =>
             setSelectedItem({
-              type: 'station',
+              type: SelectedItemType.Station,
               value: mockGetStationsResponse.stations[0],
             })
           }

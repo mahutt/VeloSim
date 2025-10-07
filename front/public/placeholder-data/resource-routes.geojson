@@ -24,7 +24,7 @@
         ]
       },
       "properties": {
-        "id": "resource-1"
+        "id": "1"
       }
     },
     {
@@ -61,7 +61,7 @@
         ]
       },
       "properties": {
-        "id": "resource-2"
+        "id": "2"
       }
     },
     {
@@ -94,7 +94,7 @@
         ]
       },
       "properties": {
-        "id": "resource-3"
+        "id": "3"
       }
     },
     {
@@ -131,7 +131,7 @@
         ]
       },
       "properties": {
-        "id": "resource-4"
+        "id": "4"
       }
     },
     {
@@ -172,7 +172,7 @@
         ]
       },
       "properties": {
-        "id": "resource-5"
+        "id": "5"
       }
     }
   ]
