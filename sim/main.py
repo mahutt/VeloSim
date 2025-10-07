@@ -36,7 +36,7 @@ class LoggerSubscriber(Subscriber):
         self.name = name
 
     def on_frame(self, frame: Frame) -> None:
-        print(f"[{self.name}] Received: {frame}")
+        print(f"[{self.name}] Received: {frame}\n\n")
 
 
 class WebSocketSubscriber(Subscriber):
@@ -44,7 +44,7 @@ class WebSocketSubscriber(Subscriber):
         self.name = name
 
     def on_frame(self, frame: Frame) -> None:
-        print(f"[{self.name}] Received: {frame}")
+        print(f"[{self.name}] Received: {frame}\n\n")
 
 
 params = InputParameter()
