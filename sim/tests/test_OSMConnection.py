@@ -497,7 +497,6 @@ def test_shortest_path_success(
     assert route == [1, 2]
 
 
-@patch("builtins.print")
 @patch("sim.DAO.OSMConnection.nx.shortest_path")
 @patch("sim.DAO.OSMConnection.OSMConnection._initialize_osm_data_file")
 @patch("sim.DAO.OSMConnection.OSMConnection._get_drivable_network")
@@ -507,7 +506,6 @@ def test_shortest_path_fail(
     mock_get_drivable_network: MagicMock,
     mock_init_file: MagicMock,
     mock_shortest_path: MagicMock,
-    mock_print: MagicMock,
 ) -> None:
     # Arrange
     instance = OSMConnection()
@@ -548,15 +546,13 @@ def test_shortest_path_fail(
     sample_graph.add_node(2, **node_data2)
     sample_graph.add_edge(1, 2, key=0, weight=1.0)
 
-    # Act
-    route = instance.shortest_path(node1, node2, sample_graph)
+    # Act and Assert
+    with pytest.raises(
+        Exception, match="Route could not be created between the two nodes"
+    ):
+        instance.shortest_path(node1, node2, sample_graph)
 
-    # Assert
     mock_shortest_path.assert_not_called()
-    mock_print.assert_called_once_with(
-        "route could not be created between the two nodes"
-    )
-    assert route == []
 
 
 @patch("sim.DAO.OSMConnection.OSMConnection._initialize_osm_data_file")

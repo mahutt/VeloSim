@@ -71,7 +71,7 @@ class OSMConnection(object):
             network_type="driving",
         )
         if self._nodes.empty or self._edges.empty:
-            print("Nodes or edges unavailable")
+            raise Exception("Nodes or edges unavailable")
 
     def get_all_nodes(self) -> gpd.GeoDataFrame:
         return self._nodes
@@ -95,13 +95,13 @@ class OSMConnection(object):
         return geometry
 
     # returns node according to its id
-    def get_node_by_id(self, id: int) -> Optional[gpd.GeoDataFrame]:
+    def get_node_by_id(self, id: int) -> Optional[Series]:
         node = self._nodes[self._nodes["id"] == id]
         if node.empty:
             print("No node could be found")
             return None
         else:
-            return node
+            return node.iloc[0]
 
     # returns source and target nodes of the edge
     def get_edge_intersections(self, edge: Series) -> tuple[Series, Series]:
@@ -163,13 +163,15 @@ class OSMConnection(object):
             source_node_id in networkx_graph.nodes()
             and target_node_id in networkx_graph.nodes()
         ):
-            # returns a list of nodes by their id passing through the route
-            route: list[int] = nx.shortest_path(
-                networkx_graph, source_node_id, target_node_id, weight="length"
-            )
-            return route
-        print("route could not be created between the two nodes")
-        return []
+            try:
+                # returns a list of nodes by their id passing through the route
+                route: list[int] = nx.shortest_path(
+                    networkx_graph, source_node_id, target_node_id, weight="length"
+                )
+                return route
+            except Exception as e:
+                print(f"Route creation failed: {e}")
+        raise Exception("Route could not be created between the two nodes")
 
     # creates new node object
     def create_node(self, id: int, lng: float, lat: float) -> Optional[Series]:
