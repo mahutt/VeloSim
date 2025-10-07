@@ -53,6 +53,9 @@ class Simulator:
         stop_flag = threading.Event()
         emitter = FrameEmitter(run_id, subscribers)
 
+        for sub in subscribers:
+            emitter.attach(sub)
+
         def sim_loop() -> None:
             env = simpy.Environment()
             _ = env  # Keeps linter happy. (temporary)
