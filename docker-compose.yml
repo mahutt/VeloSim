@@ -82,6 +82,7 @@ services:
     image: grafana/alloy:latest
     container_name: velosim-alloy
     volumes:
+      - ./back/logging/logs.txt:/etc/alloy/logs/logs.txt
       - ./back/logging/config.alloy:/etc/alloy/config.alloy
     command: ["run", "/etc/alloy/config.alloy"]
     restart: unless-stopped
