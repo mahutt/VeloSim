@@ -22,31 +22,28 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 """
 
-from enum import Enum
 from abc import ABC, abstractmethod
-from typing import Optional
+from typing import Optional, TYPE_CHECKING
 import simpy
-from .station import Station
-from .resource import Resource
+from .task_state import State
 
-
-# enum of task states
-class State(Enum):
-    OPEN = 1
-    ASSIGNED = 2
-    DISPATCHED = 3
-    CLOSED = 4
+# to avoid circular imports
+if TYPE_CHECKING:
+    from .station import Station
+    from .resource import Resource
 
 
 class Task(ABC):
-    def __init__(self, env: simpy.Environment, task_id: int, station: Station) -> None:
+    def __init__(
+        self, env: simpy.Environment, task_id: int, station: "Station"
+    ) -> None:
         self.env = env
-        self.id = task_id
+        self.id: int = task_id
         self.state = State.OPEN  # A task would always be open at creation
-        self.station = station
-        self.assigned_resource: Optional[Resource] = (
-            None  # Initially, no resource is assigned
-        )
+        self.station: "Station" = station
+        self.assigned_resource: Optional[
+            "Resource"
+        ] = None  # Initially, no resource is assigned
 
     @abstractmethod
     def get_state(self) -> State:
@@ -61,15 +58,15 @@ class Task(ABC):
         pass
 
     @abstractmethod
-    def get_station(self) -> Station:
+    def get_station(self) -> "Station":
         pass
 
     @abstractmethod
-    def get_assigned_resource(self) -> Optional[Resource]:
+    def get_assigned_resource(self) -> Optional["Resource"]:
         pass
 
     @abstractmethod
-    def set_assigned_resource(self, resource: Resource) -> None:
+    def set_assigned_resource(self, resource: "Resource") -> None:
         pass
 
     @abstractmethod

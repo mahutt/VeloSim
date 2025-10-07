@@ -23,14 +23,18 @@ SOFTWARE.
 """
 
 import simpy
-from typing import Optional
-from .task import Task, State
-from .station import Station
-from .resource import Resource
+from typing import Optional, TYPE_CHECKING
+from .task import Task
+from .task_state import State
+
+# to avoid circular imports
+if TYPE_CHECKING:
+    from .station import Station
+    from .resource import Resource
 
 
 class BatterySwapTask(Task):
-    def __init__(self, env: simpy.Environment, task_id: int, station: Station):
+    def __init__(self, env: simpy.Environment, task_id: int, station: "Station"):
         super().__init__(env, task_id, station)
 
     def get_state(self) -> State:
@@ -42,18 +46,18 @@ class BatterySwapTask(Task):
     def get_task_id(self) -> int:
         return self.id
 
-    def get_station(self) -> Station:
+    def get_station(self) -> "Station":
         return self.station
 
-    def get_assigned_resource(self) -> Optional[Resource]:
+    def get_assigned_resource(self) -> Optional["Resource"]:
         return self.assigned_resource
 
-    def set_assigned_resource(self, resource: Resource) -> None:
+    def set_assigned_resource(self, resource: "Resource") -> None:
         self.assigned_resource = resource
         self.state = State.ASSIGNED
 
     def unassign_resource(self) -> None:
-        self.assigned_resource = None
+        self.assigned_resource: Optional["Resource"] = None
         self.state = State.OPEN
 
     def is_assigned(self) -> bool:
