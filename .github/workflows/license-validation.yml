@@ -1,10 +1,10 @@
-name: License Header Validation
+name: License Compliance Validation
 
 on:
   workflow_call:
 
 jobs:
-  validate-license-headers:
+  validate-license-compliance:
     runs-on: ubuntu-latest
 
     steps:
@@ -15,12 +15,33 @@ jobs:
         with:
           python-version: "3.11"
 
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pip-licenses
+
+      - name: Install npm dependencies
+        run: npm ci
+
+      - name: Install license-checker
+        run: npm install --save-dev license-checker
+
       - name: Validate MIT license headers
         run: python scripts/validate_license_headers.py
+
+      - name: Validate dependency license compatibility
+        run: python scripts/validate_dependency_licenses.py
 
       - name: Report results
         if: failure()
         run: |
-          echo "❌ License header validation failed!"
-          echo "Please add the MIT license header to the top of all source files."
-          echo "See the validation script output above for specific files that need headers."
+          echo "❌ License compliance validation failed!"
+          echo "This could be due to:"
+          echo "  - Missing MIT license headers in source files"
+          echo "  - Dependencies with incompatible licenses for commercial redistribution"
+          echo "See the validation script outputs above for specific issues."
