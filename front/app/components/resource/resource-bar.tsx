@@ -23,29 +23,81 @@
  */
 
 import { ResourceItem } from './resource-item';
+import type { Resource } from '~/types';
 
 export default function ResourceBar() {
-  const placeholderResources = [
-    '1',
-    '2',
-    '3',
-    '4',
-    '5',
-    '6',
-    '7',
-    '8',
-    '9',
-    '10',
+  const placeholderResources: Resource[] = [
+    {
+      resourceId: '1',
+      position: [-74.006, 40.7128],
+      taskList: [101, 102],
+      routeId: '',
+    },
+    {
+      resourceId: '2',
+      position: [-74.0059, 40.7138],
+      taskList: [103],
+      routeId: '',
+    },
+    {
+      resourceId: '3',
+      position: [-74.0055, 40.7148],
+      taskList: [],
+      routeId: '',
+    },
+    {
+      resourceId: '4',
+      position: [-74.0045, 40.7158],
+      taskList: [104, 105, 106],
+      routeId: '',
+    },
+    {
+      resourceId: '5',
+      position: [-74.0035, 40.7168],
+      taskList: [107],
+      routeId: '',
+    },
+    {
+      resourceId: '6',
+      position: [-74.0025, 40.7178],
+      taskList: [108, 109],
+      routeId: '',
+    },
+    {
+      resourceId: '7',
+      position: [-74.0015, 40.7188],
+      taskList: [],
+      routeId: '',
+    },
+    {
+      resourceId: '8',
+      position: [-74.0005, 40.7198],
+      taskList: [110],
+      routeId: '',
+    },
+    {
+      resourceId: '9',
+      position: [-73.9995, 40.7208],
+      taskList: [111, 112],
+      routeId: '',
+    },
+    {
+      resourceId: '10',
+      position: [-73.9985, 40.7218],
+      taskList: [113],
+      routeId: '',
+    },
   ];
 
   return (
     <div className="absolute top-4 right-4 w-60 bg-gray-300 shadow rounded p-4">
       <div className="space-y-2">
-        {placeholderResources.map((id) => (
+        {placeholderResources.map((resource) => (
           <ResourceItem
-            key={id}
-            id={id}
-            onSelect={(id) => console.log(id)}
+            key={resource.resourceId}
+            resourceId={resource.resourceId}
+            resource={resource}
+            onSelect={(resourceId) => console.log(resourceId)}
             // logging the selection for now
             // can replace with modal or other action later
           />

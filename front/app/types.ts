@@ -50,9 +50,9 @@ export interface Route {
   coordinates: [number, number][]; // Complete road geometry
 }
 
-// Position update
-export interface ResourcePosition {
+export interface Resource {
   resourceId: string;
   position: [number, number];
+  taskList: number[]; // list of task IDs
   routeId: string;
 }
