@@ -22,18 +22,32 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 """
 
+import json
 import time
+from typing import Any, Dict, Optional
 
 
 class Frame:
-    def __init__(self, seq_numb: int, payload: str) -> None:
+    def __init__(
+        self,
+        seq_numb: int,
+        payload: Optional[Dict[str, Any]] = None,
+        payload_str: Optional[str] = None,
+    ) -> None:
         self.seq_number = seq_numb
         self.timestamp_ms = int(time.time() * 1000)
-        self.payload = payload
+        self.payload_dict = payload or {}
 
-    def __repr__(self) -> str:  # ToString method.
+        if payload_str:
+            self.payload_str = payload_str
+        elif payload:
+            self.payload_str = json.dumps(payload)
+        else:
+            self.payload_str = "{}"
+
+    def __repr__(self) -> str:
         return (
             f"Frame(seq={self.seq_number}, "
             f"timestamp={self.timestamp_ms}, "
-            f"payload={self.payload})"
+            f"payload={self.payload_dict})"
         )
