@@ -64,7 +64,7 @@ class Simulator:
             while not stop_flag.is_set():  # Run until stop is called!
                 frame = Frame(
                     seq_numb=global_seq,
-                    payload="This is my current info... beep boop beep boop",
+                    payload_str="This is my current info... beep boop beep boop",
                 )
                 global_seq += 1
                 emitter.notify(frame)

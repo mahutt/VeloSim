@@ -55,7 +55,7 @@ def test_publisher_contract_enforced() -> None:
     with pytest.raises(NotImplementedError):
         pub.detach(FakeSubscriber())
     with pytest.raises(NotImplementedError):
-        pub.notify(Frame(seq_number := 1, payload="x"))
+        pub.notify(Frame(seq_number := 1, payload_str="x"))
         _ = seq_number
 
 
@@ -84,14 +84,14 @@ def test_concrete_publisher_attach_detach_notify() -> None:
     pub.attach(s2)
     pub.attach(s1)  # idempotent
 
-    f1 = Frame(seq_numb=1, payload="hello")
+    f1 = Frame(seq_numb=1, payload_str="hello")
     pub.notify(f1)
 
     assert [f.seq_number for f in s1.received] == [1]
     assert [f.seq_number for f in s2.received] == [1]
 
     pub.detach(s1)
-    f2 = Frame(seq_numb=2, payload="world")
+    f2 = Frame(seq_numb=2, payload_str="world")
     pub.notify(f2)
 
     assert [f.seq_number for f in s1.received] == [1]

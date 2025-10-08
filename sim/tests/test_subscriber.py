@@ -45,7 +45,7 @@ def test_attach_and_notify_reaches_all_subscribers() -> None:
     emitter.attach(s1)
     emitter.attach(s2)
 
-    frame = Frame(seq_numb=1, payload="hello")
+    frame = Frame(seq_numb=1, payload_str="hello")
     emitter.notify(frame)
 
     assert s1.received == [frame]
@@ -59,7 +59,7 @@ def test_attach_is_idempotent_no_duplicates() -> None:
     emitter.attach(s)
     emitter.attach(s)
 
-    frame = Frame(seq_numb=2, payload="world")
+    frame = Frame(seq_numb=2, payload_str="world")
     emitter.notify(frame)
 
     assert s.received == [frame]
@@ -70,9 +70,9 @@ def test_detach_stops_delivery() -> None:
     s = FakeSubscriber()
 
     emitter.attach(s)
-    emitter.notify(Frame(seq_numb=3, payload="before"))
+    emitter.notify(Frame(seq_numb=3, payload_str="before"))
     emitter.detach(s)
-    emitter.notify(Frame(seq_numb=4, payload="after"))
+    emitter.notify(Frame(seq_numb=4, payload_str="after"))
 
     assert [f.seq_number for f in s.received] == [3]
 
@@ -97,7 +97,7 @@ def test_notify_is_thread_safe() -> None:
     t.start()
 
     for n in range(10):
-        emitter.notify(Frame(seq_numb=n, payload=f"frame {n}"))
+        emitter.notify(Frame(seq_numb=n, payload_str=f"frame {n}"))
 
     stop.set()
     t.join(timeout=1.0)
