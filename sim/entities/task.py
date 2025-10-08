@@ -41,9 +41,9 @@ class Task(ABC):
         self.id: int = task_id
         self.state = State.OPEN  # A task would always be open at creation
         self.station: Optional["Station"] = station
-        self.assigned_resource: Optional[
-            "Resource"
-        ] = None  # Initially, no resource is assigned
+        self.assigned_resource: Optional["Resource"] = (
+            None  # Initially, no resource is assigned
+        )
 
     @abstractmethod
     def get_state(self) -> State:

@@ -27,7 +27,8 @@ import simpy
 from sim.entities.resource import Resource
 from sim.entities.position import Position
 from sim.entities.BatterySwapTask import BatterySwapTask
-from sim.entities.task import Task
+from sim.entities.task import Task, State
+from sim.entities.station import Station
 
 
 class TestResource:
@@ -158,6 +159,90 @@ class TestResource:
         # should stay unchanged
         assert resource.get_task_count() == initial_count
         assert resource.get_task_list() == initial_tasks
+
+    def test_get_dispatched_task(
+        self, simpy_env: simpy.Environment, default_position: Position
+    ) -> None:
+        # Arrange
+        task = BatterySwapTask(simpy_env, 1)
+        task2 = BatterySwapTask(simpy_env, 2)
+        task3 = BatterySwapTask(simpy_env, 3)
+        resource = Resource(simpy_env, 2, default_position, [task, task2, task3])
+        task2.set_state(State.DISPATCHED)
+
+        # Act
+        dispatched_task = resource.get_dispatched_task()
+
+        # Assert
+        assert isinstance(dispatched_task, BatterySwapTask)
+        assert dispatched_task == task2
+
+    def test_get_dispatched_task_not_found(
+        self, simpy_env: simpy.Environment, default_position: Position
+    ) -> None:
+        # Arrange
+        task = BatterySwapTask(simpy_env, 1)
+        task2 = BatterySwapTask(simpy_env, 2)
+        task3 = BatterySwapTask(simpy_env, 3)
+        resource = Resource(simpy_env, 2, default_position, [task, task2, task3])
+
+        # Act
+        dispatched_task = resource.get_dispatched_task()
+
+        # Assert
+        assert dispatched_task is None
+
+    def test_dispatch_task_with_no_other_dispatched(
+        self, simpy_env: simpy.Environment, default_position: Position
+    ) -> None:
+        # Arrange
+        task = BatterySwapTask(simpy_env, 1)
+        task2 = BatterySwapTask(simpy_env, 2)
+        task3 = BatterySwapTask(simpy_env, 3)
+        resource = Resource(simpy_env, 2, default_position, [task, task2, task3])
+
+        # Act
+        resource.dispatch_task(task2)
+
+        # Assert
+        assert task2.get_state() == State.DISPATCHED
+
+    def test_dispatch_task_with_other_dispatched_same_station(
+        self, simpy_env: simpy.Environment, default_position: Position
+    ) -> None:
+        # Arrange
+        task = BatterySwapTask(simpy_env, 1)
+        task2 = BatterySwapTask(simpy_env, 2)
+        task3 = BatterySwapTask(simpy_env, 3)
+        station = Station(simpy_env, 1, "Test Station", default_position)
+        resource = Resource(simpy_env, 2, default_position, [task, task2, task3])
+        task.set_state(State.DISPATCHED)
+        task.set_station(station)
+        task2.set_station(station)
+
+        # Act
+        resource.dispatch_task(task2)
+
+        # Assert
+        assert task2.get_state() == State.DISPATCHED
+
+    def test_dispatch_task_with_other_dispatched_diff_station(
+        self, simpy_env: simpy.Environment, default_position: Position
+    ) -> None:
+        # Arrange
+        task = BatterySwapTask(simpy_env, 1)
+        task2 = BatterySwapTask(simpy_env, 2)
+        task3 = BatterySwapTask(simpy_env, 3)
+        station = Station(simpy_env, 1, "Test Station", default_position)
+        station2 = Station(simpy_env, 2, "Other Station", default_position)
+        resource = Resource(simpy_env, 2, default_position, [task, task2, task3])
+        task.set_state(State.DISPATCHED)
+        task.set_station(station)
+        task2.set_station(station2)
+
+        # Act and Assert
+        with pytest.raises(Exception, match="Cannot dispatch task at this station"):
+            resource.dispatch_task(task2)
 
     def test_service_task(
         self, simpy_env: simpy.Environment, default_position: Position
