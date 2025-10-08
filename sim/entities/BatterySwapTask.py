@@ -34,7 +34,9 @@ if TYPE_CHECKING:
 
 
 class BatterySwapTask(Task):
-    def __init__(self, env: simpy.Environment, task_id: int, station: "Station"):
+    def __init__(
+        self, env: simpy.Environment, task_id: int, station: Optional["Station"] = None
+    ):
         super().__init__(env, task_id, station)
 
     def get_state(self) -> State:
@@ -46,8 +48,11 @@ class BatterySwapTask(Task):
     def get_task_id(self) -> int:
         return self.id
 
-    def get_station(self) -> "Station":
+    def get_station(self) -> Optional["Station"]:
         return self.station
+
+    def set_station(self, station: "Station") -> None:
+        self.station = station
 
     def get_assigned_resource(self) -> Optional["Resource"]:
         return self.assigned_resource

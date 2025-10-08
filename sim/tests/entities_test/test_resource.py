@@ -26,6 +26,8 @@ import pytest
 import simpy
 from sim.entities.resource import Resource
 from sim.entities.position import Position
+from sim.entities.BatterySwapTask import BatterySwapTask
+from sim.entities.task import Task
 
 
 class TestResource:
@@ -47,7 +49,10 @@ class TestResource:
     def resource_with_tasks(
         self, simpy_env: simpy.Environment, default_position: Position
     ) -> Resource:
-        return Resource(simpy_env, 2, default_position, [101, 102, 103])
+        task = BatterySwapTask(simpy_env, 1)
+        task2 = BatterySwapTask(simpy_env, 2)
+        task3 = BatterySwapTask(simpy_env, 3)
+        return Resource(simpy_env, 2, default_position, [task, task2, task3])
 
     def test_resource_initialization(
         self, simpy_env: simpy.Environment, default_position: Position
@@ -64,7 +69,10 @@ class TestResource:
     def test_resource_initialization_with_task_list(
         self, simpy_env: simpy.Environment, default_position: Position
     ) -> None:
-        task_list = [101, 102, 103]
+        task = BatterySwapTask(simpy_env, 1)
+        task2 = BatterySwapTask(simpy_env, 2)
+        task3 = BatterySwapTask(simpy_env, 3)
+        task_list: list[Task] = [task, task2, task3]
         resource = Resource(simpy_env, 2, default_position, task_list)
 
         assert resource.env == simpy_env
@@ -88,73 +96,104 @@ class TestResource:
         assert resource.get_resource_position() == new_position
         assert resource.position.get_position() == [-74.0000, 40.5017]
 
-    def test_assign_task(self, resource: Resource) -> None:
+    def test_assign_task(
+        self, simpy_env: simpy.Environment, resource: Resource
+    ) -> None:
         initial_count = resource.get_task_count()
-        task_id = 201
+        task = BatterySwapTask(simpy_env, 1)
 
-        resource.assign_task(task_id)
+        resource.assign_task(task)
 
         assert resource.get_task_count() == initial_count + 1
-        assert task_id in resource.get_task_list()
+        assert task in resource.get_task_list()
 
-    def test_assign_multiple_tasks(self, resource: Resource) -> None:
-        task_ids = [301, 302, 303]
+    def test_assign_multiple_tasks(
+        self, simpy_env: simpy.Environment, resource: Resource
+    ) -> None:
+        task = BatterySwapTask(simpy_env, 1)
+        task2 = BatterySwapTask(simpy_env, 2)
+        task3 = BatterySwapTask(simpy_env, 3)
+        task_list = [task, task2, task3]
         initial_count = resource.get_task_count()
 
-        for task_id in task_ids:
+        for task_id in task_list:
             resource.assign_task(task_id)
 
-        assert resource.get_task_count() == initial_count + len(task_ids)
-        for task_id in task_ids:
+        assert resource.get_task_count() == initial_count + len(task_list)
+        for task_id in task_list:
             assert task_id in resource.get_task_list()
 
-    def test_unassign_existing_task(self, resource_with_tasks: Resource) -> None:
-        initial_count = resource_with_tasks.get_task_count()
-        task_to_remove = 102
+    def test_unassign_existing_task(
+        self, simpy_env: simpy.Environment, default_position: Position
+    ) -> None:
+        task = BatterySwapTask(simpy_env, 1)
+        task2 = BatterySwapTask(simpy_env, 2)
+        task3 = BatterySwapTask(simpy_env, 3)
+        resource = Resource(simpy_env, 2, default_position, [task, task2, task3])
+        initial_count = resource.get_task_count()
+        task_to_remove = task2
 
-        assert task_to_remove in resource_with_tasks.get_task_list()
+        assert task_to_remove in resource.get_task_list()
 
-        resource_with_tasks.unassign_task(task_to_remove)
+        resource.unassign_task(task_to_remove)
 
-        assert resource_with_tasks.get_task_count() == initial_count - 1
-        assert task_to_remove not in resource_with_tasks.get_task_list()
+        assert resource.get_task_count() == initial_count - 1
+        assert task_to_remove not in resource.get_task_list()
 
-    def test_unassign_nonexistent_task(self, resource_with_tasks: Resource) -> None:
-        initial_count = resource_with_tasks.get_task_count()
-        initial_tasks = resource_with_tasks.get_task_list().copy()
-        nonexistent_task = 999
+    def test_unassign_nonexistent_task(
+        self, simpy_env: simpy.Environment, default_position: Position
+    ) -> None:
+        task = BatterySwapTask(simpy_env, 1)
+        task2 = BatterySwapTask(simpy_env, 2)
+        task3 = BatterySwapTask(simpy_env, 3)
+        resource = Resource(simpy_env, 2, default_position, [task, task2, task3])
+        initial_count = resource.get_task_count()
+        initial_tasks = resource.get_task_list().copy()
+        nonexistent_task = BatterySwapTask(simpy_env, 4)
 
-        assert nonexistent_task not in resource_with_tasks.get_task_list()
+        assert nonexistent_task not in resource.get_task_list()
 
-        resource_with_tasks.unassign_task(nonexistent_task)
-
-        # should stay unchanged
-        assert resource_with_tasks.get_task_count() == initial_count
-        assert resource_with_tasks.get_task_list() == initial_tasks
-
-    def test_service_task(self, resource_with_tasks: Resource) -> None:
-        initial_count = resource_with_tasks.get_task_count()
-        task_to_service = 101
-
-        assert task_to_service in resource_with_tasks.get_task_list()
-
-        resource_with_tasks.service_task(task_to_service)
-
-        assert resource_with_tasks.get_task_count() == initial_count - 1
-        assert task_to_service not in resource_with_tasks.get_task_list()
-
-    def test_service_nonexistent_task(self, resource_with_tasks: Resource) -> None:
-        initial_count = resource_with_tasks.get_task_count()
-        initial_tasks = resource_with_tasks.get_task_list().copy()
-        nonexistent_task = 999
-
-        assert nonexistent_task not in resource_with_tasks.get_task_list()
-
-        resource_with_tasks.service_task(nonexistent_task)
+        resource.unassign_task(nonexistent_task)
 
         # should stay unchanged
-        assert resource_with_tasks.get_task_count() == initial_count
-        assert resource_with_tasks.get_task_list() == initial_tasks
+        assert resource.get_task_count() == initial_count
+        assert resource.get_task_list() == initial_tasks
+
+    def test_service_task(
+        self, simpy_env: simpy.Environment, default_position: Position
+    ) -> None:
+        task = BatterySwapTask(simpy_env, 1)
+        task2 = BatterySwapTask(simpy_env, 2)
+        task3 = BatterySwapTask(simpy_env, 3)
+        resource = Resource(simpy_env, 2, default_position, [task, task2, task3])
+        initial_count = resource.get_task_count()
+        task_to_service = task2
+
+        assert task_to_service in resource.get_task_list()
+
+        resource.service_task(task_to_service)
+
+        assert resource.get_task_count() == initial_count - 1
+        assert task_to_service not in resource.get_task_list()
+
+    def test_service_nonexistent_task(
+        self, simpy_env: simpy.Environment, default_position: Position
+    ) -> None:
+        task = BatterySwapTask(simpy_env, 1)
+        task2 = BatterySwapTask(simpy_env, 2)
+        task3 = BatterySwapTask(simpy_env, 3)
+        resource = Resource(simpy_env, 2, default_position, [task, task2, task3])
+        initial_count = resource.get_task_count()
+        initial_tasks = resource.get_task_list().copy()
+        nonexistent_task = BatterySwapTask(simpy_env, 4)
+
+        assert nonexistent_task not in resource.get_task_list()
+
+        resource.service_task(nonexistent_task)
+
+        # should stay unchanged
+        assert resource.get_task_count() == initial_count
+        assert resource.get_task_list() == initial_tasks
 
     def test_get_task_count_empty(self, resource: Resource) -> None:
         assert resource.get_task_count() == 0
@@ -169,30 +208,34 @@ class TestResource:
 
     def test_get_task_list_with_tasks(self, resource_with_tasks: Resource) -> None:
         task_list = resource_with_tasks.get_task_list()
-        assert task_list == [101, 102, 103]
         assert isinstance(task_list, list)
 
-    def test_task_list_modifications(self, resource: Resource) -> None:
+    def test_task_list_modifications(
+        self, simpy_env: simpy.Environment, resource: Resource
+    ) -> None:
         # start with empty list
         assert resource.get_task_count() == 0
 
         # add some tasks
-        resource.assign_task(401)
-        resource.assign_task(402)
-        resource.assign_task(403)
+        task = BatterySwapTask(simpy_env, 1)
+        task2 = BatterySwapTask(simpy_env, 2)
+        task3 = BatterySwapTask(simpy_env, 3)
+        resource.assign_task(task)
+        resource.assign_task(task2)
+        resource.assign_task(task3)
         assert resource.get_task_count() == 3
-        assert set(resource.get_task_list()) == {401, 402, 403}
+        assert set(resource.get_task_list()) == {task, task2, task3}
 
         # service a task
-        resource.service_task(402)
+        resource.service_task(task2)
         assert resource.get_task_count() == 2
-        assert 402 not in resource.get_task_list()
-        assert set(resource.get_task_list()) == {401, 403}
+        assert task2 not in resource.get_task_list()
+        assert set(resource.get_task_list()) == {task, task3}
 
         # unassign a task
-        resource.unassign_task(401)
+        resource.unassign_task(task)
         assert resource.get_task_count() == 1
-        assert resource.get_task_list() == [403]
+        assert resource.get_task_list() == [task3]
 
     def test_clear_update(self, resource: Resource) -> None:
         assert resource.has_updated == False

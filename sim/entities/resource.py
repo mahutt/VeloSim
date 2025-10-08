@@ -44,7 +44,12 @@ class Resource:
         self.env = env
         self.id = resource_id
         self.position = position
-        self.task_list = task_list if task_list is not None else []
+        if task_list is not None:
+            self.task_list = task_list
+            for task in self.task_list:
+                task.set_assigned_resource(self)
+        else:
+            self.task_list = []
         self.has_updated = False  # flag to track if a resource was updated
 
         # starting the process for periodic resource operations

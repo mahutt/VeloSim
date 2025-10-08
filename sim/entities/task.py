@@ -35,12 +35,12 @@ if TYPE_CHECKING:
 
 class Task(ABC):
     def __init__(
-        self, env: simpy.Environment, task_id: int, station: "Station"
+        self, env: simpy.Environment, task_id: int, station: Optional["Station"] = None
     ) -> None:
         self.env = env
         self.id: int = task_id
         self.state = State.OPEN  # A task would always be open at creation
-        self.station: "Station" = station
+        self.station: Optional["Station"] = station
         self.assigned_resource: Optional[
             "Resource"
         ] = None  # Initially, no resource is assigned
@@ -58,7 +58,11 @@ class Task(ABC):
         pass
 
     @abstractmethod
-    def get_station(self) -> "Station":
+    def get_station(self) -> Optional["Station"]:
+        pass
+
+    @abstractmethod
+    def set_station(self, station: "Station") -> None:
         pass
 
     @abstractmethod

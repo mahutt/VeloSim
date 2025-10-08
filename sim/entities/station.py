@@ -53,6 +53,7 @@ class Station:
 
     def add_task(self, task: "Task") -> None:
         self.tasks.append(task)
+        task.set_station(self)
 
     def remove_task(self, task: "Task") -> None:
         if task in self.tasks:
