@@ -30,9 +30,9 @@ from sim.utils.subscriber import Subscriber
 
 
 class FrameEmitter(Publisher):
-    def __init__(self, simId: str) -> None:
+    def __init__(self, sim_id: str) -> None:
         self.subscribers: List[Subscriber] = []
-        self.simId = simId
+        self.simId = sim_id
         self._lock = threading.Lock()
 
     def attach(self, sub: Subscriber) -> None:
