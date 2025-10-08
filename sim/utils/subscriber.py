@@ -22,12 +22,12 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 """
 
-from abc import abstractmethod
+from abc import ABC, abstractmethod
 
 from sim.entities.frame import Frame
 
 
-class Subscriber:
+class Subscriber(ABC):
     # Update Method
     @abstractmethod
     def on_frame(self, frame: Frame) -> None:

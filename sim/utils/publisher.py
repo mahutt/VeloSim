@@ -22,12 +22,12 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 """
 
-from abc import abstractmethod
+from abc import ABC, abstractmethod
 from sim.entities.frame import Frame
 from sim.utils.subscriber import Subscriber
 
 
-class Publisher:
+class Publisher(ABC):
     @abstractmethod
     def attach(self, sub: Subscriber) -> None:
         raise NotImplementedError()
