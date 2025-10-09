@@ -38,7 +38,7 @@ async def set_playback_speed(task: PlaybackSpeedBase) -> PlaybackSpeedResponse:
     """
     if task.playback_speed <= 0:
         raise HTTPException(status_code=400, detail="Playback speed must be positive.")
-    elif task.playback_speed > 50:
+    elif task.playback_speed > 12:
         raise HTTPException(
             status_code=400, detail="Playback speed value is too large."
         )
