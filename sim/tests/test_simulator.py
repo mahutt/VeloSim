@@ -26,6 +26,7 @@ SOFTWARE.
 
 import time
 import threading
+from typing import List
 import uuid
 
 import pytest
@@ -37,8 +38,10 @@ from sim.entities.inputParameters import InputParameter
 from sim.entities.request_type import RequestType
 import sim.simulator as simulator_mod
 from sim.simulator import Simulator
+from sim.utils.subscriber import Subscriber
 
 params = InputParameter()
+subList: List[Subscriber] = []
 
 
 @pytest.fixture
@@ -61,7 +64,7 @@ def test_start_creates_thread_and_emits_output(
     original_sleep = simulator_mod.time.sleep
     try:
         monkeypatch.setattr(simulator_mod.time, "sleep", lambda _: original_sleep(0.05))
-        sim_id = sim.start(params)
+        sim_id = sim.start(params, subList)
 
         # Basic sanity on returned id
         uuid.UUID(sim_id)  # should not raise
@@ -94,7 +97,7 @@ def test_stop_removes_thread_from_pool(
     # Make loop faster
     monkeypatch.setattr(simulator_mod.time, "sleep", lambda _: None)
 
-    sim_id = sim.start(params)
+    sim_id = sim.start(params, subList)
     assert sim_id in sim.thread_pool
     t = sim.thread_pool[sim_id]["thread"]
     assert isinstance(t, threading.Thread) and t.is_alive()
@@ -116,8 +119,8 @@ def test_multiple_parallel_sims(
 ) -> None:
     monkeypatch.setattr(simulator_mod.time, "sleep", lambda _: None)
 
-    a = sim.start(params)
-    b = sim.start(params)
+    a = sim.start(params, subList)
+    b = sim.start(params, subList)
     assert a != b
     assert a in sim.thread_pool and b in sim.thread_pool
     assert sim.thread_pool[a]["thread"].is_alive()
@@ -158,7 +161,7 @@ def test_stop_all_stops_everything_and_is_idempotent(
     """
     monkeypatch.setattr(simulator_mod.time, "sleep", lambda _: None)
 
-    sim_ids = [sim.start(params) for _ in range(3)]
+    sim_ids = [sim.start(params, subList) for _ in range(3)]
     # Sanity: all present and alive
     for sid in sim_ids:
         assert sid in sim.thread_pool

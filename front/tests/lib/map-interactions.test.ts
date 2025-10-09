@@ -25,7 +25,8 @@
 import { expect, test, vi } from 'vitest';
 import { setupMapClickHandlers } from '~/lib/map-interactions';
 import type { Map as MapboxMap } from 'mapbox-gl';
-import { MapSource } from '~/lib/map-helpers';
+import { MapLayer, MapSource } from '~/lib/map-helpers';
+import { SelectedItemType } from '~/types';
 
 test('setupMapClickHandlers registers event listeners', () => {
   const mockMap = {
@@ -37,8 +38,8 @@ test('setupMapClickHandlers registers event listeners', () => {
   const onItemSelect = vi.fn();
   setupMapClickHandlers(mockMap, onItemSelect);
 
-  // Should register 1 click + 4 cursor listeners (2 layers * 2 events)
-  expect(mockMap.on).toHaveBeenCalledTimes(5);
+  // Should register 1 click + 4 cursor listeners (3 layers * 2 events)
+  expect(mockMap.on).toHaveBeenCalledTimes(7);
   expect(mockMap.on).toHaveBeenCalledWith('click', expect.any(Function));
   expect(mockMap.on).toHaveBeenCalledWith(
     'mouseenter',
@@ -94,12 +95,9 @@ test('clicking station calls onItemSelect with wrapped station data', () => {
   handlers['click']({ point: { x: 100, y: 100 } });
 
   expect(onItemSelect).toHaveBeenCalledWith({
-    type: 'station',
-    value: {
-      id: 123,
-      name: 'Test Station',
-      position: [-73.5, 45.5],
-    },
+    type: SelectedItemType.Station,
+    id: 123,
+    coordinates: [-73.5, 45.5],
   });
 });
 
@@ -124,7 +122,7 @@ test('clicking resource calls onItemSelect with wrapped resource data', () => {
       {
         layer: { id: MapSource.Resources },
         geometry: { type: 'Point', coordinates: [-73.6, 45.6] },
-        properties: { id: 'resource-1', routeId: 'route-1' },
+        properties: { id: 1, routeId: 1 },
       },
     ]),
   } as unknown as MapboxMap;
@@ -135,16 +133,13 @@ test('clicking resource calls onItemSelect with wrapped resource data', () => {
   handlers['click']({ point: { x: 100, y: 100 } });
 
   expect(onItemSelect).toHaveBeenCalledWith({
-    type: 'resource',
-    value: {
-      id: 'resource-1',
-      position: [-73.6, 45.6],
-      routeId: 'route-1',
-    },
+    type: SelectedItemType.Resource,
+    id: 1,
+    coordinates: [-73.6, 45.6],
   });
 });
 
-test('clicking station with missing properties uses defaults', () => {
+test('clicking station with missing properties throws error', () => {
   const handlers: Record<string, (event: unknown) => void> = {};
   const mockMap = {
     on: vi.fn(
@@ -163,7 +158,7 @@ test('clicking station with missing properties uses defaults', () => {
     getCanvas: vi.fn(() => ({ style: { cursor: '' } })),
     queryRenderedFeatures: vi.fn(() => [
       {
-        layer: { id: MapSource.Stations },
+        layer: { id: MapLayer.Stations },
         geometry: { type: 'Point', coordinates: [-73.5, 45.5] },
         properties: undefined,
       },
@@ -173,19 +168,12 @@ test('clicking station with missing properties uses defaults', () => {
   const onItemSelect = vi.fn();
   setupMapClickHandlers(mockMap, onItemSelect);
 
-  handlers['click']({ point: { x: 100, y: 100 } });
-
-  expect(onItemSelect).toHaveBeenCalledWith({
-    type: 'station',
-    value: {
-      id: NaN,
-      name: '',
-      position: [-73.5, 45.5],
-    },
-  });
+  expect(() => {
+    handlers['click']({ point: { x: 100, y: 100 } });
+  }).toThrow();
 });
 
-test('clicking resource with missing properties uses defaults', () => {
+test('clicking resource with missing properties throws an error', () => {
   const handlers: Record<string, (event: unknown) => void> = {};
   const mockMap = {
     on: vi.fn(
@@ -214,16 +202,10 @@ test('clicking resource with missing properties uses defaults', () => {
   const onItemSelect = vi.fn();
   setupMapClickHandlers(mockMap, onItemSelect);
 
-  handlers['click']({ point: { x: 100, y: 100 } });
-
-  expect(onItemSelect).toHaveBeenCalledWith({
-    type: 'resource',
-    value: {
-      id: 'undefined',
-      position: [-73.6, 45.6],
-      routeId: '',
-    },
-  });
+  expect(() => {
+    handlers['click']({ point: { x: 100, y: 100 } });
+  }).toThrow();
+  expect(onItemSelect).not.toHaveBeenCalled();
 });
 
 test('clicking empty map area deselects item', () => {
@@ -253,7 +235,7 @@ test('clicking empty map area deselects item', () => {
 
   expect(mockMap.queryRenderedFeatures).toHaveBeenCalledWith(
     { x: 100, y: 100 },
-    { layers: [MapSource.Stations, MapSource.Resources] }
+    { layers: Object.values(MapLayer) }
   );
   expect(onItemSelect).toHaveBeenCalledWith(null);
 });

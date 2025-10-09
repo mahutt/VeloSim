@@ -34,6 +34,7 @@ export function adaptStationsToGeoJSON(
       properties: {
         id: station.id,
         name: station.name,
+        taskCount: station.tasks.length,
       },
       geometry: {
         type: 'Point',
