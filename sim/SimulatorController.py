@@ -25,11 +25,13 @@ SOFTWARE.
 from sim.RealTimeDriver import RealTimeDriver
 import simpy
 import threading
-
-
+from typing import List
+from sim.entities.station import Station
 class SimulatorController:
 
     # TODO Add entity Collections. Ex Resources, Stations, Tasks, etc.
+    stationEntities : List[Station]
+
 
     def __init__(
         self, simEnv: simpy.Environment, realTimeFactor: float, strict: bool
@@ -45,6 +47,8 @@ class SimulatorController:
         self.sim_thread.start()
 
     def stop(self) -> None:
+        # TODO Add a stop flag to to end the simulation by breaking from rtd loop
+        
         pass
 
     def pause(self) -> None:
@@ -59,5 +63,12 @@ class SimulatorController:
     def subscribe_to_frames(self) -> None:
         pass
 
+    # should call frame emitter
     def emit_frame(self) -> None:
         pass
+
+    # First frame sent from back to front end with station data, etc
+    def get_initial_frame(self) -> None:
+        pass
+
+    
