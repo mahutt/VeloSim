@@ -1,0 +1,112 @@
+{
+  "resources": [
+    {
+      "id": 1,
+      "position": [-73.57776, 45.48944],
+      "taskList": [1, 2, 3, 4, 5, 6],
+      "routeId": 1
+    },
+    {
+      "id": 2,
+      "position": [-73.56776, 45.47944],
+      "taskList": [1, 2],
+      "routeId": 2
+    },
+    {
+      "id": 3,
+      "position": [-73.59, 45.485],
+      "taskList": [],
+      "routeId": 3
+    },
+    {
+      "id": 4,
+      "position": [-73.57, 45.495],
+      "taskList": [1, 2, 3, 4, 5],
+      "routeId": 4
+    },
+    {
+      "id": 5,
+      "position": [-73.585, 45.475],
+      "taskList": [1, 2, 3, 4, 5, 6, 7, 8],
+      "routeId": 5
+    },
+    {
+      "id": 6,
+      "position": [-73.582, 45.488],
+      "taskList": [5, 6],
+      "routeId": 1
+    },
+    {
+      "id": 7,
+      "position": [-73.575, 45.492],
+      "taskList": [],
+      "routeId": 2
+    },
+    {
+      "id": 8,
+      "position": [-73.588, 45.486],
+      "taskList": [1],
+      "routeId": 3
+    },
+    {
+      "id": 9,
+      "position": [-73.57776, 45.48944],
+      "taskList": [101],
+      "routeId": 1
+    },
+    {
+      "id": 10,
+      "position": [-73.56776, 45.47944],
+      "taskList": [100, 1000, 1010, 101, 1, 11, 10, 1011],
+      "routeId": 2
+    },
+    {
+      "id": 11,
+      "position": [-73.59, 45.485],
+      "taskList": [],
+      "routeId": 3
+    },
+    {
+      "id": 12,
+      "position": [-73.57, 45.495],
+      "taskList": [3, 4, 5, 6, 7],
+      "routeId": 4
+    },
+    {
+      "id": 13,
+      "position": [-73.585, 45.475],
+      "taskList": [1, 2, 3],
+      "routeId": 5
+    },
+    {
+      "id": 14,
+      "position": [-73.582, 45.488],
+      "taskList": [111, 1112],
+      "routeId": 1
+    },
+    {
+      "id": 15,
+      "position": [-73.575, 45.492],
+      "taskList": [11, 112, 1114],
+      "routeId": 2
+    },
+    {
+      "id": 16,
+      "position": [-73.588, 45.486],
+      "taskList": [6, 7, 8, 9, 10],
+      "routeId": 3
+    },
+    {
+      "id": 17,
+      "position": [-73.575, 45.492],
+      "taskList": [],
+      "routeId": 2
+    },
+    {
+      "id": 18,
+      "position": [-73.588, 45.486],
+      "taskList": [111, 112, 113, 114],
+      "routeId": 3
+    }
+  ]
+}

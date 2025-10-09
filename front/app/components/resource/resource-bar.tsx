@@ -23,83 +23,29 @@
  */
 
 import { ResourceItem } from './resource-item';
+import { useSimulation } from '~/providers/simulation-provider';
 import type { Resource } from '~/types';
+import { SelectedItemType } from '~/types';
 
 export default function ResourceBar() {
-  const placeholderResources: Resource[] = [
-    {
-      id: '1',
-      position: [-74.006, 40.7128],
-      taskList: [101, 102],
-      routeId: '',
-    },
-    {
-      id: '2',
-      position: [-74.0059, 40.7138],
-      taskList: [103],
-      routeId: '',
-    },
-    {
-      id: '3',
-      position: [-74.0055, 40.7148],
-      taskList: [],
-      routeId: '',
-    },
-    {
-      id: '4',
-      position: [-74.0045, 40.7158],
-      taskList: [104, 105, 106],
-      routeId: '',
-    },
-    {
-      id: '5',
-      position: [-74.0035, 40.7168],
-      taskList: [107],
-      routeId: '',
-    },
-    {
-      id: '6',
-      position: [-74.0025, 40.7178],
-      taskList: [108, 109],
-      routeId: '',
-    },
-    {
-      id: '7',
-      position: [-74.0015, 40.7188],
-      taskList: [],
-      routeId: '',
-    },
-    {
-      id: '8',
-      position: [-74.0005, 40.7198],
-      taskList: [110],
-      routeId: '',
-    },
-    {
-      id: '9',
-      position: [-73.9995, 40.7208],
-      taskList: [111, 112],
-      routeId: '',
-    },
-    {
-      id: '10',
-      position: [-73.9985, 40.7218],
-      taskList: [113],
-      routeId: '',
-    },
-  ];
+  const { setSelectedItem, resources } = useSimulation();
+
+  const handleSelect = (resource: Resource) => {
+    setSelectedItem({
+      type: SelectedItemType.Resource,
+      value: resource,
+    });
+  };
 
   return (
-    <div className="absolute top-4 right-4 w-60 bg-gray-300 shadow rounded p-4">
-      <div className="space-y-2">
-        {placeholderResources.map((resource) => (
+    <div className="absolute top-4 right-4 w-60 bg-gray-300 shadow rounded p-4 max-h-[calc(100vh-2rem)]">
+      <div className="space-y-2 max-h-[calc(100vh-6rem)] overflow-y-auto pr-3 -mr-3">
+        {resources.map((resource) => (
           <ResourceItem
             key={resource.id}
-            resourceId={resource.id}
+            resourceId={resource.id.toString()}
             resource={resource}
-            onSelect={(resourceId) => console.log(resourceId)}
-            // logging the selection for now
-            // can replace with modal or other action later
+            onSelect={() => handleSelect(resource)}
           />
         ))}
       </div>

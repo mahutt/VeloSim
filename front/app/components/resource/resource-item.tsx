@@ -31,22 +31,18 @@ export function ResourceItem({
 }: {
   resourceId: string;
   resource?: Resource;
-  onSelect: (resourceId: string) => void;
+  onSelect: () => void;
 }) {
   return (
     <div
       className="bg-white rounded-full px-4 py-2 cursor-pointer hover:bg-gray-200 border border-transparent hover:border-black flex items-center justify-between"
-      onClick={() => onSelect(resourceId)}
+      onClick={() => onSelect()}
     >
       <div className="flex items-center gap-2">
         <span className="text-sm font-medium">#{resourceId}</span>
       </div>
       <span className="text-xs text-gray-400">
-        {' '}
-        {'resource name / '}
-        {resource
-          ? `${resource.taskList.length} tasks`
-          : '[resource name/data]'}
+        {resource ? `${resource.taskList.length} tasks` : ''}
       </span>
     </div>
   );

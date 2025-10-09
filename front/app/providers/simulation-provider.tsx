@@ -49,6 +49,8 @@ import { setupMapClickHandlers } from '~/lib/map-interactions';
 
 type SimulationContextType = {
   stationsRef: React.RefObject<Map<number, Station>>;
+  resourcesRef: React.RefObject<Map<number, Resource>>;
+  resources: Resource[];
   selectedItem: SelectedItem | null;
   setSelectedItem: (item: SelectedItem | null) => void;
 };
@@ -64,6 +66,9 @@ export const SimulationProvider = ({ children }: { children: ReactNode }) => {
 
   // Selection state
   const [selectedItem, setSelectedItem] = useState<SelectedItem | null>(null);
+
+  // Resources state
+  const [resources, setResources] = useState<Resource[]>([]);
 
   // Route geometries (received once, stored for interpolation)
   const routeGeometriesRef = useRef<Map<number, [number, number][]>>(new Map());
@@ -88,6 +93,7 @@ export const SimulationProvider = ({ children }: { children: ReactNode }) => {
     if (!mapLoaded) return;
 
     loadStations();
+    loadResources();
     fetch('/placeholder-data/resource-routes.geojson')
       .then((res) => res.json())
       .then((data: GeoJSON.FeatureCollection) => {
@@ -96,6 +102,7 @@ export const SimulationProvider = ({ children }: { children: ReactNode }) => {
           resourcesRef.current.set(id, {
             id,
             position: [0, 0],
+            taskList: [],
             routeId: id,
           });
           console.log(resourcesRef.current);
@@ -171,6 +178,20 @@ export const SimulationProvider = ({ children }: { children: ReactNode }) => {
       })
       .catch((error) => {
         console.error('Error fetching stations:', error);
+      });
+  };
+
+  const loadResources = () => {
+    fetch('/placeholder-data/resources.json')
+      .then((res) => res.json())
+      .then((data: { resources: Resource[] }) => {
+        data.resources.forEach((resource) => {
+          resourcesRef.current.set(resource.id, resource);
+        });
+        setResources(data.resources);
+      })
+      .catch((error) => {
+        console.error('Error loading resources:', error);
       });
   };
 
@@ -288,7 +309,13 @@ export const SimulationProvider = ({ children }: { children: ReactNode }) => {
 
   return (
     <SimulationContext.Provider
-      value={{ stationsRef, selectedItem, setSelectedItem }}
+      value={{
+        stationsRef,
+        resourcesRef,
+        resources,
+        selectedItem,
+        setSelectedItem,
+      }}
     >
       {children}
     </SimulationContext.Provider>

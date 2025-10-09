@@ -52,6 +52,7 @@ export function startMockBackend(
       updates.push({
         id: route.id,
         position: position,
+        taskList: [],
         routeId: route.id,
       });
 
