@@ -28,7 +28,6 @@ from .task_status import TaskStatus
 from .station_task_type import StationTaskType
 from .station_task import StationTask
 from .user import User
-from .refresh_tokens import RefreshToken
 from .sim_instance import SimInstance
 
 __all__ = [
@@ -37,6 +36,5 @@ __all__ = [
     "StationTaskType",
     "StationTask",
     "User",
-    "RefreshToken",
     "SimInstance",
 ]

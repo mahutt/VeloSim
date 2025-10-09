@@ -114,40 +114,6 @@ FROM users;
 \echo 'Total users inserted:'
 SELECT COUNT(*) FROM users;
 
--- VeloSim Refresh Token seed data
-
--- Set client encoding to UTF-8
-SET client_encoding = 'UTF8';
-
--- Clear existing data (if any)
-TRUNCATE TABLE refresh_tokens RESTART IDENTITY CASCADE;
-
--- Insert initial refresh token data
-INSERT INTO refresh_tokens (user_id, id, token_name, user_agent, creation_ip, date_expires, date_created, date_updated) VALUES
-(1, 'JDh-dF6CyBs8DoZNdW_7Sg', 'Chrome on macOS', 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36', '2a00:1450:4001:812::200e', '2026-05-01 00:00:00', '2025-01-01 00:00:00', '2025-01-01 00:00:00');
-
--- Verify the data was inserted
-SELECT
-    id,
-    user_id,
-    token_name,
-    user_agent,
-    creation_ip,
-    date_expires,
-    date_created,
-    date_updated
-FROM refresh_tokens
-ORDER BY id;
-
--- Display summary
-SELECT
-    COUNT(*) as total_refresh_tokens
-FROM refresh_tokens;
-
-\echo 'Refresh token seed data loaded successfully!'
-\echo 'Total refresh tokens inserted:'
-SELECT COUNT(*) FROM refresh_tokens;
-
 -- VeloSim Simulation Instance seed data
 
 -- Clear existing data (if any)

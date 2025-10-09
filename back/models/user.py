@@ -28,7 +28,6 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from back.database.session import Base
 
 if TYPE_CHECKING:
-    from .refresh_tokens import RefreshToken
     from .sim_instance import SimInstance
 
 
@@ -50,9 +49,6 @@ class User(Base):
     )
 
     # Use string to avoid circular import of back-populated field
-    refresh_tokens: Mapped[List["RefreshToken"]] = relationship(
-        "RefreshToken", back_populates="user"
-    )
     sim_instances: Mapped[List["SimInstance"]] = relationship(
         "SimInstance", back_populates="user"
     )
