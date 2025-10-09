@@ -43,7 +43,7 @@ export default function ResourceBar() {
         {resources.map((resource) => (
           <ResourceItem
             key={resource.id}
-            resourceId={resource.id.toString()}
+            resourceId={resource.id}
             resource={resource}
             onSelect={() => handleSelect(resource)}
           />

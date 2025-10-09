@@ -29,7 +29,7 @@ export function ResourceItem({
   resource,
   onSelect,
 }: {
-  resourceId: string;
+  resourceId: number;
   resource?: Resource;
   onSelect: () => void;
 }) {
