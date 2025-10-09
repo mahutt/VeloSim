@@ -33,12 +33,13 @@ from sim.entities.inputParameters import InputParameter
 from sim.entities.request_type import RequestType
 from sim.frame_emitter import FrameEmitter
 from sim.utils.subscriber import Subscriber
+from sim.SimulatorController import SimulatorController
 
 
 class RunInfo(TypedDict):
     thread: threading.Thread
-    stop: threading.Event
     emitter: FrameEmitter
+    simController: SimulatorController
 
 
 class Simulator:
@@ -47,40 +48,42 @@ class Simulator:
         self.thread_pool_lock = threading.Lock()
 
     def start(
-        self, input_parameters: InputParameter, subscribers: List[Subscriber]
+        self, input_parameters: InputParameter, subscribers: List[Subscriber], simTime: int
     ) -> str:
         run_id = str(uuid.uuid4())  # threadID / SIM ID
-        stop_flag = threading.Event()
         emitter = FrameEmitter(run_id)
 
         for sub in subscribers:
             emitter.attach(sub)
 
-        def sim_loop() -> None:
-            env = simpy.Environment()
-            _ = env  # Keeps linter happy. (temporary)
-            global_seq = 0
+ 
+        env = simpy.Environment()
+        _ = env  # Keeps linter happy. (temporary)
 
-            while not stop_flag.is_set():  # Run until stop is called!
-                frame = Frame(
-                    seq_numb=global_seq,
-                    payload_str="This is my current info... beep boop beep boop",
-                )
-                global_seq += 1
-                emitter.notify(frame)
-                print(f"Hello From Simulator: [{run_id}]")
-                time.sleep(1)
-            print(f"[{run_id}] stopped.")
+        simController = SimulatorController(simEnv= env,frameEmitter= emitter,strict=False)
 
-        t = threading.Thread(target=sim_loop, name=f"SIM-{run_id}", daemon=True)
+
+
+            # while not stop_flag.is_set():  # Run until stop is called!
+            #     frame = Frame(
+            #         seq_numb=global_seq,
+            #         payload_str="This is my current info... beep boop beep boop",
+            #     )
+            #     global_seq += 1
+            #     emitter.notify(frame)
+            #     print(f"Hello From Simulator: [{run_id}]")
+            #     time.sleep(1)
+            
+
+        t = threading.Thread(target=simController.start,args=(simTime,), name=f"SIM-{run_id}", daemon=True)
 
         with self.thread_pool_lock:
             if run_id in self.thread_pool:
                 raise RuntimeError(f"Run id already present: {run_id}")
             self.thread_pool[run_id] = {
                 "thread": t,
-                "stop": stop_flag,
                 "emitter": emitter,
+                "simController":simController
             }
             t.start()
 
@@ -93,13 +96,14 @@ class Simulator:
         if rec is None:
             return  # Unknown/Thread is already closed.
 
-        rec["stop"].set()
+        rec["simController"].stop()
         rec["thread"].join(timeout=join_timeout)
 
         with self.thread_pool_lock:
             current = self.thread_pool.get(sim_id)
             if current is rec and not rec["thread"].is_alive():
                 self.thread_pool.pop(sim_id, None)
+        print(f"{sim_id} ended")
 
     def pause(self) -> None:
         raise NotImplementedError("pause() not implemented yet")

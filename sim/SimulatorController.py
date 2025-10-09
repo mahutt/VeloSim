@@ -38,7 +38,7 @@ class SimulatorController:
 
 
     def __init__(
-        self, simEnv: simpy.Environment, frameEmitter: FrameEmitter,  realTimeFactor: float, strict: bool
+        self, simEnv: simpy.Environment, frameEmitter: FrameEmitter, strict: bool, realTimeFactor: float = None
     ) -> None:
         self.simEnv = simEnv
         self.realTimeDriver = RealTimeDriver(simEnv, realTimeFactor, strict)
@@ -46,14 +46,19 @@ class SimulatorController:
 
     def start(self, simTime: int) -> None:
         # TODO process initial entities into the sim env
+        # Add a dummy process to keep the simulation running
+        self.simEnv.process(self._dummy_simulation_process(simTime))
 
         self.sim_thread = threading.Thread(target=self.realTimeDriver.runUntil,args=(simTime,self.emit_frame))
         self.sim_thread.start()
 
+    def _dummy_simulation_process(self, simTime: int):
+        """A dummy process that yields every second to keep the simulation active."""
+        for i in range(simTime):
+            yield self.simEnv.timeout(1)  # Wait 1 simulation second
+
     def stop(self) -> None:
-        # TODO Add a stop flag to to end the simulation by breaking from rtd loop
-        
-        pass
+        self.realTimeDriver.stop()
 
     def pause(self) -> None:
         self.realTimeDriver.pause()

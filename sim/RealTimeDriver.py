@@ -44,6 +44,8 @@ class RealTimeDriver:
     wallStartTime: float
     # Keeps track of the simulation start for pacing
     simStartTime: float
+    # Set to true to force break out of sim loop
+    stop_flag: bool = False
 
     def _load_config(self) -> dict[str, Any]:
         """Load configuration from config.json file."""
@@ -109,6 +111,10 @@ class RealTimeDriver:
         self.resetPacingRefs()
         # Sim loop that controls the time real time (aka wall time) between sim steps
         while True:
+
+            #Stop Sim loop
+            if self.stop_flag:
+                break
             if self.running:
                 # Break out of sim loop if current sim time > specified run time
                 if self.simEnv.peek() >= until:
@@ -165,6 +171,9 @@ class RealTimeDriver:
     def resume(self) -> None:
         print("Starting")
         self.running = True
+    
+    def stop(self) -> None:
+        self.stop_flag = True
 
     def recordLag(self) -> None:
         pass

@@ -27,7 +27,7 @@ from typing import List
 from sim.entities.frame import Frame
 from sim.entities.inputParameters import InputParameter
 from sim.utils.subscriber import Subscriber
-from .simulator import Simulator
+from sim.simulator import Simulator
 
 
 class LoggerSubscriber(Subscriber):
@@ -66,8 +66,8 @@ if __name__ == "__main__":
 
     sim = Simulator()
 
-    r1 = sim.start(params, sub_list_1)
-    r2 = sim.start(params, sub_list_2)
+    r1 = sim.start(params, sub_list_1,3600)
+    r2 = sim.start(params, sub_list_2,3600)
     time.sleep(3)
     sim.stop(r1)
     time.sleep(1)
