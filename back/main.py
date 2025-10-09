@@ -27,7 +27,8 @@ from fastapi import Depends, FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import OAuth2PasswordRequestForm
 
-from back.auth.dependency import get_user_id
+# Auth temporarily disabled
+# from back.auth.dependency import get_user_id
 from back.core.config import settings
 from back.api.v1 import api_router
 from back.auth import Token, authenticate_user
@@ -76,7 +77,9 @@ app.add_middleware(
 
 # Include API routes, all protected by auth (though they will have to add to their
 # type signature to get the actual user ID)
-app.include_router(api_router, prefix="/api/v1", dependencies=[Depends(get_user_id)])
+# Disable auth for now
+# app.include_router(api_router, prefix="/api/v1", dependencies=[Depends(get_user_id)])
+app.include_router(api_router, prefix="/api/v1")
 
 
 @app.get("/")

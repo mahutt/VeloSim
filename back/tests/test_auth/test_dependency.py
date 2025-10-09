@@ -107,7 +107,9 @@ class TestGetUserId:
         mock_validate_token.return_value = None
 
         with pytest.raises(HTTPException) as exc_info:
-            asyncio.run(get_user_id(None))  # type: ignore # pyright: ignore[reportArgumentType]
+            asyncio.run(
+                get_user_id(None)  # type: ignore # pyright: ignore[reportArgumentType]
+            )
 
         assert exc_info.value.status_code == 401
         mock_validate_token.assert_called_once_with(None)
