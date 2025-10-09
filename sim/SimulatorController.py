@@ -27,18 +27,22 @@ import simpy
 import threading
 from typing import List
 from sim.entities.station import Station
+from sim.frame_emitter import FrameEmitter
+from sim.entities.frame import Frame
+
 class SimulatorController:
 
     # TODO Add entity Collections. Ex Resources, Stations, Tasks, etc.
     stationEntities : List[Station]
+    frameCounter : int = 0 # No frames emitted until sim is running
 
 
     def __init__(
-        self, simEnv: simpy.Environment, realTimeFactor: float, strict: bool
+        self, simEnv: simpy.Environment, frameEmitter: FrameEmitter,  realTimeFactor: float, strict: bool
     ) -> None:
         self.simEnv = simEnv
         self.realTimeDriver = RealTimeDriver(simEnv, realTimeFactor, strict)
-        # TODO Initialise frame emitter here
+        self.frameEmitter = frameEmitter
 
     def start(self, simTime: int) -> None:
         # TODO process initial entities into the sim env
@@ -65,7 +69,15 @@ class SimulatorController:
 
     # should call frame emitter
     def emit_frame(self) -> None:
-        pass
+        payload = { 
+            "sim_id" : self.frameEmitter.sim_id,
+            "tasks" : "TODO : Add task detials",
+            "resources": "TODO : Add resource details",
+            "stations" : "TODO: Add station details"
+        }
+        frame = Frame(seq_numb= self.frameCounter, payload= payload)
+        self.frameEmitter.notify(frame= frame)
+        self.frameCounter += 1
 
     # First frame sent from back to front end with station data, etc
     def get_initial_frame(self) -> None:
