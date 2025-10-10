@@ -61,7 +61,9 @@ export interface Resource {
   id: number;
   position: [number, number];
   taskList: number[]; // list of task IDs
-  routeId: number;
+  route: {
+    coordinates: [number, number][];
+  };
 }
 
 // Selection types

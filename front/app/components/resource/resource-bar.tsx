@@ -24,18 +24,16 @@
 
 import { ResourceItem } from './resource-item';
 import { useSimulation } from '~/providers/simulation-provider';
-import type { Resource } from '~/types';
 import { SelectedItemType } from '~/types';
 
 export default function ResourceBar() {
-  const { setSelectedItem, resources } = useSimulation();
+  const { selectItem, resourcesRef } = useSimulation();
 
-  const handleSelect = (resource: Resource) => {
-    setSelectedItem({
-      type: SelectedItemType.Resource,
-      value: resource,
-    });
+  const handleSelect = (resourceId: number) => {
+    selectItem(SelectedItemType.Resource, resourceId);
   };
+
+  const resources = Array.from(resourcesRef.current.values());
 
   return (
     <div className="absolute top-4 right-4 w-60 bg-gray-300 shadow rounded p-4 max-h-[calc(100vh-2rem)]">
@@ -45,7 +43,7 @@ export default function ResourceBar() {
             key={resource.id}
             resourceId={resource.id}
             resource={resource}
-            onSelect={() => handleSelect(resource)}
+            onSelect={() => handleSelect(resource.id)}
           />
         ))}
       </div>
