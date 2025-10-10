@@ -22,23 +22,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 """
 
-# Import all models here to ensure they are registered with SQLAlchemy
-from .station import Station
-from .task_status import TaskStatus
-from .station_task_type import StationTaskType
-from .station_task import StationTask
-from .resource import Resource
-from .resource_type import ResourceType
-from .user import User
-from .sim_instance import SimInstance
+# Import all validators here for easy access
+from .validators import validate_longitude, validate_latitude
 
-__all__ = [
-    "Station",
-    "TaskStatus",
-    "StationTaskType",
-    "StationTask",
-    "Resource",
-    "ResourceType",
-    "User",
-    "SimInstance",
-]
+__all__ = ["validate_longitude", "validate_latitude"]

@@ -22,23 +22,18 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 """
 
-# Import all models here to ensure they are registered with SQLAlchemy
-from .station import Station
-from .task_status import TaskStatus
-from .station_task_type import StationTaskType
-from .station_task import StationTask
-from .resource import Resource
-from .resource_type import ResourceType
-from .user import User
-from .sim_instance import SimInstance
+from typing import Any
 
-__all__ = [
-    "Station",
-    "TaskStatus",
-    "StationTaskType",
-    "StationTask",
-    "Resource",
-    "ResourceType",
-    "User",
-    "SimInstance",
-]
+
+def validate_longitude(v: Any) -> float:
+    """Validate that longitude is between -180 and 180."""
+    if not -180 <= v <= 180:
+        raise ValueError("Longitude must be between -180 and 180")
+    return float(v)
+
+
+def validate_latitude(v: Any) -> float:
+    """Validate that latitude is between -90 and 90."""
+    if not -90 <= v <= 90:
+        raise ValueError("Latitude must be between -90 and 90")
+    return float(v)
