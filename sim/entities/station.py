@@ -26,7 +26,7 @@ import simpy
 from typing import TYPE_CHECKING
 
 # to avoid circular imports
-if TYPE_CHECKING:
+if TYPE_CHECKING:  # pragma: no cover
     from .task import Task
     from .position import Position
 

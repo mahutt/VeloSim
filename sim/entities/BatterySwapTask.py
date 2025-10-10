@@ -28,7 +28,7 @@ from .task import Task
 from .task_state import State
 
 # to avoid circular imports
-if TYPE_CHECKING:
+if TYPE_CHECKING:  # pragma: no cover
     from .station import Station
     from .resource import Resource
 

@@ -27,7 +27,7 @@ from typing import Optional, TYPE_CHECKING
 from .task_state import State
 
 # to avoid circular imports
-if TYPE_CHECKING:
+if TYPE_CHECKING:  # pragma: no cover
     from .position import Position
     from .task import Task
 
