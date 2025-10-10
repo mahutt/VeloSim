@@ -22,19 +22,33 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 """
 
-# Import all models here to ensure they are registered with SQLAlchemy
-from .station import Station
-from .task_status import TaskStatus
-from .station_task_type import StationTaskType
-from .station_task import StationTask
-from .user import User
-from .sim_instance import SimInstance
+from typing import TYPE_CHECKING
+from sqlalchemy import DateTime, ForeignKey, func
+from sqlalchemy.orm import Mapped, mapped_column, relationship
+from back.database.session import Base
 
-__all__ = [
-    "Station",
-    "TaskStatus",
-    "StationTaskType",
-    "StationTask",
-    "User",
-    "SimInstance",
-]
+if TYPE_CHECKING:
+    from .user import User
+
+
+class SimInstance(Base):
+    """Model to represent sim instances. This model will be more fleshed out once we
+    know more about how sims will run.
+    """
+
+    __tablename__ = "sim_instances"
+
+    id: Mapped[int] = mapped_column(primary_key=True, index=True)
+
+    date_created: Mapped[DateTime] = mapped_column(
+        DateTime, nullable=False, server_default=func.now()
+    )
+    date_updated: Mapped[DateTime] = mapped_column(
+        DateTime, nullable=False, server_default=func.now(), onupdate=func.now()
+    )
+
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False)
+    user: Mapped["User"] = relationship("User", back_populates="sim_instances")
+
+    def __repr__(self) -> str:
+        return f"<SimInstance(id={self.id}, user_id={self.user_id})>"
