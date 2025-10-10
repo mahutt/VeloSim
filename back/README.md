@@ -103,11 +103,12 @@ alembic revision --autogenerate -m "message"  # Generate migration
 
 Configure these variables in your `.env` file (see [root README](../README.md) for setup):
 
-| Variable       | Description                  | Default Value                                         | Required |
-| -------------- | ---------------------------- | ----------------------------------------------------- | -------- |
-| `ENVIRONMENT`  | Application environment      | `development`                                         | No       |
-| `DEBUG`        | Enable debug mode            | `true`                                                | No       |
-| `DATABASE_URL` | PostgreSQL connection string | `postgresql://velosim:velosim@localhost:5433/velosim` | Yes      |
+| Variable             | Description                                               | Default Value                                                | Required |
+| -------------------- | --------------------------------------------------------- | ------------------------------------------------------------ | -------- |
+| `ENVIRONMENT`        | Application environment                                   | `development`                                                | No       |
+| `DEBUG`              | Enable debug mode                                         | `true`                                                       | No       |
+| `DATABASE_URL        | PostgreSQL connection string                              | `postgresql://velosim:velosim@localhost:5433/velosim`        | Yes      |
+| `VELOSIM_JWT_SECRET` | JWT signing key, must be consistent for entire deployment | Auto-generated every startup (will kill sessions on restart) | No       |
 
 **Environment Options:**
 
