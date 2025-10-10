@@ -1,8 +1,8 @@
 """add_resources
 
-Revision ID: d689fd01c393
-Revises: 04454bcd162d
-Create Date: 2025-10-07 19:34:26.531655
+Revision ID: ae69c02d06d8
+Revises: b92a9d455219
+Create Date: 2025-10-10 11:35:41.938457
 
 """
 from typing import Sequence, Union
@@ -12,8 +12,8 @@ import sqlalchemy as sa
 
 
 # revision identifiers, used by Alembic.
-revision: str = 'd689fd01c393'
-down_revision: Union[str, Sequence[str], None] = '04454bcd162d'
+revision: str = 'ae69c02d06d8'
+down_revision: Union[str, Sequence[str], None] = 'b92a9d455219'
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
