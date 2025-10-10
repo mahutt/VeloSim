@@ -39,12 +39,12 @@ services:
     ports:
       - "3100:3100"
     volumes:
-      - ./back/logging/loki-config.yaml:/etc/loki/local-config.yaml
-      - ./back/logging/loki/chunks:/loki/chunks
-      - ./back/logging/loki/index:/loki/index
-      - ./back/logging/loki/cache:/loki/cache
-      - ./back/logging/loki/wal:/loki/wal
-      - ./back/logging/loki/compactor:/loki/compactor
+      - ./back/grafana_logging/loki-config.yaml:/etc/loki/local-config.yaml:ro
+      - ./back/grafana_logging/loki/chunks:/loki/chunks
+      - ./back/grafana_logging/loki/index:/loki/index
+      - ./back/grafana_logging/loki/cache:/loki/cache
+      - ./back/grafana_logging/loki/wal:/loki/wal
+      - ./back/grafana_logging/loki/compactor:/loki/compactor
     command: -config.file=/etc/loki/local-config.yaml
     restart: unless-stopped
     healthcheck:
@@ -64,12 +64,8 @@ services:
     environment:
       - GF_SECURITY_ADMIN_USER=admin
       - GF_SECURITY_ADMIN_PASSWORD=admin
-      # Preconfigure a local Loki datasource pointing to our Loki container
-      - GF_DATASOURCES_LOKI_NAME=Loki
-      - GF_DATASOURCES_LOKI_TYPE=loki
-      - GF_DATASOURCES_LOKI_URL=http://loki:3100
-      - GF_DATASOURCES_LOKI_ACCESS=proxy
-      - GF_DATASOURCES_LOKI_BASIC_AUTH=false
+    volumes:
+      - ./back/grafana_logging/grafana/provisioning/datasources:/etc/grafana/provisioning/datasources:ro
     depends_on:
       loki:
         condition: service_healthy
@@ -77,14 +73,20 @@ services:
     networks:
       - velosim-net
 
-  # --- Grafana Alloy ---
-  grafana-alloy:
-    image: grafana/alloy:latest
-    container_name: velosim-alloy
+  # --- Promtail ---
+  promtail:
+    image: grafana/promtail:2.9.0
+    container_name: velosim-promtail
     volumes:
-      - ./back/logging/logs.txt:/etc/alloy/logs/logs.txt
-      - ./back/logging/config.alloy:/etc/alloy/config.alloy
-    command: ["run", "/etc/alloy/config.alloy"]
+      - ./back/grafana_logging/promtail/promtail-config.yaml:/etc/promtail/promtail-config.yaml:ro
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro
+      - /var/log:/var/log:ro
+      - ./back/grafana_logging/promtail/positions:/var/lib/promtail
+      - ./back/grafana_logging:/logs:ro
+    command: -config.file=/etc/promtail/promtail-config.yaml
     restart: unless-stopped
+    depends_on:
+      loki:
+        condition: service_healthy
     networks:
       - velosim-net

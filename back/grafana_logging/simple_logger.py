@@ -22,16 +22,5 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 """
 
-# write_logs.py
-from datetime import datetime
-
-log_file = "logs.txt"
-
-# Generate timestamp
-timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-
-# Write log entry with timestamp
-with open(log_file, "a") as f:
-    f.write(f"[{timestamp}] This is a test log message.\n")
-
-print(f"Logged message to {log_file}")
+with open("logs.txt", "a") as f:
+    f.write("Hello from Postman!\n")

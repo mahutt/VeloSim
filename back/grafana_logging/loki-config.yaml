@@ -1,6 +1,8 @@
+auth_enabled: false
+
 server:
   http_listen_port: 3100
-  log_level: info
+  log_level: debug
 
 ingester:
   wal:
@@ -38,4 +40,6 @@ compactor:
 
 limits_config:
   enforce_metric_name: false
-  split_queries_by_interval: 24h # <- correct loca_
+  split_queries_by_interval: 24h
+  ingestion_rate_mb: 100
+  ingestion_burst_size_mb: 100
