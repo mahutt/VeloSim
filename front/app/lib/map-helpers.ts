@@ -27,6 +27,16 @@ export enum MapSource {
   Resources = 'resources',
 }
 
+export enum MapLayer {
+  Stations = 'stations',
+  StationTaskCounts = 'station-task-counts',
+  Resources = 'resources',
+}
+
+export function isMapLayer(value: string): value is MapLayer {
+  return (Object.values(MapLayer) as string[]).includes(value);
+}
+
 // Setup helpers
 
 export function loadMapImages(map: mapboxgl.Map) {
@@ -58,7 +68,7 @@ export function initializeMapSources(map: mapboxgl.Map) {
 export function setMapLayers(map: mapboxgl.Map) {
   // Add layers for stations
   map.addLayer({
-    id: 'stations',
+    id: MapLayer.Stations,
     type: 'symbol',
     source: 'stations',
     layout: {
@@ -67,9 +77,29 @@ export function setMapLayers(map: mapboxgl.Map) {
     },
   });
 
+  // Add task count labels above stations
+  map.addLayer({
+    id: MapLayer.StationTaskCounts,
+    type: 'symbol',
+    source: 'stations',
+    layout: {
+      'text-field': ['get', 'taskCount'],
+      'text-font': ['Open Sans Bold', 'Arial Unicode MS Bold'],
+      'text-size': 12,
+      'text-offset': [0, -2],
+      'text-anchor': 'bottom',
+      'text-allow-overlap': true,
+    },
+    paint: {
+      'text-color': '#ffffff',
+      'text-halo-color': '#000000',
+      'text-halo-width': 2,
+    },
+  });
+
   // Add layers for resources
   map.addLayer({
-    id: 'resources',
+    id: MapLayer.Resources,
     type: 'symbol',
     source: 'resources',
     layout: {

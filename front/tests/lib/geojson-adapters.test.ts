@@ -33,11 +33,13 @@ describe('adaptStationsToGeoJSON', () => {
         id: 1,
         name: 'Central Station',
         position: [-74.006, 40.7128],
+        tasks: [],
       },
       {
         id: 2,
         name: 'Park Station',
         position: [-73.9857, 40.7484],
+        tasks: [],
       },
     ];
 
@@ -51,6 +53,7 @@ describe('adaptStationsToGeoJSON', () => {
           properties: {
             id: 1,
             name: 'Central Station',
+            taskCount: 0,
           },
           geometry: {
             type: 'Point',
@@ -62,6 +65,7 @@ describe('adaptStationsToGeoJSON', () => {
           properties: {
             id: 2,
             name: 'Park Station',
+            taskCount: 0,
           },
           geometry: {
             type: 'Point',

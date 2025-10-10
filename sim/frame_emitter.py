@@ -22,23 +22,34 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 """
 
-# Import all models here to ensure they are registered with SQLAlchemy
-from .station import Station
-from .task_status import TaskStatus
-from .station_task_type import StationTaskType
-from .station_task import StationTask
-from .resource import Resource
-from .resource_type import ResourceType
-from .user import User
-from .sim_instance import SimInstance
+import threading
+from typing import List
+from sim.entities.frame import Frame
+from sim.utils.publisher import Publisher
+from sim.utils.subscriber import Subscriber
 
-__all__ = [
-    "Station",
-    "TaskStatus",
-    "StationTaskType",
-    "StationTask",
-    "Resource",
-    "ResourceType",
-    "User",
-    "SimInstance",
-]
+
+class FrameEmitter(Publisher):
+    def __init__(self, sim_id: str) -> None:
+        self.subscribers: List[Subscriber] = []
+        self.sim_id = sim_id
+        self._lock = threading.Lock()
+
+    def attach(self, sub: Subscriber) -> None:
+        with self._lock:
+            if sub not in self.subscribers:
+                self.subscribers.append(sub)
+
+    def detach(self, sub: Subscriber) -> None:
+        with self._lock:
+            if sub in self.subscribers:
+                self.subscribers.remove(sub)
+
+    def notify(self, frame: Frame) -> None:
+        with self._lock:
+            live_subscribers = list(
+                self.subscribers
+            )  # Taking live subs to prevent deadlock.
+
+        for subs in live_subscribers:
+            subs.on_frame(frame)

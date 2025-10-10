@@ -35,7 +35,7 @@ export function startMockBackend(
   onFrame: (updates: Resource[]) => void
 ): () => void {
   // Track waypoint progression
-  const waypointIndices = new Map<string, number>();
+  const waypointIndices = new Map<number, number>();
   routes.forEach((route) => waypointIndices.set(route.id, 0));
 
   const intervalId = window.setInterval(() => {

@@ -22,23 +22,32 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 """
 
-# Import all models here to ensure they are registered with SQLAlchemy
-from .station import Station
-from .task_status import TaskStatus
-from .station_task_type import StationTaskType
-from .station_task import StationTask
-from .resource import Resource
-from .resource_type import ResourceType
-from .user import User
-from .sim_instance import SimInstance
+import json
+import time
+from typing import Any, Dict, Optional
 
-__all__ = [
-    "Station",
-    "TaskStatus",
-    "StationTaskType",
-    "StationTask",
-    "Resource",
-    "ResourceType",
-    "User",
-    "SimInstance",
-]
+
+class Frame:
+    def __init__(
+        self,
+        seq_numb: int,
+        payload: Optional[Dict[str, Any]] = None,
+        payload_str: Optional[str] = None,
+    ) -> None:
+        self.seq_number = seq_numb
+        self.timestamp_ms = int(time.time() * 1000)
+        self.payload_dict = payload or {}
+
+        if payload_str:
+            self.payload_str = payload_str
+        elif payload:
+            self.payload_str = json.dumps(payload)
+        else:
+            self.payload_str = "{}"
+
+    def __repr__(self) -> str:
+        return (
+            f"Frame(seq={self.seq_number}, "
+            f"timestamp={self.timestamp_ms}, "
+            f"payload={self.payload_dict})"
+        )
