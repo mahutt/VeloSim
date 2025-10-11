@@ -70,10 +70,7 @@ export const SimulationProvider = ({ children }: { children: ReactNode }) => {
   const selectItem = (type: SelectedItemType, id: number) => {
     if (type === SelectedItemType.Station) {
       const station = stationsRef.current.get(id);
-      if (!station) {
-        console.error('Selected station not found: ' + id);
-        return;
-      }
+      if (!station) throw new Error('Selected station not found: ' + id);
       setSelectedItem({ type, value: station });
     } else if (type === SelectedItemType.Resource) {
       const resource = resourcesRef.current.get(id);
