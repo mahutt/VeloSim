@@ -49,8 +49,10 @@ import { setupMapClickHandlers } from '~/lib/map-interactions';
 
 type SimulationContextType = {
   stationsRef: React.RefObject<Map<number, Station>>;
+  resourcesRef: React.RefObject<Map<number, Resource>>;
+  resources: Resource[];
   selectedItem: SelectedItem | null;
-  setSelectedItem: (item: SelectedItem | null) => void;
+  selectItem: (type: SelectedItemType, id: number) => void;
 };
 
 const SimulationContext = createContext<SimulationContextType | undefined>(
@@ -62,8 +64,24 @@ export const SimulationProvider = ({ children }: { children: ReactNode }) => {
   const stationsRef = useRef<Map<number, Station>>(new Map());
   const resourcesRef = useRef<Map<number, Resource>>(new Map());
 
+  // Resources state
+  const [resources, setResources] = useState<Resource[]>([]);
+
   // Selection state
   const [selectedItem, setSelectedItem] = useState<SelectedItem | null>(null);
+
+  // Selection function
+  const selectItem = (type: SelectedItemType, id: number) => {
+    if (type === SelectedItemType.Station) {
+      const station = stationsRef.current.get(id);
+      if (!station) throw new Error('Selected station not found: ' + id);
+      setSelectedItem({ type, value: station });
+    } else if (type === SelectedItemType.Resource) {
+      const resource = resourcesRef.current.get(id);
+      if (!resource) throw new Error('Selected resource not found: ' + id);
+      setSelectedItem({ type, value: resource });
+    }
+  };
 
   // Route geometries (received once, stored for interpolation)
   const routeGeometriesRef = useRef<Map<number, [number, number][]>>(new Map());
@@ -88,24 +106,18 @@ export const SimulationProvider = ({ children }: { children: ReactNode }) => {
     if (!mapLoaded) return;
 
     loadStations();
-    fetch('/placeholder-data/resource-routes.geojson')
+    fetch('/placeholder-data/resources.json')
       .then((res) => res.json())
-      .then((data: GeoJSON.FeatureCollection) => {
-        data.features.forEach((feature) => {
-          const id = Number(feature.properties!.id);
-          resourcesRef.current.set(id, {
-            id,
-            position: [0, 0],
-            routeId: id,
-          });
-          console.log(resourcesRef.current);
+      .then((data: { resources: Resource[] }) => {
+        data.resources.forEach((resource) => {
+          resourcesRef.current.set(resource.id, resource);
         });
-        const routes: Route[] = data.features.map((feature) => ({
-          id: feature.properties?.id,
-          coordinates: (feature.geometry as GeoJSON.LineString).coordinates as [
-            number,
-            number,
-          ][],
+
+        setResources(data.resources);
+
+        const routes: Route[] = data.resources.map((resource) => ({
+          id: resource.id,
+          coordinates: resource.route.coordinates,
         }));
 
         // Store route geometries for interpolation
@@ -128,16 +140,7 @@ export const SimulationProvider = ({ children }: { children: ReactNode }) => {
         return;
       }
       const { type, id } = item;
-      if (type === SelectedItemType.Station) {
-        const station = stationsRef.current.get(id);
-        if (!station) throw new Error('Selected station not found: ' + id);
-        setSelectedItem({ type, value: station });
-      } else if (type === SelectedItemType.Resource) {
-        console.log(id);
-        const resource = resourcesRef.current.get(id);
-        if (!resource) throw new Error('Selected resource not found: ' + id);
-        setSelectedItem({ type, value: resource });
-      }
+      selectItem(type, id);
     });
 
     // Cleanup on unmount
@@ -205,7 +208,7 @@ export const SimulationProvider = ({ children }: { children: ReactNode }) => {
 
       // Set new target position from backend
       targetPositionsRef.current.set(update.id, update.position);
-      resourceRoutesRef.current.set(update.id, update.routeId);
+      resourceRoutesRef.current.set(update.id, update.id);
     });
 
     // Reset global frame timer when new frame arrives
@@ -288,7 +291,13 @@ export const SimulationProvider = ({ children }: { children: ReactNode }) => {
 
   return (
     <SimulationContext.Provider
-      value={{ stationsRef, selectedItem, setSelectedItem }}
+      value={{
+        stationsRef,
+        resourcesRef,
+        resources,
+        selectedItem,
+        selectItem,
+      }}
     >
       {children}
     </SimulationContext.Provider>

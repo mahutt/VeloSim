@@ -22,25 +22,28 @@
  * SOFTWARE.
  */
 
-import 'mapbox-gl/dist/mapbox-gl.css';
-import MapContainer from '~/components/map/map-container';
-import { MapProvider } from '~/providers/map-provider';
-import { SimulationProvider } from '~/providers/simulation-provider';
-import ResourceBar from '~/components/resource/resource-bar';
+import type { Resource } from '~/types';
 
-export function meta() {
-  return [{ title: 'Simulation' }];
-}
-
-export default function Simulation() {
+export function ResourceItem({
+  resource,
+  onSelect,
+}: {
+  resource?: Resource;
+  onSelect: () => void;
+}) {
   return (
-    <>
-      <MapProvider>
-        <SimulationProvider>
-          <MapContainer />
-          <ResourceBar />
-        </SimulationProvider>
-      </MapProvider>
-    </>
+    <div
+      className="bg-white rounded-full px-4 py-2 cursor-pointer hover:bg-gray-200 border border-transparent hover:border-black flex items-center justify-between"
+      onClick={() => onSelect()}
+    >
+      <div className="flex items-center gap-2">
+        <span className="text-sm font-medium">
+          {resource ? `#${resource.id}` : ''}
+        </span>
+      </div>
+      <span className="text-xs text-gray-400">
+        {resource ? `${resource.taskList.length} tasks` : ''}
+      </span>
+    </div>
   );
 }

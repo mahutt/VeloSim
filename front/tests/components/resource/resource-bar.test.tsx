@@ -22,25 +22,12 @@
  * SOFTWARE.
  */
 
-import 'mapbox-gl/dist/mapbox-gl.css';
-import MapContainer from '~/components/map/map-container';
-import { MapProvider } from '~/providers/map-provider';
-import { SimulationProvider } from '~/providers/simulation-provider';
+import { expect, test } from 'vitest';
+import { render } from '@testing-library/react';
 import ResourceBar from '~/components/resource/resource-bar';
 
-export function meta() {
-  return [{ title: 'Simulation' }];
-}
-
-export default function Simulation() {
-  return (
-    <>
-      <MapProvider>
-        <SimulationProvider>
-          <MapContainer />
-          <ResourceBar />
-        </SimulationProvider>
-      </MapProvider>
-    </>
-  );
-}
+test('resource bar render should fail without a simulation provider', () => {
+  expect(() => {
+    render(<ResourceBar />);
+  }).toThrow('useSimulation must be used within a SimulationProvider');
+});

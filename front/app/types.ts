@@ -60,7 +60,10 @@ export interface Route {
 export interface Resource {
   id: number;
   position: [number, number];
-  routeId: number;
+  taskList: number[]; // list of task IDs
+  route: {
+    coordinates: [number, number][];
+  };
 }
 
 // Selection types
