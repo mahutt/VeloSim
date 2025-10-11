@@ -76,18 +76,22 @@ class TestBatterySwapTask:
 
         state = task.get_state()
         assert state == State.OPEN
+        assert str(state) == "open"
 
         task.set_state(State.ASSIGNED)
         state = task.get_state()
         assert state == State.ASSIGNED
+        assert str(state) == "assigned"
 
         task.set_state(State.DISPATCHED)
         state = task.get_state()
         assert state == State.DISPATCHED
+        assert str(state) == "dispatched"
 
         task.set_state(State.CLOSED)
         state = task.get_state()
         assert state == State.CLOSED
+        assert str(state) == "closed"
 
     def test_get_task_id(self, simpy_env: simpy.Environment) -> None:
         # Arrange

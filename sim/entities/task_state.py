@@ -31,3 +31,14 @@ class State(Enum):
     ASSIGNED = 2
     DISPATCHED = 3
     CLOSED = 4
+
+    # get string state by doing str(state)
+    def __str__(self) -> str:
+        if self == State.OPEN:
+            return "open"
+        elif self == State.ASSIGNED:
+            return "assigned"
+        elif self == State.DISPATCHED:
+            return "dispatched"
+        elif self == State.CLOSED:
+            return "closed"
