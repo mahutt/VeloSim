@@ -143,19 +143,29 @@ const mockGetStationsResponse = {
   total_pages: 1,
 };
 
-// Sample resource routes GeoJSON data
-const mockResourceRoutesData = {
-  type: 'FeatureCollection' as const,
-  features: [
+const mockResourcesData = {
+  resources: [
     {
-      type: 'Feature' as const,
-      properties: { id: 'resource-1' },
-      geometry: {
-        type: 'LineString' as const,
+      id: 1,
+      position: [-73.57776, 45.48944],
+      taskList: [1, 2, 3],
+      route: {
         coordinates: [
           [-73.57776, 45.48944],
           [-73.56776, 45.49944],
           [-73.55776, 45.50944],
+        ],
+      },
+    },
+    {
+      id: 2,
+      position: [-73.56776, 45.47944],
+      taskList: [1, 2],
+      route: {
+        coordinates: [
+          [-73.56776, 45.47944],
+          [-73.568, 45.48],
+          [-73.569, 45.482],
         ],
       },
     },
@@ -218,7 +228,7 @@ test('simulation provider fetches stations data when map is loaded', async () =>
 
   mockFetch.mockResolvedValueOnce({
     ok: true,
-    json: () => Promise.resolve(mockResourceRoutesData),
+    json: () => Promise.resolve(mockResourcesData),
   });
 
   render(
@@ -260,7 +270,7 @@ test('simulation provider updates stations ref when data is successfully fetched
 
   mockFetch.mockResolvedValueOnce({
     ok: true,
-    json: () => Promise.resolve(mockResourceRoutesData),
+    json: () => Promise.resolve(mockResourcesData),
   });
 
   let stationsRef: React.RefObject<Map<number, Station>> | undefined;
@@ -301,7 +311,7 @@ test('simulation provider loads resource routes', async () => {
 
   mockFetch.mockResolvedValueOnce({
     ok: true,
-    json: () => Promise.resolve(mockResourceRoutesData),
+    json: () => Promise.resolve(mockResourcesData),
   });
 
   render(
@@ -318,9 +328,7 @@ test('simulation provider loads resource routes', async () => {
   });
 
   await waitFor(() => {
-    expect(mockFetch).toHaveBeenCalledWith(
-      '/placeholder-data/resource-routes.geojson'
-    );
+    expect(mockFetch).toHaveBeenCalledWith('/placeholder-data/resources.json');
   });
 });
 
@@ -331,7 +339,7 @@ test('simulation provider starts animation loop', async () => {
 
   mockFetch.mockResolvedValueOnce({
     ok: true,
-    json: () => Promise.resolve(mockResourceRoutesData),
+    json: () => Promise.resolve(mockResourcesData),
   });
 
   const requestAnimationFrameSpy = vi.spyOn(window, 'requestAnimationFrame');
@@ -363,7 +371,7 @@ test('simulation provider updates resource positions', async () => {
 
   mockFetch.mockResolvedValueOnce({
     ok: true,
-    json: () => Promise.resolve(mockResourceRoutesData),
+    json: () => Promise.resolve(mockResourcesData),
   });
 
   render(
@@ -380,9 +388,7 @@ test('simulation provider updates resource positions', async () => {
   });
 
   await waitFor(() => {
-    expect(mockFetch).toHaveBeenCalledWith(
-      '/placeholder-data/resource-routes.geojson'
-    );
+    expect(mockFetch).toHaveBeenCalledWith('/placeholder-data/resources.json');
   });
 
   await waitFor(
@@ -404,7 +410,7 @@ test('simulation provider cleans up on unmount', async () => {
 
   mockFetch.mockResolvedValueOnce({
     ok: true,
-    json: () => Promise.resolve(mockResourceRoutesData),
+    json: () => Promise.resolve(mockResourcesData),
   });
 
   const cancelAnimationFrameSpy = vi.spyOn(window, 'cancelAnimationFrame');
@@ -443,16 +449,16 @@ test('simulation provider provides selection state', () => {
 
   mockFetch.mockResolvedValueOnce({
     ok: true,
-    json: () => Promise.resolve(mockResourceRoutesData),
+    json: () => Promise.resolve(mockResourcesData),
   });
 
   let selectedItem: SelectedItem | null | undefined;
-  let setSelectedItem: ((item: SelectedItem | null) => void) | undefined;
+  let selectItem: ((type: SelectedItemType, id: number) => void) | undefined;
 
   const TestComponent = () => {
     const context = useSimulation();
     selectedItem = context.selectedItem;
-    setSelectedItem = context.setSelectedItem;
+    selectItem = context.selectItem;
     return null;
   };
 
@@ -466,21 +472,21 @@ test('simulation provider provides selection state', () => {
   );
 
   expect(selectedItem).toBeNull();
-  expect(setSelectedItem).toBeDefined();
+  expect(selectItem).toBeDefined();
 });
 
-test('simulation provider allows updating selection state', () => {
+test('simulation provider allows updating selection state', async () => {
   (api.get as Mock).mockResolvedValueOnce({
     data: mockGetStationsResponse,
   });
 
   mockFetch.mockResolvedValueOnce({
     ok: true,
-    json: () => Promise.resolve(mockResourceRoutesData),
+    json: () => Promise.resolve(mockResourcesData),
   });
 
   const TestComponent = () => {
-    const { selectedItem, setSelectedItem } = useSimulation();
+    const { selectedItem, selectItem } = useSimulation();
 
     return (
       <div>
@@ -490,16 +496,13 @@ test('simulation provider allows updating selection state', () => {
         <button
           data-testid="select-station"
           onClick={() =>
-            setSelectedItem({
-              type: SelectedItemType.Station,
-              value: mockGetStationsResponse.stations[0],
-            })
+            selectItem(
+              SelectedItemType.Station,
+              mockGetStationsResponse.stations[0].id
+            )
           }
         >
           Select Station
-        </button>
-        <button data-testid="deselect" onClick={() => setSelectedItem(null)}>
-          Deselect
         </button>
       </div>
     );
@@ -516,20 +519,83 @@ test('simulation provider allows updating selection state', () => {
 
   expect(getByTestId('selected-item')).toHaveTextContent('null');
 
+  const map = MockMap.instance!;
+  act(() => {
+    map.callBacks.load();
+  });
+
+  await waitFor(() => {
+    expect(api.get).toHaveBeenCalledWith('/stations');
+  });
+
   act(() => {
     getByTestId('select-station').click();
   });
 
-  expect(getByTestId('selected-item')).toHaveTextContent(
-    JSON.stringify({
-      type: 'station',
-      value: mockGetStationsResponse.stations[0],
-    })
-  );
+  await waitFor(() => {
+    const content = getByTestId('selected-item').textContent;
+    expect(content).not.toBe('null');
+    const selectedItem = JSON.parse(content!);
+    expect(selectedItem.type).toBe(SelectedItemType.Station);
+    expect(selectedItem.value.id).toBe(mockGetStationsResponse.stations[0].id);
+  });
+});
 
-  act(() => {
-    getByTestId('deselect').click();
+test('simulation provider allows selecting a resource', async () => {
+  (api.get as Mock).mockResolvedValueOnce({
+    data: mockGetStationsResponse,
   });
 
-  expect(getByTestId('selected-item')).toHaveTextContent('null');
+  mockFetch.mockResolvedValueOnce({
+    ok: true,
+    json: () => Promise.resolve(mockResourcesData),
+  });
+
+  const TestComponent = () => {
+    const { selectedItem, selectItem } = useSimulation();
+
+    return (
+      <div>
+        <div data-testid="selected-item">
+          {selectedItem ? JSON.stringify(selectedItem) : 'null'}
+        </div>
+        <button
+          data-testid="select-resource"
+          onClick={() => selectItem(SelectedItemType.Resource, 1)}
+        >
+          Select Resource
+        </button>
+      </div>
+    );
+  };
+
+  const { getByTestId } = render(
+    <MapProvider>
+      <SimulationProvider>
+        <MapContainer />
+        <TestComponent />
+      </SimulationProvider>
+    </MapProvider>
+  );
+
+  const map = MockMap.instance!;
+  act(() => {
+    map.callBacks.load();
+  });
+
+  await waitFor(() => {
+    expect(mockFetch).toHaveBeenCalledWith('/placeholder-data/resources.json');
+  });
+
+  act(() => {
+    getByTestId('select-resource').click();
+  });
+
+  await waitFor(() => {
+    const content = getByTestId('selected-item').textContent;
+    expect(content).not.toBe('null');
+    const selectedItem = JSON.parse(content!);
+    expect(selectedItem.type).toBe(SelectedItemType.Resource);
+    expect(selectedItem.value.id).toBe(1);
+  });
 });

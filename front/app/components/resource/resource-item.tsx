@@ -25,11 +25,9 @@
 import type { Resource } from '~/types';
 
 export function ResourceItem({
-  resourceId,
   resource,
   onSelect,
 }: {
-  resourceId: number;
   resource?: Resource;
   onSelect: () => void;
 }) {
@@ -39,7 +37,9 @@ export function ResourceItem({
       onClick={() => onSelect()}
     >
       <div className="flex items-center gap-2">
-        <span className="text-sm font-medium">#{resourceId}</span>
+        <span className="text-sm font-medium">
+          {resource ? `#${resource.id}` : ''}
+        </span>
       </div>
       <span className="text-xs text-gray-400">
         {resource ? `${resource.taskList.length} tasks` : ''}

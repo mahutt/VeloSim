@@ -53,7 +53,7 @@ export function startMockBackend(
         id: route.id,
         position: position,
         taskList: [],
-        routeId: route.id,
+        route: route,
       });
 
       waypointIndices.set(route.id, nextIndex);
