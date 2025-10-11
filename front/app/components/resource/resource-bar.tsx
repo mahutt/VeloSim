@@ -27,13 +27,11 @@ import { useSimulation } from '~/providers/simulation-provider';
 import { SelectedItemType } from '~/types';
 
 export default function ResourceBar() {
-  const { selectItem, resourcesRef } = useSimulation();
+  const { selectItem, resources } = useSimulation();
 
   const handleSelect = (resourceId: number) => {
     selectItem(SelectedItemType.Resource, resourceId);
   };
-
-  const resources = Array.from(resourcesRef.current.values());
 
   return (
     <div className="absolute top-4 right-4 w-60 bg-gray-300 shadow rounded p-4 max-h-[calc(100vh-2rem)]">

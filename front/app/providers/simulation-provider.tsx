@@ -50,6 +50,7 @@ import { setupMapClickHandlers } from '~/lib/map-interactions';
 type SimulationContextType = {
   stationsRef: React.RefObject<Map<number, Station>>;
   resourcesRef: React.RefObject<Map<number, Resource>>;
+  resources: Resource[];
   selectedItem: SelectedItem | null;
   selectItem: (type: SelectedItemType, id: number) => void;
 };
@@ -62,6 +63,9 @@ export const SimulationProvider = ({ children }: { children: ReactNode }) => {
   const { mapRef, mapLoaded } = useMap();
   const stationsRef = useRef<Map<number, Station>>(new Map());
   const resourcesRef = useRef<Map<number, Resource>>(new Map());
+
+  // Resources state
+  const [resources, setResources] = useState<Resource[]>([]);
 
   // Selection state
   const [selectedItem, setSelectedItem] = useState<SelectedItem | null>(null);
@@ -109,10 +113,8 @@ export const SimulationProvider = ({ children }: { children: ReactNode }) => {
           resourcesRef.current.set(resource.id, resource);
         });
 
-        // Auto-selects first resource (if available) to render the resources
-        if (data.resources.length > 0) {
-          selectItem(SelectedItemType.Resource, data.resources[0].id);
-        }
+        setResources(data.resources);
+
         const routes: Route[] = data.resources.map((resource) => ({
           id: resource.id,
           coordinates: resource.route.coordinates,
@@ -292,6 +294,7 @@ export const SimulationProvider = ({ children }: { children: ReactNode }) => {
       value={{
         stationsRef,
         resourcesRef,
+        resources,
         selectedItem,
         selectItem,
       }}
