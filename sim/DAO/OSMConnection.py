@@ -58,20 +58,27 @@ class OSMConnection(object):
         if not os.path.exists("sim/DAO/OSMData"):
             os.makedirs("sim/DAO/OSMData")
 
-        # downloads the OSM data if doesnt exist and updates the file if corrupted/old
-        fp = get_data("Montreal", directory="sim/DAO/OSMData", update=True)
+        try:
+            # downloads the OSM data if doesnt exist and
+            # updates the file if corrupted/old
+            fp = get_data("Montreal", directory="sim/DAO/OSMData", update=True)
 
-        self._osm = OSM(fp)  # initializes OSM parser
+            self._osm = OSM(fp)  # initializes OSM parser
+        except Exception as e:
+            raise Exception(f"Error while initializing OSM: {e}")
 
     # gets roads and intersections (edges and nodes)
     # takes around a minute to get the full network
     def _get_drivable_network(self) -> None:
-        self._nodes, self._edges = self._osm.get_network(
-            nodes=True,
-            network_type="driving",
-        )
-        if self._nodes.empty or self._edges.empty:
-            raise Exception("Nodes or edges unavailable")
+        if self._osm is not None:
+            self._nodes, self._edges = self._osm.get_network(
+                nodes=True,
+                network_type="driving",
+            )
+            if self._nodes.empty or self._edges.empty:
+                raise Exception("Nodes or edges unavailable")
+        else:
+            raise Exception("Could not get network from uninitialized OSM")
 
     def get_all_nodes(self) -> gpd.GeoDataFrame:
         return self._nodes
@@ -138,16 +145,19 @@ class OSMConnection(object):
     # and can have same graph reused
     # takes around 40 seconds
     def create_networkx_graph(self) -> None:
-        node_columns = ["id", "name", "geometry"]
-        edge_columns = ["id", "u", "v", "name", "length", "geometry", "oneway"]
+        if not self._nodes.empty and not self._edges.empty:
+            node_columns = ["id", "geometry"]
+            edge_columns = ["id", "u", "v", "name", "length", "geometry", "oneway"]
 
-        # filtering nodes/edges sent to graph to heavily improve performance
-        filtered_nodes = self._nodes[self._nodes.columns.intersection(node_columns)]
-        filtered_edges = self._edges[self._edges.columns.intersection(edge_columns)]
+            # filtering nodes/edges sent to graph to heavily improve performance
+            filtered_nodes = self._nodes[self._nodes.columns.intersection(node_columns)]
+            filtered_edges = self._edges[self._edges.columns.intersection(edge_columns)]
 
-        self._graph = self._osm.to_graph(
-            filtered_nodes, filtered_edges, graph_type="networkx"
-        )
+            self._graph = self._osm.to_graph(
+                filtered_nodes, filtered_edges, graph_type="networkx"
+            )
+        else:
+            raise Exception("Cannot create network with empty nodes or edges")
 
     # gets shortest path between two nodes according to length measures
     # note: this method should be called after all self._nodes, self._edges
@@ -156,22 +166,31 @@ class OSMConnection(object):
     def shortest_path(
         self, source_node: Series, target_node: Series, networkx_graph: nx.MultiDiGraph
     ) -> list[int]:
-        # get id of nodes since networkx_graph nodes are stored as ids
-        source_node_id = source_node["id"]
-        target_node_id = target_node["id"]
         if (
-            source_node_id in networkx_graph.nodes()
-            and target_node_id in networkx_graph.nodes()
+            not self._nodes.empty
+            and not self._edges.empty
+            and networkx_graph.number_of_nodes() != 0
         ):
-            try:
-                # returns a list of nodes by their id passing through the route
-                route: list[int] = nx.shortest_path(
-                    networkx_graph, source_node_id, target_node_id, weight="length"
-                )
-                return route
-            except Exception as e:
-                print(f"Route creation failed: {e}")
-        raise Exception("Route could not be created between the two nodes")
+            # get id of nodes since networkx_graph nodes are stored as ids
+            source_node_id = source_node["id"]
+            target_node_id = target_node["id"]
+            if (
+                source_node_id in networkx_graph.nodes()
+                and target_node_id in networkx_graph.nodes()
+            ):
+                try:
+                    # returns a list of nodes by their id passing through the route
+                    route: list[int] = nx.shortest_path(
+                        networkx_graph, source_node_id, target_node_id, weight="length"
+                    )
+                    return route
+                except Exception as e:
+                    print(f"Route creation failed: {e}")
+            raise Exception("Route could not be created between the two nodes")
+        else:
+            raise Exception(
+                "Could not create route with empty nodes, edges or networkx_graph"
+            )
 
     # creates new node object
     def create_node(self, id: int, lng: float, lat: float) -> Optional[Series]:
@@ -202,9 +221,9 @@ class OSMConnection(object):
         name: str,  # name of street
         start_node: Series,
         end_node: Series,
-        length: float,  # length of road
+        length: float,  # length of road in meters
         oneway: bool,  # oneway -> true, two ways -> false
-        maxspeed: int,
+        maxspeed: int,  # in km/h
     ) -> Optional[Series]:
         try:
             directions = "yes" if oneway else "no"

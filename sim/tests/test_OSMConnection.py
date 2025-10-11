@@ -109,6 +109,99 @@ def test_osmconnection_initialization_folder_exists(
     mock_create_graph.assert_called_once()
 
 
+@patch("os.path.exists")
+@patch("sim.DAO.OSMConnection.get_data")
+@patch("sim.DAO.OSMConnection.OSMConnection._get_drivable_network")
+@patch("sim.DAO.OSMConnection.OSMConnection.create_networkx_graph")
+def test_osmconnection_initialization_get_data_fails(
+    mock_create_graph: MagicMock,
+    mock_get_drivable_network: MagicMock,
+    mock_get_data: MagicMock,
+    mock_exists: MagicMock,
+) -> None:
+    # Arrange
+    mock_exists.return_value = True  # mock folder found
+    mock_get_data.side_effect = Exception("Failed to download")
+
+    # Act and Assert
+    with pytest.raises(
+        Exception, match="Error while initializing OSM: Failed to download"
+    ):
+        OSMConnection()
+
+    mock_get_drivable_network.assert_not_called()
+    mock_create_graph.assert_not_called()
+
+
+@patch("os.path.exists")
+@patch("sim.DAO.OSMConnection.get_data")
+@patch("sim.DAO.OSMConnection.OSM")
+@patch("sim.DAO.OSMConnection.OSMConnection.create_networkx_graph")
+def test_get_drivable_network_success(
+    mock_create_graph: MagicMock,
+    mock_osm: MagicMock,
+    mock_get_data: MagicMock,
+    mock_exists: MagicMock,
+) -> None:
+    # Arrange
+    mock_exists.return_value = True  # mock folder found
+    mock_get_data.return_value = "/mock/path/montreal.osm.pbf"
+    mock_osm_instance = MagicMock()
+    mock_osm.return_value = mock_osm_instance
+    mock_nodes = gpd.GeoDataFrame({"id": [1]}, geometry=[Point(0, 0)])
+    mock_edges = gpd.GeoDataFrame({"id": [1]}, geometry=[LineString([(0, 0), (1, 0)])])
+    mock_osm_instance.get_network.return_value = (mock_nodes, mock_edges)
+
+    # Act
+    OSMConnection()
+
+    # Assert
+    mock_create_graph.assert_called_once()
+    mock_osm_instance.get_network.assert_called_once_with(
+        nodes=True, network_type="driving"
+    )
+
+
+@patch("sim.DAO.OSMConnection.OSMConnection._initialize_osm_data_file")
+@patch("sim.DAO.OSMConnection.OSMConnection.create_networkx_graph")
+def test_get_drivable_network_fail(
+    mock_create_graph: MagicMock,
+    mock_init_file: MagicMock,
+) -> None:
+    # Act and Assert
+    with pytest.raises(Exception, match="Could not get network from uninitialized OSM"):
+        OSMConnection()
+
+    mock_init_file.assert_called_once()
+    mock_create_graph.assert_not_called()
+
+
+@patch("os.path.exists")
+@patch("sim.DAO.OSMConnection.get_data")
+@patch("sim.DAO.OSMConnection.OSM")
+@patch("sim.DAO.OSMConnection.OSMConnection.create_networkx_graph")
+def test_get_drivable_network_fail_from_empty_nodes(
+    mock_create_graph: MagicMock,
+    mock_osm: MagicMock,
+    mock_get_data: MagicMock,
+    mock_exists: MagicMock,
+) -> None:
+    # Arrange
+    mock_exists.return_value = True  # mock folder found
+    mock_get_data.return_value = "/mock/path/montreal.osm.pbf"
+    mock_osm_instance = MagicMock()
+    mock_osm.return_value = mock_osm_instance
+    mock_nodes = gpd.GeoDataFrame()
+    mock_edges = gpd.GeoDataFrame({"id": [1]}, geometry=[LineString([(0, 0), (1, 0)])])
+    mock_osm_instance.get_network.return_value = (mock_nodes, mock_edges)
+
+    # Act and Assert
+    with pytest.raises(Exception, match="Nodes or edges unavailable"):
+        OSMConnection()
+
+    mock_create_graph.assert_not_called()
+
+
 @patch("sim.DAO.OSMConnection.OSMConnection._initialize_osm_data_file")
 @patch("sim.DAO.OSMConnection.OSMConnection._get_drivable_network")
 @patch("sim.DAO.OSMConnection.OSMConnection.create_networkx_graph")
@@ -482,6 +575,11 @@ def test_shortest_path_success(
         "geometry": point2,
     }
     node2 = Series(node_data2)
+
+    instance._edges = gpd.GeoDataFrame(
+        {"id": [1]}, geometry=[LineString([(0, 0), (1, 0)])]
+    )
+    instance._nodes = gpd.GeoDataFrame([node1, node2])
     sample_graph: nx.MultiDiGraph = nx.MultiDiGraph()
     del node_data["id"]
     del node_data2["id"]
@@ -497,11 +595,65 @@ def test_shortest_path_success(
     assert route == [1, 2]
 
 
+@patch("sim.DAO.OSMConnection.OSMConnection._initialize_osm_data_file")
+@patch("sim.DAO.OSMConnection.OSMConnection._get_drivable_network")
+@patch("sim.DAO.OSMConnection.OSMConnection.create_networkx_graph")
+def test_shortest_path_fail_from_empty_graph(
+    mock_create_graph: MagicMock,
+    mock_get_drivable_network: MagicMock,
+    mock_init_file: MagicMock,
+) -> None:
+    # Arrange
+    instance = OSMConnection()
+    mock_init_file.assert_called_once()
+    mock_get_drivable_network.assert_called_once()
+    mock_create_graph.assert_called_once()
+
+    point = Point(-73.591378, 45.591513)
+    node_data = {
+        "id": 1,
+        "lon": -73.591378,
+        "lat": 45.591513,
+        "timestamp": 0,
+        "visible": False,
+        "version": 0,
+        "tags": None,
+        "changeset": 0,
+        "geometry": point,
+    }
+    node1 = Series(node_data)
+    point2 = Point(-73.59159230853888, 45.59260120932741)
+    node_data2 = {
+        "id": 2,
+        "lon": -73.59159230853888,
+        "lat": 45.59260120932741,
+        "timestamp": 0,
+        "visible": False,
+        "version": 0,
+        "tags": None,
+        "changeset": 0,
+        "geometry": point2,
+    }
+    node2 = Series(node_data2)
+    instance._edges = gpd.GeoDataFrame(
+        {"id": [1]}, geometry=[LineString([(0, 0), (1, 0)])]
+    )
+    instance._nodes = gpd.GeoDataFrame([node1, node2])
+    sample_graph: nx.MultiDiGraph = nx.MultiDiGraph()
+
+    # Act and Assert
+    with pytest.raises(
+        Exception,
+        match="Could not create route with empty nodes, edges or networkx_graph",
+    ):
+        instance.shortest_path(node1, node2, sample_graph)
+
+
 @patch("sim.DAO.OSMConnection.nx.shortest_path")
 @patch("sim.DAO.OSMConnection.OSMConnection._initialize_osm_data_file")
 @patch("sim.DAO.OSMConnection.OSMConnection._get_drivable_network")
 @patch("sim.DAO.OSMConnection.OSMConnection.create_networkx_graph")
-def test_shortest_path_fail(
+def test_shortest_path_fail_from_missing_id(
     mock_create_graph: MagicMock,
     mock_get_drivable_network: MagicMock,
     mock_init_file: MagicMock,
@@ -539,6 +691,11 @@ def test_shortest_path_fail(
         "geometry": point2,
     }
     node2 = Series(node_data2)
+
+    instance._edges = gpd.GeoDataFrame(
+        {"id": [1]}, geometry=[LineString([(0, 0), (1, 0)])]
+    )
+    instance._nodes = gpd.GeoDataFrame([node1, node2])
     sample_graph: nx.MultiDiGraph = nx.MultiDiGraph()
     del node_data["id"]
     del node_data2["id"]
@@ -553,6 +710,72 @@ def test_shortest_path_fail(
         instance.shortest_path(node1, node2, sample_graph)
 
     mock_shortest_path.assert_not_called()
+
+
+@patch("builtins.print")
+@patch("sim.DAO.OSMConnection.nx.shortest_path")
+@patch("sim.DAO.OSMConnection.OSMConnection._initialize_osm_data_file")
+@patch("sim.DAO.OSMConnection.OSMConnection._get_drivable_network")
+@patch("sim.DAO.OSMConnection.OSMConnection.create_networkx_graph")
+def test_shortest_path_fail_from_nx_method_fail(
+    mock_create_graph: MagicMock,
+    mock_get_drivable_network: MagicMock,
+    mock_init_file: MagicMock,
+    mock_shortest_path: MagicMock,
+    mock_print: MagicMock,
+) -> None:
+    # Arrange
+    instance = OSMConnection()
+    mock_init_file.assert_called_once()
+    mock_get_drivable_network.assert_called_once()
+    mock_create_graph.assert_called_once()
+
+    point = Point(-73.591378, 45.591513)
+    node_data = {
+        "id": 1,
+        "lon": -73.591378,
+        "lat": 45.591513,
+        "timestamp": 0,
+        "visible": False,
+        "version": 0,
+        "tags": None,
+        "changeset": 0,
+        "geometry": point,
+    }
+    node1 = Series(node_data)
+    point2 = Point(-73.59159230853888, 45.59260120932741)
+    node_data2 = {
+        "id": 2,
+        "lon": -73.59159230853888,
+        "lat": 45.59260120932741,
+        "timestamp": 0,
+        "visible": False,
+        "version": 0,
+        "tags": None,
+        "changeset": 0,
+        "geometry": point2,
+    }
+    node2 = Series(node_data2)
+
+    instance._edges = gpd.GeoDataFrame(
+        {"id": [1]}, geometry=[LineString([(0, 0), (1, 0)])]
+    )
+    instance._nodes = gpd.GeoDataFrame([node1, node2])
+    sample_graph: nx.MultiDiGraph = nx.MultiDiGraph()
+    del node_data["id"]
+    del node_data2["id"]
+    sample_graph.add_node(1, **node_data)
+    sample_graph.add_node(2, **node_data2)
+    sample_graph.add_edge(1, 2, key=0, weight=1.0)
+
+    mock_shortest_path.side_effect = Exception("Shortest Path Failed")
+
+    # Act and Assert
+    with pytest.raises(
+        Exception, match="Route could not be created between the two nodes"
+    ):
+        instance.shortest_path(node1, node2, sample_graph)
+    mock_print.assert_called_once_with("Route creation failed: Shortest Path Failed")
 
 
 @patch("sim.DAO.OSMConnection.OSMConnection._initialize_osm_data_file")
