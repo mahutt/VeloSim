@@ -82,3 +82,33 @@ test('resource item displays correct task count', () => {
 
   expect(screen.getByText('8 tasks')).toBeDefined();
 });
+
+test('resource item renders correctly when resource is undefined', () => {
+  const mockOnSelect = vi.fn();
+
+  render(<ResourceItem resource={undefined} onSelect={mockOnSelect} />);
+
+  // Should render empty text for id and tasks
+  expect(
+    screen.getByText('', { selector: '.text-sm.font-medium' })
+  ).toBeDefined();
+  expect(
+    screen.getByText('', { selector: '.text-xs.text-gray-400' })
+  ).toBeDefined();
+});
+
+test('resource item calls onSelect even when resource is undefined', () => {
+  const mockOnSelect = vi.fn();
+
+  render(<ResourceItem resource={undefined} onSelect={mockOnSelect} />);
+
+  // Click the outermost clickable div
+  const container = screen
+    .getByText('', { selector: '.text-sm.font-medium' })
+    .closest('div');
+  if (container) {
+    fireEvent.click(container);
+  }
+
+  expect(mockOnSelect).toHaveBeenCalledTimes(1);
+});

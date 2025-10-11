@@ -24,6 +24,7 @@
 
 import 'mapbox-gl/dist/mapbox-gl.css';
 import MapContainer from '~/components/map/map-container';
+import SelectedItemBar from '~/components/map/selected-item-bar';
 import { MapProvider } from '~/providers/map-provider';
 import { SimulationProvider } from '~/providers/simulation-provider';
 import ResourceBar from '~/components/resource/resource-bar';
@@ -39,6 +40,7 @@ export default function Simulation() {
         <SimulationProvider>
           <MapContainer />
           <ResourceBar />
+          <SelectedItemBar />
         </SimulationProvider>
       </MapProvider>
     </>
