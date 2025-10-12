@@ -38,7 +38,7 @@ import { expect, test, vi, beforeEach, type Mock } from 'vitest';
 import { render, waitFor, act } from '@testing-library/react';
 import {
   SimulationProvider,
-  useSimulation,
+  useSimulationContext,
 } from '~/providers/simulation-provider';
 import { MapProvider } from '~/providers/map-provider';
 import { MockMap } from 'tests/mocks';
@@ -91,7 +91,7 @@ global.fetch = mockFetch;
 
 // Test component to access the simulation context
 const TestComponent = () => {
-  const { stationsRef } = useSimulation();
+  const { stationsRef } = useSimulationContext();
   return (
     <div data-testid="test-component">
       {stationsRef.current.size > 0 ? 'data-loaded' : 'no-data'}
@@ -222,7 +222,7 @@ test('simulation provider throws error when used outside of map provider', () =>
   }).toThrow('useMap must be used within a MapProvider');
 });
 
-test('useSimulation hook throws error when used outside of simulation provider', () => {
+test('useSimulationContext hook throws error when used outside of simulation provider', () => {
   expect(() => {
     render(
       <MapProvider>
@@ -230,7 +230,7 @@ test('useSimulation hook throws error when used outside of simulation provider',
         <TestComponent />
       </MapProvider>
     );
-  }).toThrow('useSimulation must be used within a SimulationProvider');
+  }).toThrow('useSimulationContext must be used within a SimulationProvider');
 });
 
 test('simulation provider provides context with initial state', () => {
@@ -302,7 +302,7 @@ test('simulation provider updates stations ref when data is successfully fetched
   let stationsRef: React.RefObject<Map<number, Station>> | undefined;
 
   const StateCapture = () => {
-    const { stationsRef: stationsRefFromHook } = useSimulation();
+    const { stationsRef: stationsRefFromHook } = useSimulationContext();
     stationsRef = stationsRefFromHook;
     return null;
   };
@@ -398,7 +398,7 @@ test('simulation provider sets up map click handlers and handles station selecti
 
   let selectedItem: SelectedItem | null = null;
   const TestComponent = () => {
-    const { selectedItem: currentSelection } = useSimulation();
+    const { selectedItem: currentSelection } = useSimulationContext();
     selectedItem = currentSelection;
     return null;
   };
@@ -474,7 +474,7 @@ test('simulation provider sets up map click handlers and handles resource select
 
   let selectedItem: SelectedItem | null = null;
   const TestComponent = () => {
-    const { selectedItem: currentSelection } = useSimulation();
+    const { selectedItem: currentSelection } = useSimulationContext();
     selectedItem = currentSelection;
     return null;
   };
@@ -864,7 +864,7 @@ test('simulation provider provides selection state', () => {
   let selectItem: ((type: SelectedItemType, id: number) => void) | undefined;
 
   const TestComponent = () => {
-    const context = useSimulation();
+    const context = useSimulationContext();
     selectedItem = context.selectedItem;
     selectItem = context.selectItem;
     return null;
@@ -894,7 +894,7 @@ test('simulation provider allows updating selection state', async () => {
   });
 
   const TestComponent = () => {
-    const { selectedItem, selectItem } = useSimulation();
+    const { selectedItem, selectItem } = useSimulationContext();
 
     return (
       <div>
@@ -960,7 +960,7 @@ test('simulation provider allows selecting a resource', async () => {
   });
 
   const TestComponent = () => {
-    const { selectedItem, selectItem } = useSimulation();
+    const { selectedItem, selectItem } = useSimulationContext();
 
     return (
       <div>

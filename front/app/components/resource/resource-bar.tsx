@@ -23,14 +23,14 @@
  */
 
 import { ResourceItem } from './resource-item';
-import { useSimulation } from '~/providers/simulation-provider';
+import { useSimulationContext } from '~/providers/simulation-provider';
 import { SelectedItemType } from '~/types';
 import { Card, CardContent, CardHeader } from '~/components/ui/card';
 import { SearchBar } from './search-bar';
 import { useMemo, useState } from 'react';
 
 export default function ResourceBar() {
-  const { selectItem, resources, selectedItem } = useSimulation();
+  const { selectItem, resources, selectedItem } = useSimulationContext();
   const [searchQuery, setSearchQuery] = useState('');
 
   const handleSelect = (resourceId: number) => {

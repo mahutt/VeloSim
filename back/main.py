@@ -22,12 +22,24 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 """
 
-from typing import Dict
+from typing import AsyncIterator, Dict
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from contextlib import asynccontextmanager
 
 from back.core.config import settings
 from back.api.v1 import api_router
+from back.services.simulation_service import simulation_service
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI) -> AsyncIterator[None]:
+    """Application lifespan management"""
+    # Startup
+    yield
+    # Shutdown - cleanup simulations
+    simulation_service.stop_all_simulations()
+
 
 # Create FastAPI application
 app = FastAPI(
@@ -36,6 +48,7 @@ app = FastAPI(
     version="1.0.0",
     docs_url="/api/docs" if settings.ENVIRONMENT != "production" else None,
     redoc_url="/api/redoc" if settings.ENVIRONMENT != "production" else None,
+    lifespan=lifespan,
 )
 
 # Add CORS middleware

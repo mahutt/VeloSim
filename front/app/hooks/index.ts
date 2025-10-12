@@ -22,10 +22,5 @@
  * SOFTWARE.
  */
 
-import { type RouteConfig, index, route } from '@react-router/dev/routes';
-
-export default [
-  index('routes/home.tsx'),
-  route('simulation', 'routes/simulation.tsx'),
-  route('websocket-test', 'routes/websocket-test.tsx'),
-] satisfies RouteConfig;
+export { useSimulationFrames } from './useSimulationFrames';
+export { useSimulationLifecycle } from './useSimulationLifecycle';
