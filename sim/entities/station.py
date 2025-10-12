@@ -23,7 +23,12 @@ SOFTWARE.
 """
 
 import simpy
-from .position import Position
+from typing import TYPE_CHECKING
+
+# to avoid circular imports
+if TYPE_CHECKING:  # pragma: no cover
+    from .task import Task
+    from .position import Position
 
 
 class Station:
@@ -32,10 +37,8 @@ class Station:
         env: simpy.Environment,
         station_id: int,
         name: str,
-        position: Position,  # [longitude, latitude]
-        tasks: (
-            list[int] | None
-        ) = None,  # TODO: change to list of Task entities once implemented
+        position: "Position",  # [longitude, latitude]
+        tasks: list["Task"] | None = None,
     ) -> None:
         self.env = env
         self.id = station_id
@@ -48,19 +51,18 @@ class Station:
         # starting the process for periodic station operations
         self.action = env.process(self.run())
 
-    # TODO: use Task entity instead of task_id once implemented
-    def add_task(self, task_id: int) -> None:
-        self.tasks.append(task_id)
+    def add_task(self, task: "Task") -> None:
+        self.tasks.append(task)
+        task.set_station(self)
 
-    # TODO: use Task entity instead of task_id once implemented
-    def remove_task(self, task_id: int) -> None:
-        if task_id in self.tasks:
-            self.tasks.remove(task_id)
+    def remove_task(self, task: "Task") -> None:
+        if task in self.tasks:
+            self.tasks.remove(task)
 
     def get_task_count(self) -> int:
         return len(self.tasks)
 
-    def get_station_position(self) -> Position:
+    def get_station_position(self) -> "Position":
         return self.position
 
     # continous process that runs throughout the simulation

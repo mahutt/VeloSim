@@ -23,7 +23,13 @@ SOFTWARE.
 """
 
 import simpy
-from .position import Position
+from typing import Optional, TYPE_CHECKING
+from .task_state import State
+
+# to avoid circular imports
+if TYPE_CHECKING:  # pragma: no cover
+    from .position import Position
+    from .task import Task
 
 
 class Resource:
@@ -32,45 +38,69 @@ class Resource:
         self,
         env: simpy.Environment,
         resource_id: int,
-        position: Position,  # [longitude, latitude]
-        task_list: (
-            list[int] | None
-        ) = None,  # TODO: change from list of task_id (int) to list of Task entities
+        position: "Position",  # [longitude, latitude]
+        task_list: list["Task"] | None = None,
     ) -> None:
         self.env = env
         self.id = resource_id
         self.position = position
-        self.task_list = task_list if task_list is not None else []
+        if task_list is not None:
+            self.task_list = task_list
+            for task in self.task_list:
+                task.set_assigned_resource(self)
+        else:
+            self.task_list = []
         self.has_updated = False  # flag to track if a resource was updated
 
         # starting the process for periodic resource operations
         self.action = env.process(self.run())
 
-    def get_resource_position(self) -> Position:
+    def get_resource_position(self) -> "Position":
         return self.position
 
-    def set_resource_position(self, position: Position) -> None:
+    def set_resource_position(self, position: "Position") -> None:
         self.position = position
 
-    # TODO: use Task entity instead of task_id once implemented
-    def assign_task(self, task_id: int) -> None:
-        self.task_list.append(task_id)
+    def assign_task(self, task: "Task") -> None:
+        if task.get_state() == State.OPEN:
+            self.task_list.append(task)
+            task.set_assigned_resource(self)
 
-    # TODO: use Task entity instead of task_id once implemented
-    def unassign_task(self, task_id: int) -> None:
-        if task_id in self.task_list:
-            self.task_list.remove(task_id)
+    def unassign_task(self, task: "Task") -> None:
+        if task in self.task_list and task.is_assigned():
+            self.task_list.remove(task)
+            task.unassign_resource()
 
-    def service_task(self, task_id: int) -> None:
-        # @TODO: serviceTask has to update the status/current state of the task
-        # e.g. task status complete, or task current state closed
-        # this would require the Task entity to be implemented
-        self.unassign_task(task_id)
+    def get_dispatched_task(self) -> Optional["Task"]:
+        for task in self.task_list:
+            if task.get_state() == State.DISPATCHED:
+                return task
+        return None
+
+    # dispatch a task in the list of tasks only if it is at the same station
+    # as other dispatched tasks or if no other tasks are dispatched
+    def dispatch_task(self, task: "Task") -> None:
+        if task in self.task_list and task.is_assigned():
+            dispatched_task = self.get_dispatched_task()
+            if (
+                dispatched_task is None
+                or task.get_station() == dispatched_task.get_station()
+            ):
+                task.set_state(State.DISPATCHED)
+            else:
+                raise Exception("Cannot dispatch task at this station")
+
+    # when a task has been completed, we want to remove it from the list of
+    # tasks the resource needs to complete
+    def service_task(self, task: "Task") -> None:
+        if task in self.task_list:
+            self.task_list.remove(task)
+            task.set_state(State.CLOSED)
 
     def get_task_count(self) -> int:
         return len(self.task_list)
 
-    def get_task_list(self) -> list[int]:
+    def get_task_list(self) -> list["Task"]:
         return self.task_list
 
     def clear_update(self) -> None:
