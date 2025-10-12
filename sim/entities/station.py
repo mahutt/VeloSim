@@ -47,6 +47,7 @@ class Station:
         self.tasks = (
             tasks if tasks is not None else []
         )  # list of tasks assigned to a given station
+        self.has_updated = False
 
         # starting the process for periodic station operations
         self.action = env.process(self.run())
