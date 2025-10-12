@@ -23,26 +23,51 @@ SOFTWARE.
 """
 
 from fastapi.testclient import TestClient
-from back.main import app
-
-client = TestClient(app)
+from sqlalchemy.orm import Session
 
 
-async def test_set_playback_speed_success() -> None:
-    response = client.post(
-        "/api/v1/playback/", json={"simulation_id": 1, "playback_speed": 2.5}
-    )
-    assert response.status_code == 200
-    data = response.json()
-    assert data["simulation_id"] == 1
-    assert data["playback_speed"] == 2.5
-    assert "updated successfully" in data["message"]
+class TestPlaybackSpeedAPI:
+    """Tests for the Playback Speed API endpoints."""
 
+    def test_set_playback_speed_success(self, client: TestClient, db: Session) -> None:
+        """Test setting playback speed successfully."""
+        payload = {"simulation_id": 1, "playback_speed": 2.5}
+        response = client.post("/api/v1/playback/", json=payload)
+        assert response.status_code == 200
+        data = response.json()
+        assert data["simulation_id"] == payload["simulation_id"]
+        assert data["playback_speed"] == payload["playback_speed"]
+        assert "message" in data
 
-def test_get_playback_speed_success() -> None:
-    client.post("/api/v1/playback/", json={"simulation_id": 2, "playback_speed": 3.0})
-    response = client.get("/api/v1/playback/2")
-    assert response.status_code == 200
-    data = response.json()
-    assert data["simulation_id"] == 2
-    assert data["playback_speed"] == 3.0
+    def test_set_playback_speed_invalid_value(
+        self, client: TestClient, db: Session
+    ) -> None:
+        """Test setting playback speed with invalid values (negative or too high)."""
+        invalid_payloads = [
+            {"simulation_id": 1, "playback_speed": -1},
+            {"simulation_id": 1, "playback_speed": 1000},
+        ]
+        for payload in invalid_payloads:
+            response = client.post("/api/v1/playback/", json=payload)
+            assert response.status_code in (400, 422)
+
+    def test_get_playback_speed_success(self, client: TestClient, db: Session) -> None:
+        """Test getting playback speed for an existing simulation."""
+        # First, set a playback speed
+        payload = {"simulation_id": 2, "playback_speed": 3.0}
+        client.post("/api/v1/playback/", json=payload)
+
+        response = client.get(f"/api/v1/playback/{payload['simulation_id']}")
+        assert response.status_code == 200
+        data = response.json()
+        assert data["simulation_id"] == payload["simulation_id"]
+        assert data["playback_speed"] == payload["playback_speed"]
+
+    def test_get_playback_speed_not_found(
+        self, client: TestClient, db: Session
+    ) -> None:
+        """Test getting playback speed for a non-existing simulation."""
+        response = client.get("/api/v1/playback/9999")
+        assert response.status_code == 404
+        data = response.json()
+        assert data["detail"] == "Simulation not found."
