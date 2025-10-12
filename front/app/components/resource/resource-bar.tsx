@@ -25,8 +25,8 @@
 import { ResourceItem } from './resource-item';
 import { useSimulation } from '~/providers/simulation-provider';
 import { SelectedItemType } from '~/types';
-import { Card, CardContent } from '~/components/ui/card';
-import { SearchBar } from '~/components/ui/search-bar';
+import { Card, CardContent, CardHeader } from '~/components/ui/card';
+import { SearchBar } from './search-bar';
 import { useMemo, useState } from 'react';
 
 export default function ResourceBar() {
@@ -64,14 +64,14 @@ export default function ResourceBar() {
   return (
     <div className="absolute top-4 right-4 w-60 max-h-[calc(100vh-2rem)]">
       <Card className="bg-gray-50 gap-0">
-        <div className="px-6 pb-3">
+        <CardHeader>
           <SearchBar
+            placeholder="Search Resource"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             onClear={() => setSearchQuery('')}
-            placeholder="Search Resource"
           />
-        </div>
+        </CardHeader>
         <CardContent className="pt-0">
           <div className="space-y-2 max-h-[calc(100vh-12rem)] overflow-y-auto pr-3 -mr-3">
             {filteredResources.map((resource) => (

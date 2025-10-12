@@ -24,7 +24,7 @@
 
 import { expect, test, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
-import { SearchBar } from '~/components/ui/search-bar';
+import { SearchBar } from '~/components/resource/search-bar';
 import userEvent from '@testing-library/user-event';
 
 test('renders search bar with placeholder text', () => {
@@ -100,20 +100,6 @@ test('forwards ref to input element', () => {
   render(<SearchBar ref={ref} />);
 
   expect(ref.current).toBeInstanceOf(HTMLInputElement);
-});
-
-test('applies custom className', () => {
-  render(<SearchBar className="custom-class" />);
-
-  const input = screen.getByRole('textbox');
-  expect(input.className).toContain('custom-class');
-});
-
-test('applies default styling classes', () => {
-  render(<SearchBar />);
-
-  const input = screen.getByRole('textbox');
-  expect(input).toHaveClass('h-9', 'w-full', 'rounded-full', 'border');
 });
 
 test('passes through additional props to input', () => {

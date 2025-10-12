@@ -24,6 +24,7 @@
 
 import * as React from 'react';
 import { Search, X } from 'lucide-react';
+import { Input } from '~/components/ui/input';
 import { cn } from '~/lib/utils';
 
 export interface SearchBarProps
@@ -40,29 +41,24 @@ const SearchBar = React.forwardRef<HTMLInputElement, SearchBarProps>(
     };
 
     return (
-      <div className="relative">
-        <div className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none">
-          <Search className="size-4" />
-        </div>
-        <input
+      <div className={cn('relative', className)}>
+        <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground pointer-events-none" />
+        <Input
           type="text"
           ref={ref}
           value={value}
-          className={cn(
-            'h-9 w-full rounded-full border border-input bg-background pl-9 pr-9 text-sm shadow-xs transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] disabled:cursor-not-allowed disabled:opacity-50',
-            className
-          )}
+          className="pl-9 pr-9"
           {...props}
         />
         {value && (
           <button
             type="button"
             onClick={handleClear}
-            className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+            className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
             aria-label="Clear search"
             tabIndex={-1}
           >
-            <X className="size-4" />
+            <X className="h-4 w-4" />
           </button>
         )}
       </div>
