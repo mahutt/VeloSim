@@ -78,20 +78,81 @@ export const SimulationProvider = ({ children }: { children: ReactNode }) => {
 
   // Selection function
   const selectItem = (type: SelectedItemType, id: number) => {
+    if (!mapLoaded) return;
+
+    // Get the item and validate it exists
+    const item =
+      type === SelectedItemType.Station
+        ? stationsRef.current.get(id)
+        : resourcesRef.current.get(id);
+
+    if (!item) {
+      throw new Error(`Selected ${type} not found: ${id}`);
+    }
+
+    // Update state
+    setSelectedItem({ type, value: item });
+
+    // Update refs for animation loop
     if (type === SelectedItemType.Station) {
-      const station = stationsRef.current.get(id);
-      if (!station) throw new Error('Selected station not found: ' + id);
-      setSelectedItem({ type, value: station });
-    } else if (type === SelectedItemType.Resource) {
-      const resource = resourcesRef.current.get(id);
-      if (!resource) throw new Error('Selected resource not found: ' + id);
-      setSelectedItem({ type, value: resource });
+      selectedStationIdRef.current = id;
+      selectedResourceIdRef.current = undefined;
+    } else {
+      selectedResourceIdRef.current = id;
+      selectedStationIdRef.current = undefined;
+    }
+
+    // Update map sources - selected type gets the ID, other type gets cleared
+    updateMapSources(
+      type === SelectedItemType.Station ? id : undefined,
+      type === SelectedItemType.Resource ? id : undefined
+    );
+  };
+
+  // Helper function to update both map sources
+  const updateMapSources = (
+    selectedStationId?: number,
+    selectedResourceId?: number
+  ) => {
+    // Update stations
+    if (stationsRef.current.size > 0) {
+      const stations = Array.from(stationsRef.current.values());
+      setMapSource(
+        MapSource.Stations,
+        adaptStationsToGeoJSON(
+          stations,
+          selectedStationId,
+          hoveredStationIdRef.current ?? undefined
+        ),
+        mapRef.current!
+      );
+    }
+
+    // Update resources
+    if (resourcesRef.current.size > 0) {
+      const resources = Array.from(resourcesRef.current.values());
+      const geojson = adaptResourcesToGeoJSON(
+        resources,
+        selectedResourceId,
+        hoveredResourceIdRef.current ?? undefined
+      );
+      setMapSource(MapSource.Resources, geojson, mapRef.current!);
     }
   };
 
   // Clear selection function
   const clearSelection = () => {
+    if (!mapLoaded) return;
+
+    // Update state
     setSelectedItem(null);
+
+    // Update refs for animation loop
+    selectedStationIdRef.current = undefined;
+    selectedResourceIdRef.current = undefined;
+
+    // Clear selection on both map sources
+    updateMapSources(undefined, undefined);
   };
 
   // Hover state - use refs so animation loop always has latest values
@@ -121,7 +182,7 @@ export const SimulationProvider = ({ children }: { children: ReactNode }) => {
 
   // Initialize data loading and animation when map is ready
   useEffect(() => {
-    if (!mapLoaded || !mapRef.current) return;
+    if (!mapLoaded) return;
 
     loadStations();
     fetch('/placeholder-data/resources.json')
@@ -154,7 +215,7 @@ export const SimulationProvider = ({ children }: { children: ReactNode }) => {
     // Set up map click handlers for selection
     setupMapClickHandlers(mapRef.current!, (item) => {
       if (!item) {
-        setSelectedItem(null);
+        clearSelection();
         return;
       }
       const { type, id } = item;
@@ -179,47 +240,6 @@ export const SimulationProvider = ({ children }: { children: ReactNode }) => {
     // Cleanup on unmount
     return cleanup;
   }, [mapLoaded]);
-
-  // Update map and refs when selection changes (not hover)
-  useEffect(() => {
-    if (!mapLoaded) return;
-
-    // Update refs for animation loop
-    if (selectedItem?.type === SelectedItemType.Station) {
-      selectedStationIdRef.current = (selectedItem.value as Station).id;
-      selectedResourceIdRef.current = undefined;
-    } else if (selectedItem?.type === SelectedItemType.Resource) {
-      selectedResourceIdRef.current = (selectedItem.value as Resource).id;
-      selectedStationIdRef.current = undefined;
-    } else {
-      selectedStationIdRef.current = undefined;
-      selectedResourceIdRef.current = undefined;
-    }
-
-    // Re-render stations with selection state (hover handled separately)
-    const stations = Array.from(stationsRef.current.values());
-    setMapSource(
-      MapSource.Stations,
-      adaptStationsToGeoJSON(
-        stations,
-        selectedStationIdRef.current,
-        hoveredStationIdRef.current ?? undefined
-      ),
-      mapRef.current!
-    );
-
-    // Force immediate update of resources with current positions
-    if (resourcesRef.current.size > 0) {
-      const resources = Array.from(resourcesRef.current.values());
-      const geojson = adaptResourcesToGeoJSON(
-        resources,
-        selectedResourceIdRef.current,
-        hoveredResourceIdRef.current ?? undefined
-      );
-
-      setMapSource(MapSource.Resources, geojson, mapRef.current!);
-    }
-  }, [selectedItem, mapLoaded]); // Removed hoveredStationId dependency
 
   // Load station data from backend API
   const loadStations = () => {
