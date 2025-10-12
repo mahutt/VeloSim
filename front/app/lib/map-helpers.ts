@@ -39,17 +39,65 @@ export function isMapLayer(value: string): value is MapLayer {
 
 // Setup helpers
 
-export function loadMapImages(map: mapboxgl.Map) {
-  // Load station image
-  map.loadImage('/station.png', async (error, image) => {
-    if (error) throw error;
-    map.addImage('station-marker', image!);
+/**
+ * Helper function to load a single image with error handling
+ */
+function loadSingleImage(
+  map: mapboxgl.Map,
+  imagePath: string,
+  imageId: string,
+  imageType: string
+) {
+  map.loadImage(imagePath, (error, image) => {
+    if (error) {
+      console.error(`Failed to load ${imageType}:`, error);
+      return;
+    }
+    map.addImage(imageId, image!);
   });
+}
 
-  // Load resource image
-  map.loadImage('/resource.png', async (error, image) => {
-    if (error) throw error;
-    map.addImage('resource-marker', image!);
+export function loadMapImages(map: mapboxgl.Map) {
+  // Define image configurations
+  const imageConfigs = [
+    // Station images
+    {
+      path: '/station.png',
+      id: 'station-marker',
+      type: 'station marker image',
+    },
+    {
+      path: '/station-selected.png',
+      id: 'station-marker-selected',
+      type: 'station selected marker image',
+    },
+    {
+      path: '/station-hover.png',
+      id: 'station-marker-hover',
+      type: 'station hover marker image',
+    },
+
+    // Resource images
+    {
+      path: '/resource.png',
+      id: 'resource-marker',
+      type: 'resource marker image',
+    },
+    {
+      path: '/resource-selected.png',
+      id: 'resource-marker-selected',
+      type: 'resource selected marker image',
+    },
+    {
+      path: '/resource-hover.png',
+      id: 'resource-marker-hover',
+      type: 'resource hover marker image',
+    },
+  ];
+
+  // Load all images using the helper function
+  imageConfigs.forEach(({ path, id, type }) => {
+    loadSingleImage(map, path, id, type);
   });
 }
 
@@ -72,7 +120,14 @@ export function setMapLayers(map: mapboxgl.Map) {
     type: 'symbol',
     source: 'stations',
     layout: {
-      'icon-image': 'station-marker',
+      'icon-image': [
+        'case',
+        ['boolean', ['get', 'selected'], false],
+        'station-marker-selected',
+        ['boolean', ['get', 'hover'], false],
+        'station-marker-hover',
+        'station-marker',
+      ],
       'icon-allow-overlap': true,
     },
   });
@@ -103,7 +158,14 @@ export function setMapLayers(map: mapboxgl.Map) {
     type: 'symbol',
     source: 'resources',
     layout: {
-      'icon-image': 'resource-marker',
+      'icon-image': [
+        'case',
+        ['boolean', ['get', 'selected'], false],
+        'resource-marker-selected',
+        ['boolean', ['get', 'hover'], false],
+        'resource-marker-hover',
+        'resource-marker',
+      ],
       'icon-allow-overlap': true,
     },
   });

@@ -54,6 +54,8 @@ describe('adaptStationsToGeoJSON', () => {
             id: 1,
             name: 'Central Station',
             taskCount: 0,
+            hover: false,
+            selected: false,
           },
           geometry: {
             type: 'Point',
@@ -66,6 +68,8 @@ describe('adaptStationsToGeoJSON', () => {
             id: 2,
             name: 'Park Station',
             taskCount: 0,
+            hover: false,
+            selected: false,
           },
           geometry: {
             type: 'Point',

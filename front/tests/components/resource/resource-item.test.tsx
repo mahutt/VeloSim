@@ -44,6 +44,46 @@ test('resource item renders with resource data', () => {
   expect(screen.getByText('3 tasks')).toBeDefined();
 });
 
+test('resource item renders with selection state', () => {
+  const mockResource = {
+    id: 1,
+    position: [-73.57776, 45.48944] as [number, number],
+    taskList: [1, 2],
+    route: {
+      coordinates: [[-73.57776, 45.48944]] as [number, number][],
+    },
+  };
+
+  const mockOnSelect = vi.fn();
+
+  const { rerender } = render(
+    <ResourceItem
+      resource={mockResource}
+      onSelect={mockOnSelect}
+      isSelected={false}
+    />
+  );
+
+  // Check unselected state styling
+  let item = screen.getByText('#1').closest('div')?.parentElement;
+  expect(item?.className).toContain('bg-white');
+  expect(item?.className).not.toContain('bg-red-50');
+
+  // Rerender with selected state
+  rerender(
+    <ResourceItem
+      resource={mockResource}
+      onSelect={mockOnSelect}
+      isSelected={true}
+    />
+  );
+
+  // Check selected state styling - get the element again after rerender
+  item = screen.getByText('#1').closest('div')?.parentElement;
+  expect(item?.className).toContain('bg-red-50');
+  expect(item?.className).toContain('border-red-500');
+});
+
 test('resource item calls onSelect when clicked', () => {
   const mockResource = {
     id: 2,
@@ -81,4 +121,34 @@ test('resource item displays correct task count', () => {
   render(<ResourceItem resource={mockResource} onSelect={mockOnSelect} />);
 
   expect(screen.getByText('8 tasks')).toBeDefined();
+});
+
+test('resource item renders correctly when resource is undefined', () => {
+  const mockOnSelect = vi.fn();
+
+  render(<ResourceItem resource={undefined} onSelect={mockOnSelect} />);
+
+  // Should render empty text for id and tasks
+  expect(
+    screen.getByText('', { selector: '.text-sm.font-medium' })
+  ).toBeDefined();
+  expect(
+    screen.getByText('', { selector: '.text-xs.text-gray-400' })
+  ).toBeDefined();
+});
+
+test('resource item calls onSelect even when resource is undefined', () => {
+  const mockOnSelect = vi.fn();
+
+  render(<ResourceItem resource={undefined} onSelect={mockOnSelect} />);
+
+  // Click the outermost clickable div
+  const container = screen
+    .getByText('', { selector: '.text-sm.font-medium' })
+    .closest('div');
+  if (container) {
+    fireEvent.click(container);
+  }
+
+  expect(mockOnSelect).toHaveBeenCalledTimes(1);
 });
