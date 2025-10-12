@@ -127,10 +127,10 @@ class Resource(Base):
             raise ValueError(f"Task {task.id} is not assigned to this resource.")
         self.tasks.remove(task)
         task.resource = None
-        task.status = TaskStatus.UNASSIGNED
+        task.status = TaskStatus.OPEN
 
     def service_task(self, task: "StationTask") -> None:
-        """Mark a task as completed and remove it from this resource."""
+        """Mark a task as closed and remove it from this resource."""
         if task is None:
             raise ValueError("Cannot service a null task.")
         if task not in self.tasks:
@@ -140,7 +140,7 @@ class Resource(Base):
             )
         self.tasks.remove(task)
         task.resource = None
-        task.status = TaskStatus.COMPLETED
+        task.status = TaskStatus.CLOSED
 
     def get_task_count(self) -> int:
         """Return the number of tasks currently assigned to the resource."""

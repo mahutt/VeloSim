@@ -116,19 +116,19 @@ class TestStationTasksAPI:
         create_response = client.post("/api/v1/stationTasks/", json=task_data)
         task_id = create_response.json()["id"]
 
-        # Update task to completed status
-        update_data = {"station_id": station_id, "status": "completed"}
+        # Update task to closed status
+        update_data = {"station_id": station_id, "status": "closed"}
         client.put(f"/api/v1/stationTasks/{task_id}", json=update_data)
 
-        # Create another task (will be unassigned by default)
+        # Create another task (will be open by default)
         client.post("/api/v1/stationTasks/", json=task_data)
 
-        # Filter by completed status
-        response = client.get("/api/v1/stationTasks/?taskStatus=completed")
+        # Filter by closed status
+        response = client.get("/api/v1/stationTasks/?taskStatus=closed")
         assert response.status_code == 200
         data = response.json()
         assert data["total"] == 1
-        assert data["station_tasks"][0]["status"] == "completed"
+        assert data["station_tasks"][0]["status"] == "closed"
 
     def test_get_station_task_by_id_success(
         self, client: TestClient, db: Session
@@ -150,7 +150,7 @@ class TestStationTasksAPI:
         assert data["id"] == task_id
         assert data["station_id"] == station_id
         assert data["type"] == "battery_swap"
-        assert data["status"] == "unassigned"
+        assert data["status"] == "open"
         assert "date_created" in data
         assert "date_updated" in data
 
@@ -173,7 +173,7 @@ class TestStationTasksAPI:
         data = response.json()
         assert data["station_id"] == station_id
         assert data["type"] == "battery_swap"
-        assert data["status"] == "unassigned"
+        assert data["status"] == "open"
         assert "id" in data
         assert "date_created" in data
         assert "date_updated" in data
@@ -198,11 +198,11 @@ class TestStationTasksAPI:
         task_id = create_response.json()["id"]
 
         # Update the task status
-        update_data = {"station_id": station_id, "status": "completed"}
+        update_data = {"station_id": station_id, "status": "closed"}
         response = client.put(f"/api/v1/stationTasks/{task_id}", json=update_data)
         assert response.status_code == 200
         data = response.json()
-        assert data["status"] == "completed"
+        assert data["status"] == "closed"
         assert data["station_id"] == station_id
         assert data["type"] == "battery_swap"
 
@@ -211,7 +211,7 @@ class TestStationTasksAPI:
     ) -> None:
         """Test updating a station task that doesn't exist."""
         station_id = self._create_test_station(client)
-        update_data = {"station_id": station_id, "status": "completed"}
+        update_data = {"station_id": station_id, "status": "closed"}
         response = client.put("/api/v1/stationTasks/999", json=update_data)
         assert response.status_code == 404
 

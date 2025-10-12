@@ -43,7 +43,7 @@ class StationTask(Base):
     id: Mapped[int] = mapped_column(primary_key=True, index=True)
     type: Mapped[StationTaskType] = mapped_column(Enum(StationTaskType), nullable=False)
     status: Mapped[TaskStatus] = mapped_column(
-        Enum(TaskStatus), nullable=False, default=TaskStatus.UNASSIGNED
+        Enum(TaskStatus), nullable=False, default=TaskStatus.OPEN
     )
     date_created: Mapped[DateTime] = mapped_column(
         DateTime, nullable=False, server_default=func.now()
