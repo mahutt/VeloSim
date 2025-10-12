@@ -23,11 +23,12 @@
  */
 
 import { expect, test, vi } from 'vitest';
-import { render } from '@testing-library/react';
+import { render, act } from '@testing-library/react';
 import {
   INITIAL_CENTER,
   INITIAL_ZOOM,
   MapProvider,
+  useMap,
 } from '~/providers/map-provider';
 import { MockMap } from 'tests/mocks';
 import MapContainer from '~/components/map/map-container';
@@ -36,20 +37,26 @@ import {
   loadMapImages,
   setMapLayers,
 } from '~/lib/map-helpers';
+import { SimulationProvider } from '~/providers/simulation-provider';
 
 // Mocking setup map helpers that are called by MapProvider
-vi.mock('~/lib/map-helpers.ts', () => {
+vi.mock('~/lib/map-helpers.ts', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('~/lib/map-helpers.ts')>();
   return {
+    ...actual,
     loadMapImages: vi.fn(),
     initializeMapSources: vi.fn(),
     setMapLayers: vi.fn(),
+    setMapSource: vi.fn(),
   };
 });
 
 test('map provider instantiates mapboxgl Map instance in presence of map container', async () => {
   render(
     <MapProvider>
-      <MapContainer />
+      <SimulationProvider>
+        <MapContainer />
+      </SimulationProvider>
     </MapProvider>
   );
   const map = MockMap.instance;
@@ -69,16 +76,33 @@ test("map provider doesn't instantiate mapboxgl Map instance without map contain
 });
 
 test('on-load callback sets mapLoaded to true', async () => {
+  // Create a simple test component that only uses the map container ref
+  const TestMapContainer = () => {
+    const { mapContainerRef } = useMap();
+    return (
+      <div
+        id="map-container"
+        data-testid="map-container"
+        className="h-screen w-full"
+        ref={mapContainerRef}
+      />
+    );
+  };
+
   render(
     <MapProvider>
-      <MapContainer />
+      <TestMapContainer />
     </MapProvider>
   );
 
   expect(MockMap.instance).toBeDefined();
   const map = MockMap.instance!;
   expect(map.callBacks.load).toBeDefined();
-  map.callBacks.load();
+
+  // Wrap the state update in act()
+  act(() => {
+    map.callBacks.load();
+  });
 
   expect(loadMapImages).toHaveBeenCalledWith(map);
   expect(initializeMapSources).toHaveBeenCalledWith(map);

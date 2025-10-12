@@ -41,8 +41,7 @@ function layerToEntityType(layer: MapLayer): SelectedItemType {
 }
 
 // Set up click handlers for map layers to enable item selection
-
-type itemSelectCallback = (
+type ItemSelectCallback = (
   item: {
     type: SelectedItemType;
     id: number;
@@ -50,9 +49,16 @@ type itemSelectCallback = (
   } | null
 ) => void;
 
+type ItemHoverCallback = (
+  item: {
+    type: SelectedItemType;
+    id: number;
+  } | null
+) => void;
+
 export function setupMapClickHandlers(
   map: MapboxMap,
-  onItemSelect: itemSelectCallback
+  onItemSelect: ItemSelectCallback
 ) {
   map.on('click', (e: MapMouseEvent) => {
     const features = map.queryRenderedFeatures(e.point, {
@@ -91,6 +97,30 @@ export function setupMapClickHandlers(
 
     map.on('mouseleave', layer, () => {
       map.getCanvas().style.cursor = '';
+    });
+  });
+}
+
+export function setupMapHoverHandlers(
+  map: MapboxMap,
+  onItemHover: ItemHoverCallback
+) {
+  Object.values(MapLayer).forEach((layer) => {
+    map.on('mousemove', layer, (e) => {
+      if (e.features && e.features.length > 0) {
+        const id = e.features[0].properties?.id;
+        if (id !== undefined) {
+          const type = layerToEntityType(layer);
+          onItemHover({
+            type,
+            id: Number(id),
+          });
+        }
+      }
+    });
+
+    map.on('mouseleave', layer, () => {
+      onItemHover(null);
     });
   });
 }

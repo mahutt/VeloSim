@@ -27,6 +27,7 @@ import { setupMapClickHandlers } from '~/lib/map-interactions';
 import type { Map as MapboxMap } from 'mapbox-gl';
 import { MapLayer, MapSource } from '~/lib/map-helpers';
 import { SelectedItemType } from '~/types';
+import { setupMapHoverHandlers } from '~/lib/map-interactions';
 
 test('setupMapClickHandlers registers event listeners', () => {
   const mockMap = {
@@ -275,4 +276,251 @@ test('mouseenter and mouseleave change cursor for all layers', () => {
 
   handlers['mouseleave-resources']();
   expect(canvas.style.cursor).toBe('');
+});
+
+test('clicking station task count layer calls onItemSelect with station data', () => {
+  const handlers: Record<string, (event: unknown) => void> = {};
+  const mockMap = {
+    on: vi.fn(
+      (
+        event: string,
+        layerOrHandler: string | ((e: unknown) => void),
+        handler?: (e: unknown) => void
+      ) => {
+        if (typeof layerOrHandler === 'function') {
+          handlers[event] = layerOrHandler;
+        } else if (handler) {
+          handlers[`${event}-${layerOrHandler}`] = handler;
+        }
+      }
+    ),
+    getCanvas: vi.fn(() => ({ style: { cursor: '' } })),
+    queryRenderedFeatures: vi.fn(() => [
+      {
+        layer: { id: MapLayer.StationTaskCounts },
+        geometry: { type: 'Point', coordinates: [-73.5, 45.5] },
+        properties: { id: 123, name: 'Test Station' },
+      },
+    ]),
+  } as unknown as MapboxMap;
+
+  const onItemSelect = vi.fn();
+  setupMapClickHandlers(mockMap, onItemSelect);
+
+  handlers['click']({ point: { x: 100, y: 100 } });
+
+  expect(onItemSelect).toHaveBeenCalledWith({
+    type: SelectedItemType.Station,
+    id: 123,
+    coordinates: [-73.5, 45.5],
+  });
+});
+
+test('clicking feature with missing layer throws error', () => {
+  const handlers: Record<string, (event: unknown) => void> = {};
+  const mockMap = {
+    on: vi.fn(
+      (
+        event: string,
+        layerOrHandler: string | ((e: unknown) => void),
+        handler?: (e: unknown) => void
+      ) => {
+        if (typeof layerOrHandler === 'function') {
+          handlers[event] = layerOrHandler;
+        } else if (handler) {
+          handlers[`${event}-${layerOrHandler}`] = handler;
+        }
+      }
+    ),
+    getCanvas: vi.fn(() => ({ style: { cursor: '' } })),
+    queryRenderedFeatures: vi.fn(() => [
+      {
+        layer: undefined,
+        geometry: { type: 'Point', coordinates: [-73.5, 45.5] },
+        properties: { id: 123 },
+      },
+    ]),
+  } as unknown as MapboxMap;
+
+  const onItemSelect = vi.fn();
+  setupMapClickHandlers(mockMap, onItemSelect);
+
+  expect(() => {
+    handlers['click']({ point: { x: 100, y: 100 } });
+  }).toThrow();
+});
+
+test('clicking feature with unrecognized layer throws error', () => {
+  const handlers: Record<string, (event: unknown) => void> = {};
+  const mockMap = {
+    on: vi.fn(
+      (
+        event: string,
+        layerOrHandler: string | ((e: unknown) => void),
+        handler?: (e: unknown) => void
+      ) => {
+        if (typeof layerOrHandler === 'function') {
+          handlers[event] = layerOrHandler;
+        } else if (handler) {
+          handlers[`${event}-${layerOrHandler}`] = handler;
+        }
+      }
+    ),
+    getCanvas: vi.fn(() => ({ style: { cursor: '' } })),
+    queryRenderedFeatures: vi.fn(() => [
+      {
+        layer: { id: 'unknown-layer' },
+        geometry: { type: 'Point', coordinates: [-73.5, 45.5] },
+        properties: { id: 123 },
+      },
+    ]),
+  } as unknown as MapboxMap;
+
+  const onItemSelect = vi.fn();
+  setupMapClickHandlers(mockMap, onItemSelect);
+
+  expect(() => {
+    handlers['click']({ point: { x: 100, y: 100 } });
+  }).toThrow();
+});
+
+test('mouseenter and mouseleave for station-task-counts layer', () => {
+  const handlers: Record<string, () => void> = {};
+  const canvas = { style: { cursor: '' } };
+  const mockMap = {
+    on: vi.fn(
+      (
+        event: string,
+        layerOrHandler: string | (() => void),
+        handler?: () => void
+      ) => {
+        if (typeof layerOrHandler === 'function') {
+          handlers[event] = layerOrHandler;
+        } else if (handler) {
+          handlers[`${event}-${layerOrHandler}`] = handler;
+        }
+      }
+    ),
+    getCanvas: vi.fn(() => canvas),
+    queryRenderedFeatures: vi.fn(() => []),
+  } as unknown as MapboxMap;
+
+  const onItemSelect = vi.fn();
+  setupMapClickHandlers(mockMap, onItemSelect);
+
+  handlers['mouseenter-station-task-counts']();
+  expect(canvas.style.cursor).toBe('pointer');
+
+  handlers['mouseleave-station-task-counts']();
+  expect(canvas.style.cursor).toBe('');
+});
+
+test('registers mousemove and mouseleave handlers for all layers', () => {
+  const mockMap = {
+    on: vi.fn(),
+  } as unknown as MapboxMap;
+  const onItemHover = vi.fn();
+
+  setupMapHoverHandlers(mockMap, onItemHover);
+
+  // For each layer: mousemove + mouseleave
+  expect(mockMap.on).toHaveBeenCalledTimes(Object.values(MapLayer).length * 2);
+  Object.values(MapLayer).forEach((layer) => {
+    expect(mockMap.on).toHaveBeenCalledWith(
+      'mousemove',
+      layer,
+      expect.any(Function)
+    );
+    expect(mockMap.on).toHaveBeenCalledWith(
+      'mouseleave',
+      layer,
+      expect.any(Function)
+    );
+  });
+});
+
+test('calls onItemHover with correct data on mousemove with feature', () => {
+  const handlers: Record<
+    string,
+    (e: { features?: Array<{ properties?: { id?: number } }> }) => void
+  > = {};
+  const mockMap = {
+    on: vi.fn((event, layer, handler) => {
+      if (typeof handler === 'function') {
+        handlers[`${event}-${layer}`] = handler;
+      }
+    }),
+  } as unknown as MapboxMap;
+  const onItemHover = vi.fn();
+
+  setupMapHoverHandlers(mockMap, onItemHover);
+
+  // Simulate mousemove on Stations layer
+  handlers[`mousemove-${MapLayer.Stations}`]({
+    features: [{ properties: { id: 42 } }],
+  });
+
+  expect(onItemHover).toHaveBeenCalledWith({
+    type: SelectedItemType.Station,
+    id: 42,
+  });
+});
+
+test('does not call onItemHover if no features on mousemove', () => {
+  const handlers: Record<
+    string,
+    (e: { features?: Array<{ properties?: { id?: number } }> }) => void
+  > = {};
+  const mockMap = {
+    on: vi.fn((event, layer, handler) => {
+      if (typeof handler === 'function') {
+        handlers[`${event}-${layer}`] = handler;
+      }
+    }),
+  } as unknown as MapboxMap;
+  const onItemHover = vi.fn();
+
+  setupMapHoverHandlers(mockMap, onItemHover);
+
+  handlers[`mousemove-${MapLayer.Resources}`]({ features: [] });
+  expect(onItemHover).not.toHaveBeenCalled();
+});
+
+test('does not call onItemHover if feature has no id', () => {
+  const handlers: Record<
+    string,
+    (e: { features?: Array<{ properties?: { id?: number } }> }) => void
+  > = {};
+  const mockMap = {
+    on: vi.fn((event, layer, handler) => {
+      if (typeof handler === 'function') {
+        handlers[`${event}-${layer}`] = handler;
+      }
+    }),
+  } as unknown as MapboxMap;
+  const onItemHover = vi.fn();
+
+  setupMapHoverHandlers(mockMap, onItemHover);
+
+  handlers[`mousemove-${MapLayer.Resources}`]({
+    features: [{ properties: {} }],
+  });
+  expect(onItemHover).not.toHaveBeenCalled();
+});
+
+test('calls onItemHover(null) on mouseleave', () => {
+  const handlers: Record<string, () => void> = {};
+  const mockMap = {
+    on: vi.fn((event, layer, handler) => {
+      if (typeof handler === 'function') {
+        handlers[`${event}-${layer}`] = handler;
+      }
+    }),
+  } as unknown as MapboxMap;
+  const onItemHover = vi.fn();
+
+  setupMapHoverHandlers(mockMap, onItemHover);
+
+  handlers[`mouseleave-${MapLayer.Stations}`]();
+  expect(onItemHover).toHaveBeenCalledWith(null);
 });

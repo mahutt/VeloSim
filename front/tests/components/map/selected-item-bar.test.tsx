@@ -76,7 +76,7 @@ describe('SelectedItemBar', () => {
     expect(screen.getByText('Test Station')).toBeInTheDocument();
     expect(screen.getByText('Name')).toBeInTheDocument();
     expect(screen.getByText('Position')).toBeInTheDocument();
-    expect(screen.getByText('Pending Tasks')).toBeInTheDocument();
+    expect(screen.getByText('Tasks (0)')).toBeInTheDocument();
   });
 
   it('should render resource information when resource is selected', () => {
@@ -108,8 +108,7 @@ describe('SelectedItemBar', () => {
 
     expect(screen.getByText('Resource')).toBeInTheDocument();
     expect(screen.getByText('#5')).toBeInTheDocument();
-    expect(screen.getByText('Route ID')).toBeInTheDocument();
-    expect(screen.getByText('5')).toBeInTheDocument();
+    expect(screen.getByText('Position')).toBeInTheDocument();
     expect(screen.getByText('Tasks (3)')).toBeInTheDocument();
     expect(screen.getByText('1, 2, 3')).toBeInTheDocument();
   });
@@ -170,8 +169,7 @@ describe('SelectedItemBar', () => {
 
     render(<SelectedItemBar />);
 
-    expect(screen.getByText('2')).toBeInTheDocument(); // Task count
-    expect(screen.getByText('Tasks')).toBeInTheDocument();
+    expect(screen.getByText('Tasks (2)')).toBeInTheDocument();
     expect(screen.getByText('battery swap, battery swap')).toBeInTheDocument();
   });
 });

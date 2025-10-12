@@ -40,7 +40,7 @@ export default function SelectedItemBar() {
 
   return (
     <div className="absolute top-4 left-4 z-10 w-80">
-      <Card>
+      <Card className="bg-gray-50">
         <CardHeader className="flex flex-row items-center justify-between space-y-0">
           <CardTitle className="text-lg font-semibold">
             <span className="text-red-500">
@@ -90,21 +90,17 @@ function StationInfo({ station }: { station: Station }) {
         </p>
       </div>
       <div>
-        <p className="text-sm text-muted-foreground">Pending Tasks</p>
-        <p className="text-sm">{station.tasks.length}</p>
+        <p className="text-sm text-muted-foreground">
+          Tasks ({station.tasks.length})
+        </p>
+        <p className="text-sm">
+          {station.tasks.length > 0
+            ? station.tasks
+                .map((task) => task.type.replace('_', ' '))
+                .join(', ')
+            : 'No tasks assigned'}
+        </p>
       </div>
-      {station.tasks.length > 0 && (
-        <div>
-          <p className="text-sm text-muted-foreground mb-1">Tasks</p>
-          <p className="text-sm">
-            {station.tasks.length > 0
-              ? station.tasks
-                  .map((task) => task.type.replace('_', ' '))
-                  .join(', ')
-              : 'No tasks assigned'}
-          </p>
-        </div>
-      )}
     </div>
   );
 }
@@ -117,10 +113,6 @@ function ResourceInfo({ resource }: { resource: Resource }) {
         <p className="font-mono text-xs">
           [{resource.position[0].toFixed(5)}, {resource.position[1].toFixed(5)}]
         </p>
-      </div>
-      <div>
-        <p className="text-sm text-muted-foreground">Route ID</p>
-        <p className="text-sm">{resource.id}</p>
       </div>
       <div>
         <p className="text-sm text-muted-foreground">

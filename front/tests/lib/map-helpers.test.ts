@@ -35,7 +35,7 @@ import { MockMap } from 'tests/mocks';
 test('loadMapImages loads all necessary images', () => {
   MockMap.createRandomInstance();
   loadMapImages(MockMap.instance! as unknown as mapboxgl.Map);
-  expect(MockMap.instance?.loadImage).toHaveBeenCalledTimes(2);
+  expect(MockMap.instance?.loadImage).toHaveBeenCalledTimes(6);
   expect(MockMap.instance?.loadImage).toHaveBeenCalledWith(
     '/station.png',
     expect.any(Function)
@@ -84,7 +84,14 @@ test('setMapLayers adds stations layer with correct configuration', () => {
     type: 'symbol',
     source: 'stations',
     layout: {
-      'icon-image': 'station-marker',
+      'icon-image': [
+        'case',
+        ['boolean', ['get', 'selected'], false],
+        'station-marker-selected',
+        ['boolean', ['get', 'hover'], false],
+        'station-marker-hover',
+        'station-marker',
+      ],
       'icon-allow-overlap': true,
     },
   });
@@ -94,10 +101,46 @@ test('setMapLayers adds stations layer with correct configuration', () => {
     type: 'symbol',
     source: 'resources',
     layout: {
-      'icon-image': 'resource-marker',
+      'icon-image': [
+        'case',
+        ['boolean', ['get', 'selected'], false],
+        'resource-marker-selected',
+        ['boolean', ['get', 'hover'], false],
+        'resource-marker-hover',
+        'resource-marker',
+      ],
       'icon-allow-overlap': true,
     },
   });
+});
+
+test('loadMapImages handles image loading with async callbacks', async () => {
+  MockMap.createRandomInstance();
+
+  const mockImage = { width: 32, height: 32 };
+
+  // Mock loadImage to simulate async callback
+  MockMap.instance!.loadImage = vi.fn(
+    (
+      url: string,
+      callback: (
+        error: Error | null,
+        image?: { width: number; height: number }
+      ) => void
+    ) => {
+      // Simulate async image loading
+      setTimeout(async () => {
+        callback(null, mockImage);
+      }, 0);
+    }
+  );
+
+  loadMapImages(MockMap.instance! as unknown as mapboxgl.Map);
+
+  // Wait for async callbacks
+  await new Promise((resolve) => setTimeout(resolve, 10));
+
+  expect(MockMap.instance?.loadImage).toHaveBeenCalledTimes(6);
 });
 
 test('setMapSource updates source data correctly', () => {
@@ -133,4 +176,67 @@ test('setMapSource updates source data correctly', () => {
 
   expect(MockMap.instance?.getSource).toHaveBeenCalledWith('stations');
   expect(mockGeoJSONSource.setData).toHaveBeenCalledWith(testData);
+});
+
+test('loadMapImages successfully adds images when loaded', () => {
+  MockMap.createRandomInstance();
+
+  const mockImage = { width: 32, height: 32 };
+
+  // Mock loadImage to call the callback with success
+  MockMap.instance!.loadImage = vi.fn(
+    (
+      url: string,
+      callback: (
+        error: Error | null,
+        image?: { width: number; height: number }
+      ) => void
+    ) => {
+      callback(null, mockImage);
+    }
+  );
+
+  loadMapImages(MockMap.instance! as unknown as mapboxgl.Map);
+
+  expect(MockMap.instance?.loadImage).toHaveBeenCalledTimes(6);
+  expect(MockMap.instance?.addImage).toHaveBeenCalledTimes(6);
+  expect(MockMap.instance?.addImage).toHaveBeenCalledWith(
+    'station-marker',
+    mockImage
+  );
+  expect(MockMap.instance?.addImage).toHaveBeenCalledWith(
+    'station-marker-selected',
+    mockImage
+  );
+  expect(MockMap.instance?.addImage).toHaveBeenCalledWith(
+    'resource-marker',
+    mockImage
+  );
+  expect(MockMap.instance?.addImage).toHaveBeenCalledWith(
+    'resource-marker-selected',
+    mockImage
+  );
+});
+
+test('loadMapImages handles image load failure gracefully', () => {
+  MockMap.createRandomInstance();
+
+  // Mock loadImage to call the callback with an error
+  MockMap.instance!.loadImage = vi.fn(
+    (
+      url: string,
+      callback: (
+        error: Error | null,
+        image?: { width: number; height: number }
+      ) => void
+    ) => {
+      callback(new Error('Failed to load image'));
+    }
+  );
+
+  loadMapImages(MockMap.instance! as unknown as mapboxgl.Map);
+
+  expect(MockMap.instance?.loadImage).toHaveBeenCalledTimes(6);
+  // Should not call addImage if loadImage fails
+  expect(MockMap.instance?.addImage).not.toHaveBeenCalled();
 });

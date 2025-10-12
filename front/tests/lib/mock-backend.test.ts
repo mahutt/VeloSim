@@ -24,7 +24,7 @@
 
 import { expect, test, vi, beforeEach, afterEach } from 'vitest';
 import { startMockBackend, FRAME_INTERVAL_MS } from '~/lib/mock-backend';
-import type { Route } from '~/types';
+import type { Resource } from '~/types';
 
 beforeEach(() => {
   vi.useFakeTimers();
@@ -35,19 +35,23 @@ afterEach(() => {
 });
 
 test('startMockBackend sends position updates at regular intervals', () => {
-  const routes: Route[] = [
+  const resources: Resource[] = [
     {
       id: 1,
-      coordinates: [
-        [0, 0],
-        [1, 1],
-        [2, 2],
-      ],
+      position: [0, 0],
+      taskList: [1, 2],
+      route: {
+        coordinates: [
+          [0, 0],
+          [1, 1],
+          [2, 2],
+        ],
+      },
     },
   ];
 
   const onFrame = vi.fn();
-  startMockBackend(routes, onFrame);
+  startMockBackend(resources, onFrame);
 
   expect(onFrame).not.toHaveBeenCalled();
 
@@ -59,18 +63,22 @@ test('startMockBackend sends position updates at regular intervals', () => {
 });
 
 test('startMockBackend cleanup stops sending updates', () => {
-  const routes: Route[] = [
+  const resources: Resource[] = [
     {
       id: 1,
-      coordinates: [
-        [0, 0],
-        [1, 1],
-      ],
+      position: [0, 0],
+      taskList: [3, 4],
+      route: {
+        coordinates: [
+          [0, 0],
+          [1, 1],
+        ],
+      },
     },
   ];
 
   const onFrame = vi.fn();
-  const cleanup = startMockBackend(routes, onFrame);
+  const cleanup = startMockBackend(resources, onFrame);
 
   vi.advanceTimersByTime(FRAME_INTERVAL_MS);
   expect(onFrame).toHaveBeenCalledTimes(1);

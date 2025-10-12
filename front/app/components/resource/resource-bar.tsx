@@ -25,25 +25,39 @@
 import { ResourceItem } from './resource-item';
 import { useSimulation } from '~/providers/simulation-provider';
 import { SelectedItemType } from '~/types';
+import { Card, CardContent } from '~/components/ui/card';
 
 export default function ResourceBar() {
-  const { selectItem, resources } = useSimulation();
+  const { selectItem, resources, selectedItem } = useSimulation();
 
   const handleSelect = (resourceId: number) => {
     selectItem(SelectedItemType.Resource, resourceId);
   };
 
+  // Check if a resource is currently selected
+  const isResourceSelected = (resourceId: number) => {
+    return (
+      selectedItem?.type === SelectedItemType.Resource &&
+      selectedItem.value.id === resourceId
+    );
+  };
+
   return (
-    <div className="absolute top-4 right-4 w-60 bg-gray-300 shadow rounded p-4 max-h-[calc(100vh-2rem)]">
-      <div className="space-y-2 max-h-[calc(100vh-6rem)] overflow-y-auto pr-3 -mr-3">
-        {resources.map((resource) => (
-          <ResourceItem
-            key={resource.id}
-            resource={resource}
-            onSelect={() => handleSelect(resource.id)}
-          />
-        ))}
-      </div>
+    <div className="absolute top-4 right-4 w-60 max-h-[calc(100vh-2rem)]">
+      <Card className="bg-gray-50">
+        <CardContent>
+          <div className="space-y-2 max-h-[calc(100vh-12rem)] overflow-y-auto pr-3 -mr-3">
+            {resources.map((resource) => (
+              <ResourceItem
+                key={resource.id}
+                resource={resource}
+                onSelect={() => handleSelect(resource.id)}
+                isSelected={isResourceSelected(resource.id)}
+              />
+            ))}
+          </div>
+        </CardContent>
+      </Card>
     </div>
   );
 }
