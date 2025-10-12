@@ -29,34 +29,38 @@ from typing import List
 from sim.entities.station import Station
 from sim.frame_emitter import FrameEmitter
 from sim.entities.frame import Frame
-
+from sim.entities.resource import Resource
+from sim.entities.clock import Clock
 class SimulatorController:
 
-    # TODO Add entity Collections. Ex Resources, Stations, Tasks, etc.
+    # TODO Add Task Entities
+
     stationEntities : List[Station]
+    resourcEntities: List[Resource]
+
+    clock : Clock # Keep track of sim time and real time passed in minutes & seconds
     frameCounter : int = 0 # No frames emitted until sim is running
 
 
     def __init__(
-        self, simEnv: simpy.Environment, frameEmitter: FrameEmitter, strict: bool, realTimeFactor: float = None
+        self, simEnv: simpy.Environment, frameEmitter: FrameEmitter, strict: bool, 
+        realTimeFactor: float = None,
+        keyframeFreq: int = None,
     ) -> None:
         self.simEnv = simEnv
         self.realTimeDriver = RealTimeDriver(simEnv, realTimeFactor, strict)
         self.frameEmitter = frameEmitter
+        self.keyframeFreq = keyframeFreq # key frame every nth frame
 
     def start(self, simTime: int) -> None:
         # TODO process initial entities into the sim env
-        # Add a dummy process to keep the simulation running
-        self.simEnv.process(self._dummy_simulation_process(simTime))
-
+        
+        #start sim clock
+        self.clock.run()
         self.sim_thread = threading.Thread(target=self.realTimeDriver.runUntil,args=(simTime,self.emit_frame))
         self.sim_thread.start()
 
-    def _dummy_simulation_process(self, simTime: int):
-        """A dummy process that yields every second to keep the simulation active."""
-        for i in range(simTime):
-            yield self.simEnv.timeout(1)  # Wait 1 simulation second
-
+   
     def stop(self) -> None:
         self.realTimeDriver.stop()
 
@@ -69,23 +73,53 @@ class SimulatorController:
     def set_factor(self, factor: float) -> None:
         self.realTimeDriver.setRealTimeFactor(factor)
 
-    def subscribe_to_frames(self) -> None:
-        pass
+    # First frame sent from back to front end with station data, etc
+    def emit_initial_frame(self) -> None:
+        frame = self.create_key_frame()
+        self.emit_frame(frame)
+    
+    # Should call frame emitter
+    def emit_frame(self, frame: Frame) -> None:
 
-    # should call frame emitter
-    def emit_frame(self) -> None:
-        payload = { 
-            "sim_id" : self.frameEmitter.sim_id,
-            "tasks" : "TODO : Add task detials",
-            "resources": "TODO : Add resource details",
-            "stations" : "TODO: Add station details"
-        }
-        frame = Frame(seq_numb= self.frameCounter, payload= payload)
+        frame = self.create_frame()
         self.frameEmitter.notify(frame= frame)
         self.frameCounter += 1
 
-    # First frame sent from back to front end with station data, etc
-    def get_initial_frame(self) -> None:
+    def create_frame(self) -> Frame:
         pass
 
-    
+    def create_key_frame(self) -> Frame: 
+        payload= {
+            "sim_id" : self.frameEmitter.sim_id,
+            "tasks": "TODO : Add all current task detials",
+            "stations": [
+                {
+                   "station_id":  station.id,
+                   "station_name" :station.name,
+                   "station_position": station.position,
+                   "station_tasks" : station.tasks 
+                } for station in self.stationEntities
+            ],
+            "resources":[
+                {
+                    "resource_id": resource.id,
+                    "resource_position": resource.position,
+                    "resource_tasks": resource.task_list
+
+                } for resource in self.resourcEntities
+            ],
+
+            "clock" : {
+                "realSecondsPassed" : self.clock.realSecondsPassed,
+                "realMinutesPassed" : self.clock.realMinutesPassed,
+                "simSecondsPassed" : self.clock.simTimeSeconds,
+                "simSecondsPassed" : self.clock.simTimeSeconds
+            }
+        }
+        frame = Frame(seq_numb= self.frameCounter, payload= payload)
+
+        return frame
+
+
+      
+  
