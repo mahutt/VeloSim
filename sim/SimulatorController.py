@@ -70,7 +70,7 @@ class SimulatorController:
         # start sim clock
         self.clock.run()
         self.sim_thread = threading.Thread(
-            target=self.realTimeDriver.runUntil, args=(simTime, self.emit_frame)
+            target=self.realTimeDriver.run_until, args=(simTime, self.emit_frame)
         )
         self.sim_thread.start()
 
@@ -84,7 +84,7 @@ class SimulatorController:
         self.realTimeDriver.resume()
 
     def set_factor(self, factor: float) -> None:
-        self.realTimeDriver.setRealTimeFactor(factor)
+        self.realTimeDriver.set_real_time_factor(factor)
 
     # First frame sent from back to front end with station data, etc
     def emit_initial_frame(self) -> None:
@@ -160,10 +160,10 @@ class SimulatorController:
                 if resource.has_updated
             ],
             "clock": {
-                "realSecondsPassed": self.clock.realSecondsPassed,
-                "realMinutesPassed": self.clock.realMinutesPassed,
-                "simSecondsPassed": self.clock.simTimeSeconds,
-                "simMinutesPassed": self.clock.simTimeSeconds,
+                "realSecondsPassed": self.clock.real_seconds_passed,
+                "realMinutesPassed": self.clock.real_minutes_passed,
+                "simSecondsPassed": self.clock.sim_time_seconds,
+                "simMinutesPassed": self.clock.sim_time_seconds,
             },
         }
         frame = Frame(seq_numb=self.frameCounter, payload=payload)
@@ -223,10 +223,10 @@ class SimulatorController:
                 for resource in self.resourcEntities
             ],
             "clock": {
-                "realSecondsPassed": self.clock.realSecondsPassed,
-                "realMinutesPassed": self.clock.realMinutesPassed,
-                "simSecondsPassed": self.clock.simTimeSeconds,
-                "simMinutesPassed": self.clock.simTimeSeconds,
+                "realSecondsPassed": self.clock.real_seconds_passed,
+                "realMinutesPassed": self.clock.real_minutes_passed,
+                "simSecondsPassed": self.clock.sim_time_seconds,
+                "simMinutesPassed": self.clock.sim_time_seconds,
             },
         }
         frame = Frame(seq_numb=self.frameCounter, payload=payload)

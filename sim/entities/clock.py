@@ -9,13 +9,13 @@ class Clock:
     Notes (breaking change vs previous version):
     - Previously one env unit == 1 sim minute. Now: 1 env unit == 1 sim second.
     - We expose both accumulated seconds and derived minutes for convenience.
-    - realTimePassed tracks wall-clock seconds spent running this clock process.
+    - real_time_passed tracks wall-clock seconds spent running this clock process.
     """
 
-    realSecondsPassed: float = 0.0  # wall-clock seconds elapsed while clock running
-    realMinutesPassed: float = 0.0
-    simTimeSeconds: float = 0.0  # env.now (seconds)
-    simTimeMinutes: float = 0.0  # env.now / 60 (floor)
+    real_seconds_passed: float = 0.0  # wall-clock seconds elapsed while clock running
+    real_minutes_passed: float = 0.0
+    sim_time_seconds: float = 0.0  # env.now (seconds)
+    sim_time_minutes: float = 0.0  # env.now / 60 (floor)
 
     def __init__(self, env: simpy.Environment) -> None:
         self.env = env
@@ -30,10 +30,10 @@ class Clock:
 
             real_time_accum += end - start
             sim_seconds = self.env.now  # now measured in seconds
-            self.realSecondsPassed = real_time_accum
-            self.realMinutesPassed = real_time_accum / 60  # Fractional minutes
-            self.simTimeSeconds = sim_seconds
-            self.simTimeMinutes = sim_seconds / 60
+            self.real_seconds_passed = real_time_accum
+            self.real_minutes_passed = real_time_accum / 60  # Fractional minutes
+            self.sim_time_seconds = sim_seconds
+            self.sim_time_minutes = sim_seconds / 60
 
     def run(self) -> None:
         self.env.process(self.clock())

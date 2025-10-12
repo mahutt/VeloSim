@@ -336,9 +336,9 @@ def test_stop(simulator_controller: SimulatorController) -> None:
 
 def test_set_factor(simulator_controller: SimulatorController) -> None:
     """Test set_factor functionality."""
-    # Mock the real time driver setRealTimeFactor method
+    # Mock the real time driver set_real_time_factor method
     with patch.object(
-        simulator_controller.realTimeDriver, "setRealTimeFactor"
+        simulator_controller.realTimeDriver, "set_real_time_factor"
     ) as mock_set_factor:
         simulator_controller.set_factor(2.0)
         mock_set_factor.assert_called_once_with(2.0)
@@ -366,7 +366,7 @@ def test_start_simulation(
         # Check that thread was created with correct parameters
         mock_thread_class.assert_called_once()
         args, kwargs = mock_thread_class.call_args
-        assert kwargs["target"] == simulator_controller.realTimeDriver.runUntil
+        assert kwargs["target"] == simulator_controller.realTimeDriver.run_until
         assert kwargs["args"] == (3600, simulator_controller.emit_frame)
 
         # Check that thread was started

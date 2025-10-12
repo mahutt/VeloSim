@@ -35,7 +35,7 @@ from _pytest.capture import CaptureFixture
 # Import the module so we can monkeypatch its time.sleep
 from sim.entities.inputParameters import InputParameter
 from sim.entities.request_type import RequestType
-import sim.simulator as simulator_mod
+
 import sim.RealTimeDriver as rtd_mod
 from sim.simulator import Simulator
 from sim.utils.subscriber import Subscriber
