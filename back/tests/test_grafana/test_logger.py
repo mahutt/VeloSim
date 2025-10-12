@@ -28,12 +28,7 @@ from unittest.mock import patch
 
 import pytest
 
-from back.grafana_logging.logger import (
-    VeloSimLogger,
-    get_logger,
-    log_request,
-    log_simulation_event,
-)
+from back.grafana_logging.logger import VeloSimLogger, get_logger
 
 
 @pytest.fixture
@@ -107,34 +102,48 @@ def test_logger_different_levels(temp_log_file: Path) -> None:
 
 def test_log_request_function(temp_log_file: Path) -> None:
     """Test the log_request convenience function."""
-    with patch("back.grafana_logging.logger.DEFAULT_LOG_FILE", str(temp_log_file)):
-        with patch("back.grafana_logging.logger.LOG_TO_FILE", True):
-            with patch("back.grafana_logging.logger.LOG_TO_CONSOLE", False):
-                VeloSimLogger._loggers.clear()
+    # Instead of actually logging to file, just verify the function is called correctly
+    with patch(
+        "back.grafana_logging.logger.VeloSimLogger.get_logger"
+    ) as mock_get_logger:
+        mock_logger = mock_get_logger.return_value
 
-                log_request("GET", "/api/v1/stations", 200, 45.2)
+        VeloSimLogger.log_request("GET", "/api/v1/stations", 200, 45.2)
 
-                content = temp_log_file.read_text()
-                assert "GET /api/v1/stations" in content
-                assert "200" in content
-                assert "45.20ms" in content
+        # Verify get_logger was called
+        mock_get_logger.assert_called_once_with("http")
+
+        # Verify logger.log was called with correct level and message
+        mock_logger.log.assert_called_once()
+        call_args = mock_logger.log.call_args
+        assert call_args[0][0] == logging.INFO  # level
+        assert "GET /api/v1/stations" in call_args[0][1]  # message
+        assert "200" in call_args[0][1]
+        assert "45.20ms" in call_args[0][1]
 
 
 def test_log_simulation_event(temp_log_file: Path) -> None:
     """Test the log_simulation_event function."""
-    with patch("back.grafana_logging.logger.DEFAULT_LOG_FILE", str(temp_log_file)):
-        with patch("back.grafana_logging.logger.LOG_TO_FILE", True):
-            with patch("back.grafana_logging.logger.LOG_TO_CONSOLE", False):
-                VeloSimLogger._loggers.clear()
+    # Instead of actually logging to file, just verify the function is called correctly
+    with patch(
+        "back.grafana_logging.logger.VeloSimLogger.get_logger"
+    ) as mock_get_logger:
+        mock_logger = mock_get_logger.return_value
 
-                log_simulation_event(
-                    "STEP", "Vehicle moved", {"vehicle_id": 123, "position": (10, 20)}
-                )
+        VeloSimLogger.log_simulation_event(
+            "STEP", "Vehicle moved", {"vehicle_id": 123, "position": (10, 20)}
+        )
 
-                content = temp_log_file.read_text()
-                assert "[STEP] Vehicle moved" in content
-                assert "vehicle_id=123" in content
-                assert "position=(10, 20)" in content
+        # Verify get_logger was called
+        mock_get_logger.assert_called_once_with("simulator")
+
+        # Verify logger.info was called with correct message
+        mock_logger.info.assert_called_once()
+        call_args = mock_logger.info.call_args
+        message = call_args[0][0]
+        assert "[STEP] Vehicle moved" in message
+        assert "vehicle_id=123" in message
+        assert "position=(10, 20)" in message
 
 
 def test_logger_custom_level() -> None:

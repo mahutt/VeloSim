@@ -30,7 +30,8 @@ from typing import Dict, List, Optional, Union
 
 # Default log configuration
 DEFAULT_LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO").upper()
-DEFAULT_LOG_FILE = os.getenv("LOG_FILE_PATH", "back/grafana_logging/logs.txt")
+_LOGGER_DIR = Path(__file__).parent
+DEFAULT_LOG_FILE = os.getenv("LOG_FILE_PATH", str(_LOGGER_DIR / "logs.txt"))
 LOG_TO_FILE = os.getenv("LOG_TO_FILE", "true").lower() == "true"
 LOG_TO_CONSOLE = os.getenv("LOG_TO_CONSOLE", "true").lower() == "true"
 
