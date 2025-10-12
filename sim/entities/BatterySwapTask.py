@@ -66,7 +66,4 @@ class BatterySwapTask(Task):
         self.state = State.OPEN
 
     def is_assigned(self) -> bool:
-        if self.state == State.ASSIGNED:
-            return True
-        else:
-            return False
+        return self.state == State.ASSIGNED:
