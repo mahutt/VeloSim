@@ -168,7 +168,7 @@ test('filters resources by ID match', async () => {
   const searchInput = screen.getByPlaceholderText('Search Resource');
   await user.type(searchInput, '1');
 
-  // Should show resources with ID 1 and 12 (since both contain "1")
+  // Should show resources with ID 1 and 12 (since both start with "1")
   expect(screen.getByText('#1')).toBeInTheDocument();
   expect(screen.getByText('#12')).toBeInTheDocument();
   expect(screen.queryByText('#2')).not.toBeInTheDocument();

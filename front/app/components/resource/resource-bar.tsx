@@ -47,17 +47,17 @@ export default function ResourceBar() {
 
   // Filter resources based on their ID
   const filteredResources = useMemo(() => {
-    if (!searchQuery.trim()) {
+    const trimmedQuery = searchQuery.trim();
+    if (!trimmedQuery) {
       return resources;
     }
 
-    const query = searchQuery.toLowerCase();
     return resources.filter((resource) => {
       const resourceIdString = resource.id.toString();
-      const resourceMatch =
-        resourceIdString === query || resourceIdString.startsWith(query);
-
-      return resourceMatch;
+      return (
+        resourceIdString === trimmedQuery ||
+        resourceIdString.startsWith(trimmedQuery)
+      );
     });
   }, [resources, searchQuery]);
 
