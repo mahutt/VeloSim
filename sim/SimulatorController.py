@@ -31,12 +31,15 @@ from sim.frame_emitter import FrameEmitter
 from sim.entities.frame import Frame
 from sim.entities.resource import Resource
 from sim.entities.clock import Clock
+from sim.entities.task import Task
 class SimulatorController:
 
     # TODO Add Task Entities
 
     stationEntities : List[Station]
     resourcEntities: List[Resource]
+    taskEntities: List[Task]
+
 
     clock : Clock # Keep track of sim time and real time passed in minutes & seconds
     frameCounter : int = 0 # No frames emitted until sim is running
@@ -91,20 +94,32 @@ class SimulatorController:
     def create_key_frame(self) -> Frame: 
         payload= {
             "sim_id" : self.frameEmitter.sim_id,
-            "tasks": "TODO : Add all current task detials",
+            "tasks": [
+                {
+                    "task_id": task.get_task_id(),
+                    "task_state": task.get_state().value if hasattr(task.get_state(), 'value') else str(task.get_state()),
+                    "station_id": task.get_station().id if task.get_station() else None,
+                    "station_name": task.get_station().name if task.get_station() else None,
+                    "assigned_resource_id": task.get_assigned_resource().id if task.get_assigned_resource() else None,
+                    "is_assigned": task.is_assigned()
+                } for task in self.taskEntities
+            ],
             "stations": [
                 {
                    "station_id":  station.id,
                    "station_name" :station.name,
-                   "station_position": station.position,
-                   "station_tasks" : station.tasks 
+                   "station_position": station.get_station_position(),
+                   "station_tasks" : station.tasks,
+                   "task_count": station.get_task_count()
                 } for station in self.stationEntities
             ],
             "resources":[
                 {
                     "resource_id": resource.id,
-                    "resource_position": resource.position,
-                    "resource_tasks": resource.task_list
+                    "resource_position": resource.get_resource_position(),
+                    "resource_tasks": resource.get_task_list(),
+                    "task_count": resource.get_task_count(),
+                    "dispatched_task_id": resource.get_dispatched_task().get_task_id() if resource.get_dispatched_task() else None
 
                 } for resource in self.resourcEntities
             ],
