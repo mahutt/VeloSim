@@ -27,7 +27,6 @@ import pytest
 from typing import List, Any
 from sim.RealTimeDriver import RealTimeDriver
 import sim.RealTimeDriver as rtd
-import sim.SimulatorController
 
 
 # Real time driver depends on real time passing by. Too slow for tests.

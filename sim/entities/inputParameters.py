@@ -22,7 +22,6 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 """
 
-
 # This class is a placeholder for when we define input params later down in the project.
 from typing import List, Optional
 from sim.entities.station import Station
@@ -38,11 +37,17 @@ class InputParameter:
         resource_entities: Optional[List[Resource]] = None,
         task_entities: Optional[List[Task]] = None,
         real_time_factor: Optional[float] = None,
-        key_frame_freq: Optional[int] = None
+        key_frame_freq: Optional[int] = None,
     ) -> None:
-        self.stationEntities: List[Station] = station_entities if station_entities is not None else []
-        self.resourcEntities: List[Resource] = resource_entities if resource_entities is not None else []
-        self.taskEntities: List[Task] = task_entities if task_entities is not None else []
+        self.stationEntities: List[Station] = (
+            station_entities if station_entities is not None else []
+        )
+        self.resourcEntities: List[Resource] = (
+            resource_entities if resource_entities is not None else []
+        )
+        self.taskEntities: List[Task] = (
+            task_entities if task_entities is not None else []
+        )
         self.realTimeFactor: Optional[float] = real_time_factor
         self.keyFrameFreq: Optional[int] = key_frame_freq
 
@@ -110,6 +115,3 @@ class InputParameter:
 
     def get_task_count(self) -> int:
         return len(self.taskEntities)
-
-    
-

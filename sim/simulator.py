@@ -23,12 +23,10 @@ SOFTWARE.
 """
 
 import threading
-import time
 from typing import Dict, List, TypedDict
 import uuid
 import simpy
 
-from sim.entities.frame import Frame
 from sim.entities.inputParameters import InputParameter
 from sim.entities.request_type import RequestType
 from sim.frame_emitter import FrameEmitter
@@ -50,7 +48,8 @@ class Simulator:
     def initialize(
         self, input_parameters: InputParameter, subscribers: List[Subscriber]
     ) -> str:
-        #Initialize a simulation and send the initial frame, but don't start the simulation loop.
+        # Initialize a simulation and send the initial frame, but don't start
+        # the simulation loop.
         run_id = str(uuid.uuid4())  # threadID / SIM ID
         emitter = FrameEmitter(run_id)
 
@@ -58,14 +57,14 @@ class Simulator:
             emitter.attach(sub)
 
         env = simpy.Environment()
-        
+
         simController = SimulatorController(
             simEnv=env,
             inputParameters=input_parameters,
             frameEmitter=emitter,
-            strict=False
+            strict=False,
         )
-        
+
         # Send the initial frame immediately
         simController.emit_initial_frame()
 
@@ -76,30 +75,32 @@ class Simulator:
             self.thread_pool[run_id] = {
                 "thread": None,  # No thread yet
                 "emitter": emitter,
-                "simController": simController
+                "simController": simController,
             }
 
         return run_id
 
     def start(self, sim_id: str, simTime: int) -> None:
-        #Start the simulation loop for an already initialized simulation.
+        # Start the simulation loop for an already initialized simulation.
         with self.thread_pool_lock:
             rec = self.thread_pool.get(sim_id)
-        
+
         if rec is None:
-            raise RuntimeError(f"Simulation {sim_id} not found. Call initialize() first.")
-        
+            raise RuntimeError(
+                f"Simulation {sim_id} not found. " f"Call initialize() first."
+            )
+
         if rec["thread"] is not None:
             raise RuntimeError(f"Simulation {sim_id} is already running.")
-        
+
         # Create and start the simulation thread
         t = threading.Thread(
             target=rec["simController"].start,
-            args=(simTime,), 
-            name=f"SIM-{sim_id}", 
-            daemon=True
+            args=(simTime,),
+            name=f"SIM-{sim_id}",
+            daemon=True,
         )
-        
+
         with self.thread_pool_lock:
             self.thread_pool[sim_id]["thread"] = t
             t.start()
@@ -112,14 +113,16 @@ class Simulator:
             return  # Unknown/Thread is already closed.
 
         rec["simController"].stop()
-        
+
         # Only join if there's an actual thread
         if rec["thread"] is not None:
             rec["thread"].join(timeout=join_timeout)
 
         with self.thread_pool_lock:
             current = self.thread_pool.get(sim_id)
-            if current is rec and (rec["thread"] is None or not rec["thread"].is_alive()):
+            if current is rec and (
+                rec["thread"] is None or not rec["thread"].is_alive()
+            ):
                 self.thread_pool.pop(sim_id, None)
         print(f"{sim_id} ended")
 

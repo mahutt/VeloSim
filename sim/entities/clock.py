@@ -1,6 +1,7 @@
-
-
+import simpy
 import time
+from typing import Generator, Any
+
 
 class Clock:
     """Simple simulation clock that now advances in SIM SECONDS.
@@ -11,15 +12,15 @@ class Clock:
     - realTimePassed tracks wall-clock seconds spent running this clock process.
     """
 
-    realSecondsPassed: float = 0.0   # wall-clock seconds elapsed while the clock has been running
+    realSecondsPassed: float = 0.0  # wall-clock seconds elapsed while clock running
     realMinutesPassed: float = 0.0
-    simTimeSeconds: float = 0.0   # env.now (seconds)
-    simTimeMinutes: float = 0.0   # env.now / 60 (floor)
+    simTimeSeconds: float = 0.0  # env.now (seconds)
+    simTimeMinutes: float = 0.0  # env.now / 60 (floor)
 
-    def __init__(self, env):
+    def __init__(self, env: simpy.Environment) -> None:
         self.env = env
 
-    def clock(self):
+    def clock(self) -> Generator[Any, Any, None]:
         real_time_accum = 0.0
         while True:
             start = time.perf_counter()
@@ -27,14 +28,12 @@ class Clock:
             yield self.env.timeout(1)
             end = time.perf_counter()
 
-            real_time_accum += (end - start)
+            real_time_accum += end - start
             sim_seconds = self.env.now  # now measured in seconds
             self.realSecondsPassed = real_time_accum
             self.realMinutesPassed = real_time_accum / 60  # Fractional minutes
             self.simTimeSeconds = sim_seconds
             self.simTimeMinutes = sim_seconds / 60
 
-    def run(self):
+    def run(self) -> None:
         self.env.process(self.clock())
-        
-      

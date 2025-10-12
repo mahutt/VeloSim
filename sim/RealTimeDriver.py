@@ -112,7 +112,7 @@ class RealTimeDriver:
         # Sim loop that controls the time real time (aka wall time) between sim steps
         while True:
 
-            #Stop Sim loop
+            # Stop Sim loop
             if self.stop_flag:
                 break
             if self.running:
@@ -171,7 +171,7 @@ class RealTimeDriver:
     def resume(self) -> None:
         print("Starting")
         self.running = True
-    
+
     def stop(self) -> None:
         self.stop_flag = True
 
