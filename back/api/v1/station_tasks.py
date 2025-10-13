@@ -23,6 +23,7 @@ SOFTWARE.
 """
 
 import math
+from typing import List
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError
@@ -30,6 +31,7 @@ from sqlalchemy.exc import IntegrityError
 from back.models import TaskStatus
 from back.database.session import get_db
 from back.crud import station_crud, station_task_crud
+from back.models.station_task_type import StationTaskType
 from back.schemas import (
     StationTaskCreate,
     StationTaskUpdate,
@@ -95,6 +97,13 @@ def get_station_tasks(
         per_page=limit,
         total_pages=total_pages,
     )
+
+
+# This must come ahead of the parameterized routes to prioritize the exact match on
+# 'types'
+@router.get("/types", response_model=List[str])
+def get_task_types() -> List[str]:
+    return [task_type.value for task_type in StationTaskType]
 
 
 @router.get("/{station_task_id}", response_model=StationTaskResponse)
