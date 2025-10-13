@@ -250,39 +250,47 @@ class TestResourcesAPI:
 
         return station_id, task_id, resource_id
 
-    def test_assign_task_to_resource(self, client: TestClient, db: Session) -> None:
+    def test_assign_tasks_to_resource(self, client: TestClient, db: Session) -> None:
         _, task_id, resource_id = self.create_station_task_resource(client)
 
         # Assign the task to the resource
-        response = client.post(f"/api/v1/resources/{resource_id}/assign/{task_id}")
+        response = client.post(
+            f"/api/v1/resources/{resource_id}/assign", json={"task_ids": [task_id]}
+        )
         assert response.status_code == 200
-        expected_message = f"Task {task_id} assigned to resource {resource_id}"
+        expected_message = f"Task(s) [{task_id}] assigned to resource {resource_id}"
         assert response.json()["message"] == expected_message
 
-    def test_unassign_task_from_resource(self, client: TestClient, db: Session) -> None:
+    def test_unassign_tasks_from_resource(
+        self, client: TestClient, db: Session
+    ) -> None:
         _, task_id, resource_id = self.create_station_task_resource(client)
 
         # Assign the task to the resource first
-        assign_resp = client.post(f"/api/v1/resources/{resource_id}/assign/{task_id}")
-        assert assign_resp.status_code == 200
+        client.post(
+            f"/api/v1/resources/{resource_id}/assign", json={"task_ids": [task_id]}
+        )
 
         # Unassign the task from the resource afterwards
-        unassign_resp = client.post(
-            f"/api/v1/resources/{resource_id}/unassign/{task_id}"
+        response = client.post(
+            f"/api/v1/resources/{resource_id}/unassign", json={"task_ids": [task_id]}
         )
-        assert unassign_resp.status_code == 200
-        expected_message = f"Task {task_id} unassigned from resource {resource_id}"
-        assert unassign_resp.json()["message"] == expected_message
+        assert response.status_code == 200
+        expected_message = f"Task(s) [{task_id}] unassigned from resource {resource_id}"
+        assert response.json()["message"] == expected_message
 
-    def test_service_task_for_resource(self, client: TestClient, db: Session) -> None:
+    def test_service_tasks_for_resource(self, client: TestClient, db: Session) -> None:
         _, task_id, resource_id = self.create_station_task_resource(client)
 
         # Assign the task to the resource first
-        assign_resp = client.post(f"/api/v1/resources/{resource_id}/assign/{task_id}")
-        assert assign_resp.status_code == 200
+        client.post(
+            f"/api/v1/resources/{resource_id}/assign", json={"task_ids": [task_id]}
+        )
 
         # Service the task from the resource afterwards
-        service_resp = client.post(f"/api/v1/resources/{resource_id}/service/{task_id}")
-        assert service_resp.status_code == 200
-        expected_message = f"Task {task_id} serviced by resource {resource_id}"
-        assert service_resp.json()["message"] == expected_message
+        response = client.post(
+            f"/api/v1/resources/{resource_id}/service", json={"task_ids": [task_id]}
+        )
+        assert response.status_code == 200
+        expected_message = f"Task(s) [{task_id}] serviced by resource {resource_id}"
+        assert response.json()["message"] == expected_message

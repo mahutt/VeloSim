@@ -108,6 +108,12 @@ class ResourceTaskUnassign(BaseModel):
     task_id: int = Field(..., description="ID of the task to unassign")
 
 
+class ResourceTaskIDsRequest(BaseModel):
+    """Request model for operations on one or more tasks for a resource."""
+
+    task_ids: List[int]
+
+
 class ResourceResponse(BaseModel):
     """Schema for resource responses with tasks."""
 

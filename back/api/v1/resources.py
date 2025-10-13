@@ -33,6 +33,7 @@ from back.models import ResourceType, TaskStatus
 from back.schemas import (
     ResourceCreate,
     ResourceUpdate,
+    ResourceTaskIDsRequest,
     ResourceResponse,
     ResourceListResponse,
 )
@@ -114,43 +115,54 @@ def delete_resource(resource_id: int, db: Session = Depends(get_db)) -> None:
         )
 
 
-@router.post("/{resource_id}/assign/{task_id}", status_code=200)
-def assign_task_to_resource(
-    resource_id: int, task_id: int, db: Session = Depends(get_db)
+@router.post("/{resource_id}/assign", status_code=200)
+def assign_tasks_to_resource(
+    resource_id: int, request: ResourceTaskIDsRequest, db: Session = Depends(get_db)
 ) -> Dict[str, str]:
-    """Assign a task to a resource."""
-    success = resource_crud.assign_task(db, resource_id, task_id)
-    if not success:
+    """Assign one or more tasks to a resource."""
+    failed = []
+    for task_id in request.task_ids:
+        if not resource_crud.assign_task(db, resource_id, task_id):
+            failed.append(task_id)
+    if failed:
         raise HTTPException(
             status_code=400,
-            detail=f"Failed to assign task {task_id} to resource {resource_id}",
+            detail=f"Failed to assign task(s) {failed} to resource {resource_id}",
         )
-    return {"message": f"Task {task_id} assigned to resource {resource_id}"}
+    return {"message": f"Task(s) {request.task_ids} assigned to resource {resource_id}"}
 
 
-@router.post("/{resource_id}/unassign/{task_id}", status_code=200)
-def unassign_task_from_resource(
-    resource_id: int, task_id: int, db: Session = Depends(get_db)
+@router.post("/{resource_id}/unassign", status_code=200)
+def unassign_tasks_from_resource(
+    resource_id: int, request: ResourceTaskIDsRequest, db: Session = Depends(get_db)
 ) -> Dict[str, str]:
-    """Unassign a task to a resource."""
-    success = resource_crud.unassign_task(db, resource_id, task_id)
-    if not success:
+    """Unassign one or more tasks from a resource."""
+    failed = []
+    for task_id in request.task_ids:
+        if not resource_crud.unassign_task(db, resource_id, task_id):
+            failed.append(task_id)
+    if failed:
         raise HTTPException(
             status_code=400,
-            detail=f"Failed to unassign task {task_id} from resource {resource_id}",
+            detail=f"Failed to unassign task(s) {failed} from resource {resource_id}",
         )
-    return {"message": f"Task {task_id} unassigned from resource {resource_id}"}
+    return {
+        "message": f"Task(s) {request.task_ids} unassigned from resource {resource_id}"
+    }
 
 
-@router.post("/{resource_id}/service/{task_id}", status_code=200)
-def service_task_for_resource(
-    resource_id: int, task_id: int, db: Session = Depends(get_db)
+@router.post("/{resource_id}/service", status_code=200)
+def service_tasks_for_resource(
+    resource_id: int, request: ResourceTaskIDsRequest, db: Session = Depends(get_db)
 ) -> Dict[str, str]:
-    """Mark a task as closed and remove it from the resource's assignments."""
-    success = resource_crud.service_task(db, resource_id, task_id)
-    if not success:
+    """Mark one or more tasks as closed and then remove them from the resource."""
+    failed = []
+    for task_id in request.task_ids:
+        if not resource_crud.service_task(db, resource_id, task_id):
+            failed.append(task_id)
+    if failed:
         raise HTTPException(
             status_code=400,
-            detail=f"Failed to service task {task_id} for resource {resource_id}",
+            detail=f"Failed to service task(s) {failed} for resource {resource_id}",
         )
-    return {"message": f"Task {task_id} serviced by resource {resource_id}"}
+    return {"message": f"Task(s) {request.task_ids} serviced by resource {resource_id}"}
