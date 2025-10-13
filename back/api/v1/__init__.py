@@ -1,7 +1,7 @@
 from fastapi import APIRouter
 from .stations import router as stations_router
 from .station_tasks import router as station_tasks_router
-from .simulation_speed import router as playback_speed_router
+from .simulation_speed import router as simulation_speed_router
 
 # Create the main v1 API router
 api_router = APIRouter()
@@ -9,6 +9,6 @@ api_router = APIRouter()
 # Include all endpoint routers
 api_router.include_router(stations_router)
 api_router.include_router(station_tasks_router)
-api_router.include_router(playback_speed_router)
+api_router.include_router(simulation_speed_router)
 
 __all__ = ["api_router"]

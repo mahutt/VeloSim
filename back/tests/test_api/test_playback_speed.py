@@ -24,6 +24,7 @@ SOFTWARE.
 
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
+from back.crud.simulation_speed import playback_speed_crud
 
 
 class TestPlaybackSpeedAPI:
@@ -32,7 +33,7 @@ class TestPlaybackSpeedAPI:
     def test_set_playback_speed_success(self, client: TestClient, db: Session) -> None:
         """Test setting playback speed successfully."""
         payload = {"simulation_id": 1, "playback_speed": 2.5}
-        response = client.post("/api/v1/playback/", json=payload)
+        response = client.post("/api/v1/playback_speed/", json=payload)
         assert response.status_code == 200
         data = response.json()
         assert data["simulation_id"] == payload["simulation_id"]
@@ -48,16 +49,32 @@ class TestPlaybackSpeedAPI:
             {"simulation_id": 1, "playback_speed": 1000},
         ]
         for payload in invalid_payloads:
-            response = client.post("/api/v1/playback/", json=payload)
+            response = client.post("/api/v1/playback_speed/", json=payload)
             assert response.status_code in (400, 422)
+
+    def test_update_playback_speed(self, client: TestClient, db: Session) -> None:
+        """Test updating an existing playback speed."""
+        payload = {"simulation_id": 5, "playback_speed": 2.0}
+        client.post("/api/v1/playback_speed/", json=payload)
+
+        # Update the speed
+        updated_payload = {"simulation_id": 5, "playback_speed": 4.5}
+        response = client.post("/api/v1/playback_speed/", json=updated_payload)
+        assert response.status_code == 200
+        data = response.json()
+        assert data["playback_speed"] == updated_payload["playback_speed"]
+
+        # Confirm GET returns updated speed
+        response = client.get(f"/api/v1/playback_speed/{payload['simulation_id']}")
+        data = response.json()
+        assert data["playback_speed"] == updated_payload["playback_speed"]
 
     def test_get_playback_speed_success(self, client: TestClient, db: Session) -> None:
         """Test getting playback speed for an existing simulation."""
-        # First, set a playback speed
         payload = {"simulation_id": 2, "playback_speed": 3.0}
-        client.post("/api/v1/playback/", json=payload)
+        client.post("/api/v1/playback_speed/", json=payload)
 
-        response = client.get(f"/api/v1/playback/{payload['simulation_id']}")
+        response = client.get(f"/api/v1/playback_speed/{payload['simulation_id']}")
         assert response.status_code == 200
         data = response.json()
         assert data["simulation_id"] == payload["simulation_id"]
@@ -67,7 +84,43 @@ class TestPlaybackSpeedAPI:
         self, client: TestClient, db: Session
     ) -> None:
         """Test getting playback speed for a non-existing simulation."""
-        response = client.get("/api/v1/playback/9999")
+        response = client.get("/api/v1/playback_speed/9999")
         assert response.status_code == 404
         data = response.json()
         assert data["detail"] == "Simulation not found."
+
+    def test_get_all_playback_speeds(self, client: TestClient, db: Session) -> None:
+        """Test retrieving all playback speeds."""
+        # Clear existing store
+        playback_speed_crud._store.clear()
+
+        # Add multiple playback speeds
+        speeds = [
+            {"simulation_id": 10, "playback_speed": 1.0},
+            {"simulation_id": 20, "playback_speed": 2.5},
+            {"simulation_id": 30, "playback_speed": 3.0},
+        ]
+        for speed in speeds:
+            client.post("/api/v1/playback_speed/", json=speed)
+
+        response = client.get("/api/v1/playback_speed/")
+        assert response.status_code == 200
+        data = response.json()
+        assert isinstance(data, list)
+        assert len(data) == len(speeds)
+        for item in data:
+            matching = next(
+                (s for s in speeds if s["simulation_id"] == item["simulation_id"]), None
+            )
+            assert matching is not None
+            assert item["playback_speed"] == matching["playback_speed"]
+
+    def test_get_all_playback_speeds_empty(
+        self, client: TestClient, db: Session
+    ) -> None:
+        """Test retrieving all playback speeds when store is empty."""
+        playback_speed_crud._store.clear()
+        response = client.get("/api/v1/playback_speed/")
+        assert response.status_code == 200
+        data = response.json()
+        assert data == []

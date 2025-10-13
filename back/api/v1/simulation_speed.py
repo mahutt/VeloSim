@@ -22,46 +22,25 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 """
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter
 from back.schemas.playback_speed import PlaybackSpeedBase, PlaybackSpeedResponse
+from back.crud.simulation_speed import playback_speed_crud
 
-router = APIRouter(prefix="/playback", tags=["Playback Speed"])
-
-
-playback_store: dict[int, float] = {}
+router = APIRouter(prefix="/playback_speed", tags=["Playback Speed"])
 
 
 @router.post("/", response_model=PlaybackSpeedResponse)
 async def set_playback_speed(task: PlaybackSpeedBase) -> PlaybackSpeedResponse:
-    """
-    Set the playback speed for a simulation.
-    """
-    if task.playback_speed <= 0:
-        raise HTTPException(status_code=400, detail="Playback speed must be positive.")
-    elif task.playback_speed > 12:
-        raise HTTPException(
-            status_code=400, detail="Playback speed value is too large."
-        )
-    playback_store[task.simulation_id] = task.playback_speed
-
-    return PlaybackSpeedResponse(
-        simulation_id=task.simulation_id,
-        playback_speed=task.playback_speed,
-        message="Playback speed updated successfully.",
-    )
+    """Set or update the playback speed for a simulation."""
+    return playback_speed_crud.update(task.simulation_id, task.playback_speed)
 
 
 @router.get("/{simulation_id}", response_model=PlaybackSpeedResponse)
 async def get_playback_speed(simulation_id: int) -> PlaybackSpeedResponse:
-    """
-    Get the current playback speed for a simulation.
-    """
-    speed = playback_store.get(simulation_id)
-    if speed is None:
-        raise HTTPException(status_code=404, detail="Simulation not found.")
+    """Get the current playback speed for a given simulation."""
+    return playback_speed_crud.get(simulation_id)
 
-    return PlaybackSpeedResponse(
-        simulation_id=simulation_id,
-        playback_speed=speed,
-        message="Playback speed retrieved successfully.",
-    )
+
+@router.get("/", response_model=list[PlaybackSpeedResponse])
+def get_all_playback_speeds() -> list[PlaybackSpeedResponse]:
+    return playback_speed_crud.get_all()
