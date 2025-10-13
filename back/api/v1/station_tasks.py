@@ -103,6 +103,7 @@ def get_station_tasks(
 # 'types'
 @router.get("/types", response_model=List[str])
 def get_task_types() -> List[str]:
+    """Get all station task types."""
     return [task_type.value for task_type in StationTaskType]
 
 
