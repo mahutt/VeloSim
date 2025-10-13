@@ -152,7 +152,7 @@ class ResourceCRUD:
         return True
 
     def service_task(self, db: Session, resource_id: int, task_id: int) -> bool:
-        """Mark a task as completed and remove it from the resource's assignments."""
+        """Mark a task as closed and remove it from the resource's assignments."""
         resource = self.get(db, resource_id)
         task = db.get(StationTask, task_id)
         if not resource or not task:

@@ -44,6 +44,7 @@ router = APIRouter(prefix="/resources", tags=["resources"])
 def create_resource(
     resource_data: ResourceCreate, db: Session = Depends(get_db)
 ) -> ResourceResponse:
+    """Create a new resource."""
     db_resource = resource_crud.create(db, resource_data)
     return ResourceResponse.model_validate(db_resource)
 
@@ -58,6 +59,7 @@ def get_resources(
     limit: int = Query(10, ge=1, le=100),
     db: Session = Depends(get_db),
 ) -> ResourceListResponse:
+    """Get all resources with pagination."""
     resources, total = resource_crud.get_all_filtered(
         db, skip=skip, limit=limit, type=type, status=status
     )
@@ -74,11 +76,13 @@ def get_resources(
 
 @router.get("/types", response_model=List[str])
 def get_resource_types() -> List[str]:
+    """Get all resource types."""
     return [r_type.value for r_type in ResourceType]
 
 
 @router.get("/{resource_id}", response_model=ResourceResponse)
 def get_resource(resource_id: int, db: Session = Depends(get_db)) -> ResourceResponse:
+    """Get a specific resource by ID."""
     db_resource = resource_crud.get(db, resource_id)
     if not db_resource:
         raise HTTPException(
@@ -91,6 +95,7 @@ def get_resource(resource_id: int, db: Session = Depends(get_db)) -> ResourceRes
 def update_resource(
     resource_id: int, resource_data: ResourceUpdate, db: Session = Depends(get_db)
 ) -> ResourceResponse:
+    """Update a resource (only current position and start/end of route)."""
     db_resource = resource_crud.update(db, resource_id, resource_data)
     if not db_resource:
         raise HTTPException(
@@ -102,6 +107,7 @@ def update_resource(
 @router.delete("/{resource_id}", status_code=204)
 def delete_resource(resource_id: int, db: Session = Depends(get_db)) -> None:
     success = resource_crud.delete(db, resource_id)
+    """Delete a resource."""
     if not success:
         raise HTTPException(
             status_code=404, detail=f"Resource with ID {resource_id} not found"
@@ -112,6 +118,7 @@ def delete_resource(resource_id: int, db: Session = Depends(get_db)) -> None:
 def assign_task_to_resource(
     resource_id: int, task_id: int, db: Session = Depends(get_db)
 ) -> Dict[str, str]:
+    """Assign a task to a resource."""
     success = resource_crud.assign_task(db, resource_id, task_id)
     if not success:
         raise HTTPException(
@@ -125,6 +132,7 @@ def assign_task_to_resource(
 def unassign_task_from_resource(
     resource_id: int, task_id: int, db: Session = Depends(get_db)
 ) -> Dict[str, str]:
+    """Unassign a task to a resource."""
     success = resource_crud.unassign_task(db, resource_id, task_id)
     if not success:
         raise HTTPException(
@@ -138,6 +146,7 @@ def unassign_task_from_resource(
 def service_task_for_resource(
     resource_id: int, task_id: int, db: Session = Depends(get_db)
 ) -> Dict[str, str]:
+    """Mark a task as closed and remove it from the resource's assignments."""
     success = resource_crud.service_task(db, resource_id, task_id)
     if not success:
         raise HTTPException(
