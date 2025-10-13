@@ -24,12 +24,17 @@ SOFTWARE.
 
 import asyncio
 from typing import Dict, List
-from fastapi import APIRouter, HTTPException, WebSocket, WebSocketDisconnect
+from fastapi import APIRouter, HTTPException, WebSocket, WebSocketDisconnect, Depends
 from pydantic import BaseModel
+from sqlalchemy.orm import Session
 
 from sim.entities.frame import Frame
 from sim.utils.subscriber import Subscriber
 from back.services.simulation_service import simulation_service
+from back.database.session import get_db
+
+# Auth temporarily disabled - CurrentUser not used
+# from back.api.dependencies import CurrentUser
 
 router = APIRouter(prefix="/simulation", tags=["simulation"])
 
@@ -74,6 +79,7 @@ class SimulationResponse(BaseModel):
     """Response model for simulation operations"""
 
     sim_id: str
+    db_id: int
     status: str
 
 
@@ -84,11 +90,21 @@ class SimulationListResponse(BaseModel):
 
 
 @router.post("/start", response_model=SimulationResponse)
-async def start_simulation() -> SimulationResponse:
-    """Start a new simulation and return its ID."""
+async def start_simulation(
+    # Auth temporarily disabled - default to user_id=1
+    # current_user: CurrentUser,
+    db: Session = Depends(get_db),
+) -> SimulationResponse:
+    """
+    Start a new simulation and return its ID.
+
+    Auth temporarily disabled - uses default user_id=1.
+    """
     try:
-        sim_id = simulation_service.start_simulation()
-        return SimulationResponse(sim_id=sim_id, status="started")
+        # Auth temporarily disabled - use default user_id=1
+        user_id = 1
+        sim_id, db_id = simulation_service.start_simulation(db, user_id)
+        return SimulationResponse(sim_id=sim_id, db_id=db_id, status="started")
     except Exception as e:
         raise HTTPException(
             status_code=500, detail=f"Failed to start simulation: {str(e)}"
@@ -96,12 +112,26 @@ async def start_simulation() -> SimulationResponse:
 
 
 @router.post("/stop/{sim_id}", response_model=SimulationResponse)
-async def stop_simulation(sim_id: str) -> SimulationResponse:
-    """Stop a specific simulation."""
-    success = simulation_service.stop_simulation(sim_id)
+async def stop_simulation(
+    sim_id: str,
+    # Auth temporarily disabled - default to user_id=1
+    # current_user: CurrentUser,
+    db: Session = Depends(get_db),
+) -> SimulationResponse:
+    """
+    Stop a specific simulation.
+
+    Auth temporarily disabled - uses default user_id=1.
+    """
+    # Auth temporarily disabled - use default user_id=1
+    user_id = 1
+    success = simulation_service.stop_simulation(db, sim_id, user_id)
     if not success:
-        raise HTTPException(status_code=404, detail="Simulation not found")
-    return SimulationResponse(sim_id=sim_id, status="stopped")
+        raise HTTPException(
+            status_code=404,
+            detail="Simulation not found or you are not authorized to stop it",
+        )
+    return SimulationResponse(sim_id=sim_id, db_id=-1, status="stopped")
 
 
 @router.get("/list", response_model=SimulationListResponse)
@@ -121,9 +151,18 @@ async def get_simulation_status(sim_id: str) -> Dict[str, str]:
 
 
 @router.post("/stop-all")
-async def stop_all_simulations() -> Dict[str, str]:
-    """Stop all running simulations."""
-    simulation_service.stop_all_simulations()
+async def stop_all_simulations(
+    # Auth temporarily disabled
+    # current_user: CurrentUser,
+    db: Session = Depends(get_db),
+) -> Dict[str, str]:
+    """
+    Stop all running simulations.
+
+    Auth temporarily disabled - this is an admin operation that stops
+    all simulations and cleans up database records.
+    """
+    simulation_service.stop_all_simulations(db)
     return {"message": "All simulations stopped"}
 
 

@@ -49,23 +49,6 @@ export interface GetStationsResponse extends PaginatedResponse {
   stations: Omit<Station, 'tasks'>[];
 }
 
-// Simulation types
-export interface SimulationFrame {
-  sim_id: string;
-  seq_numb: number;
-  payload: string;
-  timestamp: number;
-}
-
-export interface SimulationInfo {
-  sim_id: string;
-  status: string;
-}
-
-export interface SimulationListResponse {
-  active_simulations: string[];
-}
-
 // Resource types
 export interface Resource {
   id: number;

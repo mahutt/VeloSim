@@ -21,11 +21,3 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 """
-
-# Import all CRUD classes here for easy access
-from .station import station_crud
-from .station_task import station_task_crud
-from .resource import resource_crud
-from .sim_instance import sim_instance_crud
-
-__all__ = ["station_crud", "station_task_crud", "resource_crud", "sim_instance_crud"]

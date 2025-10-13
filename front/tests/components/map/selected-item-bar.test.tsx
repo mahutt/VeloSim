@@ -25,18 +25,18 @@
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { useSimulationContext } from '~/providers/simulation-provider';
+import { useSimulation } from '~/providers/simulation-provider';
 import SelectedItemBar from '~/components/map/selected-item-bar';
 import { SelectedItemType } from '~/types';
 
-// Mock the useSimulationContext hook
+// Mock the useSimulation hook
 vi.mock('~/providers/simulation-provider', () => ({
-  useSimulationContext: vi.fn(),
+  useSimulation: vi.fn(),
 }));
 
 describe('SelectedItemBar', () => {
   it('should not render when no item is selected', () => {
-    vi.mocked(useSimulationContext).mockReturnValue({
+    vi.mocked(useSimulation).mockReturnValue({
       selectedItem: null,
       clearSelection: vi.fn(),
       selectItem: vi.fn(),
@@ -57,7 +57,7 @@ describe('SelectedItemBar', () => {
       tasks: [],
     };
 
-    vi.mocked(useSimulationContext).mockReturnValue({
+    vi.mocked(useSimulation).mockReturnValue({
       selectedItem: {
         type: SelectedItemType.Station,
         value: mockStation,
@@ -92,7 +92,7 @@ describe('SelectedItemBar', () => {
       },
     };
 
-    vi.mocked(useSimulationContext).mockReturnValue({
+    vi.mocked(useSimulation).mockReturnValue({
       selectedItem: {
         type: SelectedItemType.Resource,
         value: mockResource,
@@ -124,7 +124,7 @@ describe('SelectedItemBar', () => {
       tasks: [],
     };
 
-    vi.mocked(useSimulationContext).mockReturnValue({
+    vi.mocked(useSimulation).mockReturnValue({
       selectedItem: {
         type: SelectedItemType.Station,
         value: mockStation,
@@ -155,7 +155,7 @@ describe('SelectedItemBar', () => {
       ],
     };
 
-    vi.mocked(useSimulationContext).mockReturnValue({
+    vi.mocked(useSimulation).mockReturnValue({
       selectedItem: {
         type: SelectedItemType.Station,
         value: mockStation,

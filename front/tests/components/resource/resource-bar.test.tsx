@@ -24,7 +24,7 @@
 
 import { beforeEach, expect, test, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
-import { useSimulationContext } from '~/providers/simulation-provider';
+import { useSimulation } from '~/providers/simulation-provider';
 import { SelectedItemType } from '~/types';
 import ResourceBar from '~/components/resource/resource-bar';
 import userEvent from '@testing-library/user-event';
@@ -44,12 +44,12 @@ vi.mock('~/components/resource/resource-item', () => ({
   ),
 }));
 
-// Mock useSimulationContext
+// Mock useSimulation
 vi.mock('~/providers/simulation-provider', async (importOriginal) => {
   const actual = await importOriginal();
   return {
     ...(typeof actual === 'object' && actual !== null ? actual : {}),
-    useSimulationContext: vi.fn(),
+    useSimulation: vi.fn(),
   };
 });
 
@@ -85,31 +85,28 @@ beforeEach(() => {
 });
 
 test('should throw error when used outside provider', () => {
-  const mockUseSimulationContext =
-    useSimulationContext as unknown as ReturnType<typeof vi.fn>;
-  mockUseSimulationContext.mockImplementation(() => {
-    throw new Error(
-      'useSimulationContext must be used within a SimulationProvider'
-    );
+  const mockUseSimulation = useSimulation as unknown as ReturnType<
+    typeof vi.fn
+  >;
+  mockUseSimulation.mockImplementation(() => {
+    throw new Error('useSimulation must be used within a SimulationProvider');
   });
 
   expect(() => {
     render(<ResourceBar />);
-  }).toThrow('useSimulationContext must be used within a SimulationProvider');
+  }).toThrow('useSimulation must be used within a SimulationProvider');
 });
 
 test('renders all resources from provider', () => {
   const selectItem = vi.fn();
-  (useSimulationContext as unknown as ReturnType<typeof vi.fn>).mockReturnValue(
-    {
-      selectItem,
-      resources: mockResources,
-      stationsRef: { current: new Map() },
-      resourcesRef: { current: new Map() },
-      selectedItem: null,
-      clearSelection: vi.fn(),
-    }
-  );
+  (useSimulation as unknown as ReturnType<typeof vi.fn>).mockReturnValue({
+    selectItem,
+    resources: mockResources,
+    stationsRef: { current: new Map() },
+    resourcesRef: { current: new Map() },
+    selectedItem: null,
+    clearSelection: vi.fn(),
+  });
 
   render(<ResourceBar />);
   expect(screen.getAllByTestId('resource-item')).toHaveLength(
@@ -122,16 +119,14 @@ test('renders all resources from provider', () => {
 
 test('renders search bar with correct placeholder', () => {
   const selectItem = vi.fn();
-  (useSimulationContext as unknown as ReturnType<typeof vi.fn>).mockReturnValue(
-    {
-      selectItem,
-      resources: mockResources,
-      stationsRef: { current: new Map() },
-      resourcesRef: { current: new Map() },
-      selectedItem: null,
-      clearSelection: vi.fn(),
-    }
-  );
+  (useSimulation as unknown as ReturnType<typeof vi.fn>).mockReturnValue({
+    selectItem,
+    resources: mockResources,
+    stationsRef: { current: new Map() },
+    resourcesRef: { current: new Map() },
+    selectedItem: null,
+    clearSelection: vi.fn(),
+  });
 
   render(<ResourceBar />);
   expect(screen.getByPlaceholderText('Search Resource')).toBeInTheDocument();
@@ -139,16 +134,14 @@ test('renders search bar with correct placeholder', () => {
 
 test('calls selectItem with correct arguments when resource is clicked', () => {
   const selectItem = vi.fn();
-  (useSimulationContext as unknown as ReturnType<typeof vi.fn>).mockReturnValue(
-    {
-      selectItem,
-      resources: mockResources,
-      stationsRef: { current: new Map() },
-      resourcesRef: { current: new Map() },
-      selectedItem: null,
-      clearSelection: vi.fn(),
-    }
-  );
+  (useSimulation as unknown as ReturnType<typeof vi.fn>).mockReturnValue({
+    selectItem,
+    resources: mockResources,
+    stationsRef: { current: new Map() },
+    resourcesRef: { current: new Map() },
+    selectedItem: null,
+    clearSelection: vi.fn(),
+  });
 
   render(<ResourceBar />);
   const items = screen.getAllByTestId('resource-item');
@@ -161,16 +154,14 @@ test('calls selectItem with correct arguments when resource is clicked', () => {
 test('filters resources by ID match', async () => {
   const user = userEvent.setup();
   const selectItem = vi.fn();
-  (useSimulationContext as unknown as ReturnType<typeof vi.fn>).mockReturnValue(
-    {
-      selectItem,
-      resources: mockResources,
-      stationsRef: { current: new Map() },
-      resourcesRef: { current: new Map() },
-      selectedItem: null,
-      clearSelection: vi.fn(),
-    }
-  );
+  (useSimulation as unknown as ReturnType<typeof vi.fn>).mockReturnValue({
+    selectItem,
+    resources: mockResources,
+    stationsRef: { current: new Map() },
+    resourcesRef: { current: new Map() },
+    selectedItem: null,
+    clearSelection: vi.fn(),
+  });
 
   render(<ResourceBar />);
 
@@ -186,16 +177,14 @@ test('filters resources by ID match', async () => {
 test('filters resources by partial ID match', async () => {
   const user = userEvent.setup();
   const selectItem = vi.fn();
-  (useSimulationContext as unknown as ReturnType<typeof vi.fn>).mockReturnValue(
-    {
-      selectItem,
-      resources: mockResources,
-      stationsRef: { current: new Map() },
-      resourcesRef: { current: new Map() },
-      selectedItem: null,
-      clearSelection: vi.fn(),
-    }
-  );
+  (useSimulation as unknown as ReturnType<typeof vi.fn>).mockReturnValue({
+    selectItem,
+    resources: mockResources,
+    stationsRef: { current: new Map() },
+    resourcesRef: { current: new Map() },
+    selectedItem: null,
+    clearSelection: vi.fn(),
+  });
 
   render(<ResourceBar />);
 
@@ -211,16 +200,14 @@ test('filters resources by partial ID match', async () => {
 test('shows no resources when search query does not match any ID', async () => {
   const user = userEvent.setup();
   const selectItem = vi.fn();
-  (useSimulationContext as unknown as ReturnType<typeof vi.fn>).mockReturnValue(
-    {
-      selectItem,
-      resources: mockResources,
-      stationsRef: { current: new Map() },
-      resourcesRef: { current: new Map() },
-      selectedItem: null,
-      clearSelection: vi.fn(),
-    }
-  );
+  (useSimulation as unknown as ReturnType<typeof vi.fn>).mockReturnValue({
+    selectItem,
+    resources: mockResources,
+    stationsRef: { current: new Map() },
+    resourcesRef: { current: new Map() },
+    selectedItem: null,
+    clearSelection: vi.fn(),
+  });
 
   render(<ResourceBar />);
 
@@ -235,16 +222,14 @@ test('shows no resources when search query does not match any ID', async () => {
 test('shows all resources when search query is empty', async () => {
   const user = userEvent.setup();
   const selectItem = vi.fn();
-  (useSimulationContext as unknown as ReturnType<typeof vi.fn>).mockReturnValue(
-    {
-      selectItem,
-      resources: mockResources,
-      stationsRef: { current: new Map() },
-      resourcesRef: { current: new Map() },
-      selectedItem: null,
-      clearSelection: vi.fn(),
-    }
-  );
+  (useSimulation as unknown as ReturnType<typeof vi.fn>).mockReturnValue({
+    selectItem,
+    resources: mockResources,
+    stationsRef: { current: new Map() },
+    resourcesRef: { current: new Map() },
+    selectedItem: null,
+    clearSelection: vi.fn(),
+  });
 
   render(<ResourceBar />);
 
@@ -265,16 +250,14 @@ test('shows all resources when search query is empty', async () => {
 test('clears search when clear button is clicked', async () => {
   const user = userEvent.setup();
   const selectItem = vi.fn();
-  (useSimulationContext as unknown as ReturnType<typeof vi.fn>).mockReturnValue(
-    {
-      selectItem,
-      resources: mockResources,
-      stationsRef: { current: new Map() },
-      resourcesRef: { current: new Map() },
-      selectedItem: null,
-      clearSelection: vi.fn(),
-    }
-  );
+  (useSimulation as unknown as ReturnType<typeof vi.fn>).mockReturnValue({
+    selectItem,
+    resources: mockResources,
+    stationsRef: { current: new Map() },
+    resourcesRef: { current: new Map() },
+    selectedItem: null,
+    clearSelection: vi.fn(),
+  });
 
   render(<ResourceBar />);
 
@@ -299,16 +282,14 @@ test('clears search when clear button is clicked', async () => {
 test('search is case insensitive for partial matches', async () => {
   const user = userEvent.setup();
   const selectItem = vi.fn();
-  (useSimulationContext as unknown as ReturnType<typeof vi.fn>).mockReturnValue(
-    {
-      selectItem,
-      resources: mockResources,
-      stationsRef: { current: new Map() },
-      resourcesRef: { current: new Map() },
-      selectedItem: null,
-      clearSelection: vi.fn(),
-    }
-  );
+  (useSimulation as unknown as ReturnType<typeof vi.fn>).mockReturnValue({
+    selectItem,
+    resources: mockResources,
+    stationsRef: { current: new Map() },
+    resourcesRef: { current: new Map() },
+    selectedItem: null,
+    clearSelection: vi.fn(),
+  });
 
   render(<ResourceBar />);
 
@@ -324,19 +305,17 @@ test('maintains selection state while filtering', async () => {
   const selectItem = vi.fn();
   const selectedResource = mockResources[0];
 
-  (useSimulationContext as unknown as ReturnType<typeof vi.fn>).mockReturnValue(
-    {
-      selectItem,
-      resources: mockResources,
-      stationsRef: { current: new Map() },
-      resourcesRef: { current: new Map() },
-      selectedItem: {
-        type: SelectedItemType.Resource,
-        value: selectedResource,
-      },
-      clearSelection: vi.fn(),
-    }
-  );
+  (useSimulation as unknown as ReturnType<typeof vi.fn>).mockReturnValue({
+    selectItem,
+    resources: mockResources,
+    stationsRef: { current: new Map() },
+    resourcesRef: { current: new Map() },
+    selectedItem: {
+      type: SelectedItemType.Resource,
+      value: selectedResource,
+    },
+    clearSelection: vi.fn(),
+  });
 
   render(<ResourceBar />);
 

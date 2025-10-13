@@ -22,10 +22,27 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 """
 
-# Import all CRUD classes here for easy access
-from .station import station_crud
-from .station_task import station_task_crud
-from .resource import resource_crud
-from .sim_instance import sim_instance_crud
+from datetime import datetime
+from pydantic import BaseModel, ConfigDict
 
-__all__ = ["station_crud", "station_task_crud", "resource_crud", "sim_instance_crud"]
+
+class SimInstanceBase(BaseModel):
+    """Base schema for SimInstance."""
+
+    user_id: int
+
+
+class SimInstanceCreate(SimInstanceBase):
+    """Schema for creating a new SimInstance."""
+
+    pass
+
+
+class SimInstanceResponse(SimInstanceBase):
+    """Schema for SimInstance response."""
+
+    id: int
+    date_created: datetime
+    date_updated: datetime
+
+    model_config = ConfigDict(from_attributes=True)

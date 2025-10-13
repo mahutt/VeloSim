@@ -26,11 +26,11 @@ import { X } from 'lucide-react';
 import { Button } from '~/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '~/components/ui/card';
 import { Separator } from '~/components/ui/separator';
-import { useSimulationContext } from '~/providers/simulation-provider';
+import { useSimulation } from '~/providers/simulation-provider';
 import { SelectedItemType, type Station, type Resource } from '~/types';
 
 export default function SelectedItemBar() {
-  const { selectedItem, clearSelection } = useSimulationContext();
+  const { selectedItem, clearSelection } = useSimulation();
 
   if (!selectedItem) return null;
 

@@ -438,12 +438,10 @@ export const SimulationProvider = ({ children }: { children: ReactNode }) => {
   );
 };
 
-export const useSimulationContext = (): SimulationContextType => {
+export const useSimulation = (): SimulationContextType => {
   const context = useContext(SimulationContext);
   if (!context) {
-    throw new Error(
-      'useSimulationContext must be used within a SimulationProvider'
-    );
+    throw new Error('useSimulation must be used within a SimulationProvider');
   }
   return context;
 };
