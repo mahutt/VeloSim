@@ -42,6 +42,7 @@ from .station_task import (
 from .resource import (
     ResourceBase,
     ResourceCreate,
+    ResourceTaskIDsRequest,
     ResourceListResponse,
     ResourceResponse,
     ResourceTaskAssign,
@@ -69,6 +70,7 @@ __all__ = [
     "StationTaskListResponse",
     "ResourceBase",
     "ResourceCreate",
+    "ResourceTaskIDsRequest",
     "ResourceListResponse",
     "ResourceResponse",
     "ResourceTaskAssign",

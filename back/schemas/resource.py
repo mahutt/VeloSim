@@ -108,6 +108,12 @@ class ResourceTaskUnassign(BaseModel):
     task_id: int = Field(..., description="ID of the task to unassign")
 
 
+class ResourceTaskIDsRequest(BaseModel):
+    """Request model for operations on one or more tasks for a resource."""
+
+    task_ids: List[int]
+
+
 class ResourceResponse(BaseModel):
     """Schema for resource responses with tasks."""
 
@@ -144,18 +150,13 @@ class ResourceResponse(BaseModel):
             [self.route_end_longitude, self.route_end_latitude],
         ]
 
-    @computed_field
-    def tasks(self) -> List["StationTaskResponse"]:
-        """Return full tasks assigned to this resource to match sim model."""
-        return [
-            StationTaskResponse.model_validate(task)
-            for task in getattr(self, "tasks", [])
-        ]
+    tasks: List[StationTaskResponse] = Field(default_factory=list)
+    """The list of full tasks assigned to this resource to match sim model."""
 
     @computed_field
     def task_count(self) -> int:
         """Return number of tasks assigned to this resource to match sim model."""
-        return len(getattr(self, "tasks", []))
+        return len(self.tasks)
 
 
 class ResourceListResponse(BaseModel):
