@@ -28,6 +28,12 @@ dependencies = [
     "pydantic>=2.5.0",
     "pydantic-settings>=2.1.0",
     "alembic>=1.13.0",
+    "geopandas>=1.1.1",
+    "pyrosm>=0.6.2",
+    "networkx",
+    "argon2-cffi>=25.1.0",
+    "python-multipart>=0.0.20",
+    "PyJWT>=2.10.1"
 ]
 
 [project.optional-dependencies]
@@ -35,11 +41,15 @@ dev = [
     "pytest>=7.0.0",
     "pytest-cov>=4.0.0",
     "coverage>=7.0.0",
-    "black>=23.0.0",
-    "flake8>=6.0.0",
-    "mypy>=1.0.0",
+    "black>=25.9.0",
+    "flake8>=7.3.0",
+    "mypy>=1.18.2",
     "pre-commit>=3.0.0",
     "httpx>=0.24.0",
+    "types-networkx>=3.0.0",
+    "pandas-stubs>=2.0.0",
+    "types-shapely>=2.0.0",
+    "types-geopandas>=1.1.1"
 ]
 
 [tool.setuptools.packages.find]

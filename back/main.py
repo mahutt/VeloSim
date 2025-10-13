@@ -22,12 +22,16 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 """
 
-from typing import Dict
-from fastapi import FastAPI
+from typing import Annotated, Dict
+from fastapi import Depends, FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.security import OAuth2PasswordRequestForm
 
+# Auth temporarily disabled
+# from back.auth.dependency import get_user_id
 from back.core.config import settings
 from back.api.v1 import api_router
+from back.auth import Token, authenticate_user
 
 # Create FastAPI application
 app = FastAPI(
@@ -38,6 +42,30 @@ app = FastAPI(
     redoc_url="/api/redoc" if settings.ENVIRONMENT != "production" else None,
 )
 
+
+@app.post("/api/token")
+async def login_for_access_token(
+    form_data: Annotated[OAuth2PasswordRequestForm, Depends()],
+) -> Token:
+    """This implements the OAuth2 token endpoint. Per the OAuth2 spec this must be
+    multipart form data and not JSON. Doing it this way means it is compatible with many
+    existing OAuth2 libraries and the built-in authentication features of Swagger.
+    However, nothing stops us from also implementing a JSON endpoint for this if it is
+    neccesary.
+
+    We only use usernames/passwords for authentication, however, we support passing
+    these in either the username or client id field, and password or client secret field
+    again for maximum compatibility with differenc scenarios.
+    """
+    access_token = authenticate_user(
+        form_data.username or form_data.client_id,
+        form_data.password or form_data.client_secret,
+    )
+    if access_token is None:
+        raise HTTPException(status_code=400, detail="Invalid credentials")
+    return Token(access_token=access_token, token_type="bearer")
+
+
 # Add CORS middleware
 app.add_middleware(
     CORSMiddleware,
@@ -47,7 +75,10 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Include API routes
+# Include API routes, all protected by auth (though they will have to add to their
+# type signature to get the actual user ID)
+# Disable auth for now
+# app.include_router(api_router, prefix="/api/v1", dependencies=[Depends(get_user_id)])
 app.include_router(api_router, prefix="/api/v1")
 
 

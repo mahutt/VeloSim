@@ -22,6 +22,8 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 """
 
+from datetime import datetime
+from typing import List
 from pydantic import BaseModel, Field
 from back.models import StationTaskType, TaskStatus
 
@@ -29,26 +31,43 @@ from back.models import StationTaskType, TaskStatus
 class StationTaskBase(BaseModel):
     """Base schema for station tasks."""
 
-    type: StationTaskType = Field(..., description="Type of station task")
-    station_id: int = Field(..., description="ID of the related station")
+    pass
 
 
 class StationTaskCreate(StationTaskBase):
     """Schema for creating a station task."""
 
-    pass
+    station_id: int = Field(..., description="ID of the related station")
+    type: StationTaskType = Field(..., description="Type of station task")
 
 
-class StationTaskUpdate(BaseModel):
+class StationTaskUpdate(StationTaskBase):
     """Schema for updating a station task."""
 
     status: TaskStatus = Field(..., description="New task completion status")
 
 
-class StationTaskResponse(BaseModel):
+class StationTaskResponse(StationTaskBase):
     """Schema for station task responses."""
 
     id: int = Field(..., description="Station task ID")
+    station_id: int = Field(..., description="ID of the related station")
+    type: StationTaskType = Field(..., description="Type of station task")
     status: TaskStatus = Field(..., description="Task completion status")
-    date_created: str = Field(..., description="Creation timestamp")
-    date_updated: str = Field(..., description="Last update timestamp")
+    date_created: datetime = Field(..., description="Creation timestamp")
+    date_updated: datetime = Field(..., description="Last update timestamp")
+
+    class Config:
+        from_attributes = True
+
+
+class StationTaskListResponse(BaseModel):
+    """Schema for paginated station list responses."""
+
+    station_tasks: List[StationTaskResponse] = Field(
+        ..., description="List of station tasks"
+    )
+    total: int = Field(..., description="Total number of station tasks")
+    page: int = Field(..., description="Current page number")
+    per_page: int = Field(..., description="Items per page")
+    total_pages: int = Field(..., description="Total number of pages")

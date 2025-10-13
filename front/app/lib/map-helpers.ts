@@ -24,14 +24,80 @@
 
 export enum MapSource {
   Stations = 'stations',
+  Resources = 'resources',
+}
+
+export enum MapLayer {
+  Stations = 'stations',
+  StationTaskCounts = 'station-task-counts',
+  Resources = 'resources',
+}
+
+export function isMapLayer(value: string): value is MapLayer {
+  return (Object.values(MapLayer) as string[]).includes(value);
 }
 
 // Setup helpers
 
+/**
+ * Helper function to load a single image with error handling
+ */
+function loadSingleImage(
+  map: mapboxgl.Map,
+  imagePath: string,
+  imageId: string,
+  imageType: string
+) {
+  map.loadImage(imagePath, (error, image) => {
+    if (error) {
+      console.error(`Failed to load ${imageType}:`, error);
+      return;
+    }
+    map.addImage(imageId, image!);
+  });
+}
+
 export function loadMapImages(map: mapboxgl.Map) {
-  map.loadImage('/station.png', async (error, image) => {
-    if (error) throw error;
-    map.addImage('station-marker', image!);
+  // Define image configurations
+  const imageConfigs = [
+    // Station images
+    {
+      path: '/station.png',
+      id: 'station-marker',
+      type: 'station marker image',
+    },
+    {
+      path: '/station-selected.png',
+      id: 'station-marker-selected',
+      type: 'station selected marker image',
+    },
+    {
+      path: '/station-hover.png',
+      id: 'station-marker-hover',
+      type: 'station hover marker image',
+    },
+
+    // Resource images
+    {
+      path: '/resource.png',
+      id: 'resource-marker',
+      type: 'resource marker image',
+    },
+    {
+      path: '/resource-selected.png',
+      id: 'resource-marker-selected',
+      type: 'resource selected marker image',
+    },
+    {
+      path: '/resource-hover.png',
+      id: 'resource-marker-hover',
+      type: 'resource hover marker image',
+    },
+  ];
+
+  // Load all images using the helper function
+  imageConfigs.forEach(({ path, id, type }) => {
+    loadSingleImage(map, path, id, type);
   });
 }
 
@@ -48,12 +114,58 @@ export function initializeMapSources(map: mapboxgl.Map) {
 }
 
 export function setMapLayers(map: mapboxgl.Map) {
+  // Add layers for stations
   map.addLayer({
-    id: 'stations',
+    id: MapLayer.Stations,
     type: 'symbol',
     source: 'stations',
     layout: {
-      'icon-image': 'station-marker',
+      'icon-image': [
+        'case',
+        ['boolean', ['get', 'selected'], false],
+        'station-marker-selected',
+        ['boolean', ['get', 'hover'], false],
+        'station-marker-hover',
+        'station-marker',
+      ],
+      'icon-allow-overlap': true,
+    },
+  });
+
+  // Add task count labels above stations
+  map.addLayer({
+    id: MapLayer.StationTaskCounts,
+    type: 'symbol',
+    source: 'stations',
+    layout: {
+      'text-field': ['get', 'taskCount'],
+      'text-font': ['Open Sans Bold', 'Arial Unicode MS Bold'],
+      'text-size': 12,
+      'text-offset': [0, -2],
+      'text-anchor': 'bottom',
+      'text-allow-overlap': true,
+    },
+    paint: {
+      'text-color': '#ffffff',
+      'text-halo-color': '#000000',
+      'text-halo-width': 2,
+    },
+  });
+
+  // Add layers for resources
+  map.addLayer({
+    id: MapLayer.Resources,
+    type: 'symbol',
+    source: 'resources',
+    layout: {
+      'icon-image': [
+        'case',
+        ['boolean', ['get', 'selected'], false],
+        'resource-marker-selected',
+        ['boolean', ['get', 'hover'], false],
+        'resource-marker-hover',
+        'resource-marker',
+      ],
       'icon-allow-overlap': true,
     },
   });

@@ -22,10 +22,12 @@
  * SOFTWARE.
  */
 
-import type { Station } from '~/types';
+import type { Resource, Station } from '~/types';
 
 export function adaptStationsToGeoJSON(
-  stations: Station[]
+  stations: Station[],
+  selectedStationId?: number,
+  hoveredStationId?: number
 ): GeoJSON.FeatureCollection {
   return {
     type: 'FeatureCollection',
@@ -34,10 +36,37 @@ export function adaptStationsToGeoJSON(
       properties: {
         id: station.id,
         name: station.name,
+        taskCount: station.tasks.length,
+        selected: station.id === selectedStationId,
+        hover: station.id === hoveredStationId,
       },
       geometry: {
         type: 'Point',
         coordinates: station.position,
+      },
+    })),
+  };
+}
+
+export function adaptResourcesToGeoJSON(
+  resources: Resource[],
+  selectedId?: number,
+  hoveredId?: number
+): GeoJSON.FeatureCollection {
+  return {
+    type: 'FeatureCollection',
+    features: resources.map((resource) => ({
+      type: 'Feature',
+      properties: {
+        id: resource.id,
+        route: resource.route.coordinates,
+        taskList: resource.taskList,
+        selected: resource.id === selectedId,
+        hover: resource.id === hoveredId,
+      },
+      geometry: {
+        type: 'Point',
+        coordinates: resource.position,
       },
     })),
   };

@@ -4,7 +4,7 @@ default_language_version:
 repos:
   # Python hooks
   - repo: https://github.com/pre-commit/pre-commit-hooks
-    rev: v4.6.0
+    rev: v6.0.0
     hooks:
       - id: trailing-whitespace
       - id: end-of-file-fixer
@@ -14,7 +14,7 @@ repos:
       - id: debug-statements
 
   - repo: https://github.com/psf/black
-    rev: 23.7.0
+    rev: 25.9.0
     hooks:
       - id: black
         files: ^(back|sim)/.*\.py$
@@ -22,7 +22,7 @@ repos:
         args: [--line-length=88]
 
   - repo: https://github.com/pycqa/flake8
-    rev: 6.0.0
+    rev: 7.3.0
     hooks:
       - id: flake8
         files: ^(back|sim)/.*\.py$
@@ -44,6 +44,10 @@ repos:
             python-dotenv,
             sqlalchemy,
             fastapi,
+            types-networkx,
+            pandas-stubs,
+            types-shapely,
+            types-geopandas,
           ]
         args: [--config-file=pyproject.toml]
 
@@ -72,6 +76,13 @@ repos:
         entry: bash -c 'if [ -f .venv/bin/python ]; then .venv/bin/python scripts/validate_license_headers.py; elif [ -f .venv/Scripts/python.exe ]; then .venv/Scripts/python.exe scripts/validate_license_headers.py; else python scripts/validate_license_headers.py; fi'
         language: system
         files: \.(py|js|jsx|ts|tsx)$
+        pass_filenames: false
+
+      - id: validate-dependency-licenses
+        name: Dependency License Compatibility Validation
+        entry: bash -c 'if [ -f .venv/bin/python ]; then .venv/bin/python scripts/validate_dependency_licenses.py; elif [ -f .venv/Scripts/python.exe ]; then .venv/Scripts/python.exe scripts/validate_dependency_licenses.py; else python scripts/validate_dependency_licenses.py; fi'
+        language: system
+        files: ^(pyproject\.toml|front/package\.json|front/package-lock\.json)$
         pass_filenames: false
 
       - id: validate-init-files
