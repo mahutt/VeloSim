@@ -22,17 +22,23 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 """
 
-from enum import Enum
+from typing import Optional
+from sqlalchemy.orm import Session
+
+from back.models.user import User
 
 
-class TaskStatus(Enum):
-    OPEN = "open"
-    ASSIGNED = "assigned"
-    DISPATCHED = "dispatched"
-    CLOSED = "closed"
+class UserCRUD:
+    """CRUD operations for User model."""
 
-    @property
-    def is_open(self) -> bool:
-        if self.value == "open":
-            return True
-        return False
+    def get(self, db: Session, user_id: int) -> Optional[User]:
+        """Get a user by ID."""
+        return db.query(User).filter(User.id == user_id).first()
+
+    def get_by_username(self, db: Session, username: str) -> Optional[User]:
+        """Get a user by username."""
+        return db.query(User).filter(User.username == username).first()
+
+
+# Create a singleton instance
+user_crud = UserCRUD()

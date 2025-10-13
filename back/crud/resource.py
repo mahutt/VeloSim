@@ -91,7 +91,7 @@ class ResourceCRUD:
         # associated with a resource).
         for task in resource.tasks:
             task.resource = None
-            task.status = TaskStatus.UNASSIGNED
+            task.status = TaskStatus.OPEN
         db.delete(resource)
         db.commit()
         return True

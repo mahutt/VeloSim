@@ -22,17 +22,22 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 """
 
-from enum import Enum
+from typing import Annotated
+from fastapi import Depends, HTTPException
+from fastapi.security import OAuth2PasswordBearer
+
+from back.auth.auth import validate_access_token
 
 
-class TaskStatus(Enum):
-    OPEN = "open"
-    ASSIGNED = "assigned"
-    DISPATCHED = "dispatched"
-    CLOSED = "closed"
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
 
-    @property
-    def is_open(self) -> bool:
-        if self.value == "open":
-            return True
-        return False
+
+async def get_user_id(token: Annotated[str, Depends(oauth2_scheme)]) -> int:
+    user_id = validate_access_token(token)
+    if user_id is None:
+        raise HTTPException(
+            status_code=401,
+            detail="Access token invalid",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    return user_id

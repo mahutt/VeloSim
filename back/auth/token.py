@@ -22,17 +22,9 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 """
 
-from enum import Enum
+from pydantic import BaseModel
 
 
-class TaskStatus(Enum):
-    OPEN = "open"
-    ASSIGNED = "assigned"
-    DISPATCHED = "dispatched"
-    CLOSED = "closed"
-
-    @property
-    def is_open(self) -> bool:
-        if self.value == "open":
-            return True
-        return False
+class Token(BaseModel):
+    access_token: str
+    token_type: str
