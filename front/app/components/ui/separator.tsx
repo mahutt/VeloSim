@@ -22,49 +22,29 @@
  * SOFTWARE.
  */
 
-// Entity types
+import * as React from 'react';
+import * as SeparatorPrimitive from '@radix-ui/react-separator';
 
-export interface Station {
-  id: number;
-  name: string;
-  position: [number, number]; // [longitude, latitude]
-  tasks: StationTask[];
+import { cn } from '~/lib/utils';
+
+function Separator({
+  className,
+  orientation = 'horizontal',
+  decorative = true,
+  ...props
+}: React.ComponentProps<typeof SeparatorPrimitive.Root>) {
+  return (
+    <SeparatorPrimitive.Root
+      data-slot="separator"
+      decorative={decorative}
+      orientation={orientation}
+      className={cn(
+        'bg-border shrink-0 data-[orientation=horizontal]:h-px data-[orientation=horizontal]:w-full data-[orientation=vertical]:h-full data-[orientation=vertical]:w-px',
+        className
+      )}
+      {...props}
+    />
+  );
 }
 
-export interface StationTask {
-  stationId: number;
-  type: 'battery_swap';
-}
-
-// API response types
-
-interface PaginatedResponse {
-  total: number;
-  page: number;
-  per_page: number;
-  total_pages: number;
-}
-
-export interface GetStationsResponse extends PaginatedResponse {
-  stations: Omit<Station, 'tasks'>[];
-}
-
-// Resource types
-export interface Resource {
-  id: number;
-  position: [number, number];
-  taskList: number[]; // list of task IDs
-  route: {
-    coordinates: [number, number][];
-  };
-}
-
-// Selection types
-export enum SelectedItemType {
-  Station = 'station',
-  Resource = 'resource',
-}
-export interface SelectedItem {
-  type: SelectedItemType;
-  value: Station | Resource;
-}
+export { Separator };

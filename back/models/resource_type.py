@@ -22,23 +22,10 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 """
 
-# Import all models here to ensure they are registered with SQLAlchemy
-from .station import Station
-from .task_status import TaskStatus
-from .station_task_type import StationTaskType
-from .station_task import StationTask
-from .resource import Resource
-from .resource_type import ResourceType
-from .user import User
-from .sim_instance import SimInstance
+from enum import Enum
 
-__all__ = [
-    "Station",
-    "TaskStatus",
-    "StationTaskType",
-    "StationTask",
-    "Resource",
-    "ResourceType",
-    "User",
-    "SimInstance",
-]
+
+class ResourceType(Enum):
+    VEHICLE_DRIVER = "vehicle_driver"
+    # Each resource combines a driver and a vehicle, since they are always
+    # paired in this context.

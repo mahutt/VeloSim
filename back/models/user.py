@@ -22,47 +22,39 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 """
 
-from typing import TYPE_CHECKING, Optional
-from sqlalchemy import DateTime, Enum, ForeignKey, func
+from typing import TYPE_CHECKING, List
+from sqlalchemy import Boolean, DateTime, String, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
-from back.models import StationTaskType, TaskStatus
 from back.database.session import Base
 
 if TYPE_CHECKING:
-    from .station import Station
-    from .resource import Resource
+    from .sim_instance import SimInstance
 
 
-class StationTask(Base):
-    """Model to represent tasks that must be done to a specific bike (as opposed to
-    tasks to maintain the station itself).
-    """
+class User(Base):
+    """User model of the VeloSim app"""
 
-    __tablename__ = "station_tasks"
+    __tablename__ = "users"
 
     id: Mapped[int] = mapped_column(primary_key=True, index=True)
-    type: Mapped[StationTaskType] = mapped_column(Enum(StationTaskType), nullable=False)
-    status: Mapped[TaskStatus] = mapped_column(
-        Enum(TaskStatus), nullable=False, default=TaskStatus.OPEN
-    )
+    username: Mapped[str] = mapped_column(String(100), nullable=False, index=True)
+    password_hash: Mapped[str] = mapped_column(String(100), nullable=False)
+    is_admin: Mapped[bool] = mapped_column(Boolean, nullable=False)
+
     date_created: Mapped[DateTime] = mapped_column(
         DateTime, nullable=False, server_default=func.now()
     )
     date_updated: Mapped[DateTime] = mapped_column(
         DateTime, nullable=False, server_default=func.now(), onupdate=func.now()
     )
-    station_id: Mapped[int] = mapped_column(ForeignKey("stations.id"), nullable=False)
-    station: Mapped["Station"] = relationship("Station", back_populates="tasks")
-    resource_id: Mapped[Optional[int]] = mapped_column(
-        ForeignKey("resources.id", ondelete="SET NULL"), nullable=True
-    )
-    resource: Mapped[Optional["Resource"]] = relationship(
-        "Resource", back_populates="tasks"
+
+    # Use string to avoid circular import of back-populated field
+    sim_instances: Mapped[List["SimInstance"]] = relationship(
+        "SimInstance", back_populates="user"
     )
 
     def __repr__(self) -> str:
         return (
-            f"<StationTask(id={self.id}, type={self.type}, status={self.status}, "
-            f"station_id={self.station_id}, resource_id={self.resource_id}, "
-            f"date_created={self.date_created}, date_updated={self.date_updated})>"
+            f"<User(id={self.id}, username='{self.username}', "
+            f"is_admin={self.is_admin})>"
         )

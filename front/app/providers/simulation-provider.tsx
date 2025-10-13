@@ -34,22 +34,31 @@ import {
 import { useMap } from './map-provider';
 import { MapSource, setMapSource } from '~/lib/map-helpers';
 import api from '~/api';
-import type {
-  GetStationsResponse,
-  Station,
-  Route,
-  Resource,
-  SelectedItem,
+import {
+  type GetStationsResponse,
+  type Station,
+  type Resource,
+  type SelectedItem,
+  SelectedItemType,
 } from '~/types';
-import { adaptStationsToGeoJSON } from '~/lib/geojson-adapters';
+import {
+  adaptStationsToGeoJSON,
+  adaptResourcesToGeoJSON,
+} from '~/lib/geojson-adapters';
 import { interpolateAlongRoute } from '~/lib/animation-helpers';
 import { startMockBackend, FRAME_INTERVAL_MS } from '~/lib/mock-backend';
-import { setupMapClickHandlers } from '~/lib/map-interactions';
+import {
+  setupMapClickHandlers,
+  setupMapHoverHandlers,
+} from '~/lib/map-interactions';
 
 type SimulationContextType = {
-  state: React.RefObject<Station[]>;
+  stationsRef: React.RefObject<Map<number, Station>>;
+  resourcesRef: React.RefObject<Map<number, Resource>>;
+  resources: Resource[];
   selectedItem: SelectedItem | null;
-  setSelectedItem: (item: SelectedItem | null) => void;
+  selectItem: (type: SelectedItemType, id: number) => void;
+  clearSelection: () => void;
 };
 
 const SimulationContext = createContext<SimulationContextType | undefined>(
@@ -58,21 +67,111 @@ const SimulationContext = createContext<SimulationContextType | undefined>(
 
 export const SimulationProvider = ({ children }: { children: ReactNode }) => {
   const { mapRef, mapLoaded } = useMap();
-  const state = useRef<Station[]>([]);
+  const stationsRef = useRef<Map<number, Station>>(new Map());
+  const resourcesRef = useRef<Map<number, Resource>>(new Map());
+
+  // Resources state for components that need to react to changes
+  const [resources, setResources] = useState<Resource[]>([]);
 
   // Selection state
   const [selectedItem, setSelectedItem] = useState<SelectedItem | null>(null);
 
-  // Route geometries (received once, stored for interpolation)
-  const routeGeometriesRef = useRef<Map<string, [number, number][]>>(new Map());
+  // Selection function
+  const selectItem = (type: SelectedItemType, id: number) => {
+    if (!mapLoaded) return;
+
+    // Get the item and validate it exists
+    const item =
+      type === SelectedItemType.Station
+        ? stationsRef.current.get(id)
+        : resourcesRef.current.get(id);
+
+    if (!item) {
+      throw new Error(`Selected ${type} not found: ${id}`);
+    }
+
+    // Update state
+    setSelectedItem({ type, value: item });
+
+    // Update refs for animation loop
+    if (type === SelectedItemType.Station) {
+      selectedStationIdRef.current = id;
+      selectedResourceIdRef.current = undefined;
+    } else {
+      selectedResourceIdRef.current = id;
+      selectedStationIdRef.current = undefined;
+    }
+
+    // Update map sources - selected type gets the ID, other type gets cleared
+    updateMapSources(
+      type === SelectedItemType.Station ? id : undefined,
+      type === SelectedItemType.Resource ? id : undefined
+    );
+  };
+
+  // Helper function to update both map sources
+  const updateMapSources = (
+    selectedStationId?: number,
+    selectedResourceId?: number
+  ) => {
+    // Update stations
+    if (stationsRef.current.size > 0) {
+      const stations = Array.from(stationsRef.current.values());
+      setMapSource(
+        MapSource.Stations,
+        adaptStationsToGeoJSON(
+          stations,
+          selectedStationId,
+          hoveredStationIdRef.current ?? undefined
+        ),
+        mapRef.current!
+      );
+    }
+
+    // Update resources
+    if (resourcesRef.current.size > 0) {
+      const resources = Array.from(resourcesRef.current.values());
+      const geojson = adaptResourcesToGeoJSON(
+        resources,
+        selectedResourceId,
+        hoveredResourceIdRef.current ?? undefined
+      );
+      setMapSource(MapSource.Resources, geojson, mapRef.current!);
+    }
+  };
+
+  // Clear selection function
+  const clearSelection = () => {
+    if (!mapLoaded) return;
+
+    // Update state
+    setSelectedItem(null);
+
+    // Update refs for animation loop
+    selectedStationIdRef.current = undefined;
+    selectedResourceIdRef.current = undefined;
+
+    // Clear selection on both map sources
+    updateMapSources(undefined, undefined);
+  };
+
+  // Hover state - use refs so animation loop always has latest values
+  const hoveredStationIdRef = useRef<number | null>(null);
+  const hoveredResourceIdRef = useRef<number | null>(null);
+
+  // Debounce hover updates to prevent excessive re-renders
+  const hoverDebounceTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Ref to track selected IDs for animation loop
+  const selectedStationIdRef = useRef<number | undefined>(undefined);
+  const selectedResourceIdRef = useRef<number | undefined>(undefined);
 
   // Position tracking for each resource
-  const frameStartPositionsRef = useRef<Map<string, [number, number]>>(
+  const frameStartPositionsRef = useRef<Map<number, [number, number]>>(
     new Map()
   );
-  const currentPositionsRef = useRef<Map<string, [number, number]>>(new Map());
-  const targetPositionsRef = useRef<Map<string, [number, number]>>(new Map());
-  const resourceRoutesRef = useRef<Map<string, string>>(new Map());
+  const currentPositionsRef = useRef<Map<number, [number, number]>>(new Map());
+  const targetPositionsRef = useRef<Map<number, [number, number]>>(new Map());
 
   // Global frame timing (shared by all resources)
   const lastFrameTimeRef = useRef<number>(0);
@@ -86,32 +185,57 @@ export const SimulationProvider = ({ children }: { children: ReactNode }) => {
     if (!mapLoaded) return;
 
     loadStations();
-    fetch('/placeholder-data/resource-routes.geojson')
+    fetch('/placeholder-data/resources.json')
       .then((res) => res.json())
-      .then((data: GeoJSON.FeatureCollection) => {
-        const routes: Route[] = data.features.map((feature) => ({
-          id: feature.properties?.id,
-          coordinates: (feature.geometry as GeoJSON.LineString).coordinates as [
-            number,
-            number,
-          ][],
+      .then((data: { resources: Resource[] }) => {
+        const resources = data.resources.map((resource) => ({
+          id: resource.id,
+          position: resource.position,
+          taskList: resource.taskList,
+          route: {
+            coordinates: resource.route.coordinates,
+          },
         }));
 
-        // Store route geometries for interpolation
-        routes.forEach((route) => {
-          routeGeometriesRef.current.set(route.id, route.coordinates);
+        resources.forEach((resource) => {
+          resourcesRef.current.set(resource.id, resource);
         });
 
-        initializeResourcePositions(routes);
+        // Update state so components can react to the loaded resources
+        setResources(resources);
+
+        initializeResourcePositions(data.resources);
         startAnimation();
-        startBackendSimulation(routes);
+        startBackendSimulation(data.resources);
       })
       .catch((error) => {
         console.error('Error loading resource routes:', error);
       });
 
     // Set up map click handlers for selection
-    setupMapClickHandlers(mapRef.current!, setSelectedItem);
+    setupMapClickHandlers(mapRef.current!, (item) => {
+      if (!item) {
+        clearSelection();
+        return;
+      }
+      const { type, id } = item;
+      selectItem(type, id);
+    });
+
+    // Set up map hover handlers
+    setupMapHoverHandlers(mapRef.current!, (item) => {
+      if (!item) {
+        updateHoverState(null, null);
+        return;
+      }
+
+      const { type, id } = item;
+      if (type === SelectedItemType.Station) {
+        updateHoverState(id, null);
+      } else if (type === SelectedItemType.Resource) {
+        updateHoverState(null, id);
+      }
+    });
 
     // Cleanup on unmount
     return cleanup;
@@ -122,8 +246,15 @@ export const SimulationProvider = ({ children }: { children: ReactNode }) => {
     api
       .get<GetStationsResponse>('/stations')
       .then((response) => {
-        const stations = response.data.stations;
-        state.current = stations;
+        const stations = response.data.stations.map((station) => ({
+          ...station,
+          tasks: [], // Initialize empty tasks array until API supports it
+        }));
+
+        stations.forEach((station) => {
+          stationsRef.current.set(station.id, station);
+        });
+
         setMapSource(
           MapSource.Stations,
           adaptStationsToGeoJSON(stations),
@@ -136,19 +267,18 @@ export const SimulationProvider = ({ children }: { children: ReactNode }) => {
   };
 
   // Initialize all resources at their route starting positions
-  const initializeResourcePositions = (routes: Route[]) => {
-    routes.forEach((route) => {
-      const startPos = route.coordinates[0];
-      currentPositionsRef.current.set(route.id, startPos);
-      frameStartPositionsRef.current.set(route.id, startPos);
-      targetPositionsRef.current.set(route.id, startPos);
-      resourceRoutesRef.current.set(route.id, route.id);
+  const initializeResourcePositions = (resources: Resource[]) => {
+    resources.forEach((resource) => {
+      const startPos = resource.route.coordinates[0];
+      currentPositionsRef.current.set(resource.id, startPos);
+      frameStartPositionsRef.current.set(resource.id, startPos);
+      targetPositionsRef.current.set(resource.id, startPos);
     });
   };
 
   // Start mock backend that emits position updates every second
-  const startBackendSimulation = (routes: Route[]) => {
-    stopMockBackendRef.current = startMockBackend(routes, handleFrameUpdate);
+  const startBackendSimulation = (resources: Resource[]) => {
+    stopMockBackendRef.current = startMockBackend(resources, handleFrameUpdate);
   };
 
   /**
@@ -166,7 +296,9 @@ export const SimulationProvider = ({ children }: { children: ReactNode }) => {
 
       // Set new target position from backend
       targetPositionsRef.current.set(update.id, update.position);
-      resourceRoutesRef.current.set(update.id, update.routeId);
+
+      // Update resource in ref
+      resourcesRef.current.set(update.id, update);
     });
 
     // Reset global frame timer when new frame arrives
@@ -196,22 +328,20 @@ export const SimulationProvider = ({ children }: { children: ReactNode }) => {
       1.0
     );
 
-    const features: GeoJSON.Feature[] = [];
-
     // Interpolate each resource from frame start to target
     frameStartPositionsRef.current.forEach((startPos, resourceId) => {
       const targetPos = targetPositionsRef.current.get(resourceId);
-      const routeId = resourceRoutesRef.current.get(resourceId);
+      const resource = resourcesRef.current.get(resourceId);
 
-      if (!targetPos || !routeId) return;
+      if (!targetPos || !resource) return;
 
-      const routeGeometry = routeGeometriesRef.current.get(routeId);
+      const routeGeometry = resource.route.coordinates;
       if (!routeGeometry) return;
 
       // Interpolate along route using global progress
       const interpolatedPos = interpolateAlongRoute(
         routeGeometry,
-        startPos, // Where we were when frame arrive
+        startPos, // Where we were when frame arrived
         targetPos, // Where backend says we should be
         globalProgress // Only this changes: 0→1 over 1 second
       );
@@ -219,22 +349,64 @@ export const SimulationProvider = ({ children }: { children: ReactNode }) => {
       // Update current position for next frame's start
       currentPositionsRef.current.set(resourceId, interpolatedPos);
 
-      features.push({
-        type: 'Feature',
-        geometry: {
-          type: 'Point',
-          coordinates: interpolatedPos,
-        },
-        properties: { id: resourceId },
-      });
+      // Update resource position in ref
+      if (resource) {
+        resource.position = interpolatedPos;
+      }
     });
 
-    const geojson: GeoJSON.FeatureCollection = {
-      type: 'FeatureCollection',
-      features,
-    };
+    // Create GeoJSON from all resources
+    const resources = Array.from(resourcesRef.current.values());
+    const geojson = adaptResourcesToGeoJSON(
+      resources,
+      selectedResourceIdRef.current,
+      hoveredResourceIdRef.current ?? undefined
+    );
 
     setMapSource(MapSource.Resources, geojson, mapRef.current!);
+  };
+
+  // Update hover state with immediate visual feedback
+  const updateHoverState = (
+    stationId: number | null,
+    resourceId: number | null
+  ) => {
+    // Update refs immediately for cursor changes
+    hoveredStationIdRef.current = stationId;
+    hoveredResourceIdRef.current = resourceId; // Clear any pending debounced map update
+    if (hoverDebounceTimeoutRef.current) {
+      clearTimeout(hoverDebounceTimeoutRef.current);
+    }
+
+    // Debounce only the expensive map source updates
+    hoverDebounceTimeoutRef.current = setTimeout(() => {
+      if (!mapRef.current) return;
+
+      // Update stations with hover state
+      if (stationsRef.current.size > 0) {
+        const stations = Array.from(stationsRef.current.values());
+        setMapSource(
+          MapSource.Stations,
+          adaptStationsToGeoJSON(
+            stations,
+            selectedStationIdRef.current,
+            stationId ?? undefined
+          ),
+          mapRef.current
+        );
+      }
+
+      // Update resources with hover state
+      if (resourcesRef.current.size > 0) {
+        const resources = Array.from(resourcesRef.current.values());
+        const geojson = adaptResourcesToGeoJSON(
+          resources,
+          selectedResourceIdRef.current,
+          resourceId ?? undefined
+        );
+        setMapSource(MapSource.Resources, geojson, mapRef.current);
+      }
+    }, 16); // ~60fps throttle for map updates only
   };
 
   // Cleanup animation and mock backend on unmount
@@ -245,11 +417,21 @@ export const SimulationProvider = ({ children }: { children: ReactNode }) => {
     if (stopMockBackendRef.current) {
       stopMockBackendRef.current();
     }
+    if (hoverDebounceTimeoutRef.current) {
+      clearTimeout(hoverDebounceTimeoutRef.current);
+    }
   };
 
   return (
     <SimulationContext.Provider
-      value={{ state, selectedItem, setSelectedItem }}
+      value={{
+        stationsRef,
+        resourcesRef,
+        resources,
+        selectedItem,
+        selectItem,
+        clearSelection,
+      }}
     >
       {children}
     </SimulationContext.Provider>
