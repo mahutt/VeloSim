@@ -25,7 +25,7 @@ SOFTWARE.
 import math
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
-from typing import Dict, Optional
+from typing import Dict, List, Optional
 
 from back.database.session import get_db
 from back.crud import resource_crud
@@ -70,6 +70,11 @@ def get_resources(
         per_page=limit,
         total_pages=total_pages,
     )
+
+
+@router.get("/types", response_model=List[str])
+def get_resource_types() -> List[str]:
+    return [r_type.value for r_type in ResourceType]
 
 
 @router.get("/{resource_id}", response_model=ResourceResponse)

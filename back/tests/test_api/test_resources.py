@@ -197,6 +197,16 @@ class TestResourcesAPI:
         response = client.delete("/api/v1/resources/999999")
         assert response.status_code == 404
 
+    def test_get_resource_types(self, client: TestClient) -> None:
+        """Test retrieving supported resource types."""
+        response = client.get("/api/v1/resources/types")
+        assert response.status_code == 200
+        data = response.json()
+        assert isinstance(data, list)
+        assert all(isinstance(t, str) for t in data)
+        # The API serializes enum names in responses
+        assert "vehicle_driver" in data
+
     def test_filter_resources_by_type(self, client: TestClient, db: Session) -> None:
         """Test filtering resources by type."""
         # Create two resources
