@@ -26,7 +26,7 @@ from fastapi import APIRouter
 from back.schemas.playback_speed import PlaybackSpeedBase, PlaybackSpeedResponse
 from back.crud.simulation_speed import playback_speed_crud
 
-router = APIRouter(prefix="/playback_speed", tags=["Playback Speed"])
+router = APIRouter(prefix="/playback_speed", tags=["simulationPlaybackSpeed"])
 
 
 @router.post("/", response_model=PlaybackSpeedResponse)
