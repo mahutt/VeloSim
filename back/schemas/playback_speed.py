@@ -22,19 +22,21 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 """
 
-from fastapi import APIRouter
-from .stations import router as stations_router
-from .station_tasks import router as station_tasks_router
-from .simulation_speed import router as simulation_speed_router
-from .resources import router as resources_router
+from pydantic import BaseModel, Field
 
-# Create the main v1 API router
-api_router = APIRouter()
 
-# Include all endpoint routers
-api_router.include_router(stations_router)
-api_router.include_router(station_tasks_router)
-api_router.include_router(simulation_speed_router)
-api_router.include_router(resources_router)
+class PlaybackSpeedBase(BaseModel):
+    """Base schema for playback speed."""
 
-__all__ = ["api_router"]
+    simulation_id: int = Field(
+        ..., description="The Simulation id that was undergo the playback speed change"
+    )
+    playback_speed: float = Field(
+        ..., description="The new playback speed that will be set"
+    )
+
+
+class PlaybackSpeedResponse(PlaybackSpeedBase):
+    """Schema for the response after updating playback speed."""
+
+    message: str = Field(..., description="Confirmation message returned by the API")
