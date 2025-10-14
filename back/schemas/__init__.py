@@ -39,6 +39,16 @@ from .station_task import (
     StationTaskType,
     StationTaskListResponse,
 )
+from .resource import (
+    ResourceBase,
+    ResourceCreate,
+    ResourceTaskIDsRequest,
+    ResourceListResponse,
+    ResourceResponse,
+    ResourceTaskAssign,
+    ResourceTaskUnassign,
+    ResourceUpdate,
+)
 
 __all__ = [
     "PositionSchema",
@@ -53,4 +63,12 @@ __all__ = [
     "StationTaskResponse",
     "StationTaskType",
     "StationTaskListResponse",
+    "ResourceBase",
+    "ResourceCreate",
+    "ResourceTaskIDsRequest",
+    "ResourceListResponse",
+    "ResourceResponse",
+    "ResourceTaskAssign",
+    "ResourceTaskUnassign",
+    "ResourceUpdate",
 ]

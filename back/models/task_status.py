@@ -26,14 +26,13 @@ from enum import Enum
 
 
 class TaskStatus(Enum):
-    UNASSIGNED = "unassigned"
+    OPEN = "open"
     ASSIGNED = "assigned"
-    IN_PROGRESS = "in_progress"
-    COMPLETED = "completed"
-    ABANDONED = "abandoned"
+    DISPATCHED = "dispatched"
+    CLOSED = "closed"
 
     @property
     def is_open(self) -> bool:
-        if self.value == "completed" or self.value == "abandoned":
-            return False
-        return True
+        if self.value == "open":
+            return True
+        return False

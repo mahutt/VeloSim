@@ -44,6 +44,10 @@ repos:
             python-dotenv,
             sqlalchemy,
             fastapi,
+            types-networkx,
+            pandas-stubs,
+            types-shapely,
+            types-geopandas,
           ]
         args: [--config-file=pyproject.toml]
 
@@ -72,6 +76,13 @@ repos:
         entry: bash -c 'if [ -f .venv/bin/python ]; then .venv/bin/python scripts/validate_license_headers.py; elif [ -f .venv/Scripts/python.exe ]; then .venv/Scripts/python.exe scripts/validate_license_headers.py; else python scripts/validate_license_headers.py; fi'
         language: system
         files: \.(py|js|jsx|ts|tsx)$
+        pass_filenames: false
+
+      - id: validate-dependency-licenses
+        name: Dependency License Compatibility Validation
+        entry: bash -c 'if [ -f .venv/bin/python ]; then .venv/bin/python scripts/validate_dependency_licenses.py; elif [ -f .venv/Scripts/python.exe ]; then .venv/Scripts/python.exe scripts/validate_dependency_licenses.py; else python scripts/validate_dependency_licenses.py; fi'
+        language: system
+        files: ^(pyproject\.toml|front/package\.json|front/package-lock\.json)$
         pass_filenames: false
 
       - id: validate-init-files

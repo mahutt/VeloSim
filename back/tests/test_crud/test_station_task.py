@@ -46,7 +46,7 @@ class TestStationTaskCRUD:
         assert task.id is not None
         assert task.type == StationTaskType.BATTERY_SWAP
         assert task.station_id == station.id
-        assert task.status == TaskStatus.UNASSIGNED
+        assert task.status == TaskStatus.OPEN
 
     def test_get_station_task_by_id(self, db: Session, station: Station) -> None:
         task_data = StationTaskCreate(
@@ -84,14 +84,14 @@ class TestStationTaskCRUD:
             type=StationTaskType.BATTERY_SWAP, station_id=station.id
         )
         created_task = station_task_crud.create(db, task_data)
-        update_data = StationTaskUpdate(status=TaskStatus.COMPLETED)
+        update_data = StationTaskUpdate(status=TaskStatus.CLOSED)
         updated_task = station_task_crud.update(db, created_task.id, update_data)
         assert updated_task is not None
         assert updated_task.id == created_task.id
-        assert updated_task.status == TaskStatus.COMPLETED
+        assert updated_task.status == TaskStatus.CLOSED
 
     def test_update_station_task_status_not_found(self, db: Session) -> None:
-        update_data = StationTaskUpdate(status=TaskStatus.COMPLETED)
+        update_data = StationTaskUpdate(status=TaskStatus.CLOSED)
         updated_task = station_task_crud.update(db, 99999, update_data)
         assert updated_task is None
 

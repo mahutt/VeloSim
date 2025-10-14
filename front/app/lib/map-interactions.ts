@@ -23,66 +23,104 @@
  */
 
 import type { Map as MapboxMap, MapMouseEvent } from 'mapbox-gl';
-import type { Station, Resource, SelectedItem } from '~/types';
-import { MapSource } from './map-helpers';
+import { SelectedItemType } from '~/types';
+import { isMapLayer, MapLayer } from './map-helpers';
 
-//Set up click handlers for map layers to enable item selection
+// Entities may be represented by more than 1 layer (e.g., stations and their task counts)
+// So we use a function to map layers to entity types
+function layerToEntityType(layer: MapLayer): SelectedItemType {
+  switch (layer) {
+    case MapLayer.Stations:
+    case MapLayer.StationTaskCounts:
+      return SelectedItemType.Station;
+    case MapLayer.Resources:
+      return SelectedItemType.Resource;
+    default:
+      throw new Error(`Unrecognized layer: ${layer}`);
+  }
+}
+
+// Set up click handlers for map layers to enable item selection
+type ItemSelectCallback = (
+  item: {
+    type: SelectedItemType;
+    id: number;
+    coordinates: [number, number];
+  } | null
+) => void;
+
+type ItemHoverCallback = (
+  item: {
+    type: SelectedItemType;
+    id: number;
+  } | null
+) => void;
 
 export function setupMapClickHandlers(
   map: MapboxMap,
-  onItemSelect: (item: SelectedItem | null) => void
+  onItemSelect: ItemSelectCallback
 ) {
   map.on('click', (e: MapMouseEvent) => {
-    const interactiveLayers = [MapSource.Stations, MapSource.Resources];
-
     const features = map.queryRenderedFeatures(e.point, {
-      layers: interactiveLayers,
+      layers: Object.values(MapLayer),
     });
 
     if (features.length === 0) {
       onItemSelect(null);
-      //TODO: Remove when UI is implemented
-      console.log('No item clicked');
       return;
     }
 
     const feature = features[0];
+
+    if (!feature.properties || !feature.properties.id) {
+      throw new Error('Clicked feature has no id property');
+    }
+
+    if (!feature.layer || !isMapLayer(feature.layer.id)) {
+      throw new Error('Clicked feature is not from a recognized layer');
+    }
+
+    const type = layerToEntityType(feature.layer.id);
+    const id = Number(feature.properties.id);
     const coordinates = (feature.geometry as GeoJSON.Point).coordinates as [
       number,
       number,
     ];
 
-    // Determine if the clicked feature is a station or resource and call onItemSelect accordingly
-    if (feature.layer && feature.layer.id === MapSource.Stations) {
-      const station: Station = {
-        id: Number(feature.properties?.id),
-        name: feature.properties?.name || '',
-        position: coordinates,
-      };
-      onItemSelect({ type: 'station', value: station });
-      //TODO: Remove when UI is implemented
-      console.log('Station clicked:', station);
-    } else if (feature.layer && feature.layer.id === MapSource.Resources) {
-      const resource: Resource = {
-        id: String(feature.properties?.id),
-        position: coordinates,
-        routeId: feature.properties?.routeId || '',
-      };
-      onItemSelect({ type: 'resource', value: resource });
-      //TODO: Remove when UI is implemented
-      console.log('Resource clicked:', resource);
-    }
+    onItemSelect({ type, id, coordinates });
   });
 
-  const interactiveLayers = [MapSource.Stations, MapSource.Resources];
-
-  interactiveLayers.forEach((layer) => {
+  Object.values(MapLayer).forEach((layer) => {
     map.on('mouseenter', layer, () => {
       map.getCanvas().style.cursor = 'pointer';
     });
 
     map.on('mouseleave', layer, () => {
       map.getCanvas().style.cursor = '';
+    });
+  });
+}
+
+export function setupMapHoverHandlers(
+  map: MapboxMap,
+  onItemHover: ItemHoverCallback
+) {
+  Object.values(MapLayer).forEach((layer) => {
+    map.on('mousemove', layer, (e) => {
+      if (e.features && e.features.length > 0) {
+        const id = e.features[0].properties?.id;
+        if (id !== undefined) {
+          const type = layerToEntityType(layer);
+          onItemHover({
+            type,
+            id: Number(id),
+          });
+        }
+      }
+    });
+
+    map.on('mouseleave', layer, () => {
+      onItemHover(null);
     });
   });
 }

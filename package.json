@@ -12,6 +12,7 @@
         "validate:init": "node scripts/run-python.js scripts/validate_init_files.py",
         "validate:licenses": "node scripts/run-python.js scripts/validate_license_headers.py",
         "validate:branch": "node scripts/run-python.js scripts/validate_branch_name.py",
+        "validate:dependencies": "node scripts/run-python.js scripts/validate_dependency_licenses.py",
         "validate": "npm run validate:init && npm run validate:licenses && npm run validate:branch",
         "setup": "node scripts/setup.js",
         "clean": "rimraf coverage_html/ .pytest_cache/ .mypy_cache/ front/coverage/ front/node_modules/",

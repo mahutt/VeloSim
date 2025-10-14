@@ -22,7 +22,7 @@
  * SOFTWARE.
  */
 
-import type { Route, Resource } from '~/types';
+import type { Resource } from '~/types';
 
 // Backend sends position updates every 1 second
 export const FRAME_INTERVAL_MS = 1000;
@@ -31,31 +31,34 @@ export const FRAME_INTERVAL_MS = 1000;
  * Simulates backend sending position updates at regular intervals
  */
 export function startMockBackend(
-  routes: Route[],
+  resources: Resource[],
   onFrame: (updates: Resource[]) => void
 ): () => void {
   // Track waypoint progression
-  const waypointIndices = new Map<string, number>();
-  routes.forEach((route) => waypointIndices.set(route.id, 0));
+  const waypointIndices = new Map<number, number>();
+  resources.forEach((resource) => waypointIndices.set(resource.id, 0));
 
   const intervalId = window.setInterval(() => {
     const updates: Resource[] = [];
 
-    routes.forEach((route) => {
-      const currentIndex = waypointIndices.get(route.id)!;
+    resources.forEach((resource) => {
+      const currentIndex = waypointIndices.get(resource.id)!;
 
       // Advance to next waypoint
-      const nextIndex = (currentIndex + 1) % route.coordinates.length;
-      const position = route.coordinates[nextIndex];
+      const nextIndex = (currentIndex + 1) % resource.route.coordinates.length;
+      const position = resource.route.coordinates[nextIndex];
 
       // Send position update
       updates.push({
-        id: route.id,
+        id: resource.id,
         position: position,
-        routeId: route.id,
+        taskList: resource.taskList,
+        route: {
+          coordinates: resource.route.coordinates,
+        },
       });
 
-      waypointIndices.set(route.id, nextIndex);
+      waypointIndices.set(resource.id, nextIndex);
     });
 
     // Invoke callback with all position updates for this frame

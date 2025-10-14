@@ -28,6 +28,12 @@ export interface Station {
   id: number;
   name: string;
   position: [number, number]; // [longitude, latitude]
+  tasks: StationTask[];
+}
+
+export interface StationTask {
+  stationId: number;
+  type: 'battery_swap';
 }
 
 // API response types
@@ -40,26 +46,24 @@ interface PaginatedResponse {
 }
 
 export interface GetStationsResponse extends PaginatedResponse {
-  stations: Station[];
-}
-
-// Route types
-
-export interface Route {
-  id: string;
-  coordinates: [number, number][]; // Complete road geometry
+  stations: Omit<Station, 'tasks'>[];
 }
 
 // Resource types
 export interface Resource {
-  id: string;
+  id: number;
   position: [number, number];
-  routeId: string;
+  taskList: number[]; // list of task IDs
+  route: {
+    coordinates: [number, number][];
+  };
 }
 
 // Selection types
-export type SelectedItemType = 'station' | 'resource';
-
+export enum SelectedItemType {
+  Station = 'station',
+  Resource = 'resource',
+}
 export interface SelectedItem {
   type: SelectedItemType;
   value: Station | Resource;
