@@ -49,6 +49,11 @@ from .resource import (
     ResourceTaskUnassign,
     ResourceUpdate,
 )
+from .sim_instance import (
+    SimInstanceBase,
+    SimInstanceCreate,
+    SimInstanceResponse,
+)
 
 __all__ = [
     "PositionSchema",
@@ -71,4 +76,7 @@ __all__ = [
     "ResourceTaskAssign",
     "ResourceTaskUnassign",
     "ResourceUpdate",
+    "SimInstanceBase",
+    "SimInstanceCreate",
+    "SimInstanceResponse",
 ]

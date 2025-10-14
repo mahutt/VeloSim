@@ -22,10 +22,33 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 """
 
-# Import all CRUD classes here for easy access
-from .station import station_crud
-from .station_task import station_task_crud
-from .resource import resource_crud
-from .sim_instance import sim_instance_crud
+from typing import Annotated
+from fastapi import Depends, HTTPException
+from sqlalchemy.orm import Session
+from back.database.session import get_db
+from back.models.user import User
+from back.auth import get_user_id
 
-__all__ = ["station_crud", "station_task_crud", "resource_crud", "sim_instance_crud"]
+
+async def get_current_user(
+    db: Annotated[Session, Depends(get_db)],
+    user_id: Annotated[int, Depends(get_user_id)],
+) -> User:
+    """
+    Get the current authenticated user from JWT token.
+
+    This function validates the JWT token via get_user_id dependency,
+    then fetches the User object from the database.
+    """
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(
+            status_code=401,
+            detail=f"User with ID {user_id} not found.",
+        )
+
+    return user
+
+
+# Type alias for dependency injection
+CurrentUser = Annotated[User, Depends(get_current_user)]

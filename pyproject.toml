@@ -151,6 +151,8 @@ module = [
     "fastapi.*",
     "pydantic.*",
     "uvicorn.*",
-    "simpy.*"
+    "simpy.*",
+    "argon2.*",
+    "jwt.*"
 ]
 ignore_missing_imports = true

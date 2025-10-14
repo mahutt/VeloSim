@@ -77,7 +77,8 @@ def generate_access_token(user_id: int) -> str:
         "exp": floor((now + ACCESS_TOKEN_LIFE).timestamp()),
         "sub": "user:" + str(user_id),
     }
-    return jwt.encode(token_data, jwt_secret, algorithm=JWT_ALGORITHM)
+    token: str = jwt.encode(token_data, jwt_secret, algorithm=JWT_ALGORITHM)
+    return token
 
 
 def validate_access_token(access_token: str) -> int | None:

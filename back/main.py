@@ -22,16 +22,38 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 """
 
-from typing import Annotated, Dict
-from fastapi import Depends, FastAPI, HTTPException
+from typing import Annotated, AsyncIterator, Dict
 from fastapi.middleware.cors import CORSMiddleware
+from contextlib import asynccontextmanager
+from fastapi import Depends, FastAPI, HTTPException
 from fastapi.security import OAuth2PasswordRequestForm
 
 # Auth temporarily disabled
 # from back.auth.dependency import get_user_id
 from back.core.config import settings
 from back.api.v1 import api_router
+from back.services.simulation_service import simulation_service
 from back.auth import Token, authenticate_user
+from back.database.session import get_db
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI) -> AsyncIterator[None]:
+    """Application lifespan management"""
+    # Startup
+    yield
+    # Shutdown - cleanup simulations
+    try:
+        db = next(get_db())
+        try:
+            simulation_service.stop_all_simulations(db)
+        finally:
+            db.close()
+    except Exception as e:
+        # In test environments or if database is unavailable,
+        # gracefully skip cleanup
+        print(f"Warning: Could not cleanup simulations during shutdown: {e}")
+
 
 # Create FastAPI application
 app = FastAPI(
@@ -40,6 +62,7 @@ app = FastAPI(
     version="1.0.0",
     docs_url="/api/docs" if settings.ENVIRONMENT != "production" else None,
     redoc_url="/api/redoc" if settings.ENVIRONMENT != "production" else None,
+    lifespan=lifespan,
 )
 
 

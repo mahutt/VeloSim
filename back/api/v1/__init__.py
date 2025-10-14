@@ -25,6 +25,7 @@ SOFTWARE.
 from fastapi import APIRouter
 from .stations import router as stations_router
 from .station_tasks import router as station_tasks_router
+from .simulation import router as simulation_router
 from .simulation_speed import router as simulation_speed_router
 from .resources import router as resources_router
 
@@ -34,6 +35,7 @@ api_router = APIRouter()
 # Include all endpoint routers
 api_router.include_router(stations_router)
 api_router.include_router(station_tasks_router)
+api_router.include_router(simulation_router)
 api_router.include_router(simulation_speed_router)
 api_router.include_router(resources_router)
 
