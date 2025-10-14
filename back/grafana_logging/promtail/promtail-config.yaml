@@ -1,0 +1,42 @@
+server:
+  http_listen_port: 9080
+  grpc_listen_port: 0
+  log_level: debug
+
+positions:
+  filename: /var/lib/promtail/positions.yaml
+
+clients:
+  - url: http://velosim-loki:3100/loki/api/v1/push
+
+scrape_configs:
+  # System logs (gz)
+  - job_name: system
+    decompression:
+      enabled: true
+      initial_delay: 10s
+      format: gz
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: varlogs
+          __path__: /var/log/**.gz
+
+  # System logs (log files)
+  - job_name: system-logs
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: varlogs
+          __path__: /var/log/**/*.log
+
+  # Python application logs
+  - job_name: python-logs
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: python_app
+          __path__: /logs/logs.txt
