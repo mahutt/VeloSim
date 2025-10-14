@@ -103,18 +103,25 @@ alembic revision --autogenerate -m "message"  # Generate migration
 
 Configure these variables in your `.env` file (see [root README](../README.md) for setup):
 
-| Variable             | Description                                               | Default Value                                                | Required |
-| -------------------- | --------------------------------------------------------- | ------------------------------------------------------------ | -------- |
-| `ENVIRONMENT`        | Application environment                                   | `development`                                                | No       |
-| `DEBUG`              | Enable debug mode                                         | `true`                                                       | No       |
-| `DATABASE_URL`        | PostgreSQL connection string                              | `postgresql://velosim:velosim@localhost:5433/velosim`        | Yes      |
-| `VELOSIM_JWT_SECRET` | JWT signing key, must be consistent for entire deployment | Auto-generated every startup (will kill sessions on restart) | No       |
+| Variable         | Description                  | Default Value                                         | Required |
+| ---------------- | ---------------------------- | ----------------------------------------------------- | -------- |
+| `ENVIRONMENT`    | Application environment      | `development`                                         | No       |
+| `DEBUG`          | Enable debug mode            | `true`                                                | No       |
+| `DATABASE_URL`   | PostgreSQL connection string | `postgresql://velosim:velosim@localhost:5433/velosim` | Yes      |
+| `LOG_LEVEL`      | Minimum log level to record  | `INFO`                                                | No       |
+| `LOG_TO_FILE`    | Enable writing logs to file  | `true`                                                | No       |
+| `LOG_TO_CONSOLE` | Enable console output        | `true`                                                | No       |
+| `LOG_FILE_PATH`  | Path to log file             | `back/grafana_logging/logs.txt`                       | No       |
 
 **Environment Options:**
 
 - `development`: Full debugging, API docs enabled
 - `production`: Optimized performance, API docs disabled
 - `testing`: Used for test runs
+
+**Log Level Options:** `DEBUG`, `INFO`, `WARNING`, `ERROR`, `CRITICAL`
+
+See the [Logging System README](./grafana_logging/README.md) for complete logging documentation.
 
 ### Hardcoded Settings
 
@@ -174,6 +181,34 @@ Once the server is running, access the interactive API documentation:
 - **Validation**: Pydantic
 - **Testing**: pytest
 - **Code Quality**: Black, Flake8, MyPy
+- **Logging**: Grafana, Loki, Promtail
+
+## 📊 Logging
+
+VeloSim includes a centralized logging system using **Grafana**, **Loki**, and **Promtail**.
+
+### Quick Start
+
+```python
+from back.grafana_logging.logger import get_logger
+
+logger = get_logger(__name__)
+logger.info("Application started")
+logger.error("An error occurred", exc_info=True)
+```
+
+### View Logs
+
+1. Start the logging stack: `docker-compose up -d`
+2. Open Grafana: http://localhost:3000 (admin/admin)
+3. Navigate to **Explore** → Query: `{job="python_app"}`
+
+### Documentation
+
+For complete logging documentation, usage examples, and troubleshooting:
+
+- **[Logging System README](./grafana_logging/README.md)** - Complete guide
+- **[Logging Examples](./grafana_logging/examples.py)** - Code examples
 
 ## 📄 Related Documentation
 

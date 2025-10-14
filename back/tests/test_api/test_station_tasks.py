@@ -267,3 +267,16 @@ class TestStationTasksAPI:
         invalid_data = {"station_id": station_id, "status": "INVALID_STATUS"}
         response = client.put(f"/api/v1/stationTasks/{task_id}", json=invalid_data)
         assert response.status_code == 422
+
+    def test_get_task_types(self, client: TestClient, db: Session) -> None:
+        """Test getting all available station task types."""
+        response = client.get("/api/v1/stationTasks/types")
+        assert response.status_code == 200
+        data = response.json()
+        assert isinstance(data, list)
+        assert len(data) > 0
+        # Verify that the response contains string values
+        for task_type in data:
+            assert isinstance(task_type, str)
+        # Verify that 'battery_swap' is in the list (based on usage in other tests)
+        assert "battery_swap" in data
