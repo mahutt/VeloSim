@@ -23,7 +23,7 @@ SOFTWARE.
 """
 
 import threading
-from typing import Dict, List, TypedDict
+from typing import Dict, List, TypedDict, Optional
 import uuid
 import simpy
 
@@ -35,7 +35,7 @@ from sim.SimulatorController import SimulatorController
 
 
 class RunInfo(TypedDict):
-    thread: threading.Thread
+    thread: Optional[threading.Thread]
     emitter: FrameEmitter
     simController: SimulatorController
 

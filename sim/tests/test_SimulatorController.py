@@ -142,7 +142,7 @@ def test_simulator_controller_initialization(
 
     # Check that entities are properly loaded from InputParameter
     assert len(simulator_controller.stationEntities) == 2
-    assert len(simulator_controller.resourcEntities) == 2
+    assert len(simulator_controller.resourceEntities) == 2
     assert len(simulator_controller.taskEntities) == 2
 
     # Check keyframe frequency
@@ -228,7 +228,7 @@ def test_create_diff_frame(simulator_controller: SimulatorController) -> None:
     # Mark one entity as updated
     simulator_controller.stationEntities[0].has_updated = True
     simulator_controller.taskEntities[0].has_updated = True
-    simulator_controller.resourcEntities[0].has_updated = True
+    simulator_controller.resourceEntities[0].has_updated = True
 
     frame = simulator_controller.create_diff_frame()
 

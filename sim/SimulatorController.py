@@ -25,7 +25,7 @@ SOFTWARE.
 from sim.RealTimeDriver import RealTimeDriver
 import simpy
 import threading
-from typing import List
+from typing import List, Optional
 from sim.entities.station import Station
 from sim.frame_emitter import FrameEmitter
 from sim.entities.frame import Frame
@@ -59,7 +59,7 @@ class SimulatorController:
 
         # Unpack InputParameter object to populate entity lists
         self.stationEntities: List[Station] = inputParameters.get_station_entities()
-        self.resourcEntities: List[Resource] = inputParameters.get_resource_entities()
+        self.resourceEntities: List[Resource] = inputParameters.get_resource_entities()
         self.taskEntities: List[Task] = inputParameters.get_task_entities()
 
         # Initialize frame counter
@@ -92,7 +92,7 @@ class SimulatorController:
         self.emit_frame(frame)
 
     # Should call frame emitter
-    def emit_frame(self, frame: Frame = None) -> None:
+    def emit_frame(self, frame: Optional[Frame] = None) -> None:
         # generate key frame if the current frame is a multiple of the n
         # specified for key frames
         if not frame:
@@ -105,108 +105,106 @@ class SimulatorController:
         self.frameCounter += 1
 
     def create_diff_frame(self) -> Frame:
+        tasks = []
+        for task in self.taskEntities:
+            if task.has_updated:
+                station = task.get_station()
+                assigned_resource = task.get_assigned_resource()
+                tasks.append(
+                    {
+                        "task_id": task.get_task_id(),
+                        "task_state": str(task.get_state()),
+                        "station_id": station.id if station is not None else None,
+                        "station_name": station.name if station is not None else None,
+                        "assigned_resource_id": (
+                            assigned_resource.id
+                            if assigned_resource is not None
+                            else None
+                        ),
+                        "is_assigned": task.is_assigned(),
+                    }
+                )
+
+        stations = [
+            {
+                "station_id": station.id,
+                "station_name": station.name,
+                "station_position": (station.get_station_position().get_position()),
+                "station_tasks": station.tasks,
+                "task_count": station.get_task_count(),
+            }
+            for station in self.stationEntities
+            if station.has_updated
+        ]
+
+        resources = []
+        for resource in self.resourceEntities:
+            if resource.has_updated:
+                dispatched_task = resource.get_dispatched_task()
+                resources.append(
+                    {
+                        "resource_id": resource.id,
+                        "resource_position": (
+                            resource.get_resource_position().get_position()
+                        ),
+                        "resource_tasks": resource.get_task_list(),
+                        "task_count": resource.get_task_count(),
+                        "dispatched_task_id": (
+                            dispatched_task.get_task_id()
+                            if dispatched_task is not None
+                            else None
+                        ),
+                    }
+                )
+
         payload = {
             "sim_id": self.frameEmitter.sim_id,
-            "tasks": [
-                {
-                    "task_id": task.get_task_id(),
-                    "task_state": (
-                        task.get_state().value
-                        if hasattr(task.get_state(), "value")
-                        else str(task.get_state())
-                    ),
-                    "station_id": (
-                        task.get_station().id if task.get_station() else None
-                    ),
-                    "station_name": (
-                        task.get_station().name if task.get_station() else None
-                    ),
-                    "assigned_resource_id": (
-                        task.get_assigned_resource().id
-                        if task.get_assigned_resource()
-                        else None
-                    ),
-                    "is_assigned": task.is_assigned(),
-                }
-                for task in self.taskEntities
-                if task.has_updated
-            ],
-            "stations": [
-                {
-                    "station_id": station.id,
-                    "station_name": station.name,
-                    "station_position": (station.get_station_position().get_position()),
-                    "station_tasks": station.tasks,
-                    "task_count": station.get_task_count(),
-                }
-                for station in self.stationEntities
-                if station.has_updated
-            ],
-            "resources": [
-                {
-                    "resource_id": resource.id,
-                    "resource_position": (
-                        resource.get_resource_position().get_position()
-                    ),
-                    "resource_tasks": resource.get_task_list(),
-                    "task_count": resource.get_task_count(),
-                    "dispatched_task_id": (
-                        resource.get_dispatched_task().get_task_id()
-                        if resource.get_dispatched_task()
-                        else None
-                    ),
-                }
-                for resource in self.resourcEntities
-                if resource.has_updated
-            ],
+            "tasks": tasks,
+            "stations": stations,
+            "resources": resources,
             "clock": {
                 "realSecondsPassed": self.clock.real_seconds_passed,
                 "realMinutesPassed": self.clock.real_minutes_passed,
                 "simSecondsPassed": self.clock.sim_time_seconds,
-                "simMinutesPassed": self.clock.sim_time_seconds,
+                "simMinutesPassed": self.clock.sim_time_minutes,
             },
         }
         frame = Frame(seq_numb=self.frameCounter, payload=payload)
-
         return frame
 
     def create_key_frame(self) -> Frame:
-        payload = {
-            "sim_id": self.frameEmitter.sim_id,
-            "tasks": [
+        tasks = []
+        for task in self.taskEntities:
+            station = task.get_station()
+            assigned_resource = task.get_assigned_resource()
+            tasks.append(
                 {
                     "task_id": task.get_task_id(),
-                    "task_state": (
-                        task.get_state().value
-                        if hasattr(task.get_state(), "value")
-                        else str(task.get_state())
-                    ),
-                    "station_id": (
-                        task.get_station().id if task.get_station() else None
-                    ),
-                    "station_name": (
-                        task.get_station().name if task.get_station() else None
-                    ),
+                    "task_state": str(task.get_state()),
+                    "station_id": station.id if station is not None else None,
+                    "station_name": station.name if station is not None else None,
                     "assigned_resource_id": (
-                        task.get_assigned_resource().id
-                        if task.get_assigned_resource()
-                        else None
+                        assigned_resource.id if assigned_resource is not None else None
                     ),
                     "is_assigned": task.is_assigned(),
                 }
-                for task in self.taskEntities
-            ],
-            "stations": [
-                {
-                    "station_id": station.id,
-                    "station_name": station.name,
-                    "station_position": (station.get_station_position().get_position()),
-                    "station_tasks": station.tasks,
-                    "task_count": station.get_task_count(),
-                }
-                for station in self.stationEntities
-            ],
-            "resources": [
+            )
+
+        stations = [
+            {
+                "station_id": station.id,
+                "station_name": station.name,
+                "station_position": (station.get_station_position().get_position()),
+                "station_tasks": station.tasks,
+                "task_count": station.get_task_count(),
+            }
+            for station in self.stationEntities
+        ]
+
+        resources = []
+        for resource in self.resourceEntities:
+            dispatched_task = resource.get_dispatched_task()
+            resources.append(
                 {
                     "resource_id": resource.id,
                     "resource_position": (
@@ -215,20 +213,24 @@ class SimulatorController:
                     "resource_tasks": resource.get_task_list(),
                     "task_count": resource.get_task_count(),
                     "dispatched_task_id": (
-                        resource.get_dispatched_task().get_task_id()
-                        if resource.get_dispatched_task()
+                        dispatched_task.get_task_id()
+                        if dispatched_task is not None
                         else None
                     ),
                 }
-                for resource in self.resourcEntities
-            ],
+            )
+
+        payload = {
+            "sim_id": self.frameEmitter.sim_id,
+            "tasks": tasks,
+            "stations": stations,
+            "resources": resources,
             "clock": {
                 "realSecondsPassed": self.clock.real_seconds_passed,
                 "realMinutesPassed": self.clock.real_minutes_passed,
                 "simSecondsPassed": self.clock.sim_time_seconds,
-                "simMinutesPassed": self.clock.sim_time_seconds,
+                "simMinutesPassed": self.clock.sim_time_minutes,
             },
         }
         frame = Frame(seq_numb=self.frameCounter, payload=payload)
-
         return frame
