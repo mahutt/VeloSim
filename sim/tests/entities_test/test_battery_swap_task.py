@@ -83,10 +83,10 @@ class TestBatterySwapTask:
         assert state == State.ASSIGNED
         assert str(state) == "assigned"
 
-        task.set_state(State.DISPATCHED)
+        task.set_state(State.IN_PROGRESS)
         state = task.get_state()
-        assert state == State.DISPATCHED
-        assert str(state) == "dispatched"
+        assert state == State.IN_PROGRESS
+        assert str(state) == "inprogress"
 
         task.set_state(State.CLOSED)
         state = task.get_state()

@@ -29,7 +29,7 @@ from enum import Enum
 class State(Enum):
     OPEN = 1
     ASSIGNED = 2
-    DISPATCHED = 3
+    IN_PROGRESS = 3
     CLOSED = 4
 
     # get string state by doing str(state)
@@ -38,7 +38,7 @@ class State(Enum):
             return "open"
         elif self == State.ASSIGNED:
             return "assigned"
-        elif self == State.DISPATCHED:
-            return "dispatched"
+        elif self == State.IN_PROGRESS:
+            return "inprogress"
         elif self == State.CLOSED:
             return "closed"
