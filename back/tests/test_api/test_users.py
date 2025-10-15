@@ -172,3 +172,99 @@ class TestUsersAPI:
         assert response.status_code == 401
         data = response.json()
         assert "Requesting user cannot create users." in str(data["detail"])
+
+    @patch("back.api.v1.users.user_crud.update_password")
+    def test_update_password_success(
+        self, mock_update: MagicMock, authenticated_client: TestClient, db: Session
+    ) -> None:
+        """Test updating a user's password successfully."""
+        mock_user = MagicMock()
+        mock_user.id = 1
+        mock_user.username = "test_user"
+        mock_user.is_admin = False
+        mock_update.return_value = mock_user
+
+        password_data = {"password": "new_password"}
+
+        response = authenticated_client.put(
+            "/api/v1/users/1/password", json=password_data
+        )
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["id"] == 1
+        assert data["username"] == "test_user"
+        assert data["is_admin"] is False
+        mock_update.assert_called_once()
+
+    @patch("back.api.v1.users.user_crud.update_password")
+    def test_update_password_bad_request(
+        self, mock_update: MagicMock, authenticated_client: TestClient, db: Session
+    ) -> None:
+        """Test updating password with bad request error."""
+        mock_update.side_effect = BadRequestError("User not found")
+
+        password_data = {"password": "new_password"}
+
+        response = authenticated_client.put(
+            "/api/v1/users/999/password", json=password_data
+        )
+
+        assert response.status_code == 400
+        data = response.json()
+        assert "User not found" in str(data["detail"])
+
+    @patch("back.api.v1.users.user_crud.update_password")
+    def test_update_password_permission_error(
+        self, mock_update: MagicMock, authenticated_client: TestClient, db: Session
+    ) -> None:
+        """Test updating password with permission error."""
+        mock_update.side_effect = VelosimPermissionError(
+            "Requesting user cannot update this password."
+        )
+
+        password_data = {"password": "new_password"}
+
+        response = authenticated_client.put(
+            "/api/v1/users/2/password", json=password_data
+        )
+
+        assert response.status_code == 401
+        data = response.json()
+        assert "Requesting user cannot update this password." in str(data["detail"])
+
+    def test_update_password_invalid_data(
+        self, authenticated_client: TestClient, db: Session
+    ) -> None:
+        """Test updating password with missing data."""
+        response = authenticated_client.put("/api/v1/users/1/password", json={})
+        assert response.status_code == 422
+
+    def test_update_password_no_authentication(
+        self, client: TestClient, db: Session
+    ) -> None:
+        """Test that authentication is required for updating passwords."""
+        password_data = {"password": "new_password"}
+
+        # Use the base client without auth override
+        response = client.put("/api/v1/users/1/password", json=password_data)
+
+        # Should fail due to authentication
+        assert response.status_code == 401
+
+    @patch("back.api.v1.users.user_crud.update_password")
+    def test_update_password_non_admin_forbidden(
+        self, mock_update: MagicMock, non_admin_client: TestClient, db: Session
+    ) -> None:
+        """Test non-admin user trying to update another user's password."""
+        mock_update.side_effect = VelosimPermissionError(
+            "Requesting user cannot update this password."
+        )
+
+        password_data = {"password": "new_password"}
+
+        response = non_admin_client.put("/api/v1/users/1/password", json=password_data)
+
+        assert response.status_code == 401
+        data = response.json()
+        assert "Requesting user cannot update this password." in str(data["detail"])

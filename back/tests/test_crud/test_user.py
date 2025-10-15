@@ -25,7 +25,7 @@ SOFTWARE.
 import pytest
 from sqlalchemy.orm import Session
 from back.crud.user import user_crud
-from back.schemas.user import UserCreate
+from back.schemas import UserCreate, UserPasswordUpdate
 from back.models.user import User
 from back.exceptions.bad_request_error import BadRequestError
 from back.exceptions.velosim_permission_error import VelosimPermissionError
@@ -129,3 +129,104 @@ class TestUserCRUD:
         hashed = user_crud.hash_password(password)
         assert hashed != password
         assert hashed.startswith("$argon2")
+
+    def test_update_password_success_admin(self, db: Session, admin_user: User) -> None:
+        """Test admin updating another user's password successfully."""
+        # Create a regular user
+        regular_user = User(
+            username="regular_user",
+            password_hash=user_crud.hash_password("old_password"),
+            is_admin=False,
+        )
+        db.add(regular_user)
+        db.flush()
+        db.refresh(regular_user)
+
+        # Store the old hash before updating
+        old_password_hash = regular_user.password_hash
+
+        password_data = UserPasswordUpdate(password="new_password")
+        updated_user = user_crud.update_password(
+            db, regular_user.id, password_data, admin_user.id
+        )
+
+        assert updated_user.id == regular_user.id
+        assert updated_user.password_hash != "new_password"  # Should be hashed
+        assert (
+            updated_user.password_hash != old_password_hash
+        )  # Should be different from old hash
+
+    def test_update_password_success_self(self, db: Session) -> None:
+        """Test user updating their own password successfully."""
+        # Create a user
+        user = User(
+            username="self_user",
+            password_hash=user_crud.hash_password("old_password"),
+            is_admin=False,
+        )
+        db.add(user)
+        db.flush()
+        db.refresh(user)
+
+        # Store the old hash before updating
+        old_hash = user.password_hash
+
+        password_data = UserPasswordUpdate(password="new_password")
+        updated_user = user_crud.update_password(db, user.id, password_data, user.id)
+
+        assert updated_user.id == user.id
+        assert updated_user.password_hash != "new_password"  # Should be hashed
+        assert (
+            updated_user.password_hash != old_hash
+        )  # Should be different from old hash
+
+    def test_update_password_permission_error_non_admin(self, db: Session) -> None:
+        """Test non-admin trying to update another user's password raises permission
+        error."""
+        # Create two regular users
+        user1 = User(
+            username="user1",
+            password_hash=user_crud.hash_password("password1"),
+            is_admin=False,
+        )
+        user2 = User(
+            username="user2",
+            password_hash=user_crud.hash_password("password2"),
+            is_admin=False,
+        )
+        db.add(user1)
+        db.add(user2)
+        db.flush()
+        db.refresh(user1)
+        db.refresh(user2)
+
+        password_data = UserPasswordUpdate(password="new_password")
+
+        with pytest.raises(VelosimPermissionError):
+            user_crud.update_password(db, user2.id, password_data, user1.id)
+
+    def test_update_password_nonexistent_requester(self, db: Session) -> None:
+        """Test updating password with nonexistent requester raises permission error."""
+        # Create a user
+        user = User(
+            username="test_user",
+            password_hash=user_crud.hash_password("password"),
+            is_admin=False,
+        )
+        db.add(user)
+        db.flush()
+        db.refresh(user)
+
+        password_data = UserPasswordUpdate(password="new_password")
+
+        with pytest.raises(VelosimPermissionError):
+            user_crud.update_password(db, user.id, password_data, 99999)
+
+    def test_update_password_user_not_found(
+        self, db: Session, admin_user: User
+    ) -> None:
+        """Test updating password for nonexistent user raises bad request error."""
+        password_data = UserPasswordUpdate(password="new_password")
+
+        with pytest.raises(BadRequestError):
+            user_crud.update_password(db, 99999, password_data, admin_user.id)
