@@ -385,3 +385,115 @@ class TestUsersAPI:
         assert response.status_code == 401
         data = response.json()
         assert "Requesting user cannot list users." in str(data["detail"])
+
+    @patch("back.api.v1.users.user_crud.update_role")
+    def test_update_role_success(
+        self, mock_update: MagicMock, authenticated_client: TestClient, db: Session
+    ) -> None:
+        """Test updating a user's role successfully."""
+        mock_user = MagicMock()
+        mock_user.id = 2
+        mock_user.username = "test_user"
+        mock_user.is_admin = True
+        mock_update.return_value = mock_user
+
+        role_data = {"is_admin": True}
+
+        response = authenticated_client.put("/api/v1/users/2/role", json=role_data)
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["id"] == 2
+        assert data["username"] == "test_user"
+        assert data["is_admin"] is True
+        mock_update.assert_called_once()
+
+    @patch("back.api.v1.users.user_crud.update_role")
+    def test_update_role_demote_admin(
+        self, mock_update: MagicMock, authenticated_client: TestClient, db: Session
+    ) -> None:
+        """Test demoting an admin user successfully."""
+        mock_user = MagicMock()
+        mock_user.id = 2
+        mock_user.username = "admin_user"
+        mock_user.is_admin = False
+        mock_update.return_value = mock_user
+
+        role_data = {"is_admin": False}
+
+        response = authenticated_client.put("/api/v1/users/2/role", json=role_data)
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["id"] == 2
+        assert data["username"] == "admin_user"
+        assert data["is_admin"] is False
+        mock_update.assert_called_once()
+
+    @patch("back.api.v1.users.user_crud.update_role")
+    def test_update_role_bad_request(
+        self, mock_update: MagicMock, authenticated_client: TestClient, db: Session
+    ) -> None:
+        """Test updating role with bad request error."""
+        mock_update.side_effect = BadRequestError("User not found")
+
+        role_data = {"is_admin": True}
+
+        response = authenticated_client.put("/api/v1/users/999/role", json=role_data)
+
+        assert response.status_code == 400
+        data = response.json()
+        assert "User not found" in str(data["detail"])
+
+    @patch("back.api.v1.users.user_crud.update_role")
+    def test_update_role_permission_error_self(
+        self, mock_update: MagicMock, authenticated_client: TestClient, db: Session
+    ) -> None:
+        """Test admin trying to update their own role."""
+        mock_update.side_effect = VelosimPermissionError(
+            "Requesting user cannot update this role."
+        )
+
+        role_data = {"is_admin": False}
+
+        response = authenticated_client.put("/api/v1/users/1/role", json=role_data)
+
+        assert response.status_code == 401
+        data = response.json()
+        assert "Requesting user cannot update this role." in str(data["detail"])
+
+    @patch("back.api.v1.users.user_crud.update_role")
+    def test_update_role_permission_error_non_admin(
+        self, mock_update: MagicMock, non_admin_client: TestClient, db: Session
+    ) -> None:
+        """Test non-admin user trying to update role."""
+        mock_update.side_effect = VelosimPermissionError(
+            "Requesting user cannot update this role."
+        )
+
+        role_data = {"is_admin": True}
+
+        response = non_admin_client.put("/api/v1/users/2/role", json=role_data)
+
+        assert response.status_code == 401
+        data = response.json()
+        assert "Requesting user cannot update this role." in str(data["detail"])
+
+    def test_update_role_invalid_data(
+        self, authenticated_client: TestClient, db: Session
+    ) -> None:
+        """Test updating role with missing data."""
+        response = authenticated_client.put("/api/v1/users/1/role", json={})
+        assert response.status_code == 422
+
+    def test_update_role_no_authentication(
+        self, client: TestClient, db: Session
+    ) -> None:
+        """Test that authentication is required for updating roles."""
+        role_data = {"is_admin": True}
+
+        # Use the base client without auth override
+        response = client.put("/api/v1/users/1/role", json=role_data)
+
+        # Should fail due to authentication
+        assert response.status_code == 401

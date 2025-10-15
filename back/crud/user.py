@@ -31,7 +31,7 @@ from sqlalchemy.orm import Session
 from back.exceptions.bad_request_error import BadRequestError
 from back.exceptions.velosim_permission_error import VelosimPermissionError
 from back.models.user import User
-from back.schemas import UserCreate, UserPasswordUpdate
+from back.schemas import UserCreate, UserPasswordUpdate, UserRoleUpdate
 
 ph = PasswordHasher.from_parameters(RFC_9106_LOW_MEMORY)
 
@@ -124,6 +124,31 @@ class UserCRUD:
             raise BadRequestError("User not found")
 
         user.password_hash = self.hash_password(password_data.password)
+        db.add(user)
+        db.flush()
+        db.refresh(user)
+        return user
+
+    def update_role(
+        self,
+        db: Session,
+        user_id: int,
+        role_data: UserRoleUpdate,
+        requesting_user_id: int,
+    ) -> User:
+        """Updates a user's role if the requester is an admin and not the user
+        themselves."""
+        requesting_user = self.get(db, requesting_user_id)
+        if not requesting_user or (
+            requesting_user.id == user_id or not requesting_user.is_admin
+        ):
+            raise VelosimPermissionError("Requesting user cannot update this role.")
+
+        user = self.get(db, user_id)
+        if not user:
+            raise BadRequestError("User not found")
+
+        user.is_admin = role_data.is_admin
         db.add(user)
         db.flush()
         db.refresh(user)

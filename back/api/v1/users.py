@@ -28,7 +28,13 @@ from back.auth.dependency import get_user_id
 from back.database.session import get_db
 from back.exceptions.bad_request_error import BadRequestError
 from back.exceptions.velosim_permission_error import VelosimPermissionError
-from back.schemas import UserCreate, UserPasswordUpdate, UserResponse, UsersResponse
+from back.schemas import (
+    UserCreate,
+    UserPasswordUpdate,
+    UserRoleUpdate,
+    UserResponse,
+    UsersResponse,
+)
 from back.crud.user import user_crud
 from sqlalchemy.orm import Session
 
@@ -104,6 +110,27 @@ async def password_update(
         updated_user = user_crud.update_password(
             db, user_id, password_data, requesting_user
         )
+        return UserResponse.model_validate(updated_user)
+    except BadRequestError as err:
+        raise HTTPException(status_code=400, detail=err.args)
+    except VelosimPermissionError as err:
+        raise HTTPException(status_code=401, detail=err.args)
+
+
+@router.put("/{user_id}/role", response_model=UserResponse)
+async def role_update(
+    user_id: int,
+    role_data: UserRoleUpdate,
+    db: Session = Depends(get_db),
+    requesting_user: int = Depends(get_user_id),
+) -> UserResponse:
+    """Update a user's role.
+
+    The requesting user must be an admin. The requesting user cannot change their own
+    role. This prevents an admin from demoting themselves without another admin to
+    restore access to the app."""
+    try:
+        updated_user = user_crud.update_role(db, user_id, role_data, requesting_user)
         return UserResponse.model_validate(updated_user)
     except BadRequestError as err:
         raise HTTPException(status_code=400, detail=err.args)
