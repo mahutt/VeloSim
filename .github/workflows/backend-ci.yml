@@ -8,6 +8,21 @@ jobs:
   backend-tests:
     runs-on: ubuntu-latest
 
+    services:
+      postgres:
+        image: postgres:15-alpine
+        env:
+          POSTGRES_USER: velosim_test
+          POSTGRES_PASSWORD: velosim_test
+          POSTGRES_DB: velosim_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
     steps:
       - uses: actions/checkout@v4
 
@@ -20,6 +35,37 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install -e .[dev]
+
+      - name: Install PostgreSQL client tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y postgresql-client
+
+      - name: Wait for PostgreSQL
+        run: |
+          until pg_isready -h localhost -p 5432 -U velosim_test; do
+            echo "Waiting for PostgreSQL..."
+            sleep 2
+          done
+
+      - name: Run Alembic migrations
+        env:
+          DATABASE_URL: postgresql://velosim_test:velosim_test@localhost:5432/velosim_test
+        run: |
+          cd back
+          alembic upgrade head
+
+      - name: Validate migration seeding (npm db:seed)
+        env:
+          DATABASE_URL: postgresql://velosim_test:velosim_test@localhost:5432/velosim_test
+        run: |
+          echo "Testing npm run db:seed command..."
+          npm run db:seed || {
+            echo "ERROR: npm run db:seed failed"
+            echo "This means the seeding process has errors that need to be fixed"
+            exit 1
+          }
+          echo "npm run db:seed completed successfully"
 
       - name: Validate Python package structure
         run: |
@@ -38,8 +84,18 @@ jobs:
           mypy back
 
       - name: Run tests with pytest
+        env:
+          DATABASE_URL: postgresql://velosim_test:velosim_test@localhost:5432/velosim_test
         run: |
           pytest back --cov=back --cov-report=term-missing --cov-report=xml --cov-fail-under=70
+
+      - name: Check for model-migration mismatches
+        env:
+          DATABASE_URL: postgresql://velosim_test:velosim_test@localhost:5432/velosim_test
+        run: |
+          cd back
+          echo "Checking for unapplied model changes..."
+          alembic check || echo "⚠️ Warning: Model changes detected that don't have migrations!"
 
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v5.5.1

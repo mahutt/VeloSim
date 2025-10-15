@@ -124,24 +124,55 @@ def seed_database():
     seeds_dir = back_dir / "alembic" / "seeds"
     if not seeds_dir.exists():
         print(f"ERROR [velosim.db_manager] Seeds directory not found: {seeds_dir}")
+        print(f"ERROR [velosim.db_manager] Expected path: {seeds_dir.absolute()}")
         return False
 
     # Get all .sql files in the seeds directory, sorted alphabetically
     seed_files = sorted(seeds_dir.glob("*.sql"))
     if not seed_files:
         print(f"ERROR [velosim.db_manager] No seed files found in: {seeds_dir}")
+        print(f"ERROR [velosim.db_manager] Please ensure .sql files exist in the seeds directory")
         return False
 
     print(f"INFO  [velosim.db_manager] Found {len(seed_files)} seed file(s): {[f.name for f in seed_files]}")
 
     db_config = parse_database_url(DATABASE_URL)
 
+    # Verify database connection before attempting to seed
+    print(f"INFO  [velosim.db_manager] Connecting to database: {db_config['database']} at {db_config['host']}:{db_config['port']}")
+
     # Set password environment variable if provided
     env = os.environ.copy()
     if db_config['password']:
         env['PGPASSWORD'] = db_config['password']
 
+    # Test database connection first
+    test_cmd = [
+        'psql',
+        '-h', db_config['host'],
+        '-p', str(db_config['port']),
+        '-U', db_config['username'],
+        '-d', db_config['database'],
+        '-c', 'SELECT 1;'
+    ]
+
+    try:
+        subprocess.run(test_cmd, env=env, check=True, capture_output=True, text=True, timeout=5)
+        print(f"INFO  [velosim.db_manager] Database connection successful")
+    except subprocess.TimeoutExpired:
+        print(f"ERROR [velosim.db_manager] Database connection timed out")
+        print(f"ERROR [velosim.db_manager] Check if PostgreSQL is running at {db_config['host']}:{db_config['port']}")
+        return False
+    except subprocess.CalledProcessError as e:
+        print(f"ERROR [velosim.db_manager] Cannot connect to database: {db_config['database']}")
+        print(f"ERROR [velosim.db_manager] Host: {db_config['host']}:{db_config['port']}, User: {db_config['username']}")
+        if e.stderr:
+            print(f"ERROR [velosim.db_manager] Connection error details: {e.stderr.strip()}")
+        print(f"ERROR [velosim.db_manager] Ensure the database exists and migrations have been run")
+        return False
+
     # Process each seed file
+    failed_files = []
     for seed_file in seed_files:
         print(f"INFO  [velosim.db_manager] Processing seed file: {seed_file.name}")
 
@@ -151,20 +182,58 @@ def seed_database():
             '-p', str(db_config['port']),
             '-U', db_config['username'],
             '-d', db_config['database'],
-            '-q',  # Quiet mode - suppress most output
+            '-v', 'ON_ERROR_STOP=1',  # Stop on first error
             '-f', str(seed_file)
         ]
 
         try:
             result = subprocess.run(cmd, env=env, check=True, capture_output=True, text=True)
-            print(f"INFO  [velosim.db_manager] Successfully processed: {seed_file.name}")
-        except subprocess.CalledProcessError as e:
-            print(f"ERROR [velosim.db_manager] Failed to process {seed_file.name}: {e}")
-            if e.stderr:
-                print(f"DEBUG [velosim.db_manager] stderr: {e.stderr}")
-            return False
 
-    print("INFO  [velosim.db_manager] All seed files processed successfully")
+            # Show output if there are any notices/warnings
+            if result.stdout and result.stdout.strip():
+                print(f"INFO  [velosim.db_manager] Output from {seed_file.name}:")
+                for line in result.stdout.strip().split('\n'):
+                    if line.strip():
+                        print(f"      {line}")
+
+            if result.stderr and result.stderr.strip():
+                # Some messages go to stderr even on success (like NOTICE)
+                for line in result.stderr.strip().split('\n'):
+                    if 'ERROR' in line.upper():
+                        print(f"ERROR [velosim.db_manager] {line}")
+                    elif 'WARNING' in line.upper():
+                        print(f"WARN  [velosim.db_manager] {line}")
+                    else:
+                        print(f"INFO  [velosim.db_manager] {line}")
+
+            print(f"INFO  [velosim.db_manager] ✅ Successfully processed: {seed_file.name}")
+
+        except subprocess.CalledProcessError as e:
+            print(f"ERROR [velosim.db_manager] ❌ Failed to process {seed_file.name}")
+            print(f"ERROR [velosim.db_manager] Exit code: {e.returncode}")
+
+            if e.stdout and e.stdout.strip():
+                print(f"ERROR [velosim.db_manager] Output:")
+                for line in e.stdout.strip().split('\n'):
+                    print(f"      {line}")
+
+            if e.stderr and e.stderr.strip():
+                print(f"ERROR [velosim.db_manager] Error details:")
+                for line in e.stderr.strip().split('\n'):
+                    print(f"      {line}")
+
+            failed_files.append(seed_file.name)
+            # Continue to show all errors, but track failures
+
+    # Report results
+    if failed_files:
+        print(f"\nERROR [velosim.db_manager] ❌ Seeding FAILED for {len(failed_files)} file(s):")
+        for filename in failed_files:
+            print(f"      - {filename}")
+        print(f"ERROR [velosim.db_manager] Please check the errors above and fix the seed files")
+        return False
+
+    print(f"\nINFO  [velosim.db_manager] ✅ All seed files processed successfully ({len(seed_files)} file(s))")
     return True
 def drop_database():
     """Drop the target database."""
@@ -252,21 +321,41 @@ def main():
 
     args = parser.parse_args()
 
-    print(f"INFO  [velosim.db_manager] VeloSim Database Tool - {args.command}")
+    print("=" * 80)
+    print(f"INFO  [velosim.db_manager] VeloSim Database Tool - {args.command.upper()}")
     print(f"INFO  [velosim.db_manager] Using DATABASE_URL: {DATABASE_URL}")
+    print("=" * 80)
 
     success = False
 
-    if args.command == 'seed':
-        success = seed_database()
-    elif args.command == 'dropseed':
-        success = dropseed()
-    elif args.command == 'drop':
-        success = drop_database()
-    elif args.command == 'create':
-        success = create_database()
-    elif args.command == 'migrate':
-        success = run_migrations()
+    try:
+        if args.command == 'seed':
+            success = seed_database()
+        elif args.command == 'dropseed':
+            success = dropseed()
+        elif args.command == 'drop':
+            success = drop_database()
+        elif args.command == 'create':
+            success = create_database()
+        elif args.command == 'migrate':
+            success = run_migrations()
+    except KeyboardInterrupt:
+        print("\n\nERROR [velosim.db_manager] Operation cancelled by user")
+        sys.exit(1)
+    except Exception as e:
+        print(f"\nERROR [velosim.db_manager] Unexpected error: {e}")
+        import traceback
+        traceback.print_exc()
+        sys.exit(1)
+
+    # Print final status
+    print("\n" + "=" * 80)
+    if success:
+        print(f"INFO  [velosim.db_manager] ✅ {args.command.upper()} completed successfully!")
+    else:
+        print(f"ERROR [velosim.db_manager] ❌ {args.command.upper()} FAILED!")
+        print("ERROR [velosim.db_manager] Please check the error messages above for details")
+    print("=" * 80)
 
     sys.exit(0 if success else 1)
 
