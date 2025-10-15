@@ -22,17 +22,10 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 """
 
-# Import all CRUD classes here for easy access
-from .station import station_crud
-from .station_task import station_task_crud
-from .resource import resource_crud
-from .sim_instance import sim_instance_crud
-from .user import user_crud
 
-__all__ = [
-    "station_crud",
-    "station_task_crud",
-    "resource_crud",
-    "sim_instance_crud",
-    "user_crud",
-]
+class VelosimPermissionError(ValueError):
+    """Raised when a permission-related error occurs in VeloSim.
+
+    Named to not conflict with a built-in class that is an OS-level permission error."""
+
+    pass
