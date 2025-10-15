@@ -23,7 +23,7 @@ SOFTWARE.
 """
 
 from sqlite3 import IntegrityError
-from typing import Optional
+from typing import List, Optional, Tuple
 from argon2 import PasswordHasher
 from argon2.profiles import RFC_9106_LOW_MEMORY
 from sqlalchemy.orm import Session
@@ -46,6 +46,38 @@ class UserCRUD:
     def get_by_username(self, db: Session, username: str) -> Optional[User]:
         """Get a user by username."""
         return db.query(User).filter(User.username == username).first()
+
+    def get_all(
+        self,
+        db: Session,
+        is_enabled: Optional[bool],
+        is_admin: Optional[bool],
+        requesting_user_id: int,
+        skip: int = 0,
+        limit: int = 10,
+    ) -> Tuple[List[User], int]:
+        """Get all users with optional filters and pagination, if the requester is an
+        admin."""
+        requesting_user = self.get(db, requesting_user_id)
+        if not requesting_user or not requesting_user.is_admin:
+            raise VelosimPermissionError("Requesting user cannot list users.")
+
+        # Build the base query
+        query = db.query(User)
+
+        # Apply filters conditionally
+        if is_enabled is not None:
+            pass  # Haven't implemented this field of user yet
+        if is_admin is not None:
+            query = query.filter(User.is_admin == True)
+
+        # Get total count for pagination
+        total = query.count()
+
+        # Apply pagination
+        users = query.offset(skip).limit(limit).all()
+
+        return users, total
 
     def create(
         self, db: Session, user_data: UserCreate, requesting_user_id: int

@@ -58,8 +58,8 @@ class UserResponse(UserBase):
 class UsersResponse(BaseModel):
     """Schema for paginated user responses."""
 
-    station_tasks: List[UserResponse] = Field(..., description="List of station tasks")
-    total: int = Field(..., description="Total number of station tasks")
+    users: List[UserResponse] = Field(..., description="List of users")
+    total: int = Field(..., description="Total number of users")
     page: int = Field(..., description="Current page number")
     per_page: int = Field(..., description="Items per page")
     total_pages: int = Field(..., description="Total number of pages")

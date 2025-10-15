@@ -230,3 +230,97 @@ class TestUserCRUD:
 
         with pytest.raises(BadRequestError):
             user_crud.update_password(db, 99999, password_data, admin_user.id)
+
+    def test_get_all_users_success_admin(self, db: Session, admin_user: User) -> None:
+        """Test admin getting all users successfully."""
+        # Create some additional users
+        user1 = User(
+            username="user1",
+            password_hash=user_crud.hash_password("password1"),
+            is_admin=False,
+        )
+        user2 = User(
+            username="user2",
+            password_hash=user_crud.hash_password("password2"),
+            is_admin=True,
+        )
+        db.add(user1)
+        db.add(user2)
+        db.flush()
+
+        users, total = user_crud.get_all(db, None, None, admin_user.id)
+
+        assert total == 3  # admin_user + user1 + user2
+        assert len(users) == 3
+        usernames = [user.username for user in users]
+        assert "admin_user" in usernames
+        assert "user1" in usernames
+        assert "user2" in usernames
+
+    def test_get_all_users_with_admin_filter(
+        self, db: Session, admin_user: User
+    ) -> None:
+        """Test getting users with admin filter."""
+        # Create some additional users
+        user1 = User(
+            username="user1",
+            password_hash=user_crud.hash_password("password1"),
+            is_admin=False,
+        )
+        user2 = User(
+            username="user2",
+            password_hash=user_crud.hash_password("password2"),
+            is_admin=True,
+        )
+        db.add(user1)
+        db.add(user2)
+        db.flush()
+
+        # Filter for admin users only
+        users, total = user_crud.get_all(db, None, True, admin_user.id)
+
+        assert total == 2  # admin_user + user2 (both admin)
+        assert len(users) == 2
+        for user in users:
+            assert user.is_admin is True
+
+    def test_get_all_users_with_pagination(self, db: Session, admin_user: User) -> None:
+        """Test getting users with pagination."""
+        # Create additional users
+        for i in range(5):
+            user = User(
+                username=f"user{i}",
+                password_hash=user_crud.hash_password(f"password{i}"),
+                is_admin=False,
+            )
+            db.add(user)
+        db.flush()
+
+        # Test pagination: skip 2, limit 3
+        users, total = user_crud.get_all(db, None, None, admin_user.id, skip=2, limit=3)
+
+        assert total == 6  # admin_user + 5 created users
+        assert len(users) == 3  # Limited to 3
+
+    def test_get_all_users_permission_error_non_admin(self, db: Session) -> None:
+        """Test non-admin trying to get all users raises permission error."""
+        # Create a non-admin user
+        non_admin = User(
+            username="regular_user",
+            password_hash=user_crud.hash_password("password"),
+            is_admin=False,
+        )
+        db.add(non_admin)
+        db.flush()
+        db.refresh(non_admin)
+
+        with pytest.raises(VelosimPermissionError):
+            user_crud.get_all(db, None, None, non_admin.id)
+
+    def test_get_all_users_permission_error_nonexistent_requester(
+        self, db: Session
+    ) -> None:
+        """Test nonexistent requester trying to get all users raises permission
+        error."""
+        with pytest.raises(VelosimPermissionError):
+            user_crud.get_all(db, None, None, 99999)

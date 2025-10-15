@@ -268,3 +268,120 @@ class TestUsersAPI:
         assert response.status_code == 401
         data = response.json()
         assert "Requesting user cannot update this password." in str(data["detail"])
+
+    @patch("back.api.v1.users.user_crud.get_all")
+    def test_get_users_success(
+        self, mock_get_all: MagicMock, authenticated_client: TestClient, db: Session
+    ) -> None:
+        """Test getting users successfully."""
+        # Mock the CRUD get_all method
+        mock_user1 = MagicMock()
+        mock_user1.id = 1
+        mock_user1.username = "user1"
+        mock_user1.is_admin = True
+
+        mock_user2 = MagicMock()
+        mock_user2.id = 2
+        mock_user2.username = "user2"
+        mock_user2.is_admin = False
+
+        mock_get_all.return_value = ([mock_user1, mock_user2], 2)
+
+        response = authenticated_client.get("/api/v1/users/")
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["total"] == 2
+        assert data["page"] == 1
+        assert data["per_page"] == 10
+        assert data["total_pages"] == 1
+        assert len(data["users"]) == 2
+        assert data["users"][0]["id"] == 1
+        assert data["users"][0]["username"] == "user1"
+        assert data["users"][0]["is_admin"] is True
+        mock_get_all.assert_called_once()
+
+    @patch("back.api.v1.users.user_crud.get_all")
+    def test_get_users_with_filters(
+        self, mock_get_all: MagicMock, authenticated_client: TestClient, db: Session
+    ) -> None:
+        """Test getting users with filters."""
+        mock_user = MagicMock()
+        mock_user.id = 1
+        mock_user.username = "admin_user"
+        mock_user.is_admin = True
+
+        mock_get_all.return_value = ([mock_user], 1)
+
+        response = authenticated_client.get("/api/v1/users/?isAdmin=true")
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["total"] == 1
+        assert len(data["users"]) == 1
+        assert data["users"][0]["is_admin"] is True
+        mock_get_all.assert_called_once()
+
+    @patch("back.api.v1.users.user_crud.get_all")
+    def test_get_users_with_pagination(
+        self, mock_get_all: MagicMock, authenticated_client: TestClient, db: Session
+    ) -> None:
+        """Test getting users with pagination."""
+        mock_users = []
+        for i in range(3):
+            mock_user = MagicMock()
+            mock_user.id = i + 1
+            mock_user.username = f"user{i + 1}"
+            mock_user.is_admin = False
+            mock_users.append(mock_user)
+
+        mock_get_all.return_value = (mock_users, 10)  # 3 users returned, 10 total
+
+        response = authenticated_client.get("/api/v1/users/?skip=5&limit=3")
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["total"] == 10
+        assert data["page"] == 2  # (5 // 3) + 1 = 2
+        assert data["per_page"] == 3
+        assert data["total_pages"] == 4  # ceil(10 / 3) = 4
+        assert len(data["users"]) == 3
+        mock_get_all.assert_called_once()
+
+    @patch("back.api.v1.users.user_crud.get_all")
+    def test_get_users_permission_error(
+        self, mock_get_all: MagicMock, authenticated_client: TestClient, db: Session
+    ) -> None:
+        """Test getting users with permission error."""
+        mock_get_all.side_effect = VelosimPermissionError(
+            "Requesting user cannot list users."
+        )
+
+        response = authenticated_client.get("/api/v1/users/")
+
+        assert response.status_code == 401
+        data = response.json()
+        assert "Requesting user cannot list users." in str(data["detail"])
+
+    def test_get_users_no_authentication(self, client: TestClient, db: Session) -> None:
+        """Test that authentication is required for getting users."""
+        # Use the base client without auth override
+        response = client.get("/api/v1/users/")
+
+        # Should fail due to authentication
+        assert response.status_code == 401
+
+    @patch("back.api.v1.users.user_crud.get_all")
+    def test_get_users_non_admin_forbidden(
+        self, mock_get_all: MagicMock, non_admin_client: TestClient, db: Session
+    ) -> None:
+        """Test non-admin user trying to get users."""
+        mock_get_all.side_effect = VelosimPermissionError(
+            "Requesting user cannot list users."
+        )
+
+        response = non_admin_client.get("/api/v1/users/")
+
+        assert response.status_code == 401
+        data = response.json()
+        assert "Requesting user cannot list users." in str(data["detail"])
