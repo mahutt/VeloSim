@@ -22,17 +22,29 @@
  * SOFTWARE.
  */
 
-import {
-  type RouteConfig,
-  index,
-  layout,
-  route,
-} from '@react-router/dev/routes';
+import { AlertCircleIcon } from 'lucide-react';
 
-export default [
-  layout('./layouts/authenticated.tsx', [
-    index('routes/home.tsx'),
-    route('simulation', 'routes/simulation.tsx'),
-  ]),
-  layout('./layouts/unauthenticated.tsx', [route('login', 'routes/login.tsx')]),
-] satisfies RouteConfig;
+import { Alert, AlertTitle } from '~/components/ui/alert';
+
+export enum LoginErrorMessage {
+  InvalidCredentials = 'Invalid credentials',
+  ServerError = 'Server error, please try again later',
+  UnknownError = 'An unknown error occurred',
+}
+
+export default function LoginAlert({ code }: { code: number }) {
+  let message: LoginErrorMessage;
+  if (code >= 500) {
+    message = LoginErrorMessage.ServerError;
+  } else if (code === 400) {
+    message = LoginErrorMessage.InvalidCredentials;
+  } else {
+    message = LoginErrorMessage.UnknownError;
+  }
+  return (
+    <Alert variant="destructive">
+      <AlertCircleIcon />
+      <AlertTitle>{message}</AlertTitle>
+    </Alert>
+  );
+}

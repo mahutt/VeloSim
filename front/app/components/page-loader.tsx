@@ -22,17 +22,15 @@
  * SOFTWARE.
  */
 
-import {
-  type RouteConfig,
-  index,
-  layout,
-  route,
-} from '@react-router/dev/routes';
+import { Loader2 } from 'lucide-react';
 
-export default [
-  layout('./layouts/authenticated.tsx', [
-    index('routes/home.tsx'),
-    route('simulation', 'routes/simulation.tsx'),
-  ]),
-  layout('./layouts/unauthenticated.tsx', [route('login', 'routes/login.tsx')]),
-] satisfies RouteConfig;
+export default function PageLoader() {
+  return (
+    <div
+      data-testid="page-loader"
+      className="flex h-dvh w-screen items-center justify-center"
+    >
+      <Loader2 className="animate-spin text-gray-300 w-16 h-16" />
+    </div>
+  );
+}

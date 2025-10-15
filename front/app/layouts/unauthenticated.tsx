@@ -22,17 +22,24 @@
  * SOFTWARE.
  */
 
-import {
-  type RouteConfig,
-  index,
-  layout,
-  route,
-} from '@react-router/dev/routes';
+import { useEffect } from 'react';
+import { Outlet, useNavigate } from 'react-router';
+import PageLoader from '~/components/page-loader';
+import useAuth from '~/hooks/use-auth';
 
-export default [
-  layout('./layouts/authenticated.tsx', [
-    index('routes/home.tsx'),
-    route('simulation', 'routes/simulation.tsx'),
-  ]),
-  layout('./layouts/unauthenticated.tsx', [route('login', 'routes/login.tsx')]),
-] satisfies RouteConfig;
+export default function Unauthenticated() {
+  const { user, loading } = useAuth();
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    if (user) {
+      navigate('/');
+    }
+  }, [user]);
+
+  if (loading || user) {
+    return <PageLoader />;
+  }
+
+  return <Outlet />;
+}

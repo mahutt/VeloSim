@@ -22,17 +22,44 @@
  * SOFTWARE.
  */
 
-import {
-  type RouteConfig,
-  index,
-  layout,
-  route,
-} from '@react-router/dev/routes';
+import { expect, test, vi } from 'vitest';
+import { renderHook } from '@testing-library/react';
+import useAuth from '~/hooks/use-auth';
+import { AuthProvider } from '~/providers/auth-provider';
+import type { ReactNode } from 'react';
 
-export default [
-  layout('./layouts/authenticated.tsx', [
-    index('routes/home.tsx'),
-    route('simulation', 'routes/simulation.tsx'),
-  ]),
-  layout('./layouts/unauthenticated.tsx', [route('login', 'routes/login.tsx')]),
-] satisfies RouteConfig;
+// Mock sessionStorage
+const mockSessionStorage = {
+  getItem: vi.fn(),
+  setItem: vi.fn(),
+  clear: vi.fn(),
+};
+Object.defineProperty(window, 'sessionStorage', {
+  value: mockSessionStorage,
+});
+
+// Wrapper component to provide context
+const Wrapper = ({ children }: { children: ReactNode }) => (
+  <AuthProvider>{children}</AuthProvider>
+);
+
+test('useAuth returns context when used within AuthProvider', () => {
+  mockSessionStorage.getItem.mockReturnValue(null);
+
+  const { result } = renderHook(() => useAuth(), {
+    wrapper: Wrapper,
+  });
+
+  expect(result.current).toEqual({
+    user: null,
+    loading: false,
+    setUser: expect.any(Function),
+    setLoading: expect.any(Function),
+  });
+});
+
+test('useAuth throws error when used outside AuthProvider', () => {
+  expect(() => {
+    renderHook(() => useAuth());
+  }).toThrow('useAuth must be used within an AuthProvider');
+});

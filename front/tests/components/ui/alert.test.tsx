@@ -22,17 +22,15 @@
  * SOFTWARE.
  */
 
-import {
-  type RouteConfig,
-  index,
-  layout,
-  route,
-} from '@react-router/dev/routes';
+import { describe, it, expect } from 'vitest';
+import { render, screen } from '@testing-library/react';
+import { AlertDescription } from '~/components/ui/alert';
 
-export default [
-  layout('./layouts/authenticated.tsx', [
-    index('routes/home.tsx'),
-    route('simulation', 'routes/simulation.tsx'),
-  ]),
-  layout('./layouts/unauthenticated.tsx', [route('login', 'routes/login.tsx')]),
-] satisfies RouteConfig;
+describe('AlertDescription', () => {
+  it('renders with default className', () => {
+    render(<AlertDescription>Test description</AlertDescription>);
+
+    const description = screen.getByText('Test description');
+    expect(description).toHaveAttribute('data-slot', 'alert-description');
+  });
+});
