@@ -76,6 +76,8 @@ class SimulatorController:
 
     def stop(self) -> None:
         self.realTimeDriver.stop()
+        if hasattr(self, "sim_thread") and self.sim_thread.is_alive():
+            self.sim_thread.join()
 
     def pause(self) -> None:
         self.realTimeDriver.pause()
