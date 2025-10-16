@@ -41,9 +41,11 @@ from typing import Optional, Callable, Any, cast
 
 class RealTimeDriver:
     # Keeps track of the actual time a simulation was started at for pacing
-    wallStartTime: float
+    wall_start_time: float
     # Keeps track of the simulation start for pacing
-    simStartTime: float
+    sim_start_time: float
+    # Set to true to force break out of sim loop
+    stop_flag: bool = False
 
     def _load_config(self) -> dict[str, Any]:
         """Load configuration from config.json file."""
@@ -70,15 +72,15 @@ class RealTimeDriver:
         self,
         simEnv: simpy.Environment,
         # Load defaults from config, allow override
-        realTimeFactor: Optional[float] = None,
+        real_time_factor: Optional[float] = None,
         strict: Optional[bool] = None,
     ) -> None:
         # Load config once and store it
         self.config = self._load_config()
         self.simEnv = simEnv
-        self.realTimeFactor = (
-            realTimeFactor
-            if realTimeFactor is not None
+        self.real_time_factor = (
+            real_time_factor
+            if real_time_factor is not None
             else self.config.get("default_real_time_factor", 1.0)
         )
         self.strict = (
@@ -90,72 +92,76 @@ class RealTimeDriver:
         self.lag: Optional[float] = None
         self.sleep_interval = self.config.get("default_sleep_interval", 0.002)
 
-    def resetPacingRefs(self) -> None:
-        self.wallStartTime = time.perf_counter()
-        self.simStartTime = self.simEnv.now
+    def reset_pacing_refs(self) -> None:
+        self.wall_start_time = time.perf_counter()
+        self.sim_start_time = self.simEnv.now
 
-    def setRealTimeFactor(self, factor: float) -> None:
-        self.resetPacingRefs()
-        self.realTimeFactor = factor
+    def set_real_time_factor(self, factor: float) -> None:
+        self.reset_pacing_refs()
+        self.real_time_factor = factor
 
-    def runUntil(
+    def run_until(
         self,
         until: Optional[float] = None,
-        stepCallback: Optional[Callable[[], None]] = None,
+        step_callback: Optional[Callable[[], None]] = None,
     ) -> None:
         # Use config default if until is not specified
         if until is None:
             until = self.config.get("default_until_time", 3600.0)
-        self.resetPacingRefs()
+        self.reset_pacing_refs()
         # Sim loop that controls the time real time (aka wall time) between sim steps
         while True:
+
+            # Stop Sim loop
+            if self.stop_flag:
+                break
             if self.running:
                 # Break out of sim loop if current sim time > specified run time
                 if self.simEnv.peek() >= until:
                     print("Specified Sim-time reached")
                     break
 
-                currentSimTime = self.simEnv.now
+                current_sim_time = self.simEnv.now
 
                 # Calculate target wall time
-                # targetWallTime = wall time that should pass before the next sim step
-                targetWallTime = (
-                    self.wallStartTime
-                    + (currentSimTime - self.simStartTime) * self.realTimeFactor
+                # target_wall_time = wall time that should pass before the next sim step
+                target_wall_time = (
+                    self.wall_start_time
+                    + (current_sim_time - self.sim_start_time) * self.real_time_factor
                 )
 
                 # Loop until actual wall time is >= target wall time
                 while True:
                     # Calculate remaining time before next step
-                    remainingWallTime = targetWallTime - time.perf_counter()
-                    if remainingWallTime <= 0:
+                    remaining_wall_time = target_wall_time - time.perf_counter()
+                    if remaining_wall_time <= 0:
                         break
                     # Wait either configured sleep interval time or remaining wall time
-                    time.sleep(min(remainingWallTime, self.sleep_interval))
+                    time.sleep(min(remaining_wall_time, self.sleep_interval))
 
                 # Allow the simpy environment to step when target wall time is reached
                 try:
                     # Callback function, presumably to emit frames, called per step
-                    if stepCallback:
-                        stepCallback()
+                    if step_callback:
+                        step_callback()
                     self.simEnv.step()
                 except simpy.core.EmptySchedule:
                     print("Simpy schedule is empty")
                     break
                 # Calculate lag if strict mode is on
                 if self.strict:
-                    current_sim_seconds_passed = self.simEnv.now - self.simStartTime
+                    current_sim_seconds_passed = self.simEnv.now - self.sim_start_time
                     # Same calculation and logic as the target wall time.
                     # Positive lag = we're behind schedule, negative = ahead
                     expected_wall_time = (
-                        self.wallStartTime
-                        + current_sim_seconds_passed * self.realTimeFactor
+                        self.wall_start_time
+                        + current_sim_seconds_passed * self.real_time_factor
                     )
                     actual_wall_time = time.perf_counter()
                     lag = expected_wall_time - actual_wall_time
                     self.lag = lag
 
-                    self.recordLag()
+                    self.record_lag()
                     # TODO: record/report lag metrics if needed
 
     def pause(self) -> None:
@@ -166,5 +172,8 @@ class RealTimeDriver:
         print("Starting")
         self.running = True
 
-    def recordLag(self) -> None:
+    def stop(self) -> None:
+        self.stop_flag = True
+
+    def record_lag(self) -> None:
         pass

@@ -44,6 +44,7 @@ class Task(ABC):
         self.assigned_resource: Optional["Resource"] = (
             None  # Initially, no resource is assigned
         )
+        self.has_updated = False
 
     @abstractmethod
     def get_state(self) -> State:

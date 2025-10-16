@@ -68,7 +68,7 @@ def run_env_process(env: simpy.Environment, num_steps: int) -> None:
 
 
 def test_driver_pause(env: simpy.Environment, fake_time: MockClock) -> None:
-    driver = RealTimeDriver(env, realTimeFactor=1.0, strict=False)
+    driver = RealTimeDriver(env, real_time_factor=1.0, strict=False)
 
     driver.running = True
 
@@ -78,7 +78,7 @@ def test_driver_pause(env: simpy.Environment, fake_time: MockClock) -> None:
 
 
 def test_driver_resume(env: simpy.Environment, fake_time: MockClock) -> None:
-    driver = RealTimeDriver(env, realTimeFactor=1.0, strict=False)
+    driver = RealTimeDriver(env, real_time_factor=1.0, strict=False)
 
     driver.running = False
 
@@ -96,23 +96,23 @@ def test_callback_called_each_step(
         nonlocal steps
         steps += 1
 
-    driver = RealTimeDriver(env, realTimeFactor=1.0, strict=False)
+    driver = RealTimeDriver(env, real_time_factor=1.0, strict=False)
     run_env_process(env, 5)
-    driver.runUntil(until=5, stepCallback=callback)
+    driver.run_until(until=5, step_callback=callback)
 
     assert steps == 5  # Callback should have been called 5 times
 
 
-def test_setRealTimeFactor(env: simpy.Environment, fake_time: MockClock) -> None:
-    driver = RealTimeDriver(env, realTimeFactor=1.0, strict=False)
-    driver.setRealTimeFactor(1 / 60)
+def test_set_real_time_factor(env: simpy.Environment, fake_time: MockClock) -> None:
+    driver = RealTimeDriver(env, real_time_factor=1.0, strict=False)
+    driver.set_real_time_factor(1 / 60)
 
-    assert driver.realTimeFactor == 1 / 60
+    assert driver.real_time_factor == 1 / 60
 
 
 def test_strict_true(env: simpy.Environment, fake_time: MockClock) -> None:
-    driver = RealTimeDriver(env, realTimeFactor=1.0, strict=True)
+    driver = RealTimeDriver(env, real_time_factor=1.0, strict=True)
     run_env_process(env, 5)
-    driver.runUntil(until=5)
+    driver.run_until(until=5)
     lag = driver.lag
     assert lag is not None
