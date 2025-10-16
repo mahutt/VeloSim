@@ -38,6 +38,14 @@ Object.defineProperty(window, 'sessionStorage', {
   value: mockSessionStorage,
 });
 
+vi.mock('react-router', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('react-router')>();
+  return {
+    ...actual,
+    useNavigate: () => vi.fn(),
+  };
+});
+
 // Wrapper component to provide context
 const Wrapper = ({ children }: { children: ReactNode }) => (
   <AuthProvider>{children}</AuthProvider>
@@ -55,6 +63,7 @@ test('useAuth returns context when used within AuthProvider', () => {
     loading: false,
     setUser: expect.any(Function),
     setLoading: expect.any(Function),
+    logout: expect.any(Function),
   });
 });
 

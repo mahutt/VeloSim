@@ -32,10 +32,10 @@ export default function Unauthenticated() {
   const navigate = useNavigate();
 
   useEffect(() => {
-    if (user) {
+    if (user && !loading) {
       navigate('/');
     }
-  }, [user]);
+  }, [user, loading]);
 
   if (loading || user) {
     return <PageLoader />;

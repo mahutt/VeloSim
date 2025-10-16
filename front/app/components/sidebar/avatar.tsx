@@ -22,34 +22,12 @@
  * SOFTWARE.
  */
 
-import { useEffect } from 'react';
-import { Outlet, useNavigate } from 'react-router';
-import { AppSidebar } from '~/components/sidebar/app-sidebar';
-import PageLoader from '~/components/page-loader';
-import { SidebarProvider, SidebarTrigger } from '~/components/ui/sidebar';
-import useAuth from '~/hooks/use-auth';
-
-export default function Authenticated() {
-  const { user, loading } = useAuth();
-  const navigate = useNavigate();
-
-  useEffect(() => {
-    if (!user && !loading) {
-      navigate('/login');
-    }
-  }, [user, loading]);
-
-  if (loading || !user) {
-    return <PageLoader />;
-  }
-
+export default function Avatar({ username }: { username: string }) {
   return (
-    <SidebarProvider>
-      <AppSidebar variant="sidebar" />
-      <main className="relative w-full h-dvh">
-        <SidebarTrigger className="absolute left-2 top-2 z-10" />
-        <Outlet />
-      </main>
-    </SidebarProvider>
+    <span className="relative flex size-8 shrink-0 overflow-hidden h-8 w-8 rounded-lg grayscale">
+      <span className="bg-muted flex size-full items-center justify-center rounded-lg">
+        {username.charAt(0).toUpperCase()}
+      </span>
+    </span>
   );
 }
