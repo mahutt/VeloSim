@@ -3,6 +3,12 @@
     "default_until_time": 3600,
     "default_real_time_factor": 1.0,
     "default_strict_mode": false,
-    "default_sleep_interval": 0.002
+    "default_sleep_interval": 0.002,
+    "map_rules": {
+      "roads": {
+        "default_road_max_speed": 50
+      }
+    },
+    "kmh_to_ms_factor": 3.6
   }
 }
