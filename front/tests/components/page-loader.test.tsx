@@ -22,17 +22,20 @@
  * SOFTWARE.
  */
 
-import {
-  type RouteConfig,
-  index,
-  layout,
-  route,
-} from '@react-router/dev/routes';
+import { describe, expect, it } from 'vitest';
+import { render, screen } from '@testing-library/react';
+import PageLoader from '../../app/components/page-loader';
 
-export default [
-  layout('./layouts/authenticated.tsx', [
-    index('routes/home.tsx'),
-    route('simulation', 'routes/simulation.tsx'),
-  ]),
-  layout('./layouts/unauthenticated.tsx', [route('login', 'routes/login.tsx')]),
-] satisfies RouteConfig;
+describe('PageLoader', () => {
+  it('should render a loading spinner', () => {
+    render(<PageLoader />);
+
+    // Check if the container div exists with correct classes
+    const container = screen.getByTestId('page-loader');
+    expect(container).toHaveClass('h-dvh', 'w-screen');
+
+    // Check if the Loader2 icon exists with correct classes
+    const loader = container.querySelector('svg');
+    expect(loader).toBeInTheDocument();
+  });
+});

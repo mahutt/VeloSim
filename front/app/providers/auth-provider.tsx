@@ -22,17 +22,46 @@
  * SOFTWARE.
  */
 
-import {
-  type RouteConfig,
-  index,
-  layout,
-  route,
-} from '@react-router/dev/routes';
+import React, {
+  createContext,
+  useEffect,
+  useState,
+  type ReactNode,
+} from 'react';
+import type { User } from '~/types';
 
-export default [
-  layout('./layouts/authenticated.tsx', [
-    index('routes/home.tsx'),
-    route('simulation', 'routes/simulation.tsx'),
-  ]),
-  layout('./layouts/unauthenticated.tsx', [route('login', 'routes/login.tsx')]),
-] satisfies RouteConfig;
+export interface AuthState {
+  user: User | null;
+  setUser: React.Dispatch<React.SetStateAction<User | null>>;
+  loading: boolean;
+  setLoading: React.Dispatch<React.SetStateAction<boolean>>;
+}
+
+const AuthContext = createContext<AuthState | undefined>(undefined);
+
+interface AuthProviderProps {
+  children: ReactNode;
+}
+
+export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
+  const [user, setUser] = useState<User | null>(null);
+  const [loading, setLoading] = useState(true);
+  const value: AuthState = {
+    user,
+    setUser,
+    loading,
+    setLoading,
+  };
+
+  useEffect(() => {
+    if (sessionStorage.getItem('access_token')) {
+      // TODO: Refresh user info once an API endpoint is available
+      setUser({ id: 1, username: 'demo_user', is_admin: false });
+    }
+    setLoading(false);
+  }, []);
+
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+};
+
+export { AuthContext };

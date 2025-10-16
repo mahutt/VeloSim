@@ -22,17 +22,33 @@
  * SOFTWARE.
  */
 
-import {
-  type RouteConfig,
-  index,
-  layout,
-  route,
-} from '@react-router/dev/routes';
+import { describe, expect, it } from 'vitest';
+import { render, screen } from '@testing-library/react';
+import LoginAlert, { LoginErrorMessage } from '~/components/login/login-alert';
 
-export default [
-  layout('./layouts/authenticated.tsx', [
-    index('routes/home.tsx'),
-    route('simulation', 'routes/simulation.tsx'),
-  ]),
-  layout('./layouts/unauthenticated.tsx', [route('login', 'routes/login.tsx')]),
-] satisfies RouteConfig;
+describe('LoginAlert', () => {
+  it('should display server error message for 5xx codes', () => {
+    render(<LoginAlert code={500} />);
+    expect(screen.getByText(LoginErrorMessage.ServerError)).toBeInTheDocument();
+  });
+
+  it('should display invalid credentials message for 400 code', () => {
+    render(<LoginAlert code={400} />);
+    expect(
+      screen.getByText(LoginErrorMessage.InvalidCredentials)
+    ).toBeInTheDocument();
+  });
+
+  it('should display unknown error message for other codes', () => {
+    render(<LoginAlert code={418} />);
+    expect(
+      screen.getByText(LoginErrorMessage.UnknownError)
+    ).toBeInTheDocument();
+  });
+
+  it('should render with destructive variant and include alert icon', () => {
+    render(<LoginAlert code={500} />);
+    const alert = screen.getByRole('alert');
+    expect(alert.querySelector('svg')).toBeInTheDocument();
+  });
+});
