@@ -22,40 +22,25 @@
  * SOFTWARE.
  */
 
-import { Users2 } from 'lucide-react';
-import { Link } from 'react-router';
-import {
-  SidebarGroup,
-  SidebarGroupLabel,
-  SidebarMenu,
-  SidebarMenuButton,
-  SidebarMenuItem,
-} from '~/components/ui/sidebar';
+import { describe, it, expect } from 'vitest';
+import { render, screen } from '@testing-library/react';
+import { Button } from '~/components/ui/button';
 
-const adminNavItems = [
-  {
-    name: 'Users',
-    url: '/users',
-    icon: Users2,
-  },
-];
+describe('Button', () => {
+  it('renders a button when asChild is not set', () => {
+    render(<Button>Test</Button>);
 
-export function NavAdmin() {
-  return (
-    <SidebarGroup className="group-data-[collapsible=icon]:hidden">
-      <SidebarGroupLabel>Admin</SidebarGroupLabel>
-      <SidebarMenu>
-        {adminNavItems.map((item) => (
-          <SidebarMenuItem key={item.name}>
-            <SidebarMenuButton asChild>
-              <Link to={item.url}>
-                <item.icon />
-                <span>{item.name}</span>
-              </Link>
-            </SidebarMenuButton>
-          </SidebarMenuItem>
-        ))}
-      </SidebarMenu>
-    </SidebarGroup>
-  );
-}
+    const buttonContent = screen.getByText('Test');
+    expect(buttonContent.tagName).toBe('BUTTON');
+  });
+  it('does not render a button when asChild is set', () => {
+    render(
+      <Button asChild>
+        <div>Test</div>
+      </Button>
+    );
+
+    const buttonContent = screen.getByText('Test');
+    expect(buttonContent.tagName).toBe('DIV');
+  });
+});
