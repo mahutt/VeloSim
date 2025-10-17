@@ -71,22 +71,22 @@ class Resource:
             self.task_list.remove(task)
             task.unassign_resource()
 
-    def get_dispatched_task(self) -> Optional["Task"]:
+    def get_in_progress_task(self) -> Optional["Task"]:
         for task in self.task_list:
-            if task.get_state() == State.DISPATCHED:
+            if task.get_state() == State.IN_PROGRESS:
                 return task
         return None
 
     # dispatch a task in the list of tasks only if it is at the same station
-    # as other dispatched tasks or if no other tasks are dispatched
+    # as other in-progress tasks or if no other tasks are in-progress
     def dispatch_task(self, task: "Task") -> None:
         if task in self.task_list and task.is_assigned():
-            dispatched_task = self.get_dispatched_task()
+            task_in_progress = self.get_in_progress_task()
             if (
-                dispatched_task is None
-                or task.get_station() == dispatched_task.get_station()
+                task_in_progress is None
+                or task.get_station() == task_in_progress.get_station()
             ):
-                task.set_state(State.DISPATCHED)
+                task.set_state(State.IN_PROGRESS)
             else:
                 raise Exception("Cannot dispatch task at this station")
 

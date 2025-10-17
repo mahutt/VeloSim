@@ -103,7 +103,7 @@ describe('Authenticated Layout', () => {
   it('renders child routes when user is authenticated', () => {
     (useAuth as Mock).mockReturnValue({
       loading: false,
-      user: { id: 1, name: 'Test User' },
+      user: { id: 1, username: 'Test User' },
     });
 
     const { getByTestId } = render(

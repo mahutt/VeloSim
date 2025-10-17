@@ -22,34 +22,24 @@
  * SOFTWARE.
  */
 
-import { useEffect } from 'react';
-import { Outlet, useNavigate } from 'react-router';
-import { AppSidebar } from '~/components/sidebar/app-sidebar';
-import PageLoader from '~/components/page-loader';
-import { SidebarProvider, SidebarTrigger } from '~/components/ui/sidebar';
-import useAuth from '~/hooks/use-auth';
+import * as React from 'react';
 
-export default function Authenticated() {
-  const { user, loading } = useAuth();
-  const navigate = useNavigate();
+const MOBILE_BREAKPOINT = 768;
 
-  useEffect(() => {
-    if (!user && !loading) {
-      navigate('/login');
-    }
-  }, [user, loading]);
-
-  if (loading || !user) {
-    return <PageLoader />;
-  }
-
-  return (
-    <SidebarProvider>
-      <AppSidebar variant="sidebar" />
-      <main className="relative w-full h-dvh">
-        <SidebarTrigger className="absolute left-2 top-2 z-10" />
-        <Outlet />
-      </main>
-    </SidebarProvider>
+export function useIsMobile() {
+  const [isMobile, setIsMobile] = React.useState<boolean | undefined>(
+    undefined
   );
+
+  React.useEffect(() => {
+    const mql = window.matchMedia(`(max-width: ${MOBILE_BREAKPOINT - 1}px)`);
+    const onChange = () => {
+      setIsMobile(window.innerWidth < MOBILE_BREAKPOINT);
+    };
+    mql.addEventListener('change', onChange);
+    setIsMobile(window.innerWidth < MOBILE_BREAKPOINT);
+    return () => mql.removeEventListener('change', onChange);
+  }, []);
+
+  return !!isMobile;
 }

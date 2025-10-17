@@ -28,7 +28,7 @@ from enum import Enum
 class TaskStatus(Enum):
     OPEN = "open"
     ASSIGNED = "assigned"
-    DISPATCHED = "dispatched"
+    IN_PROGRESS = "in_progress"
     CLOSED = "closed"
 
     @property

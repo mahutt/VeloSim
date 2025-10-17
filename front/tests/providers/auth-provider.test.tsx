@@ -37,6 +37,15 @@ Object.defineProperty(window, 'sessionStorage', {
   value: mockSessionStorage,
 });
 
+// Mock react-router useNavigate
+vi.mock('react-router', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('react-router')>();
+  return {
+    ...actual,
+    useNavigate: () => vi.fn(),
+  };
+});
+
 // Test component to access context values
 const TestComponent = () => {
   const authContext = useContext(AuthContext);
@@ -89,7 +98,7 @@ test('sets user when access token exists', async () => {
   expect(JSON.parse(userElement.textContent!)).toEqual({
     id: 1,
     username: 'demo_user',
-    is_admin: false,
+    is_admin: true,
   });
 });
 

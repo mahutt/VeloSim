@@ -22,34 +22,39 @@
  * SOFTWARE.
  */
 
-import { useEffect } from 'react';
-import { Outlet, useNavigate } from 'react-router';
-import { AppSidebar } from '~/components/sidebar/app-sidebar';
-import PageLoader from '~/components/page-loader';
-import { SidebarProvider, SidebarTrigger } from '~/components/ui/sidebar';
-import useAuth from '~/hooks/use-auth';
+import { Users2 } from 'lucide-react';
+import {
+  SidebarGroup,
+  SidebarGroupLabel,
+  SidebarMenu,
+  SidebarMenuButton,
+  SidebarMenuItem,
+} from '~/components/ui/sidebar';
 
-export default function Authenticated() {
-  const { user, loading } = useAuth();
-  const navigate = useNavigate();
+const adminNavItems = [
+  {
+    name: 'Users',
+    url: '/users',
+    icon: Users2,
+  },
+];
 
-  useEffect(() => {
-    if (!user && !loading) {
-      navigate('/login');
-    }
-  }, [user, loading]);
-
-  if (loading || !user) {
-    return <PageLoader />;
-  }
-
+export function NavAdmin() {
   return (
-    <SidebarProvider>
-      <AppSidebar variant="sidebar" />
-      <main className="relative w-full h-dvh">
-        <SidebarTrigger className="absolute left-2 top-2 z-10" />
-        <Outlet />
-      </main>
-    </SidebarProvider>
+    <SidebarGroup className="group-data-[collapsible=icon]:hidden">
+      <SidebarGroupLabel>Admin</SidebarGroupLabel>
+      <SidebarMenu>
+        {adminNavItems.map((item) => (
+          <SidebarMenuItem key={item.name}>
+            <SidebarMenuButton asChild>
+              <a href={item.url}>
+                <item.icon />
+                <span>{item.name}</span>
+              </a>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+        ))}
+      </SidebarMenu>
+    </SidebarGroup>
   );
 }

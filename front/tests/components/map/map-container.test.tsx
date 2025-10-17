@@ -25,9 +25,19 @@
 import { expect, test } from 'vitest';
 import { render } from '@testing-library/react';
 import MapContainer from '~/components/map/map-container';
+import { MapProvider } from '~/providers/map-provider';
 
 test('map container render should fail without a map provider', async () => {
   expect(() => {
     render(<MapContainer />);
   }).toThrow('useMap must be used within a MapProvider');
+});
+
+test('map container render should succeed with a map provider', async () => {
+  const { getByTestId } = render(
+    <MapProvider>
+      <MapContainer />
+    </MapProvider>
+  );
+  expect(getByTestId('map-container')).toBeDefined();
 });
