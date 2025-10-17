@@ -140,10 +140,16 @@ KNOWN_COMPATIBLE_PACKAGES = {
 
 # Known Python packages that are MIT but may have detection issues
 KNOWN_MIT_PYTHON_PACKAGES = {
+    'types-networkx',   # Apache-2.0 from typeshed (MIT-compatible)
+    'types-shapely',    # Apache-2.0 from typeshed (MIT-compatible)
+    'types-geopandas',  # Apache-2.0 from typeshed (MIT-compatible)
 }
 
 # Known licenses for Python packages (fallback for CI environments)
 KNOWN_PYTHON_PACKAGE_LICENSES = {
+    'types-networkx': 'Apache-2.0',
+    'types-shapely': 'Apache-2.0',
+    'types-geopandas': 'Apache-2.0',
 }
 
 def run_command(command: List[str], cwd: str = None) -> Tuple[int, str, str]:
