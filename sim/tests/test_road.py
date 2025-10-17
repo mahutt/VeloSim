@@ -45,7 +45,7 @@ def setup_test_environment(tmp_path: Path) -> Generator[None, None, None]:
     config_data = {
         "simulation": {
             "kmh_to_ms_factor": 3.6,
-            "map_rules": {"roads": {"default_road_max_speed": 30}},
+            "map_rules": {"roads": {"default_road_max_speed": 50}},
         }
     }
     config_file = tmp_path / "config.json"
@@ -104,12 +104,12 @@ def test_road_initialization_with_missing_maxspeed(
 
     # Check that the default speed from the real config was used
     assert road_obj.id == 202
-    # Default is 30 km/h / 3.6 = 8.333 m/s
-    assert road_obj.maxspeed == pytest.approx(8.333, 0.001)
+    # Default is 50 km/h / 3.6 = 13.888 m/s (from actual config)
+    assert road_obj.maxspeed == pytest.approx(13.888, 0.001)
 
     # Check point collection logic with default speed
-    # Expected points: at 0, 8.33, ..., 75.0 (10 points) + the final point (80, 0)
-    assert len(road_obj.pointcollection) == 11
+    # Expected points: at 0, 13.88, ..., 69.44 (6 points) + final (80, 0)
+    assert len(road_obj.pointcollection) == 7
     assert all(isinstance(p, Position) for p in road_obj.pointcollection)
 
 
