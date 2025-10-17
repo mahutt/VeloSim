@@ -23,15 +23,20 @@
  */
 
 import { Input } from '~/components/ui/input';
+import { Button } from '~/components/ui/button';
 
 interface ScenarioToolbarProps {
   scenarioName: string;
   onNameChange: (name: string) => void;
+  onImport: () => void;
+  onNew: () => void;
 }
 
 export default function ScenarioToolbar({
   scenarioName,
   onNameChange,
+  onImport,
+  onNew,
 }: ScenarioToolbarProps) {
   return (
     <div className="flex flex-col lg:flex-row gap-6 mb-6">
@@ -42,6 +47,14 @@ export default function ScenarioToolbar({
         className="flex-1"
         aria-label="Scenario name"
       />
+      <div className="flex gap-2 w-full lg:w-64">
+        <Button onClick={onImport} className="flex-1">
+          Import
+        </Button>
+        <Button onClick={onNew} variant="destructive" className="flex-1">
+          New
+        </Button>
+      </div>
     </div>
   );
 }

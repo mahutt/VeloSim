@@ -21,17 +21,24 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
  */
+
 import { Button } from '~/components/ui/button';
 
 interface ScenarioTextAreaProps {
   scenarioData: string;
+  error: string | null;
   onChange: (data: string) => void;
+  onSave: () => void;
+  onExport: () => void;
   onStart: () => void;
 }
 
 export default function ScenarioTextArea({
   scenarioData,
+  error,
   onChange,
+  onSave,
+  onExport,
   onStart,
 }: ScenarioTextAreaProps) {
   return (
@@ -44,7 +51,21 @@ export default function ScenarioTextArea({
         aria-label="Scenario JSON data"
       />
 
+      {error && (
+        <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-md text-red-600 text-sm">
+          {error}
+        </div>
+      )}
+
       <div className="flex justify-between gap-2">
+        <div className="flex gap-2">
+          <Button onClick={onSave} variant="destructive" className="w-32">
+            Save
+          </Button>
+          <Button onClick={onExport} className="w-32">
+            Export
+          </Button>
+        </div>
         <Button onClick={onStart} variant="destructive" className="w-32">
           Start Scenario
         </Button>
