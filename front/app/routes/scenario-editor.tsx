@@ -22,18 +22,68 @@
  * SOFTWARE.
  */
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import type { Scenario } from '~/types';
+import { loadSavedScenarios } from '~/lib/scenario-utils';
 import ScenarioToolbar from '~/components/scenario/scenario-toolbar';
 import ScenarioTextArea from '~/components/scenario/scenario-textarea';
+import ScenarioSidebar from '~/components/scenario/scenario-sidebar';
 
 export default function ScenarioEditor() {
   const [scenarioContent, setScenarioContent] = useState('');
   const [scenarioName, setScenarioName] = useState('');
+  const [error, setError] = useState<string | null>(null);
+  const [savedScenarios, setSavedScenarios] = useState<Scenario[]>([]);
+  const [selectedScenarioId, setSelectedScenarioId] = useState<number | null>(
+    null
+  );
+
+  useEffect(() => {
+    // Load mock data for UI testing
+    loadSavedScenarios().then(setSavedScenarios);
+  }, []);
 
   // TODO: Implement with backend API call
   const handleStartScenario = () => {
     console.log('Start scenario clicked');
     alert('Start Scenario - TODO: Implement backend integration');
+  };
+
+  // TODO: Implement with backend API call
+  const handleSaveScenario = () => {
+    console.log('Save scenario clicked');
+    alert('Save Scenario - TODO: Implement backend integration');
+  };
+
+  // TODO: Implement export functionality
+  const handleExportScenario = () => {
+    console.log('Export scenario clicked');
+    alert('Export Scenario - TODO: Implement export functionality');
+  };
+
+  const handleNewScenario = () => {
+    setScenarioContent('');
+    setScenarioName('');
+    setError(null);
+    setSelectedScenarioId(null);
+  };
+
+  // TODO: Implement import functionality
+  const handleImportScenario = () => {
+    console.log('Import scenario clicked');
+    alert('Import Scenario - TODO: Implement import functionality');
+  };
+
+  const handleSelectScenario = (scenario: Scenario) => {
+    try {
+      const parsed = JSON.parse(scenario.content);
+      setScenarioContent(JSON.stringify(parsed, null, 2));
+      setScenarioName(scenario.name);
+      setSelectedScenarioId(scenario.id);
+      setError(null);
+    } catch {
+      setError('Unable to load scenario.');
+    }
   };
 
   return (
@@ -43,13 +93,24 @@ export default function ScenarioEditor() {
       <ScenarioToolbar
         scenarioName={scenarioName}
         onNameChange={setScenarioName}
+        onImport={handleImportScenario}
+        onNew={handleNewScenario}
       />
 
       <div className="flex flex-col lg:flex-row gap-6">
         <ScenarioTextArea
           scenarioData={scenarioContent}
+          error={error}
           onChange={setScenarioContent}
+          onSave={handleSaveScenario}
+          onExport={handleExportScenario}
           onStart={handleStartScenario}
+        />
+
+        <ScenarioSidebar
+          scenarios={savedScenarios}
+          selectedScenarioId={selectedScenarioId}
+          onSelect={handleSelectScenario}
         />
       </div>
     </div>
