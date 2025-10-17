@@ -22,34 +22,45 @@
  * SOFTWARE.
  */
 
-import { useEffect } from 'react';
-import { Outlet, useNavigate } from 'react-router';
-import { AppSidebar } from '~/components/sidebar/app-sidebar';
-import PageLoader from '~/components/page-loader';
-import { SidebarProvider, SidebarTrigger } from '~/components/ui/sidebar';
-import useAuth from '~/hooks/use-auth';
+import { Gauge, FileSliders } from 'lucide-react';
+import { Link } from 'react-router';
+import {
+  SidebarGroup,
+  SidebarGroupLabel,
+  SidebarMenu,
+  SidebarMenuButton,
+  SidebarMenuItem,
+} from '~/components/ui/sidebar';
 
-export default function Authenticated() {
-  const { user, loading } = useAuth();
-  const navigate = useNavigate();
+const mainNavItems = [
+  {
+    title: 'Simulations',
+    url: '/simulations',
+    icon: Gauge,
+  },
+  {
+    title: 'Scenarios',
+    url: '/scenarios',
+    icon: FileSliders,
+  },
+];
 
-  useEffect(() => {
-    if (!user && !loading) {
-      navigate('/login');
-    }
-  }, [user, loading]);
-
-  if (loading || !user) {
-    return <PageLoader />;
-  }
-
+export function NavMain() {
   return (
-    <SidebarProvider>
-      <AppSidebar variant="sidebar" />
-      <main className="relative w-full h-dvh">
-        <SidebarTrigger className="absolute left-2 top-2 z-10" />
-        <Outlet />
-      </main>
-    </SidebarProvider>
+    <SidebarGroup>
+      <SidebarGroupLabel>Main</SidebarGroupLabel>
+      <SidebarMenu>
+        {mainNavItems.map((item) => (
+          <SidebarMenuItem key={item.title}>
+            <SidebarMenuButton tooltip={item.title} asChild>
+              <Link to={item.url}>
+                {item.icon && <item.icon />}
+                <span>{item.title}</span>
+              </Link>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+        ))}
+      </SidebarMenu>
+    </SidebarGroup>
   );
 }

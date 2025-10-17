@@ -28,6 +28,7 @@ import React, {
   useState,
   type ReactNode,
 } from 'react';
+import { useNavigate } from 'react-router';
 import type { User } from '~/types';
 
 export interface AuthState {
@@ -35,6 +36,7 @@ export interface AuthState {
   setUser: React.Dispatch<React.SetStateAction<User | null>>;
   loading: boolean;
   setLoading: React.Dispatch<React.SetStateAction<boolean>>;
+  logout: () => void;
 }
 
 const AuthContext = createContext<AuthState | undefined>(undefined);
@@ -44,22 +46,31 @@ interface AuthProviderProps {
 }
 
 export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
+  const navigate = useNavigate();
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (sessionStorage.getItem('access_token')) {
+      // TODO: Refresh user info once an API endpoint is available
+      setUser({ id: 1, username: 'demo_user', is_admin: true });
+    }
+    setLoading(false);
+  }, []);
+
+  const logout = () => {
+    sessionStorage.removeItem('access_token');
+    setUser(null);
+    navigate('/login');
+  };
+
   const value: AuthState = {
     user,
     setUser,
     loading,
     setLoading,
+    logout,
   };
-
-  useEffect(() => {
-    if (sessionStorage.getItem('access_token')) {
-      // TODO: Refresh user info once an API endpoint is available
-      setUser({ id: 1, username: 'demo_user', is_admin: false });
-    }
-    setLoading(false);
-  }, []);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };

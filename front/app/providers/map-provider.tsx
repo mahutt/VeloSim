@@ -72,7 +72,15 @@ export const MapProvider = ({ children }: { children: ReactNode }) => {
       setMapLoaded(true);
     });
 
+    // Force the map to resize when the container size changes
+    const handleResize = () => {
+      mapRef.current?.resize();
+    };
+    const resizeObserver = new ResizeObserver(handleResize);
+    resizeObserver.observe(mapContainerRef.current);
+
     return () => {
+      resizeObserver.disconnect();
       mapRef.current?.remove();
     };
   }, []);

@@ -59,6 +59,7 @@ MIT_COMPATIBLE_LICENSES = {
     'MIT*',
     'ISC',
     'ISC License (ISCL)',
+    '0BSD',
     'BSD',
     'BSD License',
     'BSD-2-Clause',
