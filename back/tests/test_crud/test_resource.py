@@ -163,7 +163,7 @@ class TestResourceCRUD:
         self, db: Session, task: StationTask
     ) -> None:
         assert not resource_crud.assign_task(db, 99999, task.id)
-        assert task.status == TaskStatus.UNASSIGNED
+        assert task.status == TaskStatus.OPEN
 
     def test_assign_task_by_id_nonexistent_task(
         self, db: Session, resource: Resource
@@ -176,7 +176,7 @@ class TestResourceCRUD:
         resource_crud.assign_task(db, resource.id, task.id)
         assert resource_crud.unassign_task(db, resource.id, task.id)
         assert task not in resource.tasks
-        assert task.status == TaskStatus.UNASSIGNED
+        assert task.status == TaskStatus.OPEN
 
     def test_unassign_task_by_id_nonexistent_resource(
         self, db: Session, task: StationTask
@@ -194,7 +194,7 @@ class TestResourceCRUD:
         resource_crud.assign_task(db, resource.id, task.id)
         assert resource_crud.service_task(db, resource.id, task.id)
         assert task not in resource.tasks
-        assert task.status == TaskStatus.COMPLETED
+        assert task.status == TaskStatus.CLOSED
 
     def test_assign_task_model_errors(
         self, resource: Resource, task: StationTask
@@ -203,7 +203,7 @@ class TestResourceCRUD:
         with pytest.raises(ValueError):
             resource.assign_task(task)  # Already assigned
 
-        task.status = TaskStatus.COMPLETED
+        task.status = TaskStatus.CLOSED
         with pytest.raises(ValueError):
             resource.assign_task(task)  # Task not open
 
@@ -233,5 +233,5 @@ class TestResourceCRUD:
     ) -> None:
         resource_crud.assign_task(db, resource.id, task.id)
         resource_crud.delete(db, resource.id)
-        assert task.status == TaskStatus.UNASSIGNED
+        assert task.status == TaskStatus.OPEN
         assert task.resource is None

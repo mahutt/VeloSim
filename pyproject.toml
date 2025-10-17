@@ -30,7 +30,10 @@ dependencies = [
     "alembic>=1.13.0",
     "geopandas>=1.1.1",
     "pyrosm>=0.6.2",
-    "networkx"
+    "networkx",
+    "argon2-cffi>=25.1.0",
+    "python-multipart>=0.0.20",
+    "PyJWT>=2.10.1"
 ]
 
 [project.optional-dependencies]
@@ -148,6 +151,8 @@ module = [
     "fastapi.*",
     "pydantic.*",
     "uvicorn.*",
-    "simpy.*"
+    "simpy.*",
+    "argon2.*",
+    "jwt.*"
 ]
 ignore_missing_imports = true

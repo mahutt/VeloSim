@@ -42,11 +42,17 @@ from .station_task import (
 from .resource import (
     ResourceBase,
     ResourceCreate,
+    ResourceTaskIDsRequest,
     ResourceListResponse,
     ResourceResponse,
     ResourceTaskAssign,
     ResourceTaskUnassign,
     ResourceUpdate,
+)
+from .sim_instance import (
+    SimInstanceBase,
+    SimInstanceCreate,
+    SimInstanceResponse,
 )
 
 __all__ = [
@@ -64,9 +70,13 @@ __all__ = [
     "StationTaskListResponse",
     "ResourceBase",
     "ResourceCreate",
+    "ResourceTaskIDsRequest",
     "ResourceListResponse",
     "ResourceResponse",
     "ResourceTaskAssign",
     "ResourceTaskUnassign",
     "ResourceUpdate",
+    "SimInstanceBase",
+    "SimInstanceCreate",
+    "SimInstanceResponse",
 ]

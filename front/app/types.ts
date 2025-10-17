@@ -22,6 +22,13 @@
  * SOFTWARE.
  */
 
+// Basic types
+export interface User {
+  id: number;
+  username: string;
+  is_admin: boolean;
+}
+
 // Entity types
 
 export interface Station {
@@ -37,6 +44,11 @@ export interface StationTask {
 }
 
 // API response types
+
+export interface LoginForAccessTokenResponse {
+  access_token: string;
+  token_type: 'Bearer';
+}
 
 interface PaginatedResponse {
   total: number;

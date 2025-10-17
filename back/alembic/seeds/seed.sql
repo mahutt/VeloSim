@@ -2,7 +2,7 @@
 SET client_encoding = 'UTF8';
 
 -- VeloSim Station Seed Data
--- This file contains initial station data for the VeloSim bike sharing system
+-- Contains initial station data for the VeloSim bike sharing system
 -- Data sourced from Montreal GBFS feed: https://gbfs.velobixi.com/gbfs/2-2/en/station_information.json
 
 -- Clear existing data (if any)
@@ -39,20 +39,64 @@ FROM stations;
 \echo 'Total stations inserted:'
 SELECT COUNT(*) FROM stations;
 
+
+-- VeloSim Resource Seed Data
+-- Contains initial resource data for the VeloSim bike sharing system
+-- Resources represent an assignable unit (in the form of a driver+vehicle pair)
+
+-- Clear existing data (if any)
+TRUNCATE TABLE resources RESTART IDENTITY CASCADE;
+
+-- Insert initial resource data
+INSERT INTO resources (
+    type,
+    date_created,
+    date_updated,
+    latitude,
+    longitude,
+    route_start_latitude,
+    route_start_longitude,
+    route_end_latitude,
+    route_end_longitude
+) VALUES
+    ('VEHICLE_DRIVER', '2025-10-01 08:00:00', '2025-10-01 08:00:00', 45.50700, -73.56100, 45.50700, -73.56100, 45.51500, -73.55500),
+    ('VEHICLE_DRIVER', '2025-10-01 08:15:00', '2025-10-01 08:15:00', 45.50900, -73.56700, 45.50900, -73.56700, 45.52000, -73.56000),
+    ('VEHICLE_DRIVER', '2025-10-01 09:00:00', '2025-10-01 09:00:00', 45.50300, -73.57400, 45.50300, -73.57400, 45.49800, -73.55200);
+
+-- Verify the data was inserted
+SELECT
+    id,
+    type,
+    latitude,
+    longitude,
+    route_start_latitude,
+    route_start_longitude,
+    route_end_latitude,
+    route_end_longitude
+FROM resources
+ORDER BY id;
+
+-- Display summary
+SELECT COUNT(*) AS total_resources FROM resources;
+
+\echo 'Resource seed data loaded successfully!'
+\echo 'Total resources inserted:'
+SELECT COUNT(*) FROM resources;
+
+
 -- VeloSim Station Task Seed Data
--- This file contains initial station task data for the VeloSim bike sharing system
+-- Contains initial station task data for the VeloSim bike sharing system
 -- Tasks represent maintenance and operational work needed at stations
 
 -- Clear existing data (if any)
 TRUNCATE TABLE station_tasks RESTART IDENTITY CASCADE;
 
 -- Insert initial station task data (one task for each status)
-INSERT INTO station_tasks (type, status, date_created, date_updated, station_id) VALUES
-    ('BATTERY_SWAP', 'UNASSIGNED', '2025-10-01 09:00:00', '2025-10-01 09:00:00', 1),
-    ('BATTERY_SWAP', 'ABANDONED', '2025-10-01 10:30:00', '2025-10-01 10:30:00', 2),
-    ('BATTERY_SWAP', 'ASSIGNED', '2025-10-01 11:15:00', '2025-10-01 11:15:00', 3),
-    ('BATTERY_SWAP', 'IN_PROGRESS', '2025-10-01 14:20:00', '2025-10-01 14:20:00', 4),
-    ('BATTERY_SWAP', 'COMPLETED', '2025-10-01 08:00:00', '2025-10-01 16:45:00', 5);
+INSERT INTO station_tasks (type, status, date_created, date_updated, station_id, resource_id) VALUES
+    ('BATTERY_SWAP', 'OPEN', '2025-10-01 09:00:00', '2025-10-01 09:00:00', 1, NULL),
+    ('BATTERY_SWAP', 'ASSIGNED', '2025-10-01 11:15:00', '2025-10-01 11:15:00', 2, 2),
+    ('BATTERY_SWAP', 'DISPATCHED', '2025-10-01 14:20:00', '2025-10-01 14:20:00', 3, NULL),
+    ('BATTERY_SWAP', 'CLOSED', '2025-10-01 08:00:00', '2025-10-01 16:45:00', 4, NULL);
 
 -- Verify the data was inserted
 SELECT

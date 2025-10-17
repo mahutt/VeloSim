@@ -23,22 +23,21 @@ SOFTWARE.
 """
 
 import threading
-import time
-from typing import Dict, List, TypedDict
+from typing import Dict, List, TypedDict, Optional
 import uuid
 import simpy
 
-from sim.entities.frame import Frame
 from sim.entities.inputParameters import InputParameter
 from sim.entities.request_type import RequestType
 from sim.frame_emitter import FrameEmitter
 from sim.utils.subscriber import Subscriber
+from sim.SimulatorController import SimulatorController
 
 
 class RunInfo(TypedDict):
-    thread: threading.Thread
-    stop: threading.Event
+    thread: Optional[threading.Thread]
     emitter: FrameEmitter
+    simController: SimulatorController
 
 
 class Simulator:
@@ -46,45 +45,65 @@ class Simulator:
         self.thread_pool: Dict[str, RunInfo] = {}
         self.thread_pool_lock = threading.Lock()
 
-    def start(
+    def initialize(
         self, input_parameters: InputParameter, subscribers: List[Subscriber]
     ) -> str:
+        # Initialize a simulation and send the initial frame, but don't start
+        # the simulation loop.
         run_id = str(uuid.uuid4())  # threadID / SIM ID
-        stop_flag = threading.Event()
         emitter = FrameEmitter(run_id)
 
         for sub in subscribers:
             emitter.attach(sub)
 
-        def sim_loop() -> None:
-            env = simpy.Environment()
-            _ = env  # Keeps linter happy. (temporary)
-            global_seq = 0
+        env = simpy.Environment()
 
-            while not stop_flag.is_set():  # Run until stop is called!
-                frame = Frame(
-                    seq_numb=global_seq,
-                    payload_str="This is my current info... beep boop beep boop",
-                )
-                global_seq += 1
-                emitter.notify(frame)
-                print(f"Hello From Simulator: [{run_id}]")
-                time.sleep(1)
-            print(f"[{run_id}] stopped.")
+        simController = SimulatorController(
+            simEnv=env,
+            inputParameters=input_parameters,
+            frameEmitter=emitter,
+            strict=False,
+        )
 
-        t = threading.Thread(target=sim_loop, name=f"SIM-{run_id}", daemon=True)
+        # Send the initial frame immediately
+        simController.emit_initial_frame()
 
         with self.thread_pool_lock:
             if run_id in self.thread_pool:
                 raise RuntimeError(f"Run id already present: {run_id}")
+            # Store the controller but don't start the thread yet
             self.thread_pool[run_id] = {
-                "thread": t,
-                "stop": stop_flag,
+                "thread": None,  # No thread yet
                 "emitter": emitter,
+                "simController": simController,
             }
-            t.start()
 
         return run_id
+
+    def start(self, sim_id: str, simTime: int) -> None:
+        # Start the simulation loop for an already initialized simulation.
+        with self.thread_pool_lock:
+            rec = self.thread_pool.get(sim_id)
+
+        if rec is None:
+            raise RuntimeError(
+                f"Simulation {sim_id} not found. " f"Call initialize() first."
+            )
+
+        if rec["thread"] is not None:
+            raise RuntimeError(f"Simulation {sim_id} is already running.")
+
+        # Create and start the simulation thread
+        t = threading.Thread(
+            target=rec["simController"].start,
+            args=(simTime,),
+            name=f"SIM-{sim_id}",
+            daemon=True,
+        )
+
+        with self.thread_pool_lock:
+            self.thread_pool[sim_id]["thread"] = t
+            t.start()
 
     def stop(self, sim_id: str, join_timeout: float | None = 2.0) -> None:
         with self.thread_pool_lock:
@@ -93,13 +112,19 @@ class Simulator:
         if rec is None:
             return  # Unknown/Thread is already closed.
 
-        rec["stop"].set()
-        rec["thread"].join(timeout=join_timeout)
+        rec["simController"].stop()
+
+        # Only join if there's an actual thread
+        if rec["thread"] is not None:
+            rec["thread"].join(timeout=join_timeout)
 
         with self.thread_pool_lock:
             current = self.thread_pool.get(sim_id)
-            if current is rec and not rec["thread"].is_alive():
+            if current is rec and (
+                rec["thread"] is None or not rec["thread"].is_alive()
+            ):
                 self.thread_pool.pop(sim_id, None)
+        print(f"{sim_id} ended")
 
     def pause(self) -> None:
         raise NotImplementedError("pause() not implemented yet")

@@ -23,8 +23,8 @@ SOFTWARE.
 """
 
 from typing import List, Optional, Tuple
-from sqlalchemy.orm import Session
 from sqlalchemy import func
+from sqlalchemy.orm import Session, aliased
 from back.models import Resource, StationTask, TaskStatus
 from back.models import ResourceType
 from back.schemas import ResourceCreate, ResourceUpdate
@@ -67,11 +67,42 @@ class ResourceCRUD:
         resource = self.get(db, resource_id)
         return resource.type if resource else None
 
+    def get_all_filtered(
+        self,
+        db: Session,
+        skip: int = 0,
+        limit: int = 100,
+        type: Optional[ResourceType] = None,
+        status: Optional[TaskStatus] = None,
+    ) -> Tuple[List[Resource], int]:
+        """
+        Get all resources with optional filters by type or task status.
+        Returns: (resources_list, total_count)
+        """
+        query = db.query(Resource)
+
+        if type:
+            query = query.filter(Resource.type == type)
+
+        if status:
+            # Use an aliased join to prevent multiple rows for same resource
+            TaskAlias = aliased(Resource.tasks.property.mapper.class_)
+            query = query.join(TaskAlias, Resource.tasks).filter(
+                TaskAlias.status == status
+            )
+
+        # Use distinct to avoid duplicates from join
+        total = query.distinct().count()
+
+        # Pagination
+        resources = query.distinct().offset(skip).limit(limit).all()
+        return resources, total
+
     def update(
         self, db: Session, resource_id: int, resource_data: ResourceUpdate
     ) -> Optional[Resource]:
-        resource = self.get(db, resource_id)
         """Update a resource (only current position and start/end of route)."""
+        resource = self.get(db, resource_id)
         if not resource:
             return None
         update_data = resource_data.model_dump(exclude_unset=True)
@@ -87,11 +118,11 @@ class ResourceCRUD:
         if not resource:
             return False
         # To handle the case where a resource may be deleted abruptly, all of
-        # its assigned tasks are marked as 'unassigned' (before no longer being
+        # its assigned tasks are marked as 'open' (before no longer being
         # associated with a resource).
         for task in resource.tasks:
             task.resource = None
-            task.status = TaskStatus.UNASSIGNED
+            task.status = TaskStatus.OPEN
         db.delete(resource)
         db.commit()
         return True
@@ -121,7 +152,7 @@ class ResourceCRUD:
         return True
 
     def service_task(self, db: Session, resource_id: int, task_id: int) -> bool:
-        """Mark a task as completed and remove it from the resource's assignments."""
+        """Mark a task as closed and remove it from the resource's assignments."""
         resource = self.get(db, resource_id)
         task = db.get(StationTask, task_id)
         if not resource or not task:
