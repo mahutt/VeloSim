@@ -22,18 +22,26 @@
  * SOFTWARE.
  */
 
-import {
-  type RouteConfig,
-  index,
-  layout,
-  route,
-} from '@react-router/dev/routes';
+import { Input } from '~/components/ui/input';
 
-export default [
-  layout('./layouts/authenticated.tsx', [
-    index('routes/home.tsx'),
-    route('simulation', 'routes/simulation.tsx'),
-    route('scenario-editor', 'routes/scenario-editor.tsx'),
-  ]),
-  layout('./layouts/unauthenticated.tsx', [route('login', 'routes/login.tsx')]),
-] satisfies RouteConfig;
+interface ScenarioToolbarProps {
+  scenarioName: string;
+  onNameChange: (name: string) => void;
+}
+
+export default function ScenarioToolbar({
+  scenarioName,
+  onNameChange,
+}: ScenarioToolbarProps) {
+  return (
+    <div className="flex flex-col lg:flex-row gap-6 mb-6">
+      <Input
+        value={scenarioName}
+        onChange={(e) => onNameChange(e.target.value)}
+        placeholder="Scenario name"
+        className="flex-1"
+        aria-label="Scenario name"
+      />
+    </div>
+  );
+}

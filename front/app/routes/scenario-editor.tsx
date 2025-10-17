@@ -22,18 +22,36 @@
  * SOFTWARE.
  */
 
-import {
-  type RouteConfig,
-  index,
-  layout,
-  route,
-} from '@react-router/dev/routes';
+import { useState } from 'react';
+import ScenarioToolbar from '~/components/scenario/scenario-toolbar';
+import ScenarioTextArea from '~/components/scenario/scenario-textarea';
 
-export default [
-  layout('./layouts/authenticated.tsx', [
-    index('routes/home.tsx'),
-    route('simulation', 'routes/simulation.tsx'),
-    route('scenario-editor', 'routes/scenario-editor.tsx'),
-  ]),
-  layout('./layouts/unauthenticated.tsx', [route('login', 'routes/login.tsx')]),
-] satisfies RouteConfig;
+export default function ScenarioEditor() {
+  const [scenarioContent, setScenarioContent] = useState('');
+  const [scenarioName, setScenarioName] = useState('');
+
+  // TODO: Implement with backend API call
+  const handleStartScenario = () => {
+    console.log('Start scenario clicked');
+    alert('Start Scenario - TODO: Implement backend integration');
+  };
+
+  return (
+    <div className="container mx-auto max-w-6xl py-8 px-4">
+      <h1 className="text-2xl font-bold mb-6">Scenario Editor</h1>
+
+      <ScenarioToolbar
+        scenarioName={scenarioName}
+        onNameChange={setScenarioName}
+      />
+
+      <div className="flex flex-col lg:flex-row gap-6">
+        <ScenarioTextArea
+          scenarioData={scenarioContent}
+          onChange={setScenarioContent}
+          onStart={handleStartScenario}
+        />
+      </div>
+    </div>
+  );
+}

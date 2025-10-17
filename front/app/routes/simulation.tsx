@@ -28,18 +28,30 @@ import SelectedItemBar from '~/components/map/selected-item-bar';
 import { MapProvider } from '~/providers/map-provider';
 import { SimulationProvider } from '~/providers/simulation-provider';
 import ResourceBar from '~/components/resource/resource-bar';
+import { useNavigate } from 'react-router';
+import { Button } from '~/components/ui/button';
 
 export function meta() {
   return [{ title: 'Simulation' }];
 }
 
 export default function Simulation() {
+  const navigate = useNavigate();
   return (
     <>
       <MapProvider>
         <SimulationProvider>
           <MapContainer />
           <ResourceBar />
+          {/* Scenario Editor Button above SelectedItemBar */}
+          <div className="absolute left-4 top-1 z-50">
+            <Button
+              onClick={() => navigate('/scenario-editor')}
+              className="bg-red-500"
+            >
+              Go to Scenario Editor
+            </Button>
+          </div>
           <SelectedItemBar />
         </SimulationProvider>
       </MapProvider>

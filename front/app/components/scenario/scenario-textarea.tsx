@@ -21,19 +21,34 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
  */
+import { Button } from '~/components/ui/button';
 
-import {
-  type RouteConfig,
-  index,
-  layout,
-  route,
-} from '@react-router/dev/routes';
+interface ScenarioTextAreaProps {
+  scenarioData: string;
+  onChange: (data: string) => void;
+  onStart: () => void;
+}
 
-export default [
-  layout('./layouts/authenticated.tsx', [
-    index('routes/home.tsx'),
-    route('simulation', 'routes/simulation.tsx'),
-    route('scenario-editor', 'routes/scenario-editor.tsx'),
-  ]),
-  layout('./layouts/unauthenticated.tsx', [route('login', 'routes/login.tsx')]),
-] satisfies RouteConfig;
+export default function ScenarioTextArea({
+  scenarioData,
+  onChange,
+  onStart,
+}: ScenarioTextAreaProps) {
+  return (
+    <div className="flex-1 flex flex-col">
+      <textarea
+        className="w-full h-[32rem] p-3 border rounded-md font-mono text-sm mb-4 resize-none"
+        placeholder="Paste or type your JSON scenario here..."
+        value={scenarioData}
+        onChange={(e) => onChange(e.target.value)}
+        aria-label="Scenario JSON data"
+      />
+
+      <div className="flex justify-between gap-2">
+        <Button onClick={onStart} variant="destructive" className="w-32">
+          Start Scenario
+        </Button>
+      </div>
+    </div>
+  );
+}
