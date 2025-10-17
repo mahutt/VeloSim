@@ -95,7 +95,7 @@ TRUNCATE TABLE station_tasks RESTART IDENTITY CASCADE;
 INSERT INTO station_tasks (type, status, date_created, date_updated, station_id, resource_id) VALUES
     ('BATTERY_SWAP', 'OPEN', '2025-10-01 09:00:00', '2025-10-01 09:00:00', 1, NULL),
     ('BATTERY_SWAP', 'ASSIGNED', '2025-10-01 11:15:00', '2025-10-01 11:15:00', 2, 2),
-    ('BATTERY_SWAP', 'DISPATCHED', '2025-10-01 14:20:00', '2025-10-01 14:20:00', 3, NULL),
+    ('BATTERY_SWAP', 'IN_PROGRESS', '2025-10-01 14:20:00', '2025-10-01 14:20:00', 3, NULL),
     ('BATTERY_SWAP', 'CLOSED', '2025-10-01 08:00:00', '2025-10-01 16:45:00', 4, NULL);
 
 -- Verify the data was inserted

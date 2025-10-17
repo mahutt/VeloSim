@@ -160,7 +160,7 @@ class TestResource:
         assert resource.get_task_count() == initial_count
         assert resource.get_task_list() == initial_tasks
 
-    def test_get_dispatched_task(
+    def test_get_in_progress_task(
         self, simpy_env: simpy.Environment, default_position: Position
     ) -> None:
         # Arrange
@@ -168,16 +168,16 @@ class TestResource:
         task2 = BatterySwapTask(simpy_env, 2)
         task3 = BatterySwapTask(simpy_env, 3)
         resource = Resource(simpy_env, 2, default_position, [task, task2, task3])
-        task2.set_state(State.DISPATCHED)
+        task2.set_state(State.IN_PROGRESS)
 
         # Act
-        dispatched_task = resource.get_dispatched_task()
+        dispatched_task = resource.get_in_progress_task()
 
         # Assert
         assert isinstance(dispatched_task, BatterySwapTask)
         assert dispatched_task == task2
 
-    def test_get_dispatched_task_not_found(
+    def test_get_in_progress_task_not_found(
         self, simpy_env: simpy.Environment, default_position: Position
     ) -> None:
         # Arrange
@@ -187,7 +187,7 @@ class TestResource:
         resource = Resource(simpy_env, 2, default_position, [task, task2, task3])
 
         # Act
-        dispatched_task = resource.get_dispatched_task()
+        dispatched_task = resource.get_in_progress_task()
 
         # Assert
         assert dispatched_task is None
@@ -205,7 +205,7 @@ class TestResource:
         resource.dispatch_task(task2)
 
         # Assert
-        assert task2.get_state() == State.DISPATCHED
+        assert task2.get_state() == State.IN_PROGRESS
 
     def test_dispatch_task_with_other_dispatched_same_station(
         self, simpy_env: simpy.Environment, default_position: Position
@@ -216,7 +216,7 @@ class TestResource:
         task3 = BatterySwapTask(simpy_env, 3)
         station = Station(simpy_env, 1, "Test Station", default_position)
         resource = Resource(simpy_env, 2, default_position, [task, task2, task3])
-        task.set_state(State.DISPATCHED)
+        task.set_state(State.IN_PROGRESS)
         task.set_station(station)
         task2.set_station(station)
 
@@ -224,7 +224,7 @@ class TestResource:
         resource.dispatch_task(task2)
 
         # Assert
-        assert task2.get_state() == State.DISPATCHED
+        assert task2.get_state() == State.IN_PROGRESS
 
     def test_dispatch_task_with_other_dispatched_diff_station(
         self, simpy_env: simpy.Environment, default_position: Position
@@ -236,7 +236,7 @@ class TestResource:
         station = Station(simpy_env, 1, "Test Station", default_position)
         station2 = Station(simpy_env, 2, "Other Station", default_position)
         resource = Resource(simpy_env, 2, default_position, [task, task2, task3])
-        task.set_state(State.DISPATCHED)
+        task.set_state(State.IN_PROGRESS)
         task.set_station(station)
         task2.set_station(station2)
 
