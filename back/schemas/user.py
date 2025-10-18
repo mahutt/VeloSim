@@ -40,6 +40,10 @@ class UserCreate(UserBase):
     is_admin: bool = Field(..., description="Whether the user is an administrator")
 
 
+class UserPasswordUpdate(UserBase):
+    password: str = Field(..., description="Password to set for the user")
+
+
 class UserResponse(UserBase):
     """Schema for user responses."""
 

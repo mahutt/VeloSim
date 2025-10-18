@@ -27,7 +27,7 @@ from back.auth.dependency import get_user_id
 from back.database.session import get_db
 from back.exceptions.bad_request_error import BadRequestError
 from back.exceptions.velosim_permission_error import VelosimPermissionError
-from back.schemas.user import UserCreate, UserResponse
+from back.schemas import UserCreate, UserPasswordUpdate, UserResponse
 from back.crud.user import user_crud
 from sqlalchemy.orm import Session
 
@@ -47,6 +47,27 @@ async def create(
     try:
         new_user = user_crud.create(db, user_create_data, requesting_user)
         return UserResponse.model_validate(new_user)
+    except BadRequestError as err:
+        raise HTTPException(status_code=400, detail=err.args)
+    except VelosimPermissionError as err:
+        raise HTTPException(status_code=401, detail=err.args)
+
+
+@router.put("/{user_id}/password", response_model=UserResponse)
+async def password_update(
+    user_id: int,
+    password_data: UserPasswordUpdate,
+    db: Session = Depends(get_db),
+    requesting_user: int = Depends(get_user_id),
+) -> UserResponse:
+    """Update a user's password.
+
+    The requesting user must be an admin or the user themselves."""
+    try:
+        updated_user = user_crud.update_password(
+            db, user_id, password_data, requesting_user
+        )
+        return UserResponse.model_validate(updated_user)
     except BadRequestError as err:
         raise HTTPException(status_code=400, detail=err.args)
     except VelosimPermissionError as err:
