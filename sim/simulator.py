@@ -32,6 +32,7 @@ from sim.entities.request_type import RequestType
 from sim.frame_emitter import FrameEmitter
 from sim.utils.subscriber import Subscriber
 from sim.SimulatorController import SimulatorController
+from sim.entities.task import Task
 
 
 class RunInfo(TypedDict):
@@ -134,6 +135,20 @@ class Simulator:
 
     def send_request(self, request_type: RequestType) -> None:
         raise NotImplementedError("send_request() not implemented yet")
+
+    def get_sim_by_id(self, sim_id: str) -> Optional[RunInfo]:
+        if sim_id in self.thread_pool:
+            return self.thread_pool.get(sim_id)
+        else:
+            raise Exception(f"Simulation {sim_id} does not exist in the thread pool")
+
+    def add_task_to_sim(self, sim_id: str, task: Task) -> None:
+        try:
+            sim_info = self.get_sim_by_id(sim_id)
+            if sim_info is not None:
+                sim_info["simController"].taskEntities.append(task)
+        except Exception as e:
+            print(f"Could not add task to sim due to: {e}")
 
     # For later use, we will be implementing a stream
     # type for continuous communication between BE and SIM (i.e. Frames)
