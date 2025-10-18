@@ -1,5 +1,14 @@
 <div align="center">
 
+<p align="center">
+  <img src="https://img.shields.io/badge/Python-3.11-blue?logo=python&logoColor=white" alt="Python Version">
+  <img src="https://img.shields.io/badge/Node.js-18%2B-green?logo=node.js&logoColor=white" alt="Node.js Version">
+  <img src="https://github.com/vinishamanek/VeloSim/actions/workflows/main-ci.yml/badge.svg?branch=main" alt="Build">
+  <img src="https://codecov.io/gh/vinishamanek/VeloSim/branch/main/graph/badge.svg?token=4GVZ2O1N5U" alt="Total Coverage">
+  <img src="https://img.shields.io/badge/License-MIT-yellow.svg" alt="License">
+  <img src="https://img.shields.io/badge/code%20style-black-000000.svg" alt="Code Style">
+</p>
+
 <img style="height: 6em;" src="TeamLogo.png" alt="TeamLogo"/>
 
 </div>

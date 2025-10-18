@@ -61,9 +61,12 @@ class SimulationService:
         db_sim_instance = sim_instance_crud.create(db, sim_instance_data)
         db.commit()
 
-        # Start simulation with empty subscriber list
+        # Initialize simulation with empty subscriber list
         # Subscribers will attach via WebSocket connections
-        sim_id = self.simulator.start(params, subscribers=[])
+        sim_id = self.simulator.initialize(params, subscribers=[])
+
+        # Start the simulation with a default runtime of 1 hour (3600 seconds)
+        self.simulator.start(sim_id, simTime=3600)
 
         # Track both the simulator UUID and database ID
         self.active_simulations[sim_id] = {

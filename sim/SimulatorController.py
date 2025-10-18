@@ -142,7 +142,7 @@ class SimulatorController:
         resources = []
         for resource in self.resourceEntities:
             if resource.has_updated:
-                dispatched_task = resource.get_dispatched_task()
+                in_progress_task = resource.get_in_progress_task()
                 resources.append(
                     {
                         "resource_id": resource.id,
@@ -151,9 +151,9 @@ class SimulatorController:
                         ),
                         "resource_tasks": resource.get_task_list(),
                         "task_count": resource.get_task_count(),
-                        "dispatched_task_id": (
-                            dispatched_task.get_task_id()
-                            if dispatched_task is not None
+                        "in_progress_task_id": (
+                            in_progress_task.get_task_id()
+                            if in_progress_task is not None
                             else None
                         ),
                     }
@@ -205,7 +205,7 @@ class SimulatorController:
 
         resources = []
         for resource in self.resourceEntities:
-            dispatched_task = resource.get_dispatched_task()
+            in_progress_task = resource.get_in_progress_task()
             resources.append(
                 {
                     "resource_id": resource.id,
@@ -214,9 +214,9 @@ class SimulatorController:
                     ),
                     "resource_tasks": resource.get_task_list(),
                     "task_count": resource.get_task_count(),
-                    "dispatched_task_id": (
-                        dispatched_task.get_task_id()
-                        if dispatched_task is not None
+                    "in_progress_task_id": (
+                        in_progress_task.get_task_id()
+                        if in_progress_task is not None
                         else None
                     ),
                 }
