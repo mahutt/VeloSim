@@ -22,18 +22,33 @@
  * SOFTWARE.
  */
 
-import {
-  type RouteConfig,
-  index,
-  layout,
-  route,
-} from '@react-router/dev/routes';
+import type { Scenario } from '~/types';
 
-export default [
-  layout('./layouts/authenticated.tsx', [
-    index('routes/home.tsx'),
-    route('simulation', 'routes/simulation.tsx'),
-    route('scenarios', 'routes/scenarios.tsx'),
-  ]),
-  layout('./layouts/unauthenticated.tsx', [route('login', 'routes/login.tsx')]),
-] satisfies RouteConfig;
+/**
+ * Helper function to get a preview text for a scenario
+ * Used for displaying in the sidebar
+ */
+export const getScenarioPreview = (scenario: Scenario): string => {
+  try {
+    const parsed = JSON.parse(scenario.content);
+    const keys = Object.keys(parsed);
+    if (keys.length === 0) return 'Empty scenario';
+    return `${keys.length} ${keys.length === 1 ? 'property' : 'properties'}`;
+  } catch {
+    return 'Invalid data';
+  }
+};
+
+/**
+ * Load saved scenarios from placeholder data
+ * TODO: Replace with actual API call to backend
+ */
+export const loadSavedScenarios = async (): Promise<Scenario[]> => {
+  try {
+    const response = await fetch('/placeholder-data/saved-scenarios.json');
+    const data = await response.json();
+    return data;
+  } catch {
+    return [];
+  }
+};
