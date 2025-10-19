@@ -23,6 +23,7 @@
  */
 
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router';
 import type { Scenario } from '~/types';
 import { loadSavedScenarios } from '~/lib/scenario-utils';
 import ScenarioToolbar from '~/components/scenario/scenario-toolbar';
@@ -37,6 +38,7 @@ export default function ScenarioEditor() {
   const [selectedScenarioId, setSelectedScenarioId] = useState<number | null>(
     null
   );
+  const navigate = useNavigate();
 
   useEffect(() => {
     // Load mock data for UI testing
@@ -46,7 +48,7 @@ export default function ScenarioEditor() {
   // TODO: Implement with backend API call
   const handleStartScenario = () => {
     console.log('Start scenario clicked');
-    alert('Start Scenario - TODO: Implement backend integration');
+    navigate('/simulation');
   };
 
   // TODO: Implement with backend API call

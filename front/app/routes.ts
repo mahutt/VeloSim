@@ -33,7 +33,7 @@ export default [
   layout('./layouts/authenticated.tsx', [
     index('routes/home.tsx'),
     route('simulation', 'routes/simulation.tsx'),
-    route('scenario-editor', 'routes/scenario-editor.tsx'),
+    route('scenarios', 'routes/scenarios.tsx'),
   ]),
   layout('./layouts/unauthenticated.tsx', [route('login', 'routes/login.tsx')]),
 ] satisfies RouteConfig;

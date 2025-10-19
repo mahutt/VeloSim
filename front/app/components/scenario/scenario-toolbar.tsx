@@ -39,22 +39,22 @@ export default function ScenarioToolbar({
   onNew,
 }: ScenarioToolbarProps) {
   return (
-    <div className="flex flex-col lg:flex-row gap-6 mb-6">
+    <div className="flex flex-col gap-4 mb-6 sm:flex-row sm:items-end sm:gap-6">
+      <div className="flex gap-2 w-full mb-2 sm:mb-0 sm:w-64 sm:order-2">
+        <Button onClick={onImport} variant="outline" className="flex-1">
+          Import
+        </Button>
+        <Button onClick={onNew} className="flex-1">
+          New
+        </Button>
+      </div>
       <Input
         value={scenarioName}
         onChange={(e) => onNameChange(e.target.value)}
         placeholder="Scenario name"
-        className="flex-1"
+        className="flex-1 sm:order-1"
         aria-label="Scenario name"
       />
-      <div className="flex gap-2 w-full lg:w-64">
-        <Button onClick={onImport} className="flex-1">
-          Import
-        </Button>
-        <Button onClick={onNew} variant="destructive" className="flex-1">
-          New
-        </Button>
-      </div>
     </div>
   );
 }

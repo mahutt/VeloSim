@@ -76,9 +76,11 @@ describe('ScenarioTextArea', () => {
     expect(onExport).toHaveBeenCalled();
   });
 
-  it('calls onStart when Start Scenario button is clicked', () => {
+  it('calls onStart when Start Simulation button is clicked', () => {
     const { onStart } = setup();
-    const startButton = screen.getByRole('button', { name: /start scenario/i });
+    const startButton = screen.getByRole('button', {
+      name: /start simulation/i,
+    });
     fireEvent.click(startButton);
     expect(onStart).toHaveBeenCalled();
   });

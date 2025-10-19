@@ -57,17 +57,21 @@ export default function ScenarioTextArea({
         </div>
       )}
 
-      <div className="flex justify-between gap-2">
-        <div className="flex gap-2">
-          <Button onClick={onSave} variant="destructive" className="w-32">
+      <div className="flex flex-col gap-2 mt-4 sm:flex-row sm:justify-between sm:items-center">
+        <div className="flex flex-col gap-2 w-full sm:flex-row sm:w-auto">
+          <Button onClick={onSave} className="w-full sm:w-32">
             Save
           </Button>
-          <Button onClick={onExport} className="w-32">
+          <Button
+            onClick={onExport}
+            variant="outline"
+            className="w-full sm:w-32"
+          >
             Export
           </Button>
         </div>
-        <Button onClick={onStart} variant="destructive" className="w-32">
-          Start Scenario
+        <Button onClick={onStart} className="w-full sm:w-32">
+          Start Simulation
         </Button>
       </div>
     </div>
