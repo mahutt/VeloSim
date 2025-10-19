@@ -39,6 +39,7 @@ from sim.entities.inputParameters import InputParameter
 from sim.entities.request_type import RequestType
 from sim.entities.station import Station
 from sim.entities.position import Position
+from sim.entities.resource import Resource
 from sim.entities.BatterySwapTask import BatterySwapTask
 
 import sim.RealTimeDriver as rtd_mod
@@ -82,6 +83,42 @@ def default_station(simpy_env: simpy.Environment) -> Station:
         name="Test Station",
         position=Position([-73.5673, 45.5017]),
     )
+
+
+@pytest.fixture()
+def input_params(simpy_env: simpy.Environment) -> InputParameter:
+    """Create a basic InputParameter with some test entities."""
+    params = InputParameter()
+
+    # Add test stations
+    station1 = Station(
+        env=simpy_env,
+        station_id=1,
+        name="Test Station 1",
+        position=Position([10.0, 20.0]),
+    )
+    station2 = Station(
+        env=simpy_env,
+        station_id=2,
+        name="Test Station 2",
+        position=Position([30.0, 40.0]),
+    )
+    params.add_station(station1)
+    params.add_station(station2)
+
+    # Add test resources
+    resource1 = Resource(env=simpy_env, resource_id=1, position=Position([15.0, 25.0]))
+    resource2 = Resource(env=simpy_env, resource_id=2, position=Position([35.0, 45.0]))
+    params.add_resource(resource1)
+    params.add_resource(resource2)
+
+    # Add test tasks using concrete BatterySwapTask
+    task1 = BatterySwapTask(env=simpy_env, task_id=1, station=station1)
+    task2 = BatterySwapTask(env=simpy_env, task_id=2, station=station2)
+    params.add_task(task1)
+    params.add_task(task2)
+
+    return params
 
 
 @pytest.fixture
@@ -297,6 +334,79 @@ def test_add_task_to_sim_fail(
     mock_print.assert_called_once_with(f"Could not add task to sim due to: {error}")
 
     sim.stop(a)
+
+
+def test_assign_task_to_resource_success(
+    sim: Simulator, input_params: InputParameter
+) -> None:
+    # Arrange
+    a = sim.initialize(input_params, subList)
+    sim.start(a, 3600)
+
+    # Act
+    sim.assign_task_to_resource(a, task_id=1, resource_id=1)
+
+    # Assert
+    sim_info = sim.get_sim_by_id(a)
+    if sim_info is not None:
+        sim_controller = sim_info["simController"]
+        task = sim_controller.get_task_by_id(1)
+        assert task is not None
+        resource = task.get_assigned_resource()
+        assert resource is not None
+        assert resource.id == 1
+
+
+@patch("builtins.print")
+def test_assign_task_to_resource_fail(
+    mock_print: MagicMock, sim: Simulator, input_params: InputParameter
+) -> None:
+    # Arrange
+    a = sim.initialize(input_params, subList)
+    sim.start(a, 3600)
+
+    # Act - Pass non-existent task_id
+    sim.assign_task_to_resource(a, task_id=6, resource_id=1)
+
+    # Assert
+    error = "Could not find task in sim with id: 6"
+    mock_print.assert_called_once_with(f"Could not assign task due to: {error}")
+
+
+def test_unassign_task_from_resource_success(
+    sim: Simulator, input_params: InputParameter
+) -> None:
+    # Arrange
+    a = sim.initialize(input_params, subList)
+    sim.start(a, 3600)
+    sim.assign_task_to_resource(a, task_id=1, resource_id=1)
+
+    # Act
+    sim.unassign_task_from_resource(a, task_id=1, resource_id=1)
+
+    # Assert
+    sim_info = sim.get_sim_by_id(a)
+    if sim_info is not None:
+        sim_controller = sim_info["simController"]
+        task = sim_controller.get_task_by_id(1)
+        assert task is not None
+        assert task.get_assigned_resource() is None
+
+
+@patch("builtins.print")
+def test_unassign_task_from_resource_fail(
+    mock_print: MagicMock, sim: Simulator, input_params: InputParameter
+) -> None:
+    # Arrange
+    a = sim.initialize(input_params, subList)
+    sim.start(a, 3600)
+
+    # Act - Pass non-existent task_id
+    sim.unassign_task_from_resource(a, task_id=6, resource_id=1)
+
+    # Assert
+    error = "Could not find task in sim with id: 6"
+    mock_print.assert_called_once_with(f"Could not unassign task due to: {error}")
 
 
 def test_get_stream_not_implemented(sim: Simulator) -> None:

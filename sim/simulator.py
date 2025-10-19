@@ -150,6 +150,28 @@ class Simulator:
         except Exception as e:
             print(f"Could not add task to sim due to: {e}")
 
+    def assign_task_to_resource(
+        self, sim_id: str, task_id: int, resource_id: int
+    ) -> None:
+        try:
+            sim_info = self.get_sim_by_id(sim_id)
+            if sim_info is not None:
+                sim_info["simController"].assign_task_to_resource(task_id, resource_id)
+        except Exception as e:
+            print(f"Could not assign task due to: {e}")
+
+    def unassign_task_from_resource(
+        self, sim_id: str, task_id: int, resource_id: int
+    ) -> None:
+        try:
+            sim_info = self.get_sim_by_id(sim_id)
+            if sim_info is not None:
+                sim_info["simController"].unassign_task_from_resource(
+                    task_id, resource_id
+                )
+        except Exception as e:
+            print(f"Could not unassign task due to: {e}")
+
     # For later use, we will be implementing a stream
     # type for continuous communication between BE and SIM (i.e. Frames)
     def get_stream(

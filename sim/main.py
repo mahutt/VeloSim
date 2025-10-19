@@ -112,8 +112,7 @@ if __name__ == "__main__":
     # Let simulations run for a bit
     time.sleep(4)
 
-    print(hasattr(sim, "add_task_to_sim"))
-    print("Adding a new task...")
+    # Add a new task
     some_new_task = BatterySwapTask(temp_env, 3, station1)
     sim.add_task_to_sim(sim_id=r1, task=some_new_task)
 
