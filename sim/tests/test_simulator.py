@@ -25,16 +25,21 @@ SOFTWARE.
 # sim/tests/test_simulator.py
 
 import time
+import simpy
 import threading
 from typing import List, Any
 import uuid
 
 import pytest
 from _pytest.capture import CaptureFixture
+from unittest.mock import patch, MagicMock
 
 # Import the module so we can monkeypatch its time.sleep
 from sim.entities.inputParameters import InputParameter
 from sim.entities.request_type import RequestType
+from sim.entities.station import Station
+from sim.entities.position import Position
+from sim.entities.BatterySwapTask import BatterySwapTask
 
 import sim.RealTimeDriver as rtd_mod
 from sim.simulator import Simulator
@@ -62,6 +67,21 @@ class MockClock:
 @pytest.fixture
 def sim() -> Simulator:
     return Simulator()
+
+
+@pytest.fixture
+def simpy_env() -> simpy.Environment:
+    return simpy.Environment()
+
+
+@pytest.fixture
+def default_station(simpy_env: simpy.Environment) -> Station:
+    return Station(
+        simpy_env,
+        station_id=1,
+        name="Test Station",
+        position=Position([-73.5673, 45.5017]),
+    )
 
 
 @pytest.fixture
@@ -107,6 +127,29 @@ def test_start_creates_thread_and_emits_output(
 
     # Thread should be gone from pool
     assert sim_id not in sim.thread_pool
+
+
+def test_start_with_non_existant_sim_id(sim: Simulator, fake_time: MockClock) -> None:
+    # Arrange
+    sim.initialize(params, subList)
+
+    # Act and Assert
+    with pytest.raises(
+        RuntimeError, match=r"Simulation some_id not found. Call initialize\(\) first."
+    ):
+        sim.start("some_id", 3600)
+
+
+def test_start_with_already_running_sim(sim: Simulator, fake_time: MockClock) -> None:
+    # Arrange
+    sim_id = sim.initialize(params, subList)
+    sim.start(sim_id, 3600)
+
+    # Act and Assert
+    with pytest.raises(RuntimeError, match=f"Simulation {sim_id} is already running."):
+        sim.start(sim_id, 3600)
+
+    sim.stop(sim_id)
 
 
 def test_stop_removes_thread_from_pool(
@@ -168,6 +211,92 @@ def test_send_request_not_implemented(sim: Simulator) -> None:
     request = RequestType()
     with pytest.raises(NotImplementedError):
         sim.send_request(request)
+
+
+def test_get_sim_by_id_success(
+    sim: Simulator,
+    fake_time: MockClock,
+) -> None:
+    # Arrange
+    a = sim.initialize(params, subList)
+    sim.start(a, 3600)
+
+    # Act
+    sim_info = sim.get_sim_by_id(a)
+
+    # Assert
+    assert sim_info is not None
+    assert sim_info["simController"] is not None
+
+    sim.stop(a)
+
+
+def test_get_sim_by_id_fail(
+    sim: Simulator,
+    fake_time: MockClock,
+) -> None:
+    # Arrange
+    a = sim.initialize(params, subList)
+    sim.start(a, 3600)
+
+    # Act and Assert
+    with pytest.raises(
+        Exception, match="Simulation random_id does not exist in the thread pool"
+    ):
+        sim.get_sim_by_id("random_id")
+
+    sim.stop(a)
+
+
+def test_add_task_to_sim_success(
+    sim: Simulator,
+    fake_time: MockClock,
+    simpy_env: simpy.Environment,
+    default_station: Station,
+) -> None:
+    # Arrange
+    a = sim.initialize(params, subList)
+    sim.start(a, 3600)
+
+    new_task = BatterySwapTask(simpy_env, 3, default_station)
+
+    # Act
+    sim.add_task_to_sim(a, new_task)
+
+    # Assert
+    sim_info = sim.get_sim_by_id(a)
+    if sim_info is not None:
+        sim_controller = sim_info["simController"]
+
+        assert len(sim_controller.taskEntities) != 0
+        assert new_task in sim_controller.taskEntities
+
+    sim_controller.taskEntities.remove(new_task)
+    sim.stop(a)
+
+
+@patch("builtins.print")
+def test_add_task_to_sim_fail(
+    mock_print: MagicMock,
+    sim: Simulator,
+    fake_time: MockClock,
+    simpy_env: simpy.Environment,
+    default_station: Station,
+) -> None:
+    # Arrange
+    a = sim.initialize(params, subList)
+    sim.start(a, 3600)
+
+    new_task = BatterySwapTask(simpy_env, 3, default_station)
+
+    # Act
+    sim.add_task_to_sim("random_id", new_task)
+
+    # Assert
+    error = "Simulation random_id does not exist in the thread pool"
+    mock_print.assert_called_once_with(f"Could not add task to sim due to: {error}")
+
+    sim.stop(a)
 
 
 def test_get_stream_not_implemented(sim: Simulator) -> None:

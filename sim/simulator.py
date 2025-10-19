@@ -88,7 +88,7 @@ class Simulator:
 
         if rec is None:
             raise RuntimeError(
-                f"Simulation {sim_id} not found. " f"Call initialize() first."
+                f"Simulation {sim_id} not found. Call initialize() first."
             )
 
         if rec["thread"] is not None:
