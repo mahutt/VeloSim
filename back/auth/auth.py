@@ -57,7 +57,7 @@ def authenticate_user(username: str | None, password: str | None) -> str | None:
 
     db = next(get_db())
     user = user_crud.get_by_username(db, username)
-    if user is None:
+    if user is None or not user.is_enabled:
         return None
 
     try:

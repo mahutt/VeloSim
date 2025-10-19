@@ -40,6 +40,7 @@ class User(Base):
     username: Mapped[str] = mapped_column(String(100), nullable=False, index=True)
     password_hash: Mapped[str] = mapped_column(String(100), nullable=False)
     is_admin: Mapped[bool] = mapped_column(Boolean, nullable=False)
+    is_enabled: Mapped[bool] = mapped_column(Boolean, nullable=False)
 
     date_created: Mapped[DateTime] = mapped_column(
         DateTime, nullable=False, server_default=func.now()

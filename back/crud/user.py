@@ -59,7 +59,11 @@ class UserCRUD:
         """Get all users with optional filters and pagination, if the requester is an
         admin."""
         requesting_user = self.get(db, requesting_user_id)
-        if not requesting_user or not requesting_user.is_admin:
+        if (
+            not requesting_user
+            or not requesting_user.is_admin
+            or not requesting_user.is_enabled
+        ):
             raise VelosimPermissionError("Requesting user cannot list users.")
 
         # Build the base query
@@ -67,9 +71,9 @@ class UserCRUD:
 
         # Apply filters conditionally
         if is_enabled is not None:
-            pass  # Haven't implemented this field of user yet
+            query = query.filter(User.is_enabled == is_enabled)
         if is_admin is not None:
-            query = query.filter(User.is_admin == True)
+            query = query.filter(User.is_admin == is_admin)
 
         # Get total count for pagination
         total = query.count()
@@ -84,7 +88,11 @@ class UserCRUD:
     ) -> User:
         """Checks whether the requester is an admin, and if so, creates a new user."""
         requesting_user = self.get(db, requesting_user_id)
-        if not requesting_user or not requesting_user.is_admin:
+        if (
+            not requesting_user
+            or not requesting_user.is_admin
+            or not requesting_user.is_enabled
+        ):
             raise VelosimPermissionError("Requesting user cannot create users.")
 
         # Need to make this explicit for the test environment
@@ -97,6 +105,7 @@ class UserCRUD:
                 username=user_data.username,
                 password_hash=self.hash_password(user_data.password),
                 is_admin=user_data.is_admin,
+                is_enabled=user_data.is_enabled,
             )
             db.add(new_user)
             db.flush()
@@ -114,9 +123,9 @@ class UserCRUD:
     ) -> User:
         """Updates a password if the requester is the user themselves or an admin."""
         requesting_user = self.get(db, requesting_user_id)
-        if not requesting_user or (
-            requesting_user.id != user_id and not requesting_user.is_admin
-        ):
+        if not requesting_user or not requesting_user.is_enabled:
+            raise VelosimPermissionError("Requesting user cannot update this password.")
+        if requesting_user.id != user_id and not requesting_user.is_admin:
             raise VelosimPermissionError("Requesting user cannot update this password.")
 
         user = self.get(db, user_id)
@@ -139,16 +148,20 @@ class UserCRUD:
         """Updates a user's role if the requester is an admin and not the user
         themselves."""
         requesting_user = self.get(db, requesting_user_id)
-        if not requesting_user or (
-            requesting_user.id == user_id or not requesting_user.is_admin
-        ):
+        if not requesting_user or not requesting_user.is_enabled:
+            raise VelosimPermissionError("Requesting user cannot update this role.")
+        if requesting_user.id == user_id or not requesting_user.is_admin:
             raise VelosimPermissionError("Requesting user cannot update this role.")
 
         user = self.get(db, user_id)
         if not user:
             raise BadRequestError("User not found")
 
-        user.is_admin = role_data.is_admin
+        if role_data.is_admin is not None:
+            user.is_admin = role_data.is_admin
+        if role_data.is_enabled is not None:
+            user.is_enabled = role_data.is_enabled
+
         db.add(user)
         db.flush()
         db.refresh(user)

@@ -22,7 +22,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 """
 
-from typing import List
+from typing import List, Optional
 from pydantic import BaseModel, Field
 
 
@@ -38,6 +38,9 @@ class UserCreate(UserBase):
     username: str = Field(..., description="Username to create")
     password: str = Field(..., description="Password to set for the user")
     is_admin: bool = Field(..., description="Whether the user is an administrator")
+    is_enabled: Optional[bool] = Field(
+        True, description="Whether the account is enabled"
+    )
 
 
 class UserPasswordUpdate(UserBase):
@@ -45,7 +48,12 @@ class UserPasswordUpdate(UserBase):
 
 
 class UserRoleUpdate(UserBase):
-    is_admin: bool = Field(..., description="Whether the user is an administrator")
+    is_admin: Optional[bool] = Field(
+        None, description="Whether the user is an administrator"
+    )
+    is_enabled: Optional[bool] = Field(
+        None, description="Whether the account is enabled"
+    )
 
 
 class UserResponse(UserBase):
@@ -54,6 +62,7 @@ class UserResponse(UserBase):
     id: int = Field(..., description="The internal identifier for the user")
     username: str = Field(..., description="Username")
     is_admin: bool = Field(..., description="Whether the user is an administrator")
+    is_enabled: bool = Field(..., description="Whether the account is enabled")
 
     class Config:
         from_attributes = True

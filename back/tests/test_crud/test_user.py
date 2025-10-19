@@ -38,6 +38,7 @@ def admin_user(db: Session) -> User:
         username="admin_user",
         password_hash=user_crud.hash_password("admin_password"),
         is_admin=True,
+        is_enabled=True,
     )
     db.add(admin)
     db.flush()
@@ -49,7 +50,10 @@ class TestUserCRUD:
     def test_create_user_success(self, db: Session, admin_user: User) -> None:
         """Test creating a user successfully."""
         user_data = UserCreate(
-            username="test_user", password="test_password", is_admin=False
+            username="test_user",
+            password="test_password",
+            is_admin=False,
+            is_enabled=True,
         )
         user = user_crud.create(db, user_data, admin_user.id)
         assert user.id is not None
@@ -64,19 +68,24 @@ class TestUserCRUD:
             username="regular_user",
             password_hash=user_crud.hash_password("password"),
             is_admin=False,
+            is_enabled=True,
         )
         db.add(non_admin)
         db.flush()
         db.refresh(non_admin)
 
-        user_data = UserCreate(username="new_user", password="password", is_admin=False)
+        user_data = UserCreate(
+            username="new_user", password="password", is_admin=False, is_enabled=True
+        )
 
         with pytest.raises(VelosimPermissionError):
             user_crud.create(db, user_data, non_admin.id)
 
     def test_create_user_nonexistent_requester(self, db: Session) -> None:
         """Test creating a user with nonexistent requester raises permission error."""
-        user_data = UserCreate(username="new_user", password="password", is_admin=False)
+        user_data = UserCreate(
+            username="new_user", password="password", is_admin=False, is_enabled=True
+        )
 
         with pytest.raises(VelosimPermissionError):
             user_crud.create(db, user_data, 99999)
@@ -87,13 +96,19 @@ class TestUserCRUD:
         """Test creating a user with duplicate username raises bad request error."""
         # Create first user
         user_data = UserCreate(
-            username="duplicate_user", password="password1", is_admin=False
+            username="duplicate_user",
+            password="password1",
+            is_admin=False,
+            is_enabled=True,
         )
         user_crud.create(db, user_data, admin_user.id)
 
         # Try to create second user with same username
         user_data2 = UserCreate(
-            username="duplicate_user", password="password2", is_admin=False
+            username="duplicate_user",
+            password="password2",
+            is_admin=False,
+            is_enabled=True,
         )
 
         with pytest.raises(BadRequestError):
@@ -137,6 +152,7 @@ class TestUserCRUD:
             username="regular_user",
             password_hash=user_crud.hash_password("old_password"),
             is_admin=False,
+            is_enabled=True,
         )
         db.add(regular_user)
         db.flush()
@@ -163,6 +179,7 @@ class TestUserCRUD:
             username="self_user",
             password_hash=user_crud.hash_password("old_password"),
             is_admin=False,
+            is_enabled=True,
         )
         db.add(user)
         db.flush()
@@ -188,11 +205,13 @@ class TestUserCRUD:
             username="user1",
             password_hash=user_crud.hash_password("password1"),
             is_admin=False,
+            is_enabled=True,
         )
         user2 = User(
             username="user2",
             password_hash=user_crud.hash_password("password2"),
             is_admin=False,
+            is_enabled=True,
         )
         db.add(user1)
         db.add(user2)
@@ -212,6 +231,7 @@ class TestUserCRUD:
             username="test_user",
             password_hash=user_crud.hash_password("password"),
             is_admin=False,
+            is_enabled=True,
         )
         db.add(user)
         db.flush()
@@ -238,12 +258,13 @@ class TestUserCRUD:
             username="regular_user",
             password_hash=user_crud.hash_password("password"),
             is_admin=False,
+            is_enabled=True,
         )
         db.add(regular_user)
         db.flush()
         db.refresh(regular_user)
 
-        role_data = UserRoleUpdate(is_admin=True)
+        role_data = UserRoleUpdate(is_admin=True, is_enabled=True)
         updated_user = user_crud.update_role(
             db, regular_user.id, role_data, admin_user.id
         )
@@ -258,12 +279,13 @@ class TestUserCRUD:
             username="admin_user2",
             password_hash=user_crud.hash_password("password"),
             is_admin=True,
+            is_enabled=True,
         )
         db.add(admin_user2)
         db.flush()
         db.refresh(admin_user2)
 
-        role_data = UserRoleUpdate(is_admin=False)
+        role_data = UserRoleUpdate(is_admin=False, is_enabled=True)
         updated_user = user_crud.update_role(
             db, admin_user2.id, role_data, admin_user.id
         )
@@ -275,7 +297,7 @@ class TestUserCRUD:
         self, db: Session, admin_user: User
     ) -> None:
         """Test admin trying to update their own role raises permission error."""
-        role_data = UserRoleUpdate(is_admin=False)
+        role_data = UserRoleUpdate(is_admin=False, is_enabled=True)
 
         with pytest.raises(VelosimPermissionError):
             user_crud.update_role(db, admin_user.id, role_data, admin_user.id)
@@ -287,11 +309,13 @@ class TestUserCRUD:
             username="user1",
             password_hash=user_crud.hash_password("password1"),
             is_admin=False,
+            is_enabled=True,
         )
         user2 = User(
             username="user2",
             password_hash=user_crud.hash_password("password2"),
             is_admin=False,
+            is_enabled=True,
         )
         db.add(user1)
         db.add(user2)
@@ -299,7 +323,7 @@ class TestUserCRUD:
         db.refresh(user1)
         db.refresh(user2)
 
-        role_data = UserRoleUpdate(is_admin=True)
+        role_data = UserRoleUpdate(is_admin=True, is_enabled=True)
 
         with pytest.raises(VelosimPermissionError):
             user_crud.update_role(db, user2.id, role_data, user1.id)
@@ -311,19 +335,20 @@ class TestUserCRUD:
             username="test_user",
             password_hash=user_crud.hash_password("password"),
             is_admin=False,
+            is_enabled=True,
         )
         db.add(user)
         db.flush()
         db.refresh(user)
 
-        role_data = UserRoleUpdate(is_admin=True)
+        role_data = UserRoleUpdate(is_admin=True, is_enabled=True)
 
         with pytest.raises(VelosimPermissionError):
             user_crud.update_role(db, user.id, role_data, 99999)
 
     def test_update_role_user_not_found(self, db: Session, admin_user: User) -> None:
         """Test updating role for nonexistent user raises bad request error."""
-        role_data = UserRoleUpdate(is_admin=True)
+        role_data = UserRoleUpdate(is_admin=True, is_enabled=True)
 
         with pytest.raises(BadRequestError):
             user_crud.update_role(db, 99999, role_data, admin_user.id)
@@ -335,11 +360,13 @@ class TestUserCRUD:
             username="user1",
             password_hash=user_crud.hash_password("password1"),
             is_admin=False,
+            is_enabled=True,
         )
         user2 = User(
             username="user2",
             password_hash=user_crud.hash_password("password2"),
             is_admin=True,
+            is_enabled=True,
         )
         db.add(user1)
         db.add(user2)
@@ -363,11 +390,13 @@ class TestUserCRUD:
             username="user1",
             password_hash=user_crud.hash_password("password1"),
             is_admin=False,
+            is_enabled=True,
         )
         user2 = User(
             username="user2",
             password_hash=user_crud.hash_password("password2"),
             is_admin=True,
+            is_enabled=True,
         )
         db.add(user1)
         db.add(user2)
@@ -389,6 +418,7 @@ class TestUserCRUD:
                 username=f"user{i}",
                 password_hash=user_crud.hash_password(f"password{i}"),
                 is_admin=False,
+                is_enabled=True,
             )
             db.add(user)
         db.flush()
@@ -406,6 +436,7 @@ class TestUserCRUD:
             username="regular_user",
             password_hash=user_crud.hash_password("password"),
             is_admin=False,
+            is_enabled=True,
         )
         db.add(non_admin)
         db.flush()
@@ -421,3 +452,185 @@ class TestUserCRUD:
         error."""
         with pytest.raises(VelosimPermissionError):
             user_crud.get_all(db, None, None, 99999)
+
+    def test_get_all_users_with_enabled_filter(
+        self, db: Session, admin_user: User
+    ) -> None:
+        """Test getting users with enabled filter."""
+        # Create some additional users - mix of enabled and disabled
+        user1 = User(
+            username="user1",
+            password_hash=user_crud.hash_password("password1"),
+            is_admin=False,
+            is_enabled=True,
+        )
+        user2 = User(
+            username="user2",
+            password_hash=user_crud.hash_password("password2"),
+            is_admin=False,
+            is_enabled=False,  # Disabled user
+        )
+        user3 = User(
+            username="user3",
+            password_hash=user_crud.hash_password("password3"),
+            is_admin=True,
+            is_enabled=False,  # Disabled admin
+        )
+        db.add(user1)
+        db.add(user2)
+        db.add(user3)
+        db.flush()
+
+        # Filter for enabled users only
+        users, total = user_crud.get_all(db, True, None, admin_user.id)
+
+        assert total == 2  # admin_user + user1 (both enabled)
+        assert len(users) == 2
+        for user in users:
+            assert user.is_enabled is True
+
+        # Filter for disabled users only
+        users, total = user_crud.get_all(db, False, None, admin_user.id)
+
+        assert total == 2  # user2 + user3 (both disabled)
+        assert len(users) == 2
+        for user in users:
+            assert user.is_enabled is False
+
+    def test_create_user_disabled_admin_requester(self, db: Session) -> None:
+        """Test creating a user with disabled admin requester raises permission
+        error."""
+        # Create a disabled admin user
+        disabled_admin = User(
+            username="disabled_admin",
+            password_hash=user_crud.hash_password("password"),
+            is_admin=True,
+            is_enabled=False,
+        )
+        db.add(disabled_admin)
+        db.flush()
+        db.refresh(disabled_admin)
+
+        user_data = UserCreate(
+            username="new_user",
+            password="password",
+            is_admin=False,
+            is_enabled=True,
+        )
+
+        with pytest.raises(VelosimPermissionError):
+            user_crud.create(db, user_data, disabled_admin.id)
+
+    def test_update_password_disabled_admin_requester(self, db: Session) -> None:
+        """Test disabled admin trying to update password raises permission error."""
+        # Create a disabled admin user
+        disabled_admin = User(
+            username="disabled_admin",
+            password_hash=user_crud.hash_password("password"),
+            is_admin=True,
+            is_enabled=False,
+        )
+        # Create a regular user
+        regular_user = User(
+            username="regular_user",
+            password_hash=user_crud.hash_password("old_password"),
+            is_admin=False,
+            is_enabled=True,
+        )
+        db.add(disabled_admin)
+        db.add(regular_user)
+        db.flush()
+        db.refresh(disabled_admin)
+        db.refresh(regular_user)
+
+        password_data = UserPasswordUpdate(password="new_password")
+
+        with pytest.raises(VelosimPermissionError):
+            user_crud.update_password(
+                db, regular_user.id, password_data, disabled_admin.id
+            )
+
+    def test_update_role_disabled_admin_requester(self, db: Session) -> None:
+        """Test disabled admin trying to update role raises permission error."""
+        # Create a disabled admin user
+        disabled_admin = User(
+            username="disabled_admin",
+            password_hash=user_crud.hash_password("password"),
+            is_admin=True,
+            is_enabled=False,
+        )
+        # Create a regular user
+        regular_user = User(
+            username="regular_user",
+            password_hash=user_crud.hash_password("password"),
+            is_admin=False,
+            is_enabled=True,
+        )
+        db.add(disabled_admin)
+        db.add(regular_user)
+        db.flush()
+        db.refresh(disabled_admin)
+        db.refresh(regular_user)
+
+        role_data = UserRoleUpdate(is_admin=True, is_enabled=True)
+
+        with pytest.raises(VelosimPermissionError):
+            user_crud.update_role(db, regular_user.id, role_data, disabled_admin.id)
+
+    def test_get_all_users_disabled_admin_requester(self, db: Session) -> None:
+        """Test disabled admin trying to get all users raises permission error."""
+        # Create a disabled admin user
+        disabled_admin = User(
+            username="disabled_admin",
+            password_hash=user_crud.hash_password("password"),
+            is_admin=True,
+            is_enabled=False,
+        )
+        db.add(disabled_admin)
+        db.flush()
+        db.refresh(disabled_admin)
+
+        with pytest.raises(VelosimPermissionError):
+            user_crud.get_all(db, None, None, disabled_admin.id)
+
+    def test_update_role_disable_user(self, db: Session, admin_user: User) -> None:
+        """Test admin disabling a user successfully."""
+        # Create a regular user
+        regular_user = User(
+            username="regular_user",
+            password_hash=user_crud.hash_password("password"),
+            is_admin=False,
+            is_enabled=True,
+        )
+        db.add(regular_user)
+        db.flush()
+        db.refresh(regular_user)
+
+        role_data = UserRoleUpdate(is_admin=False, is_enabled=False)
+        updated_user = user_crud.update_role(
+            db, regular_user.id, role_data, admin_user.id
+        )
+
+        assert updated_user.id == regular_user.id
+        assert updated_user.is_enabled is False
+
+    def test_update_role_enable_user(self, db: Session, admin_user: User) -> None:
+        """Test admin enabling a disabled user successfully."""
+        # Create a disabled user
+        disabled_user = User(
+            username="disabled_user",
+            password_hash=user_crud.hash_password("password"),
+            is_admin=False,
+            is_enabled=False,
+        )
+        db.add(disabled_user)
+        db.flush()
+        db.refresh(disabled_user)
+
+        role_data = UserRoleUpdate(is_admin=False, is_enabled=True)
+        updated_user = user_crud.update_role(
+            db, disabled_user.id, role_data, admin_user.id
+        )
+
+        assert updated_user.id == disabled_user.id
+        assert updated_user.is_enabled is True
