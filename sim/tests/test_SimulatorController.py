@@ -344,6 +344,102 @@ def test_set_factor(simulator_controller: SimulatorController) -> None:
         mock_set_factor.assert_called_once_with(2.0)
 
 
+def test_assign_task_to_resource_success(
+    simulator_controller: SimulatorController,
+) -> None:
+    """Test assign_task_to_resource functionality."""
+    # Arrange
+    task_id = 1
+    resource_id = 1
+
+    # Act
+    simulator_controller.assign_task_to_resource(task_id, resource_id)
+
+    # Assert
+    task = simulator_controller.taskEntities[0]
+    resource = simulator_controller.resourceEntities[0]
+    assert task.get_assigned_resource() == resource
+    assert resource.get_task_list()[0] == task
+
+
+def test_assign_task_to_resource_with_bad_task_id(
+    simulator_controller: SimulatorController,
+) -> None:
+    """Test assign_task_to_resource functionality with an invalid task_id."""
+    # Arrange
+    task_id = 6  # Non-existant id
+    resource_id = 1
+
+    # Act and Assert
+    with pytest.raises(
+        Exception, match=f"Could not find task in sim with id: {task_id}"
+    ):
+        simulator_controller.assign_task_to_resource(task_id, resource_id)
+
+
+def test_assign_task_to_resource_with_bad_resource_id(
+    simulator_controller: SimulatorController,
+) -> None:
+    """Test assign_task_to_resource functionality with an invalid resouruce_id."""
+    # Arrange
+    task_id = 1
+    resource_id = 6  # Non-existant id
+
+    # Act and Assert
+    with pytest.raises(
+        Exception, match=f"Could not find resource in sim with id: {resource_id}"
+    ):
+        simulator_controller.assign_task_to_resource(task_id, resource_id)
+
+
+def test_unassign_task_from_resource_success(
+    simulator_controller: SimulatorController,
+) -> None:
+    """Test unassign_task_from_resource functionality."""
+    # Arrange
+    task_id = 1
+    resource_id = 1
+
+    # Act
+    simulator_controller.unassign_task_from_resource(task_id, resource_id)
+
+    # Assert
+    task = simulator_controller.taskEntities[0]
+    resource = simulator_controller.resourceEntities[0]
+    assert task.get_assigned_resource() is None
+    assert resource.get_task_count() == 0
+
+
+def test_unassign_task_from_resource_with_bad_task_id(
+    simulator_controller: SimulatorController,
+) -> None:
+    """Test unassign_task_from_resource functionality with an invalid task_id."""
+    # Arrange
+    task_id = 6  # Non-existant id
+    resource_id = 1
+
+    # Act and Assert
+    with pytest.raises(
+        Exception, match=f"Could not find task in sim with id: {task_id}"
+    ):
+        simulator_controller.unassign_task_from_resource(task_id, resource_id)
+
+
+def test_unassign_task_from_resource_with_bad_resource_id(
+    simulator_controller: SimulatorController,
+) -> None:
+    """Test unassign_task_from_resource functionality with an invalid resource_id."""
+    # Arrange
+    task_id = 1
+    resource_id = 6  # Non-existant id
+
+    # Act and Assert
+    with pytest.raises(
+        Exception, match=f"Could not find resource in sim with id: {resource_id}"
+    ):
+        simulator_controller.unassign_task_from_resource(task_id, resource_id)
+
+
 def test_start_simulation(
     simulator_controller: SimulatorController, fake_time: MockClock
 ) -> None:

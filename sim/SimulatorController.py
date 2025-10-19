@@ -88,6 +88,40 @@ class SimulatorController:
     def set_factor(self, factor: float) -> None:
         self.realTimeDriver.set_real_time_factor(factor)
 
+    def get_task_by_id(self, task_id: int) -> Optional[Task]:
+        for task in self.taskEntities:
+            if task.id == task_id:
+                return task
+        return None
+
+    def get_resource_by_id(self, resource_id: int) -> Optional[Resource]:
+        for resource in self.resourceEntities:
+            if resource.id == resource_id:
+                return resource
+        return None
+
+    def assign_task_to_resource(self, task_id: int, resource_id: int) -> None:
+        found_task = self.get_task_by_id(task_id)
+        found_resource = self.get_resource_by_id(resource_id)
+
+        if found_task and found_resource:
+            found_resource.assign_task(found_task)
+        elif found_task is None:
+            raise Exception(f"Could not find task in sim with id: {task_id}")
+        else:
+            raise Exception(f"Could not find resource in sim with id: {resource_id}")
+
+    def unassign_task_from_resource(self, task_id: int, resource_id: int) -> None:
+        found_task = self.get_task_by_id(task_id)
+        found_resource = self.get_resource_by_id(resource_id)
+
+        if found_task and found_resource:
+            found_resource.unassign_task(found_task)
+        elif found_task is None:
+            raise Exception(f"Could not find task in sim with id: {task_id}")
+        else:
+            raise Exception(f"Could not find resource in sim with id: {resource_id}")
+
     # First frame sent from back to front end with station data, etc
     def emit_initial_frame(self) -> None:
         frame = self.create_key_frame()
