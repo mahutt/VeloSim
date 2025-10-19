@@ -32,6 +32,7 @@ from sim.entities.resource import Resource
 from sim.entities.position import Position
 from sim.utils.subscriber import Subscriber
 from sim.simulator import Simulator
+from sim.entities.BatterySwapTask import BatterySwapTask
 
 
 class LoggerSubscriber(Subscriber):
@@ -66,11 +67,16 @@ station2 = Station(temp_env, station_id=2, name="Station Beta", position=positio
 resource1 = Resource(temp_env, resource_id=101, position=position1)
 resource2 = Resource(temp_env, resource_id=102, position=position3)
 
+task1 = BatterySwapTask(temp_env, 1, station1)
+task2 = BatterySwapTask(temp_env, 2, station2)
+station1.add_task(task1)
+resource1.assign_task(task1)
+
 # Create InputParameter with example entities and simulation settings
 params = InputParameter(
     station_entities=[station1, station2],
     resource_entities=[resource1, resource2],
-    task_entities=[],  # No tasks for this example
+    task_entities=[task1, task2],  # No tasks for this example
     real_time_factor=1.0,  # Real-time simulation
     key_frame_freq=3,  # Key frame every 3 frames
 )
@@ -105,7 +111,7 @@ if __name__ == "__main__":
     sim.start(r2, 3600)
 
     # Let simulations run for a bit
-    time.sleep(12)
+    time.sleep(4)
 
     # Stop simulations
     print("Stopping simulations...")

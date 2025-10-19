@@ -23,7 +23,7 @@ SOFTWARE.
 """
 
 from abc import ABC, abstractmethod
-from typing import Optional, TYPE_CHECKING
+from typing import Optional, TYPE_CHECKING, Any
 import simpy
 from .task_state import State
 
@@ -81,3 +81,15 @@ class Task(ABC):
     @abstractmethod
     def is_assigned(self) -> bool:
         pass
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "id": self.id,
+            "state": str(self.state),
+            "station_id": (self.station.id if self.station is not None else None),
+            "assigned_resource_id": (
+                self.assigned_resource.id
+                if self.assigned_resource is not None
+                else None
+            ),
+        }
