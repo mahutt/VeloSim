@@ -344,6 +344,39 @@ def test_set_factor(simulator_controller: SimulatorController) -> None:
         mock_set_factor.assert_called_once_with(2.0)
 
 
+def test_add_task_success(
+    env: simpy.Environment, simulator_controller: SimulatorController
+) -> None:
+    """Test add_task functionality"""
+    # Arrange
+    task_id = 3
+    station1 = simulator_controller.stationEntities[0]
+    new_task = BatterySwapTask(env, task_id, station1)
+
+    # Act
+    simulator_controller.add_task(new_task)
+
+    # Assert
+    assert simulator_controller.get_task_by_id(task_id) is not None
+    assert new_task in simulator_controller.taskEntities
+
+
+def test_add_task_fail(
+    env: simpy.Environment, simulator_controller: SimulatorController
+) -> None:
+    """Test add_task functionality with existent task id"""
+    # Arrange
+    task_id = 2
+    station1 = simulator_controller.stationEntities[0]
+    new_task = BatterySwapTask(env, task_id, station1)
+
+    # Act and Assert
+    with pytest.raises(Exception, match=f"Task with id {task_id} already exists"):
+        simulator_controller.add_task(new_task)
+
+    assert new_task not in simulator_controller.taskEntities
+
+
 def test_assign_task_to_resource_success(
     simulator_controller: SimulatorController,
 ) -> None:

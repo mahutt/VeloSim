@@ -100,6 +100,15 @@ class SimulatorController:
                 return resource
         return None
 
+    def add_task(self, task: Task) -> None:
+        task_id = task.get_task_id()
+        found_task = self.get_task_by_id(task_id)
+
+        if found_task is None:
+            self.taskEntities.append(task)
+        else:  # task with same id exists already
+            raise Exception(f"Task with id {task_id} already exists")
+
     def assign_task_to_resource(self, task_id: int, resource_id: int) -> None:
         found_task = self.get_task_by_id(task_id)
         found_resource = self.get_resource_by_id(resource_id)

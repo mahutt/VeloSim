@@ -146,7 +146,7 @@ class Simulator:
         try:
             sim_info = self.get_sim_by_id(sim_id)
             if sim_info is not None:
-                sim_info["simController"].taskEntities.append(task)
+                sim_info["simController"].add_task(task)
         except Exception as e:
             print(f"Could not add task to sim due to: {e}")
 

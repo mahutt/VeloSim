@@ -114,10 +114,29 @@ if __name__ == "__main__":
     time.sleep(4)
 
     # Add a new task
+    print("Adding new task with id 3 in sim r1...")
+    print("===========================================================")
     some_new_task = BatterySwapTask(temp_env, 3, station1)
     sim.add_task_to_sim(sim_id=r1, task=some_new_task)
-
     time.sleep(4)
+
+    # Assigning task
+    print("Assigning task 3 to resource with id 102 in sim r1...")
+    print("===========================================================")
+    sim.assign_task_to_resource(r1, task_id=3, resource_id=102)
+    time.sleep(2)
+
+    # Unassign task
+    print("Unassiging task 1 from resource 101 in r2...")
+    print("===========================================================")
+    sim.unassign_task_from_resource(r2, task_id=1, resource_id=101)
+    time.sleep(2)
+
+    # Reassign task
+    print("Reassigning task 3 from resource 102 to resource 101 in r1...")
+    print("===========================================================")
+    sim.reassign_task(r1, task_id=3, old_resource_id=102, new_resource_id=101)
+    time.sleep(2)
 
     # Stop simulations
     print("Stopping simulations...")
