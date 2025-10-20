@@ -76,7 +76,7 @@ resource1.assign_task(task1)
 params = InputParameter(
     station_entities=[station1, station2],
     resource_entities=[resource1, resource2],
-    task_entities=[task1, task2],  # No tasks for this example
+    task_entities=[task1, task2],
     real_time_factor=1.0,  # Real-time simulation
     key_frame_freq=3,  # Key frame every 3 frames
 )
