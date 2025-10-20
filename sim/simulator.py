@@ -172,6 +172,18 @@ class Simulator:
         except Exception as e:
             print(f"Could not unassign task due to: {e}")
 
+    def reassign_task(
+        self, sim_id: str, task_id: int, old_resource_id: int, new_resource_id: int
+    ) -> None:
+        try:
+            sim_info = self.get_sim_by_id(sim_id)
+            if sim_info is not None:
+                sim_info["simController"].reassign_task(
+                    task_id, old_resource_id, new_resource_id
+                )
+        except Exception as e:
+            print(f"Error occurred: {e}")
+
     # For later use, we will be implementing a stream
     # type for continuous communication between BE and SIM (i.e. Frames)
     def get_stream(

@@ -409,6 +409,45 @@ def test_unassign_task_from_resource_fail(
     mock_print.assert_called_once_with(f"Could not unassign task due to: {error}")
 
 
+def test_reassign_task_success(sim: Simulator, input_params: InputParameter) -> None:
+    # Arrange
+    a = sim.initialize(input_params, subList)
+    sim.start(a, 3600)
+    sim.assign_task_to_resource(a, task_id=1, resource_id=1)
+
+    # Act
+    sim.reassign_task(a, task_id=1, old_resource_id=1, new_resource_id=2)
+
+    # Assert
+    sim_info = sim.get_sim_by_id(a)
+    if sim_info is not None:
+        sim_controller = sim_info["simController"]
+        task = sim_controller.get_task_by_id(1)
+        assert task is not None
+        old_resource = sim_controller.get_resource_by_id(1)
+        assert old_resource is not None
+        new_resource = sim_controller.get_resource_by_id(2)
+        assert new_resource is not None
+        assert task.get_assigned_resource() == new_resource
+        assert task not in old_resource.get_task_list()
+
+
+@patch("builtins.print")
+def test_reassign_task_fail(
+    mock_print: MagicMock, sim: Simulator, input_params: InputParameter
+) -> None:
+    # Arrange
+    a = sim.initialize(input_params, subList)
+    sim.start(a, 3600)
+
+    # Act - Pass non-existent task_id
+    sim.reassign_task(a, task_id=6, old_resource_id=1, new_resource_id=2)
+
+    # Assert
+    error = "Reassiging task failed as could not find task 6"
+    mock_print.assert_called_once_with(f"Error occurred: {error}")
+
+
 def test_get_stream_not_implemented(sim: Simulator) -> None:
     with pytest.raises(NotImplementedError):
         sim.get_stream()
