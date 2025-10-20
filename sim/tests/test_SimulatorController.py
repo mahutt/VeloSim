@@ -440,6 +440,91 @@ def test_unassign_task_from_resource_with_bad_resource_id(
         simulator_controller.unassign_task_from_resource(task_id, resource_id)
 
 
+def test_reassign_task_success(
+    simulator_controller: SimulatorController,
+) -> None:
+    """Test reassign_task functionality"""
+    # Arrange
+    task_id = 1
+    old_resource_id = 1
+    new_resource_id = 2
+
+    simulator_controller.assign_task_to_resource(task_id, old_resource_id)
+
+    # Act
+    simulator_controller.reassign_task(task_id, old_resource_id, new_resource_id)
+
+    # Assert
+    task = simulator_controller.get_task_by_id(task_id)
+    assert task is not None
+    old_resource = simulator_controller.get_resource_by_id(old_resource_id)
+    assert old_resource is not None
+    new_resource = simulator_controller.get_resource_by_id(new_resource_id)
+    assert new_resource is not None
+    assert task.get_assigned_resource() == new_resource
+    assert task in new_resource.get_task_list()
+    assert task not in old_resource.get_task_list()
+
+
+def test_reassign_task_fail_with_bad_task_id(
+    simulator_controller: SimulatorController,
+) -> None:
+    """Test reassign_task functionality with bad task_id"""
+    # Arrange
+    task_id = 6  # Non-existent task
+    old_resource_id = 1
+    new_resource_id = 2
+
+    # Act and Assert
+    with pytest.raises(
+        Exception, match=f"Reassiging task failed as could not find task {task_id}"
+    ):
+        simulator_controller.reassign_task(task_id, old_resource_id, new_resource_id)
+
+
+def test_reassign_task_fail_with_bad_old_resource_id(
+    simulator_controller: SimulatorController,
+) -> None:
+    """Test reassign_task functionality with bad old_resource_id"""
+    # Arrange
+    task_id = 1
+    old_resource_id = 6  # Non-existent resource
+    new_resource_id = 2
+
+    # Act and Assert
+    with pytest.raises(
+        Exception,
+        match=f"Reassiging failed as could not find resource {old_resource_id}",
+    ):
+        simulator_controller.reassign_task(task_id, old_resource_id, new_resource_id)
+
+
+def test_reassign_task_fail_with_bad_new_resource_id(
+    simulator_controller: SimulatorController,
+) -> None:
+    """Test reassign_task functionality with bad new_resource_id"""
+    # Arrange
+    task_id = 1
+    old_resource_id = 1
+    new_resource_id = 6  # Non-existent resource
+
+    simulator_controller.assign_task_to_resource(task_id, old_resource_id)
+
+    # Act and Assert
+    with pytest.raises(
+        Exception,
+        match=f"Reassiging failed as could node find resource {new_resource_id}",
+    ):
+        simulator_controller.reassign_task(task_id, old_resource_id, new_resource_id)
+
+    task = simulator_controller.get_task_by_id(task_id)
+    assert task is not None
+    old_resource = simulator_controller.get_resource_by_id(old_resource_id)
+    assert old_resource is not None
+    assert task.get_assigned_resource() == old_resource
+    assert task in old_resource.get_task_list()
+
+
 def test_start_simulation(
     simulator_controller: SimulatorController, fake_time: MockClock
 ) -> None:

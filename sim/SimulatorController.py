@@ -122,6 +122,31 @@ class SimulatorController:
         else:
             raise Exception(f"Could not find resource in sim with id: {resource_id}")
 
+    def reassign_task(
+        self, task_id: int, old_resource_id: int, new_resource_id: int
+    ) -> None:
+        try:
+            self.unassign_task_from_resource(task_id, old_resource_id)
+            self.assign_task_to_resource(task_id, new_resource_id)
+        except Exception as e:
+            error_message = str(e)
+            if str(task_id) in error_message:
+                raise Exception(
+                    f"Reassiging task failed as could not find task {task_id}"
+                )
+            elif str(old_resource_id) in error_message:
+                raise Exception(
+                    f"Reassiging failed as could not find resource {old_resource_id}"
+                )
+            elif str(new_resource_id) in error_message:
+                # Assigns back the task to its original resource as reassiging failed
+                self.assign_task_to_resource(task_id, old_resource_id)
+                raise Exception(
+                    f"Reassiging failed as could node find resource {new_resource_id}"
+                )
+            else:
+                raise Exception(f"Reassiging task failed due to error {e}")
+
     # First frame sent from back to front end with station data, etc
     def emit_initial_frame(self) -> None:
         frame = self.create_key_frame()
