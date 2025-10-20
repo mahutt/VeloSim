@@ -22,40 +22,27 @@
  * SOFTWARE.
  */
 
-import { Users2 } from 'lucide-react';
-import { Link } from 'react-router';
-import {
-  SidebarGroup,
-  SidebarGroupLabel,
-  SidebarMenu,
-  SidebarMenuButton,
-  SidebarMenuItem,
-} from '~/components/ui/sidebar';
+import { type ColumnDef } from '@tanstack/react-table';
+import type { User } from '~/types';
+import { Badge } from '../ui/badge';
 
-const adminNavItems = [
+export const columns: ColumnDef<User>[] = [
   {
-    name: 'Users',
-    url: '/users',
-    icon: Users2,
+    accessorKey: 'id',
+    header: 'Id',
+  },
+  {
+    accessorKey: 'username',
+    header: 'Username',
+  },
+  {
+    accessorKey: 'is_admin',
+    header: 'Type',
+    cell: ({ row }) => {
+      const user = row.original;
+      const label = user.is_admin ? 'Admin' : 'User';
+      const variant = user.is_admin ? 'default' : 'secondary';
+      return <Badge variant={variant}>{label}</Badge>;
+    },
   },
 ];
-
-export function NavAdmin() {
-  return (
-    <SidebarGroup className="group-data-[collapsible=icon]:hidden">
-      <SidebarGroupLabel>Admin</SidebarGroupLabel>
-      <SidebarMenu>
-        {adminNavItems.map((item) => (
-          <SidebarMenuItem key={item.name}>
-            <SidebarMenuButton asChild>
-              <Link to={item.url}>
-                <item.icon />
-                <span>{item.name}</span>
-              </Link>
-            </SidebarMenuButton>
-          </SidebarMenuItem>
-        ))}
-      </SidebarMenu>
-    </SidebarGroup>
-  );
-}

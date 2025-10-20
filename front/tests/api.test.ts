@@ -22,11 +22,58 @@
  * SOFTWARE.
  */
 
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import api from '../app/api';
+import { TOKEN_STORAGE_KEY } from '../app/contants';
+
+// Type workaround until this PR is merged: https://github.com/axios/axios/pull/5551
+import type { AxiosRequestHeaders } from 'axios';
+declare module 'axios' {
+  export interface AxiosInterceptorManager<V> {
+    handlers: Array<{
+      fulfilled: (value: V) => V | Promise<V>;
+      rejected: (error: unknown) => unknown;
+    }>;
+  }
+}
 
 describe('API Configuration', () => {
+  beforeEach(() => {
+    sessionStorage.clear();
+  });
+
+  afterEach(() => {
+    sessionStorage.clear();
+  });
+
   it('should create axios instance with correct base configuration', () => {
     expect(api.defaults.headers['Content-Type']).toBe('application/json');
+  });
+
+  it('should add authorization header when token exists', async () => {
+    const token = 'test-token';
+    sessionStorage.setItem(TOKEN_STORAGE_KEY, token);
+
+    const config = await api.interceptors.request.handlers[0].fulfilled({
+      headers: {} as AxiosRequestHeaders,
+    });
+
+    expect(config.headers.Authorization).toBe(`Bearer ${token}`);
+  });
+
+  it('should not add authorization header when token does not exist', async () => {
+    const config = await api.interceptors.request.handlers[0].fulfilled({
+      headers: {} as AxiosRequestHeaders,
+    });
+
+    expect(config.headers.Authorization).toBeUndefined();
+  });
+
+  it('should reject when interceptor encounters an error', async () => {
+    const error = new Error('Test error');
+
+    await expect(
+      api.interceptors.request.handlers[0].rejected(error)
+    ).rejects.toThrow('Test error');
   });
 });

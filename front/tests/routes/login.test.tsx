@@ -28,6 +28,7 @@ import userEvent from '@testing-library/user-event';
 import Signin from '~/routes/login';
 import axios from 'axios';
 import { AuthContext } from '~/providers/auth-provider';
+import { TOKEN_STORAGE_KEY } from '~/contants';
 
 vi.mock('axios', () => ({
   default: {
@@ -100,11 +101,11 @@ describe('Login Page', () => {
     await userEvent.click(screen.getByRole('button', { name: /log in/i }));
 
     await waitFor(() => {
-      expect(sessionStorage.getItem('access_token')).toBe('test-token');
+      expect(sessionStorage.getItem(TOKEN_STORAGE_KEY)).toBe('test-token');
       expect(mockSetUser).toHaveBeenCalledWith({
         id: 1,
         username: 'testuser',
-        is_admin: false,
+        is_admin: true,
       });
     });
   });

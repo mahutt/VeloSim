@@ -61,6 +61,10 @@ export interface GetStationsResponse extends PaginatedResponse {
   stations: Omit<Station, 'tasks'>[];
 }
 
+export interface GetUsersResponse extends PaginatedResponse {
+  users: User[];
+}
+
 // Resource types
 export interface Resource {
   id: number;
