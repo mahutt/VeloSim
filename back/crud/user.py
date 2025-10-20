@@ -47,6 +47,18 @@ class UserCRUD:
         """Get a user by username."""
         return db.query(User).filter(User.username == username).first()
 
+    def get_if_permission(
+        self, db: Session, user_id: int, requesting_user_id: int
+    ) -> Optional[User]:
+        """Get a user by ID if the requester is the user themselves or an admin."""
+        requesting_user = self.get(db, requesting_user_id)
+        if not requesting_user or not requesting_user.is_enabled:
+            raise VelosimPermissionError("Requesting user cannot access this user.")
+        if requesting_user.id != user_id and not requesting_user.is_admin:
+            raise VelosimPermissionError("Requesting user cannot access this user.")
+
+        return self.get(db, user_id)
+
     def get_all(
         self,
         db: Session,

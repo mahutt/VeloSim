@@ -634,3 +634,140 @@ class TestUserCRUD:
 
         assert updated_user.id == disabled_user.id
         assert updated_user.is_enabled is True
+
+    def test_get_if_permission_admin_access_any_user(
+        self, db: Session, admin_user: User
+    ) -> None:
+        """Test admin can access any user through get_if_permission."""
+        # Create a regular user
+        regular_user = User(
+            username="regular_user",
+            password_hash=user_crud.hash_password("password"),
+            is_admin=False,
+            is_enabled=True,
+        )
+        db.add(regular_user)
+        db.flush()
+        db.refresh(regular_user)
+
+        # Admin should be able to access regular user
+        retrieved_user = user_crud.get_if_permission(db, regular_user.id, admin_user.id)
+        assert retrieved_user is not None
+        assert retrieved_user.id == regular_user.id
+        assert retrieved_user.username == regular_user.username
+
+    def test_get_if_permission_user_access_self(self, db: Session) -> None:
+        """Test user can access themselves through get_if_permission."""
+        # Create a regular user
+        regular_user = User(
+            username="regular_user",
+            password_hash=user_crud.hash_password("password"),
+            is_admin=False,
+            is_enabled=True,
+        )
+        db.add(regular_user)
+        db.flush()
+        db.refresh(regular_user)
+
+        # User should be able to access themselves
+        retrieved_user = user_crud.get_if_permission(
+            db, regular_user.id, regular_user.id
+        )
+        assert retrieved_user is not None
+        assert retrieved_user.id == regular_user.id
+        assert retrieved_user.username == regular_user.username
+
+    def test_get_if_permission_user_access_other_forbidden(self, db: Session) -> None:
+        """Test regular user cannot access other users through get_if_permission."""
+        # Create two regular users
+        user1 = User(
+            username="user1",
+            password_hash=user_crud.hash_password("password1"),
+            is_admin=False,
+            is_enabled=True,
+        )
+        user2 = User(
+            username="user2",
+            password_hash=user_crud.hash_password("password2"),
+            is_admin=False,
+            is_enabled=True,
+        )
+        db.add(user1)
+        db.add(user2)
+        db.flush()
+        db.refresh(user1)
+        db.refresh(user2)
+
+        # User1 should not be able to access user2
+        with pytest.raises(VelosimPermissionError):
+            user_crud.get_if_permission(db, user2.id, user1.id)
+
+    def test_get_if_permission_disabled_admin_forbidden(self, db: Session) -> None:
+        """Test disabled admin cannot access users through get_if_permission."""
+        # Create a disabled admin user
+        disabled_admin = User(
+            username="disabled_admin",
+            password_hash=user_crud.hash_password("password"),
+            is_admin=True,
+            is_enabled=False,
+        )
+        # Create a regular user
+        regular_user = User(
+            username="regular_user",
+            password_hash=user_crud.hash_password("password"),
+            is_admin=False,
+            is_enabled=True,
+        )
+        db.add(disabled_admin)
+        db.add(regular_user)
+        db.flush()
+        db.refresh(disabled_admin)
+        db.refresh(regular_user)
+
+        # Disabled admin should not be able to access regular user
+        with pytest.raises(VelosimPermissionError):
+            user_crud.get_if_permission(db, regular_user.id, disabled_admin.id)
+
+    def test_get_if_permission_nonexistent_requester(self, db: Session) -> None:
+        """Test nonexistent requester cannot access users through get_if_permission."""
+        # Create a regular user
+        regular_user = User(
+            username="regular_user",
+            password_hash=user_crud.hash_password("password"),
+            is_admin=False,
+            is_enabled=True,
+        )
+        db.add(regular_user)
+        db.flush()
+        db.refresh(regular_user)
+
+        # Nonexistent requester should not be able to access user
+        with pytest.raises(VelosimPermissionError):
+            user_crud.get_if_permission(db, regular_user.id, 99999)
+
+    def test_get_if_permission_nonexistent_target_user(
+        self, db: Session, admin_user: User
+    ) -> None:
+        """Test get_if_permission returns None for nonexistent target user."""
+        # Admin trying to access nonexistent user should return None
+        retrieved_user = user_crud.get_if_permission(db, 99999, admin_user.id)
+        assert retrieved_user is None
+
+    def test_get_if_permission_disabled_user_access_self_forbidden(
+        self, db: Session
+    ) -> None:
+        """Test disabled user cannot access themselves through get_if_permission."""
+        # Create a disabled user
+        disabled_user = User(
+            username="disabled_user",
+            password_hash=user_crud.hash_password("password"),
+            is_admin=False,
+            is_enabled=False,
+        )
+        db.add(disabled_user)
+        db.flush()
+        db.refresh(disabled_user)
+
+        # Disabled user should not be able to access themselves either
+        with pytest.raises(VelosimPermissionError):
+            user_crud.get_if_permission(db, disabled_user.id, disabled_user.id)

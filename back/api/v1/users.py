@@ -53,7 +53,7 @@ def get_users(
     db: Session = Depends(get_db),
     requesting_user: int = Depends(get_user_id),
 ) -> UsersResponse:
-    """Get all station tasks with pagination."""
+    """Get all users with pagination."""
     try:
         users, total = user_crud.get_all(
             db,
@@ -74,6 +74,35 @@ def get_users(
             per_page=limit,
             total_pages=total_pages,
         )
+    except VelosimPermissionError as err:
+        raise HTTPException(status_code=401, detail=err.args)
+
+
+@router.get("/me", response_model=UserResponse)
+def get_me(
+    db: Session = Depends(get_db),
+    requesting_user: int = Depends(get_user_id),
+) -> UserResponse:
+    """Get the requesting user"""
+    user = user_crud.get_if_permission(db, requesting_user, requesting_user)
+
+    return UserResponse.model_validate(user)
+
+
+@router.get("/{user_id}", response_model=UserResponse)
+def get_by_id(
+    user_id: int,
+    db: Session = Depends(get_db),
+    requesting_user: int = Depends(get_user_id),
+) -> UserResponse:
+    """Get the requested user if it is the user themselves, or the user is an admin."""
+    try:
+        user = user_crud.get_if_permission(db, user_id, requesting_user)
+
+        if not user:
+            raise HTTPException(status_code=404, detail="User not found")
+
+        return UserResponse.model_validate(user)
     except VelosimPermissionError as err:
         raise HTTPException(status_code=401, detail=err.args)
 

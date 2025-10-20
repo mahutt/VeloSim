@@ -736,3 +736,144 @@ class TestUsersAPI:
         assert data["is_admin"] is False
         assert data["is_enabled"] is False
         mock_create.assert_called_once()
+
+    @patch("back.api.v1.users.user_crud.get_if_permission")
+    def test_get_me_success(
+        self,
+        mock_get_if_permission: MagicMock,
+        authenticated_client: TestClient,
+        db: Session,
+    ) -> None:
+        """Test getting current user info successfully."""
+        mock_user = MagicMock()
+        mock_user.id = 1
+        mock_user.username = "current_user"
+        mock_user.is_admin = True
+        mock_user.is_enabled = True
+        mock_get_if_permission.return_value = mock_user
+
+        response = authenticated_client.get("/api/v1/users/me")
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["id"] == 1
+        assert data["username"] == "current_user"
+        assert data["is_admin"] is True
+        assert data["is_enabled"] is True
+        # The function is called with (db, requesting_user, requesting_user) for /me
+        mock_get_if_permission.assert_called_once()
+
+    def test_get_me_no_authentication(self, client: TestClient, db: Session) -> None:
+        """Test that authentication is required for getting current user info."""
+        response = client.get("/api/v1/users/me")
+        assert response.status_code == 401
+
+    @patch("back.api.v1.users.user_crud.get_if_permission")
+    def test_get_by_id_success_admin(
+        self,
+        mock_get_if_permission: MagicMock,
+        authenticated_client: TestClient,
+        db: Session,
+    ) -> None:
+        """Test admin getting user by ID successfully."""
+        mock_user = MagicMock()
+        mock_user.id = 2
+        mock_user.username = "target_user"
+        mock_user.is_admin = False
+        mock_user.is_enabled = True
+        mock_get_if_permission.return_value = mock_user
+
+        response = authenticated_client.get("/api/v1/users/2")
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["id"] == 2
+        assert data["username"] == "target_user"
+        assert data["is_admin"] is False
+        assert data["is_enabled"] is True
+        mock_get_if_permission.assert_called_once()
+
+    @patch("back.api.v1.users.user_crud.get_if_permission")
+    def test_get_by_id_success_self(
+        self,
+        mock_get_if_permission: MagicMock,
+        authenticated_client: TestClient,
+        db: Session,
+    ) -> None:
+        """Test user getting their own info by ID successfully."""
+        mock_user = MagicMock()
+        mock_user.id = 1
+        mock_user.username = "current_user"
+        mock_user.is_admin = False
+        mock_user.is_enabled = True
+        mock_get_if_permission.return_value = mock_user
+
+        response = authenticated_client.get("/api/v1/users/1")
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["id"] == 1
+        assert data["username"] == "current_user"
+        assert data["is_admin"] is False
+        assert data["is_enabled"] is True
+        mock_get_if_permission.assert_called_once()
+
+    @patch("back.api.v1.users.user_crud.get_if_permission")
+    def test_get_by_id_not_found(
+        self,
+        mock_get_if_permission: MagicMock,
+        authenticated_client: TestClient,
+        db: Session,
+    ) -> None:
+        """Test getting user by ID that doesn't exist."""
+        mock_get_if_permission.return_value = None
+
+        response = authenticated_client.get("/api/v1/users/999")
+
+        assert response.status_code == 404
+        data = response.json()
+        assert "User not found" in str(data["detail"])
+        mock_get_if_permission.assert_called_once()
+
+    @patch("back.api.v1.users.user_crud.get_if_permission")
+    def test_get_by_id_permission_error(
+        self,
+        mock_get_if_permission: MagicMock,
+        non_admin_client: TestClient,
+        db: Session,
+    ) -> None:
+        """Test non-admin user trying to access another user's info."""
+        mock_get_if_permission.side_effect = VelosimPermissionError(
+            "Requesting user cannot access this user."
+        )
+
+        response = non_admin_client.get("/api/v1/users/1")
+
+        assert response.status_code == 401
+        data = response.json()
+        assert "Requesting user cannot access this user." in str(data["detail"])
+        mock_get_if_permission.assert_called_once()
+
+    def test_get_by_id_no_authentication(self, client: TestClient, db: Session) -> None:
+        """Test that authentication is required for getting user by ID."""
+        response = client.get("/api/v1/users/1")
+        assert response.status_code == 401
+
+    @patch("back.api.v1.users.user_crud.get_if_permission")
+    def test_get_by_id_disabled_admin_forbidden(
+        self,
+        mock_get_if_permission: MagicMock,
+        disabled_admin_client: TestClient,
+        db: Session,
+    ) -> None:
+        """Test disabled admin trying to get user by ID."""
+        mock_get_if_permission.side_effect = VelosimPermissionError(
+            "Requesting user cannot access this user."
+        )
+
+        response = disabled_admin_client.get("/api/v1/users/1")
+
+        assert response.status_code == 401
+        data = response.json()
+        assert "Requesting user cannot access this user." in str(data["detail"])
+        mock_get_if_permission.assert_called_once()
