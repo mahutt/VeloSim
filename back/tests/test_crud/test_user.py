@@ -25,7 +25,7 @@ SOFTWARE.
 import pytest
 from sqlalchemy.orm import Session
 from back.crud.user import user_crud
-from back.schemas import UserCreate, UserPasswordUpdate
+from back.schemas import UserCreate, UserPasswordUpdate, UserRoleUpdate
 from back.models.user import User
 from back.exceptions.bad_request_error import BadRequestError
 from back.exceptions.velosim_permission_error import VelosimPermissionError
@@ -230,3 +230,194 @@ class TestUserCRUD:
 
         with pytest.raises(BadRequestError):
             user_crud.update_password(db, 99999, password_data, admin_user.id)
+
+    def test_update_role_success_admin(self, db: Session, admin_user: User) -> None:
+        """Test admin updating another user's role successfully."""
+        # Create a regular user
+        regular_user = User(
+            username="regular_user",
+            password_hash=user_crud.hash_password("password"),
+            is_admin=False,
+        )
+        db.add(regular_user)
+        db.flush()
+        db.refresh(regular_user)
+
+        role_data = UserRoleUpdate(is_admin=True)
+        updated_user = user_crud.update_role(
+            db, regular_user.id, role_data, admin_user.id
+        )
+
+        assert updated_user.id == regular_user.id
+        assert updated_user.is_admin is True
+
+    def test_update_role_demote_admin(self, db: Session, admin_user: User) -> None:
+        """Test admin demoting another admin user successfully."""
+        # Create another admin user
+        admin_user2 = User(
+            username="admin_user2",
+            password_hash=user_crud.hash_password("password"),
+            is_admin=True,
+        )
+        db.add(admin_user2)
+        db.flush()
+        db.refresh(admin_user2)
+
+        role_data = UserRoleUpdate(is_admin=False)
+        updated_user = user_crud.update_role(
+            db, admin_user2.id, role_data, admin_user.id
+        )
+
+        assert updated_user.id == admin_user2.id
+        assert updated_user.is_admin is False
+
+    def test_update_role_permission_error_self(
+        self, db: Session, admin_user: User
+    ) -> None:
+        """Test admin trying to update their own role raises permission error."""
+        role_data = UserRoleUpdate(is_admin=False)
+
+        with pytest.raises(VelosimPermissionError):
+            user_crud.update_role(db, admin_user.id, role_data, admin_user.id)
+
+    def test_update_role_permission_error_non_admin(self, db: Session) -> None:
+        """Test non-admin trying to update role raises permission error."""
+        # Create two regular users
+        user1 = User(
+            username="user1",
+            password_hash=user_crud.hash_password("password1"),
+            is_admin=False,
+        )
+        user2 = User(
+            username="user2",
+            password_hash=user_crud.hash_password("password2"),
+            is_admin=False,
+        )
+        db.add(user1)
+        db.add(user2)
+        db.flush()
+        db.refresh(user1)
+        db.refresh(user2)
+
+        role_data = UserRoleUpdate(is_admin=True)
+
+        with pytest.raises(VelosimPermissionError):
+            user_crud.update_role(db, user2.id, role_data, user1.id)
+
+    def test_update_role_nonexistent_requester(self, db: Session) -> None:
+        """Test updating role with nonexistent requester raises permission error."""
+        # Create a user
+        user = User(
+            username="test_user",
+            password_hash=user_crud.hash_password("password"),
+            is_admin=False,
+        )
+        db.add(user)
+        db.flush()
+        db.refresh(user)
+
+        role_data = UserRoleUpdate(is_admin=True)
+
+        with pytest.raises(VelosimPermissionError):
+            user_crud.update_role(db, user.id, role_data, 99999)
+
+    def test_update_role_user_not_found(self, db: Session, admin_user: User) -> None:
+        """Test updating role for nonexistent user raises bad request error."""
+        role_data = UserRoleUpdate(is_admin=True)
+
+        with pytest.raises(BadRequestError):
+            user_crud.update_role(db, 99999, role_data, admin_user.id)
+
+    def test_get_all_users_success_admin(self, db: Session, admin_user: User) -> None:
+        """Test admin getting all users successfully."""
+        # Create some additional users
+        user1 = User(
+            username="user1",
+            password_hash=user_crud.hash_password("password1"),
+            is_admin=False,
+        )
+        user2 = User(
+            username="user2",
+            password_hash=user_crud.hash_password("password2"),
+            is_admin=True,
+        )
+        db.add(user1)
+        db.add(user2)
+        db.flush()
+
+        users, total = user_crud.get_all(db, None, None, admin_user.id)
+
+        assert total == 3  # admin_user + user1 + user2
+        assert len(users) == 3
+        usernames = [user.username for user in users]
+        assert "admin_user" in usernames
+        assert "user1" in usernames
+        assert "user2" in usernames
+
+    def test_get_all_users_with_admin_filter(
+        self, db: Session, admin_user: User
+    ) -> None:
+        """Test getting users with admin filter."""
+        # Create some additional users
+        user1 = User(
+            username="user1",
+            password_hash=user_crud.hash_password("password1"),
+            is_admin=False,
+        )
+        user2 = User(
+            username="user2",
+            password_hash=user_crud.hash_password("password2"),
+            is_admin=True,
+        )
+        db.add(user1)
+        db.add(user2)
+        db.flush()
+
+        # Filter for admin users only
+        users, total = user_crud.get_all(db, None, True, admin_user.id)
+
+        assert total == 2  # admin_user + user2 (both admin)
+        assert len(users) == 2
+        for user in users:
+            assert user.is_admin is True
+
+    def test_get_all_users_with_pagination(self, db: Session, admin_user: User) -> None:
+        """Test getting users with pagination."""
+        # Create additional users
+        for i in range(5):
+            user = User(
+                username=f"user{i}",
+                password_hash=user_crud.hash_password(f"password{i}"),
+                is_admin=False,
+            )
+            db.add(user)
+        db.flush()
+
+        # Test pagination: skip 2, limit 3
+        users, total = user_crud.get_all(db, None, None, admin_user.id, skip=2, limit=3)
+
+        assert total == 6  # admin_user + 5 created users
+        assert len(users) == 3  # Limited to 3
+
+    def test_get_all_users_permission_error_non_admin(self, db: Session) -> None:
+        """Test non-admin trying to get all users raises permission error."""
+        # Create a non-admin user
+        non_admin = User(
+            username="regular_user",
+            password_hash=user_crud.hash_password("password"),
+            is_admin=False,
+        )
+        db.add(non_admin)
+        db.flush()
+        db.refresh(non_admin)
+
+        with pytest.raises(VelosimPermissionError):
+            user_crud.get_all(db, None, None, non_admin.id)
+
+    def test_get_all_users_permission_error_nonexistent_requester(
+        self, db: Session
+    ) -> None:
+        """Test nonexistent requester trying to get all users raises permission
+        error."""
+        with pytest.raises(VelosimPermissionError):
+            user_crud.get_all(db, None, None, 99999)

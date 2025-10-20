@@ -77,6 +77,7 @@ omit = [
     "scripts/*",
     "admin/*",
     "*/alembic/env.py",
+    "sim/main.py",
 ]
 
 [tool.coverage.report]

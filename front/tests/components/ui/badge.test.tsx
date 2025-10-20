@@ -22,40 +22,25 @@
  * SOFTWARE.
  */
 
-import { Users2 } from 'lucide-react';
-import { Link } from 'react-router';
-import {
-  SidebarGroup,
-  SidebarGroupLabel,
-  SidebarMenu,
-  SidebarMenuButton,
-  SidebarMenuItem,
-} from '~/components/ui/sidebar';
+import { describe, it, expect } from 'vitest';
+import { render, screen } from '@testing-library/react';
+import { Badge } from '~/components/ui/badge';
 
-const adminNavItems = [
-  {
-    name: 'Users',
-    url: '/users',
-    icon: Users2,
-  },
-];
+describe('Badge', () => {
+  it('renders a span when asChild is not set', () => {
+    render(<Badge>Test</Badge>);
 
-export function NavAdmin() {
-  return (
-    <SidebarGroup className="group-data-[collapsible=icon]:hidden">
-      <SidebarGroupLabel>Admin</SidebarGroupLabel>
-      <SidebarMenu>
-        {adminNavItems.map((item) => (
-          <SidebarMenuItem key={item.name}>
-            <SidebarMenuButton asChild>
-              <Link to={item.url}>
-                <item.icon />
-                <span>{item.name}</span>
-              </Link>
-            </SidebarMenuButton>
-          </SidebarMenuItem>
-        ))}
-      </SidebarMenu>
-    </SidebarGroup>
-  );
-}
+    const badgeContent = screen.getByText('Test');
+    expect(badgeContent.tagName).toBe('SPAN');
+  });
+  it('does not render a span when asChild is set', () => {
+    render(
+      <Badge asChild>
+        <div>Test</div>
+      </Badge>
+    );
+
+    const badgeContent = screen.getByText('Test');
+    expect(badgeContent.tagName).toBe('DIV');
+  });
+});

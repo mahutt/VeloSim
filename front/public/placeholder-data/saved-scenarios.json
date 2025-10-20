@@ -1,0 +1,42 @@
+[
+  {
+    "id": 1,
+    "name": "Downtown Morning Rush",
+    "user_id": 1,
+    "content": "{\n  \"stations\": [\n    {\n      \"id\": 1,\n      \"name\": \"Central Station\",\n      \"position\": [-73.5673, 45.5017],\n      \"bikes\": 15,\n      \"capacity\": 20\n    },\n    {\n      \"id\": 2,\n      \"name\": \"Metro Plaza\",\n      \"position\": [-73.5712, 45.5089],\n      \"bikes\": 8,\n      \"capacity\": 15\n    },\n    {\n      \"id\": 3,\n      \"name\": \"Business District\",\n      \"position\": [-73.5645, 45.5123],\n      \"bikes\": 22,\n      \"capacity\": 30\n    }\n  ],\n  \"resources\": [\n    {\n      \"id\": 1,\n      \"type\": \"vehicle\",\n      \"capacity\": 10\n    }\n  ]\n}",
+    "date_created": "2025-01-15T08:30:00Z",
+    "date_updated": "2025-01-15T08:30:00Z"
+  },
+  {
+    "id": 2,
+    "name": "Weekend Park Loop",
+    "user_id": 1,
+    "content": "{\n  \"stations\": [\n    {\n      \"id\": 1,\n      \"name\": \"Park Entrance\",\n      \"position\": [-73.5834, 45.5156],\n      \"bikes\": 12,\n      \"capacity\": 18\n    },\n    {\n      \"id\": 2,\n      \"name\": \"Lake View Point\",\n      \"position\": [-73.5901, 45.5189],\n      \"bikes\": 6,\n      \"capacity\": 12\n    },\n    {\n      \"id\": 3,\n      \"name\": \"Trail Head\",\n      \"position\": [-73.5867, 45.5234],\n      \"bikes\": 9,\n      \"capacity\": 15\n    },\n    {\n      \"id\": 4,\n      \"name\": \"Picnic Area\",\n      \"position\": [-73.5923, 45.5267],\n      \"bikes\": 14,\n      \"capacity\": 20\n    }\n  ],\n  \"resources\": [\n    {\n      \"id\": 1,\n      \"type\": \"vehicle\",\n      \"capacity\": 8\n    },\n    {\n      \"id\": 2,\n      \"type\": \"vehicle\",\n      \"capacity\": 8\n    }\n  ]\n}",
+    "date_created": "2025-01-16T10:15:00Z",
+    "date_updated": "2025-01-16T14:22:00Z"
+  },
+  {
+    "id": 3,
+    "name": "University Campus",
+    "user_id": 1,
+    "content": "{\n  \"stations\": [\n    {\n      \"id\": 1,\n      \"name\": \"Main Library\",\n      \"position\": [-73.5756, 45.5045],\n      \"bikes\": 18,\n      \"capacity\": 25\n    },\n    {\n      \"id\": 2,\n      \"name\": \"Student Center\",\n      \"position\": [-73.5789, 45.5078],\n      \"bikes\": 11,\n      \"capacity\": 20\n    },\n    {\n      \"id\": 3,\n      \"name\": \"Engineering Building\",\n      \"position\": [-73.5723, 45.5112],\n      \"bikes\": 7,\n      \"capacity\": 15\n    },\n    {\n      \"id\": 4,\n      \"name\": \"Sports Complex\",\n      \"position\": [-73.5801, 45.5134],\n      \"bikes\": 20,\n      \"capacity\": 28\n    },\n    {\n      \"id\": 5,\n      \"name\": \"Residence Hall\",\n      \"position\": [-73.5778, 45.5167],\n      \"bikes\": 13,\n      \"capacity\": 22\n    }\n  ],\n  \"resources\": [\n    {\n      \"id\": 1,\n      \"type\": \"vehicle\",\n      \"capacity\": 12\n    }\n  ]\n}",
+    "date_created": "2025-01-17T09:00:00Z",
+    "date_updated": "2025-01-17T09:00:00Z"
+  },
+  {
+    "id": 4,
+    "name": "Evening Commute",
+    "user_id": 1,
+    "content": "{\n  \"stations\": [\n    {\n      \"id\": 1,\n      \"name\": \"Train Station North\",\n      \"position\": [-73.5698, 45.5201],\n      \"bikes\": 3,\n      \"capacity\": 25\n    },\n    {\n      \"id\": 2,\n      \"name\": \"Office Tower A\",\n      \"position\": [-73.5734, 45.5178],\n      \"bikes\": 19,\n      \"capacity\": 22\n    },\n    {\n      \"id\": 3,\n      \"name\": \"Residential West\",\n      \"position\": [-73.5812, 45.5223],\n      \"bikes\": 5,\n      \"capacity\": 18\n    },\n    {\n      \"id\": 4,\n      \"name\": \"Shopping District\",\n      \"position\": [-73.5767, 45.5245],\n      \"bikes\": 8,\n      \"capacity\": 16\n    }\n  ],\n  \"resources\": [\n    {\n      \"id\": 1,\n      \"type\": \"vehicle\",\n      \"capacity\": 10\n    },\n    {\n      \"id\": 2,\n      \"type\": \"vehicle\",\n      \"capacity\": 10\n    }\n  ]\n}",
+    "date_created": "2025-01-18T16:45:00Z",
+    "date_updated": "2025-01-18T17:30:00Z"
+  },
+  {
+    "id": 5,
+    "name": "Tourist Route",
+    "user_id": 1,
+    "content": "{\n  \"stations\": [\n    {\n      \"id\": 1,\n      \"name\": \"Old Port\",\n      \"position\": [-73.5545, 45.5088],\n      \"bikes\": 16,\n      \"capacity\": 24\n    },\n    {\n      \"id\": 2,\n      \"name\": \"Museum Quarter\",\n      \"position\": [-73.5612, 45.5134],\n      \"bikes\": 10,\n      \"capacity\": 18\n    },\n    {\n      \"id\": 3,\n      \"name\": \"Market Square\",\n      \"position\": [-73.5578, 45.5167],\n      \"bikes\": 14,\n      \"capacity\": 20\n    },\n    {\n      \"id\": 4,\n      \"name\": \"Historic District\",\n      \"position\": [-73.5501, 45.5145],\n      \"bikes\": 12,\n      \"capacity\": 19\n    },\n    {\n      \"id\": 5,\n      \"name\": \"Riverfront Park\",\n      \"position\": [-73.5534, 45.5201],\n      \"bikes\": 17,\n      \"capacity\": 26\n    },\n    {\n      \"id\": 6,\n      \"name\": \"Cathedral Plaza\",\n      \"position\": [-73.5589, 45.5189],\n      \"bikes\": 9,\n      \"capacity\": 16\n    }\n  ],\n  \"resources\": [\n    {\n      \"id\": 1,\n      \"type\": \"vehicle\",\n      \"capacity\": 15\n    }\n  ]\n}",
+    "date_created": "2025-01-19T11:20:00Z",
+    "date_updated": "2025-01-19T11:20:00Z"
+  }
+]

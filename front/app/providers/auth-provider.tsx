@@ -29,6 +29,7 @@ import React, {
   type ReactNode,
 } from 'react';
 import { useNavigate } from 'react-router';
+import { TOKEN_STORAGE_KEY } from '~/contants';
 import type { User } from '~/types';
 
 export interface AuthState {
@@ -51,7 +52,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (sessionStorage.getItem('access_token')) {
+    if (sessionStorage.getItem(TOKEN_STORAGE_KEY)) {
       // TODO: Refresh user info once an API endpoint is available
       setUser({ id: 1, username: 'demo_user', is_admin: true });
     }
@@ -59,7 +60,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   }, []);
 
   const logout = () => {
-    sessionStorage.removeItem('access_token');
+    sessionStorage.removeItem(TOKEN_STORAGE_KEY);
     setUser(null);
     navigate('/login');
   };

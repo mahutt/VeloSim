@@ -26,6 +26,7 @@ import { expect, test, vi, beforeEach } from 'vitest';
 import { render, act } from '@testing-library/react';
 import { AuthProvider, AuthContext } from '~/providers/auth-provider';
 import { useContext } from 'react';
+import { TOKEN_STORAGE_KEY } from '~/contants';
 
 // Mock sessionStorage
 const mockSessionStorage = {
@@ -79,7 +80,7 @@ test('provides initial state with no token', async () => {
 
   expect(loadingElement.textContent).toBe('false');
   expect(userElement.textContent).toBe('null');
-  expect(mockSessionStorage.getItem).toHaveBeenCalledWith('access_token');
+  expect(mockSessionStorage.getItem).toHaveBeenCalledWith(TOKEN_STORAGE_KEY);
 });
 
 test('sets user when access token exists', async () => {

@@ -57,6 +57,7 @@ from .sim_instance import (
 from .user import (
     UserCreate,
     UserPasswordUpdate,
+    UserRoleUpdate,
     UserResponse,
     UsersResponse,
 )
@@ -87,6 +88,7 @@ __all__ = [
     "SimInstanceResponse",
     "UserCreate",
     "UserPasswordUpdate",
+    "UserRoleUpdate",
     "UserResponse",
     "UsersResponse",
 ]

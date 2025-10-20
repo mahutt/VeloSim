@@ -67,15 +67,16 @@ station2 = Station(temp_env, station_id=2, name="Station Beta", position=positio
 resource1 = Resource(temp_env, resource_id=101, position=position1)
 resource2 = Resource(temp_env, resource_id=102, position=position3)
 
-# Create example tasks
 task1 = BatterySwapTask(temp_env, 1, station1)
 task2 = BatterySwapTask(temp_env, 2, station2)
+station1.add_task(task1)
+resource1.assign_task(task1)
 
 # Create InputParameter with example entities and simulation settings
 params = InputParameter(
     station_entities=[station1, station2],
     resource_entities=[resource1, resource2],
-    task_entities=[task1, task2],  # No tasks for this example
+    task_entities=[task1, task2],
     real_time_factor=1.0,  # Real-time simulation
     key_frame_freq=3,  # Key frame every 3 frames
 )

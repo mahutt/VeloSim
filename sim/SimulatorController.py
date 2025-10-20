@@ -191,7 +191,7 @@ class SimulatorController:
                 "station_id": station.id,
                 "station_name": station.name,
                 "station_position": (station.get_station_position().get_position()),
-                "station_tasks": station.tasks,
+                "station_tasks": [task.to_dict() for task in station.tasks],
                 "task_count": station.get_task_count(),
             }
             for station in self.stationEntities
@@ -208,7 +208,9 @@ class SimulatorController:
                         "resource_position": (
                             resource.get_resource_position().get_position()
                         ),
-                        "resource_tasks": resource.get_task_list(),
+                        "resource_tasks": [
+                            task.to_dict() for task in resource.get_task_list()
+                        ],
                         "task_count": resource.get_task_count(),
                         "in_progress_task_id": (
                             in_progress_task.get_task_id()
@@ -256,7 +258,7 @@ class SimulatorController:
                 "station_id": station.id,
                 "station_name": station.name,
                 "station_position": (station.get_station_position().get_position()),
-                "station_tasks": station.tasks,
+                "station_tasks": [task.to_dict() for task in station.tasks],
                 "task_count": station.get_task_count(),
             }
             for station in self.stationEntities
@@ -271,7 +273,9 @@ class SimulatorController:
                     "resource_position": (
                         resource.get_resource_position().get_position()
                     ),
-                    "resource_tasks": resource.get_task_list(),
+                    "resource_tasks": [
+                        task.to_dict() for task in resource.get_task_list()
+                    ],
                     "task_count": resource.get_task_count(),
                     "in_progress_task_id": (
                         in_progress_task.get_task_id()
