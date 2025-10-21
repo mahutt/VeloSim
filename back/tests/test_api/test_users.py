@@ -57,6 +57,18 @@ def non_admin_client(client: TestClient) -> Generator[TestClient, None, None]:
     app.dependency_overrides.clear()
 
 
+@pytest.fixture
+def disabled_admin_client(client: TestClient) -> Generator[TestClient, None, None]:
+    """Create test client with disabled admin user."""
+
+    def mock_get_user_id() -> int:
+        return 3  # Assume user ID 3 is a disabled admin
+
+    app.dependency_overrides[get_user_id] = mock_get_user_id
+    yield client
+    app.dependency_overrides.clear()
+
+
 class TestUsersAPI:
     """Test the users API endpoints."""
 
@@ -482,8 +494,11 @@ class TestUsersAPI:
     def test_update_role_invalid_data(
         self, authenticated_client: TestClient, db: Session
     ) -> None:
-        """Test updating role with missing data."""
-        response = authenticated_client.put("/api/v1/users/1/role", json={})
+        """Test updating role with invalid data. Empty object is ok because both fields
+        are optional."""
+        response = authenticated_client.put(
+            "/api/v1/users/1/role", json={"is_admin": "non_boolean"}
+        )
         assert response.status_code == 422
 
     def test_update_role_no_authentication(
@@ -497,3 +512,227 @@ class TestUsersAPI:
 
         # Should fail due to authentication
         assert response.status_code == 401
+
+    @patch("back.api.v1.users.user_crud.get_all")
+    def test_get_users_with_enabled_filter(
+        self, mock_get_all: MagicMock, authenticated_client: TestClient, db: Session
+    ) -> None:
+        """Test getting users with enabled filter."""
+        # Mock enabled users only
+        mock_user1 = MagicMock()
+        mock_user1.id = 1
+        mock_user1.username = "enabled_user1"
+        mock_user1.is_admin = False
+        mock_user1.is_enabled = True
+
+        mock_user2 = MagicMock()
+        mock_user2.id = 2
+        mock_user2.username = "enabled_user2"
+        mock_user2.is_admin = True
+        mock_user2.is_enabled = True
+
+        mock_get_all.return_value = ([mock_user1, mock_user2], 2)
+
+        response = authenticated_client.get("/api/v1/users/?isEnabled=true")
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["total"] == 2
+        assert len(data["users"]) == 2
+        for user in data["users"]:
+            assert user["is_enabled"] is True
+        mock_get_all.assert_called_once()
+
+    @patch("back.api.v1.users.user_crud.get_all")
+    def test_get_users_with_disabled_filter(
+        self, mock_get_all: MagicMock, authenticated_client: TestClient, db: Session
+    ) -> None:
+        """Test getting disabled users only."""
+        # Mock disabled users only
+        mock_user1 = MagicMock()
+        mock_user1.id = 3
+        mock_user1.username = "disabled_user1"
+        mock_user1.is_admin = False
+        mock_user1.is_enabled = False
+
+        mock_get_all.return_value = ([mock_user1], 1)
+
+        response = authenticated_client.get("/api/v1/users/?isEnabled=false")
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["total"] == 1
+        assert len(data["users"]) == 1
+        assert data["users"][0]["is_enabled"] is False
+        mock_get_all.assert_called_once()
+
+    @patch("back.api.v1.users.user_crud.update_role")
+    def test_update_role_disable_user(
+        self, mock_update: MagicMock, authenticated_client: TestClient, db: Session
+    ) -> None:
+        """Test disabling a user successfully."""
+        mock_user = MagicMock()
+        mock_user.id = 2
+        mock_user.username = "test_user"
+        mock_user.is_admin = False
+        mock_user.is_enabled = False
+        mock_update.return_value = mock_user
+
+        role_data = {"is_enabled": False}
+
+        response = authenticated_client.put("/api/v1/users/2/role", json=role_data)
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["id"] == 2
+        assert data["username"] == "test_user"
+        assert data["is_enabled"] is False
+        mock_update.assert_called_once()
+
+    @patch("back.api.v1.users.user_crud.update_role")
+    def test_update_role_enable_user(
+        self, mock_update: MagicMock, authenticated_client: TestClient, db: Session
+    ) -> None:
+        """Test enabling a disabled user successfully."""
+        mock_user = MagicMock()
+        mock_user.id = 2
+        mock_user.username = "test_user"
+        mock_user.is_admin = False
+        mock_user.is_enabled = True
+        mock_update.return_value = mock_user
+
+        role_data = {"is_enabled": True}
+
+        response = authenticated_client.put("/api/v1/users/2/role", json=role_data)
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["id"] == 2
+        assert data["username"] == "test_user"
+        assert data["is_enabled"] is True
+        mock_update.assert_called_once()
+
+    @patch("back.api.v1.users.user_crud.update_role")
+    def test_update_role_promote_and_enable(
+        self, mock_update: MagicMock, authenticated_client: TestClient, db: Session
+    ) -> None:
+        """Test promoting and enabling a user simultaneously."""
+        mock_user = MagicMock()
+        mock_user.id = 2
+        mock_user.username = "test_user"
+        mock_user.is_admin = True
+        mock_user.is_enabled = True
+        mock_update.return_value = mock_user
+
+        role_data = {"is_admin": True, "is_enabled": True}
+
+        response = authenticated_client.put("/api/v1/users/2/role", json=role_data)
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["id"] == 2
+        assert data["username"] == "test_user"
+        assert data["is_admin"] is True
+        assert data["is_enabled"] is True
+        mock_update.assert_called_once()
+
+    @patch("back.api.v1.users.user_crud.create")
+    def test_create_user_disabled_admin_forbidden(
+        self, mock_create: MagicMock, disabled_admin_client: TestClient, db: Session
+    ) -> None:
+        """Test disabled admin trying to create users."""
+        mock_create.side_effect = VelosimPermissionError(
+            "Requesting user cannot create users."
+        )
+
+        user_data = {
+            "username": "test_user",
+            "password": "test_password",
+            "is_admin": False,
+        }
+
+        response = disabled_admin_client.post("/api/v1/users/create", json=user_data)
+
+        assert response.status_code == 401
+        data = response.json()
+        assert "Requesting user cannot create users." in str(data["detail"])
+
+    @patch("back.api.v1.users.user_crud.update_password")
+    def test_update_password_disabled_admin_forbidden(
+        self, mock_update: MagicMock, disabled_admin_client: TestClient, db: Session
+    ) -> None:
+        """Test disabled admin trying to update passwords."""
+        mock_update.side_effect = VelosimPermissionError(
+            "Requesting user cannot update this password."
+        )
+
+        password_data = {"password": "new_password"}
+
+        response = disabled_admin_client.put(
+            "/api/v1/users/1/password", json=password_data
+        )
+
+        assert response.status_code == 401
+        data = response.json()
+        assert "Requesting user cannot update this password." in str(data["detail"])
+
+    @patch("back.api.v1.users.user_crud.update_role")
+    def test_update_role_disabled_admin_forbidden(
+        self, mock_update: MagicMock, disabled_admin_client: TestClient, db: Session
+    ) -> None:
+        """Test disabled admin trying to update roles."""
+        mock_update.side_effect = VelosimPermissionError(
+            "Requesting user cannot update this role."
+        )
+
+        role_data = {"is_admin": True}
+
+        response = disabled_admin_client.put("/api/v1/users/2/role", json=role_data)
+
+        assert response.status_code == 401
+        data = response.json()
+        assert "Requesting user cannot update this role." in str(data["detail"])
+
+    @patch("back.api.v1.users.user_crud.get_all")
+    def test_get_users_disabled_admin_forbidden(
+        self, mock_get_all: MagicMock, disabled_admin_client: TestClient, db: Session
+    ) -> None:
+        """Test disabled admin trying to get users."""
+        mock_get_all.side_effect = VelosimPermissionError(
+            "Requesting user cannot list users."
+        )
+
+        response = disabled_admin_client.get("/api/v1/users/")
+
+        assert response.status_code == 401
+        data = response.json()
+        assert "Requesting user cannot list users." in str(data["detail"])
+
+    @patch("back.api.v1.users.user_crud.create")
+    def test_create_user_with_disabled_status(
+        self, mock_create: MagicMock, authenticated_client: TestClient, db: Session
+    ) -> None:
+        """Test creating a user with disabled status."""
+        mock_user = MagicMock()
+        mock_user.id = 1
+        mock_user.username = "disabled_user"
+        mock_user.is_admin = False
+        mock_user.is_enabled = False
+        mock_create.return_value = mock_user
+
+        user_data = {
+            "username": "disabled_user",
+            "password": "test_password",
+            "is_admin": False,
+            "is_enabled": False,
+        }
+
+        response = authenticated_client.post("/api/v1/users/create", json=user_data)
+
+        assert response.status_code == 201
+        data = response.json()
+        assert data["id"] == 1
+        assert data["username"] == "disabled_user"
+        assert data["is_admin"] is False
+        assert data["is_enabled"] is False
+        mock_create.assert_called_once()

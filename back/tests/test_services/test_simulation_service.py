@@ -36,6 +36,7 @@ def test_user(db: Session) -> User:
         username="testuser",
         password_hash="hashedpassword",
         is_admin=False,
+        is_enabled=True,
     )
     db.add(user)
     db.commit()
@@ -50,6 +51,7 @@ def test_user2(db: Session) -> User:
         username="testuser2",
         password_hash="hashedpassword2",
         is_admin=False,
+        is_enabled=True,
     )
     db.add(user)
     db.commit()

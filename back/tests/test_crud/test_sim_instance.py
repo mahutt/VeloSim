@@ -37,6 +37,7 @@ def test_user(db: Session) -> User:
         username="testuser",
         password_hash="hashedpassword",
         is_admin=False,
+        is_enabled=True,
     )
     db.add(user)
     db.commit()
@@ -133,6 +134,7 @@ class TestSimInstanceCRUD:
             username="testuser2",
             password_hash="hashedpassword2",
             is_admin=False,
+            is_enabled=True,
         )
         db.add(user2)
         db.commit()
