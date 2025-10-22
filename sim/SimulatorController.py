@@ -141,20 +141,20 @@ class SimulatorController:
             error_message = str(e)
             if str(task_id) in error_message:
                 raise Exception(
-                    f"Reassiging task failed as could not find task {task_id}"
+                    f"Reassigning task failed as could not find task {task_id}"
                 )
             elif str(old_resource_id) in error_message:
                 raise Exception(
-                    f"Reassiging failed as could not find resource {old_resource_id}"
+                    f"Reassigning failed as could not find resource {old_resource_id}"
                 )
             elif str(new_resource_id) in error_message:
-                # Assigns back the task to its original resource as reassiging failed
+                # Assigns back the task to its original resource as reassigning failed
                 self.assign_task_to_resource(task_id, old_resource_id)
                 raise Exception(
-                    f"Reassiging failed as could node find resource {new_resource_id}"
+                    f"Reassigning failed as could not find resource {new_resource_id}"
                 )
             else:
-                raise Exception(f"Reassiging task failed due to error {e}")
+                raise Exception(f"Reassigning task failed due to error {e}")
 
     # First frame sent from back to front end with station data, etc
     def emit_initial_frame(self) -> None:

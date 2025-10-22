@@ -510,7 +510,7 @@ def test_reassign_task_fail_with_bad_task_id(
 
     # Act and Assert
     with pytest.raises(
-        Exception, match=f"Reassiging task failed as could not find task {task_id}"
+        Exception, match=f"Reassigning task failed as could not find task {task_id}"
     ):
         simulator_controller.reassign_task(task_id, old_resource_id, new_resource_id)
 
@@ -527,7 +527,7 @@ def test_reassign_task_fail_with_bad_old_resource_id(
     # Act and Assert
     with pytest.raises(
         Exception,
-        match=f"Reassiging failed as could not find resource {old_resource_id}",
+        match=f"Reassigning failed as could not find resource {old_resource_id}",
     ):
         simulator_controller.reassign_task(task_id, old_resource_id, new_resource_id)
 
@@ -546,7 +546,7 @@ def test_reassign_task_fail_with_bad_new_resource_id(
     # Act and Assert
     with pytest.raises(
         Exception,
-        match=f"Reassiging failed as could node find resource {new_resource_id}",
+        match=f"Reassigning failed as could not find resource {new_resource_id}",
     ):
         simulator_controller.reassign_task(task_id, old_resource_id, new_resource_id)
 

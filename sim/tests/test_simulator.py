@@ -444,7 +444,7 @@ def test_reassign_task_fail(
     sim.reassign_task(a, task_id=6, old_resource_id=1, new_resource_id=2)
 
     # Assert
-    error = "Reassiging task failed as could not find task 6"
+    error = "Reassigning task failed as could not find task 6"
     mock_print.assert_called_once_with(f"Error occurred: {error}")
 
 
