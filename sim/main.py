@@ -78,7 +78,7 @@ params = InputParameter(
     resource_entities=[resource1, resource2],
     task_entities=[task1, task2],
     real_time_factor=1.0,  # Real-time simulation
-    key_frame_freq=3,  # Key frame every 3 frames
+    key_frame_freq=3000,  # Key frame every 3 frames
 )
 
 
@@ -102,20 +102,20 @@ if __name__ == "__main__":
     # Initialize simulations and send initial frames
     print("Initializing simulations...")
     r1 = sim.initialize(params, sub_list_1)
-    r2 = sim.initialize(params, sub_list_2)
+    # r2 = sim.initialize(params, sub_list_2)
 
     print("Initial frames sent. Starting simulation loops...")
 
     # Start the simulation loops
     sim.start(r1, 3600)
-    sim.start(r2, 3600)
+    # sim.start(r2, 3600)
 
     # Let simulations run for a bit
-    time.sleep(4)
+    time.sleep(4000)
 
     # Stop simulations
-    print("Stopping simulations...")
-    sim.stop(r1)
-    time.sleep(1)
-    sim.stop(r2)
+    # print("Stopping simulations...")
+    # # sim.stop(r1)
+
+    # sim.stop(r2)
     print("Done.")
