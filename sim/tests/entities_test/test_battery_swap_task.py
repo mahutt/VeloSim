@@ -177,3 +177,17 @@ class TestBatterySwapTask:
         # Assert
         assert assigned == False
         assert task.get_state() == State.OPEN
+
+    def test_to_dict(
+        self, simpy_env: simpy.Environment, default_station: Station
+    ) -> None:
+        # Arrange
+        task = BatterySwapTask(simpy_env, 1, default_station)
+
+        # Act
+        task_dict = task.to_dict()
+
+        # Assert
+        assert isinstance(task_dict, dict)
+        assert task_dict["id"] == 1
+        assert task_dict["state"] == "open"

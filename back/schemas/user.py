@@ -22,7 +22,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 """
 
-from typing import List
+from typing import List, Optional
 from pydantic import BaseModel, Field
 
 
@@ -38,6 +38,22 @@ class UserCreate(UserBase):
     username: str = Field(..., description="Username to create")
     password: str = Field(..., description="Password to set for the user")
     is_admin: bool = Field(..., description="Whether the user is an administrator")
+    is_enabled: Optional[bool] = Field(
+        True, description="Whether the account is enabled"
+    )
+
+
+class UserPasswordUpdate(UserBase):
+    password: str = Field(..., description="Password to set for the user")
+
+
+class UserRoleUpdate(UserBase):
+    is_admin: Optional[bool] = Field(
+        None, description="Whether the user is an administrator"
+    )
+    is_enabled: Optional[bool] = Field(
+        None, description="Whether the account is enabled"
+    )
 
 
 class UserResponse(UserBase):
@@ -46,6 +62,7 @@ class UserResponse(UserBase):
     id: int = Field(..., description="The internal identifier for the user")
     username: str = Field(..., description="Username")
     is_admin: bool = Field(..., description="Whether the user is an administrator")
+    is_enabled: bool = Field(..., description="Whether the account is enabled")
 
     class Config:
         from_attributes = True
@@ -54,8 +71,8 @@ class UserResponse(UserBase):
 class UsersResponse(BaseModel):
     """Schema for paginated user responses."""
 
-    station_tasks: List[UserResponse] = Field(..., description="List of station tasks")
-    total: int = Field(..., description="Total number of station tasks")
+    users: List[UserResponse] = Field(..., description="List of users")
+    total: int = Field(..., description="Total number of users")
     page: int = Field(..., description="Current page number")
     per_page: int = Field(..., description="Items per page")
     total_pages: int = Field(..., description="Total number of pages")

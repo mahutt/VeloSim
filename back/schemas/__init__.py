@@ -54,6 +54,13 @@ from .sim_instance import (
     SimInstanceCreate,
     SimInstanceResponse,
 )
+from .user import (
+    UserCreate,
+    UserPasswordUpdate,
+    UserRoleUpdate,
+    UserResponse,
+    UsersResponse,
+)
 
 __all__ = [
     "PositionSchema",
@@ -79,4 +86,9 @@ __all__ = [
     "SimInstanceBase",
     "SimInstanceCreate",
     "SimInstanceResponse",
+    "UserCreate",
+    "UserPasswordUpdate",
+    "UserRoleUpdate",
+    "UserResponse",
+    "UsersResponse",
 ]

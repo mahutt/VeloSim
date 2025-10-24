@@ -132,7 +132,7 @@ class SimulatorController:
                 "station_id": station.id,
                 "station_name": station.name,
                 "station_position": (station.get_station_position().get_position()),
-                "station_tasks": station.tasks,
+                "station_tasks": [task.to_dict() for task in station.tasks],
                 "task_count": station.get_task_count(),
             }
             for station in self.stationEntities
@@ -142,18 +142,20 @@ class SimulatorController:
         resources = []
         for resource in self.resourceEntities:
             if resource.has_updated:
-                dispatched_task = resource.get_dispatched_task()
+                in_progress_task = resource.get_in_progress_task()
                 resources.append(
                     {
                         "resource_id": resource.id,
                         "resource_position": (
                             resource.get_resource_position().get_position()
                         ),
-                        "resource_tasks": resource.get_task_list(),
+                        "resource_tasks": [
+                            task.to_dict() for task in resource.get_task_list()
+                        ],
                         "task_count": resource.get_task_count(),
-                        "dispatched_task_id": (
-                            dispatched_task.get_task_id()
-                            if dispatched_task is not None
+                        "in_progress_task_id": (
+                            in_progress_task.get_task_id()
+                            if in_progress_task is not None
                             else None
                         ),
                     }
@@ -197,7 +199,7 @@ class SimulatorController:
                 "station_id": station.id,
                 "station_name": station.name,
                 "station_position": (station.get_station_position().get_position()),
-                "station_tasks": station.tasks,
+                "station_tasks": [task.to_dict() for task in station.tasks],
                 "task_count": station.get_task_count(),
             }
             for station in self.stationEntities
@@ -205,18 +207,20 @@ class SimulatorController:
 
         resources = []
         for resource in self.resourceEntities:
-            dispatched_task = resource.get_dispatched_task()
+            in_progress_task = resource.get_in_progress_task()
             resources.append(
                 {
                     "resource_id": resource.id,
                     "resource_position": (
                         resource.get_resource_position().get_position()
                     ),
-                    "resource_tasks": resource.get_task_list(),
+                    "resource_tasks": [
+                        task.to_dict() for task in resource.get_task_list()
+                    ],
                     "task_count": resource.get_task_count(),
-                    "dispatched_task_id": (
-                        dispatched_task.get_task_id()
-                        if dispatched_task is not None
+                    "in_progress_task_id": (
+                        in_progress_task.get_task_id()
+                        if in_progress_task is not None
                         else None
                     ),
                 }

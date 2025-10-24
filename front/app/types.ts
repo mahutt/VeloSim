@@ -61,6 +61,10 @@ export interface GetStationsResponse extends PaginatedResponse {
   stations: Omit<Station, 'tasks'>[];
 }
 
+export interface GetUsersResponse extends PaginatedResponse {
+  users: User[];
+}
+
 // Resource types
 export interface Resource {
   id: number;
@@ -79,4 +83,14 @@ export enum SelectedItemType {
 export interface SelectedItem {
   type: SelectedItemType;
   value: Station | Resource;
+}
+
+// Scenario types
+export interface Scenario {
+  id: number;
+  name: string;
+  user_id: number;
+  content: string;
+  date_created: string;
+  date_updated: string;
 }

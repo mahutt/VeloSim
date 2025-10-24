@@ -220,7 +220,7 @@ def test_create_key_frame(simulator_controller: SimulatorController) -> None:
     assert "resource_position" in resource
     assert "resource_tasks" in resource
     assert "task_count" in resource
-    assert "dispatched_task_id" in resource
+    assert "in_progress_task_id" in resource
 
 
 def test_create_diff_frame(simulator_controller: SimulatorController) -> None:

@@ -22,40 +22,39 @@
  * SOFTWARE.
  */
 
-import { Users2 } from 'lucide-react';
-import { Link } from 'react-router';
-import {
-  SidebarGroup,
-  SidebarGroupLabel,
-  SidebarMenu,
-  SidebarMenuButton,
-  SidebarMenuItem,
-} from '~/components/ui/sidebar';
+import { Input } from '~/components/ui/input';
+import { Button } from '~/components/ui/button';
 
-const adminNavItems = [
-  {
-    name: 'Users',
-    url: '/users',
-    icon: Users2,
-  },
-];
+interface ScenarioToolbarProps {
+  scenarioName: string;
+  onNameChange: (name: string) => void;
+  onImport: () => void;
+  onNew: () => void;
+}
 
-export function NavAdmin() {
+export default function ScenarioToolbar({
+  scenarioName,
+  onNameChange,
+  onImport,
+  onNew,
+}: ScenarioToolbarProps) {
   return (
-    <SidebarGroup className="group-data-[collapsible=icon]:hidden">
-      <SidebarGroupLabel>Admin</SidebarGroupLabel>
-      <SidebarMenu>
-        {adminNavItems.map((item) => (
-          <SidebarMenuItem key={item.name}>
-            <SidebarMenuButton asChild>
-              <Link to={item.url}>
-                <item.icon />
-                <span>{item.name}</span>
-              </Link>
-            </SidebarMenuButton>
-          </SidebarMenuItem>
-        ))}
-      </SidebarMenu>
-    </SidebarGroup>
+    <div className="flex flex-col gap-4 mb-6 sm:flex-row sm:items-end sm:gap-6">
+      <div className="flex gap-2 w-full mb-2 sm:mb-0 sm:w-64 sm:order-2">
+        <Button onClick={onImport} variant="outline" className="flex-1">
+          Import
+        </Button>
+        <Button onClick={onNew} className="flex-1">
+          New
+        </Button>
+      </div>
+      <Input
+        value={scenarioName}
+        onChange={(e) => onNameChange(e.target.value)}
+        placeholder="Scenario name"
+        className="flex-1 sm:order-1"
+        aria-label="Scenario name"
+      />
+    </div>
   );
 }

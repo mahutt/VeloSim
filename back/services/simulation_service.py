@@ -24,48 +24,68 @@ SOFTWARE.
 
 from typing import Dict, List
 from sqlalchemy.orm import Session
+from back.models import User
 from sim.simulator import Simulator
 from sim.entities.inputParameters import InputParameter
-from back.crud.sim_instance import sim_instance_crud
+from back.crud import sim_instance_crud, user_crud
 from back.schemas.sim_instance import SimInstanceCreate
+from back.exceptions import VelosimPermissionError, ItemNotFoundError
 
 
 class SimulationService:
-    """Service layer for managing simulations"""
+    """Service layer for managing the lifecycle and access control of simulations."""
 
     def __init__(self) -> None:
         self.simulator = Simulator()
         # Maps sim_id (UUID from simulator) -> (db_id, status)
         self.active_simulations: Dict[str, Dict[str, int | str]] = {}
 
+    # Internal helper
+    def _get_requesting_user(self, db: Session, requesting_user: int) -> User:
+        """
+        Attempt to fetch and validate the requesting user.
+
+        This method retrieves the user from the database by their ID, verifying
+        that the account exists and is currently enabled. It raises a
+        VelosimPermissionError if the user does not exist or is disabled.
+        """
+        user = user_crud.get(db, requesting_user)
+        if not user:
+            raise VelosimPermissionError("Requesting user not found.")
+        if not user.is_enabled:
+            raise VelosimPermissionError("Requesting user is disabled.")
+        return user
+
     def start_simulation(
-        self, db: Session, user_id: int, params: InputParameter | None = None
+        self, db: Session, requesting_user: int, params: InputParameter | None = None
     ) -> tuple[str, int]:
         """
         Start a new simulation and return its ID.
 
         Args:
             db: Database session
-            user_id: ID of the user starting the simulation
+            requesting_user: Requesting user's ID
             params: Optional input parameters for the simulation
 
         Returns:
             Tuple of (sim_id, db_id) where sim_id is the UUID from the simulator
             and db_id is the database record ID
         """
+        user = self._get_requesting_user(db, requesting_user)
+
         if params is None:
             params = InputParameter()
 
         # Create database record first
-        sim_instance_data = SimInstanceCreate(user_id=user_id)
+        sim_instance_data = SimInstanceCreate(user_id=user.id)
         db_sim_instance = sim_instance_crud.create(db, sim_instance_data)
         db.commit()
 
-        # Start simulation with empty subscriber list
-        # Subscribers will attach via WebSocket connections
-        sim_id = self.simulator.start(params, subscribers=[])
+        # Initialize and start the simulator
+        sim_id = self.simulator.initialize(params, subscribers=[])
+        self.simulator.start(sim_id, simTime=3600)
 
-        # Track both the simulator UUID and database ID
+        # Track simulator UUID and DB ID
         self.active_simulations[sim_id] = {
             "db_id": db_sim_instance.id,
             "status": "running",
@@ -73,67 +93,159 @@ class SimulationService:
 
         return sim_id, db_sim_instance.id
 
-    def stop_simulation(self, db: Session, sim_id: str, user_id: int) -> bool:
+    def stop_simulation(
+        self,
+        db: Session,
+        sim_id: str,
+        requesting_user: int,
+    ) -> bool:
         """
-        Stop a simulation by ID.
+        Stop a simulation by ID (owner or admin only).
 
         Args:
             db: Database session
             sim_id: The simulator UUID
-            user_id: ID of the user requesting to stop the simulation
-
+            requesting_user: Requesting user's ID
         Returns:
-            True if stopped successfully, False if not found or unauthorized
+            True if stopped successfully
+        Raises:
+            ItemNotFoundError if not found
+            VelosimPermissionError if unauthorized
         """
-        if sim_id not in self.active_simulations:
-            return False
+        user = self._get_requesting_user(db, requesting_user)
 
-        # Check authorization - verify the user owns this simulation
+        if sim_id not in self.active_simulations:
+            raise ItemNotFoundError(sim_id, "Simulation not found")
+
         sim_data = self.active_simulations[sim_id]
         db_id: int = sim_data["db_id"]  # type: ignore[assignment]
         db_sim_instance = sim_instance_crud.get(db, db_id)
+        if db_sim_instance is None:
+            raise ItemNotFoundError(db_id, "Simulation instance record not found")
 
-        if not db_sim_instance or db_sim_instance.user_id != user_id:
-            return False
+        assert db_sim_instance is not None
 
-        # Stop the simulator
+        # Authorization check
+        if db_sim_instance.user_id != user.id and not user.is_admin:
+            raise VelosimPermissionError("Unauthorized to stop this simulation.")
+
+        # Stop simulator and delete DB record
         self.simulator.stop(sim_id)
-
-        # Delete the database record
         sim_instance_crud.delete(db, db_id)
         db.commit()
 
-        # Remove from active simulations
         del self.active_simulations[sim_id]
         return True
 
-    def get_active_simulations(self) -> List[str]:
-        """Get list of active simulation IDs"""
+    def get_active_user_simulations(
+        self, db: Session, requesting_user: int
+    ) -> List[str]:
+        """
+        Retrieve simulations owned by the requesting user.
+        """
+        user = self._get_requesting_user(db, requesting_user)
+        return [
+            sim_id
+            for sim_id, sim_data in self.active_simulations.items()
+            if (db_instance := sim_instance_crud.get(db, int(sim_data["db_id"])))
+            is not None
+            and db_instance.user_id == user.id
+        ]
+
+    def get_all_active_simulations(
+        self, db: Session, requesting_user: int
+    ) -> List[str]:
+        """
+        Retrieve all active simulations.
+        This is an admin-only operation.
+        """
+        user = self._get_requesting_user(db, requesting_user)
+        if not user.is_admin:
+            raise VelosimPermissionError(
+                "Admin privileges required to list all active simulations."
+            )
+
         return list(self.active_simulations.keys())
 
-    def get_simulation_status(self, sim_id: str) -> str:
-        """Get status of a specific simulation"""
-        if sim_id in self.active_simulations:
-            return str(self.active_simulations[sim_id]["status"])
-        return "not_found"
-
-    def stop_all_simulations(self, db: Session) -> None:
+    def get_simulation_status(
+        self, db: Session, sim_id: str, requesting_user: int
+    ) -> str:
         """
-        Stop all running simulations and clean up database records.
+        Get status of a specific simulation.
+
+        Admins can query the status of any simulation, whereas non-admin users
+        can only query their own.
 
         Args:
             db: Database session
+            sim_id: Simulator UUID
+            requesting_user: Requesting user's ID
+
+        Returns:
+            string representing the simulation status
         """
-        # Stop all simulators
-        self.simulator.stop_all()
+        user = self._get_requesting_user(db, requesting_user)
 
-        # Delete all database records
-        for sim_data in self.active_simulations.values():
-            db_id: int = sim_data["db_id"]  # type: ignore[assignment]
-            sim_instance_crud.delete(db, db_id)
+        if sim_id not in self.active_simulations:
+            raise ItemNotFoundError(sim_id, "Simulation not found")
 
-        db.commit()
-        self.active_simulations.clear()
+        sim_data = self.active_simulations[sim_id]
+        db_id: int = sim_data["db_id"]  # type: ignore[assignment]
+        db_sim_instance = sim_instance_crud.get(db, db_id)
+        if db_sim_instance is None:
+            raise ItemNotFoundError(db_id, "Simulation instance record not found")
+
+        assert db_sim_instance is not None
+
+        if db_sim_instance.user_id != user.id and not user.is_admin:
+            raise VelosimPermissionError("Unauthorized to access this simulation.")
+
+        return str(sim_data["status"])
+
+    def _stop_all_simulations_core(self, db: Session) -> None:
+        """
+        Core logic to stop all running simulations and clean up DB records. Does
+        not perform any permission checks so it can be called by system code.
+        """
+        try:
+            # Stop all simulators
+            self.simulator.stop_all()
+
+            # Clean up database records
+            for sim_data in list(self.active_simulations.values()):
+                db_id: int = sim_data["db_id"]  # type: ignore[assignment]
+                sim_instance_crud.delete(db, db_id)
+
+            db.commit()
+            self.active_simulations.clear()
+
+        except Exception as exc:
+            db.rollback()
+            raise RuntimeError(f"Failed to stop all simulations: {exc}") from exc
+
+    def stop_all_simulations(self, db: Session, requesting_user: int) -> None:
+        """
+        Stop all running simulations and clean up database records.
+
+        This is an admin-only operation.
+
+        Args:
+            db: Database session
+            requesting_user: Requesting user's ID
+        """
+        user = self._get_requesting_user(db, requesting_user)
+        if not user.is_admin:
+            raise VelosimPermissionError("Only admins can stop all simulations.")
+
+        self._stop_all_simulations_core(db)
+
+    def stop_all_simulations_system(self, db: Session) -> None:
+        """
+        Stop all running simulations from system context (ex. during shutdown).
+
+        No user check. Use carefully.
+        """
+        self._stop_all_simulations_core(db)
 
     def get_simulator(self) -> Simulator:
         """Get the underlying simulator instance for advanced operations"""

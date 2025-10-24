@@ -22,40 +22,33 @@
  * SOFTWARE.
  */
 
-import { Users2 } from 'lucide-react';
-import { Link } from 'react-router';
-import {
-  SidebarGroup,
-  SidebarGroupLabel,
-  SidebarMenu,
-  SidebarMenuButton,
-  SidebarMenuItem,
-} from '~/components/ui/sidebar';
+import type { Scenario } from '~/types';
 
-const adminNavItems = [
-  {
-    name: 'Users',
-    url: '/users',
-    icon: Users2,
-  },
-];
+/**
+ * Helper function to get a preview text for a scenario
+ * Used for displaying in the sidebar
+ */
+export const getScenarioPreview = (scenario: Scenario): string => {
+  try {
+    const parsed = JSON.parse(scenario.content);
+    const keys = Object.keys(parsed);
+    if (keys.length === 0) return 'Empty scenario';
+    return `${keys.length} ${keys.length === 1 ? 'property' : 'properties'}`;
+  } catch {
+    return 'Invalid data';
+  }
+};
 
-export function NavAdmin() {
-  return (
-    <SidebarGroup className="group-data-[collapsible=icon]:hidden">
-      <SidebarGroupLabel>Admin</SidebarGroupLabel>
-      <SidebarMenu>
-        {adminNavItems.map((item) => (
-          <SidebarMenuItem key={item.name}>
-            <SidebarMenuButton asChild>
-              <Link to={item.url}>
-                <item.icon />
-                <span>{item.name}</span>
-              </Link>
-            </SidebarMenuButton>
-          </SidebarMenuItem>
-        ))}
-      </SidebarMenu>
-    </SidebarGroup>
-  );
-}
+/**
+ * Load saved scenarios from placeholder data
+ * TODO: Replace with actual API call to backend
+ */
+export const loadSavedScenarios = async (): Promise<Scenario[]> => {
+  try {
+    const response = await fetch('/placeholder-data/saved-scenarios.json');
+    const data = await response.json();
+    return data;
+  } catch {
+    return [];
+  }
+};

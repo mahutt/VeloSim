@@ -38,6 +38,7 @@ import axios from 'axios';
 import LoginAlert from '~/components/login/login-alert';
 import { useState } from 'react';
 import useAuth from '~/hooks/use-auth';
+import { TOKEN_STORAGE_KEY } from '~/contants';
 
 export function meta() {
   return [{ title: 'Login' }];
@@ -72,10 +73,10 @@ export default function Signin() {
         `${import.meta.env.VITE_BACKEND_URL}/api/token`,
         formData
       );
-      sessionStorage.setItem('access_token', response.data.access_token);
+      sessionStorage.setItem(TOKEN_STORAGE_KEY, response.data.access_token);
 
       // TODO: Let AuthProvider refresh user info once an API endpoint is available
-      setUser({ id: 1, username: data.username, is_admin: false });
+      setUser({ id: 1, username: data.username, is_admin: true });
     } catch (e) {
       console.error('Login error', e);
       if (axios.isAxiosError(e) && e.status) {
