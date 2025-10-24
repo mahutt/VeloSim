@@ -120,7 +120,7 @@ export default function ResetPasswordDialog({
               control={updatePasswordForm.control}
               render={({ field, fieldState }) => (
                 <Field data-invalid={fieldState.invalid}>
-                  <FieldLabel htmlFor={passwordFieldId}>Username</FieldLabel>
+                  <FieldLabel htmlFor={passwordFieldId}>Password</FieldLabel>
                   <Input
                     {...field}
                     id={passwordFieldId}
@@ -140,7 +140,9 @@ export default function ResetPasswordDialog({
               control={updatePasswordForm.control}
               render={({ field, fieldState }) => (
                 <Field data-invalid={fieldState.invalid}>
-                  <FieldLabel htmlFor={confirmFieldId}>Password</FieldLabel>
+                  <FieldLabel htmlFor={confirmFieldId}>
+                    Confirm password
+                  </FieldLabel>
                   <Input
                     {...field}
                     id={confirmFieldId}
