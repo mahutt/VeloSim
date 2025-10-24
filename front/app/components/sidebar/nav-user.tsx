@@ -22,13 +22,14 @@
  * SOFTWARE.
  */
 
-import { EllipsisVertical, LogOut } from 'lucide-react';
+import { EllipsisVertical, KeyRound, LogOut } from 'lucide-react';
 
 import { default as AvatarOld } from '~/components/sidebar/avatar';
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '~/components/ui/dropdown-menu';
 import {
@@ -37,44 +38,61 @@ import {
   SidebarMenuItem,
 } from '~/components/ui/sidebar';
 import useAuth from '~/hooks/use-auth';
+import ResetPasswordDialog from '../reset-password-dialog';
+import { useState } from 'react';
 
 export function NavUser() {
   const { user, logout } = useAuth();
+  const [showResetPasswordDialog, setShowResetPasswordDialog] = useState(false);
 
   if (!user) return null;
 
   return (
-    <SidebarMenu>
-      <SidebarMenuItem>
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <SidebarMenuButton
-              size="lg"
-              className="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
+    <>
+      <SidebarMenu>
+        <SidebarMenuItem>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <SidebarMenuButton
+                size="lg"
+                className="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
+              >
+                <AvatarOld username={user.username} />
+                <div className="grid flex-1 text-left text-sm leading-tight">
+                  <span className="truncate font-medium">{user.username}</span>
+                  <span className="text-muted-foreground truncate text-xs">
+                    {user.is_admin ? 'Admin' : 'User'}
+                  </span>
+                </div>
+                <EllipsisVertical className="ml-auto size-4" />
+              </SidebarMenuButton>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent
+              className="w-(--radix-dropdown-menu-trigger-width) min-w-56 rounded-lg"
+              side="bottom"
+              align="end"
+              sideOffset={4}
             >
-              <AvatarOld username={user.username} />
-              <div className="grid flex-1 text-left text-sm leading-tight">
-                <span className="truncate font-medium">{user.username}</span>
-                <span className="text-muted-foreground truncate text-xs">
-                  {user.is_admin ? 'Admin' : 'User'}
-                </span>
-              </div>
-              <EllipsisVertical className="ml-auto size-4" />
-            </SidebarMenuButton>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent
-            className="w-(--radix-dropdown-menu-trigger-width) min-w-56 rounded-lg"
-            side="bottom"
-            align="end"
-            sideOffset={4}
-          >
-            <DropdownMenuItem onClick={logout}>
-              <LogOut />
-              Log out
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
-      </SidebarMenuItem>
-    </SidebarMenu>
+              <DropdownMenuItem
+                onClick={() => setShowResetPasswordDialog(true)}
+              >
+                <KeyRound />
+                Change password
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={logout}>
+                <LogOut />
+                Log out
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </SidebarMenuItem>
+      </SidebarMenu>
+      <ResetPasswordDialog
+        open={showResetPasswordDialog}
+        onOpenChange={setShowResetPasswordDialog}
+        targetUser={user}
+      />
+    </>
   );
 }

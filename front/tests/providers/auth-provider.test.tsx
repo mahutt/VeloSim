@@ -38,6 +38,22 @@ Object.defineProperty(window, 'sessionStorage', {
   value: mockSessionStorage,
 });
 
+vi.mock('~/api', () => {
+  return {
+    default: {
+      get: vi.fn(() =>
+        Promise.resolve({
+          data: {
+            id: 1,
+            username: 'demo_user',
+            is_admin: true,
+          },
+        })
+      ),
+    },
+  };
+});
+
 // Mock react-router useNavigate
 vi.mock('react-router', async (importOriginal) => {
   const actual = await importOriginal<typeof import('react-router')>();

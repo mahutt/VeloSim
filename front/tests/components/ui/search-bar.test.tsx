@@ -62,14 +62,14 @@ test('calls onChange when typing in input', async () => {
 });
 
 test('shows clear button when value is provided', () => {
-  render(<SearchBar value="test" onClear={() => {}} />);
+  render(<SearchBar value="test" onClear={() => {}} onChange={() => {}} />);
 
   const clearButton = screen.getByRole('button', { name: 'Clear search' });
   expect(clearButton).toBeInTheDocument();
 });
 
 test('does not show clear button when value is empty', () => {
-  render(<SearchBar value="" onClear={() => {}} />);
+  render(<SearchBar value="" onClear={() => {}} onChange={() => {}} />);
 
   const clearButton = screen.queryByRole('button', { name: 'Clear search' });
   expect(clearButton).not.toBeInTheDocument();
@@ -86,7 +86,7 @@ test('calls onClear when clear button is clicked', async () => {
   const user = userEvent.setup();
   const handleClear = vi.fn();
 
-  render(<SearchBar value="test" onClear={handleClear} />);
+  render(<SearchBar value="test" onClear={handleClear} onChange={() => {}} />);
 
   const clearButton = screen.getByRole('button', { name: 'Clear search' });
   await user.click(clearButton);
@@ -146,7 +146,7 @@ test('handles focus and blur events', async () => {
 });
 
 test('clear button has correct accessibility attributes', () => {
-  render(<SearchBar value="test" onClear={() => {}} />);
+  render(<SearchBar value="test" onClear={() => {}} onChange={() => {}} />);
 
   const clearButton = screen.getByRole('button', { name: 'Clear search' });
   expect(clearButton).toHaveAttribute('aria-label', 'Clear search');
@@ -155,7 +155,7 @@ test('clear button has correct accessibility attributes', () => {
 });
 
 test('clear button shows X icon', () => {
-  render(<SearchBar value="test" onClear={() => {}} />);
+  render(<SearchBar value="test" onClear={() => {}} onChange={() => {}} />);
 
   const clearButton = screen.getByRole('button', { name: 'Clear search' });
   const icon = clearButton.querySelector('svg');
@@ -175,7 +175,7 @@ test('handles keyboard events correctly', async () => {
 });
 
 test('clear button hover styles are applied', () => {
-  render(<SearchBar value="test" onClear={() => {}} />);
+  render(<SearchBar value="test" onClear={() => {}} onChange={() => {}} />);
 
   const clearButton = screen.getByRole('button', { name: 'Clear search' });
   expect(clearButton).toHaveClass('hover:text-foreground', 'transition-colors');

@@ -25,6 +25,14 @@
 import { type ColumnDef } from '@tanstack/react-table';
 import type { User } from '~/types';
 import { Badge } from '../ui/badge';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '../ui/dropdown-menu';
+import { MoreHorizontal } from 'lucide-react';
+import { Button } from '../ui/button';
 
 export const columns: ColumnDef<User>[] = [
   {
@@ -43,6 +51,35 @@ export const columns: ColumnDef<User>[] = [
       const label = user.is_admin ? 'Admin' : 'User';
       const variant = user.is_admin ? 'default' : 'secondary';
       return <Badge variant={variant}>{label}</Badge>;
+    },
+  },
+  {
+    id: 'actions',
+    enableHiding: false,
+    cell: ({ row, table }) => {
+      const user = row.original;
+      return (
+        <div className="flex justify-end gap-1">
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" className="h-8 w-8 p-0">
+                <span className="sr-only">Open menu</span>
+                <MoreHorizontal />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem
+                onClick={() => {
+                  table.options.meta?.setResetPasswordUser(user);
+                  table.options.meta?.setShowResetPasswordDialog(true);
+                }}
+              >
+                Change password
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
+      );
     },
   },
 ];
