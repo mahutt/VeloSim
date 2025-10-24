@@ -125,8 +125,8 @@ class MapController:
                     v_node = disabled_edge["v"]
 
                     # Remove from edges dataframe
-                    updated_edges = all_edges[~edge_mask]
-                    self.osm.set_edges(updated_edges)
+                    all_edges = all_edges[~edge_mask]
+                    self.osm.set_edges(all_edges)
 
                     # Remove from networkx graph
                     graph = self.osm.get_graph()
