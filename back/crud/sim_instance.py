@@ -24,8 +24,9 @@ SOFTWARE.
 
 from typing import List, Optional
 from sqlalchemy.orm import Session
-from back.models.sim_instance import SimInstance
-from back.schemas.sim_instance import SimInstanceCreate
+from back.exceptions import VelosimPermissionError
+from back.models import SimInstance
+from back.schemas import SimInstanceCreate
 
 
 class SimInstanceCRUD:
@@ -46,12 +47,32 @@ class SimInstanceCRUD:
         return db.query(SimInstance).filter(SimInstance.id == sim_instance_id).first()
 
     def get_by_user(
-        self, db: Session, user_id: int, skip: int = 0, limit: int = 100
+        self,
+        db: Session,
+        target_user_id: int,
+        requesting_user_id: int,
+        skip: int = 0,
+        limit: int = 100,
     ) -> List[SimInstance]:
-        """Get all simulation instances for a specific user."""
+        """
+        Get all simulation instances for a specific user if permitted.
+
+        Normal users can only see their own simulations. Admins can access any.
+        """
+        # Lazy import to avoid circular dependency
+        from back.crud import user_crud
+
+        requesting_user = user_crud.get(db, requesting_user_id)
+        if not requesting_user or not requesting_user.is_enabled:
+            raise VelosimPermissionError("Requesting user cannot access simulations.")
+        if requesting_user.id != target_user_id and not requesting_user.is_admin:
+            raise VelosimPermissionError(
+                "Requesting user cannot access simulations for this user."
+            )
+
         return (
             db.query(SimInstance)
-            .filter(SimInstance.user_id == user_id)
+            .filter(SimInstance.user_id == target_user_id)
             .offset(skip)
             .limit(limit)
             .all()
