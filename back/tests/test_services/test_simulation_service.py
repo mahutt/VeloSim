@@ -204,7 +204,7 @@ class TestSimulationService:
         with pytest.raises(VelosimPermissionError) as exc_info:
             simulation_service.get_all_active_simulations(db, test_user.id)
 
-        assert "Administrative privileges" in str(exc_info.value)
+        assert "Admin privileges required" in str(exc_info.value)
 
         # Verify simulation is still active
         active_sims = simulation_service.get_active_user_simulations(db, test_user.id)
