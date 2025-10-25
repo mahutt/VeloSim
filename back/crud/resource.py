@@ -37,6 +37,7 @@ class ResourceCRUD:
         """Create a new resource."""
         with db.begin(nested=True):
             db_resource = Resource(
+                sim_instance_id=resource_data.sim_instance_id,
                 type=resource_data.type,
                 latitude=resource_data.latitude,
                 longitude=resource_data.longitude,

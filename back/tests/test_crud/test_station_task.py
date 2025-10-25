@@ -26,21 +26,61 @@ import pytest
 from sqlalchemy.orm import Session
 from back.crud.station import station_crud
 from back.crud.station_task import station_task_crud
-from back.schemas import StationCreate, StationTaskCreate, StationTaskUpdate
-from back.models import Station, StationTaskType, TaskStatus
+from back.crud.sim_instance import sim_instance_crud
+from back.crud.user import user_crud
+from back.schemas import (
+    StationCreate,
+    StationTaskCreate,
+    StationTaskUpdate,
+    SimInstanceCreate,
+)
+from back.models import Station, StationTaskType, TaskStatus, SimInstance, User
 
 
 @pytest.fixture
-def station(db: Session) -> Station:
-    station_data = StationCreate(name="Test Station", longitude=0.0, latitude=0.0)
+def test_user(db: Session) -> User:
+    """Create a non-admin user for testing."""
+    test_user = User(
+        username="test_user",
+        password_hash=user_crud.hash_password("test_password"),
+        is_admin=False,
+        is_enabled=True,
+    )
+    db.add(test_user)
+    db.flush()
+    db.refresh(test_user)
+    return test_user
+
+
+@pytest.fixture
+def sim_instance(db: Session, test_user: User) -> SimInstance:
+    """Create a test simulation instance for the normal user."""
+    sim_instance_data = SimInstanceCreate(user_id=test_user.id)
+    sim = sim_instance_crud.create(db, sim_instance_data)
+    db.commit()
+    return sim
+
+
+@pytest.fixture
+def station(db: Session, sim_instance: SimInstance) -> Station:
+    station_data = StationCreate(
+        name="Test Station",
+        longitude=0.0,
+        latitude=0.0,
+        sim_instance_id=sim_instance.id,
+    )
     station = station_crud.create(db, station_data)
     return station
 
 
 class TestStationTaskCRUD:
-    def test_create_station_task(self, db: Session, station: Station) -> None:
+    def test_create_station_task(
+        self, db: Session, station: Station, sim_instance: SimInstance
+    ) -> None:
         task_data = StationTaskCreate(
-            type=StationTaskType.BATTERY_SWAP, station_id=station.id
+            type=StationTaskType.BATTERY_SWAP,
+            station_id=station.id,
+            sim_instance_id=sim_instance.id,
         )
         task = station_task_crud.create(db, task_data)
         assert task.id is not None
@@ -48,9 +88,13 @@ class TestStationTaskCRUD:
         assert task.station_id == station.id
         assert task.status == TaskStatus.OPEN
 
-    def test_get_station_task_by_id(self, db: Session, station: Station) -> None:
+    def test_get_station_task_by_id(
+        self, db: Session, station: Station, sim_instance: SimInstance
+    ) -> None:
         task_data = StationTaskCreate(
-            type=StationTaskType.BATTERY_SWAP, station_id=station.id
+            type=StationTaskType.BATTERY_SWAP,
+            station_id=station.id,
+            sim_instance_id=sim_instance.id,
         )
         created_task = station_task_crud.create(db, task_data)
         retrieved_task = station_task_crud.get(db, created_task.id)
@@ -68,20 +112,26 @@ class TestStationTaskCRUD:
         assert total == 0
 
     def test_get_all_station_tasks_with_data(
-        self, db: Session, station: Station
+        self, db: Session, station: Station, sim_instance: SimInstance
     ) -> None:
         for _ in range(3):
             task_data = StationTaskCreate(
-                type=StationTaskType.BATTERY_SWAP, station_id=station.id
+                type=StationTaskType.BATTERY_SWAP,
+                station_id=station.id,
+                sim_instance_id=sim_instance.id,
             )
             station_task_crud.create(db, task_data)
         tasks, total = station_task_crud.get_all(db)
         assert len(tasks) == 3
         assert total == 3
 
-    def test_update_station_task_status(self, db: Session, station: Station) -> None:
+    def test_update_station_task_status(
+        self, db: Session, station: Station, sim_instance: SimInstance
+    ) -> None:
         task_data = StationTaskCreate(
-            type=StationTaskType.BATTERY_SWAP, station_id=station.id
+            type=StationTaskType.BATTERY_SWAP,
+            station_id=station.id,
+            sim_instance_id=sim_instance.id,
         )
         created_task = station_task_crud.create(db, task_data)
         update_data = StationTaskUpdate(status=TaskStatus.CLOSED)
@@ -95,9 +145,13 @@ class TestStationTaskCRUD:
         updated_task = station_task_crud.update(db, 99999, update_data)
         assert updated_task is None
 
-    def test_delete_station_task(self, db: Session, station: Station) -> None:
+    def test_delete_station_task(
+        self, db: Session, station: Station, sim_instance: SimInstance
+    ) -> None:
         task_data = StationTaskCreate(
-            type=StationTaskType.BATTERY_SWAP, station_id=station.id
+            type=StationTaskType.BATTERY_SWAP,
+            station_id=station.id,
+            sim_instance_id=sim_instance.id,
         )
         created_task = station_task_crud.create(db, task_data)
         success = station_task_crud.delete(db, created_task.id)

@@ -27,6 +27,9 @@ from sqlalchemy.orm import Session
 from back.crud.resource import resource_crud
 from back.crud.station import station_crud
 from back.crud.station_task import station_task_crud
+from back.crud.sim_instance import sim_instance_crud
+from back.crud.user import user_crud
+
 from back.models import (
     Resource,
     ResourceType,
@@ -34,24 +37,56 @@ from back.models import (
     StationTask,
     StationTaskType,
     TaskStatus,
+    User,
+    SimInstance,
 )
 from back.schemas import (
     ResourceCreate,
     ResourceUpdate,
     StationCreate,
     StationTaskCreate,
+    SimInstanceCreate,
 )
 
 
 @pytest.fixture
-def station(db: Session) -> Station:
+def test_user(db: Session) -> User:
+    """Create a non-admin user for testing."""
+    test_user = User(
+        username="test_user",
+        password_hash=user_crud.hash_password("test_password"),
+        is_admin=False,
+        is_enabled=True,
+    )
+    db.add(test_user)
+    db.flush()
+    db.refresh(test_user)
+    return test_user
+
+
+@pytest.fixture
+def sim_instance(db: Session, test_user: User) -> SimInstance:
+    """Create a test simulation instance for the normal user."""
+    sim_instance_data = SimInstanceCreate(user_id=test_user.id)
+    sim = sim_instance_crud.create(db, sim_instance_data)
+    db.commit()
+    return sim
+
+
+@pytest.fixture
+def station(db: Session, sim_instance: SimInstance) -> Station:
     """Create a station for testing tasks."""
-    station_data = StationCreate(name="Test Station", longitude=0.0, latitude=0.0)
+    station_data = StationCreate(
+        name="Test Station",
+        longitude=0.0,
+        latitude=0.0,
+        sim_instance_id=sim_instance.id,
+    )
     return station_crud.create(db, station_data)
 
 
 @pytest.fixture
-def resource(db: Session) -> Resource:
+def resource(db: Session, sim_instance: SimInstance) -> Resource:
     """Create a resource for testing."""
     resource_data = ResourceCreate(
         type=ResourceType.VEHICLE_DRIVER,
@@ -61,16 +96,18 @@ def resource(db: Session) -> Resource:
         route_start_longitude=1.0,
         route_end_latitude=2.0,
         route_end_longitude=2.0,
+        sim_instance_id=sim_instance.id,
     )
     return resource_crud.create(db, resource_data)
 
 
 @pytest.fixture
-def task(db: Session, station: Station) -> StationTask:
+def task(db: Session, station: Station, sim_instance: SimInstance) -> StationTask:
     """Create a station task for assignment tests."""
     task_data = StationTaskCreate(
         type=StationTaskType.BATTERY_SWAP,
         station_id=station.id,
+        sim_instance_id=sim_instance.id,
     )
     return station_task_crud.create(db, task_data)
 
@@ -78,7 +115,7 @@ def task(db: Session, station: Station) -> StationTask:
 class TestResourceCRUD:
     """Tests for Resource CRUD operations."""
 
-    def test_create_resource(self, db: Session) -> None:
+    def test_create_resource(self, db: Session, sim_instance: SimInstance) -> None:
         resource_data = ResourceCreate(
             type=ResourceType.VEHICLE_DRIVER,
             latitude=0.0,
@@ -87,6 +124,7 @@ class TestResourceCRUD:
             route_start_longitude=1.0,
             route_end_latitude=2.0,
             route_end_longitude=2.0,
+            sim_instance_id=sim_instance.id,
         )
         r = resource_crud.create(db, resource_data)
         assert r.id is not None

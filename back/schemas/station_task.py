@@ -39,6 +39,7 @@ class StationTaskCreate(StationTaskBase):
 
     station_id: int = Field(..., description="ID of the related station")
     type: StationTaskType = Field(..., description="Type of station task")
+    sim_instance_id: int
 
 
 class StationTaskUpdate(StationTaskBase):
@@ -54,6 +55,7 @@ class StationTaskResponse(StationTaskBase):
     station_id: int = Field(..., description="ID of the related station")
     type: StationTaskType = Field(..., description="Type of station task")
     status: TaskStatus = Field(..., description="Task completion status")
+    sim_instance_id: int
     date_created: datetime = Field(..., description="Creation timestamp")
     date_updated: datetime = Field(..., description="Last update timestamp")
 

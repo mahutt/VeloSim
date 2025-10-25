@@ -56,8 +56,7 @@ class ResourceCreate(ResourceBase):
     """Schema for creating a new resource."""
 
     type: ResourceType = Field(..., description="Type of resource")
-
-    pass
+    sim_instance_id: int
 
 
 class ResourceUpdate(BaseModel):
@@ -119,6 +118,7 @@ class ResourceResponse(BaseModel):
 
     id: int
     type: ResourceType
+    sim_instance_id: int
     latitude: float = Field(..., exclude=True)  # Hidden field for position calculation
     longitude: float = Field(..., exclude=True)  # Hidden field for position calculation
     route_start_latitude: float = Field(
@@ -133,6 +133,9 @@ class ResourceResponse(BaseModel):
     route_end_longitude: float = Field(
         ..., exclude=True
     )  # Hidden field for route end calculation
+
+    tasks: List[StationTaskResponse] = Field(default_factory=list)
+    """The list of full tasks assigned to this resource to match sim model."""
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -149,9 +152,6 @@ class ResourceResponse(BaseModel):
             [self.route_start_longitude, self.route_start_latitude],
             [self.route_end_longitude, self.route_end_latitude],
         ]
-
-    tasks: List[StationTaskResponse] = Field(default_factory=list)
-    """The list of full tasks assigned to this resource to match sim model."""
 
     @computed_field
     def task_count(self) -> int:

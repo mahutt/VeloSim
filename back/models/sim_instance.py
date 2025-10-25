@@ -22,13 +22,16 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 """
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, List
 from sqlalchemy import DateTime, ForeignKey, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from back.database.session import Base
 
 if TYPE_CHECKING:
     from .user import User
+    from .resource import Resource
+    from .station_task import StationTask
+    from .station import Station
 
 
 class SimInstance(Base):
@@ -50,5 +53,20 @@ class SimInstance(Base):
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False)
     user: Mapped["User"] = relationship("User", back_populates="sim_instances")
 
+    tasks: Mapped[List["StationTask"]] = relationship(
+        "StationTask", back_populates="sim_instance", cascade="all, delete-orphan"
+    )
+    resources: Mapped[List["Resource"]] = relationship(
+        "Resource", back_populates="sim_instance", cascade="all, delete-orphan"
+    )
+    stations: Mapped[List["Station"]] = relationship(
+        "Station", back_populates="sim_instance", cascade="all, delete-orphan"
+    )
+
     def __repr__(self) -> str:
-        return f"<SimInstance(id={self.id}, user_id={self.user_id})>"
+        return (
+            f"<SimInstance(id={self.id}, user_id={self.user_id}, "
+            f"resources={len(self.resources)}, "
+            f"stations={len(self.stations)}, "
+            f"tasks={len(self.tasks)})>"
+        )

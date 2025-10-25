@@ -23,7 +23,40 @@ SOFTWARE.
 """
 
 from fastapi.testclient import TestClient
+import pytest
 from sqlalchemy.orm import Session
+from back.crud.sim_instance import sim_instance_crud
+from back.crud.user import user_crud
+
+from back.models import (
+    User,
+    SimInstance,
+)
+from back.schemas import SimInstanceCreate
+
+
+@pytest.fixture
+def test_user(db: Session) -> User:
+    """Create a non-admin user for testing."""
+    test_user = User(
+        username="test_user",
+        password_hash=user_crud.hash_password("test_password"),
+        is_admin=False,
+        is_enabled=True,
+    )
+    db.add(test_user)
+    db.flush()
+    db.refresh(test_user)
+    return test_user
+
+
+@pytest.fixture
+def sim_instance(db: Session, test_user: User) -> SimInstance:
+    """Create a test simulation instance for the normal user."""
+    sim_instance_data = SimInstanceCreate(user_id=test_user.id)
+    sim = sim_instance_crud.create(db, sim_instance_data)
+    db.commit()
+    return sim
 
 
 class TestStationsAPI:
@@ -41,7 +74,7 @@ class TestStationsAPI:
         assert data["total_pages"] == 0
 
     def test_get_stations_with_pagination(
-        self, client: TestClient, db: Session
+        self, client: TestClient, db: Session, sim_instance: SimInstance
     ) -> None:
         """Test getting stations with pagination parameters."""
         # Create some test stations first
@@ -50,6 +83,7 @@ class TestStationsAPI:
                 "name": f"Station {i}",
                 "longitude": -73.5 + i * 0.01,
                 "latitude": 45.5 + i * 0.01,
+                "sim_instance_id": sim_instance.id,
             }
             client.post("/api/v1/stations/", json=station_data)
 
@@ -71,10 +105,17 @@ class TestStationsAPI:
         assert data["page"] == 2
         assert data["per_page"] == 2
 
-    def test_get_station_by_id_success(self, client: TestClient, db: Session) -> None:
+    def test_get_station_by_id_success(
+        self, client: TestClient, db: Session, sim_instance: SimInstance
+    ) -> None:
         """Test getting a station by ID successfully."""
         # Create a test station
-        station_data = {"name": "Test Station", "longitude": -73.5, "latitude": 45.5}
+        station_data = {
+            "name": "Test Station",
+            "longitude": -73.5,
+            "latitude": 45.5,
+            "sim_instance_id": sim_instance.id,
+        }
         create_response = client.post("/api/v1/stations/", json=station_data)
         assert create_response.status_code == 201
         created_station = create_response.json()
@@ -98,9 +139,16 @@ class TestStationsAPI:
         data = response.json()
         assert "Station with ID 999 not found" in data["detail"]
 
-    def test_create_station_success(self, client: TestClient, db: Session) -> None:
+    def test_create_station_success(
+        self, client: TestClient, db: Session, sim_instance: SimInstance
+    ) -> None:
         """Test creating a station successfully."""
-        station_data = {"name": "New Station", "longitude": -73.6, "latitude": 45.6}
+        station_data = {
+            "name": "New Station",
+            "longitude": -73.6,
+            "latitude": 45.6,
+            "sim_instance_id": sim_instance.id,
+        }
         response = client.post("/api/v1/stations/", json=station_data)
         assert response.status_code == 201
         data = response.json()
@@ -112,13 +160,14 @@ class TestStationsAPI:
         assert "latitude" not in data
 
     def test_create_station_duplicate_name(
-        self, client: TestClient, db: Session
+        self, client: TestClient, db: Session, sim_instance: SimInstance
     ) -> None:
         """Test creating a station with a duplicate name."""
         station_data = {
             "name": "Duplicate Station",
             "longitude": -73.5,
             "latitude": 45.5,
+            "sim_instance_id": sim_instance.id,
         }
         # Create first station
         response1 = client.post("/api/v1/stations/", json=station_data)
@@ -130,13 +179,16 @@ class TestStationsAPI:
         data = response2.json()
         assert "already exists" in data["detail"]
 
-    def test_update_station_success(self, client: TestClient, db: Session) -> None:
+    def test_update_station_success(
+        self, client: TestClient, db: Session, sim_instance: SimInstance
+    ) -> None:
         """Test updating a station successfully."""
         # Create a station
         station_data = {
             "name": "Original Station",
             "longitude": -73.5,
             "latitude": 45.5,
+            "sim_instance_id": sim_instance.id,
         }
         create_response = client.post("/api/v1/stations/", json=station_data)
         station_id = create_response.json()["id"]
@@ -159,12 +211,22 @@ class TestStationsAPI:
         assert response.status_code == 404
 
     def test_update_station_duplicate_name(
-        self, client: TestClient, db: Session
+        self, client: TestClient, db: Session, sim_instance: SimInstance
     ) -> None:
         """Test updating a station to have a duplicate name."""
         # Create two stations
-        station1_data = {"name": "Station 1", "longitude": -73.5, "latitude": 45.5}
-        station2_data = {"name": "Station 2", "longitude": -73.6, "latitude": 45.6}
+        station1_data = {
+            "name": "Station 1",
+            "longitude": -73.5,
+            "latitude": 45.5,
+            "sim_instance_id": sim_instance.id,
+        }
+        station2_data = {
+            "name": "Station 2",
+            "longitude": -73.6,
+            "latitude": 45.6,
+            "sim_instance_id": sim_instance.id,
+        }
 
         response1 = client.post("/api/v1/stations/", json=station1_data)
         response2 = client.post("/api/v1/stations/", json=station2_data)
@@ -179,13 +241,16 @@ class TestStationsAPI:
         assert response.status_code == 400
         assert "already exists" in response.json()["detail"]
 
-    def test_delete_station_success(self, client: TestClient, db: Session) -> None:
+    def test_delete_station_success(
+        self, client: TestClient, db: Session, sim_instance: SimInstance
+    ) -> None:
         """Test deleting a station successfully."""
         # Create a station
         station_data = {
             "name": "Station to Delete",
             "longitude": -73.5,
             "latitude": 45.5,
+            "sim_instance_id": sim_instance.id,
         }
         create_response = client.post("/api/v1/stations/", json=station_data)
         station_id = create_response.json()["id"]
@@ -203,7 +268,11 @@ class TestStationsAPI:
         response = client.delete("/api/v1/stations/999")
         assert response.status_code == 404
 
-    def test_create_station_invalid_data(self, client: TestClient, db: Session) -> None:
+    def test_create_station_invalid_data(
+        self,
+        client: TestClient,
+        db: Session,
+    ) -> None:
         """Test creating a station with invalid data."""
         # Missing required fields
         response = client.post("/api/v1/stations/", json={"name": "Incomplete Station"})
@@ -214,6 +283,7 @@ class TestStationsAPI:
             "name": "Invalid Station",
             "longitude": "not_a_number",
             "latitude": 45.5,
+            "sim_instance": 999,
         }
         response = client.post("/api/v1/stations/", json=invalid_data)
         assert response.status_code == 422

@@ -66,7 +66,7 @@ class StationBase(BaseModel):
 class StationCreate(StationBase):
     """Schema for creating a new station."""
 
-    pass
+    sim_instance_id: int
 
 
 class StationUpdate(BaseModel):
@@ -98,6 +98,7 @@ class StationResponse(BaseModel):
 
     id: int = Field(..., description="Station ID")
     name: str = Field(..., description="Station name")
+    sim_instance_id: int
     longitude: float = Field(..., exclude=True)  # Hidden field for position calculation
     latitude: float = Field(..., exclude=True)  # Hidden field for position calculation
 
