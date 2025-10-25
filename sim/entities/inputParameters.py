@@ -39,13 +39,13 @@ class InputParameter:
         real_time_factor: Optional[float] = None,
         key_frame_freq: Optional[int] = None,
     ) -> None:
-        self.stationEntities: Dict[int, Station] = (
+        self.station_entities: Dict[int, Station] = (
             station_entities if station_entities is not None else {}
         )
-        self.resourcEntities: Dict[int, Resource] = (
+        self.resource_entities: Dict[int, Resource] = (
             resource_entities if resource_entities is not None else {}
         )
-        self.taskEntities: Dict[int, Task] = (
+        self.task_entities: Dict[int, Task] = (
             task_entities if task_entities is not None else {}
         )
         self.realTimeFactor: Optional[float] = real_time_factor
@@ -53,13 +53,13 @@ class InputParameter:
 
     # Getter methods
     def get_station_entities(self) -> Dict[int, Station]:
-        return self.stationEntities
+        return self.station_entities
 
     def get_resource_entities(self) -> Dict[int, Resource]:
-        return self.resourcEntities
+        return self.resource_entities
 
     def get_task_entities(self) -> Dict[int, Task]:
-        return self.taskEntities
+        return self.task_entities
 
     def get_real_time_factor(self) -> Optional[float]:
         return self.realTimeFactor
@@ -69,13 +69,13 @@ class InputParameter:
 
     # Setter methods
     def set_station_entities(self, station_entities: Dict[int, Station]) -> None:
-        self.stationEntities = station_entities
+        self.station_entities = station_entities
 
     def set_resource_entities(self, resource_entities: Dict[int, Resource]) -> None:
-        self.resourcEntities = resource_entities
+        self.resource_entities = resource_entities
 
     def set_task_entities(self, task_entities: Dict[int, Task]) -> None:
-        self.taskEntities = task_entities
+        self.task_entities = task_entities
 
     def set_real_time_factor(self, real_time_factor: Optional[float]) -> None:
         self.realTimeFactor = real_time_factor
@@ -85,36 +85,36 @@ class InputParameter:
 
     # Utility methods to add individual entities
     def add_station(self, station: Station) -> None:
-        self.stationEntities[station.id] = station
+        self.station_entities[station.id] = station
 
     def add_resource(self, resource: Resource) -> None:
-        self.resourcEntities[resource.id] = resource
+        self.resource_entities[resource.id] = resource
 
     def add_task(self, task: Task) -> None:
-        self.taskEntities[task.id] = task
+        self.task_entities[task.id] = task
 
     # Utility methods to remove individual entities
     def remove_station(self, station: Station) -> None:
-        deleted_station = self.stationEntities.pop(station.id, False)
+        deleted_station = self.station_entities.pop(station.id, False)
         if not deleted_station:
             print(f"remove_station(): Station: {station.id} not found")
 
     def remove_resource(self, resource: Resource) -> None:
-        deleted_resource = self.resourcEntities.pop(resource.id, False)
+        deleted_resource = self.resource_entities.pop(resource.id, False)
         if not deleted_resource:
             print(f"remove_resource(): Resource: {resource.id} not found")
 
     def remove_task(self, task: Task) -> None:
-        deleted_task = self.taskEntities.pop(task.id, False)
+        deleted_task = self.task_entities.pop(task.id, False)
         if not deleted_task:
             print(f"remove_task(): Task: {task.id} not found")
 
     # Get counts
     def get_station_count(self) -> int:
-        return len(self.stationEntities)
+        return len(self.station_entities)
 
     def get_resource_count(self) -> int:
-        return len(self.resourcEntities)
+        return len(self.resource_entities)
 
     def get_task_count(self) -> int:
-        return len(self.taskEntities)
+        return len(self.task_entities)

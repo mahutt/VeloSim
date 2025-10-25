@@ -58,13 +58,13 @@ class SimulatorController:
         self.clock = Clock(simEnv)
 
         # Unpack InputParameter object to populate entity lists
-        self.stationEntities: Dict[int, Station] = (
+        self.station_entities: Dict[int, Station] = (
             inputParameters.get_station_entities()
         )
-        self.resourceEntities: Dict[int, Resource] = (
+        self.resource_entities: Dict[int, Resource] = (
             inputParameters.get_resource_entities()
         )
-        self.taskEntities: Dict[int, Task] = inputParameters.get_task_entities()
+        self.task_entities: Dict[int, Task] = inputParameters.get_task_entities()
 
         # Initialize frame counter
         self.frameCounter: int = 0
@@ -93,20 +93,20 @@ class SimulatorController:
         self.realTimeDriver.set_real_time_factor(factor)
 
     def get_task_by_id(self, task_id: int) -> Optional[Task]:
-        return self.taskEntities.get(task_id)
+        return self.task_entities.get(task_id)
 
     def get_resource_by_id(self, resource_id: int) -> Optional[Resource]:
-        return self.resourceEntities.get(resource_id)
+        return self.resource_entities.get(resource_id)
 
     def get_station_by_id(self, station_id: int) -> Optional[Station]:
-        return self.stationEntities.get(station_id)
+        return self.station_entities.get(station_id)
 
     def add_task(self, task: Task) -> None:
         task_id = task.get_task_id()
         found_task = self.get_task_by_id(task_id)
 
         if found_task is None:
-            self.taskEntities[task_id] = task
+            self.task_entities[task_id] = task
         else:  # task with same id exists already
             raise Exception(f"Task with id {task_id} already exists")
 
@@ -177,7 +177,7 @@ class SimulatorController:
 
     def create_diff_frame(self) -> Frame:
         tasks = []
-        for task in self.taskEntities.values():
+        for task in self.task_entities.values():
             if task.has_updated:
                 station = task.get_station()
                 assigned_resource = task.get_assigned_resource()
@@ -204,12 +204,12 @@ class SimulatorController:
                 "station_tasks": [task.to_dict() for task in station.tasks],
                 "task_count": station.get_task_count(),
             }
-            for station in self.stationEntities.values()
+            for station in self.station_entities.values()
             if station.has_updated
         ]
 
         resources = []
-        for resource in self.resourceEntities.values():
+        for resource in self.resource_entities.values():
             if resource.has_updated:
                 in_progress_task = resource.get_in_progress_task()
                 resources.append(
@@ -247,7 +247,7 @@ class SimulatorController:
 
     def create_key_frame(self) -> Frame:
         tasks = []
-        for task in self.taskEntities.values():
+        for task in self.task_entities.values():
             station = task.get_station()
             assigned_resource = task.get_assigned_resource()
             tasks.append(
@@ -271,11 +271,11 @@ class SimulatorController:
                 "station_tasks": [task.to_dict() for task in station.tasks],
                 "task_count": station.get_task_count(),
             }
-            for station in self.stationEntities.values()
+            for station in self.station_entities.values()
         ]
 
         resources = []
-        for resource in self.resourceEntities.values():
+        for resource in self.resource_entities.values():
             in_progress_task = resource.get_in_progress_task()
             resources.append(
                 {
