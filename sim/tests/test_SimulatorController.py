@@ -225,10 +225,10 @@ def test_create_key_frame(simulator_controller: SimulatorController) -> None:
 
 def test_create_diff_frame(simulator_controller: SimulatorController) -> None:
     """Test that create_diff_frame generates a frame with only updated entities."""
-    # Mark one entity as updated
-    simulator_controller.stationEntities[0].has_updated = True
-    simulator_controller.taskEntities[0].has_updated = True
-    simulator_controller.resourceEntities[0].has_updated = True
+    # Mark one entity as updated (using ID keys instead of indices)
+    simulator_controller.stationEntities[1].has_updated = True
+    simulator_controller.taskEntities[1].has_updated = True
+    simulator_controller.resourceEntities[1].has_updated = True
 
     frame = simulator_controller.create_diff_frame()
 
@@ -296,8 +296,8 @@ def test_emit_frame_without_provided_frame_diff_frame(
     # Set frame counter to non-multiple of keyframe frequency
     simulator_controller.frameCounter = 30  # Should create diff frame
 
-    # Mark some entities as updated
-    simulator_controller.stationEntities[0].has_updated = True
+    # Mark some entities as updated (using ID keys instead of indices)
+    simulator_controller.stationEntities[1].has_updated = True
 
     simulator_controller.emit_frame()
 
@@ -350,7 +350,7 @@ def test_add_task_success(
     """Test add_task functionality"""
     # Arrange
     task_id = 3
-    station1 = simulator_controller.stationEntities[0]
+    station1 = simulator_controller.stationEntities[1]  # Use ID key instead of index
     new_task = BatterySwapTask(env, task_id, station1)
 
     # Act
@@ -358,7 +358,7 @@ def test_add_task_success(
 
     # Assert
     assert simulator_controller.get_task_by_id(task_id) is not None
-    assert new_task in simulator_controller.taskEntities
+    assert new_task in simulator_controller.taskEntities.values()
 
 
 def test_add_task_fail(
@@ -367,14 +367,14 @@ def test_add_task_fail(
     """Test add_task functionality with existent task id"""
     # Arrange
     task_id = 2
-    station1 = simulator_controller.stationEntities[0]
+    station1 = simulator_controller.stationEntities[1]  # Use ID key instead of index
     new_task = BatterySwapTask(env, task_id, station1)
 
     # Act and Assert
     with pytest.raises(Exception, match=f"Task with id {task_id} already exists"):
         simulator_controller.add_task(new_task)
 
-    assert new_task not in simulator_controller.taskEntities
+    assert new_task not in simulator_controller.taskEntities.values()
 
 
 def test_assign_task_to_resource_success(
@@ -389,8 +389,10 @@ def test_assign_task_to_resource_success(
     simulator_controller.assign_task_to_resource(task_id, resource_id)
 
     # Assert
-    task = simulator_controller.taskEntities[0]
-    resource = simulator_controller.resourceEntities[0]
+    task = simulator_controller.get_task_by_id(task_id)
+    resource = simulator_controller.get_resource_by_id(resource_id)
+    assert task is not None
+    assert resource is not None
     assert task.get_assigned_resource() == resource
     assert resource.get_task_list()[0] == task
 
@@ -437,8 +439,10 @@ def test_unassign_task_from_resource_success(
     simulator_controller.unassign_task_from_resource(task_id, resource_id)
 
     # Assert
-    task = simulator_controller.taskEntities[0]
-    resource = simulator_controller.resourceEntities[0]
+    task = simulator_controller.get_task_by_id(task_id)
+    resource = simulator_controller.get_resource_by_id(resource_id)
+    assert task is not None
+    assert resource is not None
     assert task.get_assigned_resource() is None
     assert resource.get_task_count() == 0
 
