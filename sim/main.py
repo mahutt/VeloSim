@@ -78,7 +78,7 @@ params = InputParameter(
     resource_entities=[resource1, resource2],
     task_entities=[task1, task2],
     real_time_factor=1.0,  # Real-time simulation
-    key_frame_freq=3000,  # Key frame every 3 frames
+    key_frame_freq=3000,  # Key frame every 3000 frames
 )
 
 
