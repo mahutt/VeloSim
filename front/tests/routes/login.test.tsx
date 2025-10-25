@@ -37,6 +37,22 @@ vi.mock('axios', () => ({
   },
 }));
 
+vi.mock('~/api', () => {
+  return {
+    default: {
+      get: vi.fn(() =>
+        Promise.resolve({
+          data: {
+            id: 1,
+            username: 'demo_user',
+            is_admin: true,
+          },
+        })
+      ),
+    },
+  };
+});
+
 // Mock the login-alert component
 vi.mock('~/components/login/login-alert.tsx', () => ({
   default: ({ code }: { code: number }) => (
@@ -46,6 +62,7 @@ vi.mock('~/components/login/login-alert.tsx', () => ({
 
 describe('Login Page', () => {
   const mockSetUser = vi.fn();
+  const mockRefreshUser = vi.fn();
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -61,6 +78,7 @@ describe('Login Page', () => {
           loading: false,
           setLoading: vi.fn(),
           logout: vi.fn(),
+          refreshUser: mockRefreshUser,
         }}
       >
         <Signin />
@@ -102,11 +120,7 @@ describe('Login Page', () => {
 
     await waitFor(() => {
       expect(sessionStorage.getItem(TOKEN_STORAGE_KEY)).toBe('test-token');
-      expect(mockSetUser).toHaveBeenCalledWith({
-        id: 1,
-        username: 'testuser',
-        is_admin: true,
-      });
+      expect(mockRefreshUser).toHaveBeenCalled();
     });
   });
 

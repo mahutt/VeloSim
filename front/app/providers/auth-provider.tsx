@@ -29,6 +29,7 @@ import React, {
   type ReactNode,
 } from 'react';
 import { useNavigate } from 'react-router';
+import api from '~/api';
 import { TOKEN_STORAGE_KEY } from '~/contants';
 import type { User } from '~/types';
 
@@ -38,6 +39,7 @@ export interface AuthState {
   loading: boolean;
   setLoading: React.Dispatch<React.SetStateAction<boolean>>;
   logout: () => void;
+  refreshUser: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthState | undefined>(undefined);
@@ -51,12 +53,23 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    if (sessionStorage.getItem(TOKEN_STORAGE_KEY)) {
-      // TODO: Refresh user info once an API endpoint is available
-      setUser({ id: 1, username: 'demo_user', is_admin: true });
+  const refreshUser = async () => {
+    setLoading(true);
+    try {
+      const response = await api.get<User>('/users/me');
+      setUser(response.data);
+    } catch {
+      setUser(null);
     }
     setLoading(false);
+  };
+
+  useEffect(() => {
+    if (sessionStorage.getItem(TOKEN_STORAGE_KEY)) {
+      refreshUser();
+    } else {
+      setLoading(false);
+    }
   }, []);
 
   const logout = () => {
@@ -71,6 +84,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     loading,
     setLoading,
     logout,
+    refreshUser,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
