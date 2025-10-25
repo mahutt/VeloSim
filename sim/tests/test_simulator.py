@@ -305,13 +305,13 @@ def test_add_task_to_sim_success(
     if sim_info is not None:
         sim_controller = sim_info["simController"]
 
-        # taskEntities is a dict keyed by task id
-        assert len(sim_controller.taskEntities) != 0
+        # task_entities is a dict keyed by task id
+        assert len(sim_controller.task_entities) != 0
         assert sim_controller.get_task_by_id(3) is not None
 
     # Cleanup: remove the task from the controller if present
     if sim_info is not None:
-        sim_controller.taskEntities.pop(3, None)
+        sim_controller.task_entities.pop(3, None)
     sim.stop(a)
 
 
