@@ -46,7 +46,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     try:
         db = next(get_db())
         try:
-            simulation_service.stop_all_simulations(db)
+            simulation_service.stop_all_simulations_system(db)
         finally:
             db.close()
     except Exception as e:

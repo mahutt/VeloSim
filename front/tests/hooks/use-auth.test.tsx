@@ -64,6 +64,7 @@ test('useAuth returns context when used within AuthProvider', () => {
     setUser: expect.any(Function),
     setLoading: expect.any(Function),
     logout: expect.any(Function),
+    refreshUser: expect.any(Function),
   });
 });
 

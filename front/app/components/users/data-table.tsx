@@ -41,6 +41,17 @@ import {
 } from '~/components/ui/table';
 import { Input } from '~/components/ui/input';
 import { Button } from '../ui/button';
+import ResetPasswordDialog from '../reset-password-dialog';
+import { useState } from 'react';
+import type { User } from '~/types';
+
+declare module '@tanstack/react-table' {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  interface TableMeta<TData> {
+    setResetPasswordUser: (u: User) => void;
+    setShowResetPasswordDialog: (open: boolean) => void;
+  }
+}
 
 interface DataTableProps<TData, TValue> {
   columns: ColumnDef<TData, TValue>[];
@@ -51,12 +62,19 @@ export function DataTable<TData, TValue>({
   columns,
   data,
 }: DataTableProps<TData, TValue>) {
+  const [showResetPasswordDialog, setShowResetPasswordDialog] = useState(false);
+  const [resetPasswordUser, setResetPasswordUser] = useState<User | null>(null);
+
   const table = useReactTable({
     data,
     columns,
     getCoreRowModel: getCoreRowModel(),
     getPaginationRowModel: getPaginationRowModel(),
     getFilteredRowModel: getFilteredRowModel(),
+    meta: {
+      setResetPasswordUser,
+      setShowResetPasswordDialog,
+    },
   });
 
   return (
@@ -141,6 +159,13 @@ export function DataTable<TData, TValue>({
           Next
         </Button>
       </div>
+      {resetPasswordUser && (
+        <ResetPasswordDialog
+          open={showResetPasswordDialog}
+          onOpenChange={setShowResetPasswordDialog}
+          targetUser={resetPasswordUser}
+        />
+      )}
     </div>
   );
 }

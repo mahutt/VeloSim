@@ -24,17 +24,22 @@ SOFTWARE.
 
 import asyncio
 from typing import Dict, List
-from fastapi import APIRouter, HTTPException, WebSocket, WebSocketDisconnect, Depends
+from fastapi import (
+    APIRouter,
+    HTTPException,
+    WebSocket,
+    WebSocketDisconnect,
+    Depends,
+)
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
+from back.auth.dependency import get_user_id
+from back.exceptions import VelosimPermissionError, ItemNotFoundError
 from sim.entities.frame import Frame
 from sim.utils.subscriber import Subscriber
 from back.services.simulation_service import simulation_service
 from back.database.session import get_db
-
-# Auth temporarily disabled - CurrentUser not used
-# from back.api.dependencies import CurrentUser
 
 router = APIRouter(prefix="/simulation", tags=["simulation"])
 
@@ -71,8 +76,8 @@ class WebSocketSubscriber(Subscriber):
         """Send frame data over WebSocket."""
         try:
             await self.websocket.send_json(frame_data)
-        except Exception as e:
-            print(f"Error sending frame over WebSocket: {e}")
+        except Exception as err:
+            print(f"Error sending frame over WebSocket: {err}")
 
 
 class SimulationResponse(BaseModel):
@@ -91,79 +96,99 @@ class SimulationListResponse(BaseModel):
 
 @router.post("/start", response_model=SimulationResponse)
 async def start_simulation(
-    # Auth temporarily disabled - default to user_id=1
-    # current_user: CurrentUser,
     db: Session = Depends(get_db),
+    requesting_user: int = Depends(get_user_id),
 ) -> SimulationResponse:
-    """
-    Start a new simulation and return its ID.
-
-    Auth temporarily disabled - uses default user_id=1.
-    """
+    """Start a new simulation and return its ID."""
     try:
-        # Auth temporarily disabled - use default user_id=1
-        user_id = 1
-        sim_id, db_id = simulation_service.start_simulation(db, user_id)
+        sim_id, db_id = simulation_service.start_simulation(db, requesting_user)
         return SimulationResponse(sim_id=sim_id, db_id=db_id, status="started")
-    except Exception as e:
-        raise HTTPException(
-            status_code=500, detail=f"Failed to start simulation: {str(e)}"
-        )
+    except VelosimPermissionError as err:
+        raise HTTPException(status_code=403, detail=str(err))
+    except Exception as err:
+        raise HTTPException(status_code=500, detail=str(err))
 
 
 @router.post("/stop/{sim_id}", response_model=SimulationResponse)
 async def stop_simulation(
     sim_id: str,
-    # Auth temporarily disabled - default to user_id=1
-    # current_user: CurrentUser,
     db: Session = Depends(get_db),
+    requesting_user: int = Depends(get_user_id),
 ) -> SimulationResponse:
-    """
-    Stop a specific simulation.
+    """Stop a specific simulation."""
+    try:
+        simulation_service.stop_simulation(db, sim_id, requesting_user)
+        return SimulationResponse(sim_id=sim_id, db_id=-1, status="stopped")
+    except VelosimPermissionError as err:
+        raise HTTPException(status_code=403, detail=str(err))
+    except ItemNotFoundError as err:
+        raise HTTPException(status_code=404, detail=str(err))
+    except Exception as err:
+        raise HTTPException(status_code=500, detail=str(err))
 
-    Auth temporarily disabled - uses default user_id=1.
-    """
-    # Auth temporarily disabled - use default user_id=1
-    user_id = 1
-    success = simulation_service.stop_simulation(db, sim_id, user_id)
-    if not success:
-        raise HTTPException(
-            status_code=404,
-            detail="Simulation not found or you are not authorized to stop it",
-        )
-    return SimulationResponse(sim_id=sim_id, db_id=-1, status="stopped")
+
+@router.get("/my", response_model=SimulationListResponse)
+async def list_my_simulations(
+    db: Session = Depends(get_db), requesting_user: int = Depends(get_user_id)
+) -> SimulationListResponse:
+    """List active simulations simulations owned by the requesting user."""
+    try:
+        sims = simulation_service.get_active_user_simulations(db, requesting_user)
+        return SimulationListResponse(active_simulations=sims)
+    except VelosimPermissionError as err:
+        raise HTTPException(status_code=403, detail=str(err))
 
 
 @router.get("/list", response_model=SimulationListResponse)
-async def list_simulations() -> SimulationListResponse:
-    """List all active simulations."""
-    active = simulation_service.get_active_simulations()
-    return SimulationListResponse(active_simulations=active)
+async def list_all_simulations(
+    db: Session = Depends(get_db), requesting_user: int = Depends(get_user_id)
+) -> SimulationListResponse:
+    """List all active simulations globally (admin-only)."""
+    try:
+        sims = simulation_service.get_all_active_simulations(db, requesting_user)
+        return SimulationListResponse(active_simulations=sims)
+    except VelosimPermissionError as err:
+        raise HTTPException(status_code=403, detail=str(err))
 
 
 @router.get("/status/{sim_id}")
-async def get_simulation_status(sim_id: str) -> Dict[str, str]:
-    """Get status of a specific simulation."""
-    status = simulation_service.get_simulation_status(sim_id)
-    if status == "not_found":
-        raise HTTPException(status_code=404, detail="Simulation not found")
-    return {"sim_id": sim_id, "status": status}
+async def get_simulation_status(
+    sim_id: str,
+    db: Session = Depends(get_db),
+    requesting_user: int = Depends(get_user_id),
+) -> Dict[str, str]:
+    """Get the status of a specific simulation."""
+    try:
+        status = simulation_service.get_simulation_status(db, sim_id, requesting_user)
+        return {"sim_id": sim_id, "status": status}
+    except ItemNotFoundError as err:
+        raise HTTPException(status_code=404, detail=str(err))
+    except VelosimPermissionError as err:
+        raise HTTPException(status_code=403, detail=str(err))
+    except Exception as err:
+        raise HTTPException(status_code=500, detail=str(err))
 
 
 @router.post("/stop-all")
 async def stop_all_simulations(
-    # Auth temporarily disabled
-    # current_user: CurrentUser,
     db: Session = Depends(get_db),
+    requesting_user: int = Depends(get_user_id),
 ) -> Dict[str, str]:
     """
     Stop all running simulations.
 
-    Auth temporarily disabled - this is an admin operation that stops
-    all simulations and cleans up database records.
+    This is an admin-only operation that stops all simulations and cleans up
+    database records.
     """
-    simulation_service.stop_all_simulations(db)
-    return {"message": "All simulations stopped"}
+    try:
+        simulation_service.stop_all_simulations(db, requesting_user)
+        return {"message": "All simulations stopped"}
+    except VelosimPermissionError as err:
+        raise HTTPException(status_code=403, detail=str(err))
+    except Exception as err:
+        raise HTTPException(
+            status_code=500, detail=f"Failed to stop all simulations: {str(err)}"
+        )
 
 
 @router.websocket("/stream/{sim_id}")
@@ -177,8 +202,7 @@ async def websocket_simulation_stream(websocket: WebSocket, sim_id: str) -> None
     await websocket.accept()
 
     # Check if simulation exists
-    status = simulation_service.get_simulation_status(sim_id)
-    if status == "not_found":
+    if sim_id not in simulation_service.active_simulations:
         await websocket.send_json({"error": "Simulation not found", "sim_id": sim_id})
         await websocket.close(code=4004, reason="Simulation not found")
         return
@@ -225,8 +249,8 @@ async def websocket_simulation_stream(websocket: WebSocket, sim_id: str) -> None
 
     except WebSocketDisconnect:
         print(f"WebSocket disconnected for sim {sim_id}")
-    except Exception as e:
-        print(f"WebSocket error for sim {sim_id}: {e}")
+    except Exception as err:
+        print(f"WebSocket error for sim {sim_id}: {err}")
     finally:
         # Detach subscriber when connection closes
         emitter.detach(subscriber)

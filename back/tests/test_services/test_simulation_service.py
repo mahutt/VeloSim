@@ -24,6 +24,7 @@ SOFTWARE.
 
 import pytest
 from sqlalchemy.orm import Session
+from back.exceptions import VelosimPermissionError, ItemNotFoundError
 from back.models.user import User
 from back.services.simulation_service import SimulationService
 from back.crud.sim_instance import sim_instance_crud
@@ -31,7 +32,10 @@ from back.crud.sim_instance import sim_instance_crud
 
 @pytest.fixture
 def test_user(db: Session) -> User:
-    """Create a test user."""
+    """Create a normal test user (non-admin)."""
+    user = db.query(User).filter(User.username == "testuser").first()
+    if user:
+        return user
     user = User(
         username="testuser",
         password_hash="hashedpassword",
@@ -46,11 +50,32 @@ def test_user(db: Session) -> User:
 
 @pytest.fixture
 def test_user2(db: Session) -> User:
-    """Create a second test user."""
+    """Create a second normal test user (non-admin)."""
+    user = db.query(User).filter(User.username == "testuser2").first()
+    if user:
+        return user
     user = User(
         username="testuser2",
         password_hash="hashedpassword2",
         is_admin=False,
+        is_enabled=True,
+    )
+    db.add(user)
+    db.commit()
+    db.refresh(user)
+    return user
+
+
+@pytest.fixture
+def admin_user(db: Session) -> User:
+    """Create an admin test user."""
+    user = db.query(User).filter(User.username == "adminuser").first()
+    if user:
+        return user
+    user = User(
+        username="adminuser",
+        password_hash="hashedpassword3",
+        is_admin=True,
         is_enabled=True,
     )
     db.add(user)
@@ -68,70 +93,55 @@ def simulation_service() -> SimulationService:
 class TestSimulationService:
     """Tests for SimulationService."""
 
-    def test_start_simulation(
+    def test_get_requesting_user_not_found(
+        self, db: Session, simulation_service: SimulationService
+    ) -> None:
+        """Fetching a non-existent user should raise VelosimPermissionError."""
+        with pytest.raises(VelosimPermissionError, match="Requesting user not found."):
+            simulation_service._get_requesting_user(db, 99999)  # ID does not exist
+
+    def test_get_requesting_user_disabled(
+        self, db: Session, simulation_service: SimulationService, test_user: User
+    ) -> None:
+        """Fetching a disabled user should raise VelosimPermissionError."""
+        # Disable the user
+        test_user.is_enabled = False
+        db.commit()
+
+        with pytest.raises(
+            VelosimPermissionError, match="Requesting user is disabled."
+        ):
+            simulation_service._get_requesting_user(db, test_user.id)
+
+        # Re-enable for other tests
+        test_user.is_enabled = True
+        db.commit()
+
+    def test_start_and_stop_simulation(
         self, db: Session, test_user: User, simulation_service: SimulationService
     ) -> None:
-        """Test starting a simulation creates database record."""
+        """Normal user starts and stops a simulation."""
+        # Start simulation
         sim_id, db_id = simulation_service.start_simulation(db, test_user.id)
-
-        # Verify sim_id is returned
-        assert sim_id is not None
-        assert isinstance(sim_id, str)
-        assert db_id > 0
+        assert sim_id in simulation_service.active_simulations
 
         # Verify database record was created
-        sim_instance = sim_instance_crud.get(db, db_id)
-        assert sim_instance is not None
-        assert sim_instance.user_id == test_user.id
-
-        # Verify simulation is tracked in service
-        assert sim_id in simulation_service.active_simulations
-        assert simulation_service.active_simulations[sim_id]["db_id"] == db_id
-        assert simulation_service.active_simulations[sim_id]["status"] == "running"
-
-    def test_start_multiple_simulations(
-        self, db: Session, test_user: User, simulation_service: SimulationService
-    ) -> None:
-        """Test starting multiple simulations."""
-        sim_id1, db_id1 = simulation_service.start_simulation(db, test_user.id)
-        sim_id2, db_id2 = simulation_service.start_simulation(db, test_user.id)
-
-        assert sim_id1 != sim_id2
-        assert db_id1 != db_id2
-
-        # Verify both are tracked
-        assert len(simulation_service.active_simulations) == 2
-        assert sim_id1 in simulation_service.active_simulations
-        assert sim_id2 in simulation_service.active_simulations
-
-        # Verify both have database records
-        assert sim_instance_crud.get(db, db_id1) is not None
-        assert sim_instance_crud.get(db, db_id2) is not None
-
-    def test_stop_simulation(
-        self, db: Session, test_user: User, simulation_service: SimulationService
-    ) -> None:
-        """Test stopping a simulation removes database record."""
-        sim_id, db_id = simulation_service.start_simulation(db, test_user.id)
+        assert sim_instance_crud.get(db, db_id) is not None
 
         # Stop the simulation
         success = simulation_service.stop_simulation(db, sim_id, test_user.id)
-
         assert success is True
         assert sim_id not in simulation_service.active_simulations
 
         # Verify database record was deleted
-        sim_instance = sim_instance_crud.get(db, db_id)
-        assert sim_instance is None
+        assert sim_instance_crud.get(db, db_id) is None
 
     def test_stop_simulation_not_found(
         self, db: Session, test_user: User, simulation_service: SimulationService
     ) -> None:
-        """Test stopping a simulation that doesn't exist."""
-        success = simulation_service.stop_simulation(
-            db, "nonexistent-sim-id", test_user.id
-        )
-        assert success is False
+        """Stopping a non-existent simulation raises ItemNotFoundError."""
+        with pytest.raises(ItemNotFoundError):
+            simulation_service.stop_simulation(db, "nonexistent-sim-id", test_user.id)
 
     def test_stop_simulation_unauthorized(
         self,
@@ -145,53 +155,93 @@ class TestSimulationService:
         sim_id, db_id = simulation_service.start_simulation(db, test_user.id)
 
         # User 2 tries to stop it
-        success = simulation_service.stop_simulation(db, sim_id, test_user2.id)
+        with pytest.raises(VelosimPermissionError):
+            simulation_service.stop_simulation(db, sim_id, test_user2.id)
 
-        assert success is False
         # Verify simulation is still running
         assert sim_id in simulation_service.active_simulations
         assert sim_instance_crud.get(db, db_id) is not None
 
-    def test_get_active_simulations(
+    def test_get_active_user_simulations(
         self, db: Session, test_user: User, simulation_service: SimulationService
     ) -> None:
-        """Test getting list of active simulation IDs."""
+        """Retrieve only the requesting user's simulations."""
         # Start two simulations
         sim_id1, _ = simulation_service.start_simulation(db, test_user.id)
         sim_id2, _ = simulation_service.start_simulation(db, test_user.id)
 
-        active_sims = simulation_service.get_active_simulations()
-
+        active_sims = simulation_service.get_active_user_simulations(db, test_user.id)
         assert len(active_sims) == 2
         assert sim_id1 in active_sims
         assert sim_id2 in active_sims
 
+    def test_get_all_active_simulations_admin(
+        self,
+        db: Session,
+        test_user: User,
+        admin_user: User,
+        simulation_service: SimulationService,
+    ) -> None:
+        """Admin users can list all active simulations."""
+        # Start two simulations
+        sim_id1, _ = simulation_service.start_simulation(db, test_user.id)
+        sim_id2, _ = simulation_service.start_simulation(db, test_user.id)
+
+        # Admin lists all active simulations
+        sims = simulation_service.get_all_active_simulations(db, admin_user.id)
+        assert sim_id1 in sims
+        assert sim_id2 in sims
+        assert len(sims) == 2
+
+    def test_get_all_active_simulations_non_admin(
+        self, db: Session, test_user: User, simulation_service: SimulationService
+    ) -> None:
+        """Non-admin users cannot list all active simulations."""
+        # Start a simulation as a normal user
+        sim_id, _ = simulation_service.start_simulation(db, test_user.id)
+
+        # Attempt to list all active simulations as the same non-admin user
+        with pytest.raises(VelosimPermissionError) as exc_info:
+            simulation_service.get_all_active_simulations(db, test_user.id)
+
+        assert "Admin privileges required" in str(exc_info.value)
+
+        # Verify simulation is still active
+        active_sims = simulation_service.get_active_user_simulations(db, test_user.id)
+        assert sim_id in active_sims
+
     def test_get_simulation_status(
         self, db: Session, test_user: User, simulation_service: SimulationService
     ) -> None:
-        """Test getting status of a specific simulation."""
+        """Test getting status of a user's specific simulation."""
         sim_id, _ = simulation_service.start_simulation(db, test_user.id)
 
-        status = simulation_service.get_simulation_status(sim_id)
+        status = simulation_service.get_simulation_status(db, sim_id, test_user.id)
         assert status == "running"
 
     def test_get_simulation_status_not_found(
-        self, simulation_service: SimulationService
-    ) -> None:
-        """Test getting status of a simulation that doesn't exist."""
-        status = simulation_service.get_simulation_status("nonexistent-sim-id")
-        assert status == "not_found"
-
-    def test_stop_all_simulations(
         self, db: Session, test_user: User, simulation_service: SimulationService
     ) -> None:
-        """Test stopping all simulations."""
-        # Start two simulations
+        """Non-existent simulation status raises error."""
+        with pytest.raises(ItemNotFoundError):
+            simulation_service.get_simulation_status(
+                db, "nonexistent-sim-id", test_user.id
+            )
+
+    def test_stop_all_simulations_admin(
+        self,
+        db: Session,
+        test_user: User,
+        admin_user: User,
+        simulation_service: SimulationService,
+    ) -> None:
+        """Test that an admin can stop all running simulations."""
+        # Start two simulations as a non-admin user
         sim_id1, db_id1 = simulation_service.start_simulation(db, test_user.id)
         sim_id2, db_id2 = simulation_service.start_simulation(db, test_user.id)
 
-        # Stop all
-        simulation_service.stop_all_simulations(db)
+        # Admin stops all simulations
+        simulation_service.stop_all_simulations(db, admin_user.id)
 
         # Verify all simulations are stopped
         assert len(simulation_service.active_simulations) == 0
@@ -200,19 +250,41 @@ class TestSimulationService:
         assert sim_instance_crud.get(db, db_id1) is None
         assert sim_instance_crud.get(db, db_id2) is None
 
+    def test_stop_all_simulations_non_admin(
+        self, db: Session, test_user: User, simulation_service: SimulationService
+    ) -> None:
+        """Non-admin attempting to stop all simulations fails."""
+        # Start a simulation
+        sim_id, _ = simulation_service.start_simulation(db, test_user.id)
+
+        # Non-admin cannot stop all simulations
+        with pytest.raises(VelosimPermissionError):
+            simulation_service.stop_all_simulations(db, test_user.id)
+
     def test_simulation_lifecycle(
         self, db: Session, test_user: User, simulation_service: SimulationService
     ) -> None:
         """Test complete simulation lifecycle: start -> check status -> stop."""
         # Start
         sim_id, db_id = simulation_service.start_simulation(db, test_user.id)
-        assert sim_id in simulation_service.get_active_simulations()
-        assert simulation_service.get_simulation_status(sim_id) == "running"
-        assert sim_instance_crud.get(db, db_id) is not None
+
+        # Verify simulation is active
+        active_sims = simulation_service.get_active_user_simulations(db, test_user.id)
+        assert sim_id in active_sims
+
+        # Verify status
+        assert (
+            simulation_service.get_simulation_status(db, sim_id, test_user.id)
+            == "running"
+        )
 
         # Stop
-        success = simulation_service.stop_simulation(db, sim_id, test_user.id)
-        assert success is True
-        assert sim_id not in simulation_service.get_active_simulations()
-        assert simulation_service.get_simulation_status(sim_id) == "not_found"
-        assert sim_instance_crud.get(db, db_id) is None
+        simulation_service.stop_simulation(db, sim_id, test_user.id)
+
+        # Verify simulation no longer active
+        active_sims = simulation_service.get_active_user_simulations(db, test_user.id)
+        assert sim_id not in active_sims
+
+        # Verify status now raises error
+        with pytest.raises(ItemNotFoundError):
+            simulation_service.get_simulation_status(db, sim_id, test_user.id)

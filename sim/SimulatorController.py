@@ -25,7 +25,7 @@ SOFTWARE.
 from sim.RealTimeDriver import RealTimeDriver
 import simpy
 import threading
-from typing import List, Optional
+from typing import Optional, Dict
 from sim.entities.station import Station
 from sim.frame_emitter import FrameEmitter
 from sim.entities.frame import Frame
@@ -58,9 +58,13 @@ class SimulatorController:
         self.clock = Clock(simEnv)
 
         # Unpack InputParameter object to populate entity lists
-        self.stationEntities: List[Station] = inputParameters.get_station_entities()
-        self.resourceEntities: List[Resource] = inputParameters.get_resource_entities()
-        self.taskEntities: List[Task] = inputParameters.get_task_entities()
+        self.station_entities: Dict[int, Station] = (
+            inputParameters.get_station_entities()
+        )
+        self.resource_entities: Dict[int, Resource] = (
+            inputParameters.get_resource_entities()
+        )
+        self.task_entities: Dict[int, Task] = inputParameters.get_task_entities()
 
         # Initialize frame counter
         self.frameCounter: int = 0
@@ -92,6 +96,71 @@ class SimulatorController:
     def set_factor(self, factor: float) -> None:
         self.realTimeDriver.set_real_time_factor(factor)
 
+    def get_task_by_id(self, task_id: int) -> Optional[Task]:
+        return self.task_entities.get(task_id)
+
+    def get_resource_by_id(self, resource_id: int) -> Optional[Resource]:
+        return self.resource_entities.get(resource_id)
+
+    def get_station_by_id(self, station_id: int) -> Optional[Station]:
+        return self.station_entities.get(station_id)
+
+    def add_task(self, task: Task) -> None:
+        task_id = task.get_task_id()
+        found_task = self.get_task_by_id(task_id)
+
+        if found_task is None:
+            self.task_entities[task_id] = task
+        else:  # task with same id exists already
+            raise Exception(f"Task with id {task_id} already exists")
+
+    def assign_task_to_resource(self, task_id: int, resource_id: int) -> None:
+        found_task = self.get_task_by_id(task_id)
+        found_resource = self.get_resource_by_id(resource_id)
+
+        if found_task and found_resource:
+            found_resource.assign_task(found_task)
+        elif found_task is None:
+            raise Exception(f"Could not find task in sim with id: {task_id}")
+        else:
+            raise Exception(f"Could not find resource in sim with id: {resource_id}")
+
+    def unassign_task_from_resource(self, task_id: int, resource_id: int) -> None:
+        found_task = self.get_task_by_id(task_id)
+        found_resource = self.get_resource_by_id(resource_id)
+
+        if found_task and found_resource:
+            found_resource.unassign_task(found_task)
+        elif found_task is None:
+            raise Exception(f"Could not find task in sim with id: {task_id}")
+        else:
+            raise Exception(f"Could not find resource in sim with id: {resource_id}")
+
+    def reassign_task(
+        self, task_id: int, old_resource_id: int, new_resource_id: int
+    ) -> None:
+        try:
+            self.unassign_task_from_resource(task_id, old_resource_id)
+            self.assign_task_to_resource(task_id, new_resource_id)
+        except Exception as e:
+            error_message = str(e)
+            if str(task_id) in error_message:
+                raise Exception(
+                    f"Reassigning task failed as could not find task {task_id}"
+                )
+            elif str(old_resource_id) in error_message:
+                raise Exception(
+                    f"Reassigning failed as could not find resource {old_resource_id}"
+                )
+            elif str(new_resource_id) in error_message:
+                # Assigns back the task to its original resource as reassigning failed
+                self.assign_task_to_resource(task_id, old_resource_id)
+                raise Exception(
+                    f"Reassigning failed as could not find resource {new_resource_id}"
+                )
+            else:
+                raise Exception(f"Reassigning task failed due to error {e}")
+
     # First frame sent from back to front end with station data, etc
     def emit_initial_frame(self) -> None:
         frame = self.create_key_frame()
@@ -113,7 +182,7 @@ class SimulatorController:
 
     def create_diff_frame(self) -> Frame:
         tasks = []
-        for task in self.taskEntities:
+        for task in self.task_entities.values():
             if task.has_updated:
                 station = task.get_station()
                 assigned_resource = task.get_assigned_resource()
@@ -140,12 +209,12 @@ class SimulatorController:
                 "station_tasks": [task.to_dict() for task in station.tasks],
                 "task_count": station.get_task_count(),
             }
-            for station in self.stationEntities
+            for station in self.station_entities.values()
             if station.has_updated
         ]
 
         resources = []
-        for resource in self.resourceEntities:
+        for resource in self.resource_entities.values():
             if resource.has_updated:
                 in_progress_task = resource.get_in_progress_task()
                 resources.append(
@@ -183,7 +252,7 @@ class SimulatorController:
 
     def create_key_frame(self) -> Frame:
         tasks = []
-        for task in self.taskEntities:
+        for task in self.task_entities.values():
             station = task.get_station()
             assigned_resource = task.get_assigned_resource()
             tasks.append(
@@ -207,11 +276,11 @@ class SimulatorController:
                 "station_tasks": [task.to_dict() for task in station.tasks],
                 "task_count": station.get_task_count(),
             }
-            for station in self.stationEntities
+            for station in self.station_entities.values()
         ]
 
         resources = []
-        for resource in self.resourceEntities:
+        for resource in self.resource_entities.values():
             in_progress_task = resource.get_in_progress_task()
             resources.append(
                 {

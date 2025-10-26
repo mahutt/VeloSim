@@ -25,16 +25,22 @@ SOFTWARE.
 # sim/tests/test_simulator.py
 
 import time
+import simpy
 import threading
 from typing import List, Any
 import uuid
 
 import pytest
 from _pytest.capture import CaptureFixture
+from unittest.mock import patch, MagicMock
 
 # Import the module so we can monkeypatch its time.sleep
 from sim.entities.inputParameters import InputParameter
 from sim.entities.request_type import RequestType
+from sim.entities.station import Station
+from sim.entities.position import Position
+from sim.entities.resource import Resource
+from sim.entities.BatterySwapTask import BatterySwapTask
 
 import sim.RealTimeDriver as rtd_mod
 from sim.simulator import Simulator
@@ -62,6 +68,57 @@ class MockClock:
 @pytest.fixture
 def sim() -> Simulator:
     return Simulator()
+
+
+@pytest.fixture
+def simpy_env() -> simpy.Environment:
+    return simpy.Environment()
+
+
+@pytest.fixture
+def default_station(simpy_env: simpy.Environment) -> Station:
+    return Station(
+        simpy_env,
+        station_id=1,
+        name="Test Station",
+        position=Position([-73.5673, 45.5017]),
+    )
+
+
+@pytest.fixture()
+def input_params(simpy_env: simpy.Environment) -> InputParameter:
+    """Create a basic InputParameter with some test entities."""
+    params = InputParameter()
+
+    # Add test stations
+    station1 = Station(
+        env=simpy_env,
+        station_id=1,
+        name="Test Station 1",
+        position=Position([10.0, 20.0]),
+    )
+    station2 = Station(
+        env=simpy_env,
+        station_id=2,
+        name="Test Station 2",
+        position=Position([30.0, 40.0]),
+    )
+    params.add_station(station1)
+    params.add_station(station2)
+
+    # Add test resources
+    resource1 = Resource(env=simpy_env, resource_id=1, position=Position([15.0, 25.0]))
+    resource2 = Resource(env=simpy_env, resource_id=2, position=Position([35.0, 45.0]))
+    params.add_resource(resource1)
+    params.add_resource(resource2)
+
+    # Add test tasks using concrete BatterySwapTask
+    task1 = BatterySwapTask(env=simpy_env, task_id=1, station=station1)
+    task2 = BatterySwapTask(env=simpy_env, task_id=2, station=station2)
+    params.add_task(task1)
+    params.add_task(task2)
+
+    return params
 
 
 @pytest.fixture
@@ -107,6 +164,29 @@ def test_start_creates_thread_and_emits_output(
 
     # Thread should be gone from pool
     assert sim_id not in sim.thread_pool
+
+
+def test_start_with_non_existant_sim_id(sim: Simulator, fake_time: MockClock) -> None:
+    # Arrange
+    sim.initialize(params, subList)
+
+    # Act and Assert
+    with pytest.raises(
+        RuntimeError, match=r"Simulation some_id not found. Call initialize\(\) first."
+    ):
+        sim.start("some_id", 3600)
+
+
+def test_start_with_already_running_sim(sim: Simulator, fake_time: MockClock) -> None:
+    # Arrange
+    sim_id = sim.initialize(params, subList)
+    sim.start(sim_id, 3600)
+
+    # Act and Assert
+    with pytest.raises(RuntimeError, match=f"Simulation {sim_id} is already running."):
+        sim.start(sim_id, 3600)
+
+    sim.stop(sim_id)
 
 
 def test_stop_removes_thread_from_pool(
@@ -168,6 +248,207 @@ def test_send_request_not_implemented(sim: Simulator) -> None:
     request = RequestType()
     with pytest.raises(NotImplementedError):
         sim.send_request(request)
+
+
+def test_get_sim_by_id_success(
+    sim: Simulator,
+    fake_time: MockClock,
+) -> None:
+    # Arrange
+    a = sim.initialize(params, subList)
+    sim.start(a, 3600)
+
+    # Act
+    sim_info = sim.get_sim_by_id(a)
+
+    # Assert
+    assert sim_info is not None
+    assert sim_info["simController"] is not None
+
+    sim.stop(a)
+
+
+def test_get_sim_by_id_fail(
+    sim: Simulator,
+    fake_time: MockClock,
+) -> None:
+    # Arrange
+    a = sim.initialize(params, subList)
+    sim.start(a, 3600)
+
+    # Act and Assert
+    with pytest.raises(
+        Exception, match="Simulation random_id does not exist in the thread pool"
+    ):
+        sim.get_sim_by_id("random_id")
+
+    sim.stop(a)
+
+
+def test_add_task_to_sim_success(
+    sim: Simulator,
+    fake_time: MockClock,
+    simpy_env: simpy.Environment,
+    default_station: Station,
+) -> None:
+    # Arrange
+    a = sim.initialize(params, subList)
+    sim.start(a, 3600)
+
+    new_task = BatterySwapTask(simpy_env, 3, default_station)
+
+    # Act
+    sim.add_task_to_sim(a, new_task)
+
+    # Assert
+    sim_info = sim.get_sim_by_id(a)
+    if sim_info is not None:
+        sim_controller = sim_info["simController"]
+
+        # task_entities is a dict keyed by task id
+        assert len(sim_controller.task_entities) != 0
+        assert sim_controller.get_task_by_id(3) is not None
+
+    # Cleanup: remove the task from the controller if present
+    if sim_info is not None:
+        sim_controller.task_entities.pop(3, None)
+    sim.stop(a)
+
+
+@patch("builtins.print")
+def test_add_task_to_sim_fail(
+    mock_print: MagicMock,
+    sim: Simulator,
+    fake_time: MockClock,
+    simpy_env: simpy.Environment,
+    default_station: Station,
+) -> None:
+    # Arrange
+    a = sim.initialize(params, subList)
+    sim.start(a, 3600)
+
+    new_task = BatterySwapTask(simpy_env, 3, default_station)
+
+    # Act
+    sim.add_task_to_sim("random_id", new_task)
+
+    # Assert
+    error = "Simulation random_id does not exist in the thread pool"
+    mock_print.assert_called_once_with(f"Could not add task to sim due to: {error}")
+
+    sim.stop(a)
+
+
+def test_assign_task_to_resource_success(
+    sim: Simulator, input_params: InputParameter
+) -> None:
+    # Arrange
+    a = sim.initialize(input_params, subList)
+    sim.start(a, 3600)
+
+    # Act
+    sim.assign_task_to_resource(a, task_id=1, resource_id=1)
+
+    # Assert
+    sim_info = sim.get_sim_by_id(a)
+    if sim_info is not None:
+        sim_controller = sim_info["simController"]
+        task = sim_controller.get_task_by_id(1)
+        assert task is not None
+        resource = task.get_assigned_resource()
+        assert resource is not None
+        assert resource.id == 1
+
+
+@patch("builtins.print")
+def test_assign_task_to_resource_fail(
+    mock_print: MagicMock, sim: Simulator, input_params: InputParameter
+) -> None:
+    # Arrange
+    a = sim.initialize(input_params, subList)
+    sim.start(a, 3600)
+
+    # Act - Pass non-existent task_id
+    sim.assign_task_to_resource(a, task_id=6, resource_id=1)
+
+    # Assert
+    error = "Could not find task in sim with id: 6"
+    mock_print.assert_called_once_with(f"Could not assign task due to: {error}")
+
+
+def test_unassign_task_from_resource_success(
+    sim: Simulator, input_params: InputParameter
+) -> None:
+    # Arrange
+    a = sim.initialize(input_params, subList)
+    sim.start(a, 3600)
+    sim.assign_task_to_resource(a, task_id=1, resource_id=1)
+
+    # Act
+    sim.unassign_task_from_resource(a, task_id=1, resource_id=1)
+
+    # Assert
+    sim_info = sim.get_sim_by_id(a)
+    if sim_info is not None:
+        sim_controller = sim_info["simController"]
+        task = sim_controller.get_task_by_id(1)
+        assert task is not None
+        assert task.get_assigned_resource() is None
+
+
+@patch("builtins.print")
+def test_unassign_task_from_resource_fail(
+    mock_print: MagicMock, sim: Simulator, input_params: InputParameter
+) -> None:
+    # Arrange
+    a = sim.initialize(input_params, subList)
+    sim.start(a, 3600)
+
+    # Act - Pass non-existent task_id
+    sim.unassign_task_from_resource(a, task_id=6, resource_id=1)
+
+    # Assert
+    error = "Could not find task in sim with id: 6"
+    mock_print.assert_called_once_with(f"Could not unassign task due to: {error}")
+
+
+def test_reassign_task_success(sim: Simulator, input_params: InputParameter) -> None:
+    # Arrange
+    a = sim.initialize(input_params, subList)
+    sim.start(a, 3600)
+    sim.assign_task_to_resource(a, task_id=1, resource_id=1)
+
+    # Act
+    sim.reassign_task(a, task_id=1, old_resource_id=1, new_resource_id=2)
+
+    # Assert
+    sim_info = sim.get_sim_by_id(a)
+    if sim_info is not None:
+        sim_controller = sim_info["simController"]
+        task = sim_controller.get_task_by_id(1)
+        assert task is not None
+        old_resource = sim_controller.get_resource_by_id(1)
+        assert old_resource is not None
+        new_resource = sim_controller.get_resource_by_id(2)
+        assert new_resource is not None
+        assert task.get_assigned_resource() == new_resource
+        assert task not in old_resource.get_task_list()
+
+
+@patch("builtins.print")
+def test_reassign_task_fail(
+    mock_print: MagicMock, sim: Simulator, input_params: InputParameter
+) -> None:
+    # Arrange
+    a = sim.initialize(input_params, subList)
+    sim.start(a, 3600)
+
+    # Act - Pass non-existent task_id
+    sim.reassign_task(a, task_id=6, old_resource_id=1, new_resource_id=2)
+
+    # Assert
+    error = "Reassigning task failed as could not find task 6"
+    mock_print.assert_called_once_with(f"Error occurred: {error}")
 
 
 def test_get_stream_not_implemented(sim: Simulator) -> None:

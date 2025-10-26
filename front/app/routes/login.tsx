@@ -53,7 +53,7 @@ const loginFormSchema = z.object({
 });
 
 export default function Signin() {
-  const { setUser } = useAuth();
+  const { refreshUser } = useAuth();
   const [responseCode, setResponseCode] = useState<number | null>(null);
 
   const loginForm = useForm<z.infer<typeof loginFormSchema>>({
@@ -74,9 +74,7 @@ export default function Signin() {
         formData
       );
       sessionStorage.setItem(TOKEN_STORAGE_KEY, response.data.access_token);
-
-      // TODO: Let AuthProvider refresh user info once an API endpoint is available
-      setUser({ id: 1, username: data.username, is_admin: true });
+      refreshUser();
     } catch (e) {
       console.error('Login error', e);
       if (axios.isAxiosError(e) && e.status) {

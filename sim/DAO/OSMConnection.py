@@ -118,21 +118,24 @@ class OSMConnection(object):
 
     # gets nearest node according to passed coordinates
     def coordinates_to_nearest_node(self, lng: float, lat: float) -> Series:
-        # converts nodes to GeoDataFrame
+        # converts nodes to GeoDataFrame with WGS84 CRS (EPSG:4326)
         nodes_gdf = gpd.GeoDataFrame(
-            self._nodes, geometry=gpd.points_from_xy(self._nodes.lon, self._nodes.lat)
+            self._nodes,
+            geometry=gpd.points_from_xy(self._nodes.lon, self._nodes.lat),
+            crs="EPSG:4326",
         )
 
-        # creates point from coordinates
-        point = Point(lng, lat)
+        # creates point from coordinates in WGS84
+        point_gdf = gpd.GeoDataFrame([{"geometry": Point(lng, lat)}], crs="EPSG:4326")
 
         # find nearest node
         # gets node with the smallest distance from the input coordinates
-        projected_gdf = nodes_gdf.to_crs(
-            "EPSG:32633"
-        )  # project gdf to calculate accurately distance
-        nearest_node = projected_gdf.loc[
-            projected_gdf.geometry.distance(point).idxmin()
+        # project both to same CRS to calculate accurately distance
+        projected_nodes = nodes_gdf.to_crs("EPSG:32633")
+        projected_point = point_gdf.to_crs("EPSG:32633")
+
+        nearest_node = projected_nodes.loc[
+            projected_nodes.geometry.distance(projected_point.geometry.iloc[0]).idxmin()
         ]
 
         # nearest node in original geometry system

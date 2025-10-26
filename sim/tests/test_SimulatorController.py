@@ -141,9 +141,9 @@ def test_simulator_controller_initialization(
     assert simulator_controller.clock is not None
 
     # Check that entities are properly loaded from InputParameter
-    assert len(simulator_controller.stationEntities) == 2
-    assert len(simulator_controller.resourceEntities) == 2
-    assert len(simulator_controller.taskEntities) == 2
+    assert len(simulator_controller.station_entities) == 2
+    assert len(simulator_controller.resource_entities) == 2
+    assert len(simulator_controller.task_entities) == 2
 
     # Check keyframe frequency
     assert simulator_controller.keyframeFreq == 60  # default value
@@ -225,10 +225,10 @@ def test_create_key_frame(simulator_controller: SimulatorController) -> None:
 
 def test_create_diff_frame(simulator_controller: SimulatorController) -> None:
     """Test that create_diff_frame generates a frame with only updated entities."""
-    # Mark one entity as updated
-    simulator_controller.stationEntities[0].has_updated = True
-    simulator_controller.taskEntities[0].has_updated = True
-    simulator_controller.resourceEntities[0].has_updated = True
+    # Mark one entity as updated (using ID keys instead of indices)
+    simulator_controller.station_entities[1].has_updated = True
+    simulator_controller.task_entities[1].has_updated = True
+    simulator_controller.resource_entities[1].has_updated = True
 
     frame = simulator_controller.create_diff_frame()
 
@@ -296,9 +296,9 @@ def test_emit_frame_without_provided_frame_diff_frame(
     # Set frame counter to non-multiple of keyframe frequency
     simulator_controller.frameCounter = 30  # Should create diff frame
 
-    # Mark some entities as updated
-    simulator_controller.stationEntities[0].has_updated = True
-    simulator_controller.sim_time = 3600
+    # Mark some entities as updated (using ID keys instead of indices)
+    simulator_controller.station_entities[1].has_updated = True
+
     simulator_controller.emit_frame()
 
     # Check that a frame was emitted
@@ -342,6 +342,224 @@ def test_set_factor(simulator_controller: SimulatorController) -> None:
     ) as mock_set_factor:
         simulator_controller.set_factor(2.0)
         mock_set_factor.assert_called_once_with(2.0)
+
+
+def test_add_task_success(
+    env: simpy.Environment, simulator_controller: SimulatorController
+) -> None:
+    """Test add_task functionality"""
+    # Arrange
+    task_id = 3
+    station1 = simulator_controller.get_station_by_id(1)
+    new_task = BatterySwapTask(env, task_id, station1)
+
+    # Act
+    simulator_controller.add_task(new_task)
+
+    # Assert
+    assert simulator_controller.get_task_by_id(task_id) is not None
+    assert new_task in simulator_controller.task_entities.values()
+
+
+def test_add_task_fail(
+    env: simpy.Environment, simulator_controller: SimulatorController
+) -> None:
+    """Test add_task functionality with existent task id"""
+    # Arrange
+    task_id = 2
+    station1 = simulator_controller.get_station_by_id(1)
+    new_task = BatterySwapTask(env, task_id, station1)
+
+    # Act and Assert
+    with pytest.raises(Exception, match=f"Task with id {task_id} already exists"):
+        simulator_controller.add_task(new_task)
+
+    assert new_task not in simulator_controller.task_entities.values()
+
+
+def test_assign_task_to_resource_success(
+    simulator_controller: SimulatorController,
+) -> None:
+    """Test assign_task_to_resource functionality."""
+    # Arrange
+    task_id = 1
+    resource_id = 1
+
+    # Act
+    simulator_controller.assign_task_to_resource(task_id, resource_id)
+
+    # Assert
+    task = simulator_controller.get_task_by_id(task_id)
+    resource = simulator_controller.get_resource_by_id(resource_id)
+    assert task is not None
+    assert resource is not None
+    assert task.get_assigned_resource() == resource
+    assert resource.get_task_list()[0] == task
+
+
+def test_assign_task_to_resource_with_bad_task_id(
+    simulator_controller: SimulatorController,
+) -> None:
+    """Test assign_task_to_resource functionality with an invalid task_id."""
+    # Arrange
+    task_id = 6  # Non-existant id
+    resource_id = 1
+
+    # Act and Assert
+    with pytest.raises(
+        Exception, match=f"Could not find task in sim with id: {task_id}"
+    ):
+        simulator_controller.assign_task_to_resource(task_id, resource_id)
+
+
+def test_assign_task_to_resource_with_bad_resource_id(
+    simulator_controller: SimulatorController,
+) -> None:
+    """Test assign_task_to_resource functionality with an invalid resouruce_id."""
+    # Arrange
+    task_id = 1
+    resource_id = 6  # Non-existant id
+
+    # Act and Assert
+    with pytest.raises(
+        Exception, match=f"Could not find resource in sim with id: {resource_id}"
+    ):
+        simulator_controller.assign_task_to_resource(task_id, resource_id)
+
+
+def test_unassign_task_from_resource_success(
+    simulator_controller: SimulatorController,
+) -> None:
+    """Test unassign_task_from_resource functionality."""
+    # Arrange
+    task_id = 1
+    resource_id = 1
+
+    # Act
+    simulator_controller.unassign_task_from_resource(task_id, resource_id)
+
+    # Assert
+    task = simulator_controller.get_task_by_id(task_id)
+    resource = simulator_controller.get_resource_by_id(resource_id)
+    assert task is not None
+    assert resource is not None
+    assert task.get_assigned_resource() is None
+    assert resource.get_task_count() == 0
+
+
+def test_unassign_task_from_resource_with_bad_task_id(
+    simulator_controller: SimulatorController,
+) -> None:
+    """Test unassign_task_from_resource functionality with an invalid task_id."""
+    # Arrange
+    task_id = 6  # Non-existant id
+    resource_id = 1
+
+    # Act and Assert
+    with pytest.raises(
+        Exception, match=f"Could not find task in sim with id: {task_id}"
+    ):
+        simulator_controller.unassign_task_from_resource(task_id, resource_id)
+
+
+def test_unassign_task_from_resource_with_bad_resource_id(
+    simulator_controller: SimulatorController,
+) -> None:
+    """Test unassign_task_from_resource functionality with an invalid resource_id."""
+    # Arrange
+    task_id = 1
+    resource_id = 6  # Non-existant id
+
+    # Act and Assert
+    with pytest.raises(
+        Exception, match=f"Could not find resource in sim with id: {resource_id}"
+    ):
+        simulator_controller.unassign_task_from_resource(task_id, resource_id)
+
+
+def test_reassign_task_success(
+    simulator_controller: SimulatorController,
+) -> None:
+    """Test reassign_task functionality"""
+    # Arrange
+    task_id = 1
+    old_resource_id = 1
+    new_resource_id = 2
+
+    simulator_controller.assign_task_to_resource(task_id, old_resource_id)
+
+    # Act
+    simulator_controller.reassign_task(task_id, old_resource_id, new_resource_id)
+
+    # Assert
+    task = simulator_controller.get_task_by_id(task_id)
+    assert task is not None
+    old_resource = simulator_controller.get_resource_by_id(old_resource_id)
+    assert old_resource is not None
+    new_resource = simulator_controller.get_resource_by_id(new_resource_id)
+    assert new_resource is not None
+    assert task.get_assigned_resource() == new_resource
+    assert task in new_resource.get_task_list()
+    assert task not in old_resource.get_task_list()
+
+
+def test_reassign_task_fail_with_bad_task_id(
+    simulator_controller: SimulatorController,
+) -> None:
+    """Test reassign_task functionality with bad task_id"""
+    # Arrange
+    task_id = 6  # Non-existent task
+    old_resource_id = 1
+    new_resource_id = 2
+
+    # Act and Assert
+    with pytest.raises(
+        Exception, match=f"Reassigning task failed as could not find task {task_id}"
+    ):
+        simulator_controller.reassign_task(task_id, old_resource_id, new_resource_id)
+
+
+def test_reassign_task_fail_with_bad_old_resource_id(
+    simulator_controller: SimulatorController,
+) -> None:
+    """Test reassign_task functionality with bad old_resource_id"""
+    # Arrange
+    task_id = 1
+    old_resource_id = 6  # Non-existent resource
+    new_resource_id = 2
+
+    # Act and Assert
+    with pytest.raises(
+        Exception,
+        match=f"Reassigning failed as could not find resource {old_resource_id}",
+    ):
+        simulator_controller.reassign_task(task_id, old_resource_id, new_resource_id)
+
+
+def test_reassign_task_fail_with_bad_new_resource_id(
+    simulator_controller: SimulatorController,
+) -> None:
+    """Test reassign_task functionality with bad new_resource_id"""
+    # Arrange
+    task_id = 1
+    old_resource_id = 1
+    new_resource_id = 6  # Non-existent resource
+
+    simulator_controller.assign_task_to_resource(task_id, old_resource_id)
+
+    # Act and Assert
+    with pytest.raises(
+        Exception,
+        match=f"Reassigning failed as could not find resource {new_resource_id}",
+    ):
+        simulator_controller.reassign_task(task_id, old_resource_id, new_resource_id)
+
+    task = simulator_controller.get_task_by_id(task_id)
+    assert task is not None
+    old_resource = simulator_controller.get_resource_by_id(old_resource_id)
+    assert old_resource is not None
+    assert task.get_assigned_resource() == old_resource
+    assert task in old_resource.get_task_list()
 
 
 def test_start_simulation(
