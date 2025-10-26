@@ -28,6 +28,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '~/components/ui/card';
 import { Separator } from '~/components/ui/separator';
 import { useSimulation } from '~/providers/simulation-provider';
 import { SelectedItemType, type Station, type Resource } from '~/types';
+import { TaskItem } from '../task/task-item';
 
 export default function SelectedItemBar() {
   const { selectedItem, clearSelection } = useSimulation();
@@ -118,11 +119,13 @@ function ResourceInfo({ resource }: { resource: Resource }) {
         <p className="text-sm text-muted-foreground">
           Tasks ({resource.taskList.length})
         </p>
-        <p className="text-sm">
-          {resource.taskList.length > 0
-            ? resource.taskList.map((id) => `${id}`).join(', ')
-            : 'No tasks assigned'}
-        </p>
+        <div className="space-y-2">
+          {resource.taskList.length > 0 ? (
+            resource.taskList.map((id) => <TaskItem key={id} taskId={id} />)
+          ) : (
+            <p className="text-sm">No tasks assigned</p>
+          )}
+        </div>
       </div>
     </div>
   );

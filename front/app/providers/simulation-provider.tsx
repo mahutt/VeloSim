@@ -59,6 +59,7 @@ type SimulationContextType = {
   selectedItem: SelectedItem | null;
   selectItem: (type: SelectedItemType, id: number) => void;
   clearSelection: () => void;
+  assignTaskToResource: (resourceId: number, taskId: number) => void;
 };
 
 const SimulationContext = createContext<SimulationContextType | undefined>(
@@ -153,6 +154,15 @@ export const SimulationProvider = ({ children }: { children: ReactNode }) => {
 
     // Clear selection on both map sources
     updateMapSources(undefined, undefined);
+  };
+
+  const assignTaskToResource = (resourceId: number, taskId: number) => {
+    try {
+      // TODO: use /assign endpoint
+      console.log('assignTaskToResource', { resourceId, taskId });
+    } catch (error) {
+      console.error('Error assigning task to resource:', error);
+    }
   };
 
   // Hover state - use refs so animation loop always has latest values
@@ -431,6 +441,7 @@ export const SimulationProvider = ({ children }: { children: ReactNode }) => {
         selectedItem,
         selectItem,
         clearSelection,
+        assignTaskToResource,
       }}
     >
       {children}

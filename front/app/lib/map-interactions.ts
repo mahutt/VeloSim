@@ -124,3 +124,50 @@ export function setupMapHoverHandlers(
     });
   });
 }
+
+export function setupMapDropHandlers(
+  map: MapboxMap,
+  requestAssignment: (resourceId: number, taskId: number) => void
+) {
+  const canvas = map.getCanvas();
+
+  const handleDragOver = (e: DragEvent) => {
+    e.preventDefault();
+    if (e.dataTransfer) {
+      e.dataTransfer.dropEffect = 'move';
+    }
+  };
+
+  const handleDrop = (e: DragEvent) => {
+    e.preventDefault();
+    if (!e.dataTransfer) return;
+
+    const taskId = Number(e.dataTransfer.getData('taskId'));
+    if (Number.isNaN(taskId)) return;
+
+    // covert drop position from viewport to the canvas' coordinates
+    const rect = canvas.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+
+    const features = map.queryRenderedFeatures([x, y], {
+      layers: [MapLayer.Resources],
+    });
+
+    if (!features || features.length === 0) return;
+
+    const feature = features[0];
+    const resourceId = Number(feature.properties?.id);
+    if (Number.isNaN(resourceId)) return;
+
+    requestAssignment(resourceId, taskId);
+  };
+
+  canvas.addEventListener('dragover', handleDragOver);
+  canvas.addEventListener('drop', handleDrop);
+
+  return () => {
+    canvas.removeEventListener('dragover', handleDragOver);
+    canvas.removeEventListener('drop', handleDrop);
+  };
+}

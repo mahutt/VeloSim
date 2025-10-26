@@ -22,7 +22,10 @@
  * SOFTWARE.
  */
 
+import { useState } from 'react';
 import type { Resource } from '~/types';
+import { Item, ItemContent, ItemTitle } from '~/components/ui/item';
+import { useTaskAssignment } from '~/providers/task-assignment-provider';
 
 export function ResourceItem({
   resource,
@@ -33,8 +36,50 @@ export function ResourceItem({
   onSelect: () => void;
   isSelected?: boolean;
 }) {
+  const [isDragOver, setIsDragOver] = useState(false);
+  const { requestAssignment } = useTaskAssignment();
+
+  const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
+    if (!resource) return;
+
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+  };
+
+  const handleDropOnResource = (e: React.DragEvent<HTMLDivElement>) => {
+    if (!resource) return;
+    e.preventDefault();
+    setIsDragOver(false);
+
+    const taskId = Number(e.dataTransfer.getData('taskId'));
+    if (!Number.isNaN(taskId)) {
+      requestAssignment(resource.id, taskId);
+    }
+  };
+
+  const handleDragEnter = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    setIsDragOver(true);
+  };
+
+  const handleDragLeave = (e: React.DragEvent<HTMLDivElement>) => {
+    if (e.currentTarget.contains(e.relatedTarget as Node)) {
+      return;
+    }
+    setIsDragOver(false);
+  };
+
+  if (!resource) {
+    return null;
+  }
+
   return (
-    <div
+    <Item
+      onClick={onSelect}
+      onDragOver={handleDragOver}
+      onDrop={handleDropOnResource}
+      onDragEnter={handleDragEnter}
+      onDragLeave={handleDragLeave}
       className={`
         rounded-full px-4 py-2 cursor-pointer flex items-center justify-between transition-all duration-200 border
         ${
@@ -42,21 +87,25 @@ export function ResourceItem({
             ? 'bg-red-50 border-red-500 border-2 shadow-md ring-1 ring-red-200'
             : 'bg-white border-gray-200 hover:bg-gray-200 hover:border-gray-400'
         }
+        ${isDragOver ? 'ring-1 ring-yellow-300 bg-yellow-50' : ''}
       `}
-      onClick={() => onSelect()}
     >
-      <div className="flex items-center gap-2">
-        <span
-          className={`text-sm font-medium ${isSelected ? 'text-red-700' : ''}`}
-        >
-          {resource ? `#${resource.id}` : ''}
-        </span>
-      </div>
+      <ItemContent>
+        <div className="flex items-center gap-2">
+          <ItemTitle
+            className={`text-sm font-medium ${isSelected ? 'text-red-700' : ''}`}
+          >
+            #{resource.id}
+          </ItemTitle>
+        </div>
+      </ItemContent>
+
       <span
         className={`text-xs ${isSelected ? 'text-red-600' : 'text-gray-400'}`}
       >
-        {resource ? `${resource.taskList.length} tasks` : ''}
+        {resource.taskList.length}{' '}
+        {resource.taskList.length === 1 ? 'task' : 'tasks'}
       </span>
-    </div>
+    </Item>
   );
 }
