@@ -63,7 +63,7 @@ export function ResourceItem({
   };
 
   const handleDragLeave = (e: React.DragEvent<HTMLDivElement>) => {
-    if (e.currentTarget.contains(e.relatedTarget as Node)) {
+    if (!e.relatedTarget || e.currentTarget.contains(e.relatedTarget as Node)) {
       return;
     }
     setIsDragOver(false);
