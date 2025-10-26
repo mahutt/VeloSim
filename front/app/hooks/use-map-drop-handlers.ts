@@ -36,5 +36,5 @@ export function useMapDropHandlers() {
 
     const cleanup = setupMapDropHandlers(mapRef.current, requestAssignment);
     return cleanup;
-  }, [mapLoaded, mapRef, requestAssignment]);
+  }, [mapLoaded, requestAssignment]);
 }

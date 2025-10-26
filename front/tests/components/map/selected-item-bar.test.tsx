@@ -43,6 +43,7 @@ describe('SelectedItemBar', () => {
       stationsRef: { current: new Map() },
       resourcesRef: { current: new Map() },
       resources: [],
+      assignTaskToResource: vi.fn(),
     });
 
     const { container } = render(<SelectedItemBar />);
@@ -67,6 +68,7 @@ describe('SelectedItemBar', () => {
       stationsRef: { current: new Map() },
       resourcesRef: { current: new Map() },
       resources: [],
+      assignTaskToResource: vi.fn(),
     });
 
     render(<SelectedItemBar />);
@@ -102,6 +104,7 @@ describe('SelectedItemBar', () => {
       stationsRef: { current: new Map() },
       resourcesRef: { current: new Map() },
       resources: [],
+      assignTaskToResource: vi.fn(),
     });
 
     render(<SelectedItemBar />);
@@ -134,6 +137,7 @@ describe('SelectedItemBar', () => {
       stationsRef: { current: new Map() },
       resourcesRef: { current: new Map() },
       resources: [],
+      assignTaskToResource: vi.fn(),
     });
 
     render(<SelectedItemBar />);
@@ -165,6 +169,7 @@ describe('SelectedItemBar', () => {
       stationsRef: { current: new Map() },
       resourcesRef: { current: new Map() },
       resources: [],
+      assignTaskToResource: vi.fn(),
     });
 
     render(<SelectedItemBar />);
