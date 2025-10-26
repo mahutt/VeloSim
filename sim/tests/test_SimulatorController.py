@@ -350,7 +350,7 @@ def test_add_task_success(
     """Test add_task functionality"""
     # Arrange
     task_id = 3
-    station1 = simulator_controller.station_entities[1]  # Use ID key instead of index
+    station1 = simulator_controller.get_station_by_id(1)
     new_task = BatterySwapTask(env, task_id, station1)
 
     # Act
@@ -367,7 +367,7 @@ def test_add_task_fail(
     """Test add_task functionality with existent task id"""
     # Arrange
     task_id = 2
-    station1 = simulator_controller.station_entities[1]  # Use ID key instead of index
+    station1 = simulator_controller.get_station_by_id(1)
     new_task = BatterySwapTask(env, task_id, station1)
 
     # Act and Assert
