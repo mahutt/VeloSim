@@ -96,14 +96,18 @@ export const columns: ColumnDef<User>[] = [
               </DropdownMenuItem>
               <DropdownMenuItem
                 onClick={async () => {
-                  const { data: UpdatedUser } = await api.put<User>(
-                    `/users/${user.id}/role`,
-                    {
-                      is_admin: user.is_admin,
-                      is_enabled: !user.is_enabled,
-                    }
-                  );
-                  table.options.meta?.updateUser(UpdatedUser);
+                  try {
+                    const { data: UpdatedUser } = await api.put<User>(
+                      `/users/${user.id}/role`,
+                      {
+                        is_admin: user.is_admin,
+                        is_enabled: !user.is_enabled,
+                      }
+                    );
+                    table.options.meta?.updateUser(UpdatedUser);
+                  } catch (error) {
+                    console.error('Failed to enable / disable user:', error);
+                  }
                 }}
               >
                 {user.is_enabled ? 'Disable user' : 'Enable user'}
