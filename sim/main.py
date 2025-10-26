@@ -102,7 +102,7 @@ if __name__ == "__main__":
     # Initialize simulations and send initial frames
     print("Initializing simulations...")
     r1 = sim.initialize(params, sub_list_1)
-    # r2 = sim.initialize(params, sub_list_2)
+    r2 = sim.initialize(params, sub_list_2)
 
     print("Initial frames sent. Starting simulation loops...")
 
