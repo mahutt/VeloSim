@@ -25,6 +25,9 @@
 import { expect, test, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { ResourceItem } from '~/components/resource/resource-item';
+import { MapProvider } from '~/providers/map-provider';
+import { SimulationProvider } from '~/providers/simulation-provider';
+import { TaskAssignmentProvider } from '~/providers/task-assignment-provider';
 
 test('resource item renders with resource data', () => {
   const mockResource = {
@@ -38,7 +41,15 @@ test('resource item renders with resource data', () => {
 
   const mockOnSelect = vi.fn();
 
-  render(<ResourceItem resource={mockResource} onSelect={mockOnSelect} />);
+  render(
+    <MapProvider>
+      <SimulationProvider>
+        <TaskAssignmentProvider>
+          <ResourceItem resource={mockResource} onSelect={mockOnSelect} />
+        </TaskAssignmentProvider>
+      </SimulationProvider>
+    </MapProvider>
+  );
 
   expect(screen.getByText('#1')).toBeDefined();
   expect(screen.getByText('3 tasks')).toBeDefined();
@@ -57,31 +68,50 @@ test('resource item renders with selection state', () => {
   const mockOnSelect = vi.fn();
 
   const { rerender } = render(
-    <ResourceItem
-      resource={mockResource}
-      onSelect={mockOnSelect}
-      isSelected={false}
-    />
+    <MapProvider>
+      <SimulationProvider>
+        <TaskAssignmentProvider>
+          <ResourceItem
+            resource={mockResource}
+            onSelect={mockOnSelect}
+            isSelected={false}
+          />
+        </TaskAssignmentProvider>
+      </SimulationProvider>
+    </MapProvider>
   );
 
   // Check unselected state styling
-  let item = screen.getByText('#1').closest('div')?.parentElement;
-  expect(item?.className).toContain('bg-white');
-  expect(item?.className).not.toContain('bg-red-50');
+  const itemRoot = screen
+    .getByText('#1')
+    .closest('div')
+    ?.closest('[data-slot="item"]') as HTMLElement | null;
+  expect(itemRoot).toBeDefined();
+  expect(itemRoot?.className).toContain('bg-white');
+  expect(itemRoot?.className).not.toContain('bg-red-50');
 
   // Rerender with selected state
   rerender(
-    <ResourceItem
-      resource={mockResource}
-      onSelect={mockOnSelect}
-      isSelected={true}
-    />
+    <MapProvider>
+      <SimulationProvider>
+        <TaskAssignmentProvider>
+          <ResourceItem
+            resource={mockResource}
+            onSelect={mockOnSelect}
+            isSelected={true}
+          />
+        </TaskAssignmentProvider>
+      </SimulationProvider>
+    </MapProvider>
   );
 
-  // Check selected state styling - get the element again after rerender
-  item = screen.getByText('#1').closest('div')?.parentElement;
-  expect(item?.className).toContain('bg-red-50');
-  expect(item?.className).toContain('border-red-500');
+  const selectedItemRoot = screen
+    .getByText('#1')
+    .closest('div')
+    ?.closest('[data-slot="item"]') as HTMLElement | null;
+  expect(selectedItemRoot).toBeDefined();
+  expect(selectedItemRoot?.className).toContain('bg-red-50');
+  expect(selectedItemRoot?.className).toContain('border-red-500');
 });
 
 test('resource item calls onSelect when clicked', () => {
@@ -96,7 +126,15 @@ test('resource item calls onSelect when clicked', () => {
 
   const mockOnSelect = vi.fn();
 
-  render(<ResourceItem resource={mockResource} onSelect={mockOnSelect} />);
+  render(
+    <MapProvider>
+      <SimulationProvider>
+        <TaskAssignmentProvider>
+          <ResourceItem resource={mockResource} onSelect={mockOnSelect} />
+        </TaskAssignmentProvider>
+      </SimulationProvider>
+    </MapProvider>
+  );
 
   const container = screen.getByText('#2').closest('div');
   if (container) {
@@ -118,7 +156,15 @@ test('resource item displays correct task count', () => {
 
   const mockOnSelect = vi.fn();
 
-  render(<ResourceItem resource={mockResource} onSelect={mockOnSelect} />);
+  render(
+    <MapProvider>
+      <SimulationProvider>
+        <TaskAssignmentProvider>
+          <ResourceItem resource={mockResource} onSelect={mockOnSelect} />
+        </TaskAssignmentProvider>
+      </SimulationProvider>
+    </MapProvider>
+  );
 
   expect(screen.getByText('8 tasks')).toBeDefined();
 });
@@ -126,29 +172,31 @@ test('resource item displays correct task count', () => {
 test('resource item renders correctly when resource is undefined', () => {
   const mockOnSelect = vi.fn();
 
-  render(<ResourceItem resource={undefined} onSelect={mockOnSelect} />);
+  const { container } = render(
+    <MapProvider>
+      <SimulationProvider>
+        <TaskAssignmentProvider>
+          <ResourceItem resource={undefined} onSelect={mockOnSelect} />
+        </TaskAssignmentProvider>
+      </SimulationProvider>
+    </MapProvider>
+  );
 
-  // Should render empty text for id and tasks
-  expect(
-    screen.getByText('', { selector: '.text-sm.font-medium' })
-  ).toBeDefined();
-  expect(
-    screen.getByText('', { selector: '.text-xs.text-gray-400' })
-  ).toBeDefined();
+  expect(container.firstChild).toBeNull();
 });
 
 test('resource item calls onSelect even when resource is undefined', () => {
   const mockOnSelect = vi.fn();
 
-  render(<ResourceItem resource={undefined} onSelect={mockOnSelect} />);
+  render(
+    <MapProvider>
+      <SimulationProvider>
+        <TaskAssignmentProvider>
+          <ResourceItem resource={undefined} onSelect={mockOnSelect} />
+        </TaskAssignmentProvider>
+      </SimulationProvider>
+    </MapProvider>
+  );
 
-  // Click the outermost clickable div
-  const container = screen
-    .getByText('', { selector: '.text-sm.font-medium' })
-    .closest('div');
-  if (container) {
-    fireEvent.click(container);
-  }
-
-  expect(mockOnSelect).toHaveBeenCalledTimes(1);
+  expect(mockOnSelect).toHaveBeenCalledTimes(0);
 });

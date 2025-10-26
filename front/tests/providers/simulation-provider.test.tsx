@@ -41,6 +41,7 @@ import {
   useSimulation,
 } from '~/providers/simulation-provider';
 import { MapProvider } from '~/providers/map-provider';
+import { TaskAssignmentProvider } from '~/providers/task-assignment-provider';
 import { MockMap } from 'tests/mocks';
 import MapContainer from '~/components/map/map-container';
 import { setMapSource, MapSource } from '~/lib/map-helpers';
@@ -82,6 +83,7 @@ vi.mock('~/lib/map-interactions.ts', () => {
   return {
     setupMapClickHandlers: vi.fn(),
     setupMapHoverHandlers: vi.fn(),
+    setupMapDropHandlers: vi.fn(),
   };
 });
 
@@ -226,8 +228,10 @@ test('useSimulation hook throws error when used outside of simulation provider',
   expect(() => {
     render(
       <MapProvider>
-        <MapContainer />
-        <TestComponent />
+        <TaskAssignmentProvider>
+          <MapContainer />
+          <TestComponent />
+        </TaskAssignmentProvider>
       </MapProvider>
     );
   }).toThrow('useSimulation must be used within a SimulationProvider');
@@ -237,8 +241,10 @@ test('simulation provider provides context with initial state', () => {
   const { getByTestId } = render(
     <MapProvider>
       <SimulationProvider>
-        <MapContainer />
-        <TestComponent />
+        <TaskAssignmentProvider>
+          <MapContainer />
+          <TestComponent />
+        </TaskAssignmentProvider>
       </SimulationProvider>
     </MapProvider>
   );
@@ -260,8 +266,10 @@ test('simulation provider fetches stations data when map is loaded', async () =>
   render(
     <MapProvider>
       <SimulationProvider>
-        <MapContainer />
-        <TestComponent />
+        <TaskAssignmentProvider>
+          <MapContainer />
+          <TestComponent />
+        </TaskAssignmentProvider>
       </SimulationProvider>
     </MapProvider>
   );
@@ -310,8 +318,10 @@ test('simulation provider updates stations ref when data is successfully fetched
   render(
     <MapProvider>
       <SimulationProvider>
-        <MapContainer />
-        <StateCapture />
+        <TaskAssignmentProvider>
+          <MapContainer />
+          <StateCapture />
+        </TaskAssignmentProvider>
       </SimulationProvider>
     </MapProvider>
   );
@@ -344,7 +354,9 @@ test('simulation provider handles fetch error for resource routes gracefully', a
   render(
     <MapProvider>
       <SimulationProvider>
-        <MapContainer />
+        <TaskAssignmentProvider>
+          <MapContainer />
+        </TaskAssignmentProvider>
       </SimulationProvider>
     </MapProvider>
   );
@@ -406,8 +418,10 @@ test('simulation provider sets up map click handlers and handles station selecti
   render(
     <MapProvider>
       <SimulationProvider>
-        <MapContainer />
-        <TestComponent />
+        <TaskAssignmentProvider>
+          <MapContainer />
+          <TestComponent />
+        </TaskAssignmentProvider>
       </SimulationProvider>
     </MapProvider>
   );
@@ -482,8 +496,10 @@ test('simulation provider sets up map click handlers and handles resource select
   render(
     <MapProvider>
       <SimulationProvider>
-        <MapContainer />
-        <TestComponent />
+        <TaskAssignmentProvider>
+          <MapContainer />
+          <TestComponent />
+        </TaskAssignmentProvider>
       </SimulationProvider>
     </MapProvider>
   );
@@ -549,7 +565,9 @@ test('simulation provider sets up map hover handlers and handles station hover',
   render(
     <MapProvider>
       <SimulationProvider>
-        <MapContainer />
+        <TaskAssignmentProvider>
+          <MapContainer />
+        </TaskAssignmentProvider>
       </SimulationProvider>
     </MapProvider>
   );
@@ -640,7 +658,9 @@ test('simulation provider handles click on non-existent station gracefully', asy
   render(
     <MapProvider>
       <SimulationProvider>
-        <MapContainer />
+        <TaskAssignmentProvider>
+          <MapContainer />
+        </TaskAssignmentProvider>
       </SimulationProvider>
     </MapProvider>
   );
@@ -695,7 +715,9 @@ test('simulation provider handles click on non-existent resource gracefully', as
   render(
     <MapProvider>
       <SimulationProvider>
-        <MapContainer />
+        <TaskAssignmentProvider>
+          <MapContainer />
+        </TaskAssignmentProvider>
       </SimulationProvider>
     </MapProvider>
   );
@@ -739,7 +761,9 @@ test('simulation provider starts animation loop', async () => {
   render(
     <MapProvider>
       <SimulationProvider>
-        <MapContainer />
+        <TaskAssignmentProvider>
+          <MapContainer />
+        </TaskAssignmentProvider>
       </SimulationProvider>
     </MapProvider>
   );
@@ -769,7 +793,9 @@ test('simulation provider updates resource positions', async () => {
   render(
     <MapProvider>
       <SimulationProvider>
-        <MapContainer />
+        <TaskAssignmentProvider>
+          <MapContainer />
+        </TaskAssignmentProvider>
       </SimulationProvider>
     </MapProvider>
   );
@@ -827,7 +853,9 @@ test('simulation provider cleans up on unmount', async () => {
   const { unmount } = render(
     <MapProvider>
       <SimulationProvider>
-        <MapContainer />
+        <TaskAssignmentProvider>
+          <MapContainer />
+        </TaskAssignmentProvider>
       </SimulationProvider>
     </MapProvider>
   );
@@ -873,8 +901,10 @@ test('simulation provider provides selection state', () => {
   render(
     <MapProvider>
       <SimulationProvider>
-        <MapContainer />
-        <TestComponent />
+        <TaskAssignmentProvider>
+          <MapContainer />
+          <TestComponent />
+        </TaskAssignmentProvider>
       </SimulationProvider>
     </MapProvider>
   );
@@ -919,8 +949,10 @@ test('simulation provider allows updating selection state', async () => {
   const { getByTestId } = render(
     <MapProvider>
       <SimulationProvider>
-        <MapContainer />
-        <TestComponent />
+        <TaskAssignmentProvider>
+          <MapContainer />
+          <TestComponent />
+        </TaskAssignmentProvider>
       </SimulationProvider>
     </MapProvider>
   );
@@ -980,8 +1012,10 @@ test('simulation provider allows selecting a resource', async () => {
   const { getByTestId } = render(
     <MapProvider>
       <SimulationProvider>
-        <MapContainer />
-        <TestComponent />
+        <TaskAssignmentProvider>
+          <MapContainer />
+          <TestComponent />
+        </TaskAssignmentProvider>
       </SimulationProvider>
     </MapProvider>
   );
@@ -1032,7 +1066,9 @@ test('handleFrameUpdate updates resource positions and resets frame timer', asyn
   render(
     <MapProvider>
       <SimulationProvider>
-        <MapContainer />
+        <TaskAssignmentProvider>
+          <MapContainer />
+        </TaskAssignmentProvider>
       </SimulationProvider>
     </MapProvider>
   );

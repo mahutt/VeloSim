@@ -113,7 +113,9 @@ describe('SelectedItemBar', () => {
     expect(screen.getByText('#5')).toBeInTheDocument();
     expect(screen.getByText('Position')).toBeInTheDocument();
     expect(screen.getByText('Tasks (3)')).toBeInTheDocument();
-    expect(screen.getByText('1, 2, 3')).toBeInTheDocument();
+    expect(screen.getByText('Task #1')).toBeInTheDocument();
+    expect(screen.getByText('Task #2')).toBeInTheDocument();
+    expect(screen.getByText('Task #3')).toBeInTheDocument();
   });
 
   it('should call clearSelection when close button is clicked', async () => {
