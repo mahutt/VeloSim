@@ -156,8 +156,8 @@ describe('SelectedItemBar', () => {
       name: 'Test Station',
       position: [-73.57776, 45.48944] as [number, number],
       tasks: [
-        { stationId: 1, type: 'battery_swap' as const },
-        { stationId: 1, type: 'battery_swap' as const },
+        { id: 1, stationId: 1, type: 'battery_swap' as const },
+        { id: 2, stationId: 1, type: 'battery_swap' as const },
       ],
     };
 
@@ -177,6 +177,7 @@ describe('SelectedItemBar', () => {
     render(<SelectedItemBar />);
 
     expect(screen.getByText('Tasks (2)')).toBeInTheDocument();
-    expect(screen.getByText('battery swap, battery swap')).toBeInTheDocument();
+    const taskItems = screen.getAllByText(/^Task #/);
+    expect(taskItems).toHaveLength(2);
   });
 });

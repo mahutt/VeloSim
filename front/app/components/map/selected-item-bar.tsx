@@ -94,13 +94,15 @@ function StationInfo({ station }: { station: Station }) {
         <p className="text-sm text-muted-foreground">
           Tasks ({station.tasks.length})
         </p>
-        <p className="text-sm">
-          {station.tasks.length > 0
-            ? station.tasks
-                .map((task) => task.type.replace('_', ' '))
-                .join(', ')
-            : 'No tasks assigned'}
-        </p>
+        <div className="space-y-2">
+          {station.tasks.length > 0 ? (
+            station.tasks.map((task) => (
+              <TaskItem key={task.id} taskId={task.id} />
+            ))
+          ) : (
+            <p className="text-sm">No tasks assigned</p>
+          )}
+        </div>
       </div>
     </div>
   );
