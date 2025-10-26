@@ -27,6 +27,7 @@ export interface User {
   id: number;
   username: string;
   is_admin: boolean;
+  is_enabled: boolean;
 }
 
 // Entity types

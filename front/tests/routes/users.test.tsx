@@ -22,39 +22,28 @@
  * SOFTWARE.
  */
 
-import { expect, test, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { expect, test, vi, beforeEach } from 'vitest';
+import { render, screen, within } from '@testing-library/react';
+import api from '~/api';
 import { createRoutesStub } from 'react-router';
 import Users, { meta } from '~/routes/users';
+import userEvent from '@testing-library/user-event';
 
 // Mock the API module
-vi.mock('~/api', () => {
-  return {
-    default: {
-      get: vi.fn(() =>
-        Promise.resolve({
-          data: {
-            users: [
-              {
-                id: 1,
-                username: 'john_doe',
-                is_admin: true,
-              },
-              {
-                id: 2,
-                username: 'amy',
-                is_admin: false,
-              },
-            ],
-            total: 0,
-            page: 0,
-            per_page: 0,
-            total_pages: 0,
-          },
-        })
-      ),
+vi.mock('~/api');
+vi.mock('~/hooks/use-auth', () => ({
+  default: () => ({
+    user: {
+      id: 1,
+      username: 'Test',
+      is_admin: false,
+      is_enabled: true,
     },
-  };
+  }),
+}));
+
+beforeEach(() => {
+  vi.resetAllMocks();
 });
 
 test('meta function sets all fields', () => {
@@ -62,7 +51,30 @@ test('meta function sets all fields', () => {
   expect(metaInfo[0].title).toBeDefined();
 });
 
-test('home pages loads 1 button', async () => {
+test('users page shows list of users when data is available', async () => {
+  vi.mocked(api.get).mockResolvedValueOnce({
+    data: {
+      users: [
+        {
+          id: 1,
+          username: 'john_doe',
+          is_admin: true,
+          is_enabled: true,
+        },
+        {
+          id: 2,
+          username: 'amy',
+          is_admin: false,
+          is_enabled: false,
+        },
+      ],
+      total: 2,
+      page: 1,
+      per_page: 10,
+      total_pages: 1,
+    },
+  });
+
   const Stub = createRoutesStub([
     {
       path: '/users',
@@ -74,4 +86,119 @@ test('home pages loads 1 button', async () => {
 
   expect(await screen.findByText('john_doe')).toBeInTheDocument();
   expect(await screen.findByText('amy')).toBeInTheDocument();
+  expect(await screen.findAllByText('Enabled')).toHaveLength(1);
+  expect(await screen.findAllByText('Disabled')).toHaveLength(1);
+});
+
+test('users page shows empty state when no users are available', async () => {
+  vi.mocked(api.get).mockResolvedValueOnce({
+    data: {
+      users: [],
+      total: 0,
+      page: 1,
+      per_page: 10,
+      total_pages: 0,
+    },
+  });
+
+  const Stub = createRoutesStub([
+    {
+      path: '/users',
+      Component: Users,
+    },
+  ]);
+
+  render(<Stub initialEntries={['/users']} />);
+  expect(await screen.findByText(/No results./i)).toBeInTheDocument();
+});
+
+test('ResetPasswordDialog renders when triggered', async () => {
+  const user = userEvent.setup();
+
+  vi.mocked(api.get).mockResolvedValueOnce({
+    data: {
+      users: [
+        {
+          id: 1,
+          username: 'john_doe',
+          is_admin: true,
+          is_enabled: true,
+        },
+      ],
+      total: 1,
+      page: 1,
+      per_page: 10,
+      total_pages: 1,
+    },
+  });
+
+  const Stub = createRoutesStub([
+    {
+      path: '/users',
+      Component: Users,
+    },
+  ]);
+
+  // Create a container for portals
+  const { baseElement } = render(<Stub initialEntries={['/users']} />);
+
+  // Find and click the menu button
+  const menuButton = await screen.findByTestId('user-actions');
+  await user.click(menuButton);
+
+  // Query from baseElement instead of screen to catch portaled content
+  const changePasswordButton =
+    await within(baseElement).findByText('Change password');
+  await user.click(changePasswordButton);
+
+  // Check if the ResetPasswordDialog appears
+  const dialogTitle = await screen.findByRole('dialog');
+  expect(dialogTitle).toBeInTheDocument();
+});
+
+test('clicking enable / disable user makes API PUT request', async () => {
+  const user = userEvent.setup();
+
+  vi.mocked(api.get).mockResolvedValueOnce({
+    data: {
+      users: [
+        {
+          id: 1,
+          username: 'john_doe',
+          is_admin: true,
+          is_enabled: true,
+        },
+      ],
+      total: 1,
+      page: 1,
+      per_page: 10,
+      total_pages: 1,
+    },
+  });
+
+  vi.mocked(api.put).mockResolvedValueOnce({
+    data: {
+      id: 1,
+      username: 'john_doe',
+      is_admin: true,
+      is_enabled: false,
+    },
+  });
+
+  const Stub = createRoutesStub([
+    {
+      path: '/users',
+      Component: Users,
+    },
+  ]);
+  render(<Stub initialEntries={['/users']} />);
+  // Find and click the menu button
+  const menuButton = await screen.findByTestId('user-actions');
+  await user.click(menuButton);
+  const toggleEnableButton = await screen.findByText('Disable user');
+  await user.click(toggleEnableButton);
+  expect(api.put).toHaveBeenCalledWith('/users/1/role', {
+    is_admin: true,
+    is_enabled: false,
+  });
 });

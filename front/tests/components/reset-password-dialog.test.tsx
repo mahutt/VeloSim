@@ -42,11 +42,13 @@ describe('ResetPasswordDialog', () => {
     id: 1,
     username: 'current_user',
     is_admin: true,
+    is_enabled: true,
   };
   const mockTargetUser: User = {
     id: 2,
     username: 'target_user',
     is_admin: false,
+    is_enabled: true,
   };
 
   beforeEach(() => {
