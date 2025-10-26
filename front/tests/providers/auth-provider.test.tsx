@@ -131,6 +131,7 @@ test('updates user state through context', async () => {
               id: 2,
               username: 'test_user',
               is_admin: true,
+              is_enabled: true,
             });
           });
           return <TestComponent />;
@@ -144,5 +145,6 @@ test('updates user state through context', async () => {
     id: 2,
     username: 'test_user',
     is_admin: true,
+    is_enabled: true,
   });
 });

@@ -85,7 +85,14 @@ export default function Users() {
     <Page>
       <div className="flex flex-col gap-2">
         <div className="text-xl">Users</div>
-        <DataTable columns={columns} data={users} />
+        <DataTable
+          columns={columns}
+          data={users}
+          getRowId={(row) => String(row.id)}
+          onUpdateUser={(u) =>
+            setUsers((prev) => prev.map((x) => (x.id === u.id ? u : x)))
+          }
+        />
       </div>
     </Page>
   );

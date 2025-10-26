@@ -24,6 +24,7 @@
 
 import {
   type ColumnDef,
+  type PaginationState,
   flexRender,
   getCoreRowModel,
   getFilteredRowModel,
@@ -50,20 +51,29 @@ declare module '@tanstack/react-table' {
   interface TableMeta<TData> {
     setResetPasswordUser: (u: User) => void;
     setShowResetPasswordDialog: (open: boolean) => void;
+    updateUser: (u: User) => void;
   }
 }
 
 interface DataTableProps<TData, TValue> {
   columns: ColumnDef<TData, TValue>[];
   data: TData[];
+  onUpdateUser: (u: User) => void;
+  getRowId: (originalRow: TData, index: number, parent?: unknown) => string;
 }
 
 export function DataTable<TData, TValue>({
   columns,
   data,
+  onUpdateUser,
+  getRowId,
 }: DataTableProps<TData, TValue>) {
   const [showResetPasswordDialog, setShowResetPasswordDialog] = useState(false);
   const [resetPasswordUser, setResetPasswordUser] = useState<User | null>(null);
+  const [pagination, setPagination] = useState<PaginationState>({
+    pageIndex: 0,
+    pageSize: 10,
+  });
 
   const table = useReactTable({
     data,
@@ -71,9 +81,14 @@ export function DataTable<TData, TValue>({
     getCoreRowModel: getCoreRowModel(),
     getPaginationRowModel: getPaginationRowModel(),
     getFilteredRowModel: getFilteredRowModel(),
+    getRowId,
+    state: { pagination },
+    onPaginationChange: setPagination,
+    autoResetPageIndex: false,
     meta: {
       setResetPasswordUser,
       setShowResetPasswordDialog,
+      updateUser: onUpdateUser,
     },
   });
 

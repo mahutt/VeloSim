@@ -33,6 +33,7 @@ import {
 } from '../ui/dropdown-menu';
 import { MoreHorizontal } from 'lucide-react';
 import { Button } from '../ui/button';
+import api from '~/api';
 
 export const columns: ColumnDef<User>[] = [
   {
@@ -54,6 +55,19 @@ export const columns: ColumnDef<User>[] = [
     },
   },
   {
+    accessorKey: 'is_enabled',
+    header: 'Status',
+    cell: ({ row }) => {
+      const user = row.original;
+
+      return (
+        <span className="text-muted-foreground">
+          {user.is_enabled ? 'Enabled' : 'Disabled'}
+        </span>
+      );
+    },
+  },
+  {
     id: 'actions',
     enableHiding: false,
     cell: ({ row, table }) => {
@@ -62,7 +76,11 @@ export const columns: ColumnDef<User>[] = [
         <div className="flex justify-end gap-1">
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="ghost" className="h-8 w-8 p-0">
+              <Button
+                data-testid="user-actions"
+                variant="ghost"
+                className="h-8 w-8 p-0"
+              >
                 <span className="sr-only">Open menu</span>
                 <MoreHorizontal />
               </Button>
@@ -75,6 +93,20 @@ export const columns: ColumnDef<User>[] = [
                 }}
               >
                 Change password
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onClick={async () => {
+                  const { data: UpdatedUser } = await api.put<User>(
+                    `/users/${user.id}/role`,
+                    {
+                      is_admin: user.is_admin,
+                      is_enabled: !user.is_enabled,
+                    }
+                  );
+                  table.options.meta?.updateUser(UpdatedUser);
+                }}
+              >
+                {user.is_enabled ? 'Disable user' : 'Enable user'}
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
