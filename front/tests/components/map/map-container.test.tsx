@@ -26,6 +26,8 @@ import { expect, test } from 'vitest';
 import { render } from '@testing-library/react';
 import MapContainer from '~/components/map/map-container';
 import { MapProvider } from '~/providers/map-provider';
+import { SimulationProvider } from '~/providers/simulation-provider';
+import { TaskAssignmentProvider } from '~/providers/task-assignment-provider';
 
 test('map container render should fail without a map provider', async () => {
   expect(() => {
@@ -36,7 +38,11 @@ test('map container render should fail without a map provider', async () => {
 test('map container render should succeed with a map provider', async () => {
   const { getByTestId } = render(
     <MapProvider>
-      <MapContainer />
+      <SimulationProvider>
+        <TaskAssignmentProvider>
+          <MapContainer />
+        </TaskAssignmentProvider>
+      </SimulationProvider>
     </MapProvider>
   );
   expect(getByTestId('map-container')).toBeDefined();

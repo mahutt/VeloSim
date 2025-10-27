@@ -43,6 +43,7 @@ describe('SelectedItemBar', () => {
       stationsRef: { current: new Map() },
       resourcesRef: { current: new Map() },
       resources: [],
+      assignTaskToResource: vi.fn(),
     });
 
     const { container } = render(<SelectedItemBar />);
@@ -67,6 +68,7 @@ describe('SelectedItemBar', () => {
       stationsRef: { current: new Map() },
       resourcesRef: { current: new Map() },
       resources: [],
+      assignTaskToResource: vi.fn(),
     });
 
     render(<SelectedItemBar />);
@@ -102,6 +104,7 @@ describe('SelectedItemBar', () => {
       stationsRef: { current: new Map() },
       resourcesRef: { current: new Map() },
       resources: [],
+      assignTaskToResource: vi.fn(),
     });
 
     render(<SelectedItemBar />);
@@ -110,7 +113,9 @@ describe('SelectedItemBar', () => {
     expect(screen.getByText('#5')).toBeInTheDocument();
     expect(screen.getByText('Position')).toBeInTheDocument();
     expect(screen.getByText('Tasks (3)')).toBeInTheDocument();
-    expect(screen.getByText('1, 2, 3')).toBeInTheDocument();
+    expect(screen.getByText('Task #1')).toBeInTheDocument();
+    expect(screen.getByText('Task #2')).toBeInTheDocument();
+    expect(screen.getByText('Task #3')).toBeInTheDocument();
   });
 
   it('should call clearSelection when close button is clicked', async () => {
@@ -134,6 +139,7 @@ describe('SelectedItemBar', () => {
       stationsRef: { current: new Map() },
       resourcesRef: { current: new Map() },
       resources: [],
+      assignTaskToResource: vi.fn(),
     });
 
     render(<SelectedItemBar />);
@@ -150,8 +156,8 @@ describe('SelectedItemBar', () => {
       name: 'Test Station',
       position: [-73.57776, 45.48944] as [number, number],
       tasks: [
-        { stationId: 1, type: 'battery_swap' as const },
-        { stationId: 1, type: 'battery_swap' as const },
+        { id: 1, stationId: 1, type: 'battery_swap' as const },
+        { id: 2, stationId: 1, type: 'battery_swap' as const },
       ],
     };
 
@@ -165,11 +171,13 @@ describe('SelectedItemBar', () => {
       stationsRef: { current: new Map() },
       resourcesRef: { current: new Map() },
       resources: [],
+      assignTaskToResource: vi.fn(),
     });
 
     render(<SelectedItemBar />);
 
     expect(screen.getByText('Tasks (2)')).toBeInTheDocument();
-    expect(screen.getByText('battery swap, battery swap')).toBeInTheDocument();
+    const taskItems = screen.getAllByText(/^Task #/);
+    expect(taskItems).toHaveLength(2);
   });
 });

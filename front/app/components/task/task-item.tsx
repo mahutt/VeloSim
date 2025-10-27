@@ -22,30 +22,25 @@
  * SOFTWARE.
  */
 
-import 'mapbox-gl/dist/mapbox-gl.css';
-import MapContainer from '~/components/map/map-container';
-import SelectedItemBar from '~/components/map/selected-item-bar';
-import { MapProvider } from '~/providers/map-provider';
-import { SimulationProvider } from '~/providers/simulation-provider';
-import ResourceBar from '~/components/resource/resource-bar';
-import { TaskAssignmentProvider } from '~/providers/task-assignment-provider';
+import { Item, ItemContent, ItemTitle } from '~/components/ui/item';
 
-export function meta() {
-  return [{ title: 'Simulation' }];
-}
+export function TaskItem({ taskId }: { taskId: number }) {
+  const handleDragStart = (e: React.DragEvent<HTMLDivElement>) => {
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('taskId', taskId.toString());
+  };
 
-export default function Simulation() {
   return (
-    <>
-      <MapProvider>
-        <SimulationProvider>
-          <TaskAssignmentProvider>
-            <MapContainer />
-            <ResourceBar />
-            <SelectedItemBar />
-          </TaskAssignmentProvider>
-        </SimulationProvider>
-      </MapProvider>
-    </>
+    <Item
+      draggable
+      onDragStart={handleDragStart}
+      className="rounded-lg px-3 py-2 bg-white border border-gray-200
+                 hover:border-gray-300 transition-all duration-200
+                 cursor-grab hover:shadow-sm active:cursor-grabbing active:opacity-50"
+    >
+      <ItemContent>
+        <ItemTitle>Task #{taskId}</ItemTitle>
+      </ItemContent>
+    </Item>
   );
 }

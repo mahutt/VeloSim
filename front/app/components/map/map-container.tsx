@@ -23,9 +23,12 @@
  */
 
 import { useMap } from '~/providers/map-provider';
+import { useMapDropHandlers } from '~/hooks/use-map-drop-handlers';
 
 export default function MapContainer() {
   const { mapContainerRef } = useMap();
+
+  useMapDropHandlers();
 
   return (
     <div

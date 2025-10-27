@@ -23,11 +23,15 @@
  */
 
 import { expect, test, vi } from 'vitest';
-import { setupMapClickHandlers } from '~/lib/map-interactions';
+import {
+  setupMapClickHandlers,
+  setupMapHoverHandlers,
+  setupMapDropHandlers,
+} from '~/lib/map-interactions';
 import type { Map as MapboxMap } from 'mapbox-gl';
 import { MapLayer, MapSource } from '~/lib/map-helpers';
 import { SelectedItemType } from '~/types';
-import { setupMapHoverHandlers } from '~/lib/map-interactions';
+// setupMapHoverHandlers imported above
 
 test('setupMapClickHandlers registers event listeners', () => {
   const mockMap = {
@@ -523,4 +527,120 @@ test('calls onItemHover(null) on mouseleave', () => {
 
   handlers[`mouseleave-${MapLayer.Stations}`]();
   expect(onItemHover).toHaveBeenCalledWith(null);
+});
+
+test('drop assigns task to resource when dropped on resource and cleanup removes listeners', () => {
+  const listeners: Record<string, (e: unknown) => void> = {};
+  const canvas = {
+    addEventListener: vi.fn((event: string, handler: (e: unknown) => void) => {
+      listeners[event] = handler;
+    }),
+    removeEventListener: vi.fn(() => {}),
+    getBoundingClientRect: vi.fn(() => ({ left: 10, top: 20 })),
+  } as unknown as HTMLCanvasElement;
+
+  const mockMap = {
+    getCanvas: vi.fn(() => canvas),
+    queryRenderedFeatures: vi.fn(() => [
+      {
+        properties: { id: 7 },
+        geometry: { type: 'Point', coordinates: [-73.6, 45.6] },
+      },
+    ]),
+  } as unknown as MapboxMap;
+
+  const requestAssignment = vi.fn();
+
+  const cleanup = setupMapDropHandlers(mockMap, requestAssignment);
+
+  expect(canvas.addEventListener).toHaveBeenCalledWith(
+    'dragover',
+    expect.any(Function)
+  );
+  expect(canvas.addEventListener).toHaveBeenCalledWith(
+    'drop',
+    expect.any(Function)
+  );
+
+  // simulate dragover
+  const dragOverPrevent = vi.fn();
+  const dragOverEvent = {
+    preventDefault: dragOverPrevent,
+    dataTransfer: { dropEffect: '' },
+  } as unknown as DragEvent;
+  listeners['dragover'](dragOverEvent);
+  expect(dragOverPrevent).toHaveBeenCalled();
+  expect(dragOverEvent.dataTransfer!.dropEffect).toBe('move');
+
+  // simulate drop with valid taskId
+  const dropPrevent = vi.fn();
+  const dropGetData = vi.fn(() => '99');
+  const dropEvent = {
+    preventDefault: dropPrevent,
+    dataTransfer: { getData: dropGetData },
+    clientX: 15,
+    clientY: 25,
+  } as unknown as DragEvent;
+
+  listeners['drop'](dropEvent);
+
+  expect(dropPrevent).toHaveBeenCalled();
+  expect(mockMap.queryRenderedFeatures).toHaveBeenCalledWith([5, 5], {
+    layers: [MapLayer.Resources],
+  });
+  expect(requestAssignment).toHaveBeenCalledWith(7, 99);
+
+  cleanup();
+  expect(canvas.removeEventListener).toHaveBeenCalledWith(
+    'dragover',
+    expect.any(Function)
+  );
+  expect(canvas.removeEventListener).toHaveBeenCalledWith(
+    'drop',
+    expect.any(Function)
+  );
+});
+
+test('drop ignores invalid taskId and missing features', () => {
+  const listeners: Record<string, (e: unknown) => void> = {};
+  const canvas = {
+    addEventListener: vi.fn((event: string, handler: (e: unknown) => void) => {
+      listeners[event] = handler;
+    }),
+    removeEventListener: vi.fn(() => {}),
+    getBoundingClientRect: vi.fn(() => ({ left: 0, top: 0 })),
+  } as unknown as HTMLCanvasElement;
+
+  const mockMap = {
+    getCanvas: vi.fn(() => canvas),
+    queryRenderedFeatures: vi.fn(() => []),
+  } as unknown as MapboxMap;
+
+  const requestAssignment = vi.fn();
+  const cleanup = setupMapDropHandlers(mockMap, requestAssignment);
+
+  const dropInvalidPrevent = vi.fn();
+  const dropEventInvalid = {
+    preventDefault: dropInvalidPrevent,
+    dataTransfer: { getData: vi.fn(() => 'not-a-number') },
+    clientX: 10,
+    clientY: 10,
+  } as unknown as DragEvent;
+
+  listeners['drop'](dropEventInvalid);
+  expect(dropInvalidPrevent).toHaveBeenCalled();
+  expect(requestAssignment).not.toHaveBeenCalled();
+
+  const dropNoFeaturesPrevent = vi.fn();
+  const dropEventNoFeatures = {
+    preventDefault: dropNoFeaturesPrevent,
+    dataTransfer: { getData: vi.fn(() => '42') },
+    clientX: 10,
+    clientY: 10,
+  } as unknown as DragEvent;
+
+  listeners['drop'](dropEventNoFeatures);
+  expect(requestAssignment).not.toHaveBeenCalled();
+
+  cleanup();
 });

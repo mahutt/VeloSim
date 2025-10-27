@@ -22,30 +22,19 @@
  * SOFTWARE.
  */
 
-import 'mapbox-gl/dist/mapbox-gl.css';
-import MapContainer from '~/components/map/map-container';
-import SelectedItemBar from '~/components/map/selected-item-bar';
-import { MapProvider } from '~/providers/map-provider';
-import { SimulationProvider } from '~/providers/simulation-provider';
-import ResourceBar from '~/components/resource/resource-bar';
-import { TaskAssignmentProvider } from '~/providers/task-assignment-provider';
+import { useEffect } from 'react';
+import { useMap } from '~/providers/map-provider';
+import { useTaskAssignment } from '~/providers/task-assignment-provider';
+import { setupMapDropHandlers } from '~/lib/map-interactions';
 
-export function meta() {
-  return [{ title: 'Simulation' }];
-}
+export function useMapDropHandlers() {
+  const { mapRef, mapLoaded } = useMap();
+  const { requestAssignment } = useTaskAssignment();
 
-export default function Simulation() {
-  return (
-    <>
-      <MapProvider>
-        <SimulationProvider>
-          <TaskAssignmentProvider>
-            <MapContainer />
-            <ResourceBar />
-            <SelectedItemBar />
-          </TaskAssignmentProvider>
-        </SimulationProvider>
-      </MapProvider>
-    </>
-  );
+  useEffect(() => {
+    if (!mapLoaded || !mapRef.current) return;
+
+    const cleanup = setupMapDropHandlers(mapRef.current, requestAssignment);
+    return cleanup;
+  }, [mapLoaded, requestAssignment]);
 }

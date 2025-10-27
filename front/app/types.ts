@@ -40,6 +40,7 @@ export interface Station {
 }
 
 export interface StationTask {
+  id: number;
   stationId: number;
   type: 'battery_swap';
 }

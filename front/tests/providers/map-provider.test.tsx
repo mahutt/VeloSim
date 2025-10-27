@@ -38,6 +38,7 @@ import {
   setMapLayers,
 } from '~/lib/map-helpers';
 import { SimulationProvider } from '~/providers/simulation-provider';
+import { TaskAssignmentProvider } from '~/providers/task-assignment-provider';
 
 // Mocking setup map helpers that are called by MapProvider
 vi.mock('~/lib/map-helpers.ts', async (importOriginal) => {
@@ -55,7 +56,9 @@ test('map provider instantiates mapboxgl Map instance in presence of map contain
   render(
     <MapProvider>
       <SimulationProvider>
-        <MapContainer />
+        <TaskAssignmentProvider>
+          <MapContainer />
+        </TaskAssignmentProvider>
       </SimulationProvider>
     </MapProvider>
   );
