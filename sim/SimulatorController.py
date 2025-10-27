@@ -69,12 +69,13 @@ class SimulatorController:
         # Initialize frame counter
         self.frameCounter: int = 0
 
-    def start(self, simTime: int) -> None:
+    def start(self, sim_time: int) -> None:
         # TODO process initial entities into the sim env
         # start sim clock
         self.clock.run()
+        self.sim_time = sim_time
         self.sim_thread = threading.Thread(
-            target=self.realTimeDriver.run_until, args=(simTime, self.emit_frame)
+            target=self.realTimeDriver.run_until, args=(sim_time, self.emit_frame)
         )
         self.sim_thread.start()
 
@@ -82,6 +83,9 @@ class SimulatorController:
         self.realTimeDriver.stop()
         if hasattr(self, "sim_thread") and self.sim_thread.is_alive():
             self.sim_thread.join()
+
+        final_frame = self.create_key_frame()
+        self.emit_frame(final_frame)
 
     def pause(self) -> None:
         self.realTimeDriver.pause()
@@ -170,6 +174,7 @@ class SimulatorController:
             frame = (
                 self.create_key_frame()
                 if self.frameCounter % self.keyframeFreq == 0
+                or self.frameCounter == self.sim_time
                 else self.create_diff_frame()
             )
         self.frameEmitter.notify(frame=frame)
@@ -307,5 +312,5 @@ class SimulatorController:
                 "simMinutesPassed": self.clock.sim_time_minutes,
             },
         }
-        frame = Frame(seq_numb=self.frameCounter, payload=payload)
+        frame = Frame(seq_numb=self.frameCounter, payload=payload, is_key=True)
         return frame

@@ -33,10 +33,12 @@ class Frame:
         seq_numb: int,
         payload: Optional[Dict[str, Any]] = None,
         payload_str: Optional[str] = None,
+        is_key: Optional[bool] = False,
     ) -> None:
         self.seq_number = seq_numb
         self.timestamp_ms = int(time.time() * 1000)
         self.payload_dict = payload or {}
+        self.is_key = is_key
 
         if payload_str:
             self.payload_str = payload_str
@@ -49,5 +51,6 @@ class Frame:
         return (
             f"Frame(seq={self.seq_number}, "
             f"timestamp={self.timestamp_ms}, "
-            f"payload={self.payload_dict})"
+            f"payload={self.payload_dict}, "
+            f"is_key={self.is_key})"
         )

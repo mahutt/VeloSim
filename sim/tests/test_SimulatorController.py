@@ -298,6 +298,7 @@ def test_emit_frame_without_provided_frame_diff_frame(
 
     # Mark some entities as updated (using ID keys instead of indices)
     simulator_controller.station_entities[1].has_updated = True
+    simulator_controller.sim_time = 3600
 
     simulator_controller.emit_frame()
 

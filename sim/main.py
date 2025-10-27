@@ -78,7 +78,7 @@ params = InputParameter(
     resource_entities={101: resource1, 102: resource2},
     task_entities={1: task1, 2: task2},
     real_time_factor=1.0,  # Real-time simulation
-    key_frame_freq=3,  # Key frame every 3 frames
+    key_frame_freq=3000,  # Key frame every 3000 frames
 )
 
 
@@ -108,10 +108,10 @@ if __name__ == "__main__":
 
     # Start the simulation loops
     sim.start(r1, 3600)
-    sim.start(r2, 3600)
+    # sim.start(r2, 3600)
 
     # Let simulations run for a bit
-    time.sleep(4)
+    time.sleep(4000)
 
     # Add a new task
     print("Adding new task with id 3 in sim r1...")
@@ -139,8 +139,8 @@ if __name__ == "__main__":
     time.sleep(2)
 
     # Stop simulations
-    print("Stopping simulations...")
-    sim.stop(r1)
-    time.sleep(1)
-    sim.stop(r2)
+    # print("Stopping simulations...")
+    # # sim.stop(r1)
+
+    # sim.stop(r2)
     print("Done.")
