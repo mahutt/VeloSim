@@ -22,20 +22,33 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 """
 
+from typing import Optional, Dict
 
-class Position:
-    def __init__(self, position: list[float]) -> None:  # [longitude, latitude]
-        self.position = position
+from sim.behaviour.resource_behaviour.resource_choose_next_task_strategy import (
+    ResourceChooseNextTaskStrategy,
+)
+from sim.behaviour.task_behaviour.auto_task_dispatch_strategy import (
+    AutoTaskDispatchStrategy,
+)
+from sim.behaviour.station_behaviour.task_popup_strategy import TaskPopupStrategy
 
-    def get_position(self) -> list[float]:
-        return self.position
 
-    def set_position(self, position: list[float]) -> None:
-        self.position = position
+class SimBehaviour:
 
-    def __eq__ (self,other: object) -> bool:
-        if not isinstance(self, Position):
-            return False
-        return (other[0] == self[0] and other[1] == self[1])
-    
-    
+    RCNT_strategy: ResourceChooseNextTaskStrategy
+
+    ATD_strategy: AutoTaskDispatchStrategy
+
+    TPU_strategy: TaskPopupStrategy
+
+    def __init__(self) -> None:
+        pass
+
+    def set_RCNT_strategy(self, strategy: ResourceChooseNextTaskStrategy) -> None:
+        self.RCNT_strategy = strategy
+
+    def set_ATD_strategy(self, strategy: AutoTaskDispatchStrategy) -> None:
+        self.ATD_strategy = strategy
+
+    def set_TPU_strategy(self, strategy: TaskPopupStrategy) -> None:
+        self.TPU_strategy = strategy

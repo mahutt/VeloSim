@@ -33,6 +33,8 @@ from sim.entities.resource import Resource
 from sim.entities.clock import Clock
 from sim.entities.task import Task
 from sim.entities.inputParameters import InputParameter
+from sim.behaviour.sim_behaviour import SimBehaviour
+from sim.controller.MapController import MapController
 
 
 class SimulatorController:
@@ -42,10 +44,11 @@ class SimulatorController:
         simEnv: simpy.Environment,
         frameEmitter: FrameEmitter,
         inputParameters: InputParameter,
+        sim_behaviour: SimBehaviour,
         strict: bool = False,
     ) -> None:
         self.simEnv = simEnv
-
+        self.map_controller = MapController()
         # Get parameters directly from InputParameter object
         real_time_factor = inputParameters.get_real_time_factor()
         keyframe_freq = inputParameters.get_key_frame_freq()
@@ -56,6 +59,7 @@ class SimulatorController:
         self.frameEmitter = frameEmitter
         self.keyframeFreq = keyframe_freq
         self.clock = Clock(simEnv)
+        self.sim_behaviour = sim_behaviour
 
         # Unpack InputParameter object to populate entity lists
         self.station_entities: Dict[int, Station] = (
@@ -69,8 +73,28 @@ class SimulatorController:
         # Initialize frame counter
         self.frameCounter: int = 0
 
+    def prep_entities(self) -> None:
+
+        for _, station in self.station_entities.items():
+            station.set_behaviour(self.sim_behaviour)
+            station.run()
+
+        for _,task in self.task_entities.items():
+            task.set_behaviour(self.sim_behaviour)
+            task.run()
+
+        for _, resource in self.resource_entities.items():
+            resource.set_behaviour(self.sim_behaviour)
+            resource.set_map_controller(self.map_controller)
+            resource.run()
+
+
+
     def start(self, sim_time: int) -> None:
         # TODO process initial entities into the sim env
+        
+        # Load entities into sim event queue and pass behaviour and/or mapcontroller
+        self.prep_entities()
         # start sim clock
         self.clock.run()
         self.sim_time = sim_time

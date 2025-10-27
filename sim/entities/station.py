@@ -23,6 +23,7 @@ SOFTWARE.
 """
 
 import simpy
+from sim.behaviour.sim_behaviour import SimBehaviour
 from typing import TYPE_CHECKING
 
 # to avoid circular imports
@@ -66,6 +67,9 @@ class Station:
     def get_station_position(self) -> "Position":
         return self.position
 
+    def set_behaviour(self, behaviour: SimBehaviour) -> None:
+        self.behaviour = behaviour
+        
     # continous process that runs throughout the simulation
     def run(self):  # type: ignore[no-untyped-def]
         # TODO: replace with periodic operations

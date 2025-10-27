@@ -23,6 +23,8 @@ SOFTWARE.
 """
 
 import simpy
+from sim.behaviour.sim_behaviour import SimBehaviour
+from sim.controller.MapController import MapController
 from typing import Optional, TYPE_CHECKING, Generator
 from .task_state import State
 
@@ -57,9 +59,15 @@ class Resource:
 
     def get_resource_position(self) -> "Position":
         return self.position
+    
+    def set_behaviour(self, sim_behaviour: SimBehaviour) -> None:
+        self.sim_behaviour = sim_behaviour
 
     def set_resource_position(self, position: "Position") -> None:
         self.position = position
+    
+    def set_map_controller(self, map_controller: MapController) -> None:
+        self.set_map_controller = map_controller
 
     def assign_task(self, task: "Task", dispatch_delay: Optional[float] = None) -> None:
 
@@ -123,8 +131,25 @@ class Resource:
     def clear_update(self) -> None:
         self.has_updated = False
 
+    # def travel_to(self, position: Position) -> None:
+    #     if self.position == position:
+    #         return
+        
+    #     while True:
+
+
+
     # continous process that runs throughout the simulation
     def run(self):  # type: ignore[no-untyped-def]
         while True:
             # @TODO: replace with actual periodic logic
+
+            # Select Next Task
+            # if(len(self.task_list) > 0):
+            #     if(not self.get_in_progress_task):
+            #         next_task_id = self.sim_behaviour.RCNT_strategy.select_next_task(self)
+
+            # # Check if position is the next task position
             yield self.env.timeout(1)
+
+

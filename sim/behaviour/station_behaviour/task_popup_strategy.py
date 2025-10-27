@@ -22,20 +22,13 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 """
 
+from abc import ABC, abstractmethod
+from sim.entities.station import Station
+from typing import Dict, int
 
-class Position:
-    def __init__(self, position: list[float]) -> None:  # [longitude, latitude]
-        self.position = position
 
-    def get_position(self) -> list[float]:
-        return self.position
+class TaskPopupStrategy(ABC):
 
-    def set_position(self, position: list[float]) -> None:
-        self.position = position
-
-    def __eq__ (self,other: object) -> bool:
-        if not isinstance(self, Position):
-            return False
-        return (other[0] == self[0] and other[1] == self[1])
-    
-    
+    @abstractmethod
+    def check_for_new_task(self, stations: Dict[int, Station]) -> None:
+        raise NotImplementedError()
