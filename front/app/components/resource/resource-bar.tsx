@@ -74,14 +74,24 @@ export default function ResourceBar() {
         </CardHeader>
         <CardContent className="pt-0">
           <div className="space-y-2 max-h-[calc(100vh-12rem)] overflow-y-auto pr-3 -mr-3">
-            {filteredResources.map((resource) => (
-              <ResourceItem
-                key={resource.id}
-                resource={resource}
-                onSelect={() => handleSelect(resource.id)}
-                isSelected={isResourceSelected(resource.id)}
-              />
-            ))}
+            {resources.length === 0 ? (
+              <div className="text-center text-muted-foreground py-8 select-none">
+                No resources currently available
+              </div>
+            ) : filteredResources.length === 0 ? (
+              <div className="text-center text-muted-foreground py-8 select-none">
+                No resources match your search
+              </div>
+            ) : (
+              filteredResources.map((resource) => (
+                <ResourceItem
+                  key={resource.id}
+                  resource={resource}
+                  onSelect={() => handleSelect(resource.id)}
+                  isSelected={isResourceSelected(resource.id)}
+                />
+              ))
+            )}
           </div>
         </CardContent>
       </Card>
