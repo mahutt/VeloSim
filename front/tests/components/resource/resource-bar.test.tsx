@@ -328,3 +328,40 @@ test('maintains selection state while filtering', async () => {
   expect(screen.getByText('#1')).toBeInTheDocument();
   expect(screen.queryByText('#2')).not.toBeInTheDocument();
 });
+
+test('shows "No resources currently available" when resources array is empty', () => {
+  const selectItem = vi.fn();
+  (useSimulation as unknown as ReturnType<typeof vi.fn>).mockReturnValue({
+    selectItem,
+    resources: [],
+    stationsRef: { current: new Map() },
+    resourcesRef: { current: new Map() },
+    selectedItem: null,
+    clearSelection: vi.fn(),
+  });
+
+  render(<ResourceBar />);
+  expect(
+    screen.getByText('No resources currently available')
+  ).toBeInTheDocument();
+});
+
+test('shows "No resources match your search" when search yields no results', async () => {
+  const user = userEvent.setup();
+  const selectItem = vi.fn();
+  (useSimulation as unknown as ReturnType<typeof vi.fn>).mockReturnValue({
+    selectItem,
+    resources: mockResources,
+    stationsRef: { current: new Map() },
+    resourcesRef: { current: new Map() },
+    selectedItem: null,
+    clearSelection: vi.fn(),
+  });
+
+  render(<ResourceBar />);
+  const searchInput = screen.getByPlaceholderText('Search Resource');
+  await user.type(searchInput, '999');
+  expect(
+    screen.getByText('No resources match your search')
+  ).toBeInTheDocument();
+});
