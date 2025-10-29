@@ -35,6 +35,7 @@ import {
   SidebarMenu,
   SidebarMenuItem,
 } from '~/components/ui/sidebar';
+import { APP_NAME } from '~/contants';
 import useAuth from '~/hooks/use-auth';
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
@@ -47,7 +48,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
             <div className="flex flex-row items-center gap-2 p-2">
               <img src="/logo.png" alt="Velosim Logo" className="h-5 w-5" />
               <span className="text-muted-foreground text-base tracking-tight">
-                Velosim
+                {APP_NAME}
               </span>
             </div>
           </SidebarMenuItem>

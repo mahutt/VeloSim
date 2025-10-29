@@ -22,5 +22,6 @@
  * SOFTWARE.
  */
 
+const APP_NAME = 'VeloSim';
 const TOKEN_STORAGE_KEY = 'access_token';
-export { TOKEN_STORAGE_KEY };
+export { APP_NAME, TOKEN_STORAGE_KEY };
