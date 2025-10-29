@@ -30,7 +30,7 @@ import React, {
 } from 'react';
 import { useNavigate } from 'react-router';
 import api from '~/api';
-import { TOKEN_STORAGE_KEY } from '~/contants';
+import { TOKEN_STORAGE_KEY } from '~/constants';
 import type { User } from '~/types';
 
 export interface AuthState {

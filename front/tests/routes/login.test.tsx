@@ -28,7 +28,7 @@ import userEvent from '@testing-library/user-event';
 import Signin from '~/routes/login';
 import axios from 'axios';
 import { AuthContext } from '~/providers/auth-provider';
-import { TOKEN_STORAGE_KEY } from '~/contants';
+import { TOKEN_STORAGE_KEY } from '~/constants';
 
 vi.mock('axios', () => ({
   default: {

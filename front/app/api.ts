@@ -23,7 +23,7 @@
  */
 
 import axios from 'axios';
-import { TOKEN_STORAGE_KEY } from './contants';
+import { TOKEN_STORAGE_KEY } from './constants';
 
 const API_VERSION = 'v1';
 

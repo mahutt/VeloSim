@@ -35,7 +35,7 @@ import {
   SidebarMenu,
   SidebarMenuItem,
 } from '~/components/ui/sidebar';
-import { APP_NAME } from '~/contants';
+import { APP_NAME } from '~/constants';
 import useAuth from '~/hooks/use-auth';
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {

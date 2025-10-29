@@ -24,7 +24,7 @@
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import api from '../app/api';
-import { TOKEN_STORAGE_KEY } from '../app/contants';
+import { TOKEN_STORAGE_KEY } from '../app/constants';
 
 // Type workaround until this PR is merged: https://github.com/axios/axios/pull/5551
 import type { AxiosRequestHeaders } from 'axios';
