@@ -31,7 +31,7 @@ from sim.entities.task import Task
 
 
 @dataclass
-class ScenarioConfig:
+class Scenario:
     scenario_title: Optional[str]
     start_time: str
     end_time: str
@@ -57,17 +57,6 @@ class ScenarioConfig:
         self.stations = stations or []
         self.initial_tasks = initial_tasks or []
         self.scheduled_tasks = scheduled_tasks or []
-
-    def to_json_dict(self) -> dict:
-        """Return only the simulation-related JSON schema fields."""
-        return {
-            "start_time": self.start_time,
-            "end_time": self.end_time,
-            "resources": [r.__dict__ for r in self.resources],
-            "stations": [s.__dict__ for s in self.stations],
-            "initial_tasks": [t.__dict__ for t in self.initial_tasks],
-            "scheduled_tasks": [t.__dict__ for t in self.scheduled_tasks],
-        }
 
     def __str__(self) -> str:
         """Readable string summary for debugging or logs."""
