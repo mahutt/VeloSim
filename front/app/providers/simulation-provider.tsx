@@ -51,6 +51,7 @@ import {
   setupMapClickHandlers,
   setupMapHoverHandlers,
 } from '~/lib/map-interactions';
+import useError from '~/hooks/use-error';
 
 type SimulationContextType = {
   stationsRef: React.RefObject<Map<number, Station>>;
@@ -67,6 +68,7 @@ const SimulationContext = createContext<SimulationContextType | undefined>(
 );
 
 export const SimulationProvider = ({ children }: { children: ReactNode }) => {
+  const { displayError } = useError();
   const { mapRef, mapLoaded } = useMap();
   const stationsRef = useRef<Map<number, Station>>(new Map());
   const resourcesRef = useRef<Map<number, Resource>>(new Map());
@@ -273,6 +275,11 @@ export const SimulationProvider = ({ children }: { children: ReactNode }) => {
       })
       .catch((error) => {
         console.error('Error fetching stations:', error);
+        displayError(
+          'Station load error',
+          'Failed to load stations from server.',
+          loadStations
+        );
       });
   };
 
