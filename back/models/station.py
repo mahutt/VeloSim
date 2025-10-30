@@ -23,12 +23,13 @@ SOFTWARE.
 """
 
 from typing import TYPE_CHECKING, List
-from sqlalchemy import String, Float
+from sqlalchemy import String, Float, ForeignKey
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from back.database.session import Base
 
 if TYPE_CHECKING:
     from .station_task import StationTask
+    from .sim_instance import SimInstance
 
 
 class Station(Base):
@@ -37,10 +38,16 @@ class Station(Base):
     __tablename__ = "stations"
 
     id: Mapped[int] = mapped_column(primary_key=True, index=True)
+    sim_instance_id: Mapped[int] = mapped_column(
+        ForeignKey("sim_instances.id"), nullable=False
+    )
+    sim_instance: Mapped["SimInstance"] = relationship(
+        "SimInstance", back_populates="stations"
+    )
+
     name: Mapped[str] = mapped_column(String(100), nullable=False, index=True)
     longitude: Mapped[float] = mapped_column(Float, nullable=False)
     latitude: Mapped[float] = mapped_column(Float, nullable=False)
-    # Use string to avoid circular import of back-populated field
     tasks: Mapped[List["StationTask"]] = relationship(
         "StationTask", back_populates="station"
     )

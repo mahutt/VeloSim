@@ -22,18 +22,49 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 """
 
+import pytest
 from sqlalchemy.orm import Session
 from back.crud.station import station_crud
-from back.schemas.station import StationCreate, StationUpdate
+from back.crud.user import user_crud
+from back.crud.sim_instance import sim_instance_crud
+from back.schemas import StationCreate, StationUpdate, SimInstanceCreate
+from back.models import User, SimInstance
+
+
+@pytest.fixture
+def test_user(db: Session) -> User:
+    """Create a non-admin user for testing."""
+    test_user = User(
+        username="test_user",
+        password_hash=user_crud.hash_password("test_password"),
+        is_admin=False,
+        is_enabled=True,
+    )
+    db.add(test_user)
+    db.flush()
+    db.refresh(test_user)
+    return test_user
+
+
+@pytest.fixture
+def sim_instance(db: Session, test_user: User) -> SimInstance:
+    """Create a test simulation instance for the normal user."""
+    sim_instance_data = SimInstanceCreate(user_id=test_user.id)
+    sim = sim_instance_crud.create(db, sim_instance_data)
+    db.commit()
+    return sim
 
 
 class TestStationCRUD:
     """Test the station CRUD operations."""
 
-    def test_create_station(self, db: Session) -> None:
+    def test_create_station(self, db: Session, sim_instance: SimInstance) -> None:
         """Test creating a station."""
         station_data = StationCreate(
-            name="Test Station", longitude=-73.5, latitude=45.5
+            name="Test Station",
+            longitude=-73.5,
+            latitude=45.5,
+            sim_instance_id=sim_instance.id,
         )
         station = station_crud.create(db, station_data)
 
@@ -42,11 +73,14 @@ class TestStationCRUD:
         assert station.longitude == -73.5
         assert station.latitude == 45.5
 
-    def test_get_station_by_id(self, db: Session) -> None:
+    def test_get_station_by_id(self, db: Session, sim_instance: SimInstance) -> None:
         """Test getting a station by ID."""
         # Create a station first
         station_data = StationCreate(
-            name="Get Test Station", longitude=-73.6, latitude=45.6
+            name="Get Test Station",
+            longitude=-73.6,
+            latitude=45.6,
+            sim_instance_id=sim_instance.id,
         )
         created_station = station_crud.create(db, station_data)
 
@@ -61,11 +95,14 @@ class TestStationCRUD:
         station = station_crud.get(db, 999)
         assert station is None
 
-    def test_get_station_by_name(self, db: Session) -> None:
+    def test_get_station_by_name(self, db: Session, sim_instance: SimInstance) -> None:
         """Test getting a station by name."""
         # Create a station first
         station_data = StationCreate(
-            name="Named Station", longitude=-73.7, latitude=45.7
+            name="Named Station",
+            longitude=-73.7,
+            latitude=45.7,
+            sim_instance_id=sim_instance.id,
         )
         created_station = station_crud.create(db, station_data)
 
@@ -86,7 +123,9 @@ class TestStationCRUD:
         assert stations == []
         assert total == 0
 
-    def test_get_all_stations_with_data(self, db: Session) -> None:
+    def test_get_all_stations_with_data(
+        self, db: Session, sim_instance: SimInstance
+    ) -> None:
         """Test getting all stations with data."""
         # Create multiple stations
         for i in range(5):
@@ -94,6 +133,7 @@ class TestStationCRUD:
                 name=f"Station {i}",
                 longitude=-73.5 + i * 0.01,
                 latitude=45.5 + i * 0.01,
+                sim_instance_id=sim_instance.id,
             )
             station_crud.create(db, station_data)
 
@@ -102,7 +142,9 @@ class TestStationCRUD:
         assert len(stations) == 5
         assert total == 5
 
-    def test_get_all_stations_with_pagination(self, db: Session) -> None:
+    def test_get_all_stations_with_pagination(
+        self, db: Session, sim_instance: SimInstance
+    ) -> None:
         """Test getting all stations with pagination."""
         # Create multiple stations
         for i in range(10):
@@ -110,6 +152,7 @@ class TestStationCRUD:
                 name=f"Pagination Station {i}",
                 longitude=-73.5 + i * 0.01,
                 latitude=45.5 + i * 0.01,
+                sim_instance_id=sim_instance.id,
             )
             station_crud.create(db, station_data)
 
@@ -123,11 +166,14 @@ class TestStationCRUD:
         expected_names = [f"Pagination Station {i}" for i in range(3, 7)]
         assert station_names == expected_names
 
-    def test_update_station(self, db: Session) -> None:
+    def test_update_station(self, db: Session, sim_instance: SimInstance) -> None:
         """Test updating a station."""
         # Create a station first
         station_data = StationCreate(
-            name="Original Station", longitude=-73.5, latitude=45.5
+            name="Original Station",
+            longitude=-73.5,
+            latitude=45.5,
+            sim_instance_id=sim_instance.id,
         )
         created_station = station_crud.create(db, station_data)
 
@@ -143,11 +189,16 @@ class TestStationCRUD:
         assert updated_station.longitude == -73.6
         assert updated_station.latitude == 45.6
 
-    def test_update_station_partial(self, db: Session) -> None:
+    def test_update_station_partial(
+        self, db: Session, sim_instance: SimInstance
+    ) -> None:
         """Test updating a station with partial data."""
         # Create a station first
         station_data = StationCreate(
-            name="Partial Update Station", longitude=-73.5, latitude=45.5
+            name="Partial Update Station",
+            longitude=-73.5,
+            latitude=45.5,
+            sim_instance_id=sim_instance.id,
         )
         created_station = station_crud.create(db, station_data)
 
@@ -166,11 +217,14 @@ class TestStationCRUD:
         updated_station = station_crud.update(db, 999, update_data)
         assert updated_station is None
 
-    def test_delete_station(self, db: Session) -> None:
+    def test_delete_station(self, db: Session, sim_instance: SimInstance) -> None:
         """Test deleting a station."""
         # Create a station first
         station_data = StationCreate(
-            name="Station to Delete", longitude=-73.5, latitude=45.5
+            name="Station to Delete",
+            longitude=-73.5,
+            latitude=45.5,
+            sim_instance_id=sim_instance.id,
         )
         created_station = station_crud.create(db, station_data)
 
@@ -187,12 +241,29 @@ class TestStationCRUD:
         success = station_crud.delete(db, 999)
         assert success is False
 
-    def test_create_multiple_stations_with_different_names(self, db: Session) -> None:
+    def test_create_multiple_stations_with_different_names(
+        self, db: Session, sim_instance: SimInstance
+    ) -> None:
         """Test creating multiple stations with different names."""
         stations_data = [
-            StationCreate(name="Station A", longitude=-73.5, latitude=45.5),
-            StationCreate(name="Station B", longitude=-73.6, latitude=45.6),
-            StationCreate(name="Station C", longitude=-73.7, latitude=45.7),
+            StationCreate(
+                name="Station A",
+                longitude=-73.5,
+                latitude=45.5,
+                sim_instance_id=sim_instance.id,
+            ),
+            StationCreate(
+                name="Station B",
+                longitude=-73.6,
+                latitude=45.6,
+                sim_instance_id=sim_instance.id,
+            ),
+            StationCreate(
+                name="Station C",
+                longitude=-73.7,
+                latitude=45.7,
+                sim_instance_id=sim_instance.id,
+            ),
         ]
 
         created_stations = []

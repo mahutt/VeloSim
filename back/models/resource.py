@@ -23,7 +23,7 @@ SOFTWARE.
 """
 
 from typing import TYPE_CHECKING, List
-from sqlalchemy import Enum, Float, DateTime, func
+from sqlalchemy import Enum, Float, DateTime, ForeignKey, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from .resource_type import ResourceType
 from .task_status import TaskStatus
@@ -31,6 +31,7 @@ from back.database.session import Base
 
 if TYPE_CHECKING:
     from .station_task import StationTask
+    from .sim_instance import SimInstance
 
 
 class Resource(Base):
@@ -41,6 +42,13 @@ class Resource(Base):
     __tablename__ = "resources"
 
     id: Mapped[int] = mapped_column(primary_key=True, index=True)
+    sim_instance_id: Mapped[int] = mapped_column(
+        ForeignKey("sim_instances.id"), nullable=False
+    )
+    sim_instance: Mapped["SimInstance"] = relationship(
+        "SimInstance", back_populates="resources"
+    )
+
     type: Mapped[ResourceType] = mapped_column(Enum(ResourceType), nullable=False)
     date_created: Mapped[DateTime] = mapped_column(
         DateTime, nullable=False, server_default=func.now()
@@ -54,7 +62,7 @@ class Resource(Base):
     route_start_longitude: Mapped[float] = mapped_column(Float, nullable=False)
     route_end_latitude: Mapped[float] = mapped_column(Float, nullable=False)
     route_end_longitude: Mapped[float] = mapped_column(Float, nullable=False)
-    # Use string to avoid circular import of back-populated field
+
     tasks: Mapped[List["StationTask"]] = relationship(
         "StationTask",
         back_populates="resource",
@@ -114,6 +122,10 @@ class Resource(Base):
         if not task.status.is_open:
             raise ValueError(
                 f"Task {task.id} has status {task.status.value} and cannot be assigned."
+            )
+        if task.sim_instance_id != self.sim_instance_id:
+            raise ValueError(
+                f"Task {task.id} belongs to a different simulation than this resource."
             )
         self.tasks.append(task)
         task.resource = self

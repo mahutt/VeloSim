@@ -24,7 +24,36 @@ SOFTWARE.
 
 from typing import Any, Dict
 from fastapi.testclient import TestClient
+import pytest
 from sqlalchemy.orm import Session
+
+from back.models import SimInstance, User
+from back.schemas import SimInstanceCreate
+from back.crud.sim_instance import sim_instance_crud
+
+
+@pytest.fixture
+def test_user(db: Session) -> User:
+    """Create a non-admin test user."""
+    user = User(
+        username="test_user",
+        password_hash="test_password",
+        is_admin=False,
+        is_enabled=True,
+    )
+    db.add(user)
+    db.flush()
+    db.refresh(user)
+    return user
+
+
+@pytest.fixture
+def sim_instance(db: Session, test_user: User) -> SimInstance:
+    """Create a test simulation instance for the normal user."""
+    sim_instance_data = SimInstanceCreate(user_id=test_user.id)
+    sim = sim_instance_crud.create(db, sim_instance_data)
+    db.commit()
+    return sim
 
 
 def make_resource_payload(
@@ -36,6 +65,7 @@ def make_resource_payload(
     route_start_longitude: float = -73.6,
     route_end_latitude: float = 45.6,
     route_end_longitude: float = -73.4,
+    sim_instance_id: int,
 ) -> Dict[str, Any]:
     """Helper to build a full valid resource creation payload."""
     return {
@@ -46,6 +76,7 @@ def make_resource_payload(
         "route_start_longitude": route_start_longitude,
         "route_end_latitude": route_end_latitude,
         "route_end_longitude": route_end_longitude,
+        "sim_instance_id": sim_instance_id,
     }
 
 
@@ -63,7 +94,9 @@ class TestResourcesAPI:
         assert data["per_page"] == 10
         assert data["total_pages"] == 0
 
-    def test_create_resource_success(self, client: TestClient, db: Session) -> None:
+    def test_create_resource_success(
+        self, client: TestClient, db: Session, sim_instance: SimInstance
+    ) -> None:
         """Test creating a resource successfully."""
         payload = make_resource_payload(
             latitude=45.5,
@@ -72,6 +105,7 @@ class TestResourcesAPI:
             route_start_longitude=-73.6,
             route_end_latitude=45.6,
             route_end_longitude=-73.4,
+            sim_instance_id=sim_instance.id,
         )
 
         response = client.post("/api/v1/resources/", json=payload)
@@ -89,11 +123,16 @@ class TestResourcesAPI:
             [payload["route_end_longitude"], payload["route_end_latitude"]],
         ]
 
-    def test_get_resource_by_id_success(self, client: TestClient, db: Session) -> None:
+    def test_get_resource_by_id_success(
+        self, client: TestClient, db: Session, sim_instance: SimInstance
+    ) -> None:
         """Test retrieving a resource by ID successfully."""
         # Create resource
         payload = make_resource_payload(
-            type_value="vehicle_driver", latitude=45.7, longitude=-73.7
+            type_value="vehicle_driver",
+            latitude=45.7,
+            longitude=-73.7,
+            sim_instance_id=sim_instance.id,
         )
         create_response = client.post("/api/v1/resources/", json=payload)
         assert create_response.status_code == 201, create_response.text
@@ -119,7 +158,7 @@ class TestResourcesAPI:
         assert "not found" in data.get("detail", "").lower()
 
     def test_get_resources_with_pagination(
-        self, client: TestClient, db: Session
+        self, client: TestClient, db: Session, sim_instance: SimInstance
     ) -> None:
         """Test listing resources with pagination."""
         # Create multiple resources
@@ -131,6 +170,7 @@ class TestResourcesAPI:
                 route_start_longitude=-73.6,
                 route_end_latitude=45.6,
                 route_end_longitude=-73.4,
+                sim_instance_id=sim_instance.id,
             )
             resp = client.post("/api/v1/resources/", json=payload)
             assert resp.status_code == 201, resp.text
@@ -154,10 +194,14 @@ class TestResourcesAPI:
         assert data["page"] == 2
         assert data["per_page"] == 2
 
-    def test_update_resource_success(self, client: TestClient, db: Session) -> None:
+    def test_update_resource_success(
+        self, client: TestClient, db: Session, sim_instance: SimInstance
+    ) -> None:
         """Test updating a resource successfully."""
         # Create resource
-        payload = make_resource_payload(latitude=45.5, longitude=-73.5)
+        payload = make_resource_payload(
+            latitude=45.5, longitude=-73.5, sim_instance_id=sim_instance.id
+        )
         create_response = client.post("/api/v1/resources/", json=payload)
         assert create_response.status_code == 201, create_response.text
         resource_id = create_response.json()["id"]
@@ -176,10 +220,14 @@ class TestResourcesAPI:
         assert response.status_code == 404
         assert "not found" in response.json().get("detail", "").lower()
 
-    def test_delete_resource_success(self, client: TestClient, db: Session) -> None:
+    def test_delete_resource_success(
+        self, client: TestClient, db: Session, sim_instance: SimInstance
+    ) -> None:
         """Test deleting a resource successfully."""
         # Create resource
-        payload = make_resource_payload(latitude=45.5, longitude=-73.5)
+        payload = make_resource_payload(
+            latitude=45.5, longitude=-73.5, sim_instance_id=sim_instance.id
+        )
         create_response = client.post("/api/v1/resources/", json=payload)
         assert create_response.status_code == 201, create_response.text
         resource_id = create_response.json()["id"]
@@ -207,11 +255,17 @@ class TestResourcesAPI:
         # The API serializes enum names in responses
         assert "vehicle_driver" in data
 
-    def test_filter_resources_by_type(self, client: TestClient, db: Session) -> None:
+    def test_filter_resources_by_type(
+        self, client: TestClient, db: Session, sim_instance: SimInstance
+    ) -> None:
         """Test filtering resources by type."""
         # Create two resources
-        p1 = make_resource_payload(latitude=45.5, longitude=-73.5)
-        p2 = make_resource_payload(latitude=46.0, longitude=-74.0)
+        p1 = make_resource_payload(
+            latitude=45.5, longitude=-73.5, sim_instance_id=sim_instance.id
+        )
+        p2 = make_resource_payload(
+            latitude=46.0, longitude=-74.0, sim_instance_id=sim_instance.id
+        )
         r1 = client.post("/api/v1/resources/", json=p1)
         r2 = client.post("/api/v1/resources/", json=p2)
         assert r1.status_code == 201, r1.text
@@ -225,33 +279,50 @@ class TestResourcesAPI:
         # All returned resources should have the serialized type name
         assert all(r["type"] == "vehicle_driver" for r in data["resources"])
 
-    def create_station_task_resource(self, client: TestClient) -> tuple[int, int, int]:
+    def create_station_task_resource(
+        self, client: TestClient, sim_instance: SimInstance
+    ) -> tuple[int, int, int]:
         """
         Helper to create a station, a station task, and a resource.
         Returns: (station_id, task_id, resource_id)
         """
         # Create station
-        station_data = {"name": "Test Station", "longitude": -73.5, "latitude": 45.5}
+        station_data = {
+            "name": "Test Station",
+            "longitude": -73.5,
+            "latitude": 45.5,
+            "sim_instance_id": sim_instance.id,
+        }
         station_resp = client.post("/api/v1/stations/", json=station_data)
         assert station_resp.status_code == 201
         station_id = station_resp.json()["id"]
 
         # Create station task
-        task_data = {"station_id": station_id, "type": "battery_swap"}
+        task_data = {
+            "station_id": station_id,
+            "type": "battery_swap",
+            "sim_instance_id": sim_instance.id,
+        }
         task_resp = client.post("/api/v1/stationTasks/", json=task_data)
         assert task_resp.status_code == 201
         task_id = task_resp.json()["id"]
 
         # Create resource
-        resource_payload = make_resource_payload(type_value="vehicle_driver")
+        resource_payload = make_resource_payload(
+            type_value="vehicle_driver", sim_instance_id=sim_instance.id
+        )
         resource_resp = client.post("/api/v1/resources/", json=resource_payload)
         assert resource_resp.status_code == 201
         resource_id = resource_resp.json()["id"]
 
         return station_id, task_id, resource_id
 
-    def test_assign_tasks_to_resource(self, client: TestClient, db: Session) -> None:
-        _, task_id, resource_id = self.create_station_task_resource(client)
+    def test_assign_tasks_to_resource(
+        self, client: TestClient, db: Session, sim_instance: SimInstance
+    ) -> None:
+        _, task_id, resource_id = self.create_station_task_resource(
+            client, sim_instance
+        )
 
         # Assign the task to the resource
         response = client.post(
@@ -262,9 +333,11 @@ class TestResourcesAPI:
         assert response.json()["message"] == expected_message
 
     def test_unassign_tasks_from_resource(
-        self, client: TestClient, db: Session
+        self, client: TestClient, db: Session, sim_instance: SimInstance
     ) -> None:
-        _, task_id, resource_id = self.create_station_task_resource(client)
+        _, task_id, resource_id = self.create_station_task_resource(
+            client, sim_instance
+        )
 
         # Assign the task to the resource first
         client.post(
@@ -279,8 +352,12 @@ class TestResourcesAPI:
         expected_message = f"Task(s) [{task_id}] unassigned from resource {resource_id}"
         assert response.json()["message"] == expected_message
 
-    def test_service_tasks_for_resource(self, client: TestClient, db: Session) -> None:
-        _, task_id, resource_id = self.create_station_task_resource(client)
+    def test_service_tasks_for_resource(
+        self, client: TestClient, db: Session, sim_instance: SimInstance
+    ) -> None:
+        _, task_id, resource_id = self.create_station_task_resource(
+            client, sim_instance
+        )
 
         # Assign the task to the resource first
         client.post(

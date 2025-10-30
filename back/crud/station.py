@@ -36,6 +36,7 @@ class StationCRUD:
     def create(self, db: Session, station_data: StationCreate) -> Station:
         """Create a new station."""
         db_station = Station(
+            sim_instance_id=station_data.sim_instance_id,
             name=station_data.name,
             longitude=station_data.longitude,
             latitude=station_data.latitude,

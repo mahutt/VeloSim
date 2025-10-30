@@ -31,6 +31,7 @@ from back.database.session import Base
 if TYPE_CHECKING:
     from .station import Station
     from .resource import Resource
+    from .sim_instance import SimInstance
 
 
 class StationTask(Base):
@@ -41,6 +42,13 @@ class StationTask(Base):
     __tablename__ = "station_tasks"
 
     id: Mapped[int] = mapped_column(primary_key=True, index=True)
+    sim_instance_id: Mapped[int] = mapped_column(
+        ForeignKey("sim_instances.id"), nullable=False
+    )
+    sim_instance: Mapped["SimInstance"] = relationship(
+        "SimInstance", back_populates="tasks"
+    )
+
     type: Mapped[StationTaskType] = mapped_column(Enum(StationTaskType), nullable=False)
     status: Mapped[TaskStatus] = mapped_column(
         Enum(TaskStatus), nullable=False, default=TaskStatus.OPEN
@@ -64,5 +72,6 @@ class StationTask(Base):
         return (
             f"<StationTask(id={self.id}, type={self.type}, status={self.status}, "
             f"station_id={self.station_id}, resource_id={self.resource_id}, "
+            f"sim_instance_id={self.sim_instance_id}, "
             f"date_created={self.date_created}, date_updated={self.date_updated})>"
         )

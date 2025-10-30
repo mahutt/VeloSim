@@ -44,5 +44,8 @@ class SimInstanceResponse(SimInstanceBase):
     id: int
     date_created: datetime
     date_updated: datetime
+    resource_count: int
+    station_count: int
+    task_count: int
 
     model_config = ConfigDict(from_attributes=True)

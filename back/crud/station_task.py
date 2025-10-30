@@ -35,6 +35,7 @@ class StationTaskCRUD:
         """Create a new station task."""
         with db.begin(nested=True):
             db_task = StationTask(
+                sim_instance_id=station_task_data.sim_instance_id,
                 type=station_task_data.type,
                 station_id=station_task_data.station_id,
             )
