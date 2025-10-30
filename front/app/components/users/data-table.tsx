@@ -45,6 +45,7 @@ import { Button } from '../ui/button';
 import ResetPasswordDialog from '../reset-password-dialog';
 import { useState } from 'react';
 import type { User } from '~/types';
+import NewUserDialog from '~/components/users/new-user-dialog';
 
 declare module '@tanstack/react-table' {
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -58,6 +59,7 @@ declare module '@tanstack/react-table' {
 interface DataTableProps<TData, TValue> {
   columns: ColumnDef<TData, TValue>[];
   data: TData[];
+  onAddUser: (u: User) => void;
   onUpdateUser: (u: User) => void;
   getRowId: (originalRow: TData, index: number, parent?: unknown) => string;
 }
@@ -65,9 +67,11 @@ interface DataTableProps<TData, TValue> {
 export function DataTable<TData, TValue>({
   columns,
   data,
+  onAddUser,
   onUpdateUser,
   getRowId,
 }: DataTableProps<TData, TValue>) {
+  const [showUserForm, setShowUserForm] = useState(false);
   const [showResetPasswordDialog, setShowResetPasswordDialog] = useState(false);
   const [resetPasswordUser, setResetPasswordUser] = useState<User | null>(null);
   const [pagination, setPagination] = useState<PaginationState>({
@@ -94,7 +98,7 @@ export function DataTable<TData, TValue>({
 
   return (
     <div>
-      <div className="flex items-center py-4">
+      <div className="flex justify-between items-center gap-4 py-4">
         <Input
           placeholder="Filter usernames..."
           value={
@@ -105,6 +109,9 @@ export function DataTable<TData, TValue>({
           }
           className="max-w-sm"
         />
+        <Button variant="outline" onClick={() => setShowUserForm(true)}>
+          New user
+        </Button>
       </div>
       <div className="overflow-hidden rounded-md border">
         <Table>
@@ -181,6 +188,11 @@ export function DataTable<TData, TValue>({
           targetUser={resetPasswordUser}
         />
       )}
+      <NewUserDialog
+        open={showUserForm}
+        onOpenChange={setShowUserForm}
+        onAddUser={onAddUser}
+      />
     </div>
   );
 }
