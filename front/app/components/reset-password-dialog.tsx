@@ -96,7 +96,7 @@ export default function ResetPasswordDialog({
         onOpenChange(false);
       }, 2000);
     } catch (e) {
-      console.error('Login error', e);
+      console.error('Reset password error', e);
       setMessage(UpdatePasswordFormMessage.Error);
     }
   }
