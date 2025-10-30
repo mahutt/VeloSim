@@ -23,7 +23,9 @@ SOFTWARE.
 """
 
 import os
-from typing import List
+import json
+from typing import Any, List
+from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from dotenv import load_dotenv
 
@@ -36,6 +38,25 @@ def env_flag(name: str) -> bool:
     return os.getenv(name, "false").strip().lower() == "true"
 
 
+def compose_database_url_from_env(default: str) -> str:
+    """Compose the database URL from its individual components. This is neccesary when
+    some parts of the URLs are kept as secrets in cloud environments."""
+    host = os.getenv("DB_HOST")
+    port = os.getenv("DB_PORT")
+    name = os.getenv("DB_NAME")
+    username = os.getenv("DB_USERNAME")
+    password = os.getenv("DB_PASSWORD")
+    if (
+        host is None
+        or port is None
+        or username is None
+        or password is None
+        or name is None
+    ):
+        return default
+    return f"postgresql://{username}:{password}@{host}:{port}/{name}"
+
+
 class Settings(BaseSettings):
     """Application settings."""
 
@@ -44,8 +65,8 @@ class Settings(BaseSettings):
     DEBUG: bool = os.getenv("DEBUG", "True").lower() == "true"
 
     # Database
-    DATABASE_URL: str = os.getenv(
-        "DATABASE_URL", "postgresql://velosim:velosim@localhost:5433/velosim"
+    DATABASE_URL: str = compose_database_url_from_env(
+        os.getenv("DATABASE_URL", "postgresql://velosim:velosim@localhost:5433/velosim")
     )
 
     # CORS
@@ -55,6 +76,36 @@ class Settings(BaseSettings):
         "http://127.0.0.1:3000",
         "http://127.0.0.1:5173",
     ]
+
+    @field_validator("ALLOWED_ORIGINS", mode="before")
+    @classmethod
+    def parse_allowed_origins(cls, v: Any) -> Any:
+        """
+        Needed to pass this parameter via CLI, because it is a string and not a List:
+        - JSON array string: '["https://a.com","https://b.com"]'
+        - Comma-separated string: "https://a.com, https://b.com"
+        - Single string: "https://a.com"
+        - List[str]
+        """
+        if v is None:
+            return v
+        if isinstance(v, list):
+            return v
+        if isinstance(v, str):
+            s = v.strip()
+            # Try JSON array first
+            if s.startswith("["):
+                try:
+                    parsed = json.loads(s)
+                    if isinstance(parsed, list):
+                        return [str(x).strip() for x in parsed]
+                except Exception:
+                    pass
+            # Fallback to comma-separated or single value
+            if "," in s:
+                return [p.strip() for p in s.split(",") if p.strip()]
+            return [s]
+        return v
 
     # API
     API_V1_PREFIX: str = "/api/v1"

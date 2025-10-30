@@ -2,6 +2,12 @@
 .secrets
 .env
 
+# Compiled Open Container Images
+*.oci
+
+cdk/cdk.out/
+cdk/cdk.context.json
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
