@@ -32,6 +32,7 @@ import {
   type ReactNode,
   type RefObject,
 } from 'react';
+import useError from '~/hooks/use-error';
 import {
   initializeMapSources,
   loadMapImages,
@@ -50,6 +51,7 @@ type MapContextType = {
 const MapContext = createContext<MapContextType | undefined>(undefined);
 
 export const MapProvider = ({ children }: { children: ReactNode }) => {
+  const { displayError } = useError();
   const mapRef = useRef<mapboxgl.Map | null>(null);
   const mapContainerRef = useRef<HTMLDivElement | null>(null);
   const [mapLoaded, setMapLoaded] = useState(false);
@@ -70,6 +72,16 @@ export const MapProvider = ({ children }: { children: ReactNode }) => {
       initializeMapSources(mapRef.current);
       setMapLayers(mapRef.current);
       setMapLoaded(true);
+    });
+
+    mapRef.current.on('error', () => {
+      displayError(
+        'Failed to load map',
+        'An error occurred while loading the map. Please try again later.',
+        () => {
+          window.location.reload();
+        }
+      );
     });
 
     // Force the map to resize when the container size changes

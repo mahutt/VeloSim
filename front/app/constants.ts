@@ -22,30 +22,6 @@
  * SOFTWARE.
  */
 
-import axios from 'axios';
-import { TOKEN_STORAGE_KEY } from './constants';
-
-const API_VERSION = 'v1';
-
-const api = axios.create({
-  baseURL: `${import.meta.env.VITE_BACKEND_URL}/api/${API_VERSION}`,
-  headers: {
-    'Content-Type': 'application/json',
-  },
-  withCredentials: true,
-});
-
-api.interceptors.request.use(
-  (config) => {
-    const token = sessionStorage.getItem(TOKEN_STORAGE_KEY);
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`;
-    }
-    return config;
-  },
-  (error) => {
-    return Promise.reject(error);
-  }
-);
-
-export default api;
+const APP_NAME = 'VeloSim';
+const TOKEN_STORAGE_KEY = 'access_token';
+export { APP_NAME, TOKEN_STORAGE_KEY };

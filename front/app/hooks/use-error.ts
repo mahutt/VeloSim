@@ -22,5 +22,15 @@
  * SOFTWARE.
  */
 
-const TOKEN_STORAGE_KEY = 'access_token';
-export { TOKEN_STORAGE_KEY };
+import { useContext } from 'react';
+import { ErrorContext, type ErrorState } from '~/providers/error-provider';
+
+const useError = (): ErrorState => {
+  const context = useContext(ErrorContext);
+  if (context === undefined) {
+    throw new Error('useError must be used within an ErrorProvider');
+  }
+  return context;
+};
+
+export default useError;

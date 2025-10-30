@@ -38,7 +38,7 @@ import axios from 'axios';
 import LoginAlert from '~/components/login/login-alert';
 import { useState } from 'react';
 import useAuth from '~/hooks/use-auth';
-import { TOKEN_STORAGE_KEY } from '~/contants';
+import { TOKEN_STORAGE_KEY } from '~/constants';
 
 export function meta() {
   return [{ title: 'Login' }];

@@ -22,30 +22,34 @@
  * SOFTWARE.
  */
 
-import axios from 'axios';
-import { TOKEN_STORAGE_KEY } from './constants';
+import { expect, test, vi } from 'vitest';
+import { renderHook } from '@testing-library/react';
+import { ErrorProvider } from '~/providers/error-provider';
+import type { ReactNode } from 'react';
 
-const API_VERSION = 'v1';
-
-const api = axios.create({
-  baseURL: `${import.meta.env.VITE_BACKEND_URL}/api/${API_VERSION}`,
-  headers: {
-    'Content-Type': 'application/json',
-  },
-  withCredentials: true,
-});
-
-api.interceptors.request.use(
-  (config) => {
-    const token = sessionStorage.getItem(TOKEN_STORAGE_KEY);
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`;
-    }
-    return config;
-  },
-  (error) => {
-    return Promise.reject(error);
-  }
+// Wrapper component to provide context
+const Wrapper = ({ children }: { children: ReactNode }) => (
+  <ErrorProvider>{children}</ErrorProvider>
 );
 
-export default api;
+test('useError returns context when used within ErrorProvider', async () => {
+  vi.doUnmock('~/hooks/use-error');
+  const module = await import('~/hooks/use-error');
+  const localUseError = module.default;
+  const { result } = renderHook(() => localUseError(), {
+    wrapper: Wrapper,
+  });
+
+  expect(result.current).toEqual({
+    displayError: expect.any(Function),
+  });
+});
+
+test('useError throws error when used outside ErrorProvider', async () => {
+  vi.doUnmock('~/hooks/use-error');
+  const module = await import('~/hooks/use-error');
+  const localUseError = module.default;
+  expect(() => {
+    renderHook(() => localUseError());
+  }).toThrow('useError must be used within an ErrorProvider');
+});

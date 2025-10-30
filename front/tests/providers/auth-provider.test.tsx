@@ -26,7 +26,7 @@ import { expect, test, vi, beforeEach } from 'vitest';
 import { render, act } from '@testing-library/react';
 import { AuthProvider, AuthContext } from '~/providers/auth-provider';
 import { useContext } from 'react';
-import { TOKEN_STORAGE_KEY } from '~/contants';
+import { TOKEN_STORAGE_KEY } from '~/constants';
 
 // Mock sessionStorage
 const mockSessionStorage = {
