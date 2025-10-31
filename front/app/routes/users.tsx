@@ -89,6 +89,7 @@ export default function Users() {
           columns={columns}
           data={users}
           getRowId={(row) => String(row.id)}
+          onAddUser={(u) => setUsers((prev) => [...prev, u])}
           onUpdateUser={(u) =>
             setUsers((prev) => prev.map((x) => (x.id === u.id ? u : x)))
           }
