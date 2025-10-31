@@ -34,6 +34,7 @@ import {
 import { MoreHorizontal } from 'lucide-react';
 import { Button } from '../ui/button';
 import api from '~/api';
+import useAuth from '~/hooks/use-auth';
 
 export const columns: ColumnDef<User>[] = [
   {
@@ -71,6 +72,7 @@ export const columns: ColumnDef<User>[] = [
     id: 'actions',
     enableHiding: false,
     cell: ({ row, table }) => {
+      const { user: authenticatedUser } = useAuth();
       const user = row.original;
       return (
         <div className="flex justify-end gap-1">
@@ -93,6 +95,28 @@ export const columns: ColumnDef<User>[] = [
                 }}
               >
                 Change password
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                disabled={authenticatedUser?.id === user.id}
+                onClick={async () => {
+                  try {
+                    const { data: UpdatedUser } = await api.put<User>(
+                      `/users/${user.id}/role`,
+                      {
+                        is_admin: !user.is_admin,
+                        is_enabled: user.is_enabled,
+                      }
+                    );
+                    table.options.meta?.updateUser(UpdatedUser);
+                  } catch (error) {
+                    const errorLog = user.is_admin
+                      ? 'revoke admin'
+                      : 'make admin';
+                    console.error(`Failed to ${errorLog}:`, error);
+                  }
+                }}
+              >
+                {user.is_admin ? 'Revoke admin' : 'Make admin'}
               </DropdownMenuItem>
               <DropdownMenuItem
                 onClick={async () => {

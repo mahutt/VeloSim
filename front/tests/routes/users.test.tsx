@@ -23,7 +23,7 @@
  */
 
 import { expect, test, vi, beforeEach } from 'vitest';
-import { render, screen, within } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import api from '~/api';
 import { createRoutesStub } from 'react-router';
 import Users, { meta } from '~/routes/users';
@@ -201,4 +201,169 @@ test('clicking enable / disable user makes API PUT request', async () => {
     is_admin: true,
     is_enabled: false,
   });
+});
+
+test('clicking make / revoke admin makes API PUT request', async () => {
+  const user = userEvent.setup();
+
+  vi.mocked(api.get).mockResolvedValueOnce({
+    data: {
+      users: [
+        {
+          id: 1,
+          username: 'john_doe',
+          is_admin: true,
+          is_enabled: true,
+        },
+      ],
+      total: 1,
+      page: 1,
+      per_page: 10,
+      total_pages: 1,
+    },
+  });
+
+  vi.mocked(api.put).mockResolvedValueOnce({
+    data: {
+      id: 1,
+      username: 'john_doe',
+      is_admin: false,
+      is_enabled: true,
+    },
+  });
+
+  const Stub = createRoutesStub([
+    {
+      path: '/users',
+      Component: Users,
+    },
+  ]);
+  render(<Stub initialEntries={['/users']} />);
+  // Find and click the menu button
+  const menuButton = await screen.findByTestId('user-actions');
+  await user.click(menuButton);
+  const toggleEnableButton = await screen.findByText('Revoke admin');
+  await user.click(toggleEnableButton);
+  expect(api.put).toHaveBeenCalledWith('/users/1/role', {
+    is_admin: false,
+    is_enabled: true,
+  });
+});
+
+test('clicking make admin handles API error', async () => {
+  const consoleErrorSpy = vi
+    .spyOn(console, 'error')
+    .mockImplementation(() => {});
+  const user = userEvent.setup();
+
+  vi.mocked(api.get).mockResolvedValueOnce({
+    data: {
+      users: [
+        {
+          id: 1,
+          username: 'john_doe',
+          is_admin: false,
+          is_enabled: true,
+        },
+      ],
+      total: 1,
+      page: 1,
+      per_page: 10,
+      total_pages: 1,
+    },
+  });
+
+  const mockError = new Error('Failed to update user role');
+  vi.mocked(api.put).mockRejectedValueOnce(mockError);
+
+  const Stub = createRoutesStub([
+    {
+      path: '/users',
+      Component: Users,
+    },
+  ]);
+
+  render(<Stub initialEntries={['/users']} />);
+
+  // Find and click the menu button
+  const menuButton = await screen.findByTestId('user-actions');
+  await user.click(menuButton);
+
+  const revokeAdminButton = await screen.findByText('Make admin');
+  await user.click(revokeAdminButton);
+
+  // Wait for the API call to complete
+  await waitFor(() => {
+    expect(api.put).toHaveBeenCalledWith('/users/1/role', {
+      is_admin: true,
+      is_enabled: true,
+    });
+  });
+
+  // Verify error was logged
+  expect(consoleErrorSpy).toHaveBeenCalledWith(
+    'Failed to make admin:',
+    mockError
+  );
+
+  consoleErrorSpy.mockRestore();
+});
+
+test('clicking revoke admin handles API error', async () => {
+  const consoleErrorSpy = vi
+    .spyOn(console, 'error')
+    .mockImplementation(() => {});
+  const user = userEvent.setup();
+
+  vi.mocked(api.get).mockResolvedValueOnce({
+    data: {
+      users: [
+        {
+          id: 1,
+          username: 'john_doe',
+          is_admin: true,
+          is_enabled: true,
+        },
+      ],
+      total: 1,
+      page: 1,
+      per_page: 10,
+      total_pages: 1,
+    },
+  });
+
+  const mockError = new Error('Failed to update user role');
+  vi.mocked(api.put).mockRejectedValueOnce(mockError);
+
+  const Stub = createRoutesStub([
+    {
+      path: '/users',
+      Component: Users,
+    },
+  ]);
+
+  render(<Stub initialEntries={['/users']} />);
+
+  // Find and click the menu button
+  const menuButton = await screen.findByTestId('user-actions');
+  await user.click(menuButton);
+
+  const revokeAdminButton = await screen.findByText('Revoke admin');
+  await user.click(revokeAdminButton);
+
+  // Wait for the API call to complete
+  await waitFor(() => {
+    expect(api.put).toHaveBeenCalledWith('/users/1/role', {
+      is_admin: false,
+      is_enabled: true,
+    });
+  });
+
+  // Verify error was logged
+  expect(consoleErrorSpy).toHaveBeenCalledWith(
+    'Failed to revoke admin:',
+    mockError
+  );
+
+  consoleErrorSpy.mockRestore();
 });
