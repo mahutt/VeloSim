@@ -34,6 +34,19 @@ scrape_configs:
 
   # Python application logs
   - job_name: python-logs
+    pipeline_stages:
+      - regex:
+          expression: '^(?P<logger>\S+)\s+-\s+(?P<level>\S+)\s+-\s+(?P<json_data>\{.+\})\s*$'
+      - json:
+          expressions:
+            source: source
+            user_id: user_id
+            entity_type: entityType
+            error_type: errorType
+          source: json_data
+      - labels:
+          source:
+          level:
     static_configs:
       - targets:
           - localhost
