@@ -655,11 +655,24 @@ test('simulation provider handles click on non-existent station gracefully', asy
     clickHandler = handler;
   });
 
+  // Capture selection state to ensure it remains unchanged
+  let selectedItem: SelectedItem | null = null;
+  const SelectionCapture = () => {
+    const { selectedItem: current } = useSimulation();
+    selectedItem = current;
+    return null;
+  };
+
+  const consoleErrorSpy = vi
+    .spyOn(console, 'error')
+    .mockImplementation(() => {});
+
   render(
     <MapProvider>
       <SimulationProvider>
         <TaskAssignmentProvider>
           <MapContainer />
+          <SelectionCapture />
         </TaskAssignmentProvider>
       </SimulationProvider>
     </MapProvider>
@@ -678,15 +691,25 @@ test('simulation provider handles click on non-existent station gracefully', asy
   });
 
   // Simulate clicking on a non-existent station
-  expect(() => {
-    act(() => {
-      clickHandler!({
-        type: SelectedItemType.Station,
-        id: 999, // Non-existent station ID
-        coordinates: [0, 0], // Mock coordinates for non-existent station
-      });
+  act(() => {
+    clickHandler!({
+      type: SelectedItemType.Station,
+      id: 999, // Non-existent station ID
+      coordinates: [0, 0], // Mock coordinates for non-existent station
     });
-  }).toThrow('Selected station not found: 999');
+  });
+
+  // Should not throw, selection should remain unchanged (null), and an error should be logged
+  expect(selectedItem).toBeNull();
+  expect(consoleErrorSpy).toHaveBeenCalled();
+  // Ensure the log contains our marker and the missing id
+  const logged = (consoleErrorSpy as unknown as Mock).mock.calls
+    .map((c) => (c || []).join(' '))
+    .join('\n');
+  expect(logged).toContain('SIMULATION_ERROR');
+  expect(logged).toContain('999');
+
+  consoleErrorSpy.mockRestore();
 });
 
 test('simulation provider handles click on non-existent resource gracefully', async () => {
@@ -712,11 +735,24 @@ test('simulation provider handles click on non-existent resource gracefully', as
     clickHandler = handler;
   });
 
+  // Capture selection to verify it doesn't change
+  let selectedItem: SelectedItem | null = null;
+  const SelectionCapture = () => {
+    const { selectedItem: current } = useSimulation();
+    selectedItem = current;
+    return null;
+  };
+
+  const consoleErrorSpy = vi
+    .spyOn(console, 'error')
+    .mockImplementation(() => {});
+
   render(
     <MapProvider>
       <SimulationProvider>
         <TaskAssignmentProvider>
           <MapContainer />
+          <SelectionCapture />
         </TaskAssignmentProvider>
       </SimulationProvider>
     </MapProvider>
@@ -735,15 +771,24 @@ test('simulation provider handles click on non-existent resource gracefully', as
   });
 
   // Simulate clicking on a non-existent resource
-  expect(() => {
-    act(() => {
-      clickHandler!({
-        type: SelectedItemType.Resource,
-        id: 999, // Non-existent resource ID
-        coordinates: [0, 0], // Mock coordinates for non-existent resource
-      });
+  act(() => {
+    clickHandler!({
+      type: SelectedItemType.Resource,
+      id: 999, // Non-existent resource ID
+      coordinates: [0, 0], // Mock coordinates for non-existent resource
     });
-  }).toThrow('Selected resource not found: 999');
+  });
+
+  // Should not throw, selection remains unchanged, and error is logged
+  expect(selectedItem).toBeNull();
+  expect(consoleErrorSpy).toHaveBeenCalled();
+  const logged = (consoleErrorSpy as unknown as Mock).mock.calls
+    .map((c) => (c || []).join(' '))
+    .join('\n');
+  expect(logged).toContain('SIMULATION_ERROR');
+  expect(logged).toContain('999');
+
+  consoleErrorSpy.mockRestore();
 });
 
 test('simulation provider starts animation loop', async () => {
