@@ -52,6 +52,10 @@ import {
   setupMapHoverHandlers,
 } from '~/lib/map-interactions';
 import useError from '~/hooks/use-error';
+import {
+  logMissingEntityError,
+  logSimulationError,
+} from '~/utils/simulation-error-utils';
 
 type SimulationContextType = {
   stationsRef: React.RefObject<Map<number, Station>>;
@@ -90,13 +94,23 @@ export const SimulationProvider = ({ children }: { children: ReactNode }) => {
         : resourcesRef.current.get(id);
 
     if (!item) {
-      throw new Error(`Selected ${type} not found: ${id}`);
+      // Log missing entity data and notify user
+      const entityType =
+        type === SelectedItemType.Station ? 'station' : 'resource';
+      logMissingEntityError(entityType, id);
+
+      // Display error to user
+      const capitalizedType =
+        entityType.charAt(0).toUpperCase() + entityType.slice(1);
+      displayError(
+        `${capitalizedType} not found`,
+        `Failed to load ${entityType} details. Please try again later.`
+      );
+      return; // Don't throw - let the app continue running
     }
 
     // Update state
-    setSelectedItem({ type, value: item });
-
-    // Update refs for animation loop
+    setSelectedItem({ type, value: item! }); // Update refs for animation loop
     if (type === SelectedItemType.Station) {
       selectedStationIdRef.current = id;
       selectedResourceIdRef.current = undefined;
@@ -222,6 +236,13 @@ export const SimulationProvider = ({ children }: { children: ReactNode }) => {
       })
       .catch((error) => {
         console.error('Error loading resource routes:', error);
+        logSimulationError(error, 'Resource loading', {
+          errorType: 'RESOURCE_LOAD_FAILED',
+        });
+        displayError(
+          'Resource load error',
+          'Failed to load resources from server.'
+        );
       });
 
     // Set up map click handlers for selection
@@ -275,10 +296,12 @@ export const SimulationProvider = ({ children }: { children: ReactNode }) => {
       })
       .catch((error) => {
         console.error('Error fetching stations:', error);
+        logSimulationError(error, 'Station loading', {
+          errorType: 'STATION_LOAD_FAILED',
+        });
         displayError(
           'Station load error',
-          'Failed to load stations from server.',
-          loadStations
+          'Failed to load stations from server.'
         );
       });
   };
@@ -304,6 +327,17 @@ export const SimulationProvider = ({ children }: { children: ReactNode }) => {
    */
   const handleFrameUpdate = (updates: Resource[]) => {
     updates.forEach((update) => {
+      // Verify resource exists before updating
+      const existingResource = resourcesRef.current.get(update.id);
+      if (!existingResource) {
+        logMissingEntityError('resource', update.id);
+        displayError(
+          'Resource not found',
+          'Failed to load resource details. Please try again later.'
+        );
+        return;
+      }
+
       // Capture current animated position as start for next interpolation
       const currentAnimatedPos = currentPositionsRef.current.get(update.id);
 
@@ -350,10 +384,38 @@ export const SimulationProvider = ({ children }: { children: ReactNode }) => {
       const targetPos = targetPositionsRef.current.get(resourceId);
       const resource = resourcesRef.current.get(resourceId);
 
-      if (!targetPos || !resource) return;
+      if (!targetPos) {
+        // Target position missing - state inconsistency
+        logSimulationError(
+          new Error(`Target position missing for resource ${resourceId}`),
+          'Animation frame update',
+          { resourceId, errorType: 'MISSING_TARGET_POSITION' }
+        );
+        displayError('Animation error', 'Failed to update resource position.');
+        return;
+      }
+
+      if (!resource) {
+        // Resource missing from state - state inconsistency
+        logMissingEntityError('resource', resourceId);
+        displayError(
+          'Resource not found',
+          'Failed to load resource details. Please try again later.'
+        );
+        return;
+      }
 
       const routeGeometry = resource.route.coordinates;
-      if (!routeGeometry) return;
+      if (!routeGeometry) {
+        // Route geometry missing - state inconsistency
+        logSimulationError(
+          new Error(`Route geometry missing for resource ${resourceId}`),
+          'Animation frame update',
+          { resourceId, errorType: 'MISSING_ROUTE_GEOMETRY' }
+        );
+        displayError('Animation error', 'Failed to animate resource movement.');
+        return;
+      }
 
       // Interpolate along route using global progress
       const interpolatedPos = interpolateAlongRoute(
