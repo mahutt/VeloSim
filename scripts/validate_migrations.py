@@ -81,7 +81,7 @@ def validate_migrations_docker() -> bool:
     """
     Validate migrations using Docker Compose with a temporary database.
     """
-    print("\n📦 Using Docker for validation...")
+    print("\nUsing Docker for validation...")
 
     # Create a temporary docker-compose file for testing
     docker_compose_test = """
@@ -111,17 +111,17 @@ services:
 
     try:
         # Start test database
-        print("\n🚀 Starting test database container...")
+        print("\nStarting test database container...")
         code, _, _ = run_command(
             ["docker", "compose", "-f", str(compose_file), "up", "-d"],
             cwd=temp_dir
         )
         if code != 0:
-            print("❌ Failed to start test database")
+            print("ERROR: Failed to start test database")
             return False
 
         # Wait for database to be ready
-        print("\n⏳ Waiting for database to be ready...")
+        print("\nWaiting for database to be ready...")
         code, _, _ = run_command(
             ["docker", "compose", "-f", str(compose_file), "exec", "-T", "postgres-test",
              "pg_isready", "-U", "velosim_test"],
@@ -133,7 +133,7 @@ services:
         time.sleep(3)
 
         # Run migrations
-        print("\n📋 Running Alembic migrations...")
+        print("\nRunning Alembic migrations...")
         env = os.environ.copy()
         env["DATABASE_URL"] = test_db_url
 
@@ -144,14 +144,14 @@ services:
         )
 
         if code != 0:
-            print(f"❌ Migration failed!\nStdout: {stdout}\nStderr: {stderr}")
+            print(f"ERROR: Migration failed!\nStdout: {stdout}\nStderr: {stderr}")
             return False
 
-        print("✅ Migrations applied successfully")
+        print("SUCCESS: Migrations applied successfully")
         print(stdout)
 
         # Load seed data
-        print("\n🌱 Loading seed data...")
+        print("\nLoading seed data...")
         seed_file = project_root / "back" / "alembic" / "seeds" / "seed.sql"
 
         if seed_file.exists():
@@ -187,17 +187,17 @@ services:
                 code = proc.returncode
 
             if code != 0:
-                print(f"⚠️  Seed data loading had issues (non-critical)\nStdout: {stdout}\nStderr: {stderr}")
+                print(f"WARNING: Seed data loading had issues (non-critical)\nStdout: {stdout}\nStderr: {stderr}")
                 # Don't fail on seed errors as they might be warnings
             else:
-                print("✅ Seed data loaded successfully")
+                print("SUCCESS: Seed data loaded successfully")
                 if stdout:
                     print(stdout)
         else:
-            print("ℹ️  No seed file found, skipping...")
+            print("INFO: No seed file found, skipping...")
 
         # Verify database structure
-        print("\n🔍 Verifying database structure...")
+        print("\nVerifying database structure...")
         code, stdout, stderr = run_command(
             ["docker", "compose", "-f", str(compose_file), "exec", "-T", "postgres-test",
              "psql", "-U", "velosim_test", "-d", "velosim_test", "-c",
@@ -206,21 +206,21 @@ services:
         )
 
         if code == 0:
-            print("✅ Database tables:")
+            print("SUCCESS: Database tables:")
             print(stdout)
 
-        print("\n✅ Migration validation successful!")
+        print("\nSUCCESS: Migration validation successful!")
         return True
 
     except Exception as e:
-        print(f"❌ Validation failed with exception: {e}")
+        print(f"ERROR: Validation failed with exception: {e}")
         import traceback
         traceback.print_exc()
         return False
 
     finally:
         # Cleanup: Stop and remove test containers
-        print("\n🧹 Cleaning up test database...")
+        print("\nCleaning up test database...")
         run_command(
             ["docker", "compose", "-f", str(compose_file), "down", "-v"],
             cwd=temp_dir
@@ -238,26 +238,26 @@ def validate_migrations_direct() -> bool:
     Validate migrations directly using existing DATABASE_URL.
     WARNING: This will modify the database!
     """
-    print("\n⚠️  Using direct database connection (DATABASE_URL set)")
-    print("⚠️  This will modify the database!")
+    print("\nWARNING: Using direct database connection (DATABASE_URL set)")
+    print("WARNING: This will modify the database!")
 
     back_dir = project_root / "back"
 
     # Run migrations
-    print("\n📋 Running Alembic migrations...")
+    print("\nRunning Alembic migrations...")
     code, stdout, stderr = run_command(
         ["alembic", "upgrade", "head"],
         cwd=back_dir
     )
 
     if code != 0:
-        print(f"❌ Migration failed!\nStdout: {stdout}\nStderr: {stderr}")
+        print(f"ERROR: Migration failed!\nStdout: {stdout}\nStderr: {stderr}")
         return False
 
-    print("✅ Migrations applied successfully")
+    print("SUCCESS: Migrations applied successfully")
     print(stdout)
 
-    print("\n✅ Migration validation successful!")
+    print("\nSUCCESS: Migration validation successful!")
     return True
 
 
