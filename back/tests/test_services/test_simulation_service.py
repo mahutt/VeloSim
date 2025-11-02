@@ -28,6 +28,7 @@ from typing import Generator
 from sqlalchemy.orm import Session
 from back.exceptions import VelosimPermissionError, ItemNotFoundError
 from back.models.user import User
+from back.schemas import SimInstanceCreate
 from back.schemas.playback_speed import (
     ALLOWED_SPEEDS,
     PlaybackSpeedBase,
@@ -127,7 +128,7 @@ class TestSimulationService:
         self, db: Session, simulation_service: SimulationService
     ) -> None:
         """Fetching a non-existent user should raise VelosimPermissionError."""
-        with pytest.raises(VelosimPermissionError, match="Requesting user not found."):
+        with pytest.raises(ItemNotFoundError, match="Requesting user not found."):
             simulation_service._get_requesting_user(db, 99999)  # ID does not exist
 
     def test_get_requesting_user_disabled(
@@ -338,6 +339,78 @@ class TestSimulationService:
         # Verify status now raises error
         with pytest.raises(ItemNotFoundError):
             simulation_service.get_simulation_status(db, sim_id, test_user.id)
+
+    def test_simulation_not_active(
+        self, db: Session, test_user: User, simulation_service: SimulationService
+    ) -> None:
+        """Sim UUID not in active_simulations raises ItemNotFoundError."""
+        with pytest.raises(
+            ItemNotFoundError, match="Simulation .* is not currently active"
+        ):
+            simulation_service.verify_access(db, "nonexistent-sim-id", test_user.id)
+
+    def test_simulation_db_record_not_found(
+        self, db: Session, test_user: User, simulation_service: SimulationService
+    ) -> None:
+        """Sim record missing in DB raises ItemNotFoundError."""
+        # Add active simulation with fake DB id
+        simulation_service.active_simulations["sim-uuid-1"] = {
+            "db_id": 99999,
+            "status": "running",
+        }
+
+        with pytest.raises(
+            ItemNotFoundError, match="Simulation instance record 99999 not found"
+        ):
+            simulation_service.verify_access(db, "sim-uuid-1", test_user.id)
+
+    def test_user_is_admin(
+        self, db: Session, admin_user: User, simulation_service: SimulationService
+    ) -> None:
+        """Admin user should have access regardless of ownership."""
+        sim_instance_data = SimInstanceCreate(user_id=999)
+        db_sim = sim_instance_crud.create(db, sim_instance_data)
+        db.commit()
+        simulation_service.active_simulations["sim-uuid-2"] = {
+            "db_id": db_sim.id,
+            "status": "running",
+        }
+
+        assert simulation_service.verify_access(db, "sim-uuid-2", admin_user.id) is True
+
+    def test_user_owns_simulation(
+        self, db: Session, test_user: User, simulation_service: SimulationService
+    ) -> None:
+        """Simulation owner should have access."""
+        sim_instance_data = SimInstanceCreate(user_id=test_user.id)
+        db_sim = sim_instance_crud.create(db, sim_instance_data)
+        db.commit()
+        simulation_service.active_simulations["sim-uuid-3"] = {
+            "db_id": db_sim.id,
+            "status": "running",
+        }
+
+        assert simulation_service.verify_access(db, "sim-uuid-3", test_user.id) is True
+
+    def test_user_does_not_own_simulation(
+        self,
+        db: Session,
+        test_user2: User,
+        simulation_service: SimulationService,
+        test_user: User,
+    ) -> None:
+        """Non-admin, non-owner should not have access."""
+        sim_instance_data = SimInstanceCreate(user_id=test_user.id)
+        db_sim = sim_instance_crud.create(db, sim_instance_data)
+        db.commit()
+        simulation_service.active_simulations["sim-uuid-4"] = {
+            "db_id": db_sim.id,
+            "status": "running",
+        }
+
+        assert (
+            simulation_service.verify_access(db, "sim-uuid-4", test_user2.id) is False
+        )
 
     def test_set_playback_speed_valid_values(
         self, db: Session, test_user: User, simulation_service: SimulationService

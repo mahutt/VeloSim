@@ -7,6 +7,7 @@ The VeloSim backend follows a layered architecture pattern:
 1. **Models** - SQLAlchemy database models
 2. **Schemas** - Pydantic request/response validation
 3. **CRUD** - Database operations
+4. **Services** - Business logic (encompasses `/auth` and `/service` folders)
 4. **API** - FastAPI route endpoints
 5. **Migration** - Database schema changes
 
@@ -337,7 +338,28 @@ Test via Swagger UI at http://localhost:8000/api/docs:
 4. **PUT /api/v1/stations/{id}** - Update station
 5. **DELETE /api/v1/stations/{id}** - Delete station
 
+## 🚩 Using Feature Flags
+
+Sometimes you want to release a new feature gradually, test it in production,
+or turn it off quickly if something goes wrong.
+
+Feature flags (aka Feature Toggles) make it possible to mitigate risk for
+deployment without redeploying code. An example would be having a feature flag
+act as a rollback / kill switch that disables an endpoint if something goes
+wrong in production.
+
+When developing a new feature that involves a feature flag/toggle:
+
+1. Wrap it with a feature flag check.
+3. Enable the feature via environment variable for testing if applicable.
+4. Document the changes in your Pull Request and the project where applicable.
+
 ## 🧪 Testing Best Practices
+
+Write tests that break if your core logic breaks. You don't need to achieve 100%
+coverage, but you need tests for core logic.
+
+Use mocks to test logic in isolation.
 
 Create comprehensive tests for your feature:
 
@@ -380,11 +402,13 @@ def test_get_station():
 
 ## 📋 Development Checklist
 
-When implementing a new feature, ensure you:
+When implementing a new feature, cover the following areas as appropriate:
 
 - [ ] **Model**: SQLAlchemy model with proper fields and constraints
 - [ ] **Schemas**: Pydantic schemas for create/update/response
 - [ ] **CRUD**: Complete database operations with error handling
+- [ ] **Services**: Handle necessary business logic
+- [ ] **Feature Flags**: Optional toggles gated with environment flags
 - [ ] **API**: FastAPI routes with proper status codes and validation
 - [ ] **Migration**: Alembic migration generated and applied
 - [ ] **Routes**: API router properly registered

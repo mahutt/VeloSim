@@ -31,6 +31,11 @@ from dotenv import load_dotenv
 load_dotenv()
 
 
+def env_flag(name: str) -> bool:
+    """Convert an environment variable to a boolean flag (default is False)."""
+    return os.getenv(name, "false").strip().lower() == "true"
+
+
 class Settings(BaseSettings):
     """Application settings."""
 
@@ -53,6 +58,13 @@ class Settings(BaseSettings):
 
     # API
     API_V1_PREFIX: str = "/api/v1"
+
+    # Feature flags
+    FEATURE_STATIONS_API_ROUTER: bool = env_flag("FEATURE_STATIONS_API_ROUTER")
+    FEATURE_STATION_TASKS_API_ROUTER: bool = env_flag(
+        "FEATURE_STATION_TASKS_API_ROUTER"
+    )
+    FEATURE_RESOURCES_API_ROUTER: bool = env_flag("FEATURE_RESOURCES_API_ROUTER")
 
     model_config = SettingsConfigDict(case_sensitive=True)
 

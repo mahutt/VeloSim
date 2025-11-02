@@ -95,18 +95,6 @@ class ResourceUpdate(BaseModel):
         return None
 
 
-class ResourceTaskAssign(BaseModel):
-    """Schema for assigning a task to a resource."""
-
-    task_id: int = Field(..., description="ID of the task to assign")
-
-
-class ResourceTaskUnassign(BaseModel):
-    """Schema for unassigning a task from a resource."""
-
-    task_id: int = Field(..., description="ID of the task to unassign")
-
-
 class ResourceTaskIDsRequest(BaseModel):
     """Request model for operations on one or more tasks for a resource."""
 
@@ -167,3 +155,51 @@ class ResourceListResponse(BaseModel):
     page: int = Field(..., description="Current page number")
     per_page: int = Field(..., description="Items per page")
     total_pages: int = Field(..., description="Total number of pages")
+
+
+class ResourceTaskAssignRequest(BaseModel):
+    """Request schema for assigning a task to a resource."""
+
+    task_id: int = Field(..., description="ID of the task to assign")
+    resource_id: int = Field(
+        ..., description="ID of the resource to assign the task to"
+    )
+
+
+class ResourceTaskAssignResponse(BaseModel):
+    """Response schema for successfully assigning a task to a resource."""
+
+    resource_id: int
+    task_id: int
+
+
+class ResourceTaskUnassignRequest(BaseModel):
+    """Request schema for unassigning a task from a resource."""
+
+    task_id: int = Field(..., description="ID of the task to unassign")
+    resource_id: int = Field(
+        ..., description="ID of the resource from which to unassign the task"
+    )
+
+
+class ResourceTaskUnassignResponse(BaseModel):
+    """Response schema for successfully unassigning a task from a resource."""
+
+    resource_id: int
+    task_id: int
+
+
+class ResourceTaskReassignRequest(BaseModel):
+    """Request schema for reassigning a task from one resource to another."""
+
+    task_id: int
+    old_resource_id: int
+    new_resource_id: int
+
+
+class ResourceTaskReassignResponse(BaseModel):
+    """Response schema for successfully reassigning a task to a new resource."""
+
+    task_id: int
+    old_resource_id: int
+    new_resource_id: int

@@ -30,17 +30,21 @@ from .resources import router as resources_router
 from .users import router as users_router
 from .logs import router as logs_router
 from .scenarios import router as scenarios_router
+from back.core.config import settings
 
 # Create the main v1 API router
 api_router = APIRouter()
 
 # Include all endpoint routers
-api_router.include_router(stations_router)
-api_router.include_router(station_tasks_router)
 api_router.include_router(simulation_router)
-api_router.include_router(resources_router)
 api_router.include_router(users_router)
 api_router.include_router(logs_router)
 api_router.include_router(scenarios_router)
+if settings.FEATURE_STATIONS_API_ROUTER:
+    api_router.include_router(stations_router)
+if settings.FEATURE_STATION_TASKS_API_ROUTER:
+    api_router.include_router(station_tasks_router)
+if settings.FEATURE_RESOURCES_API_ROUTER:
+    api_router.include_router(resources_router)
 
 __all__ = ["api_router"]

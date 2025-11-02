@@ -32,6 +32,16 @@ import asyncio
 from back.main import app
 from back.auth.dependency import get_user_id
 from back.exceptions import VelosimPermissionError, ItemNotFoundError
+from back.schemas import (
+    ResourceTaskAssignResponse,
+    ResourceTaskUnassignResponse,
+    ResourceTaskReassignResponse,
+)
+from back.schemas.resource import (
+    ResourceTaskAssignRequest,
+    ResourceTaskReassignRequest,
+    ResourceTaskUnassignRequest,
+)
 from back.schemas import PlaybackSpeedResponse, SimulationPlaybackStatus
 from back.services import simulation_service
 from back.api.v1.simulation import WebSocketSubscriber
@@ -103,6 +113,15 @@ def disabled_admin_client(client: TestClient) -> Generator[TestClient, None, Non
 @pytest.fixture
 def ws_client(client: TestClient) -> Generator[TestClient, None, None]:
     yield client
+
+
+@pytest.fixture
+def active_sim_id() -> Generator[str, None, None]:
+    """Provides a dummy in-memory active simulation for tests."""
+    sim_id = "sim-test-123"
+    simulation_service.active_simulations[sim_id] = {"db_id": 999, "status": "running"}
+    yield sim_id
+    del simulation_service.active_simulations[sim_id]
 
 
 @pytest.fixture
@@ -575,6 +594,157 @@ class TestSimulationAPI:
             websocket.send_text("ping")
             pong = websocket.receive_json()
             assert pong["type"] == "pong"
+
+    @patch("back.api.v1.simulation.resource_service.assign_task")
+    def test_assign_task_success(
+        self,
+        mock_assign: MagicMock,
+        authenticated_client: TestClient,
+        active_sim_id: str,
+    ) -> None:
+        mock_assign.return_value = ResourceTaskAssignResponse(resource_id=7, task_id=42)
+        payload = {"resource_id": 7, "task_id": 42}
+
+        response = authenticated_client.post(
+            f"/api/v1/simulation/{active_sim_id}/resources/assign", json=payload
+        )
+
+        assert response.status_code == 200
+        assert response.json() == {"resource_id": 7, "task_id": 42}
+
+        mock_assign.assert_called_once_with(
+            db=ANY,
+            sim_uuid=active_sim_id,
+            requesting_user=1,
+            task_assign_data=ResourceTaskAssignRequest(**payload),
+        )
+
+    @patch("back.api.v1.simulation.resource_service.assign_task")
+    def test_assign_task_permission_error(
+        self,
+        mock_assign: MagicMock,
+        authenticated_client: TestClient,
+        active_sim_id: str,
+    ) -> None:
+        mock_assign.side_effect = VelosimPermissionError("No permission")
+        payload = {"resource_id": 7, "task_id": 42}
+        response = authenticated_client.post(
+            f"/api/v1/simulation/{active_sim_id}/resources/assign", json=payload
+        )
+        assert response.status_code == 403
+        assert "No permission" in response.json()["detail"]
+
+    @patch("back.api.v1.simulation.resource_service.assign_task")
+    def test_assign_task_not_found(
+        self,
+        mock_assign: MagicMock,
+        authenticated_client: TestClient,
+        active_sim_id: str,
+    ) -> None:
+        mock_assign.side_effect = ItemNotFoundError("Task not found")
+        payload = {"resource_id": 999, "task_id": 42}
+        response = authenticated_client.post(
+            f"/api/v1/simulation/{active_sim_id}/resources/assign", json=payload
+        )
+        assert response.status_code == 404
+
+    @patch("back.api.v1.simulation.resource_service.unassign_task")
+    def test_unassign_task_success(
+        self,
+        mock_unassign: MagicMock,
+        authenticated_client: TestClient,
+        active_sim_id: str,
+    ) -> None:
+        mock_unassign.return_value = ResourceTaskUnassignResponse(
+            resource_id=7, task_id=42
+        )
+        payload = {"resource_id": 7, "task_id": 42}
+
+        response = authenticated_client.post(
+            f"/api/v1/simulation/{active_sim_id}/resources/unassign", json=payload
+        )
+
+        assert response.status_code == 200
+        assert response.json() == {"resource_id": 7, "task_id": 42}
+
+        mock_unassign.assert_called_once_with(
+            db=ANY,
+            sim_uuid=active_sim_id,
+            requesting_user=1,
+            task_unassign_data=ResourceTaskUnassignRequest(**payload),
+        )
+
+    @patch("back.api.v1.simulation.resource_service.unassign_task")
+    def test_unassign_task_permission_error(
+        self,
+        mock_unassign: MagicMock,
+        authenticated_client: TestClient,
+        active_sim_id: str,
+    ) -> None:
+        mock_unassign.side_effect = VelosimPermissionError("No permission")
+        payload = {"resource_id": 7, "task_id": 42}
+        response = authenticated_client.post(
+            f"/api/v1/simulation/{active_sim_id}/resources/unassign", json=payload
+        )
+        assert response.status_code == 403
+
+    @patch("back.api.v1.simulation.resource_service.reassign_task")
+    def test_reassign_task_success(
+        self,
+        mock_reassign: MagicMock,
+        authenticated_client: TestClient,
+        active_sim_id: str,
+    ) -> None:
+        mock_reassign.return_value = ResourceTaskReassignResponse(
+            task_id=42, old_resource_id=7, new_resource_id=8
+        )
+        payload = {"task_id": 42, "old_resource_id": 7, "new_resource_id": 8}
+
+        response = authenticated_client.post(
+            f"/api/v1/simulation/{active_sim_id}/resources/reassign", json=payload
+        )
+
+        assert response.status_code == 200
+        assert response.json() == {
+            "task_id": 42,
+            "old_resource_id": 7,
+            "new_resource_id": 8,
+        }
+
+        mock_reassign.assert_called_once_with(
+            db=ANY,
+            sim_uuid=active_sim_id,
+            requesting_user=1,
+            task_reassign_data=ResourceTaskReassignRequest(**payload),
+        )
+
+    @patch("back.api.v1.simulation.resource_service.reassign_task")
+    def test_reassign_task_permission_error(
+        self,
+        mock_reassign: MagicMock,
+        authenticated_client: TestClient,
+        active_sim_id: str,
+    ) -> None:
+        mock_reassign.side_effect = VelosimPermissionError("No permission")
+        payload = {"task_id": 42, "old_resource_id": 7, "new_resource_id": 8}
+        response = authenticated_client.post(
+            f"/api/v1/simulation/{active_sim_id}/resources/reassign", json=payload
+        )
+        assert response.status_code == 403
+
+    @patch("back.api.v1.simulation.resource_service.reassign_task")
+    def test_reassign_task_not_found(
+        self,
+        mock_reassign: MagicMock,
+        authenticated_client: TestClient,
+        active_sim_id: str,
+    ) -> None:
+        mock_reassign.side_effect = ItemNotFoundError("Task not found")
+        payload = {"task_id": 999, "old_resource_id": 7, "new_resource_id": 8}
+        response = authenticated_client.post(
+            f"/api/v1/simulation/{active_sim_id}/resources/reassign", json=payload
+        )
+        assert response.status_code == 404
 
 
 class TestSimulationListIntegration:

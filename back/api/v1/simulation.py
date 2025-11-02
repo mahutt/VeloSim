@@ -33,11 +33,20 @@ from fastapi import (
     Depends,
     Query,
 )
+from back.schemas import (
+    ResourceTaskAssignRequest,
+    ResourceTaskUnassignRequest,
+    ResourceTaskReassignRequest,
+    ResourceTaskAssignResponse,
+    ResourceTaskUnassignResponse,
+    ResourceTaskReassignResponse,
+)
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from back.auth.dependency import get_user_id
 from back.exceptions import VelosimPermissionError, ItemNotFoundError
+from back.services import resource_service
 from back.schemas import PlaybackSpeedBase, PlaybackSpeedResponse
 from back.schemas.sim_instance import SimInstanceResponse
 from sim.entities.frame import Frame
@@ -341,3 +350,84 @@ async def websocket_simulation_stream(websocket: WebSocket, sim_id: str) -> None
         # Detach subscriber when connection closes
         emitter.detach(subscriber)
         print(f"Detached subscriber for sim {sim_id}")
+
+
+@router.post(
+    "/{sim_id}/resources/assign",
+    status_code=200,
+    response_model=ResourceTaskAssignResponse,
+)
+def assign_task_to_resource(
+    sim_id: str,
+    task_assign_data: ResourceTaskAssignRequest,
+    requesting_user: int = Depends(get_user_id),
+    db: Session = Depends(get_db),
+) -> ResourceTaskAssignResponse:
+    """Assign a task to a resource in a running simulation."""
+    try:
+        return resource_service.assign_task(
+            db=db,
+            sim_uuid=sim_id,
+            requesting_user=requesting_user,
+            task_assign_data=task_assign_data,
+        )
+    except ItemNotFoundError as err:
+        raise HTTPException(status_code=404, detail=str(err))
+    except VelosimPermissionError as err:
+        raise HTTPException(status_code=403, detail=str(err))
+    except RuntimeError as err:
+        raise HTTPException(status_code=500, detail=str(err))
+
+
+@router.post(
+    "/{sim_id}/resources/unassign",
+    status_code=200,
+    response_model=ResourceTaskUnassignResponse,
+)
+def unassign_task_from_resource(
+    sim_id: str,
+    task_unassign_data: ResourceTaskUnassignRequest,
+    requesting_user: int = Depends(get_user_id),
+    db: Session = Depends(get_db),
+) -> ResourceTaskUnassignResponse:
+    """Unassign a task from a resource in a running simulation."""
+    try:
+        return resource_service.unassign_task(
+            db=db,
+            sim_uuid=sim_id,
+            requesting_user=requesting_user,
+            task_unassign_data=task_unassign_data,
+        )
+    except ItemNotFoundError as err:
+        raise HTTPException(status_code=404, detail=str(err))
+    except VelosimPermissionError as err:
+        raise HTTPException(status_code=403, detail=str(err))
+    except RuntimeError as err:
+        raise HTTPException(status_code=500, detail=str(err))
+
+
+@router.post(
+    "/{sim_id}/resources/reassign",
+    status_code=200,
+    response_model=ResourceTaskReassignResponse,
+)
+def reassign_task_between_resources(
+    sim_id: str,
+    task_reassign_data: ResourceTaskReassignRequest,
+    requesting_user: int = Depends(get_user_id),
+    db: Session = Depends(get_db),
+) -> ResourceTaskReassignResponse:
+    """Reassign a task from one resource to another in a running simulation."""
+    try:
+        return resource_service.reassign_task(
+            db=db,
+            sim_uuid=sim_id,
+            requesting_user=requesting_user,
+            task_reassign_data=task_reassign_data,
+        )
+    except ItemNotFoundError as err:
+        raise HTTPException(status_code=404, detail=str(err))
+    except VelosimPermissionError as err:
+        raise HTTPException(status_code=403, detail=str(err))
+    except RuntimeError as err:
+        raise HTTPException(status_code=500, detail=str(err))
