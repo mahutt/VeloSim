@@ -22,8 +22,6 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 """
 
-from typing import Optional, Dict
-
 from sim.behaviour.resource_behaviour.resource_choose_next_task_strategy import (
     ResourceChooseNextTaskStrategy,
 )

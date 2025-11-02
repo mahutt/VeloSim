@@ -72,6 +72,10 @@ class Station:
         
     # continous process that runs throughout the simulation
     def run(self):  # type: ignore[no-untyped-def]
+        # Yield once at the start to ensure behaviour is set
+        yield self.env.timeout(1)
+        
         # TODO: replace with periodic operations
         while True:
+            print("Station out*********************")
             yield self.env.timeout(1)

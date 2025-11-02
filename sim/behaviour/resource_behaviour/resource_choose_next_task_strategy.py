@@ -23,11 +23,14 @@ SOFTWARE.
 """
 
 from abc import ABC, abstractmethod
-from sim.entities.resource import Resource
+from typing import TYPE_CHECKING
 
+if TYPE_CHECKING:
+    from sim.entities.task import Task
+    from sim.entities.resource import Resource
 
 class ResourceChooseNextTaskStrategy(ABC):
 
     @abstractmethod
-    def select_next_task(self, resource: Resource) -> int:
+    def select_next_task(self, resource: "Resource") -> "Task":
         raise NotImplementedError()

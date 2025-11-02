@@ -257,3 +257,6 @@ class OSMConnection(object):
     @classmethod
     def reset_instance(cls) -> None:  # for testing
         cls.__instance = None
+
+if __name__ == "__main__":
+    print("OSM Connection working")

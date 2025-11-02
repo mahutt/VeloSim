@@ -36,6 +36,6 @@ class Position:
     def __eq__ (self,other: object) -> bool:
         if not isinstance(self, Position):
             return False
-        return (other[0] == self[0] and other[1] == self[1])
+        return (other.position[0] == self.position[0] and other.position[1] == self.position[1])
     
     

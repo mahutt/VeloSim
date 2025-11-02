@@ -35,6 +35,8 @@ from sim.entities.task import Task
 from sim.entities.inputParameters import InputParameter
 from sim.behaviour.sim_behaviour import SimBehaviour
 from sim.controller.MapController import MapController
+from sim.entities.position import Position
+from sim.entities.route import Route
 
 
 class SimulatorController:
@@ -77,22 +79,34 @@ class SimulatorController:
 
         for _, station in self.station_entities.items():
             station.set_behaviour(self.sim_behaviour)
-            station.run()
+            # Rebind to the actual simulation environment
+            station.env = self.simEnv
+            # station.action = self.simEnv.process(station.run())
 
-        for _,task in self.task_entities.items():
+        for _, task in self.task_entities.items():
             task.set_behaviour(self.sim_behaviour)
-            task.run()
+            # Rebind to the actual simulation environment
+            task.env = self.simEnv
 
         for _, resource in self.resource_entities.items():
             resource.set_behaviour(self.sim_behaviour)
             resource.set_map_controller(self.map_controller)
-            resource.run()
+            # Rebind to the actual simulation environment
+            resource.env = self.simEnv
+            # resource.action = self.simEnv.process(resource.run())
 
 
 
     def start(self, sim_time: int) -> None:
         # TODO process initial entities into the sim env
         
+
+        ikea = Position([-73.691993, 45.490198])  # IKEA
+        concordia = Position([-73.577797, 45.495009])  # Concordia
+
+        print("Cold starting get route.....")
+        route = self.map_controller.getRoute(ikea,concordia)
+
         # Load entities into sim event queue and pass behaviour and/or mapcontroller
         self.prep_entities()
         # start sim clock

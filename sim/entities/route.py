@@ -23,8 +23,8 @@ SOFTWARE.
 """
 
 from typing import Optional, List, Tuple, Union, TYPE_CHECKING
-from sim.DAO.OSMConnection import OSMConnection
 from sim.entities.road import road
+from sim.DAO.OSMConnection import OSMConnection
 from sim.entities.position import Position
 
 if TYPE_CHECKING:

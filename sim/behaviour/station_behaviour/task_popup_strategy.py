@@ -23,12 +23,16 @@ SOFTWARE.
 """
 
 from abc import ABC, abstractmethod
-from sim.entities.station import Station
-from typing import Dict, int
+
+from typing import Dict
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from sim.entities.station import Station
 
 
 class TaskPopupStrategy(ABC):
 
     @abstractmethod
-    def check_for_new_task(self, stations: Dict[int, Station]) -> None:
+    def check_for_new_task(self, stations: Dict[int, "Station"]) -> None:
         raise NotImplementedError()
