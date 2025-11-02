@@ -65,7 +65,7 @@ class Simulator:
             inputParameters=input_parameters,
             frameEmitter=emitter,
             sim_behaviour=sim_behaviour,
-            strict=False,
+            strict=True,
         )
 
         # Send the initial frame immediately

@@ -161,7 +161,7 @@ class RealTimeDriver:
                     lag = expected_wall_time - actual_wall_time
                     self.lag = lag
 
-                    self.record_lag()
+                    self.record_lag(lag)
                     # TODO: record/report lag metrics if needed
 
     def pause(self) -> None:
@@ -175,5 +175,6 @@ class RealTimeDriver:
     def stop(self) -> None:
         self.stop_flag = True
 
-    def record_lag(self) -> None:
+    def record_lag(self,lag: float) -> None:
         pass
+        # print(f"********************** Lag: {lag} ***************************")

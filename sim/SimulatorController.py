@@ -98,14 +98,19 @@ class SimulatorController:
 
 
     def start(self, sim_time: int) -> None:
-        # TODO process initial entities into the sim env
+        # Build CH network for fast routing (with caching and progress bar)
+        print("\n" + "="*60)
+        print("Preparing Contraction Hierarchy network for fast routing...")
+        print("="*60)
+        self.map_controller.osm.build_ch_network()
+        print("="*60 + "\n")
         
-
         ikea = Position([-73.691993, 45.490198])  # IKEA
         concordia = Position([-73.577797, 45.495009])  # Concordia
 
-        print("Cold starting get route.....")
-        route = self.map_controller.getRoute(ikea,concordia)
+        print("Testing route generation with CH network.....")
+        route = self.map_controller.getRoute(ikea, concordia)
+        print(f"Route generated successfully with {len(route.roads)} road segments\n")
 
         # Load entities into sim event queue and pass behaviour and/or mapcontroller
         self.prep_entities()
