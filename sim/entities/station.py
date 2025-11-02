@@ -77,5 +77,4 @@ class Station:
         
         # TODO: replace with periodic operations
         while True:
-            print("Station out*********************")
             yield self.env.timeout(1)

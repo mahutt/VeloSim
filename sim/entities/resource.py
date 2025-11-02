@@ -151,10 +151,9 @@ class Resource:
         self.current_route = route
         next_position, full_route = route.next()
         self.current_route = full_route
-        print("*************** Traveling **************")
         try:
             while self.position != position and next_position:
-                print("*************** Traveling **************")
+             
                 self.set_resource_position(next_position)
                 yield self.env.timeout(1)
                 next_position = route.next()
@@ -174,7 +173,6 @@ class Resource:
         yield self.env.timeout(1)
         
         while True:
-            print("Resource Running*******************************")
             # @TODO: replace with actual periodic logic
 
             # Select Next Task
