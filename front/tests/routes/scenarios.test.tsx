@@ -43,6 +43,12 @@ vi.mock('react-router', async () => {
   };
 });
 
+// Mock the error hook
+const mockDisplayError = vi.fn();
+vi.mock('~/hooks/use-error', () => ({
+  default: () => ({ displayError: mockDisplayError }),
+}));
+
 const mockScenarios = [
   {
     id: 1,
@@ -65,6 +71,7 @@ const mockScenarios = [
 describe('ScenarioEditor', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockDisplayError.mockClear();
     vi.mocked(scenarioUtils.loadSavedScenarios).mockResolvedValue(
       mockScenarios
     );
@@ -194,6 +201,22 @@ describe('ScenarioEditor', () => {
       </BrowserRouter>
     );
 
+    // Set a scenario name so save doesn't prompt for name
+    const nameInput = screen.getByPlaceholderText('Scenario name');
+    fireEvent.change(nameInput, { target: { value: 'Test Scenario' } });
+
+    // Add valid content so validation passes
+    const textarea = screen.getByPlaceholderText(
+      'Paste or type your JSON scenario here...'
+    );
+    fireEvent.change(textarea, {
+      target: {
+        value: JSON.stringify({
+          stations: [{ id: 's1' }],
+        }),
+      },
+    });
+
     const saveButton = screen.getByText('Save');
     fireEvent.click(saveButton);
 
@@ -203,8 +226,10 @@ describe('ScenarioEditor', () => {
     alertSpy.mockRestore();
   });
 
-  it('shows alert when Export button is clicked', () => {
-    const alertSpy = vi.spyOn(window, 'alert').mockImplementation(() => {});
+  it('triggers download when Export button is clicked with valid content and no name', () => {
+    // Mock URL.createObjectURL and URL.revokeObjectURL
+    global.URL.createObjectURL = vi.fn(() => 'blob:mock-url');
+    global.URL.revokeObjectURL = vi.fn();
 
     render(
       <BrowserRouter>
@@ -212,13 +237,36 @@ describe('ScenarioEditor', () => {
       </BrowserRouter>
     );
 
+    // Add some valid scenario content to export
+    const textarea = screen.getByPlaceholderText(
+      'Paste or type your JSON scenario here...'
+    );
+    fireEvent.change(textarea, {
+      target: {
+        value: JSON.stringify({
+          scenario_title: 'Test Scenario',
+          stations: [{ id: 's1', name: 'Station 1' }],
+        }),
+      },
+    });
+
     const exportButton = screen.getByText('Export');
     fireEvent.click(exportButton);
 
-    expect(alertSpy).toHaveBeenCalledWith(
-      'Export Scenario - TODO: Implement export functionality'
-    );
-    alertSpy.mockRestore();
+    // Should open the name dialog since no name is set
+    expect(screen.getByText('Scenario Name Required')).toBeInTheDocument();
+    expect(mockDisplayError).not.toHaveBeenCalled();
+
+    // Enter a name and confirm
+    const nameInput = screen.getByPlaceholderText('Enter scenario name');
+    fireEvent.change(nameInput, { target: { value: 'My Export' } });
+
+    const confirmButton = screen.getByRole('button', { name: /continue/i });
+    fireEvent.click(confirmButton);
+
+    // Verify blob was created and cleaned up
+    expect(global.URL.createObjectURL).toHaveBeenCalled();
+    expect(global.URL.revokeObjectURL).toHaveBeenCalled();
   });
 
   it('shows alert when Import button is clicked', () => {
@@ -280,5 +328,214 @@ describe('ScenarioEditor', () => {
     fireEvent.click(invalidScenarioItem);
 
     expect(screen.getByText('Unable to load scenario.')).toBeInTheDocument();
+  });
+
+  it('shows error when trying to export empty content', () => {
+    render(
+      <BrowserRouter>
+        <ScenarioEditor />
+      </BrowserRouter>
+    );
+
+    // Set scenario name so validation runs immediately
+    const nameInput = screen.getByPlaceholderText('Scenario name');
+    fireEvent.change(nameInput, { target: { value: 'Test' } });
+
+    const exportButton = screen.getByText('Export');
+    fireEvent.click(exportButton);
+
+    // Should call displayError since content is empty
+    expect(mockDisplayError).toHaveBeenCalledWith(
+      'No content to process',
+      'Please enter or load a scenario first.'
+    );
+  });
+
+  it('shows error when trying to export invalid JSON', () => {
+    render(
+      <BrowserRouter>
+        <ScenarioEditor />
+      </BrowserRouter>
+    );
+
+    // Set scenario name so validation runs immediately
+    const nameInput = screen.getByPlaceholderText('Scenario name');
+    fireEvent.change(nameInput, { target: { value: 'Test' } });
+
+    // Add invalid JSON content
+    const textarea = screen.getByPlaceholderText(
+      'Paste or type your JSON scenario here...'
+    );
+    fireEvent.change(textarea, {
+      target: { value: '{invalid json content}' },
+    });
+
+    const exportButton = screen.getByText('Export');
+    fireEvent.click(exportButton);
+
+    // Should call displayError since JSON is invalid
+    expect(mockDisplayError).toHaveBeenCalledWith(
+      'Invalid JSON format',
+      'The scenario content is not valid JSON. Please fix the formatting.'
+    );
+  });
+
+  it('exports with scenario name when name is provided', () => {
+    global.URL.createObjectURL = vi.fn(() => 'blob:mock-url');
+    global.URL.revokeObjectURL = vi.fn();
+
+    render(
+      <BrowserRouter>
+        <ScenarioEditor />
+      </BrowserRouter>
+    );
+
+    // Set scenario name
+    const nameInput = screen.getByPlaceholderText('Scenario name');
+    fireEvent.change(nameInput, { target: { value: 'My Test Scenario' } });
+
+    // Add content - use valid scenario structure
+    const textarea = screen.getByPlaceholderText(
+      'Paste or type your JSON scenario here...'
+    );
+    fireEvent.change(textarea, {
+      target: {
+        value: JSON.stringify({
+          scenario_title: 'Test',
+          stations: [{ id: 's1' }],
+        }),
+      },
+    });
+
+    const exportButton = screen.getByText('Export');
+    fireEvent.click(exportButton);
+
+    // Should export directly without showing dialog since name is provided
+    expect(
+      screen.queryByText('Scenario Name Required')
+    ).not.toBeInTheDocument();
+    expect(mockDisplayError).not.toHaveBeenCalled();
+    expect(global.URL.createObjectURL).toHaveBeenCalled();
+    expect(global.URL.revokeObjectURL).toHaveBeenCalled();
+  });
+
+  it('shows error when exporting scenario with validation errors', () => {
+    render(
+      <BrowserRouter>
+        <ScenarioEditor />
+      </BrowserRouter>
+    );
+
+    // Set scenario name to avoid name dialog
+    const nameInput = screen.getByPlaceholderText('Scenario name');
+    fireEvent.change(nameInput, { target: { value: 'Test' } });
+
+    // Add scenario with validation errors
+    const textarea = screen.getByPlaceholderText(
+      'Paste or type your JSON scenario here...'
+    );
+    fireEvent.change(textarea, {
+      target: {
+        value: JSON.stringify({
+          start_time: 'invalid-time',
+          end_time: '25:00',
+        }),
+      },
+    });
+
+    const exportButton = screen.getByText('Export');
+    fireEvent.click(exportButton);
+
+    // Should show validation error
+    expect(mockDisplayError).toHaveBeenCalledWith(
+      'Scenario validation failed',
+      expect.stringContaining('validation failed')
+    );
+  });
+
+  it('exports valid scenario with warnings', () => {
+    global.URL.createObjectURL = vi.fn(() => 'blob:mock-url');
+    global.URL.revokeObjectURL = vi.fn();
+    const consoleWarnSpy = vi
+      .spyOn(console, 'warn')
+      .mockImplementation(() => {});
+
+    render(
+      <BrowserRouter>
+        <ScenarioEditor />
+      </BrowserRouter>
+    );
+
+    // Add scenario with warnings but no errors
+    const textarea = screen.getByPlaceholderText(
+      'Paste or type your JSON scenario here...'
+    );
+    fireEvent.change(textarea, {
+      target: {
+        value: JSON.stringify({
+          stations: [],
+        }),
+      },
+    });
+
+    const exportButton = screen.getByText('Export');
+    fireEvent.click(exportButton);
+
+    // Dialog should open since no name is set (warnings don't block export)
+    expect(screen.getByText('Scenario Name Required')).toBeInTheDocument();
+    expect(mockDisplayError).not.toHaveBeenCalled();
+
+    // Enter a name and confirm export
+    const nameInput = screen.getByPlaceholderText('Enter scenario name');
+    fireEvent.change(nameInput, { target: { value: 'Warning Test' } });
+
+    const confirmButton = screen.getByRole('button', { name: /continue/i });
+    fireEvent.click(confirmButton);
+
+    // Warning should have been logged when export was confirmed
+    expect(consoleWarnSpy).toHaveBeenCalled();
+
+    // Should still export
+    expect(global.URL.createObjectURL).toHaveBeenCalled();
+
+    consoleWarnSpy.mockRestore();
+  });
+
+  it('does not export when user cancels the export dialog', () => {
+    global.URL.createObjectURL = vi.fn(() => 'blob:mock-url');
+    global.URL.revokeObjectURL = vi.fn();
+
+    render(
+      <BrowserRouter>
+        <ScenarioEditor />
+      </BrowserRouter>
+    );
+
+    // Add valid content
+    const textarea = screen.getByPlaceholderText(
+      'Paste or type your JSON scenario here...'
+    );
+    fireEvent.change(textarea, {
+      target: {
+        value: JSON.stringify({
+          scenario_title: 'Test',
+          stations: [{ id: 's1' }],
+        }),
+      },
+    });
+
+    const exportButton = screen.getByText('Export');
+    fireEvent.click(exportButton);
+
+    // Dialog should open
+    expect(screen.getByText('Scenario Name Required')).toBeInTheDocument();
+
+    // Cancel the export
+    const cancelButton = screen.getByRole('button', { name: /cancel/i });
+    fireEvent.click(cancelButton);
+
+    // No download should happen
+    expect(global.URL.createObjectURL).not.toHaveBeenCalled();
+    expect(global.URL.revokeObjectURL).not.toHaveBeenCalled();
   });
 });

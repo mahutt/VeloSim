@@ -29,6 +29,8 @@ import { loadSavedScenarios } from '~/lib/scenario-utils';
 import ScenarioToolbar from '~/components/scenario/scenario-toolbar';
 import ScenarioTextArea from '~/components/scenario/scenario-textarea';
 import ScenarioSidebar from '~/components/scenario/scenario-sidebar';
+import ScenarioNameDialog from '~/components/scenario/scenario-name-dialog';
+import { useScenarioOperations } from '~/hooks/use-scenario-operations';
 
 export default function ScenarioEditor() {
   const [scenarioContent, setScenarioContent] = useState('');
@@ -38,7 +40,13 @@ export default function ScenarioEditor() {
   const [selectedScenarioId, setSelectedScenarioId] = useState<number | null>(
     null
   );
+  const [nameDialogOpen, setNameDialogOpen] = useState(false);
+  const [pendingAction, setPendingAction] = useState<'export' | 'save' | null>(
+    null
+  );
   const navigate = useNavigate();
+  const { exportScenario, saveScenario, importScenario } =
+    useScenarioOperations();
 
   useEffect(() => {
     // Load mock data for UI testing
@@ -51,16 +59,39 @@ export default function ScenarioEditor() {
     navigate('/simulation');
   };
 
-  // TODO: Implement with backend API call
   const handleSaveScenario = () => {
-    console.log('Save scenario clicked');
-    alert('Save Scenario - TODO: Implement backend integration');
+    // Check if scenario has a name
+    if (!scenarioName.trim()) {
+      setPendingAction('save');
+      setNameDialogOpen(true);
+    } else {
+      saveScenario(scenarioContent, scenarioName);
+    }
   };
 
-  // TODO: Implement export functionality
   const handleExportScenario = () => {
-    console.log('Export scenario clicked');
-    alert('Export Scenario - TODO: Implement export functionality');
+    // Check if scenario has a name
+    if (!scenarioName.trim()) {
+      setPendingAction('export');
+      setNameDialogOpen(true);
+    } else {
+      exportScenario(scenarioContent, scenarioName);
+    }
+  };
+
+  const handleNameDialogConfirm = (name: string) => {
+    // Update the scenario name
+    setScenarioName(name);
+
+    // Perform the pending action
+    if (pendingAction === 'export') {
+      exportScenario(scenarioContent, name);
+    } else if (pendingAction === 'save') {
+      saveScenario(scenarioContent, name);
+    }
+
+    // Clear pending action
+    setPendingAction(null);
   };
 
   const handleNewScenario = () => {
@@ -68,12 +99,6 @@ export default function ScenarioEditor() {
     setScenarioName('');
     setError(null);
     setSelectedScenarioId(null);
-  };
-
-  // TODO: Implement import functionality
-  const handleImportScenario = () => {
-    console.log('Import scenario clicked');
-    alert('Import Scenario - TODO: Implement import functionality');
   };
 
   const handleSelectScenario = (scenario: Scenario) => {
@@ -95,7 +120,7 @@ export default function ScenarioEditor() {
       <ScenarioToolbar
         scenarioName={scenarioName}
         onNameChange={setScenarioName}
-        onImport={handleImportScenario}
+        onImport={importScenario}
         onNew={handleNewScenario}
       />
 
@@ -115,6 +140,13 @@ export default function ScenarioEditor() {
           onSelect={handleSelectScenario}
         />
       </div>
+
+      <ScenarioNameDialog
+        open={nameDialogOpen}
+        onOpenChange={setNameDialogOpen}
+        currentName={scenarioName}
+        onConfirm={handleNameDialogConfirm}
+      />
     </div>
   );
 }

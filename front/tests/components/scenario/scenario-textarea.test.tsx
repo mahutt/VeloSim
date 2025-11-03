@@ -84,4 +84,95 @@ describe('ScenarioTextArea', () => {
     fireEvent.click(startButton);
     expect(onStart).toHaveBeenCalled();
   });
+
+  describe('Tab key handling (lines 46-63)', () => {
+    it('inserts 2 spaces when Tab is pressed', () => {
+      const { onChange } = setup({ scenarioData: 'test' });
+      const textarea = screen.getByLabelText(
+        'Scenario JSON data'
+      ) as HTMLTextAreaElement;
+
+      // Set cursor position at the end
+      textarea.selectionStart = 4;
+      textarea.selectionEnd = 4;
+
+      fireEvent.keyDown(textarea, { key: 'Tab' });
+
+      expect(onChange).toHaveBeenCalledWith('test  ');
+    });
+
+    it('inserts 2 spaces at cursor position in middle of text', () => {
+      const { onChange } = setup({ scenarioData: 'before after' });
+      const textarea = screen.getByLabelText(
+        'Scenario JSON data'
+      ) as HTMLTextAreaElement;
+
+      // Set cursor position between "before" and " after"
+      textarea.selectionStart = 6;
+      textarea.selectionEnd = 6;
+
+      fireEvent.keyDown(textarea, { key: 'Tab' });
+
+      expect(onChange).toHaveBeenCalledWith('before   after');
+    });
+
+    it('replaces selected text with 2 spaces when Tab is pressed', () => {
+      const { onChange } = setup({ scenarioData: 'select this text' });
+      const textarea = screen.getByLabelText(
+        'Scenario JSON data'
+      ) as HTMLTextAreaElement;
+
+      // Select "this"
+      textarea.selectionStart = 7;
+      textarea.selectionEnd = 11;
+
+      fireEvent.keyDown(textarea, { key: 'Tab' });
+
+      expect(onChange).toHaveBeenCalledWith('select    text');
+    });
+
+    it('inserts 2 spaces at beginning of empty textarea', () => {
+      const { onChange } = setup({ scenarioData: '' });
+      const textarea = screen.getByLabelText(
+        'Scenario JSON data'
+      ) as HTMLTextAreaElement;
+
+      textarea.selectionStart = 0;
+      textarea.selectionEnd = 0;
+
+      fireEvent.keyDown(textarea, { key: 'Tab' });
+
+      expect(onChange).toHaveBeenCalledWith('  ');
+    });
+
+    it('does not affect other key presses', () => {
+      const { onChange } = setup({ scenarioData: 'test' });
+      const textarea = screen.getByLabelText('Scenario JSON data');
+
+      fireEvent.keyDown(textarea, { key: 'Enter' });
+      fireEvent.keyDown(textarea, { key: 'a' });
+      fireEvent.keyDown(textarea, { key: 'Backspace' });
+
+      // onChange should not be called by these keyDown events
+      // (it's only called by the change event)
+      expect(onChange).not.toHaveBeenCalled();
+    });
+
+    it('handles Tab key with multiline JSON content', () => {
+      const { onChange } = setup({
+        scenarioData: '{\n  "key": "value"\n}',
+      });
+      const textarea = screen.getByLabelText(
+        'Scenario JSON data'
+      ) as HTMLTextAreaElement;
+
+      // Set cursor at the end of first line
+      textarea.selectionStart = 1;
+      textarea.selectionEnd = 1;
+
+      fireEvent.keyDown(textarea, { key: 'Tab' });
+
+      expect(onChange).toHaveBeenCalledWith('{  \n  "key": "value"\n}');
+    });
+  });
 });
