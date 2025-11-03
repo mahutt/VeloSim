@@ -24,7 +24,7 @@
 
 import { vi } from 'vitest';
 
-type eventType = 'load' | 'move';
+type eventType = 'load' | 'move' | 'error';
 
 export class MockMap {
   static instance: undefined | MockMap;
@@ -32,9 +32,10 @@ export class MockMap {
   private center: [number, number];
   private zoom: number;
   private style: string;
-  public callBacks: Record<eventType, () => void> = {
+  public callBacks: Record<eventType, (arg?: unknown) => void> = {
     move: () => {},
     load: () => {},
+    error: () => {},
   };
   constructor({
     container,
@@ -53,7 +54,7 @@ export class MockMap {
     this.style = style;
     this.container = container;
   }
-  on = vi.fn((type: eventType, cb: () => void) => {
+  on = vi.fn((type: eventType, cb: (arg?: unknown) => void) => {
     this.callBacks[type] = cb;
   });
   remove = vi.fn();

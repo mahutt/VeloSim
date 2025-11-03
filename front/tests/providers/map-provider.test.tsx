@@ -37,6 +37,7 @@ import {
   loadMapImages,
   setMapLayers,
 } from '~/lib/map-helpers';
+import { logSimulationError } from '~/utils/simulation-error-utils';
 import { SimulationProvider } from '~/providers/simulation-provider';
 import { TaskAssignmentProvider } from '~/providers/task-assignment-provider';
 
@@ -51,6 +52,17 @@ vi.mock('~/lib/map-helpers.ts', async (importOriginal) => {
     setMapSource: vi.fn(),
   };
 });
+
+// Mock simulation error utils
+vi.mock('~/utils/simulation-error-utils', () => ({
+  logSimulationError: vi.fn(),
+}));
+
+// Mock useError hook
+const mockDisplayError = vi.fn();
+vi.mock('~/hooks/use-error', () => ({
+  default: () => ({ displayError: mockDisplayError }),
+}));
 
 test('map provider instantiates mapboxgl Map instance in presence of map container', async () => {
   render(
@@ -110,4 +122,59 @@ test('on-load callback sets mapLoaded to true', async () => {
   expect(loadMapImages).toHaveBeenCalledWith(map);
   expect(initializeMapSources).toHaveBeenCalledWith(map);
   expect(setMapLayers).toHaveBeenCalledWith(map);
+});
+
+test('on-error callback logs error, calls logSimulationError and displayError, and reloads on retry', async () => {
+  // Mock dependencies
+  const mockReload = vi.fn();
+  const errorObj = { message: 'Map failed' };
+
+  // Mock window.location.reload
+  const originalReload = window.location.reload;
+  window.location.reload = mockReload;
+
+  // Setup mockDisplayError to call retry callback
+  mockDisplayError.mockImplementation((_title, _desc, retry) => {
+    if (retry) retry();
+  });
+
+  // Minimal test component to trigger map error
+  const TestMapContainer = () => {
+    const { mapContainerRef } = useMap();
+    return <div ref={mapContainerRef} />;
+  };
+
+  render(
+    <MapProvider>
+      <TestMapContainer />
+    </MapProvider>
+  );
+
+  const map = MockMap.instance!;
+  expect(map.callBacks.error).toBeDefined();
+
+  // Spy on console.error
+  const consoleErrorSpy = vi
+    .spyOn(console, 'error')
+    .mockImplementation(() => {});
+
+  // Trigger error callback
+  act(() => {
+    map.callBacks.error(errorObj);
+  });
+
+  expect(logSimulationError).toHaveBeenCalledWith(errorObj, 'Map loading', {
+    errorType: 'MAP_LOAD_FAILED',
+  });
+  expect(mockDisplayError).toHaveBeenCalledWith(
+    'Failed to load map',
+    'An error occurred while loading the map. Please try again later.',
+    expect.any(Function)
+  );
+  expect(mockReload).toHaveBeenCalled();
+
+  // Restore mocks
+  consoleErrorSpy.mockRestore();
+  window.location.reload = originalReload;
+  mockDisplayError.mockClear();
 });
