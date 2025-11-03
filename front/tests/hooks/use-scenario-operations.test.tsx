@@ -200,68 +200,6 @@ describe('useScenarioOperations', () => {
     });
   });
 
-  describe('prepareForExport', () => {
-    it('adds scenario_title to content', () => {
-      const { result } = renderHook(() => useScenarioOperations(), {
-        wrapper: Wrapper,
-        container,
-      });
-
-      const content = { stations: [] };
-      const exportedContent = result.current.prepareForExport(
-        content,
-        'Test Scenario'
-      );
-
-      expect(exportedContent).toContain('"scenario_title": "Test Scenario"');
-    });
-
-    it('trims whitespace from scenario name', () => {
-      const { result } = renderHook(() => useScenarioOperations(), {
-        wrapper: Wrapper,
-        container,
-      });
-
-      const content = { stations: [] };
-      const exportedContent = result.current.prepareForExport(
-        content,
-        '  Scenario Name  '
-      );
-
-      expect(exportedContent).toContain('"scenario_title": "Scenario Name"');
-    });
-
-    it('formats JSON with 2-space indentation', () => {
-      const { result } = renderHook(() => useScenarioOperations(), {
-        wrapper: Wrapper,
-        container,
-      });
-
-      const content = { stations: [] };
-      const exportedContent = result.current.prepareForExport(content, 'Test');
-
-      expect(exportedContent).toContain('  "scenario_title"');
-      expect(exportedContent).toContain('  "stations"');
-    });
-
-    it('places scenario_title first in the output', () => {
-      const { result } = renderHook(() => useScenarioOperations(), {
-        wrapper: Wrapper,
-        container,
-      });
-
-      const content = { stations: [], bikes: [] };
-      const exportedContent = result.current.prepareForExport(content, 'Test');
-
-      const titleIndex = exportedContent.indexOf('"scenario_title"');
-      const stationsIndex = exportedContent.indexOf('"stations"');
-      const bikesIndex = exportedContent.indexOf('"bikes"');
-
-      expect(titleIndex).toBeLessThan(stationsIndex);
-      expect(titleIndex).toBeLessThan(bikesIndex);
-    });
-  });
-
   describe('downloadJSON', () => {
     it('creates blob and triggers download with correct filename', () => {
       const { result } = renderHook(() => useScenarioOperations(), {
@@ -380,9 +318,10 @@ describe('useScenarioOperations', () => {
       result.current.exportScenario(JSON.stringify(mockContent), 'My Scenario');
 
       expect(capturedBlob).toBeDefined();
-      // Read blob content to verify scenario_title is included
+      // Read blob content to verify it matches the original content
       capturedBlob!.text().then((text) => {
-        expect(text).toContain('"scenario_title": "My Scenario"');
+        const exported = JSON.parse(text);
+        expect(exported).toEqual(mockContent);
       });
     });
   });

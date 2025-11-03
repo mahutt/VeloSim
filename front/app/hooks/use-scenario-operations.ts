@@ -81,18 +81,6 @@ export function useScenarioOperations() {
     return parsedContent;
   };
 
-  // Prepares scenario content for export by adding scenario_title
-  const prepareForExport = (
-    parsedContent: Record<string, unknown>,
-    scenarioName: string
-  ) => {
-    const contentWithTitle = {
-      scenario_title: scenarioName.trim(),
-      ...parsedContent,
-    };
-    return JSON.stringify(contentWithTitle, null, 2);
-  };
-
   // Downloads JSON content as a file
   const downloadJSON = (content: string, filename: string) => {
     try {
@@ -126,7 +114,7 @@ export function useScenarioOperations() {
     const parsedContent = validateContent(content);
     if (!parsedContent) return false;
 
-    const contentToExport = prepareForExport(parsedContent, scenarioName);
+    const contentToExport = JSON.stringify(parsedContent, null, 2);
     downloadJSON(contentToExport, scenarioName);
     return true;
   };
@@ -158,7 +146,6 @@ export function useScenarioOperations() {
 
   return {
     validateContent,
-    prepareForExport,
     downloadJSON,
     exportScenario,
     saveScenario,
