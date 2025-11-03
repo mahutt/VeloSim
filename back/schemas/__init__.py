@@ -61,6 +61,11 @@ from .user import (
     UserResponse,
     UsersResponse,
 )
+from .frontend_log import (
+    LogLevel,
+    FrontendLogEntry,
+    FrontendLogResponse,
+)
 
 __all__ = [
     "PositionSchema",
@@ -91,4 +96,7 @@ __all__ = [
     "UserRoleUpdate",
     "UserResponse",
     "UsersResponse",
+    "LogLevel",
+    "FrontendLogEntry",
+    "FrontendLogResponse",
 ]
