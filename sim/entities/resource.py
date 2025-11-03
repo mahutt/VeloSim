@@ -29,16 +29,15 @@ from typing import Optional, TYPE_CHECKING, Generator
 from .task_state import State
 from sim.entities.route import Route
 from typing import Generator, Any
+
 # to avoid circular imports
 if TYPE_CHECKING:  # pragma: no cover
     from .position import Position
     from .task import Task
     from sim.behaviour.sim_behaviour import SimBehaviour
- 
 
 
 class Resource:
-   
 
     map_controller: MapController
     sim_behaviour: "SimBehaviour"
@@ -67,14 +66,14 @@ class Resource:
 
     def get_resource_position(self) -> "Position":
         return self.position
-    
+
     def set_behaviour(self, sim_behaviour: "SimBehaviour") -> None:
         self.sim_behaviour = sim_behaviour
 
     def set_resource_position(self, position: "Position") -> None:
         self.position = position
         self.has_updated = True
-    
+
     def set_map_controller(self, map_controller: MapController) -> None:
         self.map_controller = map_controller
 
@@ -135,7 +134,6 @@ class Resource:
             task.set_state(State.CLOSED)
             self.has_updated = True
 
-
     def get_task_count(self) -> int:
         return len(self.task_list)
 
@@ -150,32 +148,32 @@ class Resource:
         if self.position == position:
             print("*************** Already here **************")
             return
-    
+
         route = self.map_controller.getRoute(self.position, position)
         self.current_route = route
-        next_position, full_route = route.next()
-        self.current_route = full_route
+        first_result = route.next()
+        if isinstance(first_result, tuple):
+            next_position, full_route = first_result
+            self.current_route = full_route  # type: ignore[assignment]
+        else:
+            next_position = first_result  # type: ignore[assignment]
         try:
             while self.position != position and next_position:
-             
+
                 self.set_resource_position(next_position)
                 yield self.env.timeout(1)
-                next_position = route.next()
+                next_position = route.next()  # type: ignore[assignment]
         # Allows a traveling resource to be interrupted by other simpy entities
         except simpy.Interrupt:
             # TODO Implement interrupt logic
             print(f"Resource: {self.id} travel interrupted")
 
-
-            
-
-
-
     # continous process that runs throughout the simulation
     def run(self):  # type: ignore[no-untyped-def]
-        # Yield once at the start to ensure sim_behaviour and map_controller are set
+        # Yield once at the start to ensure sim_behaviour and
+        # map_controller are set
         yield self.env.timeout(1)
-        
+
         while True:
             # @TODO: replace with actual periodic logic
 
@@ -184,11 +182,14 @@ class Resource:
                 print(f"Resource {self.id} has {len(self.task_list)} tasks")
                 in_progress = self.get_in_progress_task()
                 print(f"In progress task: {in_progress}")
-                
+
                 if in_progress:
                     # We have a task in progress - check if we're at the station
                     task_station = in_progress.get_station()
-                    if self.position == task_station.get_station_position():
+                    if (
+                        task_station is not None
+                        and self.position == task_station.get_station_position()
+                    ):
                         print(f"At station, servicing task {in_progress.get_task_id()}")
                         self.service_task(in_progress)
                     # If not at station, travel_to is still in progress
@@ -201,12 +202,11 @@ class Resource:
                         # Dispatch the task to mark it as in-progress
                         self.dispatch_task(next_task)
                         # Travel to the task's station
-                        task_position = next_task.get_station().get_station_position()
-                        print(f"Traveling to {task_position.get_position()}")
-                        yield self.env.process(self.travel_to(task_position))
+                        task_station = next_task.get_station()
+                        if task_station is not None:
+                            task_position = task_station.get_station_position()
+                            print(f"Traveling to {task_position.get_position()}")
+                            yield self.env.process(self.travel_to(task_position))
 
             # Wait for next tick
             yield self.env.timeout(1)
-           
-
-

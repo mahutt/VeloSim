@@ -74,4 +74,4 @@ class BatterySwapTask(Task):
         return self.assigned_resource is not None and self.state == State.ASSIGNED
 
     def clear_update(self) -> None:
-            self.has_updated = False
+        self.has_updated = False

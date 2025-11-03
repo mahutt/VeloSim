@@ -89,8 +89,12 @@ def mock_osm_connection() -> Mock:
     mock_edges_df = DataFrame(edges_data)
     mock_osm.get_all_edges.return_value = mock_edges_df
 
-    # Provide edge index mapping (u, v) -> DataFrame index, as Route expects
-    edge_index = {(int(row["u"]), int(row["v"])): int(idx) for idx, row in mock_edges_df.iterrows()}
+    # Provide edge index mapping (u, v) -> DataFrame index, as Route
+    # expects
+    edge_index = {
+        (int(row["u"]), int(row["v"])): int(idx)
+        for idx, row in mock_edges_df.iterrows()
+    }
     mock_osm.get_edge_index.return_value = edge_index
 
     # Mock graph operations

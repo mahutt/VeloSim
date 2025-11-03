@@ -29,6 +29,7 @@ if TYPE_CHECKING:
     from sim.entities.task import Task
     from sim.entities.resource import Resource
 
+
 class ResourceChooseNextTaskStrategy(ABC):
 
     @abstractmethod

@@ -35,9 +35,6 @@ from sim.simulator import Simulator
 from sim.entities.BatterySwapTask import BatterySwapTask
 
 from sim.behaviour.sim_behaviour import SimBehaviour
-from sim.behaviour.sim_behaviour_builder import SimBehaviourBuilder
-from sim.behaviour.default.defualt_RCNT_strategy import DefaultRCNTStrategy
-from sim.behaviour.default.default_TPU_strategy import DefaultTPUStrategy
 
 
 class LoggerSubscriber(Subscriber):
@@ -54,7 +51,6 @@ class WebSocketSubscriber(Subscriber):
 
     def on_frame(self, frame: Frame) -> None:
         print(f"[{self.name}] Received: {frame}\n\n")
-
 
 
 # Create a temporary environment for entity creation
@@ -76,7 +72,9 @@ station2 = Station(temp_env, station_id=2, name="Concordia", position=concordia)
 station3 = Station(temp_env, station_id=3, name="McGill", position=mcgill)
 station4 = Station(temp_env, station_id=4, name="Downtown", position=downtown)
 station5 = Station(temp_env, station_id=5, name="Old Montreal", position=old_montreal)
-station6 = Station(temp_env, station_id=6, name="Olympic Stadium", position=olympic_stadium)
+station6 = Station(
+    temp_env, station_id=6, name="Olympic Stadium", position=olympic_stadium
+)
 
 # Create example resources at different starting positions
 resource1 = Resource(temp_env, resource_id=101, position=ikea)
@@ -121,7 +119,7 @@ params = InputParameter(
         3: task3,
         4: task4,
     },
-    real_time_factor=1.0,  # Real-time simulation
+    real_time_factor=0.1,  # Real-time simulation
     key_frame_freq=3000,  # Key frame every 3000 frames
 )
 
@@ -141,24 +139,23 @@ sub_list_1: List[Subscriber] = [sim1_sub]
 if __name__ == "__main__":
     import time
 
-    sim_behaviour_builder = SimBehaviourBuilder()
-    sim_behaviour_builder.set_RCNT_strategy(DefaultRCNTStrategy())
-    sim_behaviour_builder.set_TPU_strategy(DefaultTPUStrategy())
-    sim_behaviour = sim_behaviour_builder.get_sim_behaviour()
-
+    sim_behaviour = SimBehaviour()
     sim = Simulator()
-    
 
     # Initialize simulations and send initial frames
     print("Initializing simulations...")
-    r1 = sim.initialize(params, sub_list_1, sim_env=temp_env, sim_behaviour=sim_behaviour)
+    r1 = sim.initialize(
+        params, sub_list_1, sim_env=temp_env, sim_behaviour=sim_behaviour
+    )
 
     print("Initial frames sent. Starting simulation loops...")
 
     # Start the simulation loops
     sim.start(r1, 3600)
-    sim.thread_pool[r1]["thread"].join()
-    
+    thread = sim.thread_pool[r1]["thread"]
+    if thread is not None:
+        thread.join()
+
     # Let first resource run for a bit
     print("Resource 101 started with task 1 (Concordia)...")
     time.sleep(5)
@@ -176,9 +173,8 @@ if __name__ == "__main__":
     # # Assign task to fourth resource after another 5 seconds
     # print("\nAssigning task 4 to resource 104 (Olympic Stadium)...")
     # sim.assign_task_to_resource(r1, task_id=4, resource_id=104)
-    
+
     # Let all resources run
     print("\nAll resources now running with their assigned tasks...")
-    time.sleep(3500)
-
+    # time.sleep(3500)
     print("Done.")

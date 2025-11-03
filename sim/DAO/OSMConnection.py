@@ -31,25 +31,23 @@ import geopandas as gpd
 from pandas import Series
 from shapely.geometry import Point, LineString
 import numpy as np
-from scipy.spatial import cKDTree
+from scipy.spatial import cKDTree  # type: ignore[import-untyped]
 from pyproj import Transformer
-import pandana as pdna
-from tqdm import tqdm
+import pandana as pdna  # type: ignore[import-untyped]
+from tqdm import tqdm  # type: ignore[import-untyped]
 import pandas as pd
-
-
 
 
 class OSMConnection(object):
     __instance = None
 
-    nodes_gdf : gpd.GeoDataFrame
-    projected_nodes : gpd.GeoDataFrame
+    nodes_gdf: gpd.GeoDataFrame
+    projected_nodes: gpd.GeoDataFrame
     edge_index: Optional[dict] = None
     _ch_network: Optional[pdna.Network] = None
     _node_id_mapping: Optional[dict] = None
     _reverse_node_id_mapping: Optional[dict] = None
-  
+
     def __new__(cls) -> Self:
         if cls.__instance is None:
             cls.__instance = super(OSMConnection, cls).__new__(cls)
@@ -63,9 +61,13 @@ class OSMConnection(object):
         self._osm: OSM = None  # OSM parser object
         self._nodes: gpd.GeoDataFrame = gpd.GeoDataFrame()  # intersections
         self._edges: gpd.GeoDataFrame = gpd.GeoDataFrame()  # roads
+        print("Init OSM Data File...")
         self._initialize_osm_data_file()
+        print("Init drivable network...")
         self._get_drivable_network()  # ~1min
+        print("Set projected nodes...")
         self._set_projected_nodes()
+        print("Build edge index...")
         self._build_edge_index()
         self._graph: nx.MultiDiGraph = nx.MultiDiGraph()  # networkx graph
         # Build the networkx graph during initialization to match test expectations
@@ -82,7 +84,7 @@ class OSMConnection(object):
             # downloads the OSM data if doesnt exist and
             # updates the file if corrupted/old
             # Note: Tests expect update=True
-            fp = get_data("Montreal", directory="sim/DAO/OSMData", update=True)
+            fp = get_data("Montreal", directory="sim/DAO/OSMData", update=False)
 
             self._osm = OSM(fp)  # initializes OSM parser
         except Exception as e:
@@ -97,12 +99,11 @@ class OSMConnection(object):
                 network_type="driving",
             )
 
-
             if self._nodes.empty or self._edges.empty:
                 raise Exception("Nodes or edges unavailable")
         else:
             raise Exception("Could not get network from uninitialized OSM")
-    
+
     def _set_projected_nodes(self) -> None:
         # Build a GeoDataFrame with geometry defined. If 'lon'/'lat' columns
         # are missing (as in several tests), fall back to existing geometry
@@ -110,28 +111,42 @@ class OSMConnection(object):
         nodes_df = self._nodes.copy()
         if nodes_df is None or nodes_df.empty:
             # Initialize empty structures and skip KD-tree build
-            self.nodes_gdf = gpd.GeoDataFrame(columns=["id", "geometry"], geometry=[], crs="EPSG:4326")
+            self.nodes_gdf = gpd.GeoDataFrame(
+                columns=["id", "geometry"], geometry=[], crs="EPSG:4326"
+            )
             self.projected_nodes = self.nodes_gdf
             target_crs = "EPSG:32633"
-            self._to_proj = Transformer.from_crs("EPSG:4326", target_crs, always_xy=True)
+            self._to_proj = Transformer.from_crs(
+                "EPSG:4326", target_crs, always_xy=True
+            )
             self._coords_xy = np.empty((0, 2))
             self._ids = np.array([], dtype=int)
-            self._kdtree = None  # type: ignore[assignment]
+            self._kdtree = None
             return
-        if 'geometry' in nodes_df.columns and not nodes_df.geometry.is_empty.all():
+        if "geometry" in nodes_df.columns and not nodes_df.geometry.is_empty.all():
             # Ensure CRS is set for existing geometry
-            nodes_gdf = gpd.GeoDataFrame(nodes_df, geometry=nodes_df.geometry, crs="EPSG:4326")
+            nodes_gdf = gpd.GeoDataFrame(
+                nodes_df, geometry=nodes_df.geometry, crs="EPSG:4326"
+            )
         else:
-            # Derive geometry from lon/lat columns (tests may omit lon/lat; guard lookup)
-            if 'lon' in nodes_df.columns and 'lat' in nodes_df.columns:
+            # Derive geometry from lon/lat columns (tests may omit lon/lat;
+            # guard lookup)
+            if "lon" in nodes_df.columns and "lat" in nodes_df.columns:
                 nodes_gdf = gpd.GeoDataFrame(
                     nodes_df,
-                    geometry=gpd.points_from_xy(nodes_df['lon'], nodes_df['lat']),
+                    geometry=gpd.points_from_xy(nodes_df["lon"], nodes_df["lat"]),
                     crs="EPSG:4326",
                 )
             else:
-                # As a last resort, create empty geometry (should not happen in normal flows)
-                nodes_gdf = gpd.GeoDataFrame(nodes_df, geometry=gpd.points_from_xy(pd.Series([], dtype=float), pd.Series([], dtype=float)), crs="EPSG:4326")
+                # As a last resort, create empty geometry (should not
+                # happen in normal flows)
+                nodes_gdf = gpd.GeoDataFrame(
+                    nodes_df,
+                    geometry=gpd.points_from_xy(
+                        pd.Series([], dtype=float), pd.Series([], dtype=float)
+                    ),
+                    crs="EPSG:4326",
+                )
 
         # Index by id for O(1) lookups later
         nodes_gdf = nodes_gdf.set_index("id", drop=False)
@@ -149,21 +164,27 @@ class OSMConnection(object):
         if not projected_nodes.empty:
             xs = projected_nodes.geometry.x.to_numpy()
             ys = projected_nodes.geometry.y.to_numpy()
-            self._coords_xy = np.column_stack((xs, ys))         # shape (N, 2)
-            self._ids = projected_nodes.index.to_numpy()        # node ids aligned with rows
-            self._kdtree = cKDTree(self._coords_xy)             # fast nearest neighbor
+            # shape (N, 2)
+            self._coords_xy = np.column_stack((xs, ys))
+            # node ids aligned with rows
+            self._ids = projected_nodes.index.to_numpy()
+            # fast nearest neighbor
+            self._kdtree = cKDTree(self._coords_xy)
         else:
             self._coords_xy = np.empty((0, 2))
             self._ids = np.array([], dtype=int)
-            self._kdtree = None  # type: ignore[assignment]
+            self._kdtree = None
 
     # KD-tree built and caches ready
-    
-    def build_ch_network(self, cache_path: str = "sim/DAO/OSMData/montreal_ch_network.h5") -> None:
+
+    def build_ch_network(
+        self, cache_path: str = "sim/DAO/OSMData/montreal_ch_network.h5"
+    ) -> None:
         """
         Build Contraction Hierarchy network from nodes/edges GeoDataFrames.
-        This method should be called explicitly when you want to enable CH routing.
-        
+        This method should be called explicitly when you want to enable CH
+        routing.
+
         Args:
             cache_path: Path to save/load the preprocessed CH network
         """
@@ -178,49 +199,55 @@ class OSMConnection(object):
             except Exception as e:
                 print(f"Failed to load cached network: {e}")
                 print("Building CH network from scratch...")
-        
+
         print("Building Contraction Hierarchy network...")
         print("This may take 2-5 minutes for Montreal-scale network...")
-        
-        # Step 1: Create node ID mapping 
+
+        # Step 1: Create node ID mapping
         with tqdm(total=5, desc="CH Network Build Progress") as pbar:
             pbar.set_description("Creating node ID mapping")
             self._create_node_id_mapping()
             pbar.update(1)
-            
+
             # Step 2: Prepare nodes DataFrame
             pbar.set_description("Preparing nodes")
             nodes_df = self._nodes.copy()
-            nodes_df['node_id'] = nodes_df['id'].map(self._node_id_mapping)
+            if self._node_id_mapping is not None:
+                nodes_df["node_id"] = nodes_df["id"].map(self._node_id_mapping)
             pbar.update(1)
-            
-            # Step 3: Prepare edges DataFrame with aggregation for parallel edges
+
+            # Step 3: Prepare edges DataFrame with aggregation for
+            # parallel edges
             pbar.set_description("Preparing edges")
             edges_df = self._edges.copy()
-            edges_df['from_id'] = edges_df['u'].map(self._node_id_mapping)
-            edges_df['to_id'] = edges_df['v'].map(self._node_id_mapping)
-            
+            if self._node_id_mapping is not None:
+                edges_df["from_id"] = edges_df["u"].map(self._node_id_mapping)
+                edges_df["to_id"] = edges_df["v"].map(self._node_id_mapping)
+
             # Ensure length column exists
-            if 'length' not in edges_df.columns:
-                edges_df['length'] = edges_df.geometry.length
-            
+            if "length" not in edges_df.columns:
+                edges_df["length"] = edges_df.geometry.length
+
             # Aggregate parallel edges (take minimum length)
-            edges_aggregated = edges_df.groupby(['from_id', 'to_id']).agg({
-                'length': 'min'
-            }).reset_index()
-            pbar.update(1)
-            
-            # Step 4: Build Pandana network (this is the time-consuming step)
-            pbar.set_description("Building CH network (this takes time)")
-            self._ch_network = pdna.Network(
-                nodes_df['lon'].values,              # x coordinates (longitudes)
-                nodes_df['lat'].values,              # y coordinates (latitudes)
-                edges_aggregated['from_id'].values,  # source nodes
-                edges_aggregated['to_id'].values,    # target nodes
-                edges_aggregated[['length']]         # edge weights (DataFrame, not array!)
+            edges_aggregated = (
+                edges_df.groupby(["from_id", "to_id"])
+                .agg({"length": "min"})
+                .reset_index()
             )
             pbar.update(1)
-            
+
+            # Step 4: Build Pandana network (this is the time-consuming
+            # step)
+            pbar.set_description("Building CH network (this takes time)")
+            self._ch_network = pdna.Network(
+                nodes_df["lon"].values,  # x coordinates
+                nodes_df["lat"].values,  # y coordinates
+                edges_aggregated["from_id"].values,  # source nodes
+                edges_aggregated["to_id"].values,  # target nodes
+                edges_aggregated[["length"]],  # edge weights
+            )
+            pbar.update(1)
+
             # Step 5: Cache the network for future use
             pbar.set_description("Caching CH network")
             try:
@@ -232,64 +259,74 @@ class OSMConnection(object):
             except Exception as e:
                 print(f"Warning: Could not cache CH network: {e}")
             pbar.update(1)
-        
+
         print("CH network build complete!")
-    
+
     def _create_node_id_mapping(self) -> None:
-        """Create mapping between OSM node IDs and contiguous integer IDs for Pandana"""
-        unique_node_ids = self._nodes['id'].unique()
-        self._node_id_mapping = {old_id: new_id for new_id, old_id in enumerate(unique_node_ids)}
+        """Create mapping between OSM node IDs and contiguous integer IDs
+        for Pandana"""
+        unique_node_ids = self._nodes["id"].unique()
+        self._node_id_mapping = {
+            old_id: new_id for new_id, old_id in enumerate(unique_node_ids)
+        }
         self._reverse_node_id_mapping = {v: k for k, v in self._node_id_mapping.items()}
-    
+
     def _save_node_id_mapping(self) -> None:
         """Save node ID mapping to disk for future use"""
         mapping_path = "sim/DAO/OSMData/node_id_mapping.npz"
         try:
             # Convert dict to arrays for efficient storage
-            osm_ids = np.array(list(self._node_id_mapping.keys()))
-            pandana_ids = np.array(list(self._node_id_mapping.values()))
-            np.savez_compressed(mapping_path, osm_ids=osm_ids, pandana_ids=pandana_ids)
+            if self._node_id_mapping is not None:
+                osm_ids = np.array(list(self._node_id_mapping.keys()))
+                pandana_ids = np.array(list(self._node_id_mapping.values()))
+                np.savez_compressed(
+                    mapping_path, osm_ids=osm_ids, pandana_ids=pandana_ids
+                )
         except Exception as e:
             print(f"Warning: Could not save node ID mapping: {e}")
-    
+
     def _load_node_id_mapping(self) -> None:
         """Load node ID mapping from disk"""
         mapping_path = "sim/DAO/OSMData/node_id_mapping.npz"
         try:
             data = np.load(mapping_path)
-            osm_ids = data['osm_ids']
-            pandana_ids = data['pandana_ids']
-            self._node_id_mapping = {int(osm): int(pan) for osm, pan in zip(osm_ids, pandana_ids)}
-            self._reverse_node_id_mapping = {v: k for k, v in self._node_id_mapping.items()}
+            osm_ids = data["osm_ids"]
+            pandana_ids = data["pandana_ids"]
+            self._node_id_mapping = {
+                int(osm): int(pan) for osm, pan in zip(osm_ids, pandana_ids)
+            }
+            self._reverse_node_id_mapping = {
+                v: k for k, v in self._node_id_mapping.items()
+            }
         except Exception as e:
             print(f"Warning: Could not load node ID mapping: {e}")
             self._create_node_id_mapping()
-    
+
     def get_ch_network(self) -> Optional[pdna.Network]:
         """Get the CH network, building it if it doesn't exist"""
         if self._ch_network is None:
             print("CH network not built yet. Building now...")
             self.build_ch_network()
         return self._ch_network
-            
-    def _build_edge_index(self) -> dict:
+
+    def _build_edge_index(self) -> dict[tuple[int, int], int]:
         if self.edge_index is None:
             self.edge_index = {}
         # Only build when expected columns exist
         if (
             getattr(self, "_edges", None) is not None
             and not self._edges.empty
-            and 'u' in self._edges.columns
-            and 'v' in self._edges.columns
+            and "u" in self._edges.columns
+            and "v" in self._edges.columns
         ):
             for idx, row in self._edges.iterrows():
-                u, v = row['u'], row['v']
+                u, v = row["u"], row["v"]
                 self.edge_index[(u, v)] = idx
         return self.edge_index
-    
-    def get_edge_index(self):
-        return self.edge_index
-    
+
+    def get_edge_index(self) -> dict[tuple[int, int], int]:
+        return self.edge_index  # type: ignore[return-value]
+
     def get_all_nodes(self) -> gpd.GeoDataFrame:
         return self._nodes
 
@@ -329,9 +366,12 @@ class OSMConnection(object):
     # gets nearest node according to passed coordinates
     def coordinates_to_nearest_node(self, lng: float, lat: float) -> Series:
         # Ensure spatial caches are built (tests may assign _nodes directly)
-        if getattr(self, "nodes_gdf", None) is None or getattr(self, "_kdtree", None) is None:
+        if (
+            getattr(self, "nodes_gdf", None) is None
+            or getattr(self, "_kdtree", None) is None
+        ):
             self._set_projected_nodes()
-        elif self.nodes_gdf is not None and len(self.nodes_gdf) != len(self._ids):  # type: ignore[arg-type]
+        elif self.nodes_gdf is not None and len(self.nodes_gdf) != len(self._ids):
             # Rebuild if size mismatch
             self._set_projected_nodes()
 
@@ -342,11 +382,11 @@ class OSMConnection(object):
             raise Exception("No nodes available to query nearest node")
 
         # KD-tree nearest neighbor
-        _, idx = self._kdtree.query([x, y], k=1)  # type: ignore[union-attr]
+        _, idx = self._kdtree.query([x, y], k=1)
 
         # Map KD-tree index → node id → row in O(1)
         node_id = self._ids[idx]
-        return self.nodes_gdf.loc[node_id]
+        return self.nodes_gdf.loc[node_id]  # type: ignore[no-any-return]
 
     # creates networkx graph to allow its methods to read nodes/edges
     # separated from shortest path as takes time to create
@@ -357,7 +397,8 @@ class OSMConnection(object):
             node_columns = ["id", "geometry"]
             edge_columns = ["id", "u", "v", "name", "length", "geometry", "oneway"]
 
-            # filtering nodes/edges sent to graph to heavily improve performance
+            # filtering nodes/edges sent to graph to heavily improve
+            # performance
             filtered_nodes = self._nodes[self._nodes.columns.intersection(node_columns)]
             filtered_edges = self._edges[self._edges.columns.intersection(edge_columns)]
 
@@ -372,54 +413,71 @@ class OSMConnection(object):
     # and create_networkx_graph have been updated if changes have been made
     # src:https://pyrosm.readthedocs.io/en/latest/graphs.html#calculate-shortest-paths
     def shortest_path(
-        self, source_node: Series, target_node: Series, networkx_graph: Optional[nx.MultiDiGraph] = None, use_ch: bool = True
+        self,
+        source_node: Series,
+        target_node: Series,
+        networkx_graph: Optional[nx.MultiDiGraph] = None,
+        use_ch: bool = True,
     ) -> list[int]:
         """
         Compute shortest path between two nodes.
-        
+
         Args:
             source_node: Source node (pandas Series with 'id' field)
             target_node: Target node (pandas Series with 'id' field)
-            networkx_graph: NetworkX graph (optional, used when use_ch=False)
-            use_ch: If True, use Pandana CH routing (faster); if False, use NetworkX
-        
+            networkx_graph: NetworkX graph (optional, used when
+                use_ch=False)
+            use_ch: If True, use Pandana CH routing (faster); if False,
+                use NetworkX
+
         Returns:
             List of node IDs in the shortest path
         """
         source_node_id = source_node["id"]
         target_node_id = target_node["id"]
-        
+
         if use_ch and self._ch_network is not None:
             # Use Pandana Contraction Hierarchy (3-100x faster)
             try:
                 if self._node_id_mapping is None:
                     self._create_node_id_mapping()
-                
+
                 # Map OSM node IDs to Pandana integer IDs
-                pandana_source = self._node_id_mapping.get(source_node_id)
-                pandana_target = self._node_id_mapping.get(target_node_id)
-                
+                if self._node_id_mapping is not None:
+                    pandana_source = self._node_id_mapping.get(source_node_id)
+                    pandana_target = self._node_id_mapping.get(target_node_id)
+                else:
+                    pandana_source = None
+                    pandana_target = None
+
                 if pandana_source is None or pandana_target is None:
                     raise ValueError("Source or target node not found in node mapping")
-                
+
                 # Get path from Pandana (returns Pandana IDs)
-                path_pandana = self._ch_network.shortest_path(pandana_source, pandana_target)
-                
+                path_pandana = self._ch_network.shortest_path(
+                    pandana_source, pandana_target
+                )
+
                 # Map back to OSM node IDs
-                route = [self._reverse_node_id_mapping[node] for node in path_pandana]
-                return route
+                if self._reverse_node_id_mapping is not None:
+                    route = [
+                        self._reverse_node_id_mapping[node] for node in path_pandana
+                    ]
+                    return route
+                else:
+                    raise ValueError("Reverse node ID mapping not available")
             except Exception as e:
                 print(f"CH routing failed: {e}. Falling back to NetworkX...")
                 # Fall back to NetworkX
                 use_ch = False
-        
+
         # Use NetworkX routing (fallback or when CH not available)
         if networkx_graph is None:
             # Create NetworkX graph if not provided
             if self._graph.number_of_nodes() == 0:
                 self.create_networkx_graph()
             networkx_graph = self._graph
-        
+
         if (
             not self._nodes.empty
             and not self._edges.empty
@@ -430,88 +488,115 @@ class OSMConnection(object):
                 and target_node_id in networkx_graph.nodes()
             ):
                 try:
-                    # returns a list of nodes by their id passing through the route
-                    route: list[int] = nx.shortest_path(
+                    # returns a list of nodes by their id passing through
+                    # the route
+                    path: list[int] = nx.shortest_path(
                         networkx_graph, source_node_id, target_node_id, weight="length"
                     )
-                    return route
+                    return path
                 except Exception as e:
                     print(f"Route creation failed: {e}")
                     raise Exception("Route could not be created between the two nodes")
             raise Exception("Route could not be created between the two nodes")
         else:
             raise Exception(
-                "Could not create route with empty nodes, edges or networkx_graph"
+                "Could not create route with empty nodes, edges or " "networkx_graph"
             )
-    
-    def shortest_path_length(self, source_node: Series, target_node: Series, use_ch: bool = True) -> float:
+
+    def shortest_path_length(
+        self, source_node: Series, target_node: Series, use_ch: bool = True
+    ) -> float:
         """
         Compute shortest path length between two nodes.
-        
+
         Args:
             source_node: Source node (pandas Series with 'id' field)
             target_node: Target node (pandas Series with 'id' field)
-            use_ch: If True, use Pandana CH routing; if False, use NetworkX
-        
+            use_ch: If True, use Pandana CH routing; if False, use
+                NetworkX
+
         Returns:
             Path length in meters
         """
         source_node_id = source_node["id"]
         target_node_id = target_node["id"]
-        
+
         if use_ch and self._ch_network is not None:
             try:
                 if self._node_id_mapping is None:
                     self._create_node_id_mapping()
-                
-                pandana_source = self._node_id_mapping.get(source_node_id)
-                pandana_target = self._node_id_mapping.get(target_node_id)
-                
+
+                if self._node_id_mapping is not None:
+                    pandana_source = self._node_id_mapping.get(source_node_id)
+                    pandana_target = self._node_id_mapping.get(target_node_id)
+                else:
+                    pandana_source = None
+                    pandana_target = None
+
                 if pandana_source is None or pandana_target is None:
                     raise ValueError("Source or target node not found in node mapping")
-                
-                return self._ch_network.shortest_path_length(pandana_source, pandana_target)
+
+                length: float = self._ch_network.shortest_path_length(
+                    pandana_source, pandana_target
+                )
+                return length
             except Exception as e:
-                print(f"CH path length calculation failed: {e}. Falling back to NetworkX...")
-        
+                print(
+                    f"CH path length calculation failed: {e}. "
+                    f"Falling back to NetworkX..."
+                )
+
         # NetworkX fallback
         if self._graph.number_of_nodes() == 0:
             self.create_networkx_graph()
-        
-        return nx.shortest_path_length(self._graph, source_node_id, target_node_id, weight="length")
-    
-    def batch_shortest_paths(self, sources: list[Series], targets: list[Series]) -> list[list[int]]:
+
+        path_length: float = nx.shortest_path_length(
+            self._graph, source_node_id, target_node_id, weight="length"
+        )
+        return path_length
+
+    def batch_shortest_paths(
+        self, sources: list[Series], targets: list[Series]
+    ) -> list[list[int]]:
         """
         Vectorized batch routing for multiple origin-destination pairs.
         Much faster than looping with individual queries.
         Requires CH network to be built.
-        
+
         Args:
             sources: List of source nodes (pandas Series with 'id' field)
             targets: List of target nodes (same length as sources)
-        
+
         Returns:
             List of paths (one per OD pair)
         """
         if self._ch_network is None:
             raise Exception("CH network must be built before using batch routing")
-        
+
         if self._node_id_mapping is None:
             self._create_node_id_mapping()
-        
+
         # Convert to Pandana IDs
-        pandana_sources = [self._node_id_mapping[s["id"]] for s in sources]
-        pandana_targets = [self._node_id_mapping[t["id"]] for t in targets]
-        
+        if self._node_id_mapping is not None:
+            pandana_sources = [self._node_id_mapping[s["id"]] for s in sources]
+            pandana_targets = [self._node_id_mapping[t["id"]] for t in targets]
+        else:
+            raise ValueError("Node ID mapping not available")
+
         # Get paths from Pandana
-        paths_pandana = self._ch_network.shortest_paths(pandana_sources, pandana_targets)
-        
+        paths_pandana = self._ch_network.shortest_paths(
+            pandana_sources, pandana_targets
+        )
+
         # Convert back to OSM IDs
         paths = []
-        for path_pandana in paths_pandana:
-            path = [self._reverse_node_id_mapping[node] for node in path_pandana]
-            paths.append(path)
-        
+        if self._reverse_node_id_mapping is not None:
+            for path_pandana in paths_pandana:
+                path = [self._reverse_node_id_mapping[node] for node in path_pandana]
+                paths.append(path)
+        else:
+            raise ValueError("Reverse node ID mapping not available")
+
         return paths
 
     # creates new node object
@@ -576,6 +661,7 @@ class OSMConnection(object):
     @classmethod
     def reset_instance(cls) -> None:  # for testing
         cls.__instance = None
+
 
 if __name__ == "__main__":
     print("OSM Connection working")

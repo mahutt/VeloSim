@@ -27,7 +27,10 @@ from sim.behaviour.resource_behaviour.resource_choose_next_task_strategy import 
     ResourceChooseNextTaskStrategy,
 )
 
-from sim.behaviour.station_behaviour.strategies.task_popup_strategy import TaskPopupStrategy
+from sim.behaviour.station_behaviour.strategies.task_popup_strategy import (
+    TaskPopupStrategy,
+)
+from typing import Self
 
 
 class SimBehaviourBuilder:
@@ -36,13 +39,11 @@ class SimBehaviourBuilder:
     def __init__(self) -> None:
         self.reset()
 
-    def set_RCNT_strategy(self, strategy: ResourceChooseNextTaskStrategy) -> None:
+    def set_RCNT_strategy(self, strategy: ResourceChooseNextTaskStrategy) -> Self:
         self.sim_behaviour.set_RCNT_strategy(strategy)
         return self
 
-   
-
-    def set_TPU_strategy(self, strategy: TaskPopupStrategy) -> None:
+    def set_TPU_strategy(self, strategy: TaskPopupStrategy) -> Self:
         self.sim_behaviour.set_TPU_strategy(strategy)
         return self
 

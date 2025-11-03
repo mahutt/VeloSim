@@ -107,6 +107,9 @@ class Task(ABC):
     def set_behaviour(self, behaviour: "SimBehaviour") -> None:
         self.behaviour = behaviour
 
+    def clear_update(self) -> None:
+        self.has_updated = False
+
     def to_dict(self) -> dict[str, Any]:
         return {
             "id": self.id,
@@ -118,12 +121,11 @@ class Task(ABC):
                 else None
             ),
         }
-    
+
     def __eq__(self, other: object) -> bool:
         if not isinstance(other, Task):
             return False
         return self.id == other.id
-        
+
     def __hash__(self) -> int:
         return hash(self.id)
-

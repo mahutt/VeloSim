@@ -48,7 +48,11 @@ class Simulator:
         self.thread_pool_lock = threading.Lock()
 
     def initialize(
-        self, input_parameters: InputParameter, subscribers: List[Subscriber], sim_env: simpy.Environment, sim_behaviour: SimBehaviour
+        self,
+        input_parameters: InputParameter,
+        subscribers: List[Subscriber],
+        sim_env: simpy.Environment = simpy.Environment(),
+        sim_behaviour: SimBehaviour = SimBehaviour(),
     ) -> str:
         # Initialize a simulation and send the initial frame, but don't start
         # the simulation loop.

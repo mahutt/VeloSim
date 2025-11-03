@@ -36,25 +36,27 @@ from sim.entities.resource import Resource
 from sim.entities.BatterySwapTask import BatterySwapTask
 from sim.entities.position import Position
 from sim.utils.subscriber import Subscriber
+from sim.behaviour.sim_behaviour import SimBehaviour
 import sim.RealTimeDriver as rtd
 import sim.SimulatorController as sc_mod
 from types import SimpleNamespace
 
 
 class FakeTPUStrategy:
-    def check_for_new_task(self) -> bool:
+    def check_for_new_task(self, station: Station) -> bool:
         return False
 
 
 class FakeRCNTStrategy:
-    def select_next_task(self, resource: Resource):  # type: ignore[name-defined]
+    def select_next_task(self, resource: Resource) -> None:
         return None
 
 
-class FakeSimBehaviour:
+class FakeSimBehaviour(SimBehaviour):
     def __init__(self) -> None:
-        self.TPU_strategy = FakeTPUStrategy()
-        self.RCNT_strategy = FakeRCNTStrategy()
+        super().__init__()
+        self.TPU_strategy = FakeTPUStrategy()  # type: ignore[assignment]
+        self.RCNT_strategy = FakeRCNTStrategy()  # type: ignore[assignment]
 
 
 # Real time driver depends on real time passing by. Too slow for tests.
@@ -656,12 +658,12 @@ def test_start_simulation(
                 simulator_controller.map_controller.osm,
                 "build_ch_network",
                 return_value=None,
-            ) as _mock_build,
+            ),
             patch.object(
                 simulator_controller.map_controller,
                 "getRoute",
                 return_value=SimpleNamespace(roads=[1, 2]),
-            ) as _mock_route,
+            ),
         ):
             simulator_controller.start(3600)
 

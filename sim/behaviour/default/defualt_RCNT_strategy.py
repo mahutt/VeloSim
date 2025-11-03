@@ -21,15 +21,20 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 """
-from sim.behaviour.resource_behaviour.resource_choose_next_task_strategy import ResourceChooseNextTaskStrategy
-from typing import Optional, TYPE_CHECKING
+
+from sim.behaviour.resource_behaviour.resource_choose_next_task_strategy import (
+    ResourceChooseNextTaskStrategy,
+)
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from sim.entities.task import Task
     from sim.entities.resource import Resource
+
+
 class DefaultRCNTStrategy(ResourceChooseNextTaskStrategy):
 
-     def select_next_task(self, resource: "Resource") -> "Task":
-        
+    def select_next_task(self, resource: "Resource") -> "Task":
+
         tasks = resource.get_task_list()
         return tasks[0]

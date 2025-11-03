@@ -46,25 +46,27 @@ from sim.entities.BatterySwapTask import BatterySwapTask
 import sim.RealTimeDriver as rtd_mod
 from sim.simulator import Simulator
 from sim.utils.subscriber import Subscriber
+from sim.behaviour.sim_behaviour import SimBehaviour
 
 params = InputParameter()
 subList: List[Subscriber] = []
 
 
 class FakeTPUStrategy:
-    def check_for_new_task(self) -> bool:
+    def check_for_new_task(self, station: Station) -> bool:
         return False
 
 
 class FakeRCNTStrategy:
-    def select_next_task(self, resource: Resource):  # type: ignore[name-defined]
+    def select_next_task(self, resource: Resource) -> None:
         return None
 
 
-class FakeSimBehaviour:
+class FakeSimBehaviour(SimBehaviour):
     def __init__(self) -> None:
-        self.TPU_strategy = FakeTPUStrategy()
-        self.RCNT_strategy = FakeRCNTStrategy()
+        super().__init__()
+        self.TPU_strategy = FakeTPUStrategy()  # type: ignore[assignment]
+        self.RCNT_strategy = FakeRCNTStrategy()  # type: ignore[assignment]
 
 
 # Mock time to avoid real time delays in tests
@@ -172,7 +174,9 @@ def test_start_creates_thread_and_emits_output(
     ctrl = sim_info["simController"]
     with (
         patch.object(ctrl.map_controller.osm, "build_ch_network", return_value=None),
-        patch.object(ctrl.map_controller, "getRoute", return_value=SimpleNamespace(roads=[1])),
+        patch.object(
+            ctrl.map_controller, "getRoute", return_value=SimpleNamespace(roads=[1])
+        ),
     ):
         # Start the simulation
         sim.start(sim_id, 3600)
@@ -192,7 +196,9 @@ def test_start_creates_thread_and_emits_output(
     assert sim_id not in sim.thread_pool
 
 
-def test_start_with_non_existant_sim_id(sim: Simulator, fake_time: MockClock, simpy_env: simpy.Environment) -> None:
+def test_start_with_non_existant_sim_id(
+    sim: Simulator, fake_time: MockClock, simpy_env: simpy.Environment
+) -> None:
     # Arrange
     sim.initialize(params, subList, simpy_env, FakeSimBehaviour())
 
@@ -203,7 +209,9 @@ def test_start_with_non_existant_sim_id(sim: Simulator, fake_time: MockClock, si
         sim.start("some_id", 3600)
 
 
-def test_start_with_already_running_sim(sim: Simulator, fake_time: MockClock, simpy_env: simpy.Environment) -> None:
+def test_start_with_already_running_sim(
+    sim: Simulator, fake_time: MockClock, simpy_env: simpy.Environment
+) -> None:
     # Arrange
     sim_id = sim.initialize(params, subList, simpy_env, FakeSimBehaviour())
     sim_info = sim.get_sim_by_id(sim_id)
@@ -211,7 +219,9 @@ def test_start_with_already_running_sim(sim: Simulator, fake_time: MockClock, si
     ctrl = sim_info["simController"]
     with (
         patch.object(ctrl.map_controller.osm, "build_ch_network", return_value=None),
-        patch.object(ctrl.map_controller, "getRoute", return_value=SimpleNamespace(roads=[1])),
+        patch.object(
+            ctrl.map_controller, "getRoute", return_value=SimpleNamespace(roads=[1])
+        ),
     ):
         sim.start(sim_id, 3600)
 
@@ -234,7 +244,11 @@ def test_stop_removes_thread_from_pool(
     ctrl = sim_info["simController"]
     with (
         patch.object(ctrl.map_controller.osm, "build_ch_network", return_value=None),
-        patch.object(ctrl.map_controller, "getRoute", return_value=SimpleNamespace(roads=[1])),
+        patch.object(
+            ctrl.map_controller,
+            "getRoute",
+            return_value=SimpleNamespace(roads=[1]),
+        ),
     ):
         sim.start(sim_id, 3600)
 
@@ -271,9 +285,17 @@ def test_multiple_parallel_sims(
     b_ctrl = b_info["simController"]
     with (
         patch.object(a_ctrl.map_controller.osm, "build_ch_network", return_value=None),
-        patch.object(a_ctrl.map_controller, "getRoute", return_value=SimpleNamespace(roads=[1])),
+        patch.object(
+            a_ctrl.map_controller,
+            "getRoute",
+            return_value=SimpleNamespace(roads=[1]),
+        ),
         patch.object(b_ctrl.map_controller.osm, "build_ch_network", return_value=None),
-        patch.object(b_ctrl.map_controller, "getRoute", return_value=SimpleNamespace(roads=[1])),
+        patch.object(
+            b_ctrl.map_controller,
+            "getRoute",
+            return_value=SimpleNamespace(roads=[1]),
+        ),
     ):
         sim.start(a, 3600)
         sim.start(b, 3600)
@@ -409,7 +431,11 @@ def test_get_sim_by_id_success(
     ctrl = a_info["simController"]
     with (
         patch.object(ctrl.map_controller.osm, "build_ch_network", return_value=None),
-        patch.object(ctrl.map_controller, "getRoute", return_value=SimpleNamespace(roads=[1])),
+        patch.object(
+            ctrl.map_controller,
+            "getRoute",
+            return_value=SimpleNamespace(roads=[1]),
+        ),
     ):
         sim.start(a, 3600)
 
@@ -435,7 +461,11 @@ def test_get_sim_by_id_fail(
     ctrl = a_info["simController"]
     with (
         patch.object(ctrl.map_controller.osm, "build_ch_network", return_value=None),
-        patch.object(ctrl.map_controller, "getRoute", return_value=SimpleNamespace(roads=[1])),
+        patch.object(
+            ctrl.map_controller,
+            "getRoute",
+            return_value=SimpleNamespace(roads=[1]),
+        ),
     ):
         sim.start(a, 3600)
 
@@ -461,7 +491,11 @@ def test_add_task_to_sim_success(
     ctrl = a_info["simController"]
     with (
         patch.object(ctrl.map_controller.osm, "build_ch_network", return_value=None),
-        patch.object(ctrl.map_controller, "getRoute", return_value=SimpleNamespace(roads=[1])),
+        patch.object(
+            ctrl.map_controller,
+            "getRoute",
+            return_value=SimpleNamespace(roads=[1]),
+        ),
     ):
         sim.start(a, 3600)
 
@@ -500,7 +534,11 @@ def test_add_task_to_sim_fail(
     ctrl = a_info["simController"]
     with (
         patch.object(ctrl.map_controller.osm, "build_ch_network", return_value=None),
-        patch.object(ctrl.map_controller, "getRoute", return_value=SimpleNamespace(roads=[1])),
+        patch.object(
+            ctrl.map_controller,
+            "getRoute",
+            return_value=SimpleNamespace(roads=[1]),
+        ),
     ):
         sim.start(a, 3600)
 
@@ -511,7 +549,8 @@ def test_add_task_to_sim_fail(
 
     # Assert
     error = "Simulation random_id does not exist in the thread pool"
-    # Other prints may occur (e.g., network setup); ensure our error was printed at least once
+    # Other prints may occur (e.g., network setup);
+    # ensure our error was printed at least once
     mock_print.assert_any_call(f"Could not add task to sim due to: {error}")
 
     sim.stop(a)
@@ -527,7 +566,11 @@ def test_assign_task_to_resource_success(
     ctrl = a_info["simController"]
     with (
         patch.object(ctrl.map_controller.osm, "build_ch_network", return_value=None),
-        patch.object(ctrl.map_controller, "getRoute", return_value=SimpleNamespace(roads=[1])),
+        patch.object(
+            ctrl.map_controller,
+            "getRoute",
+            return_value=SimpleNamespace(roads=[1]),
+        ),
     ):
         sim.start(a, 3600)
 
@@ -557,7 +600,11 @@ def test_assign_task_to_resource_fail(
     ctrl = a_info["simController"]
     with (
         patch.object(ctrl.map_controller.osm, "build_ch_network", return_value=None),
-        patch.object(ctrl.map_controller, "getRoute", return_value=SimpleNamespace(roads=[1])),
+        patch.object(
+            ctrl.map_controller,
+            "getRoute",
+            return_value=SimpleNamespace(roads=[1]),
+        ),
     ):
         sim.start(a, 3600)
 
@@ -579,7 +626,11 @@ def test_unassign_task_from_resource_success(
     ctrl = a_info["simController"]
     with (
         patch.object(ctrl.map_controller.osm, "build_ch_network", return_value=None),
-        patch.object(ctrl.map_controller, "getRoute", return_value=SimpleNamespace(roads=[1])),
+        patch.object(
+            ctrl.map_controller,
+            "getRoute",
+            return_value=SimpleNamespace(roads=[1]),
+        ),
     ):
         sim.start(a, 3600)
     sim.assign_task_to_resource(a, task_id=1, resource_id=1)
@@ -608,7 +659,11 @@ def test_unassign_task_from_resource_fail(
     ctrl = a_info["simController"]
     with (
         patch.object(ctrl.map_controller.osm, "build_ch_network", return_value=None),
-        patch.object(ctrl.map_controller, "getRoute", return_value=SimpleNamespace(roads=[1])),
+        patch.object(
+            ctrl.map_controller,
+            "getRoute",
+            return_value=SimpleNamespace(roads=[1]),
+        ),
     ):
         sim.start(a, 3600)
 
@@ -630,7 +685,11 @@ def test_reassign_task_success(sim: Simulator, input_params: InputParameter) -> 
     ctrl = a_info["simController"]
     with (
         patch.object(ctrl.map_controller.osm, "build_ch_network", return_value=None),
-        patch.object(ctrl.map_controller, "getRoute", return_value=SimpleNamespace(roads=[1])),
+        patch.object(
+            ctrl.map_controller,
+            "getRoute",
+            return_value=SimpleNamespace(roads=[1]),
+        ),
     ):
         sim.start(a, 3600)
     sim.assign_task_to_resource(a, task_id=1, resource_id=1)
@@ -654,7 +713,10 @@ def test_reassign_task_success(sim: Simulator, input_params: InputParameter) -> 
 
 @patch("builtins.print")
 def test_reassign_task_fail(
-    mock_print: MagicMock, sim: Simulator, input_params: InputParameter, simpy_env: simpy.Environment
+    mock_print: MagicMock,
+    sim: Simulator,
+    input_params: InputParameter,
+    simpy_env: simpy.Environment,
 ) -> None:
     # Arrange
     a = sim.initialize(input_params, subList, simpy_env, FakeSimBehaviour())
@@ -663,7 +725,11 @@ def test_reassign_task_fail(
     ctrl = a_info["simController"]
     with (
         patch.object(ctrl.map_controller.osm, "build_ch_network", return_value=None),
-        patch.object(ctrl.map_controller, "getRoute", return_value=SimpleNamespace(roads=[1])),
+        patch.object(
+            ctrl.map_controller,
+            "getRoute",
+            return_value=SimpleNamespace(roads=[1]),
+        ),
     ):
         sim.start(a, 3600)
 
@@ -698,8 +764,16 @@ def test_stop_all_stops_everything_and_is_idempotent(
         assert sim_info is not None
         ctrl = sim_info["simController"]
         with (
-            patch.object(ctrl.map_controller.osm, "build_ch_network", return_value=None),
-            patch.object(ctrl.map_controller, "getRoute", return_value=SimpleNamespace(roads=[1])),
+            patch.object(
+                ctrl.map_controller.osm,
+                "build_ch_network",
+                return_value=None,
+            ),
+            patch.object(
+                ctrl.map_controller,
+                "getRoute",
+                return_value=SimpleNamespace(roads=[1]),
+            ),
         ):
             sim.start(sim_id, 3600)
         sim_ids.append(sim_id)

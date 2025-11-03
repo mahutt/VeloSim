@@ -70,9 +70,7 @@ class MapController:
         )
 
         # 2. Generate the path:
-        osm_route = self.osm.shortest_path(
-            starting_node, ending_node, use_ch=True
-        )
+        osm_route = self.osm.shortest_path(starting_node, ending_node, use_ch=True)
 
         # 3. Create a new route object
         traversable_route = Route(osm_route, self.osm)

@@ -168,7 +168,7 @@ class RealTimeDriver:
                     actual_wall_time = time.perf_counter()
                     lag = expected_wall_time - actual_wall_time
                     self.lag = lag
-                    if(lag>0):
+                    if lag > 0:
                         self.record_lag(lag)
                     # TODO: record/report lag metrics if needed
 
@@ -183,6 +183,5 @@ class RealTimeDriver:
     def stop(self) -> None:
         self.stop_flag = True
 
-    def record_lag(self,lag: float) -> None:
+    def record_lag(self, lag: float) -> None:
         pass
-

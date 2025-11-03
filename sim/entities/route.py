@@ -72,7 +72,7 @@ class Route:
         # If no roads were created, the route was finished from the start
         if not self.roads:
             self.is_finished = True
-    
+
     def _build_road_segments(
         self, route_node_ids: List[int], osm_connection: OSMConnection
     ) -> List[road]:
@@ -87,17 +87,20 @@ class Route:
             end_node_id = route_node_ids[i + 1]
 
             edge_idx = edge_index.get((start_node_id, end_node_id))
-            
+
             if edge_idx is not None:
                 edge = all_edges.loc[edge_idx]
-                road_segments.append(road(edge))
+                road_segments.append(road(edge))  # type: ignore[arg-type]
             else:
                 edge_idx = edge_index.get((end_node_id, start_node_id))
                 if edge_idx is not None:
                     edge = all_edges.loc[edge_idx]
-                    road_segments.append(road(edge))
+                    road_segments.append(road(edge))  # type: ignore[arg-type]
                 else:
-                    print(f"Warning: Could not find edge {start_node_id} -> {end_node_id}")
+                    print(
+                        f"Warning: Could not find edge "
+                        f"{start_node_id} -> {end_node_id}"
+                    )
 
         return road_segments
 

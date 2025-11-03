@@ -22,8 +22,10 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 """
 
-from sim.behaviour.station_behaviour.strategies.task_popup_strategy import TaskPopupStrategy
-from typing import Optional, TYPE_CHECKING
+from sim.behaviour.station_behaviour.strategies.task_popup_strategy import (
+    TaskPopupStrategy,
+)
+from typing import TYPE_CHECKING
 import random
 
 if TYPE_CHECKING:
@@ -32,11 +34,7 @@ if TYPE_CHECKING:
 
 class DefaultTPUStrategy(TaskPopupStrategy):
 
-    def check_for_new_task(self) -> bool:
+    def check_for_new_task(self, station: "Station") -> bool:
         # 0.001% chance of a new task popping up per station per second
-        hit = (random.randrange(100000) == 0)
+        hit = random.randrange(100000) == 0
         return hit
-    
-        
-        
-

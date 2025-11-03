@@ -33,9 +33,10 @@ class Position:
     def set_position(self, position: list[float]) -> None:
         self.position = position
 
-    def __eq__ (self,other: object) -> bool:
-        if not isinstance(self, Position):
+    def __eq__(self, other: object) -> bool:
+        if not isinstance(other, Position):
             return False
-        return (other.position[0] == self.position[0] and other.position[1] == self.position[1])
-    
-    
+        return (
+            other.position[0] == self.position[0]
+            and other.position[1] == self.position[1]
+        )

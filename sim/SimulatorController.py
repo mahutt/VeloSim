@@ -36,7 +36,6 @@ from sim.entities.inputParameters import InputParameter
 from sim.behaviour.sim_behaviour import SimBehaviour
 from sim.controller.MapController import MapController
 from sim.entities.position import Position
-from sim.entities.route import Route
 
 
 class SimulatorController:
@@ -62,6 +61,7 @@ class SimulatorController:
         self.keyframeFreq = keyframe_freq
         self.clock = Clock(simEnv)
         self.sim_behaviour = sim_behaviour
+        self.frameCounter: int = 0
 
         # Unpack InputParameter object to populate entity lists
         self.station_entities: Dict[int, Station] = (
@@ -70,10 +70,7 @@ class SimulatorController:
         self.resource_entities: Dict[int, Resource] = (
             inputParameters.get_resource_entities()
         )
-        self.task_entities: Dict[int, Task] = inputParameters.get_task_entities()
-
-        # Initialize frame counter
-        self.frameCounter: int = 0
+        self.task_entities = inputParameters.get_task_entities()
 
     def prep_entities(self) -> None:
 
@@ -95,16 +92,14 @@ class SimulatorController:
             resource.env = self.simEnv
             # resource.action = self.simEnv.process(resource.run())
 
-
-
     def start(self, sim_time: int) -> None:
         # Build CH network for fast routing (with caching and progress bar)
-        print("\n" + "="*60)
+        print("\n" + "=" * 60)
         print("Preparing Contraction Hierarchy network for fast routing...")
-        print("="*60)
+        print("=" * 60)
         self.map_controller.osm.build_ch_network()
-        print("="*60 + "\n")
-        
+        print("=" * 60 + "\n")
+
         ikea = Position([-73.691993, 45.490198])  # IKEA
         concordia = Position([-73.577797, 45.495009])  # Concordia
 
@@ -121,6 +116,7 @@ class SimulatorController:
             target=self.realTimeDriver.run_until, args=(sim_time, self.emit_frame)
         )
         self.sim_thread.start()
+        self.sim_thread.join()
 
     def stop(self) -> None:
         self.realTimeDriver.stop()
@@ -227,7 +223,8 @@ class SimulatorController:
                 else self.create_diff_frame()
             )
         self.frameEmitter.notify(frame=frame)
-        # After emitting the frame, clear update flags so only fresh changes appear next time
+        # After emitting the frame, clear update flags so only fresh
+        # changes appear next time
         self.clear_entity_updates()
         self.frameCounter += 1
 

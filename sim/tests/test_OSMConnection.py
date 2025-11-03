@@ -67,7 +67,7 @@ def test_osmconnection_initialization_methods_called(
     # makedirs called since folder "not found"
     mock_makedirs.assert_called_once_with("sim/DAO/OSMData")
     mock_get_data.assert_called_once_with(
-        "Montreal", directory="sim/DAO/OSMData", update=True
+        "Montreal", directory="sim/DAO/OSMData", update=False
     )
     mock_OSM.assert_called_once_with("/mock/path/montreal.osm.pbf")
     assert instance._osm is mock_OSM.return_value
@@ -102,7 +102,7 @@ def test_osmconnection_initialization_folder_exists(
     # makedirs not called since folder existed
     mock_makedirs.assert_not_called()
     mock_get_data.assert_called_once_with(
-        "Montreal", directory="sim/DAO/OSMData", update=True
+        "Montreal", directory="sim/DAO/OSMData", update=False
     )
     mock_OSM.assert_called_once_with("/mock/path/montreal.osm.pbf")
     mock_get_drivable_network.assert_called_once()
@@ -319,6 +319,8 @@ def test_get_node_by_id_found(
     mock_init_file.assert_called_once()
     mock_get_drivable_network.assert_called_once()
     mock_create_graph.assert_called_once()
+    # Clear prints captured during initialization
+    mock_print.reset_mock()
 
     mock_nodes = gpd.GeoDataFrame({"id": [1]}, geometry=[Point(0, 0)])
     instance._nodes = mock_nodes
@@ -346,6 +348,8 @@ def test_get_node_by_id_not_found(
     mock_init_file.assert_called_once()
     mock_get_drivable_network.assert_called_once()
     mock_create_graph.assert_called_once()
+    # Clear prints captured during initialization
+    mock_print.reset_mock()
 
     mock_nodes = gpd.GeoDataFrame({"id": [1]}, geometry=[Point(0, 0)])
     instance._nodes = mock_nodes
@@ -439,6 +443,8 @@ def test_create_node_fail(
     mock_init_file.assert_called_once()
     mock_get_drivable_network.assert_called_once()
     mock_create_graph.assert_called_once()
+    # Clear prints captured during initialization
+    mock_print.reset_mock()
 
     mock_point.side_effect = ValueError("Invalid Coordinates")
 
@@ -505,6 +511,8 @@ def test_create_edge_fail(
     mock_init_file.assert_called_once()
     mock_get_drivable_network.assert_called_once()
     mock_create_graph.assert_called_once()
+    # Clear prints captured during initialization
+    mock_print.reset_mock()
 
     point = Point(-73.591378, 45.591513)
     node_data = {
@@ -729,6 +737,8 @@ def test_shortest_path_fail_from_nx_method_fail(
     mock_init_file.assert_called_once()
     mock_get_drivable_network.assert_called_once()
     mock_create_graph.assert_called_once()
+    # Clear prints captured during initialization
+    mock_print.reset_mock()
 
     point = Point(-73.591378, 45.591513)
     node_data = {

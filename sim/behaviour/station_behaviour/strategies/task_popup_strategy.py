@@ -24,7 +24,6 @@ SOFTWARE.
 
 from abc import ABC, abstractmethod
 
-from typing import Dict
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:

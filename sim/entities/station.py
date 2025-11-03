@@ -32,8 +32,6 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:  # pragma: no cover
     from .task import Task
     from .position import Position
-    from .BatterySwapTask import BatterySwapTask
-
 
 
 class Station:
@@ -80,27 +78,26 @@ class Station:
     def set_behaviour(self, behaviour: SimBehaviour) -> None:
         # Store behaviour consistently under 'behaviour'
         self.behaviour = behaviour
-    
+
     def check_for_new_task(self) -> None:
         # Use the behaviour reference set via set_behaviour
         has_new_task = False
         if hasattr(self, "behaviour") and hasattr(self.behaviour, "TPU_strategy"):
-            has_new_task = self.behaviour.TPU_strategy.check_for_new_task()
-            
+            has_new_task = self.behaviour.TPU_strategy.check_for_new_task(self)
+
         if has_new_task:
-            
+
             # TEMPORARY ID SOLUTION FOR TESTING
             task_id = uuid.uuid4().int % 1_000_000_000
-            # Ensure BatterySwapTask is instantiated with the current env and station
+            # Ensure BatterySwapTask is instantiated with the current env
+            # and station
             task = BatterySwapTask(env=self.env, task_id=task_id, station=self)
             self.add_task(task)
             self.add_pop_up_task(task)
-        
 
     def clear_update(self) -> None:
         self.has_updated = False
 
-        
     # continous process that runs throughout the simulation
     def run(self):  # type: ignore[no-untyped-def]
         # Yield once at the start to ensure behaviour is set
