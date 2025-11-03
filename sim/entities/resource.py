@@ -23,7 +23,7 @@ SOFTWARE.
 """
 
 import simpy
-from typing import Optional, TYPE_CHECKING
+from typing import Optional, TYPE_CHECKING, Generator
 from .task_state import State
 
 # to avoid circular imports
@@ -61,10 +61,27 @@ class Resource:
     def set_resource_position(self, position: "Position") -> None:
         self.position = position
 
-    def assign_task(self, task: "Task") -> None:
+    def assign_task(self, task: "Task", dispatch_delay: Optional[float] = None) -> None:
+
         if task.get_state() == State.OPEN:
             self.task_list.append(task)
             task.set_assigned_resource(self)
+            # Task state is now ASSIGNED (set by task.set_assigned_resource)
+            # Handle dispatch scheduling
+            if dispatch_delay is not None and dispatch_delay > 0:
+                # Schedule dispatch for later
+                # Start self-dispatching process
+                self.env.process(self._dispatch_after_delay(task, dispatch_delay))
+            # else: Task remains ASSIGNED, can be dispatched manually later
+
+    def _dispatch_after_delay(
+        self, task: "Task", delay: float
+    ) -> Generator[simpy.Event, None, None]:
+        # Yield when time delta has been reached.
+        yield self.env.timeout(delay)
+        # Check task is still assigned to us
+        if task in self.task_list and task.is_assigned():
+            self.dispatch_task(task)
 
     def unassign_task(self, task: "Task") -> None:
         if task in self.task_list and task.is_assigned():

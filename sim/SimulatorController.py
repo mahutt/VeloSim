@@ -114,12 +114,14 @@ class SimulatorController:
         else:  # task with same id exists already
             raise Exception(f"Task with id {task_id} already exists")
 
-    def assign_task_to_resource(self, task_id: int, resource_id: int) -> None:
+    def assign_task_to_resource(
+        self, task_id: int, resource_id: int, dispatch_delay: Optional[float] = None
+    ) -> None:
         found_task = self.get_task_by_id(task_id)
         found_resource = self.get_resource_by_id(resource_id)
 
         if found_task and found_resource:
-            found_resource.assign_task(found_task)
+            found_resource.assign_task(found_task, dispatch_delay)
         elif found_task is None:
             raise Exception(f"Could not find task in sim with id: {task_id}")
         else:
@@ -137,11 +139,15 @@ class SimulatorController:
             raise Exception(f"Could not find resource in sim with id: {resource_id}")
 
     def reassign_task(
-        self, task_id: int, old_resource_id: int, new_resource_id: int
+        self,
+        task_id: int,
+        old_resource_id: int,
+        new_resource_id: int,
+        dispatch_delay: Optional[float] = None,
     ) -> None:
         try:
             self.unassign_task_from_resource(task_id, old_resource_id)
-            self.assign_task_to_resource(task_id, new_resource_id)
+            self.assign_task_to_resource(task_id, new_resource_id, dispatch_delay)
         except Exception as e:
             error_message = str(e)
             if str(task_id) in error_message:
@@ -154,7 +160,7 @@ class SimulatorController:
                 )
             elif str(new_resource_id) in error_message:
                 # Assigns back the task to its original resource as reassigning failed
-                self.assign_task_to_resource(task_id, old_resource_id)
+                self.assign_task_to_resource(task_id, old_resource_id, dispatch_delay)
                 raise Exception(
                     f"Reassigning failed as could not find resource {new_resource_id}"
                 )

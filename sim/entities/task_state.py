@@ -27,6 +27,7 @@ from enum import Enum
 
 # enum of task states
 class State(Enum):
+    SCHEDULED = 0
     OPEN = 1
     ASSIGNED = 2
     IN_PROGRESS = 3
@@ -34,7 +35,9 @@ class State(Enum):
 
     # get string state by doing str(state)
     def __str__(self) -> str:
-        if self == State.OPEN:
+        if self == State.SCHEDULED:
+            return "scheduled"
+        elif self == State.OPEN:
             return "open"
         elif self == State.ASSIGNED:
             return "assigned"

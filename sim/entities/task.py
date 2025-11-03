@@ -22,8 +22,10 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 """
 
+from __future__ import annotations
 from abc import ABC, abstractmethod
-from typing import Optional, TYPE_CHECKING, Any
+from typing import Any, Generator, Optional, TYPE_CHECKING
+
 import simpy
 from .task_state import State
 
@@ -35,16 +37,34 @@ if TYPE_CHECKING:  # pragma: no cover
 
 class Task(ABC):
     def __init__(
-        self, env: simpy.Environment, task_id: int, station: Optional["Station"] = None
+        self,
+        env: simpy.Environment,
+        task_id: int,
+        station: Optional[Station] = None,
+        spawn_delay: Optional[float] = None,
     ) -> None:
         self.env = env
         self.id: int = task_id
-        self.state = State.OPEN  # A task would always be open at creation
-        self.station: Optional["Station"] = station
-        self.assigned_resource: Optional["Resource"] = (
-            None  # Initially, no resource is assigned
-        )
+        self.station: Optional[Station] = station
+        self.assigned_resource: Optional[Resource] = None
         self.has_updated = False
+
+        self.spawn_time: float = env.now + (spawn_delay if spawn_delay else 0)
+
+        # Handle scheduling
+        if spawn_delay is not None and spawn_delay > 0:
+            # Task starts SCHEDULED, will become OPEN after delay
+            self.state = State.SCHEDULED
+            # Start self-spawning process
+            env.process(self._spawn_after_delay(spawn_delay))
+        else:
+            # Task is immediately OPEN
+            self.state = State.OPEN
+
+    def _spawn_after_delay(self, delay: float) -> Generator[simpy.Event, None, None]:
+        # Yield until scheduled time has been reached.
+        yield self.env.timeout(delay)
+        self.set_state(State.OPEN)
 
     @abstractmethod
     def get_state(self) -> State:

@@ -35,9 +35,13 @@ if TYPE_CHECKING:  # pragma: no cover
 
 class BatterySwapTask(Task):
     def __init__(
-        self, env: simpy.Environment, task_id: int, station: Optional["Station"] = None
-    ):
-        super().__init__(env, task_id, station)
+        self,
+        env: simpy.Environment,
+        task_id: int,
+        station: Optional["Station"] = None,
+        spawn_delay: Optional[float] = None,
+    ) -> None:
+        super().__init__(env, task_id, station, spawn_delay)
 
     def get_state(self) -> State:
         return self.state
@@ -66,4 +70,4 @@ class BatterySwapTask(Task):
         self.state = State.OPEN
 
     def is_assigned(self) -> bool:
-        return self.state == State.ASSIGNED
+        return self.assigned_resource is not None and self.state == State.ASSIGNED
