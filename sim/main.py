@@ -37,6 +37,7 @@ from sim.entities.BatterySwapTask import BatterySwapTask
 from sim.behaviour.sim_behaviour import SimBehaviour
 from sim.behaviour.sim_behaviour_builder import SimBehaviourBuilder
 from sim.behaviour.default.defualt_RCNT_strategy import DefaultRCNTStrategy
+from sim.behaviour.default.default_TPU_strategy import DefaultTPUStrategy
 
 
 class LoggerSubscriber(Subscriber):
@@ -142,6 +143,7 @@ if __name__ == "__main__":
 
     sim_behaviour_builder = SimBehaviourBuilder()
     sim_behaviour_builder.set_RCNT_strategy(DefaultRCNTStrategy())
+    sim_behaviour_builder.set_TPU_strategy(DefaultTPUStrategy())
     sim_behaviour = sim_behaviour_builder.get_sim_behaviour()
 
     sim = Simulator()

@@ -25,17 +25,13 @@ SOFTWARE.
 from sim.behaviour.resource_behaviour.resource_choose_next_task_strategy import (
     ResourceChooseNextTaskStrategy,
 )
-from sim.behaviour.task_behaviour.auto_task_dispatch_strategy import (
-    AutoTaskDispatchStrategy,
-)
-from sim.behaviour.station_behaviour.task_popup_strategy import TaskPopupStrategy
+
+from sim.behaviour.station_behaviour.strategies.task_popup_strategy import TaskPopupStrategy
 
 
 class SimBehaviour:
 
     RCNT_strategy: ResourceChooseNextTaskStrategy
-
-    ATD_strategy: AutoTaskDispatchStrategy
 
     TPU_strategy: TaskPopupStrategy
 
@@ -44,9 +40,6 @@ class SimBehaviour:
 
     def set_RCNT_strategy(self, strategy: ResourceChooseNextTaskStrategy) -> None:
         self.RCNT_strategy = strategy
-
-    def set_ATD_strategy(self, strategy: AutoTaskDispatchStrategy) -> None:
-        self.ATD_strategy = strategy
 
     def set_TPU_strategy(self, strategy: TaskPopupStrategy) -> None:
         self.TPU_strategy = strategy

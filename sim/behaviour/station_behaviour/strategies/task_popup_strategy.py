@@ -34,5 +34,5 @@ if TYPE_CHECKING:
 class TaskPopupStrategy(ABC):
 
     @abstractmethod
-    def check_for_new_task(self, stations: Dict[int, "Station"]) -> None:
+    def check_for_new_task(self, station: "Station") -> bool:
         raise NotImplementedError()

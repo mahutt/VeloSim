@@ -83,6 +83,7 @@ class Resource:
         if task.get_state() == State.OPEN:
             self.task_list.append(task)
             task.set_assigned_resource(self)
+            self.has_updated = True
             # Task state is now ASSIGNED (set by task.set_assigned_resource)
             # Handle dispatch scheduling
             if dispatch_delay is not None and dispatch_delay > 0:
@@ -104,6 +105,7 @@ class Resource:
         if task in self.task_list and task.is_assigned():
             self.task_list.remove(task)
             task.unassign_resource()
+            self.has_updated = True
 
     def get_in_progress_task(self) -> Optional["Task"]:
         for task in self.task_list:
@@ -121,6 +123,7 @@ class Resource:
                 or task.get_station() == task_in_progress.get_station()
             ):
                 task.set_state(State.IN_PROGRESS)
+                self.has_updated = True
             else:
                 raise Exception("Cannot dispatch task at this station")
 
@@ -130,6 +133,7 @@ class Resource:
         if task in self.task_list:
             self.task_list.remove(task)
             task.set_state(State.CLOSED)
+            self.has_updated = True
 
 
     def get_task_count(self) -> int:

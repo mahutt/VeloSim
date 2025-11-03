@@ -227,7 +227,20 @@ class SimulatorController:
                 else self.create_diff_frame()
             )
         self.frameEmitter.notify(frame=frame)
+        # After emitting the frame, clear update flags so only fresh changes appear next time
+        self.clear_entity_updates()
         self.frameCounter += 1
+
+    def clear_entity_updates(self) -> None:
+        # Tasks
+        for task in self.task_entities.values():
+            task.clear_update()
+        # Stations
+        for station in self.station_entities.values():
+            station.clear_update()
+        # Resources
+        for resource in self.resource_entities.values():
+            resource.clear_update()
 
     def create_diff_frame(self) -> Frame:
         tasks = []
@@ -262,6 +275,27 @@ class SimulatorController:
             if station.has_updated
         ]
 
+        # Aggregate newly created pop-up tasks from stations (if any)
+        new_task_objects = [
+            task
+            for station in self.station_entities.values()
+            for task in getattr(station, "pop_up_tasks", [])
+        ]
+
+        # Ensure pop-up tasks are added to global task_entities
+        for task in new_task_objects:
+            tid = task.get_task_id()
+            if tid not in self.task_entities:
+                self.task_entities[tid] = task
+
+        new_tasks = [t.to_dict() for t in new_task_objects]
+
+        # Clear pop-up tasks after including them in the frame to avoid duplicates
+        if new_task_objects:
+            for station in self.station_entities.values():
+                if getattr(station, "pop_up_tasks", None):
+                    station.pop_up_tasks.clear()
+
         resources = []
         for resource in self.resource_entities.values():
             if resource.has_updated:
@@ -287,6 +321,7 @@ class SimulatorController:
         payload = {
             "sim_id": self.frameEmitter.sim_id,
             "tasks": tasks,
+            "new_tasks": new_tasks,
             "stations": stations,
             "resources": resources,
             "clock": {
@@ -328,6 +363,27 @@ class SimulatorController:
             for station in self.station_entities.values()
         ]
 
+        # Aggregate newly created pop-up tasks from stations (if any)
+        new_task_objects = [
+            task
+            for station in self.station_entities.values()
+            for task in getattr(station, "pop_up_tasks", [])
+        ]
+
+        # Ensure pop-up tasks are added to global task_entities
+        for task in new_task_objects:
+            tid = task.get_task_id()
+            if tid not in self.task_entities:
+                self.task_entities[tid] = task
+
+        new_tasks = [t.to_dict() for t in new_task_objects]
+
+        # Clear pop-up tasks after including them in the frame to avoid duplicates
+        if new_task_objects:
+            for station in self.station_entities.values():
+                if getattr(station, "pop_up_tasks", None):
+                    station.pop_up_tasks.clear()
+
         resources = []
         for resource in self.resource_entities.values():
             in_progress_task = resource.get_in_progress_task()
@@ -352,6 +408,7 @@ class SimulatorController:
         payload = {
             "sim_id": self.frameEmitter.sim_id,
             "tasks": tasks,
+            "new_tasks": new_tasks,
             "stations": stations,
             "resources": resources,
             "clock": {

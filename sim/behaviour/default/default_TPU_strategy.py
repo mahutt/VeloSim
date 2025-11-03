@@ -22,14 +22,21 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 """
 
-from abc import ABC, abstractmethod
-from typing import Dict
-from sim.entities.resource import Resource
-from sim.entities.task import Task
+from sim.behaviour.station_behaviour.strategies.task_popup_strategy import TaskPopupStrategy
+from typing import Optional, TYPE_CHECKING
+import random
+
+if TYPE_CHECKING:
+    from sim.entities.station import Station
 
 
-class AutoTaskDispatchStrategy(ABC):
+class DefaultTPUStrategy(TaskPopupStrategy):
 
-    @abstractmethod
-    def auto_dispatch_task(self, task: Task, resources: Dict[int, Resource]) -> None:
-        raise NotImplementedError()
+    def check_for_new_task(self) -> bool:
+        # 0.001% chance of a new task popping up per station per second
+        hit = (random.randrange(100000) == 0)
+        return hit
+    
+        
+        
+

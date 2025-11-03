@@ -78,6 +78,8 @@ class Route:
     ) -> List[road]:
         road_segments = []
         all_edges = osm_connection.get_all_edges()
+
+        # Retrieve cached edge index mapping
         edge_index = osm_connection.get_edge_index()  # Get cached index
 
         for i in range(len(route_node_ids) - 1):

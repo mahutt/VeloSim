@@ -119,11 +119,6 @@ class RealTimeDriver:
             if self.stop_flag:
                 break
             if self.running:
-                # Break out of sim loop if current sim time > specified run time
-                if self.simEnv.peek() >= until:
-                    print("Specified Sim-time reached")
-                    break
-
                 current_sim_time = self.simEnv.now
 
                 # Calculate target wall time
@@ -144,14 +139,23 @@ class RealTimeDriver:
 
                 # Allow the simpy environment to step when target wall time is reached
                 try:
-                    # Callback function, presumably to emit frames, called per step
+                    # Step the environment once, advancing simulated time
                     self.simEnv.step()
                 except simpy.core.EmptySchedule:
                     print("Simpy schedule is empty")
                     break
-                if step_callback and current_sim_time > prev_sim_time:
-                    step_callback()
-                    prev_sim_time = current_sim_time
+                # Invoke the step callback once per simulated second advanced
+                # Compare AFTER stepping so we see the incremented env.now
+                if step_callback:
+                    current_after = self.simEnv.now
+                    if current_after > prev_sim_time:
+                        step_callback()
+                        prev_sim_time = current_after
+                # After stepping, if we've reached or passed the target sim time, stop
+                if self.simEnv.now >= until:
+                    print("Specified Sim-time reached")
+                    break
+
                 # Calculate lag if strict mode is on
                 if self.strict:
                     current_sim_seconds_passed = self.simEnv.now - self.sim_start_time
