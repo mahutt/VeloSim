@@ -81,9 +81,7 @@ export function useScenarioOperations() {
     return parsedContent;
   };
 
-  /**
-   * Prepares scenario content for export by adding scenario_title
-   */
+  // Prepares scenario content for export by adding scenario_title
   const prepareForExport = (
     parsedContent: Record<string, unknown>,
     scenarioName: string
@@ -95,9 +93,7 @@ export function useScenarioOperations() {
     return JSON.stringify(contentWithTitle, null, 2);
   };
 
-  /**
-   * Downloads JSON content as a file
-   */
+  // Downloads JSON content as a file
   const downloadJSON = (content: string, filename: string) => {
     try {
       // Sanitize filename (replace spaces with underscores)
@@ -125,9 +121,7 @@ export function useScenarioOperations() {
     }
   };
 
-  /**
-   * Exports scenario content as a JSON file
-   */
+  // Exports scenario content as a JSON file
   const exportScenario = (content: string, scenarioName: string) => {
     const parsedContent = validateContent(content);
     if (!parsedContent) return false;
@@ -137,10 +131,7 @@ export function useScenarioOperations() {
     return true;
   };
 
-  /**
-   * Saves scenario to backend
-   * TODO: Implement backend API integration
-   */
+  // Saves scenario to backend
   const saveScenario = (content: string, scenarioName: string) => {
     const parsedContent = validateContent(content);
     if (!parsedContent) return false;
@@ -151,20 +142,14 @@ export function useScenarioOperations() {
     return true;
   };
 
-  /**
-   * Loads scenario from backend
-   * TODO: Implement backend API integration
-   */
+  // Loads scenario from backend
   const loadScenario = (scenarioId: number) => {
     // TODO: Add API call to backend
     console.log('Load scenario:', scenarioId);
     alert('Load Scenario - TODO: Implement backend integration');
   };
 
-  /**
-   * Imports scenario from file
-   * TODO: Implement file import functionality
-   */
+  // Imports scenario from file
   const importScenario = () => {
     // TODO: Add file picker and import logic
     console.log('Import scenario clicked');

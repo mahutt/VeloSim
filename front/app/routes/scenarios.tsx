@@ -45,7 +45,7 @@ export default function ScenarioEditor() {
     null
   );
   const navigate = useNavigate();
-  const { exportScenario, saveScenario, importScenario } =
+  const { validateContent, exportScenario, saveScenario, importScenario } =
     useScenarioOperations();
 
   useEffect(() => {
@@ -60,6 +60,15 @@ export default function ScenarioEditor() {
   };
 
   const handleSaveScenario = () => {
+    // Validate content first, then check for name
+    // This provides faster feedback if content is invalid
+    const parsedContent = validateContent(scenarioContent);
+
+    if (!parsedContent) {
+      // Validation failed, error already displayed
+      return;
+    }
+
     // Check if scenario has a name
     if (!scenarioName.trim()) {
       setPendingAction('save');
@@ -70,6 +79,15 @@ export default function ScenarioEditor() {
   };
 
   const handleExportScenario = () => {
+    // Validate content first, then check for name
+    // This provides faster feedback if content is invalid
+    const parsedContent = validateContent(scenarioContent);
+
+    if (!parsedContent) {
+      // Validation failed, error already displayed
+      return;
+    }
+
     // Check if scenario has a name
     if (!scenarioName.trim()) {
       setPendingAction('export');

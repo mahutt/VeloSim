@@ -249,23 +249,17 @@ export function validateScenario(scenarioData: unknown): ValidationResult {
 export function formatValidationResults(result: ValidationResult): string {
   const lines: string[] = [];
 
-  if (result.valid) {
-    lines.push('✓ Scenario is valid');
-  } else {
-    lines.push('✗ Scenario validation failed');
-  }
-
   if (result.errors.length > 0) {
     lines.push('\nErrors:');
     result.errors.forEach((error) => {
-      lines.push(`  • ${error}`);
+      lines.push(`  : ${error}`);
     });
   }
 
   if (result.warnings.length > 0) {
     lines.push('\nWarnings:');
     result.warnings.forEach((warning) => {
-      lines.push(`  • ${warning}`);
+      lines.push(`  : ${warning}`);
     });
   }
 

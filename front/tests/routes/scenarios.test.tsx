@@ -449,7 +449,7 @@ describe('ScenarioEditor', () => {
     // Should show validation error
     expect(mockDisplayError).toHaveBeenCalledWith(
       'Scenario validation failed',
-      expect.stringContaining('validation failed')
+      expect.stringContaining('Errors:')
     );
   });
 

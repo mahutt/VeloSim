@@ -472,7 +472,7 @@ describe('validateScenario', () => {
 });
 
 describe('formatValidationResults', () => {
-  it('formats valid results', () => {
+  it('formats valid results with no errors or warnings', () => {
     const result = {
       valid: true,
       errors: [],
@@ -481,7 +481,7 @@ describe('formatValidationResults', () => {
 
     const formatted = formatValidationResults(result);
 
-    expect(formatted).toContain('✓ Scenario is valid');
+    expect(formatted).toBe('');
   });
 
   it('formats invalid results with errors', () => {
@@ -493,10 +493,9 @@ describe('formatValidationResults', () => {
 
     const formatted = formatValidationResults(result);
 
-    expect(formatted).toContain('✗ Scenario validation failed');
     expect(formatted).toContain('Errors:');
-    expect(formatted).toContain('Error 1');
-    expect(formatted).toContain('Error 2');
+    expect(formatted).toContain(': Error 1');
+    expect(formatted).toContain(': Error 2');
   });
 
   it('formats results with warnings', () => {
@@ -509,8 +508,8 @@ describe('formatValidationResults', () => {
     const formatted = formatValidationResults(result);
 
     expect(formatted).toContain('Warnings:');
-    expect(formatted).toContain('Warning 1');
-    expect(formatted).toContain('Warning 2');
+    expect(formatted).toContain(': Warning 1');
+    expect(formatted).toContain(': Warning 2');
   });
 
   it('formats results with both errors and warnings', () => {
@@ -523,8 +522,8 @@ describe('formatValidationResults', () => {
     const formatted = formatValidationResults(result);
 
     expect(formatted).toContain('Errors:');
-    expect(formatted).toContain('Critical error');
+    expect(formatted).toContain(': Critical error');
     expect(formatted).toContain('Warnings:');
-    expect(formatted).toContain('Minor warning');
+    expect(formatted).toContain(': Minor warning');
   });
 });
