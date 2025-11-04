@@ -46,11 +46,23 @@ class JSONBCompatible(TypeDecorator[Any]):
     def process_bind_param(
         self, value: Optional[Any], dialect: Dialect
     ) -> Optional[Any]:
+        if value is None:
+            return None
+        if dialect.name == "sqlite":
+            import json
+
+            return json.dumps(value)  # convert dict to JSON string for SQLite
         return value
 
     def process_result_value(
         self, value: Optional[Any], dialect: Dialect
     ) -> Optional[Any]:
+        if value is None:
+            return None
+        if dialect.name == "sqlite":
+            import json
+
+            return json.loads(value)  # convert JSON string back to dict
         return value
 
 
