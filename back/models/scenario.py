@@ -22,26 +22,50 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 """
 
-from typing import TYPE_CHECKING, List
-from sqlalchemy import Boolean, DateTime, String, func
+from typing import TYPE_CHECKING, Any, Optional
+from sqlalchemy import DateTime, Dialect, ForeignKey, String, Text, func
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
+from sqlalchemy.types import TypeDecorator, TypeEngine
 from back.database.session import Base
 
 if TYPE_CHECKING:
-    from .sim_instance import SimInstance
-    from back.models.scenario import Scenario
+    from .user import User
 
 
-class User(Base):
-    """User model of the VeloSim app"""
+class JSONBCompatible(TypeDecorator[Any]):
+    """Use PostgreSQL JSONB if available, otherwise fallback to Text (SQLite)."""
 
-    __tablename__ = "users"
+    impl = Text  # fallback for SQLite
+
+    def load_dialect_impl(self, dialect: Dialect) -> TypeEngine[Any]:
+        if dialect.name == "postgresql":
+            return dialect.type_descriptor(JSONB())
+        return dialect.type_descriptor(Text())
+
+    def process_bind_param(
+        self, value: Optional[Any], dialect: Dialect
+    ) -> Optional[Any]:
+        return value
+
+    def process_result_value(
+        self, value: Optional[Any], dialect: Dialect
+    ) -> Optional[Any]:
+        return value
+
+
+class Scenario(Base):
+    """Model to represent user-created simulation scenarios."""
+
+    __tablename__ = "scenarios"
 
     id: Mapped[int] = mapped_column(primary_key=True, index=True)
-    username: Mapped[str] = mapped_column(String(100), nullable=False, index=True)
-    password_hash: Mapped[str] = mapped_column(String(100), nullable=False)
-    is_admin: Mapped[bool] = mapped_column(Boolean, nullable=False)
-    is_enabled: Mapped[bool] = mapped_column(Boolean, nullable=False)
+    name: Mapped[str] = mapped_column(String, nullable=False)
+
+    # JSONB for Postgres, Text fallback for SQLite
+    content: Mapped[Any] = mapped_column(JSONBCompatible, nullable=False)
+
+    description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
 
     date_created: Mapped[DateTime] = mapped_column(
         DateTime, nullable=False, server_default=func.now()
@@ -50,17 +74,8 @@ class User(Base):
         DateTime, nullable=False, server_default=func.now(), onupdate=func.now()
     )
 
-    # Use string to avoid circular import of back-populated field
-    sim_instances: Mapped[List["SimInstance"]] = relationship(
-        "SimInstance", back_populates="user"
-    )
-
-    scenarios: Mapped[list["Scenario"]] = relationship(
-        "Scenario", back_populates="user", cascade="all, delete-orphan"
-    )
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False)
+    user: Mapped["User"] = relationship("User", back_populates="scenarios")
 
     def __repr__(self) -> str:
-        return (
-            f"<User(id={self.id}, username='{self.username}', "
-            f"is_admin={self.is_admin})>"
-        )
+        return f"<Scenario(id={self.id}, name='{self.name}', user_id={self.user_id})>"
