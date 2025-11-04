@@ -24,7 +24,15 @@
 
 // These test cases were written with the help of Claude Sonnet 4.5
 
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import {
+  describe,
+  it,
+  expect,
+  vi,
+  beforeEach,
+  afterEach,
+  beforeAll,
+} from 'vitest';
 import { log, LogLevel } from '~/lib/logger';
 import api from '~/api';
 import { TOKEN_STORAGE_KEY } from '~/constants';
@@ -39,6 +47,10 @@ describe('log', () => {
 
   afterEach(() => {
     vi.restoreAllMocks();
+  });
+
+  beforeAll(() => {
+    vi.unmock('~/lib/logger');
   });
 
   it('does not send log when user is not authenticated', async () => {
