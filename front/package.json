@@ -15,7 +15,7 @@
     "coverage": "vitest run --coverage",
     "coverage:open": "npm run coverage && npx open-cli coverage/index.html",
     "test:e2e": "playwright test",
-    "test:e2e:video": "VIDEO=1 playwright test"
+    "test:e2e:video": "cross-env VIDEO=1 playwright test"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",
@@ -55,6 +55,7 @@
     "@types/react": "^19.1.13",
     "@types/react-dom": "^19.1.9",
     "@vitest/coverage-v8": "^3.2.4",
+    "cross-env": "^10.1.0",
     "eslint": "^9.36.0",
     "eslint-plugin-react": "^7.37.5",
     "globals": "^16.4.0",
