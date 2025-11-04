@@ -167,13 +167,21 @@ class TestSimulationService:
     ) -> None:
         """Retrieve only the requesting user's simulations."""
         # Start two simulations
-        sim_id1, _ = simulation_service.start_simulation(db, test_user.id)
-        sim_id2, _ = simulation_service.start_simulation(db, test_user.id)
+        sim_id1, db_id1 = simulation_service.start_simulation(db, test_user.id)
+        sim_id2, db_id2 = simulation_service.start_simulation(db, test_user.id)
 
-        active_sims = simulation_service.get_active_user_simulations(db, test_user.id)
+        active_sims, total = simulation_service.get_active_user_simulations(
+            db, test_user.id
+        )
+        assert total == 2
         assert len(active_sims) == 2
-        assert sim_id1 in active_sims
-        assert sim_id2 in active_sims
+        # Check that we got SimInstance objects
+        assert all(hasattr(sim, "id") for sim in active_sims)
+        assert all(hasattr(sim, "user_id") for sim in active_sims)
+        # Check db_ids are in the results
+        db_ids = [sim.id for sim in active_sims]
+        assert db_id1 in db_ids
+        assert db_id2 in db_ids
 
     def test_get_all_active_simulations_admin(
         self,
@@ -184,14 +192,19 @@ class TestSimulationService:
     ) -> None:
         """Admin users can list all active simulations."""
         # Start two simulations
-        sim_id1, _ = simulation_service.start_simulation(db, test_user.id)
-        sim_id2, _ = simulation_service.start_simulation(db, test_user.id)
+        sim_id1, db_id1 = simulation_service.start_simulation(db, test_user.id)
+        sim_id2, db_id2 = simulation_service.start_simulation(db, test_user.id)
 
         # Admin lists all active simulations
-        sims = simulation_service.get_all_active_simulations(db, admin_user.id)
-        assert sim_id1 in sims
-        assert sim_id2 in sims
+        sims, total = simulation_service.get_all_active_simulations(db, admin_user.id)
+        assert total == 2
         assert len(sims) == 2
+        # Check that we got SimInstance objects
+        assert all(hasattr(sim, "id") for sim in sims)
+        # Check db_ids are in the results
+        db_ids = [sim.id for sim in sims]
+        assert db_id1 in db_ids
+        assert db_id2 in db_ids
 
     def test_get_all_active_simulations_non_admin(
         self, db: Session, test_user: User, simulation_service: SimulationService
@@ -207,8 +220,11 @@ class TestSimulationService:
         assert "Admin privileges required" in str(exc_info.value)
 
         # Verify simulation is still active
-        active_sims = simulation_service.get_active_user_simulations(db, test_user.id)
-        assert sim_id in active_sims
+        active_sims, total = simulation_service.get_active_user_simulations(
+            db, test_user.id
+        )
+        assert total == 1
+        assert len(active_sims) == 1
 
     def test_get_simulation_status(
         self, db: Session, test_user: User, simulation_service: SimulationService
@@ -269,8 +285,10 @@ class TestSimulationService:
         sim_id, db_id = simulation_service.start_simulation(db, test_user.id)
 
         # Verify simulation is active
-        active_sims = simulation_service.get_active_user_simulations(db, test_user.id)
-        assert sim_id in active_sims
+        active_sims, total = simulation_service.get_active_user_simulations(
+            db, test_user.id
+        )
+        assert any(sim.id == db_id for sim in active_sims)
 
         # Verify status
         assert (
@@ -282,8 +300,10 @@ class TestSimulationService:
         simulation_service.stop_simulation(db, sim_id, test_user.id)
 
         # Verify simulation no longer active
-        active_sims = simulation_service.get_active_user_simulations(db, test_user.id)
-        assert sim_id not in active_sims
+        active_sims, total = simulation_service.get_active_user_simulations(
+            db, test_user.id
+        )
+        assert not any(sim.id == db_id for sim in active_sims)
 
         # Verify status now raises error
         with pytest.raises(ItemNotFoundError):
