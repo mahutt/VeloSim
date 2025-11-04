@@ -22,7 +22,7 @@
  * SOFTWARE.
  */
 
-import { log } from '~/lib/logger';
+import { log, LogLevel } from '~/lib/logger';
 
 /**
  * Logs an error for debugging and monitoring.
@@ -40,6 +40,7 @@ export function logSimulationError(
   const errorMessage = error instanceof Error ? error.message : String(error);
   const errorData = {
     message: errorMessage,
+    level: LogLevel.ERROR,
     stack: error instanceof Error ? error.stack : undefined,
     context,
     ...additionalData,
