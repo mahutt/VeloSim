@@ -38,6 +38,7 @@ import {
   loadMapImages,
   setMapLayers,
 } from '~/lib/map-helpers';
+import { logSimulationError } from '~/utils/simulation-error-utils';
 
 export const INITIAL_CENTER = [-73.57776, 45.48944] as [number, number];
 export const INITIAL_ZOOM = 10.12;
@@ -74,7 +75,10 @@ export const MapProvider = ({ children }: { children: ReactNode }) => {
       setMapLoaded(true);
     });
 
-    mapRef.current.on('error', () => {
+    mapRef.current.on('error', (error) => {
+      logSimulationError(error, 'Map loading', {
+        errorType: 'MAP_LOAD_FAILED',
+      });
       displayError(
         'Failed to load map',
         'An error occurred while loading the map. Please try again later.',

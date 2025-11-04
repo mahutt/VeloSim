@@ -1,0 +1,30 @@
+{
+  "start_time": "10:00",
+  "end_time": "14:00",
+  "resources": [
+    {
+      "id": "bike-201",
+      "type": "bike",
+      "capacity": 1
+    }
+  ],
+  "stations": [
+    {
+      "id": "s1",
+      "name": "Waterfront Station",
+      "location": {
+        "lat": 45.5,
+        "lng": -73.55
+      },
+      "capacity": 25
+    }
+  ],
+  "initial_tasks": [],
+  "scheduled_tasks": [
+    {
+      "id": "t1",
+      "station_id": "s1",
+      "time": "11:30"
+    }
+  ]
+}

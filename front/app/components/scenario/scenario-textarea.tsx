@@ -41,6 +41,27 @@ export default function ScenarioTextArea({
   onExport,
   onStart,
 }: ScenarioTextAreaProps) {
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    // Allow Tab key to insert spaces for indentation
+    if (e.key === 'Tab') {
+      e.preventDefault();
+      const target = e.currentTarget;
+      const start = target.selectionStart;
+      const end = target.selectionEnd;
+
+      // Insert 2 spaces at cursor position
+      const newValue =
+        scenarioData.substring(0, start) + '  ' + scenarioData.substring(end);
+
+      onChange(newValue);
+
+      // Move cursor after the inserted spaces
+      setTimeout(() => {
+        target.selectionStart = target.selectionEnd = start + 2;
+      }, 0);
+    }
+  };
+
   return (
     <div className="flex-1 flex flex-col">
       <textarea
@@ -48,6 +69,7 @@ export default function ScenarioTextArea({
         placeholder="Paste or type your JSON scenario here..."
         value={scenarioData}
         onChange={(e) => onChange(e.target.value)}
+        onKeyDown={handleKeyDown}
         aria-label="Scenario JSON data"
       />
 
