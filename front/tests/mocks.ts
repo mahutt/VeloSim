@@ -80,3 +80,5 @@ export class MockMap {
     });
   }
 }
+
+export const mockDisplayError = vi.fn();
