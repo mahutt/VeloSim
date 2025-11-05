@@ -27,6 +27,7 @@ import { Outlet, useNavigate } from 'react-router';
 import { AppSidebar } from '~/components/sidebar/app-sidebar';
 import PageLoader from '~/components/page-loader';
 import { SidebarProvider, SidebarTrigger } from '~/components/ui/sidebar';
+import { useFeature } from '~/hooks/use-feature';
 import useAuth from '~/hooks/use-auth';
 
 export default function Authenticated() {
@@ -47,7 +48,9 @@ export default function Authenticated() {
     <SidebarProvider>
       <AppSidebar variant="sidebar" />
       <main className="relative w-full h-dvh">
-        <SidebarTrigger className="absolute left-2 top-2 z-10" />
+        {useFeature('sidebar') && (
+          <SidebarTrigger className="absolute left-2 top-2 z-10" />
+        )}
         <Outlet />
       </main>
     </SidebarProvider>
