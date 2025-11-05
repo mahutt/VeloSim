@@ -469,8 +469,6 @@ class OSMConnection(object):
                     raise ValueError("Reverse node ID mapping not available")
             except Exception as e:
                 print(f"CH routing failed: {e}. Falling back to NetworkX...")
-                # Fall back to NetworkX
-                use_ch = False
 
         # Use NetworkX routing (fallback or when CH not available)
         if networkx_graph is None:

@@ -170,3 +170,6 @@ class MapController:
             # Clean up empty sets to save memory
             if not self.road_subscriptions[road_id]:
                 del self.road_subscriptions[road_id]
+
+    def build_ch_netowrk(self) -> None:
+        self.osm.build_ch_network()

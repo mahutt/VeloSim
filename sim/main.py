@@ -119,7 +119,7 @@ params = InputParameter(
         3: task3,
         4: task4,
     },
-    real_time_factor=0.1,  # Real-time simulation
+    real_time_factor=1,  # Real-time simulation
     key_frame_freq=3000,  # Key frame every 3000 frames
 )
 
@@ -176,5 +176,5 @@ if __name__ == "__main__":
 
     # Let all resources run
     print("\nAll resources now running with their assigned tasks...")
-    # time.sleep(3500)
+    time.sleep(3500)
     print("Done.")

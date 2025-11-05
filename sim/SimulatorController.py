@@ -35,7 +35,6 @@ from sim.entities.task import Task
 from sim.entities.inputParameters import InputParameter
 from sim.behaviour.sim_behaviour import SimBehaviour
 from sim.controller.MapController import MapController
-from sim.entities.position import Position
 
 
 class SimulatorController:
@@ -97,16 +96,8 @@ class SimulatorController:
         print("\n" + "=" * 60)
         print("Preparing Contraction Hierarchy network for fast routing...")
         print("=" * 60)
-        self.map_controller.osm.build_ch_network()
+        self.map_controller.build_ch_netowrk()
         print("=" * 60 + "\n")
-
-        ikea = Position([-73.691993, 45.490198])  # IKEA
-        concordia = Position([-73.577797, 45.495009])  # Concordia
-
-        print("Testing route generation with CH network.....")
-        route = self.map_controller.getRoute(ikea, concordia)
-        print(f"Route generated successfully with {len(route.roads)} road segments\n")
-
         # Load entities into sim event queue and pass behaviour and/or mapcontroller
         self.prep_entities()
         # start sim clock
@@ -116,7 +107,6 @@ class SimulatorController:
             target=self.realTimeDriver.run_until, args=(sim_time, self.emit_frame)
         )
         self.sim_thread.start()
-        self.sim_thread.join()
 
     def stop(self) -> None:
         self.realTimeDriver.stop()

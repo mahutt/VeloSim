@@ -24,7 +24,7 @@ SOFTWARE.
 
 import pytest
 
-from sim.behaviour.default.defualt_RCNT_strategy import DefaultRCNTStrategy
+from sim.behaviour.default.default_RCNT_strategy import DefaultRCNTStrategy
 from typing import Any
 
 

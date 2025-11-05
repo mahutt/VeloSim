@@ -32,7 +32,7 @@ from sim.behaviour.station_behaviour.strategies.task_popup_strategy import (
 
 from sim.behaviour.default.default_TPU_strategy import DefaultTPUStrategy
 
-from sim.behaviour.default.defualt_RCNT_strategy import DefaultRCNTStrategy
+from sim.behaviour.default.default_RCNT_strategy import DefaultRCNTStrategy
 
 
 class SimBehaviour:

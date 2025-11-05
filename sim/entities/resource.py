@@ -179,10 +179,8 @@ class Resource:
 
             # Select Next Task
             if len(self.task_list) > 0:
-                print(f"Resource {self.id} has {len(self.task_list)} tasks")
                 in_progress = self.get_in_progress_task()
-                print(f"In progress task: {in_progress}")
-
+                # shorter, equivalent print for the in-progress task
                 if in_progress:
                     # We have a task in progress - check if we're at the station
                     task_station = in_progress.get_station()
@@ -190,7 +188,6 @@ class Resource:
                         task_station is not None
                         and self.position == task_station.get_station_position()
                     ):
-                        print(f"At station, servicing task {in_progress.get_task_id()}")
                         self.service_task(in_progress)
                     # If not at station, travel_to is still in progress
                 else:
@@ -198,14 +195,12 @@ class Resource:
                     next_task = self.sim_behaviour.RCNT_strategy.select_next_task(self)
                     print(f"next task: {next_task}")
                     if next_task:
-                        print(f"Dispatching task {next_task.get_task_id()}")
                         # Dispatch the task to mark it as in-progress
                         self.dispatch_task(next_task)
                         # Travel to the task's station
                         task_station = next_task.get_station()
                         if task_station is not None:
                             task_position = task_station.get_station_position()
-                            print(f"Traveling to {task_position.get_position()}")
                             yield self.env.process(self.travel_to(task_position))
 
             # Wait for next tick
