@@ -27,11 +27,6 @@ import { render, screen, fireEvent } from '@testing-library/react';
 import ScenarioSidebar from '../../../app/components/scenario/scenario-sidebar';
 import type { Scenario } from '~/types';
 
-// Mock getScenarioPreview
-vi.mock('~/lib/scenario-utils', () => ({
-  getScenarioPreview: (scenario: Scenario) => `Preview for ${scenario.name}`,
-}));
-
 // Mock Card and CardContent to simple divs for easier testing
 import React from 'react';
 vi.mock('~/components/ui/card', () => ({
@@ -42,8 +37,24 @@ vi.mock('~/components/ui/card', () => ({
 }));
 
 const scenarios: Scenario[] = [
-  { id: 1, name: 'Scenario 1' } as Scenario,
-  { id: 2, name: 'Scenario 2' } as Scenario,
+  {
+    id: 1,
+    name: 'Scenario 1',
+    content: { stations: [], resources: [] },
+    description: 'Preview for Scenario 1',
+    user_id: 1,
+    date_created: '2025-01-15T08:30:00Z',
+    date_updated: '2025-01-15T08:30:00Z',
+  },
+  {
+    id: 2,
+    name: 'Scenario 2',
+    content: { stations: [] },
+    description: 'Preview for Scenario 2',
+    user_id: 1,
+    date_created: '2025-01-15T08:30:00Z',
+    date_updated: '2025-01-15T08:30:00Z',
+  },
 ];
 
 describe('ScenarioSidebar', () => {
@@ -92,10 +103,9 @@ describe('ScenarioSidebar', () => {
       />
     );
     const selectedCard =
-      screen.getByText('Scenario 2').parentElement?.parentElement;
-    expect(selectedCard?.className).toContain(
-      'flex items-start justify-between gap-2'
-    );
+      screen.getByText('Scenario 2').parentElement?.parentElement
+        ?.parentElement;
+    expect(selectedCard?.className).toContain('border-2 border-red-500');
   });
 
   it('calls onSelect when a scenario is clicked', () => {

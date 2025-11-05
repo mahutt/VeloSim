@@ -26,14 +26,12 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { BrowserRouter } from 'react-router';
 import ScenarioEditor from '~/routes/scenarios';
-import * as scenarioUtils from '~/lib/scenario-utils';
 import { log } from '~/lib/logger';
+import api from '~/api';
+import type { ScenarioListResponse } from '~/types';
 
-// Mock the scenario utils module
-vi.mock('~/lib/scenario-utils', () => ({
-  loadSavedScenarios: vi.fn(),
-  getScenarioPreview: vi.fn(),
-}));
+// Mock the API
+vi.mock('~/api');
 
 const mockNavigate = vi.fn();
 vi.mock('react-router', async () => {
@@ -55,7 +53,7 @@ const mockScenarios = [
     id: 1,
     name: 'Test Scenario 1',
     user_id: 1,
-    content: '{"stations": []}',
+    content: { stations: [], resources: [] },
     date_created: '2025-01-15T08:30:00Z',
     date_updated: '2025-01-15T08:30:00Z',
   },
@@ -63,7 +61,7 @@ const mockScenarios = [
     id: 2,
     name: 'Test Scenario 2',
     user_id: 1,
-    content: '{"stations": [], "resources": []}',
+    content: { stations: [], resources: [] },
     date_created: '2025-01-16T10:15:00Z',
     date_updated: '2025-01-16T14:22:00Z',
   },
@@ -73,10 +71,17 @@ describe('ScenarioEditor', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockDisplayError.mockClear();
-    vi.mocked(scenarioUtils.loadSavedScenarios).mockResolvedValue(
-      mockScenarios
-    );
-    vi.mocked(scenarioUtils.getScenarioPreview).mockReturnValue('2 properties');
+
+    // Mock API response for scenarios
+    vi.mocked(api.get).mockResolvedValue({
+      data: {
+        scenarios: mockScenarios,
+        total: mockScenarios.length,
+        page: 1,
+        per_page: 10,
+        total_pages: 1,
+      },
+    } as { data: ScenarioListResponse });
   });
 
   it('renders the scenario editor page', () => {
@@ -101,7 +106,9 @@ describe('ScenarioEditor', () => {
     );
 
     await waitFor(() => {
-      expect(scenarioUtils.loadSavedScenarios).toHaveBeenCalled();
+      expect(api.get).toHaveBeenCalledWith(
+        expect.stringContaining('/scenarios')
+      );
     });
   });
 
@@ -189,7 +196,7 @@ describe('ScenarioEditor', () => {
 
     expect(nameInput).toHaveValue('Test Scenario 1');
     expect(textarea).toHaveValue(
-      JSON.stringify(JSON.parse(mockScenarios[0].content), null, 2)
+      JSON.stringify(mockScenarios[0].content, null, 2)
     );
   });
 
@@ -300,19 +307,25 @@ describe('ScenarioEditor', () => {
     expect(mockNavigate).toHaveBeenCalledWith('/simulation');
   });
 
-  it('displays error when invalid JSON scenario is selected', async () => {
-    const invalidScenario = {
+  it('loads scenario content from backend when selected', async () => {
+    const testScenario = {
       id: 3,
-      name: 'Invalid Scenario',
+      name: 'Backend Scenario',
       user_id: 1,
-      content: 'invalid json',
+      content: { stations: [{ id: 1, name: 'Station 1' }], resources: [] },
       date_created: '2025-01-17T09:00:00Z',
       date_updated: '2025-01-17T09:00:00Z',
     };
 
-    vi.mocked(scenarioUtils.loadSavedScenarios).mockResolvedValue([
-      invalidScenario,
-    ]);
+    vi.mocked(api.get).mockResolvedValue({
+      data: {
+        scenarios: [testScenario],
+        total: 1,
+        page: 1,
+        per_page: 10,
+        total_pages: 1,
+      },
+    } as { data: ScenarioListResponse });
 
     render(
       <BrowserRouter>
@@ -321,13 +334,19 @@ describe('ScenarioEditor', () => {
     );
 
     await waitFor(() => {
-      expect(screen.getByText('Invalid Scenario')).toBeInTheDocument();
+      expect(screen.getByText('Backend Scenario')).toBeInTheDocument();
     });
 
-    const invalidScenarioItem = screen.getByText('Invalid Scenario');
-    fireEvent.click(invalidScenarioItem);
+    const scenarioItem = screen.getByText('Backend Scenario');
+    fireEvent.click(scenarioItem);
 
-    expect(screen.getByText('Unable to load scenario.')).toBeInTheDocument();
+    // Content should be stringified and displayed in textarea
+    const textarea = screen.getByLabelText('Scenario JSON data');
+    await waitFor(() => {
+      expect(textarea).toHaveValue(
+        JSON.stringify(testScenario.content, null, 2)
+      );
+    });
   });
 
   it('shows error when trying to export empty content', () => {

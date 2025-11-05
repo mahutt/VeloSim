@@ -65,7 +65,7 @@ export default function ScenarioTextArea({
   return (
     <div className="flex-1 flex flex-col">
       <textarea
-        className="w-full h-[32rem] p-3 border rounded-md font-mono text-sm mb-4 resize-none"
+        className="w-full h-[32rem] p-3 border rounded-md font-mono text-sm mb-4 resize-none overflow-y-auto"
         placeholder="Paste or type your JSON scenario here..."
         value={scenarioData}
         onChange={(e) => onChange(e.target.value)}

@@ -24,7 +24,6 @@
 
 import { Card, CardContent } from '~/components/ui/card';
 import type { Scenario } from '~/types';
-import { getScenarioPreview } from '~/lib/scenario-utils';
 
 interface ScenarioSidebarProps {
   scenarios: Scenario[];
@@ -48,7 +47,6 @@ export default function ScenarioSidebar({
           )}
 
           {scenarios.map((scenario) => {
-            const preview = getScenarioPreview(scenario);
             const isSelected = selectedScenarioId === scenario.id;
 
             return (
@@ -60,13 +58,15 @@ export default function ScenarioSidebar({
                 }`}
               >
                 <CardContent className="px-3">
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="flex-1 min-w-0">
-                      <div className="text-sm font-medium truncate mb-1">
-                        {scenario.name}
-                      </div>
-                      <div className="text-xs text-gray-500">{preview}</div>
+                  <div className="flex flex-col gap-1.5">
+                    <div className="text-sm font-semibold truncate">
+                      {scenario.name}
                     </div>
+                    {scenario.description && (
+                      <div className="text-xs text-gray-600 line-clamp-2">
+                        {scenario.description}
+                      </div>
+                    )}
                   </div>
                 </CardContent>
               </Card>

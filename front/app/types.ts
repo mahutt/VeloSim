@@ -96,9 +96,15 @@ export interface Scenario {
   id: number;
   name: string;
   user_id: number;
-  content: string;
+  content: Record<string, unknown>; // JSON object from backend
+  description?: string;
   date_created: string;
   date_updated: string;
+  content_size?: number;
+}
+
+export interface ScenarioListResponse extends PaginatedResponse {
+  scenarios: Scenario[];
 }
 
 // Simulation types
