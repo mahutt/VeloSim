@@ -220,6 +220,7 @@ class SimulatorController:
                 self.create_key_frame()
                 if self.frameCounter % self.keyframeFreq == 0
                 or self.frameCounter == self.sim_time
+                or self.frameCounter == 0
                 else self.create_diff_frame()
             )
         self.frameEmitter.notify(frame=frame)

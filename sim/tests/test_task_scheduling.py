@@ -24,6 +24,7 @@ SOFTWARE.
 
 import pytest
 import simpy
+from unittest.mock import Mock
 from sim.entities.BatterySwapTask import BatterySwapTask
 from sim.entities.resource import Resource
 from sim.entities.position import Position
@@ -46,7 +47,11 @@ def station(env: simpy.Environment) -> Station:
 @pytest.fixture
 def resource(env: simpy.Environment) -> Resource:
     # Create new test resource
-    return Resource(env, resource_id=1, position=Position([0.0, 0.0]))
+    res = Resource(env, resource_id=1, position=Position([0.0, 0.0]))
+    # Mock the sim_behaviour and map_controller to avoid AttributeError
+    res.sim_behaviour = Mock()
+    res.map_controller = Mock()
+    return res
 
 
 def test_task_immediate_spawn(env: simpy.Environment, station: Station) -> None:
@@ -107,6 +112,9 @@ def test_resource_scheduled_dispatch(env: simpy.Environment, station: Station) -
     # Dispatching with delays
     task = BatterySwapTask(env, task_id=2, station=station)
     resource = Resource(env, resource_id=2, position=Position([0.0, 0.0]))
+    # Mock the sim_behaviour and map_controller to avoid AttributeError
+    resource.sim_behaviour = Mock()
+    resource.map_controller = Mock()
 
     assign_time = env.now
     resource.assign_task(task, dispatch_delay=3.0)

@@ -71,10 +71,6 @@ class Simulator:
             sim_behaviour=sim_behaviour,
             strict=True,
         )
-
-        # Send the initial frame immediately
-        simController.emit_initial_frame()
-
         with self.thread_pool_lock:
             if run_id in self.thread_pool:
                 raise RuntimeError(f"Run id already present: {run_id}")

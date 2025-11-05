@@ -461,7 +461,8 @@ class OSMConnection(object):
                 # Map back to OSM node IDs
                 if self._reverse_node_id_mapping is not None:
                     route = [
-                        self._reverse_node_id_mapping[node] for node in path_pandana
+                        self._reverse_node_id_mapping[node_id]
+                        for node_id in path_pandana
                     ]
                     return route
                 else:
