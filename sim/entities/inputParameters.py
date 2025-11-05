@@ -23,7 +23,7 @@ SOFTWARE.
 """
 
 # This class is a placeholder for when we define input params later down in the project.
-from typing import Dict, Optional
+from typing import Dict, Mapping, Optional
 from sim.entities.station import Station
 from sim.entities.resource import Resource
 from sim.entities.task import Task
@@ -35,7 +35,7 @@ class InputParameter:
         self,
         station_entities: Optional[Dict[int, Station]] = None,
         resource_entities: Optional[Dict[int, Resource]] = None,
-        task_entities: Optional[Dict[int, Task]] = None,
+        task_entities: Optional[Mapping[int, Task]] = None,
         real_time_factor: Optional[float] = None,
         key_frame_freq: Optional[int] = None,
     ) -> None:
@@ -45,9 +45,9 @@ class InputParameter:
         self.resource_entities: Dict[int, Resource] = (
             resource_entities if resource_entities is not None else {}
         )
-        self.task_entities: Dict[int, Task] = (
-            task_entities if task_entities is not None else {}
-        )
+
+        self.task_entities: Dict[int, Task] = dict(task_entities or {})
+
         self.realTimeFactor: Optional[float] = real_time_factor
         self.keyFrameFreq: Optional[int] = key_frame_freq
 
