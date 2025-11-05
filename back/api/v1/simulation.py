@@ -23,6 +23,7 @@ SOFTWARE.
 """
 
 import asyncio
+import math
 from typing import Dict, List
 from fastapi import (
     APIRouter,
@@ -30,12 +31,14 @@ from fastapi import (
     WebSocket,
     WebSocketDisconnect,
     Depends,
+    Query,
 )
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from back.auth.dependency import get_user_id
 from back.exceptions import VelosimPermissionError, ItemNotFoundError
+from back.schemas.sim_instance import SimInstanceResponse
 from sim.entities.frame import Frame
 from sim.utils.subscriber import Subscriber
 from back.services.simulation_service import simulation_service
@@ -89,9 +92,13 @@ class SimulationResponse(BaseModel):
 
 
 class SimulationListResponse(BaseModel):
-    """Response model for listing simulations"""
+    """Response model for listing simulations with pagination"""
 
-    active_simulations: List[str]
+    simulations: List[SimInstanceResponse]
+    total: int
+    page: int
+    per_page: int
+    total_pages: int
 
 
 @router.post("/start", response_model=SimulationResponse)
@@ -129,24 +136,58 @@ async def stop_simulation(
 
 @router.get("/my", response_model=SimulationListResponse)
 async def list_my_simulations(
-    db: Session = Depends(get_db), requesting_user: int = Depends(get_user_id)
+    skip: int = Query(0, ge=0, description="Number of simulations to skip"),
+    limit: int = Query(
+        10, ge=1, le=100, description="Number of simulations to retrieve"
+    ),
+    db: Session = Depends(get_db),
+    requesting_user: int = Depends(get_user_id),
 ) -> SimulationListResponse:
-    """List active simulations simulations owned by the requesting user."""
+    """List active simulations owned by the requesting user with pagination."""
     try:
-        sims = simulation_service.get_active_user_simulations(db, requesting_user)
-        return SimulationListResponse(active_simulations=sims)
+        sims, total = simulation_service.get_active_user_simulations(
+            db, requesting_user, skip, limit
+        )
+
+        total_pages = math.ceil(total / limit) if total > 0 else 0
+        page = (skip // limit) + 1
+
+        return SimulationListResponse(
+            simulations=[SimInstanceResponse.model_validate(sim) for sim in sims],
+            total=total,
+            page=page,
+            per_page=limit,
+            total_pages=total_pages,
+        )
     except VelosimPermissionError as err:
         raise HTTPException(status_code=403, detail=str(err))
 
 
 @router.get("/list", response_model=SimulationListResponse)
 async def list_all_simulations(
-    db: Session = Depends(get_db), requesting_user: int = Depends(get_user_id)
+    skip: int = Query(0, ge=0, description="Number of simulations to skip"),
+    limit: int = Query(
+        10, ge=1, le=100, description="Number of simulations to retrieve"
+    ),
+    db: Session = Depends(get_db),
+    requesting_user: int = Depends(get_user_id),
 ) -> SimulationListResponse:
-    """List all active simulations globally (admin-only)."""
+    """List all active simulations globally (admin-only) with pagination."""
     try:
-        sims = simulation_service.get_all_active_simulations(db, requesting_user)
-        return SimulationListResponse(active_simulations=sims)
+        sims, total = simulation_service.get_all_active_simulations(
+            db, requesting_user, skip, limit
+        )
+
+        total_pages = math.ceil(total / limit) if total > 0 else 0
+        page = (skip // limit) + 1
+
+        return SimulationListResponse(
+            simulations=[SimInstanceResponse.model_validate(sim) for sim in sims],
+            total=total,
+            page=page,
+            per_page=limit,
+            total_pages=total_pages,
+        )
     except VelosimPermissionError as err:
         raise HTTPException(status_code=403, detail=str(err))
 
