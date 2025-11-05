@@ -25,7 +25,7 @@ SOFTWARE.
 from typing import List, Tuple
 from sqlalchemy.orm import Session
 from sqlalchemy import func
-from fastapi import HTTPException, status
+from back.exceptions import BadRequestError, ItemNotFoundError
 from back.models import Scenario
 from back.schemas.scenario import ScenarioCreate, ScenarioUpdate
 
@@ -36,15 +36,10 @@ class ScenarioCRUD:
     def create(self, db: Session, scenario_data: ScenarioCreate) -> Scenario:
         """Create a new scenario. Raises 400 if invalid data."""
         if not scenario_data.name:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Scenario must have a name",
-            )
+            raise BadRequestError("Scenario must have a name")
+
         if not isinstance(scenario_data.content, dict):
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Scenario content must be a dictionary",
-            )
+            raise BadRequestError("Scenario content must be a dictionary")
 
         db_scenario = Scenario(
             name=scenario_data.name,
@@ -65,10 +60,8 @@ class ScenarioCRUD:
             .first()
         )
         if not scenario:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Scenario not found or not owned by user",
-            )
+            raise ItemNotFoundError("Scenario not found or not owned by user")
+
         return scenario
 
     def get_by_user(
@@ -100,16 +93,10 @@ class ScenarioCRUD:
 
         update_data = scenario_data.model_dump(exclude_unset=True)
         if not update_data:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="No valid fields to update",
-            )
+            raise BadRequestError("No valid fields to update")
 
         if "content" in update_data and not isinstance(update_data["content"], dict):
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Scenario content must be a dictionary",
-            )
+            raise BadRequestError("Scenario content must be a dictionary")
 
         for key, value in update_data.items():
             setattr(scenario, key, value)

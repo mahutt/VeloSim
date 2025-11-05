@@ -30,6 +30,7 @@ from .simulation_speed import router as simulation_speed_router
 from .resources import router as resources_router
 from .users import router as users_router
 from .logs import router as logs_router
+from .scenarios import router as scenarios_router
 
 # Create the main v1 API router
 api_router = APIRouter()
@@ -42,5 +43,6 @@ api_router.include_router(simulation_speed_router)
 api_router.include_router(resources_router)
 api_router.include_router(users_router)
 api_router.include_router(logs_router)
+api_router.include_router(scenarios_router)
 
 __all__ = ["api_router"]

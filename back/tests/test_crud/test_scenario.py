@@ -25,9 +25,9 @@ SOFTWARE.
 import pytest
 from sqlalchemy.orm import Session
 from pydantic import ValidationError
-from fastapi import HTTPException
 from back.crud.scenario import scenario_crud
 from back.crud.user import user_crud
+from back.exceptions import ItemNotFoundError
 from back.models import User
 from back.schemas.scenario import ScenarioCreate, ScenarioUpdate
 from back.models.scenario import Scenario
@@ -119,9 +119,9 @@ class TestScenarioCRUD:
     def test_get_wrong_user_or_nonexistent(
         self, db: Session, scenario: Scenario, another_user: User
     ) -> None:
-        with pytest.raises(HTTPException):
+        with pytest.raises(ItemNotFoundError):
             scenario_crud.get(db, scenario.id, user_id=another_user.id)
-        with pytest.raises(HTTPException):
+        with pytest.raises(ItemNotFoundError):
             scenario_crud.get(db, 99999, user_id=another_user.id)
 
     # ------------------ UPDATE ------------------ #
@@ -142,7 +142,7 @@ class TestScenarioCRUD:
         update_data = ScenarioUpdate(
             name="Hacked", content={"a": 1}, description="desc"
         )
-        with pytest.raises(HTTPException):
+        with pytest.raises(ItemNotFoundError):
             scenario_crud.update(db, scenario.id, another_user.id, update_data)
 
         # Invalid content type triggers ValidationError
@@ -158,15 +158,15 @@ class TestScenarioCRUD:
         self, db: Session, scenario: Scenario, test_user: User
     ) -> None:
         scenario_crud.delete(db, scenario.id, test_user.id)
-        with pytest.raises(HTTPException):
+        with pytest.raises(ItemNotFoundError):
             scenario_crud.get(db, scenario.id, test_user.id)
 
     def test_delete_wrong_user_or_nonexistent(
         self, db: Session, scenario: Scenario, another_user: User, test_user: User
     ) -> None:
-        with pytest.raises(HTTPException):
+        with pytest.raises(ItemNotFoundError):
             scenario_crud.delete(db, scenario.id, another_user.id)
-        with pytest.raises(HTTPException):
+        with pytest.raises(ItemNotFoundError):
             scenario_crud.delete(db, 99999, test_user.id)
 
     # ------------------ PAGINATION ------------------ #
