@@ -111,7 +111,8 @@ export default defineConfig({
       command: 'npm run dev:backend',
       cwd: '..',
       url: 'http://localhost:8000',
-      reuseExistingServer: !process.env.CI,
+      reuseExistingServer: true,
+      timeout: 120000,
     },
     {
       command: 'npm run dev',
