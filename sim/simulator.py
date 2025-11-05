@@ -127,8 +127,29 @@ class Simulator:
                 self.thread_pool.pop(sim_id, None)
         print(f"{sim_id} ended")
 
-    def pause(self) -> None:
-        raise NotImplementedError("pause() not implemented yet")
+    def pause(self, sim_id: str) -> None:
+        try:
+            sim_info = self.get_sim_by_id(sim_id)
+            if sim_info is not None:
+                sim_info["simController"].pause()
+        except Exception as e:
+            print(f"Could not pause simulation due to: {e}")
+
+    def resume(self, sim_id: str) -> None:
+        try:
+            sim_info = self.get_sim_by_id(sim_id)
+            if sim_info is not None:
+                sim_info["simController"].resume()
+        except Exception as e:
+            print(f"Could not resume simulation due to: {e}")
+
+    def set_factor(self, sim_id: str, factor: float) -> None:
+        try:
+            sim_info = self.get_sim_by_id(sim_id)
+            if sim_info is not None:
+                sim_info["simController"].set_factor(factor)
+        except Exception as e:
+            print(f"Could not set factor due to: {e}")
 
     def status(self) -> None:
         raise NotImplementedError("status() not implemented yet")
