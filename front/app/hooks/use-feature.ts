@@ -22,28 +22,15 @@
  * SOFTWARE.
  */
 
-import { Item, ItemContent, ItemTitle } from '~/components/ui/item';
-import { useFeature } from '~/hooks/use-feature';
+import { useContext } from 'react';
+import { FeatureToggleContext } from '~/providers/feature-toggle-provider';
+import type { FeatureFlags } from '~/utils/feature-flags';
 
-export function TaskItem({ taskId }: { taskId: number }) {
-  const dragEnabled = useFeature('taskDragAndDrop');
-
-  const handleDragStart = (e: React.DragEvent<HTMLDivElement>) => {
-    e.dataTransfer.effectAllowed = 'move';
-    e.dataTransfer.setData('taskId', taskId.toString());
-  };
-
-  return (
-    <Item
-      draggable={dragEnabled}
-      onDragStart={handleDragStart}
-      className="rounded-lg px-3 py-2 bg-white border border-gray-200
-                 hover:border-gray-300 transition-all duration-200
-                 cursor-grab hover:shadow-sm active:cursor-grabbing active:opacity-50"
-    >
-      <ItemContent>
-        <ItemTitle>Task #{taskId}</ItemTitle>
-      </ItemContent>
-    </Item>
-  );
+export function useFeature<K extends keyof FeatureFlags>(key: K) {
+  const context = useContext(FeatureToggleContext);
+  if (!context)
+    throw new Error('useFeature must be used within FeatureToggleProvider');
+  return context.isEnabled(key);
 }
+
+export default useFeature;

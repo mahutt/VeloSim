@@ -37,9 +37,16 @@ import {
 } from '~/components/ui/sidebar';
 import { APP_NAME } from '~/constants';
 import useAuth from '~/hooks/use-auth';
+import { useFeature } from '~/hooks/use-feature';
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   const { user } = useAuth();
+  const showSidebar = useFeature('sidebar');
+
+  if (!showSidebar) {
+    return null;
+  }
+
   return (
     <Sidebar collapsible="offcanvas" {...props}>
       <SidebarHeader>

@@ -28,6 +28,7 @@ import userEvent from '@testing-library/user-event';
 import { useSimulation } from '~/providers/simulation-provider';
 import SelectedItemBar from '~/components/map/selected-item-bar';
 import { SelectedItemType } from '~/types';
+import { FeatureToggleProvider } from '~/providers/feature-toggle-provider';
 
 // Mock the useSimulation hook
 vi.mock('~/providers/simulation-provider', () => ({
@@ -46,7 +47,11 @@ describe('SelectedItemBar', () => {
       assignTaskToResource: vi.fn(),
     });
 
-    const { container } = render(<SelectedItemBar />);
+    const { container } = render(
+      <FeatureToggleProvider>
+        <SelectedItemBar />
+      </FeatureToggleProvider>
+    );
     expect(container.firstChild).toBeNull();
   });
 
@@ -71,7 +76,11 @@ describe('SelectedItemBar', () => {
       assignTaskToResource: vi.fn(),
     });
 
-    render(<SelectedItemBar />);
+    render(
+      <FeatureToggleProvider>
+        <SelectedItemBar />
+      </FeatureToggleProvider>
+    );
 
     expect(screen.getByText('Station')).toBeInTheDocument();
     expect(screen.getByText('#1')).toBeInTheDocument();
@@ -107,7 +116,11 @@ describe('SelectedItemBar', () => {
       assignTaskToResource: vi.fn(),
     });
 
-    render(<SelectedItemBar />);
+    render(
+      <FeatureToggleProvider>
+        <SelectedItemBar />
+      </FeatureToggleProvider>
+    );
 
     expect(screen.getByText('Resource')).toBeInTheDocument();
     expect(screen.getByText('#5')).toBeInTheDocument();
@@ -142,7 +155,11 @@ describe('SelectedItemBar', () => {
       assignTaskToResource: vi.fn(),
     });
 
-    render(<SelectedItemBar />);
+    render(
+      <FeatureToggleProvider>
+        <SelectedItemBar />
+      </FeatureToggleProvider>
+    );
 
     const closeButton = screen.getByRole('button');
     await user.click(closeButton);
@@ -174,7 +191,11 @@ describe('SelectedItemBar', () => {
       assignTaskToResource: vi.fn(),
     });
 
-    render(<SelectedItemBar />);
+    render(
+      <FeatureToggleProvider>
+        <SelectedItemBar />
+      </FeatureToggleProvider>
+    );
 
     expect(screen.getByText('Tasks (2)')).toBeInTheDocument();
     const taskItems = screen.getAllByText(/^Task #/);

@@ -22,28 +22,26 @@
  * SOFTWARE.
  */
 
-import { Item, ItemContent, ItemTitle } from '~/components/ui/item';
-import { useFeature } from '~/hooks/use-feature';
+export const FEATURE_FLAGS_KEY = 'velosim_feature_flags';
 
-export function TaskItem({ taskId }: { taskId: number }) {
-  const dragEnabled = useFeature('taskDragAndDrop');
+export type FeatureFlags = {
+  sidebar?: boolean;
+  taskDragAndDrop?: boolean;
+};
 
-  const handleDragStart = (e: React.DragEvent<HTMLDivElement>) => {
-    e.dataTransfer.effectAllowed = 'move';
-    e.dataTransfer.setData('taskId', taskId.toString());
-  };
+export const DEFAULT_FLAGS: FeatureFlags = {
+  sidebar: true,
+  taskDragAndDrop: false,
+};
 
-  return (
-    <Item
-      draggable={dragEnabled}
-      onDragStart={handleDragStart}
-      className="rounded-lg px-3 py-2 bg-white border border-gray-200
-                 hover:border-gray-300 transition-all duration-200
-                 cursor-grab hover:shadow-sm active:cursor-grabbing active:opacity-50"
-    >
-      <ItemContent>
-        <ItemTitle>Task #{taskId}</ItemTitle>
-      </ItemContent>
-    </Item>
-  );
+export function parseFlags(input: string | null): Partial<FeatureFlags> {
+  if (!input) return {};
+  try {
+    const parsed = JSON.parse(input);
+    return parsed && typeof parsed === 'object'
+      ? (parsed as Partial<FeatureFlags>)
+      : {};
+  } catch {
+    return {};
+  }
 }
