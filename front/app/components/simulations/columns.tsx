@@ -22,22 +22,44 @@
  * SOFTWARE.
  */
 
-import {
-  type RouteConfig,
-  index,
-  layout,
-  route,
-} from '@react-router/dev/routes';
+import { type ColumnDef } from '@tanstack/react-table';
+import type { Simulation } from '~/types';
 
-export default [
-  layout('./layouts/authenticated.tsx', [
-    index('routes/home.tsx'),
-    route('simulation', 'routes/simulation.tsx'),
-    route('simulations', 'routes/simulations.tsx'),
-    route('scenarios', 'routes/scenarios.tsx'),
-
-    // Admin pages
-    route('users', 'routes/users.tsx'),
-  ]),
-  layout('./layouts/unauthenticated.tsx', [route('login', 'routes/login.tsx')]),
-] satisfies RouteConfig;
+export const columns: ColumnDef<Simulation>[] = [
+  {
+    accessorKey: 'id',
+    header: 'ID',
+  },
+  {
+    accessorKey: 'user_id',
+    header: 'User ID',
+  },
+  {
+    accessorKey: 'date_created',
+    header: 'Created',
+    cell: ({ row }) => {
+      const date = new Date(row.original.date_created);
+      return <span>{date.toLocaleDateString()}</span>;
+    },
+  },
+  {
+    accessorKey: 'date_updated',
+    header: 'Updated',
+    cell: ({ row }) => {
+      const date = new Date(row.original.date_updated);
+      return <span>{date.toLocaleDateString()}</span>;
+    },
+  },
+  {
+    accessorKey: 'resource_count',
+    header: 'Resources',
+  },
+  {
+    accessorKey: 'station_count',
+    header: 'Stations',
+  },
+  {
+    accessorKey: 'task_count',
+    header: 'Tasks',
+  },
+];

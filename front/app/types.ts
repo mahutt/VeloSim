@@ -63,6 +63,10 @@ export interface GetStationsResponse extends PaginatedResponse {
   stations: Omit<Station, 'tasks'>[];
 }
 
+export interface ListMySimulationsResponse extends PaginatedResponse {
+  simulations: Simulation[];
+}
+
 export interface GetUsersResponse extends PaginatedResponse {
   users: User[];
 }
@@ -95,4 +99,15 @@ export interface Scenario {
   content: string;
   date_created: string;
   date_updated: string;
+}
+
+// Simulation types
+export interface Simulation {
+  id: number;
+  user_id: number;
+  date_created: string;
+  date_updated: string;
+  resource_count: number;
+  station_count: number;
+  task_count: number;
 }
