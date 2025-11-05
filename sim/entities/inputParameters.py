@@ -23,6 +23,7 @@ SOFTWARE.
 """
 
 # This class is a placeholder for when we define input params later down in the project.
+import json
 from typing import Dict, Mapping, Optional
 from sim.entities.station import Station
 from sim.entities.resource import Resource
@@ -118,3 +119,31 @@ class InputParameter:
 
     def get_task_count(self) -> int:
         return len(self.task_entities)
+
+    def __str__(self) -> str:
+        data = {
+            "stations": {
+                sid: station.name for sid, station in self.station_entities.items()
+            },
+            "resources": {
+                rid: getattr(resource, "name", f"Resource {rid}")
+                for rid, resource in self.resource_entities.items()
+            },
+            "tasks": {
+                tid: (
+                    task.station.name
+                    if (task.station is not None and hasattr(task.station, "name"))
+                    else "-"
+                )
+                for tid, task in self.task_entities.items()
+            },
+            "realTimeFactor": self.realTimeFactor,
+            "keyFrameFreq": self.keyFrameFreq,
+            "counts": {
+                "stations": len(self.station_entities),
+                "resources": len(self.resource_entities),
+                "tasks": len(self.task_entities),
+            },
+        }
+
+        return json.dumps(data, indent=2)
