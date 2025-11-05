@@ -68,20 +68,6 @@ describe('simulation-error-utils', () => {
         expect.stringContaining('Context')
       );
     });
-
-    it('should include timestamp and browser info', () => {
-      logSimulationError(new Error('Test error'));
-
-      const mockConsoleError = console.error as unknown as ReturnType<
-        typeof vi.fn
-      >;
-      const call = mockConsoleError.mock.calls[0][1] as string;
-      const loggedData = JSON.parse(call);
-
-      expect(loggedData.timestamp).toBeDefined();
-      expect(loggedData.userAgent).toBeDefined();
-      expect(loggedData.url).toBeDefined();
-    });
   });
 
   describe('logMissingEntityError', () => {

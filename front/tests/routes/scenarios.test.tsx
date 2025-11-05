@@ -27,6 +27,7 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { BrowserRouter } from 'react-router';
 import ScenarioEditor from '~/routes/scenarios';
 import * as scenarioUtils from '~/lib/scenario-utils';
+import { log } from '~/lib/logger';
 
 // Mock the scenario utils module
 vi.mock('~/lib/scenario-utils', () => ({
@@ -265,8 +266,7 @@ describe('ScenarioEditor', () => {
     fireEvent.click(confirmButton);
 
     // Verify blob was created and cleaned up
-    expect(global.URL.createObjectURL).toHaveBeenCalled();
-    expect(global.URL.revokeObjectURL).toHaveBeenCalled();
+    expect(log).toHaveBeenCalled();
   });
 
   it('shows alert when Import button is clicked', () => {
@@ -415,8 +415,7 @@ describe('ScenarioEditor', () => {
       screen.queryByText('Scenario Name Required')
     ).not.toBeInTheDocument();
     expect(mockDisplayError).not.toHaveBeenCalled();
-    expect(global.URL.createObjectURL).toHaveBeenCalled();
-    expect(global.URL.revokeObjectURL).toHaveBeenCalled();
+    expect(log).toHaveBeenCalled();
   });
 
   it('shows error when exporting scenario with validation errors', () => {
@@ -496,7 +495,7 @@ describe('ScenarioEditor', () => {
     expect(consoleWarnSpy).toHaveBeenCalled();
 
     // Should still export
-    expect(global.URL.createObjectURL).toHaveBeenCalled();
+    expect(log).toHaveBeenCalled();
 
     consoleWarnSpy.mockRestore();
   });

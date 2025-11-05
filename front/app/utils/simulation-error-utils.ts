@@ -22,6 +22,8 @@
  * SOFTWARE.
  */
 
+import { log, LogLevel } from '~/lib/logger';
+
 /**
  * Logs an error for debugging and monitoring.
  * This logs to console with structured data that can be picked up by logging systems like Grafana.
@@ -38,18 +40,15 @@ export function logSimulationError(
   const errorMessage = error instanceof Error ? error.message : String(error);
   const errorData = {
     message: errorMessage,
+    level: LogLevel.ERROR,
     stack: error instanceof Error ? error.stack : undefined,
     context,
-    timestamp: new Date().toISOString(),
-    userAgent: navigator.userAgent,
-    url: window.location.href,
     ...additionalData,
   };
 
   // Log structured error data to console (Grafana/Loki can scrape these logs)
   console.error('[SIMULATION_ERROR]', JSON.stringify(errorData, null, 2));
-
-  // TODO: Send to backend for Grafana/Loki monitoring
+  log(errorData);
 }
 
 /**
