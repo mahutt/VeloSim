@@ -22,6 +22,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 """
 
+from datetime import datetime
 from typing import Optional, List, Dict, Any
 from pydantic import BaseModel, Field, ConfigDict, computed_field
 
@@ -60,8 +61,8 @@ class ScenarioResponse(BaseModel):
     content: Dict[str, Any]
     description: Optional[str] = None
     user_id: int
-    date_created: Optional[str] = None
-    date_updated: Optional[str] = None
+    date_created: datetime
+    date_updated: datetime
 
     model_config = ConfigDict(from_attributes=True)
 
