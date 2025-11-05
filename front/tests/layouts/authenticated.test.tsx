@@ -68,13 +68,15 @@ describe('Authenticated Layout', () => {
     });
 
     const { getByTestId } = render(
-      <BrowserRouter>
-        <Routes>
-          <Route element={<Authenticated />}>
-            <Route path="/" element={<MockChild />} />
-          </Route>
-        </Routes>
-      </BrowserRouter>
+      <FeatureToggleProvider>
+        <BrowserRouter>
+          <Routes>
+            <Route element={<Authenticated />}>
+              <Route path="/" element={<MockChild />} />
+            </Route>
+          </Routes>
+        </BrowserRouter>
+      </FeatureToggleProvider>
     );
 
     expect(getByTestId('page-loader')).toBeInTheDocument();
@@ -87,13 +89,15 @@ describe('Authenticated Layout', () => {
     });
 
     render(
-      <BrowserRouter>
-        <Routes>
-          <Route element={<Authenticated />}>
-            <Route path="/" element={<MockChild />} />
-          </Route>
-        </Routes>
-      </BrowserRouter>
+      <FeatureToggleProvider>
+        <BrowserRouter>
+          <Routes>
+            <Route element={<Authenticated />}>
+              <Route path="/" element={<MockChild />} />
+            </Route>
+          </Routes>
+        </BrowserRouter>
+      </FeatureToggleProvider>
     );
 
     await waitFor(() => {

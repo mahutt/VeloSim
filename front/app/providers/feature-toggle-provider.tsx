@@ -84,12 +84,12 @@ export const FeatureToggleProvider: React.FC<FeatureToggleProviderProps> = ({
 
   const setOverride = useCallback(
     (partial: Partial<FeatureFlags>) => {
-      const merged = { ...flags, ...partial } as FeatureFlags;
-      setFlags(merged);
       try {
         const existing = parseFlags(sessionStorage.getItem(FEATURE_FLAGS_KEY));
         const newOverride = { ...existing, ...partial };
         sessionStorage.setItem(FEATURE_FLAGS_KEY, JSON.stringify(newOverride));
+        const merged = { ...flags, ...partial } as FeatureFlags;
+        setFlags(merged);
       } catch (err) {
         console.warn(err);
       }

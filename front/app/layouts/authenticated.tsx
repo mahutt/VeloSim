@@ -33,6 +33,7 @@ import useAuth from '~/hooks/use-auth';
 export default function Authenticated() {
   const { user, loading } = useAuth();
   const navigate = useNavigate();
+  const showSidebar = useFeature('sidebar');
 
   useEffect(() => {
     if (!user && !loading) {
@@ -48,7 +49,7 @@ export default function Authenticated() {
     <SidebarProvider>
       <AppSidebar variant="sidebar" />
       <main className="relative w-full h-dvh">
-        {useFeature('sidebar') && (
+        {showSidebar && (
           <SidebarTrigger className="absolute left-2 top-2 z-10" />
         )}
         <Outlet />
