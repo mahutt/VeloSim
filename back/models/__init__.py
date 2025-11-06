@@ -31,6 +31,7 @@ from .resource import Resource
 from .resource_type import ResourceType
 from .user import User
 from .sim_instance import SimInstance
+from .scenario import Scenario
 
 __all__ = [
     "Station",
@@ -41,4 +42,5 @@ __all__ = [
     "ResourceType",
     "User",
     "SimInstance",
+    "Scenario",
 ]

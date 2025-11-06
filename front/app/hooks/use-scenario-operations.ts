@@ -27,6 +27,7 @@ import {
   formatValidationResults,
 } from '~/lib/scenario-validation';
 import useError from '~/hooks/use-error';
+import { log, LogLevel } from '~/lib/logger';
 
 /**
  * Custom hook for scenario operations (export, save, load, import)
@@ -106,6 +107,11 @@ export function useScenarioOperations() {
         'Download failed',
         'An unexpected error occurred while downloading the file. Please try again.'
       );
+      log({
+        message: 'Scenario download failed',
+        level: LogLevel.ERROR,
+        stack: error instanceof Error ? error.stack : undefined,
+      });
     }
   };
 
@@ -115,6 +121,10 @@ export function useScenarioOperations() {
     if (!parsedContent) return false;
 
     const contentToExport = JSON.stringify(parsedContent, null, 2);
+    log({
+      message: 'Scenario exported',
+      level: LogLevel.INFO,
+    });
     downloadJSON(contentToExport, scenarioName);
     return true;
   };
@@ -142,6 +152,10 @@ export function useScenarioOperations() {
     // TODO: Add file picker and import logic
     console.log('Import scenario clicked');
     alert('Import Scenario - TODO: Implement import functionality');
+    log({
+      message: 'Scenario imported',
+      level: LogLevel.INFO,
+    });
   };
 
   return {

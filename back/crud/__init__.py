@@ -28,6 +28,7 @@ from .station_task import station_task_crud
 from .resource import resource_crud
 from .sim_instance import sim_instance_crud
 from .user import user_crud
+from .scenario import scenario_crud
 
 __all__ = [
     "station_crud",
@@ -35,4 +36,5 @@ __all__ = [
     "resource_crud",
     "sim_instance_crud",
     "user_crud",
+    "scenario_crud",
 ]

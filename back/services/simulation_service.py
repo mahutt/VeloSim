@@ -25,6 +25,7 @@ SOFTWARE.
 from typing import Dict, List
 from sqlalchemy.orm import Session
 from back.models import User
+from back.models.sim_instance import SimInstance
 from sim.simulator import Simulator
 from sim.entities.inputParameters import InputParameter
 from back.crud import sim_instance_crud, user_crud
@@ -138,26 +139,52 @@ class SimulationService:
         return True
 
     def get_active_user_simulations(
-        self, db: Session, requesting_user: int
-    ) -> List[str]:
+        self, db: Session, requesting_user: int, skip: int = 0, limit: int = 10
+    ) -> tuple[List[SimInstance], int]:
         """
-        Retrieve simulations owned by the requesting user.
+        Retrieve simulations owned by the requesting user with pagination.
+
+        Args:
+            db: Database session
+            requesting_user: Requesting user's ID
+            skip: Number of records to skip
+            limit: Maximum number of records to return
+
+        Returns:
+            Tuple of (list of SimInstance objects, total count)
         """
         user = self._get_requesting_user(db, requesting_user)
-        return [
-            sim_id
-            for sim_id, sim_data in self.active_simulations.items()
-            if (db_instance := sim_instance_crud.get(db, int(sim_data["db_id"])))
-            is not None
-            and db_instance.user_id == user.id
-        ]
+
+        if not self.active_simulations:
+            return [], 0
+
+        db_ids = [int(data["db_id"]) for data in self.active_simulations.values()]
+        all_instances = (
+            db.query(SimInstance)
+            .filter(SimInstance.id.in_(db_ids), SimInstance.user_id == user.id)
+            .all()
+        )
+
+        total = len(all_instances)
+        paginated = all_instances[skip : skip + limit]
+
+        return paginated, total
 
     def get_all_active_simulations(
-        self, db: Session, requesting_user: int
-    ) -> List[str]:
+        self, db: Session, requesting_user: int, skip: int = 0, limit: int = 10
+    ) -> tuple[List[SimInstance], int]:
         """
-        Retrieve all active simulations.
+        Retrieve all active simulations with pagination.
         This is an admin-only operation.
+
+        Args:
+            db: Database session
+            requesting_user: Requesting user's ID
+            skip: Number of records to skip
+            limit: Maximum number of records to return
+
+        Returns:
+            Tuple of (list of SimInstance objects, total count)
         """
         user = self._get_requesting_user(db, requesting_user)
         if not user.is_admin:
@@ -165,7 +192,17 @@ class SimulationService:
                 "Admin privileges required to list all active simulations."
             )
 
-        return list(self.active_simulations.keys())
+        # Batch fetch all sim_instances in a single query
+        if not self.active_simulations:
+            return [], 0
+
+        db_ids = [int(data["db_id"]) for data in self.active_simulations.values()]
+        all_instances = db.query(SimInstance).filter(SimInstance.id.in_(db_ids)).all()
+
+        total = len(all_instances)
+        paginated = all_instances[skip : skip + limit]
+
+        return paginated, total
 
     def get_simulation_status(
         self, db: Session, sim_id: str, requesting_user: int
@@ -211,10 +248,14 @@ class SimulationService:
             # Stop all simulators
             self.simulator.stop_all()
 
-            # Clean up database records
-            for sim_data in list(self.active_simulations.values()):
-                db_id: int = sim_data["db_id"]  # type: ignore[assignment]
-                sim_instance_crud.delete(db, db_id)
+            # Clean up database records in a single batch operation
+            if self.active_simulations:
+                db_ids = [
+                    int(data["db_id"]) for data in self.active_simulations.values()
+                ]
+                db.query(SimInstance).filter(SimInstance.id.in_(db_ids)).delete(
+                    synchronize_session=False
+                )
 
             db.commit()
             self.active_simulations.clear()

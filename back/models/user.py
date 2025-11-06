@@ -29,6 +29,7 @@ from back.database.session import Base
 
 if TYPE_CHECKING:
     from .sim_instance import SimInstance
+    from back.models.scenario import Scenario
 
 
 class User(Base):
@@ -52,6 +53,10 @@ class User(Base):
     # Use string to avoid circular import of back-populated field
     sim_instances: Mapped[List["SimInstance"]] = relationship(
         "SimInstance", back_populates="user"
+    )
+
+    scenarios: Mapped[list["Scenario"]] = relationship(
+        "Scenario", back_populates="user", cascade="all, delete-orphan"
     )
 
     def __repr__(self) -> str:

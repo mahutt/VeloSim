@@ -1,0 +1,217 @@
+name: E2E Tests
+
+on:
+  # Manual trigger via GitHub UI
+  workflow_dispatch:
+    inputs:
+      video:
+        description: "Record videos for tests"
+        required: false
+        type: boolean
+        default: false
+      browser:
+        description: "Browser to run tests on"
+        required: false
+        type: choice
+        options:
+          - chromium
+          - firefox
+          - webkit
+          - all
+        default: chromium
+      skip_map_tests:
+        description: "Skip map-related tests (if Mapbox token unavailable)"
+        required: false
+        type: boolean
+        default: false
+
+jobs:
+  e2e-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    services:
+      postgres:
+        image: postgres:15-alpine
+        env:
+          POSTGRES_USER: velosim
+          POSTGRES_PASSWORD: velosim
+          POSTGRES_DB: velosim
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Set up Node.js 20.x
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20.x
+          cache: "npm"
+          cache-dependency-path: |
+            package-lock.json
+            front/package-lock.json
+
+      # ============== Backend Setup ==============
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e .[dev]
+
+      - name: Set up database schema
+        working-directory: ./back
+        env:
+          DATABASE_URL: postgresql://velosim:velosim@localhost:5432/velosim
+          PYTHONPATH: ${{ github.workspace }}
+        run: |
+          # Run migrations
+          alembic upgrade head
+          # Seed test data if needed
+          python -c "
+          import sys
+          sys.path.insert(0, '${{ github.workspace }}')
+          from back.database.session import SessionLocal, engine
+          from back.models import User
+          from back.crud.user import user_crud
+
+          db = SessionLocal()
+          try:
+              # Check if admin user exists
+              existing_user = db.query(User).filter(User.username == 'admin').first()
+              if not existing_user:
+                  # Create admin user for E2E tests
+                  admin = User(
+                      username='admin',
+                      password_hash=user_crud.hash_password('velosim'),
+                      is_admin=True,
+                      is_enabled=True
+                  )
+                  db.add(admin)
+                  db.commit()
+                  print('Admin user created for E2E tests')
+              else:
+                  print('Admin user already exists')
+          finally:
+              db.close()
+          "
+
+      # ============== Frontend Setup ==============
+      - name: Install root dependencies
+        run: npm ci
+
+      - name: Install frontend dependencies
+        working-directory: ./front
+        run: npm ci
+
+      - name: Install Playwright Browsers
+        working-directory: ./front
+        run: npx playwright install --with-deps ${{ github.event.inputs.browser == 'all' && '' || github.event.inputs.browser || 'chromium' }}
+
+      # ============== Run E2E Tests ==============
+      - name: Start backend server
+        working-directory: ./back
+        env:
+          DATABASE_URL: postgresql://velosim:velosim@localhost:5432/velosim
+          SECRET_KEY: test-secret-key-for-e2e-tests
+          PYTHONPATH: ${{ github.workspace }}
+        run: |
+          python -m uvicorn main:app --host 0.0.0.0 --port 8000 &
+          echo $! > backend.pid
+          # Wait for backend to be ready
+          timeout 30 bash -c 'until curl -f http://localhost:8000/health 2>/dev/null; do sleep 1; done' || echo "Backend health check timeout"
+          sleep 5
+
+      - name: Create frontend .env file
+        working-directory: ./front
+        run: |
+          echo "Creating .env file..."
+          echo "VITE_BACKEND_URL=http://localhost:8000" > .env
+          echo "VITE_MAPBOX_ACCESS_TOKEN=${{ secrets.MAPBOX_ACCESS_TOKEN }}" >> .env
+
+      - name: Run E2E Tests
+        working-directory: ./front
+        env:
+          CI: true
+          VIDEO: ${{ github.event.inputs.video == 'true' && '1' || '' }}
+          PYTHONPATH: ${{ github.workspace }}
+          MAPBOX_TOKEN: ${{ secrets.MAPBOX_ACCESS_TOKEN }}
+        run: |
+          # Add grep filter to skip map tests if requested or if no Mapbox token
+          GREP_ARGS=""
+          if [ "${{ github.event.inputs.skip_map_tests }}" = "true" ] || [ -z "$MAPBOX_TOKEN" ]; then
+            GREP_ARGS="--grep-invert /map|canvas/"
+            echo "WARNING: Skipping map-related tests (Mapbox token not available or skip requested)"
+          fi
+
+          if [ "${{ github.event.inputs.browser }}" = "all" ]; then
+            npm run test:e2e -- --project=chromium --project=firefox --project=webkit $GREP_ARGS
+          elif [ -n "${{ github.event.inputs.browser }}" ]; then
+            npm run test:e2e -- --project=${{ github.event.inputs.browser }} $GREP_ARGS
+          else
+            npm run test:e2e -- --project=chromium $GREP_ARGS
+          fi
+
+      - name: Stop backend server
+        if: always()
+        run: |
+          if [ -f back/backend.pid ]; then
+            kill $(cat back/backend.pid) || true
+          fi
+
+      # ============== Upload Artifacts ==============
+      - name: Upload Playwright Report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: playwright-report-${{ github.event.inputs.browser || 'chromium' }}
+          path: front/playwright-report/
+          retention-days: 14
+
+      - name: Upload Test Videos
+        uses: actions/upload-artifact@v4
+        if: always() && github.event.inputs.video == 'true'
+        with:
+          name: test-videos-${{ github.event.inputs.browser || 'chromium' }}
+          path: front/test-results/**/video.webm
+          retention-days: 7
+
+      - name: Upload Test Traces
+        uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: test-traces-${{ github.event.inputs.browser || 'chromium' }}
+          path: front/test-results/**/trace.zip
+          retention-days: 7
+
+      - name: Upload Test Screenshots
+        uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: test-screenshots-${{ github.event.inputs.browser || 'chromium' }}
+          path: front/test-results/**/*.png
+          retention-days: 7
+
+      # ============== Summary ==============
+      - name: Test Summary
+        if: always()
+        run: |
+          echo "## E2E Test Results" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- **Browser**: ${{ github.event.inputs.browser || 'chromium' }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Video Recording**: ${{ github.event.inputs.video == 'true' && 'Enabled' || 'Disabled' }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          if [ -f front/playwright-report/index.html ]; then
+            echo "Playwright report generated" >> $GITHUB_STEP_SUMMARY
+          fi

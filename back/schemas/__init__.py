@@ -67,6 +67,14 @@ from .frontend_log import (
     FrontendLogResponse,
 )
 
+from .scenario import (
+    ScenarioBase,
+    ScenarioCreate,
+    ScenarioUpdate,
+    ScenarioResponse,
+    ScenarioListResponse,
+)
+
 __all__ = [
     "PositionSchema",
     "StationBase",
@@ -99,4 +107,9 @@ __all__ = [
     "LogLevel",
     "FrontendLogEntry",
     "FrontendLogResponse",
+    "ScenarioBase",
+    "ScenarioCreate",
+    "ScenarioUpdate",
+    "ScenarioResponse",
+    "ScenarioListResponse",
 ]

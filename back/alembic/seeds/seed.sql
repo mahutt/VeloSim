@@ -187,3 +187,72 @@ ORDER BY status;
 SELECT COUNT(*) FROM station_tasks;
 \echo 'Tasks by status:'
 SELECT status, COUNT(*) FROM station_tasks GROUP BY status ORDER BY status;
+
+
+-- VeloSim Scenario Seed Data
+-- Contains initial simulation scenarios for testing and development
+
+TRUNCATE TABLE scenarios RESTART IDENTITY CASCADE;
+
+INSERT INTO scenarios (name, content, description, user_id, date_created, date_updated)
+VALUES
+(
+    'Test Scenario 1',
+    '{
+        "scenario_title": "Test Scenario 1",
+        "start_time": "08:00",
+        "end_time": "12:00",
+        "resources": [
+            { "resource_id": 1, "resource_position": [45.5070, -73.5610], "task_count": 2 },
+            { "resource_id": 2, "resource_position": [45.5090, -73.5670], "task_count": 1 }
+        ],
+        "stations": [
+            { "station_id": 1, "station_name": "Metcalfe / de Maisonneuve", "station_position": [45.50137, -73.57314], "task_count": 2 },
+            { "station_id": 2, "station_name": "Sanguinet / de Maisonneuve", "station_position": [45.51344, -73.56261], "task_count": 1 }
+        ],
+        "initial_tasks": [
+            { "id": "t1", "station_id": "1" },
+            { "id": "t2", "station_id": "2" }
+        ],
+        "scheduled_tasks": [
+            { "id": "t3", "station_id": "1", "time": "09:30" },
+            { "id": "t4", "station_id": "2", "time": "10:15" }
+        ]
+    }',
+    'Test description for Scenario 1.',
+    1,
+    NOW(),
+    NOW()
+),
+(
+    'Test Scenario 2',
+    '{
+        "scenario_title": "Test Scenario 2",
+        "start_time": "13:00",
+        "end_time": "17:00",
+        "resources": [
+            { "resource_id": 3, "resource_position": [45.5030, -73.5740], "task_count": 3 }
+        ],
+        "stations": [
+            { "station_id": 3, "station_name": "St-Denis / Ste-Catherine", "station_position": [45.51007, -73.56391], "task_count": 2 },
+            { "station_id": 4, "station_name": "St-André / Ontario", "station_position": [45.52188, -73.56353], "task_count": 1 }
+        ],
+        "initial_tasks": [
+            { "id": "t5", "station_id": "3" },
+            { "id": "t6", "station_id": "4" }
+        ],
+        "scheduled_tasks": [
+            { "id": "t7", "station_id": "3", "time": "14:00" },
+            { "id": "t8", "station_id": "4", "time": "15:30" }
+        ]
+    }',
+    'Test description for Scenario 2.',
+    1,
+    NOW(),
+    NOW()
+);
+
+SELECT id, name, description, user_id, date_created FROM scenarios ORDER BY id;
+SELECT COUNT(*) AS total_scenarios FROM scenarios;
+
+\echo 'Scenario seed data loaded successfully!'

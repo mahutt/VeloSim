@@ -236,11 +236,105 @@ def test_multiple_parallel_sims(
     assert a not in sim.thread_pool and b not in sim.thread_pool
 
 
-def test_pause_and_status_not_implemented(sim: Simulator) -> None:
-    with pytest.raises(NotImplementedError):
-        sim.pause()
+def test_status_not_implemented(sim: Simulator) -> None:
     with pytest.raises(NotImplementedError):
         sim.status()
+
+
+def test_pause_success(sim: Simulator, input_params: InputParameter) -> None:
+    # Arrange
+    a = sim.initialize(input_params, subList)
+    sim.start(a, 3600)
+
+    sim_info = sim.get_sim_by_id(a)
+    assert sim_info is not None
+
+    # Act & Assert
+    with patch.object(sim_info["simController"], "pause") as mock_pause:
+        sim.pause(a)
+        mock_pause.assert_called_once()
+
+    sim.stop(a)
+
+
+@patch("builtins.print")
+def test_pause_fail(mock_print: MagicMock, sim: Simulator) -> None:
+    # Arrange
+    a = sim.initialize(params, subList)
+    sim.start(a, 3600)
+
+    # Act
+    sim.pause("random_id")
+
+    # Assert
+    error = "Simulation random_id does not exist in the thread pool"
+    mock_print.assert_called_once_with(f"Could not pause simulation due to: {error}")
+
+    sim.stop(a)
+
+
+def test_resume_success(sim: Simulator, input_params: InputParameter) -> None:
+    # Arrange
+    a = sim.initialize(input_params, subList)
+    sim.start(a, 3600)
+
+    sim_info = sim.get_sim_by_id(a)
+    assert sim_info is not None
+
+    # Act & Assert
+    with patch.object(sim_info["simController"], "resume") as mock_resume:
+        sim.resume(a)
+        mock_resume.assert_called_once()
+
+    sim.stop(a)
+
+
+@patch("builtins.print")
+def test_resume_fail(mock_print: MagicMock, sim: Simulator) -> None:
+    # Arrange
+    a = sim.initialize(params, subList)
+    sim.start(a, 3600)
+
+    # Act
+    sim.resume("random_id")
+
+    # Assert
+    error = "Simulation random_id does not exist in the thread pool"
+    mock_print.assert_called_once_with(f"Could not resume simulation due to: {error}")
+
+    sim.stop(a)
+
+
+def test_set_factor_success(sim: Simulator, input_params: InputParameter) -> None:
+    # Arrange
+    a = sim.initialize(input_params, subList)
+    sim.start(a, 3600)
+
+    sim_info = sim.get_sim_by_id(a)
+    assert sim_info is not None
+
+    # Act & Assert
+    with patch.object(sim_info["simController"], "set_factor") as mock_set_factor:
+        sim.set_factor(a, 2.5)
+        mock_set_factor.assert_called_once_with(2.5)
+
+    sim.stop(a)
+
+
+@patch("builtins.print")
+def test_set_factor_fail(mock_print: MagicMock, sim: Simulator) -> None:
+    # Arrange
+    a = sim.initialize(params, subList)
+    sim.start(a, 3600)
+
+    # Act
+    sim.set_factor("random_id", 2.0)
+
+    # Assert
+    error = "Simulation random_id does not exist in the thread pool"
+    mock_print.assert_called_once_with(f"Could not set factor due to: {error}")
+
+    sim.stop(a)
 
 
 def test_send_request_not_implemented(sim: Simulator) -> None:

@@ -37,6 +37,7 @@ from back.api.v1.simulation import WebSocketSubscriber
 from fastapi import WebSocket
 
 from sim.frame_emitter import FrameEmitter
+from back.models.user import User
 
 
 @pytest.fixture
@@ -78,6 +79,60 @@ def disabled_admin_client(client: TestClient) -> Generator[TestClient, None, Non
 @pytest.fixture
 def ws_client(client: TestClient) -> Generator[TestClient, None, None]:
     yield client
+
+
+@pytest.fixture
+def test_user(db: Session) -> User:
+    """Create a test user with ID=1 for authenticated_client fixture."""
+    # authenticated_client fixture mocks get_user_id to return 1
+    # So we need to create a user with ID=1 in the test database
+    user = db.query(User).filter(User.id == 1).first()
+    if user:
+        return user
+    user = User(
+        id=1,
+        username="testuser",
+        password_hash="hashedpassword",
+        is_admin=False,
+        is_enabled=True,
+    )
+    db.add(user)
+    db.commit()
+    db.refresh(user)
+    return user
+
+
+@pytest.fixture
+def admin_user(db: Session) -> User:
+    """Create an admin test user with ID=999."""
+    user = db.query(User).filter(User.id == 999).first()
+    if user:
+        return user
+    user = User(
+        id=999,
+        username="adminuser",
+        password_hash="hashedpassword2",
+        is_admin=True,
+        is_enabled=True,
+    )
+    db.add(user)
+    db.commit()
+    db.refresh(user)
+    return user
+
+
+@pytest.fixture
+def admin_authenticated_client(
+    client: TestClient, admin_user: User
+) -> Generator[TestClient, None, None]:
+    """Client with authenticated admin user (ID=999)."""
+
+    def mock_get_user_id() -> int:
+        return admin_user.id
+
+    app.dependency_overrides[get_user_id] = mock_get_user_id
+    yield client
+    app.dependency_overrides.clear()
 
 
 class TestSimulationAPI:
@@ -160,12 +215,26 @@ class TestSimulationAPI:
     def test_list_my_simulations_success(
         self, mock_list: MagicMock, authenticated_client: TestClient, db: Session
     ) -> None:
-        mock_list.return_value = ["sim1"]
+        # Create a mock SimInstance object
+        mock_sim = MagicMock()
+        mock_sim.id = 1
+        mock_sim.user_id = 1
+        mock_sim.date_created = "2025-01-01T00:00:00"
+        mock_sim.date_updated = "2025-01-01T00:00:00"
+        mock_sim.resources = []
+        mock_sim.stations = []
+        mock_sim.tasks = []
+
+        mock_list.return_value = ([mock_sim], 1)
         response = authenticated_client.get("/api/v1/simulation/my")
         assert response.status_code == 200
         data = response.json()
-        assert data["active_simulations"] == ["sim1"]
-        mock_list.assert_called_once_with(ANY, 1)
+        assert "simulations" in data
+        assert data["total"] == 1
+        assert data["page"] == 1
+        assert data["per_page"] == 10
+        assert data["total_pages"] == 1
+        mock_list.assert_called_once_with(ANY, 1, 0, 10)
 
     @patch(
         "back.services.simulation_service.simulation_service."
@@ -185,12 +254,35 @@ class TestSimulationAPI:
     def test_list_all_simulations_success(
         self, mock_list: MagicMock, authenticated_client: TestClient, db: Session
     ) -> None:
-        mock_list.return_value = ["sim1", "sim2"]
+        # Create mock SimInstance objects
+        mock_sim1 = MagicMock()
+        mock_sim1.id = 1
+        mock_sim1.user_id = 1
+        mock_sim1.date_created = "2025-01-01T00:00:00"
+        mock_sim1.date_updated = "2025-01-01T00:00:00"
+        mock_sim1.resources = []
+        mock_sim1.stations = []
+        mock_sim1.tasks = []
+
+        mock_sim2 = MagicMock()
+        mock_sim2.id = 2
+        mock_sim2.user_id = 1
+        mock_sim2.date_created = "2025-01-01T00:00:00"
+        mock_sim2.date_updated = "2025-01-01T00:00:00"
+        mock_sim2.resources = []
+        mock_sim2.stations = []
+        mock_sim2.tasks = []
+
+        mock_list.return_value = ([mock_sim1, mock_sim2], 2)
         response = authenticated_client.get("/api/v1/simulation/list")
         assert response.status_code == 200
         data = response.json()
-        assert data["active_simulations"] == ["sim1", "sim2"]
-        mock_list.assert_called_once_with(ANY, 1)
+        assert "simulations" in data
+        assert data["total"] == 2
+        assert data["page"] == 1
+        assert data["per_page"] == 10
+        assert data["total_pages"] == 1
+        mock_list.assert_called_once_with(ANY, 1, 0, 10)
 
     @patch(
         "back.services.simulation_service.simulation_service.get_all_active_simulations"
@@ -338,3 +430,173 @@ class TestSimulationAPI:
             websocket.send_text("ping")
             pong = websocket.receive_json()
             assert pong["type"] == "pong"
+
+
+class TestSimulationListIntegration:
+    """Integration tests for simulation listing with full flow."""
+
+    @pytest.fixture(autouse=True)
+    def reset_simulation_service(self) -> Generator[None, None, None]:
+        """Reset simulation service before each integration test."""
+        # Clear active simulations before test
+        simulation_service.active_simulations.clear()
+        yield
+        # Clean up after test
+        simulation_service.active_simulations.clear()
+
+    def test_start_and_list_my_simulations(
+        self, authenticated_client: TestClient, db: Session, test_user: User
+    ) -> None:
+        """
+        Test complete flow: start simulation -> list simulations with metadata.
+        """
+        # Step 1: Start a simulation
+        start_response = authenticated_client.post("/api/v1/simulation/start")
+        assert start_response.status_code == 200
+        sim_data = start_response.json()
+        assert "sim_id" in sim_data
+        assert "db_id" in sim_data
+        sim_id = sim_data["sim_id"]
+        db_id = sim_data["db_id"]
+
+        # Step 2: List my simulations
+        list_response = authenticated_client.get("/api/v1/simulation/my")
+        assert list_response.status_code == 200
+        list_data = list_response.json()
+
+        # Verify response structure
+        assert "simulations" in list_data
+        assert "total" in list_data
+        assert "page" in list_data
+        assert "per_page" in list_data
+        assert "total_pages" in list_data
+
+        # Verify pagination metadata
+        assert list_data["total"] == 1
+        assert list_data["page"] == 1
+        assert list_data["per_page"] == 10
+        assert list_data["total_pages"] == 1
+
+        # Verify simulation data contains metadata
+        assert len(list_data["simulations"]) == 1
+        simulation = list_data["simulations"][0]
+        assert simulation["id"] == db_id
+        assert simulation["user_id"] == 1  # authenticated_client uses user_id=1
+        assert "date_created" in simulation
+        assert "date_updated" in simulation
+        assert "resource_count" in simulation
+        assert "station_count" in simulation
+        assert "task_count" in simulation
+        # Counts should be 0 for new simulation
+        assert simulation["resource_count"] == 0
+        assert simulation["station_count"] == 0
+        assert simulation["task_count"] == 0
+
+        # Step 3: Stop the simulation
+        stop_response = authenticated_client.post(f"/api/v1/simulation/stop/{sim_id}")
+        assert stop_response.status_code == 200
+
+    def test_list_with_pagination(
+        self, authenticated_client: TestClient, db: Session, test_user: User
+    ) -> None:
+        """Test listing simulations with pagination parameters."""
+        # Start 3 simulations
+        sim_ids = []
+        for _ in range(3):
+            response = authenticated_client.post("/api/v1/simulation/start")
+            assert response.status_code == 200
+            sim_ids.append(response.json()["sim_id"])
+
+        # Test pagination: page 1, limit 2
+        response = authenticated_client.get("/api/v1/simulation/my?skip=0&limit=2")
+        assert response.status_code == 200
+        data = response.json()
+        assert data["total"] == 3
+        assert data["page"] == 1
+        assert data["per_page"] == 2
+        assert data["total_pages"] == 2
+        assert len(data["simulations"]) == 2
+
+        # Test pagination: page 2, limit 2
+        response = authenticated_client.get("/api/v1/simulation/my?skip=2&limit=2")
+        assert response.status_code == 200
+        data = response.json()
+        assert data["total"] == 3
+        assert data["page"] == 2
+        assert data["per_page"] == 2
+        assert data["total_pages"] == 2
+        assert len(data["simulations"]) == 1
+
+        # Cleanup
+        for sim_id in sim_ids:
+            authenticated_client.post(f"/api/v1/simulation/stop/{sim_id}")
+
+    def test_list_all_simulations_as_admin(
+        self, admin_authenticated_client: TestClient, db: Session, admin_user: User
+    ) -> None:
+        """Test admin can list all simulations globally."""
+        # Start a simulation as admin
+        start_response = admin_authenticated_client.post("/api/v1/simulation/start")
+        assert start_response.status_code == 200
+        sim_id = start_response.json()["sim_id"]
+        db_id = start_response.json()["db_id"]
+
+        # List all simulations (admin endpoint)
+        response = admin_authenticated_client.get("/api/v1/simulation/list")
+        assert response.status_code == 200
+        data = response.json()
+        assert data["total"] >= 1
+        assert len(data["simulations"]) >= 1
+
+        # Verify simulation is in the list
+        sim_ids = [sim["id"] for sim in data["simulations"]]
+        assert db_id in sim_ids
+
+        # Cleanup
+        admin_authenticated_client.post(f"/api/v1/simulation/stop/{sim_id}")
+
+    def test_empty_simulation_list(
+        self, authenticated_client: TestClient, db: Session, test_user: User
+    ) -> None:
+        """Test listing when no simulations are running."""
+        response = authenticated_client.get("/api/v1/simulation/my")
+        assert response.status_code == 200
+        data = response.json()
+        assert data["total"] == 0
+        assert data["page"] == 1
+        assert data["per_page"] == 10
+        assert data["total_pages"] == 0
+        assert len(data["simulations"]) == 0
+
+    def test_pagination_edge_cases(
+        self, authenticated_client: TestClient, db: Session, test_user: User
+    ) -> None:
+        """Test pagination with various edge cases."""
+        # Start 1 simulation
+        start_response = authenticated_client.post("/api/v1/simulation/start")
+        assert start_response.status_code == 200
+        sim_id = start_response.json()["sim_id"]
+
+        # Test large limit
+        response = authenticated_client.get("/api/v1/simulation/my?skip=0&limit=100")
+        assert response.status_code == 200
+        data = response.json()
+        assert data["total"] == 1
+        assert data["per_page"] == 100
+        assert data["total_pages"] == 1
+
+        # Test skip beyond total
+        response = authenticated_client.get("/api/v1/simulation/my?skip=10&limit=10")
+        assert response.status_code == 200
+        data = response.json()
+        assert data["total"] == 1
+        assert len(data["simulations"]) == 0
+        assert data["page"] == 2
+
+        # Cleanup
+        authenticated_client.post(f"/api/v1/simulation/stop/{sim_id}")
+
+    def test_unauthorized_list_returns_401(self, client: TestClient) -> None:
+        """Test that listing without authentication returns 401."""
+        response = client.get("/api/v1/simulation/my")
+        assert response.status_code == 401

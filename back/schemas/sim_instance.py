@@ -23,7 +23,7 @@ SOFTWARE.
 """
 
 from datetime import datetime
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, computed_field
 
 
 class SimInstanceBase(BaseModel):
@@ -44,8 +44,23 @@ class SimInstanceResponse(SimInstanceBase):
     id: int
     date_created: datetime
     date_updated: datetime
-    resource_count: int
-    station_count: int
-    task_count: int
 
     model_config = ConfigDict(from_attributes=True)
+
+    @computed_field  # type: ignore[prop-decorator]
+    @property
+    def resource_count(self) -> int:
+        """Compute the number of resources."""
+        return len(self.resources) if hasattr(self, "resources") else 0
+
+    @computed_field  # type: ignore[prop-decorator]
+    @property
+    def station_count(self) -> int:
+        """Compute the number of stations."""
+        return len(self.stations) if hasattr(self, "stations") else 0
+
+    @computed_field  # type: ignore[prop-decorator]
+    @property
+    def task_count(self) -> int:
+        """Compute the number of tasks."""
+        return len(self.tasks) if hasattr(self, "tasks") else 0

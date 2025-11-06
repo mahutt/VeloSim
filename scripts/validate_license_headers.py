@@ -128,11 +128,12 @@ EXCLUDED_PATHS = {
     'versions',  # Alembic versions directory
     'alembic/versions',  # Full path
 
+    # Playwright test artifacts (auto-generated)
+    'playwright-report',  # Playwright HTML reports
+    'test-results',  # Playwright test results and videos
+
     # Python package init files
     '__init__.py',  # All __init__.py files
-
-    # Special files
-    '__init__.py'  # Often just contain imports
 }
 
 def normalize_whitespace(text: str) -> str:
