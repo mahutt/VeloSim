@@ -31,6 +31,7 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
 } from '~/components/ui/sidebar';
+import { useFeature } from '~/hooks/use-feature';
 
 const mainNavItems = [
   {
@@ -46,11 +47,18 @@ const mainNavItems = [
 ];
 
 export function NavMain() {
+  const showSimulations = useFeature('simulationsPage');
+
+  const items = mainNavItems.filter((i) => {
+    if (i.url === '/simulations' && !showSimulations) return false;
+    return true;
+  });
+
   return (
     <SidebarGroup>
       <SidebarGroupLabel>Main</SidebarGroupLabel>
       <SidebarMenu>
-        {mainNavItems.map((item) => (
+        {items.map((item) => (
           <SidebarMenuItem key={item.title}>
             <SidebarMenuButton tooltip={item.title} asChild>
               <Link to={item.url}>

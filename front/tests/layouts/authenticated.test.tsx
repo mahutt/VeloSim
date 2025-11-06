@@ -27,6 +27,7 @@ import { render, waitFor } from '@testing-library/react';
 import { BrowserRouter, Route, Routes } from 'react-router';
 import Authenticated from '~/layouts/authenticated';
 import '@testing-library/jest-dom';
+import { FeatureToggleProvider } from '~/providers/feature-toggle-provider';
 
 // Mock the useAuth hook
 vi.mock('~/hooks/use-auth', () => ({
@@ -67,13 +68,15 @@ describe('Authenticated Layout', () => {
     });
 
     const { getByTestId } = render(
-      <BrowserRouter>
-        <Routes>
-          <Route element={<Authenticated />}>
-            <Route path="/" element={<MockChild />} />
-          </Route>
-        </Routes>
-      </BrowserRouter>
+      <FeatureToggleProvider>
+        <BrowserRouter>
+          <Routes>
+            <Route element={<Authenticated />}>
+              <Route path="/" element={<MockChild />} />
+            </Route>
+          </Routes>
+        </BrowserRouter>
+      </FeatureToggleProvider>
     );
 
     expect(getByTestId('page-loader')).toBeInTheDocument();
@@ -86,13 +89,15 @@ describe('Authenticated Layout', () => {
     });
 
     render(
-      <BrowserRouter>
-        <Routes>
-          <Route element={<Authenticated />}>
-            <Route path="/" element={<MockChild />} />
-          </Route>
-        </Routes>
-      </BrowserRouter>
+      <FeatureToggleProvider>
+        <BrowserRouter>
+          <Routes>
+            <Route element={<Authenticated />}>
+              <Route path="/" element={<MockChild />} />
+            </Route>
+          </Routes>
+        </BrowserRouter>
+      </FeatureToggleProvider>
     );
 
     await waitFor(() => {
@@ -107,13 +112,15 @@ describe('Authenticated Layout', () => {
     });
 
     const { getByTestId } = render(
-      <BrowserRouter>
-        <Routes>
-          <Route element={<Authenticated />}>
-            <Route path="/" element={<MockChild />} />
-          </Route>
-        </Routes>
-      </BrowserRouter>
+      <FeatureToggleProvider>
+        <BrowserRouter>
+          <Routes>
+            <Route element={<Authenticated />}>
+              <Route path="/" element={<MockChild />} />
+            </Route>
+          </Routes>
+        </BrowserRouter>
+      </FeatureToggleProvider>
     );
 
     expect(getByTestId('protected-content')).toBeInTheDocument();

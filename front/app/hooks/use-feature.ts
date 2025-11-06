@@ -22,38 +22,15 @@
  * SOFTWARE.
  */
 
-import { useEffect } from 'react';
-import { Outlet, useNavigate } from 'react-router';
-import { AppSidebar } from '~/components/sidebar/app-sidebar';
-import PageLoader from '~/components/page-loader';
-import { SidebarProvider, SidebarTrigger } from '~/components/ui/sidebar';
-import { useFeature } from '~/hooks/use-feature';
-import useAuth from '~/hooks/use-auth';
+import { useContext } from 'react';
+import { FeatureToggleContext } from '~/providers/feature-toggle-provider';
+import type { FeatureFlags } from '~/utils/feature-flags';
 
-export default function Authenticated() {
-  const { user, loading } = useAuth();
-  const navigate = useNavigate();
-  const showSidebar = useFeature('sidebar');
-
-  useEffect(() => {
-    if (!user && !loading) {
-      navigate('/login');
-    }
-  }, [user, loading]);
-
-  if (loading || !user) {
-    return <PageLoader />;
-  }
-
-  return (
-    <SidebarProvider>
-      <AppSidebar variant="sidebar" />
-      <main className="relative w-full h-dvh">
-        {showSidebar && (
-          <SidebarTrigger className="absolute left-2 top-2 z-10" />
-        )}
-        <Outlet />
-      </main>
-    </SidebarProvider>
-  );
+export function useFeature<K extends keyof FeatureFlags>(key: K) {
+  const context = useContext(FeatureToggleContext);
+  if (!context)
+    throw new Error('useFeature must be used within FeatureToggleProvider');
+  return context.isEnabled(key);
 }
+
+export default useFeature;

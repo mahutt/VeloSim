@@ -22,38 +22,28 @@
  * SOFTWARE.
  */
 
-import { useEffect } from 'react';
-import { Outlet, useNavigate } from 'react-router';
-import { AppSidebar } from '~/components/sidebar/app-sidebar';
-import PageLoader from '~/components/page-loader';
-import { SidebarProvider, SidebarTrigger } from '~/components/ui/sidebar';
-import { useFeature } from '~/hooks/use-feature';
-import useAuth from '~/hooks/use-auth';
+export const FEATURE_FLAGS_KEY = 'velosim_feature_flags';
 
-export default function Authenticated() {
-  const { user, loading } = useAuth();
-  const navigate = useNavigate();
-  const showSidebar = useFeature('sidebar');
+export type FeatureFlags = {
+  sidebar: boolean;
+  taskDragAndDrop: boolean;
+  simulationsPage: boolean;
+};
 
-  useEffect(() => {
-    if (!user && !loading) {
-      navigate('/login');
-    }
-  }, [user, loading]);
+export const DEFAULT_FLAGS: FeatureFlags = {
+  sidebar: true,
+  taskDragAndDrop: false,
+  simulationsPage: false,
+};
 
-  if (loading || !user) {
-    return <PageLoader />;
+export function parseFlags(input: string | null): Partial<FeatureFlags> {
+  if (!input) return {};
+  try {
+    const parsed = JSON.parse(input);
+    return parsed && typeof parsed === 'object'
+      ? (parsed as Partial<FeatureFlags>)
+      : {};
+  } catch {
+    return {};
   }
-
-  return (
-    <SidebarProvider>
-      <AppSidebar variant="sidebar" />
-      <main className="relative w-full h-dvh">
-        {showSidebar && (
-          <SidebarTrigger className="absolute left-2 top-2 z-10" />
-        )}
-        <Outlet />
-      </main>
-    </SidebarProvider>
-  );
 }

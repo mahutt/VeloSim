@@ -35,6 +35,7 @@ import type { Route } from './+types/root';
 import './app.css';
 import { AuthProvider } from './providers/auth-provider';
 import { ErrorProvider } from './providers/error-provider';
+import { FeatureToggleProvider } from './providers/feature-toggle-provider';
 
 export const links: Route.LinksFunction = () => [
   { rel: 'preconnect', href: 'https://fonts.googleapis.com' },
@@ -70,9 +71,11 @@ export function Layout({ children }: { children: React.ReactNode }) {
 export default function App() {
   return (
     <ErrorProvider>
-      <AuthProvider>
-        <Outlet />
-      </AuthProvider>
+      <FeatureToggleProvider>
+        <AuthProvider>
+          <Outlet />
+        </AuthProvider>
+      </FeatureToggleProvider>
     </ErrorProvider>
   );
 }

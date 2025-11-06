@@ -26,6 +26,7 @@ import { Loader2 } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import api from '~/api';
 import Page from '~/components/page';
+import { useFeature } from '~/hooks/use-feature';
 import { columns } from '~/components/simulations/columns';
 import { DataTable } from '~/components/simulations/data-table';
 import useError from '~/hooks/use-error';
@@ -36,9 +37,14 @@ export function meta() {
 }
 
 export default function Simulations() {
+  const showSimulationsPage = useFeature('simulationsPage');
   const { displayError } = useError();
   const [loading, setLoading] = useState(true);
   const [simulations, setSimulations] = useState<Simulation[]>([]);
+
+  if (!showSimulationsPage) {
+    return null;
+  }
 
   /*
   The TanStack Table pagination guide recommends starting with client-side pagination

@@ -23,8 +23,11 @@
  */
 
 import { Item, ItemContent, ItemTitle } from '~/components/ui/item';
+import { useFeature } from '~/hooks/use-feature';
 
 export function TaskItem({ taskId }: { taskId: number }) {
+  const dragEnabled = useFeature('taskDragAndDrop');
+
   const handleDragStart = (e: React.DragEvent<HTMLDivElement>) => {
     e.dataTransfer.effectAllowed = 'move';
     e.dataTransfer.setData('taskId', taskId.toString());
@@ -32,7 +35,7 @@ export function TaskItem({ taskId }: { taskId: number }) {
 
   return (
     <Item
-      draggable
+      draggable={dragEnabled}
       onDragStart={handleDragStart}
       className="rounded-lg px-3 py-2 bg-white border border-gray-200
                  hover:border-gray-300 transition-all duration-200
