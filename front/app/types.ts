@@ -71,6 +71,10 @@ export interface GetUsersResponse extends PaginatedResponse {
   users: User[];
 }
 
+export interface ScenarioListResponse extends PaginatedResponse {
+  scenarios: Scenario[];
+}
+
 // Resource types
 export interface Resource {
   id: number;
@@ -101,10 +105,6 @@ export interface Scenario {
   date_created: string;
   date_updated: string;
   content_size?: number;
-}
-
-export interface ScenarioListResponse extends PaginatedResponse {
-  scenarios: Scenario[];
 }
 
 // Simulation types
