@@ -26,6 +26,11 @@ import pytest
 from sqlalchemy.orm import Session
 from back.exceptions import VelosimPermissionError, ItemNotFoundError
 from back.models.user import User
+from back.schemas.playback_speed import (
+    ALLOWED_SPEEDS,
+    PlaybackSpeedBase,
+    SimulationPlaybackStatus,
+)
 from back.services.simulation_service import SimulationService
 from back.crud.sim_instance import sim_instance_crud
 
@@ -308,3 +313,71 @@ class TestSimulationService:
         # Verify status now raises error
         with pytest.raises(ItemNotFoundError):
             simulation_service.get_simulation_status(db, sim_id, test_user.id)
+
+    def test_set_playback_speed_valid_values(
+        self, db: Session, test_user: User, simulation_service: SimulationService
+    ) -> None:
+        """User can set a valid playback speed."""
+        sim_id, _ = simulation_service.start_simulation(db, test_user.id)
+
+        # Pick a valid speed
+        playback_speed = PlaybackSpeedBase(playback_speed=2.0)
+        response = simulation_service.set_playback_speed(
+            db, sim_id, playback_speed, test_user.id
+        )
+
+        # Compare the inner float
+        assert response.playback_speed == playback_speed.playback_speed
+        assert response.playback_speed in ALLOWED_SPEEDS
+        assert response.status in [
+            SimulationPlaybackStatus.RUNNING,
+            SimulationPlaybackStatus.PAUSED,
+        ]
+
+    def test_set_playback_speed_invalid_value(
+        self, db: Session, test_user: User, simulation_service: SimulationService
+    ) -> None:
+        """Invalid playback speeds should raise ValueError via schema validation."""
+        # Schema itself should catch it before service is called
+        with pytest.raises(ValueError, match="Playback speed must be one of"):
+            PlaybackSpeedBase(playback_speed=3.0)
+
+    def test_set_playback_speed_unauthorized_user(
+        self,
+        db: Session,
+        test_user: User,
+        test_user2: User,
+        simulation_service: SimulationService,
+    ) -> None:
+        """A user cannot modify another user's simulation."""
+        sim_id, _ = simulation_service.start_simulation(db, test_user.id)
+
+        playback_speed = PlaybackSpeedBase(playback_speed=1.0)
+        with pytest.raises(VelosimPermissionError):
+            simulation_service.set_playback_speed(
+                db, sim_id, playback_speed, test_user2.id
+            )
+
+    def test_get_playback_speed_valid(
+        self, db: Session, test_user: User, simulation_service: SimulationService
+    ) -> None:
+        """Retrieve playback status for a simulation."""
+        sim_id, _ = simulation_service.start_simulation(db, test_user.id)
+
+        response = simulation_service.get_playback_speed(db, sim_id, test_user.id)
+
+        assert response.simulation_id == sim_id
+        assert response.playback_speed in ALLOWED_SPEEDS
+        assert response.status in [
+            SimulationPlaybackStatus.RUNNING,
+            SimulationPlaybackStatus.PAUSED,
+        ]
+
+    def test_get_playback_speed_not_found(
+        self, db: Session, test_user: User, simulation_service: SimulationService
+    ) -> None:
+        """Accessing playback status for nonexistent sim should raise error."""
+        with pytest.raises(ItemNotFoundError):
+            simulation_service.get_playback_speed(
+                db, "nonexistent-sim-id", test_user.id
+            )
