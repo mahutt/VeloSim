@@ -24,13 +24,14 @@
 
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router';
-import type { Scenario } from '~/types';
-import { loadSavedScenarios } from '~/lib/scenario-utils';
+import type { Scenario, ScenarioListResponse } from '~/types';
+import api from '~/api';
 import ScenarioToolbar from '~/components/scenario/scenario-toolbar';
 import ScenarioTextArea from '~/components/scenario/scenario-textarea';
 import ScenarioSidebar from '~/components/scenario/scenario-sidebar';
 import ScenarioNameDialog from '~/components/scenario/scenario-name-dialog';
 import { useScenarioOperations } from '~/hooks/use-scenario-operations';
+import useError from '~/hooks/use-error';
 
 export default function ScenarioEditor() {
   const [scenarioContent, setScenarioContent] = useState('');
@@ -45,13 +46,52 @@ export default function ScenarioEditor() {
     null
   );
   const navigate = useNavigate();
+  const { displayError } = useError();
   const { validateContent, exportScenario, saveScenario, importScenario } =
     useScenarioOperations();
 
+  /**
+   * Load all saved scenarios for the current user
+   * Fetches paginated data and returns all scenarios
+   */
+  async function loadSavedScenarios(): Promise<Scenario[]> {
+    const scenarios: Scenario[] = [];
+    let page = 1;
+    const perPage = 10;
+    let totalPages = 1;
+    let failureOccurred = false;
+
+    while (page <= totalPages) {
+      try {
+        const response = await api.get<ScenarioListResponse>(
+          `/scenarios?skip=${(page - 1) * perPage}&limit=${perPage}`
+        );
+        const data = response.data;
+        scenarios.push(...data.scenarios);
+        totalPages = data.total_pages;
+        page += 1;
+      } catch (error) {
+        console.error('Failed to fetch scenarios:', error);
+        failureOccurred = true;
+        break;
+      }
+    }
+    if (failureOccurred) {
+      displayError(
+        'Failure loading scenarios',
+        scenarios.length > 0
+          ? 'Some scenarios may be missing from the list.'
+          : 'All scenarios failed to load.',
+        scenarios.length > 0 ? undefined : loadSavedScenarios
+      );
+    }
+    return scenarios;
+  }
+
   useEffect(() => {
-    // Load mock data for UI testing
+    // Load scenarios from backend API
     loadSavedScenarios().then(setSavedScenarios);
-  }, []);
+  }, [displayError]);
 
   // TODO: Implement with backend API call
   const handleStartScenario = () => {
@@ -121,8 +161,7 @@ export default function ScenarioEditor() {
 
   const handleSelectScenario = (scenario: Scenario) => {
     try {
-      const parsed = JSON.parse(scenario.content);
-      setScenarioContent(JSON.stringify(parsed, null, 2));
+      setScenarioContent(JSON.stringify(scenario.content, null, 2));
       setScenarioName(scenario.name);
       setSelectedScenarioId(scenario.id);
       setError(null);
