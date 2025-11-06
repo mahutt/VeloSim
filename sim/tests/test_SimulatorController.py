@@ -36,8 +36,27 @@ from sim.entities.resource import Resource
 from sim.entities.BatterySwapTask import BatterySwapTask
 from sim.entities.position import Position
 from sim.utils.subscriber import Subscriber
+from sim.behaviour.sim_behaviour import SimBehaviour
 import sim.RealTimeDriver as rtd
 import sim.SimulatorController as sc_mod
+from types import SimpleNamespace
+
+
+class FakeTPUStrategy:
+    def check_for_new_task(self, station: Station) -> bool:
+        return False
+
+
+class FakeRCNTStrategy:
+    def select_next_task(self, resource: Resource) -> None:
+        return None
+
+
+class FakeSimBehaviour(SimBehaviour):
+    def __init__(self) -> None:
+        super().__init__()
+        self.TPU_strategy = FakeTPUStrategy()  # type: ignore[assignment]
+        self.RCNT_strategy = FakeRCNTStrategy()  # type: ignore[assignment]
 
 
 # Real time driver depends on real time passing by. Too slow for tests.
@@ -126,6 +145,7 @@ def simulator_controller(
         simEnv=env,
         frameEmitter=frame_emitter,
         inputParameters=input_params,
+        sim_behaviour=FakeSimBehaviour(),
         strict=False,
     )
 
@@ -171,6 +191,8 @@ def test_emit_initial_frame(
     assert "tasks" in frame.payload_dict
     assert "stations" in frame.payload_dict
     assert "resources" in frame.payload_dict
+    assert "new_tasks" in frame.payload_dict
+    assert frame.payload_dict["new_tasks"] == []
     assert "clock" in frame.payload_dict
 
     # Check that frame counter was incremented
@@ -191,6 +213,8 @@ def test_create_key_frame(simulator_controller: SimulatorController) -> None:
     assert "stations" in payload
     assert "resources" in payload
     assert "clock" in payload
+    assert "new_tasks" in payload
+    assert payload["new_tasks"] == []
 
     # Check that all entities are included in key frame
     assert len(payload["tasks"]) == 2
@@ -242,6 +266,8 @@ def test_create_diff_frame(simulator_controller: SimulatorController) -> None:
     assert len(payload["tasks"]) == 1
     assert len(payload["stations"]) == 1
     assert len(payload["resources"]) == 1
+    assert "new_tasks" in payload
+    assert payload["new_tasks"] == []
 
 
 def test_emit_frame_with_provided_frame(
@@ -283,6 +309,8 @@ def test_emit_frame_without_provided_frame_key_frame(
     assert len(frame.payload_dict["tasks"]) == 2
     assert len(frame.payload_dict["stations"]) == 2
     assert len(frame.payload_dict["resources"]) == 2
+    assert "new_tasks" in frame.payload_dict
+    assert frame.payload_dict["new_tasks"] == []
 
 
 def test_emit_frame_without_provided_frame_diff_frame(
@@ -310,6 +338,48 @@ def test_emit_frame_without_provided_frame_diff_frame(
     assert len(frame.payload_dict["stations"]) == 1
     assert len(frame.payload_dict["tasks"]) == 0  # No tasks marked as updated
     assert len(frame.payload_dict["resources"]) == 0  # No resources marked as updated
+    assert "new_tasks" in frame.payload_dict
+    assert frame.payload_dict["new_tasks"] == []
+
+
+def test_emit_frame_clears_update_flags(
+    simulator_controller: SimulatorController, frame_emitter: FrameEmitter
+) -> None:
+    subscriber = FakeSubscriber()
+    frame_emitter.attach(subscriber)
+
+    # Mark entities as updated
+    simulator_controller.station_entities[1].has_updated = True
+    simulator_controller.task_entities[1].has_updated = True
+    simulator_controller.resource_entities[1].has_updated = True
+
+    # Emit a provided frame to avoid depending on internal selection
+    custom_frame = Frame(seq_numb=0, payload={})
+    simulator_controller.emit_frame(custom_frame)
+
+    assert simulator_controller.station_entities[1].has_updated is False
+    assert simulator_controller.task_entities[1].has_updated is False
+    assert simulator_controller.resource_entities[1].has_updated is False
+
+
+def test_key_frame_includes_new_tasks_and_clears_popups(
+    env: simpy.Environment,
+    simulator_controller: SimulatorController,
+) -> None:
+    station1 = simulator_controller.get_station_by_id(1)
+    assert station1 is not None
+    # create a popup task and attach to station
+    new_task = BatterySwapTask(env=env, task_id=99, station=station1)
+    station1.pop_up_tasks.append(new_task)
+
+    frame = simulator_controller.create_key_frame()
+    payload = frame.payload_dict
+    assert "new_tasks" in payload
+    assert any(t["id"] == 99 for t in payload["new_tasks"])
+    # ensure task added to controller task_entities
+    assert simulator_controller.get_task_by_id(99) is not None
+    # ensure popups cleared after frame generation
+    assert station1.pop_up_tasks == []
 
 
 def test_pause_and_resume(simulator_controller: SimulatorController) -> None:
@@ -374,8 +444,13 @@ def test_add_task_fail(
     # Act and Assert
     with pytest.raises(Exception, match=f"Task with id {task_id} already exists"):
         simulator_controller.add_task(new_task)
-
-    assert new_task not in simulator_controller.task_entities.values()
+    # Verify controller state was not mutated: the existing task with id=2 remains,
+    # and the controller does not hold a reference to the new_task instance.
+    existing = simulator_controller.get_task_by_id(task_id)
+    assert existing is not None
+    assert existing is not new_task
+    # Optionally ensure the size did not grow
+    assert set(simulator_controller.task_entities.keys()) == {1, 2}
 
 
 def test_assign_task_to_resource_success(
@@ -577,7 +652,20 @@ def test_start_simulation(
         mock_thread = Mock()
         mock_thread_class.return_value = mock_thread
 
-        simulator_controller.start(3600)
+        # Patch heavy map building and routing
+        with (
+            patch.object(
+                simulator_controller.map_controller.osm,
+                "build_ch_network",
+                return_value=None,
+            ),
+            patch.object(
+                simulator_controller.map_controller,
+                "getRoute",
+                return_value=SimpleNamespace(roads=[1, 2]),
+            ),
+        ):
+            simulator_controller.start(3600)
 
         # Check that clock was started
         mock_clock_run.assert_called_once()
@@ -603,7 +691,11 @@ def test_custom_keyframe_frequency(
     params.set_key_frame_freq(30)  # Custom frequency
 
     controller = SimulatorController(
-        simEnv=env, frameEmitter=frame_emitter, inputParameters=params, strict=False
+        simEnv=env,
+        frameEmitter=frame_emitter,
+        inputParameters=params,
+        sim_behaviour=FakeSimBehaviour(),
+        strict=False,
     )
 
     assert controller.keyframeFreq == 30
@@ -620,6 +712,7 @@ def test_strict_mode_initialization(
         simEnv=env,
         frameEmitter=frame_emitter,
         inputParameters=input_params,
+        sim_behaviour=FakeSimBehaviour(),
         strict=True,
     )
 

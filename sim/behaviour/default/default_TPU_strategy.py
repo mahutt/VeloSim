@@ -22,21 +22,19 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 """
 
+from sim.behaviour.station_behaviour.strategies.task_popup_strategy import (
+    TaskPopupStrategy,
+)
+from typing import TYPE_CHECKING
+import random
 
-class Position:
-    def __init__(self, position: list[float]) -> None:  # [longitude, latitude]
-        self.position = position
+if TYPE_CHECKING:
+    from sim.entities.station import Station
 
-    def get_position(self) -> list[float]:
-        return self.position
 
-    def set_position(self, position: list[float]) -> None:
-        self.position = position
+class DefaultTPUStrategy(TaskPopupStrategy):
 
-    def __eq__(self, other: object) -> bool:
-        if not isinstance(other, Position):
-            return False
-        return (
-            other.position[0] == self.position[0]
-            and other.position[1] == self.position[1]
-        )
+    def check_for_new_task(self, station: "Station") -> bool:
+        # 0.001% chance of a new task popping up per station per second
+        hit = random.randrange(100000) == 0
+        return hit

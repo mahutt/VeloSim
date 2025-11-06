@@ -33,6 +33,8 @@ from sim.entities.resource import Resource
 from sim.entities.clock import Clock
 from sim.entities.task import Task
 from sim.entities.inputParameters import InputParameter
+from sim.behaviour.sim_behaviour import SimBehaviour
+from sim.controller.MapController import MapController
 
 
 class SimulatorController:
@@ -42,10 +44,11 @@ class SimulatorController:
         simEnv: simpy.Environment,
         frameEmitter: FrameEmitter,
         inputParameters: InputParameter,
+        sim_behaviour: SimBehaviour,
         strict: bool = False,
     ) -> None:
         self.simEnv = simEnv
-
+        self.map_controller = MapController()
         # Get parameters directly from InputParameter object
         real_time_factor = inputParameters.get_real_time_factor()
         keyframe_freq = inputParameters.get_key_frame_freq()
@@ -56,6 +59,8 @@ class SimulatorController:
         self.frameEmitter = frameEmitter
         self.keyframeFreq = keyframe_freq
         self.clock = Clock(simEnv)
+        self.sim_behaviour = sim_behaviour
+        self.frameCounter: int = 0
 
         # Unpack InputParameter object to populate entity lists
         self.station_entities: Dict[int, Station] = (
@@ -64,13 +69,37 @@ class SimulatorController:
         self.resource_entities: Dict[int, Resource] = (
             inputParameters.get_resource_entities()
         )
-        self.task_entities: Dict[int, Task] = inputParameters.get_task_entities()
+        self.task_entities = inputParameters.get_task_entities()
 
-        # Initialize frame counter
-        self.frameCounter: int = 0
+    def prep_entities(self) -> None:
+
+        for _, station in self.station_entities.items():
+            station.set_behaviour(self.sim_behaviour)
+            # Rebind to the actual simulation environment
+            station.env = self.simEnv
+            # station.action = self.simEnv.process(station.run())
+
+        for _, task in self.task_entities.items():
+            task.set_behaviour(self.sim_behaviour)
+            # Rebind to the actual simulation environment
+            task.env = self.simEnv
+
+        for _, resource in self.resource_entities.items():
+            resource.set_behaviour(self.sim_behaviour)
+            resource.set_map_controller(self.map_controller)
+            # Rebind to the actual simulation environment
+            resource.env = self.simEnv
+            # resource.action = self.simEnv.process(resource.run())
 
     def start(self, sim_time: int) -> None:
-        # TODO process initial entities into the sim env
+        # Build CH network for fast routing (with caching and progress bar)
+        print("\n" + "=" * 60)
+        print("Preparing Contraction Hierarchy network for fast routing...")
+        print("=" * 60)
+        self.map_controller.build_ch_netowrk()
+        print("=" * 60 + "\n")
+        # Load entities into sim event queue and pass behaviour and/or mapcontroller
+        self.prep_entities()
         # start sim clock
         self.clock.run()
         self.sim_time = sim_time
@@ -181,10 +210,25 @@ class SimulatorController:
                 self.create_key_frame()
                 if self.frameCounter % self.keyframeFreq == 0
                 or self.frameCounter == self.sim_time
+                or self.frameCounter == 0
                 else self.create_diff_frame()
             )
         self.frameEmitter.notify(frame=frame)
+        # After emitting the frame, clear update flags so only fresh
+        # changes appear next time
+        self.clear_entity_updates()
         self.frameCounter += 1
+
+    def clear_entity_updates(self) -> None:
+        # Tasks
+        for task in self.task_entities.values():
+            task.clear_update()
+        # Stations
+        for station in self.station_entities.values():
+            station.clear_update()
+        # Resources
+        for resource in self.resource_entities.values():
+            resource.clear_update()
 
     def create_diff_frame(self) -> Frame:
         tasks = []
@@ -219,6 +263,27 @@ class SimulatorController:
             if station.has_updated
         ]
 
+        # Aggregate newly created pop-up tasks from stations (if any)
+        new_task_objects = [
+            task
+            for station in self.station_entities.values()
+            for task in getattr(station, "pop_up_tasks", [])
+        ]
+
+        # Ensure pop-up tasks are added to global task_entities
+        for task in new_task_objects:
+            tid = task.get_task_id()
+            if tid not in self.task_entities:
+                self.task_entities[tid] = task
+
+        new_tasks = [t.to_dict() for t in new_task_objects]
+
+        # Clear pop-up tasks after including them in the frame to avoid duplicates
+        if new_task_objects:
+            for station in self.station_entities.values():
+                if getattr(station, "pop_up_tasks", None):
+                    station.pop_up_tasks.clear()
+
         resources = []
         for resource in self.resource_entities.values():
             if resource.has_updated:
@@ -244,6 +309,7 @@ class SimulatorController:
         payload = {
             "sim_id": self.frameEmitter.sim_id,
             "tasks": tasks,
+            "new_tasks": new_tasks,
             "stations": stations,
             "resources": resources,
             "clock": {
@@ -285,6 +351,27 @@ class SimulatorController:
             for station in self.station_entities.values()
         ]
 
+        # Aggregate newly created pop-up tasks from stations (if any)
+        new_task_objects = [
+            task
+            for station in self.station_entities.values()
+            for task in getattr(station, "pop_up_tasks", [])
+        ]
+
+        # Ensure pop-up tasks are added to global task_entities
+        for task in new_task_objects:
+            tid = task.get_task_id()
+            if tid not in self.task_entities:
+                self.task_entities[tid] = task
+
+        new_tasks = [t.to_dict() for t in new_task_objects]
+
+        # Clear pop-up tasks after including them in the frame to avoid duplicates
+        if new_task_objects:
+            for station in self.station_entities.values():
+                if getattr(station, "pop_up_tasks", None):
+                    station.pop_up_tasks.clear()
+
         resources = []
         for resource in self.resource_entities.values():
             in_progress_task = resource.get_in_progress_task()
@@ -309,6 +396,7 @@ class SimulatorController:
         payload = {
             "sim_id": self.frameEmitter.sim_id,
             "tasks": tasks,
+            "new_tasks": new_tasks,
             "stations": stations,
             "resources": resources,
             "clock": {

@@ -22,21 +22,19 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 """
 
+from sim.behaviour.resource_behaviour.resource_choose_next_task_strategy import (
+    ResourceChooseNextTaskStrategy,
+)
+from typing import TYPE_CHECKING
 
-class Position:
-    def __init__(self, position: list[float]) -> None:  # [longitude, latitude]
-        self.position = position
+if TYPE_CHECKING:
+    from sim.entities.task import Task
+    from sim.entities.resource import Resource
 
-    def get_position(self) -> list[float]:
-        return self.position
 
-    def set_position(self, position: list[float]) -> None:
-        self.position = position
+class DefaultRCNTStrategy(ResourceChooseNextTaskStrategy):
 
-    def __eq__(self, other: object) -> bool:
-        if not isinstance(other, Position):
-            return False
-        return (
-            other.position[0] == self.position[0]
-            and other.position[1] == self.position[1]
-        )
+    def select_next_task(self, resource: "Resource") -> "Task":
+
+        tasks = resource.get_task_list()
+        return tasks[0]

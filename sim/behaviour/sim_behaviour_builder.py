@@ -22,21 +22,35 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 """
 
+from sim.behaviour.sim_behaviour import SimBehaviour
+from sim.behaviour.resource_behaviour.resource_choose_next_task_strategy import (
+    ResourceChooseNextTaskStrategy,
+)
 
-class Position:
-    def __init__(self, position: list[float]) -> None:  # [longitude, latitude]
-        self.position = position
+from sim.behaviour.station_behaviour.strategies.task_popup_strategy import (
+    TaskPopupStrategy,
+)
+from typing import Self
 
-    def get_position(self) -> list[float]:
-        return self.position
 
-    def set_position(self, position: list[float]) -> None:
-        self.position = position
+class SimBehaviourBuilder:
+    sim_behaviour: SimBehaviour
 
-    def __eq__(self, other: object) -> bool:
-        if not isinstance(other, Position):
-            return False
-        return (
-            other.position[0] == self.position[0]
-            and other.position[1] == self.position[1]
-        )
+    def __init__(self) -> None:
+        self.reset()
+
+    def set_RCNT_strategy(self, strategy: ResourceChooseNextTaskStrategy) -> Self:
+        self.sim_behaviour.set_RCNT_strategy(strategy)
+        return self
+
+    def set_TPU_strategy(self, strategy: TaskPopupStrategy) -> Self:
+        self.sim_behaviour.set_TPU_strategy(strategy)
+        return self
+
+    def reset(self) -> None:
+        self.sim_behaviour = SimBehaviour()
+
+    def get_sim_behaviour(self) -> SimBehaviour:
+        ret_sim_behaviour = self.sim_behaviour
+        self.reset()
+        return ret_sim_behaviour

@@ -23,17 +23,26 @@ SOFTWARE.
 """
 
 import simpy
-from typing import Optional, TYPE_CHECKING, Generator
+
+from sim.controller.MapController import MapController
+from typing import Optional, TYPE_CHECKING
 from .task_state import State
+from sim.entities.route import Route
+from typing import Generator, Any
 
 # to avoid circular imports
 if TYPE_CHECKING:  # pragma: no cover
     from .position import Position
     from .task import Task
+    from sim.behaviour.sim_behaviour import SimBehaviour
 
 
 class Resource:
-    # @TODO: add attribute for route once Route entity is implemented
+
+    map_controller: MapController
+    sim_behaviour: "SimBehaviour"
+    current_route: Route
+
     def __init__(
         self,
         env: simpy.Environment,
@@ -58,14 +67,22 @@ class Resource:
     def get_resource_position(self) -> "Position":
         return self.position
 
+    def set_behaviour(self, sim_behaviour: "SimBehaviour") -> None:
+        self.sim_behaviour = sim_behaviour
+
     def set_resource_position(self, position: "Position") -> None:
         self.position = position
+        self.has_updated = True
+
+    def set_map_controller(self, map_controller: MapController) -> None:
+        self.map_controller = map_controller
 
     def assign_task(self, task: "Task", dispatch_delay: Optional[float] = None) -> None:
 
         if task.get_state() == State.OPEN:
             self.task_list.append(task)
             task.set_assigned_resource(self)
+            self.has_updated = True
             # Task state is now ASSIGNED (set by task.set_assigned_resource)
             # Handle dispatch scheduling
             if dispatch_delay is not None and dispatch_delay > 0:
@@ -87,6 +104,7 @@ class Resource:
         if task in self.task_list and task.is_assigned():
             self.task_list.remove(task)
             task.unassign_resource()
+            self.has_updated = True
 
     def get_in_progress_task(self) -> Optional["Task"]:
         for task in self.task_list:
@@ -104,6 +122,7 @@ class Resource:
                 or task.get_station() == task_in_progress.get_station()
             ):
                 task.set_state(State.IN_PROGRESS)
+                self.has_updated = True
             else:
                 raise Exception("Cannot dispatch task at this station")
 
@@ -113,6 +132,7 @@ class Resource:
         if task in self.task_list:
             self.task_list.remove(task)
             task.set_state(State.CLOSED)
+            self.has_updated = True
 
     def get_task_count(self) -> int:
         return len(self.task_list)
@@ -123,8 +143,65 @@ class Resource:
     def clear_update(self) -> None:
         self.has_updated = False
 
+    def travel_to(self, position: "Position") -> Generator[Any, None, None]:
+
+        if self.position == position:
+            return
+
+        route = self.map_controller.getRoute(self.position, position)
+        self.current_route = route
+        first_result = route.next()
+        if isinstance(first_result, tuple):
+            next_position, full_route = first_result
+            self.current_route = full_route  # type: ignore[assignment]
+        else:
+            next_position = first_result  # type: ignore[assignment]
+        try:
+            while self.position != position and next_position:
+
+                self.set_resource_position(next_position)
+                yield self.env.timeout(1)
+                next_position = route.next()  # type: ignore[assignment]
+        # Allows a traveling resource to be interrupted by other simpy entities
+        except simpy.Interrupt:
+            # TODO Implement interrupt logic
+            pass
+
     # continous process that runs throughout the simulation
     def run(self):  # type: ignore[no-untyped-def]
+        # Yield once at the start to ensure sim_behaviour and
+        # map_controller are set
+        yield self.env.timeout(1)
+
         while True:
             # @TODO: replace with actual periodic logic
+
+            # Select Next Task
+            if len(self.task_list) > 0:
+                in_progress = self.get_in_progress_task()
+                # shorter, equivalent print for the in-progress task
+                if in_progress:
+                    # We have a task in progress - check if we're at the station
+                    task_station = in_progress.get_station()
+                    if (
+                        task_station is not None
+                        and self.position == task_station.get_station_position()
+                    ):
+                        self.service_task(in_progress)
+                    # If not at station, travel_to is still in progress
+                else:
+                    # No task in progress, select and dispatch next task
+                    next_task = self.sim_behaviour.RCNT_strategy.select_next_task(self)
+                    if next_task:
+                        # Dispatch the task to mark it as in-progress
+                        self.dispatch_task(next_task)
+                        # Travel to the task's station
+                        task_station = next_task.get_station()
+                        if task_station is not None:
+                            task_position = task_station.get_station_position()
+                            yield self.env.process(self.travel_to(task_position))
+                            if self.position == task_position:
+                                self.service_task(next_task)
+
+            # Wait for next tick
             yield self.env.timeout(1)

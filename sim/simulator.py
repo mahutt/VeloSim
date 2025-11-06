@@ -33,6 +33,7 @@ from sim.frame_emitter import FrameEmitter
 from sim.utils.subscriber import Subscriber
 from sim.SimulatorController import SimulatorController
 from sim.entities.task import Task
+from sim.behaviour.sim_behaviour import SimBehaviour
 
 
 class RunInfo(TypedDict):
@@ -47,7 +48,11 @@ class Simulator:
         self.thread_pool_lock = threading.Lock()
 
     def initialize(
-        self, input_parameters: InputParameter, subscribers: List[Subscriber]
+        self,
+        input_parameters: InputParameter,
+        subscribers: List[Subscriber],
+        sim_env: simpy.Environment = simpy.Environment(),
+        sim_behaviour: SimBehaviour = SimBehaviour(),
     ) -> str:
         # Initialize a simulation and send the initial frame, but don't start
         # the simulation loop.
@@ -57,18 +62,15 @@ class Simulator:
         for sub in subscribers:
             emitter.attach(sub)
 
-        env = simpy.Environment()
+        env = sim_env
 
         simController = SimulatorController(
             simEnv=env,
             inputParameters=input_parameters,
             frameEmitter=emitter,
-            strict=False,
+            sim_behaviour=sim_behaviour,
+            strict=True,
         )
-
-        # Send the initial frame immediately
-        simController.emit_initial_frame()
-
         with self.thread_pool_lock:
             if run_id in self.thread_pool:
                 raise RuntimeError(f"Run id already present: {run_id}")

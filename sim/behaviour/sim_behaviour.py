@@ -22,21 +22,31 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 """
 
+from sim.behaviour.resource_behaviour.resource_choose_next_task_strategy import (
+    ResourceChooseNextTaskStrategy,
+)
 
-class Position:
-    def __init__(self, position: list[float]) -> None:  # [longitude, latitude]
-        self.position = position
+from sim.behaviour.station_behaviour.strategies.task_popup_strategy import (
+    TaskPopupStrategy,
+)
 
-    def get_position(self) -> list[float]:
-        return self.position
+from sim.behaviour.default.default_TPU_strategy import DefaultTPUStrategy
 
-    def set_position(self, position: list[float]) -> None:
-        self.position = position
+from sim.behaviour.default.default_RCNT_strategy import DefaultRCNTStrategy
 
-    def __eq__(self, other: object) -> bool:
-        if not isinstance(other, Position):
-            return False
-        return (
-            other.position[0] == self.position[0]
-            and other.position[1] == self.position[1]
-        )
+
+class SimBehaviour:
+
+    RCNT_strategy: ResourceChooseNextTaskStrategy
+
+    TPU_strategy: TaskPopupStrategy
+
+    def __init__(self) -> None:
+        self.RCNT_strategy = DefaultRCNTStrategy()
+        self.TPU_strategy = DefaultTPUStrategy()
+
+    def set_RCNT_strategy(self, strategy: ResourceChooseNextTaskStrategy) -> None:
+        self.RCNT_strategy = strategy
+
+    def set_TPU_strategy(self, strategy: TaskPopupStrategy) -> None:
+        self.TPU_strategy = strategy

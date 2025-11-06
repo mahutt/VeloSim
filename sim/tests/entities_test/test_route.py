@@ -86,6 +86,14 @@ def mock_osm_connection() -> Mock:
     mock_edges_df = DataFrame(edges_data)
     mock_osm.get_all_edges.return_value = mock_edges_df
 
+    # Provide edge index mapping (u, v) -> DataFrame index as expected
+    # by Route
+    edge_index = {
+        (int(row["u"]), int(row["v"])): int(idx)
+        for idx, row in mock_edges_df.iterrows()
+    }
+    mock_osm.get_edge_index.return_value = edge_index
+
     return mock_osm
 
 
@@ -355,6 +363,11 @@ class TestRouteRecalculation:
             ],
         }
         mock_osm.get_all_edges.return_value = DataFrame(initial_edges_data)
+        # Provide edge index mapping for (u, v) -> row index
+        _df = DataFrame(initial_edges_data)
+        mock_osm.get_edge_index.return_value = {
+            (int(row["u"]), int(row["v"])): int(idx) for idx, row in _df.iterrows()
+        }
 
         # Mock pathfinding to return alternative route
         mock_osm.coordinates_to_nearest_node.return_value = 1
@@ -397,6 +410,10 @@ class TestRouteRecalculation:
             ],
         }
         mock_osm.get_all_edges.return_value = DataFrame(initial_edges_data)
+        _df = DataFrame(initial_edges_data)
+        mock_osm.get_edge_index.return_value = {
+            (int(row["u"]), int(row["v"])): int(idx) for idx, row in _df.iterrows()
+        }
         mock_osm.coordinates_to_nearest_node.return_value = 1
         mock_osm.get_node_by_id.return_value = {"id": 4, "x": 1, "y": 2}
         mock_osm.shortest_path.return_value = [1, 4]  # Direct route
@@ -436,6 +453,10 @@ class TestRouteRecalculation:
             ],
         }
         mock_osm.get_all_edges.return_value = DataFrame(initial_edges_data)
+        _df = DataFrame(initial_edges_data)
+        mock_osm.get_edge_index.return_value = {
+            (int(row["u"]), int(row["v"])): int(idx) for idx, row in _df.iterrows()
+        }
         mock_osm.coordinates_to_nearest_node.return_value = 1
         mock_osm.get_node_by_id.return_value = {"id": 4, "x": 1, "y": 2}
         mock_osm.shortest_path.return_value = [1, 2, 4]
@@ -447,7 +468,6 @@ class TestRouteRecalculation:
         route.subscribe_to_map_controller(mock_map_controller)
 
         route.recalculate()
-
         assert route.id == original_id
 
     def test_recalculate_resets_traversal_state(
@@ -470,10 +490,13 @@ class TestRouteRecalculation:
             ],
         }
         mock_osm.get_all_edges.return_value = DataFrame(initial_edges_data)
+        _df = DataFrame(initial_edges_data)
+        mock_osm.get_edge_index.return_value = {
+            (int(row["u"]), int(row["v"])): int(idx) for idx, row in _df.iterrows()
+        }
         mock_osm.coordinates_to_nearest_node.return_value = 1
         mock_osm.get_node_by_id.return_value = {"id": 4, "x": 1, "y": 2}
         mock_osm.shortest_path.return_value = [1, 2, 4]
-
         route = Route(sample_route_node_ids, mock_osm)
 
         # Advance the route
@@ -544,6 +567,10 @@ class TestRouteEdgeCases:
             "geometry": [LineString([(0, 0), (0, 1)]), LineString([(0, 1), (1, 1)])],
         }
         mock_osm.get_all_edges.return_value = DataFrame(edges_data)
+        _df = DataFrame(edges_data)
+        mock_osm.get_edge_index.return_value = {
+            (int(row["u"]), int(row["v"])): int(idx) for idx, row in _df.iterrows()
+        }
 
         # This should print a warning but not crash
         route = Route(sample_route_node_ids, mock_osm)

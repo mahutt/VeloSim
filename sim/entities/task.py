@@ -27,12 +27,14 @@ from abc import ABC, abstractmethod
 from typing import Any, Generator, Optional, TYPE_CHECKING
 
 import simpy
+
 from .task_state import State
 
 # to avoid circular imports
 if TYPE_CHECKING:  # pragma: no cover
     from .station import Station
     from .resource import Resource
+    from sim.behaviour.sim_behaviour import SimBehaviour
 
 
 class Task(ABC):
@@ -102,6 +104,12 @@ class Task(ABC):
     def is_assigned(self) -> bool:
         pass
 
+    def set_behaviour(self, behaviour: "SimBehaviour") -> None:
+        self.behaviour = behaviour
+
+    def clear_update(self) -> None:
+        self.has_updated = False
+
     def to_dict(self) -> dict[str, Any]:
         return {
             "id": self.id,
@@ -113,3 +121,11 @@ class Task(ABC):
                 else None
             ),
         }
+
+    def __eq__(self, other: object) -> bool:
+        if not isinstance(other, Task):
+            return False
+        return self.id == other.id
+
+    def __hash__(self) -> int:
+        return hash(self.id)

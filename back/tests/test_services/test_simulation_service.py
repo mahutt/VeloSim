@@ -23,11 +23,36 @@ SOFTWARE.
 """
 
 import pytest
+from unittest.mock import patch
+from typing import Generator
 from sqlalchemy.orm import Session
 from back.exceptions import VelosimPermissionError, ItemNotFoundError
 from back.models.user import User
 from back.services.simulation_service import SimulationService
 from back.crud.sim_instance import sim_instance_crud
+
+# Apply patches before any simulator code is imported
+pytestmark = pytest.mark.usefixtures("mock_heavy_sim_operations")
+
+
+@pytest.fixture(scope="session", autouse=True)
+def mock_heavy_sim_operations() -> Generator[None, None, None]:
+    """
+    Mock heavy simulation operations at the session level to prevent
+    OSM data loading and CH network building during tests.
+    """
+    with (
+        patch("sim.DAO.OSMConnection.OSMConnection._initialize_osm_data_file"),
+        patch("sim.DAO.OSMConnection.OSMConnection._get_drivable_network"),
+        patch("sim.DAO.OSMConnection.OSMConnection._set_projected_nodes"),
+        patch("sim.DAO.OSMConnection.OSMConnection._build_edge_index"),
+        patch("sim.DAO.OSMConnection.OSMConnection.create_networkx_graph"),
+        patch("sim.DAO.OSMConnection.OSMConnection.build_ch_network"),
+        patch("sim.SimulatorController.SimulatorController.start") as mock_start,
+    ):
+        # Make start() a no-op that doesn't spawn threads or do heavy work
+        mock_start.return_value = None
+        yield
 
 
 @pytest.fixture

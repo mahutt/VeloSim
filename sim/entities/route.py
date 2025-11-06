@@ -23,8 +23,8 @@ SOFTWARE.
 """
 
 from typing import Optional, List, Tuple, Union, TYPE_CHECKING
-from sim.DAO.OSMConnection import OSMConnection
 from sim.entities.road import road
+from sim.DAO.OSMConnection import OSMConnection
 from sim.entities.position import Position
 
 if TYPE_CHECKING:
@@ -76,46 +76,31 @@ class Route:
     def _build_road_segments(
         self, route_node_ids: List[int], osm_connection: OSMConnection
     ) -> List[road]:
-        """
-        Takes a list of node IDs and finds the corresponding road edges to
-        create a complete list of Road objects for the route.
-        """
         road_segments = []
         all_edges = osm_connection.get_all_edges()
 
-        # Traverse over intersection nodes in pairs (i.e, [A, B, C] -> (A,B), (B,C))
+        # Retrieve cached edge index mapping
+        edge_index = osm_connection.get_edge_index()  # Get cached index
+
         for i in range(len(route_node_ids) - 1):
             start_node_id = route_node_ids[i]
             end_node_id = route_node_ids[i + 1]
 
-            try:
-                # Find the specific edge that connects these two nodes
-                edge = all_edges[
-                    (all_edges["u"] == start_node_id) & (all_edges["v"] == end_node_id)
-                ].iloc[0]
+            edge_idx = edge_index.get((start_node_id, end_node_id))
 
-                # Create a Road object and add it to our list of roads
-                road_segments.append(road(edge))
-            except IndexError:
-                # Try reverse direction
-                # (might be a bidirectional road stored in reverse)
-                try:
-                    edge = all_edges[
-                        (all_edges["u"] == end_node_id)
-                        & (all_edges["v"] == start_node_id)
-                    ].iloc[0]
-                    # Found in reverse
-                    # - we could reverse the geometry if needed
-                    road_segments.append(road(edge))
-                    # Note: This may cause issues if the road geometry
-                    # needs to be reversed
-                except IndexError:
-                    msg = (
-                        f"Warning: Could not find a direct edge from "
-                        f"{start_node_id} to {end_node_id} in either direction. "
-                        f"Skipping this segment."
+            if edge_idx is not None:
+                edge = all_edges.loc[edge_idx]
+                road_segments.append(road(edge))  # type: ignore[arg-type]
+            else:
+                edge_idx = edge_index.get((end_node_id, start_node_id))
+                if edge_idx is not None:
+                    edge = all_edges.loc[edge_idx]
+                    road_segments.append(road(edge))  # type: ignore[arg-type]
+                else:
+                    print(
+                        f"Warning: Could not find edge "
+                        f"{start_node_id} -> {end_node_id}"
                     )
-                    print(msg)
 
         return road_segments
 
@@ -177,9 +162,9 @@ class Route:
 
                 if end_node is not None:
                     try:
-                        # Calculate new route
+                        # Calculate new route using CH network
                         new_route_node_ids = self.osm_connection.shortest_path(
-                            current_node, end_node, self.osm_connection.get_graph()
+                            current_node, end_node, use_ch=True
                         )
 
                         # Build new road segments

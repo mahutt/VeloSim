@@ -89,6 +89,14 @@ def mock_osm_connection() -> Mock:
     mock_edges_df = DataFrame(edges_data)
     mock_osm.get_all_edges.return_value = mock_edges_df
 
+    # Provide edge index mapping (u, v) -> DataFrame index, as Route
+    # expects
+    edge_index = {
+        (int(row["u"]), int(row["v"])): int(idx)
+        for idx, row in mock_edges_df.iterrows()
+    }
+    mock_osm.get_edge_index.return_value = edge_index
+
     # Mock graph operations
     mock_graph: nx.MultiDiGraph = nx.MultiDiGraph()
     for idx, row in mock_edges_df.iterrows():
@@ -119,7 +127,12 @@ def mock_osm_connection() -> Mock:
     mock_osm.coordinates_to_nearest_node.side_effect = mock_coordinates_to_nearest_node
 
     # Mock shortest path
-    def mock_shortest_path(start: int, end: int, graph: nx.MultiDiGraph) -> list[int]:
+    def mock_shortest_path(
+        start: int,
+        end: int,
+        graph: nx.MultiDiGraph | None = None,
+        use_ch: bool = True,
+    ) -> list[int]:
         # Return predefined paths based on start/end
         paths: Dict[tuple[int, int], list[int]] = {
             (1, 4): [1, 2, 3, 4],  # Main path
@@ -522,10 +535,16 @@ class TestMapControllerIntegration:
         original_road_ids = [r.id for r in route.roads]
 
         # Mock alternative path when road is disabled
-        def alternative_path(start, end, graph):
-            # If road 102 is disabled, use alternative
-            if not any(d.get("id") == 102 for u, v, d in graph.edges(data=True)):
-                return [start, 4]  # Direct alternative
+        def alternative_path(start, end, graph=None, use_ch=True):
+            # If a graph is provided and road 102 is disabled, use alternative
+            try:
+                if graph is not None and not any(
+                    d.get("id") == 102 for u, v, d in graph.edges(data=True)
+                ):
+                    return [start, 4]  # Direct alternative
+            except Exception:
+                pass
+            # Default behavior
             return [1, 2, 3, 4]
 
         mock_osm_connection.shortest_path.side_effect = alternative_path

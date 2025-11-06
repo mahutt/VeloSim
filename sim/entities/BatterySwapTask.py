@@ -48,6 +48,7 @@ class BatterySwapTask(Task):
 
     def set_state(self, state: State) -> None:
         self.state = state
+        self.has_updated = True
 
     def get_task_id(self) -> int:
         return self.id
@@ -71,3 +72,6 @@ class BatterySwapTask(Task):
 
     def is_assigned(self) -> bool:
         return self.assigned_resource is not None and self.state == State.ASSIGNED
+
+    def clear_update(self) -> None:
+        self.has_updated = False

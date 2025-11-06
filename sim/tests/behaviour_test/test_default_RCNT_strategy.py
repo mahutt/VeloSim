@@ -22,21 +22,32 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 """
 
+import pytest
 
-class Position:
-    def __init__(self, position: list[float]) -> None:  # [longitude, latitude]
-        self.position = position
+from sim.behaviour.default.default_RCNT_strategy import DefaultRCNTStrategy
+from typing import Any
 
-    def get_position(self) -> list[float]:
-        return self.position
 
-    def set_position(self, position: list[float]) -> None:
-        self.position = position
+class _FakeResource:
+    def __init__(self, tasks: list[Any]) -> None:
+        self._tasks = tasks
 
-    def __eq__(self, other: object) -> bool:
-        if not isinstance(other, Position):
-            return False
-        return (
-            other.position[0] == self.position[0]
-            and other.position[1] == self.position[1]
-        )
+    def get_task_list(self) -> list[Any]:
+        return self._tasks
+
+
+def test_default_rcnt_strategy_picks_first_task() -> None:
+    t1, t2 = object(), object()
+    resource = _FakeResource([t1, t2])
+    strat = DefaultRCNTStrategy()
+
+    chosen = strat.select_next_task(resource)  # type: ignore[arg-type]
+    assert chosen is t1
+
+
+def test_default_rcnt_strategy_raises_on_empty_list() -> None:
+    resource = _FakeResource([])
+    strat = DefaultRCNTStrategy()
+
+    with pytest.raises(IndexError):
+        _ = strat.select_next_task(resource)  # type: ignore[arg-type]
