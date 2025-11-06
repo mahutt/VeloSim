@@ -27,11 +27,13 @@ export const FEATURE_FLAGS_KEY = 'velosim_feature_flags';
 export type FeatureFlags = {
   sidebar: boolean;
   taskDragAndDrop: boolean;
+  simulationsPage: boolean;
 };
 
 export const DEFAULT_FLAGS: FeatureFlags = {
   sidebar: true,
   taskDragAndDrop: false,
+  simulationsPage: false,
 };
 
 export function parseFlags(input: string | null): Partial<FeatureFlags> {

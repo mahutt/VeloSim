@@ -32,8 +32,24 @@ import { mockDisplayError } from 'tests/mocks';
 // Mock the API module
 vi.mock('~/api');
 
-beforeEach(() => {
+vi.mock('~/hooks/use-feature', () => ({
+  useFeature: vi.fn(),
+}));
+
+vi.mock('~/hooks/use-error', () => ({
+  default: vi.fn(),
+}));
+
+beforeEach(async () => {
   vi.resetAllMocks();
+
+  const { useFeature } = await import('~/hooks/use-feature');
+  const useError = await import('~/hooks/use-error');
+
+  vi.mocked(useFeature).mockReturnValue(true);
+  vi.mocked(useError.default).mockReturnValue({
+    displayError: mockDisplayError,
+  });
 });
 
 test('meta function sets all fields', () => {

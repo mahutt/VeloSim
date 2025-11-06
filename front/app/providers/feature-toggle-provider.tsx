@@ -52,26 +52,14 @@ interface FeatureToggleProviderProps {
 }
 
 async function fetchAndMergeFlags(): Promise<FeatureFlags> {
-  try {
-    const res = await fetch('/feature-flags.json', { cache: 'no-store' });
-    let remote: Partial<FeatureFlags> = {};
-    if (res.ok) {
-      remote = await res.json();
-    }
-    const override = parseFlags(sessionStorage.getItem(FEATURE_FLAGS_KEY));
-    return { ...DEFAULT_FLAGS, ...remote, ...override } as FeatureFlags;
-  } catch {
-    const override = parseFlags(sessionStorage.getItem(FEATURE_FLAGS_KEY));
-    return { ...DEFAULT_FLAGS, ...override } as FeatureFlags;
-  }
+  const override = parseFlags(sessionStorage.getItem(FEATURE_FLAGS_KEY));
+  return { ...DEFAULT_FLAGS, ...override } as FeatureFlags;
 }
 
 export const FeatureToggleProvider: React.FC<FeatureToggleProviderProps> = ({
   children,
 }) => {
-  const [flags, setFlags] = useState<FeatureFlags>(
-    () => ({ ...DEFAULT_FLAGS }) as FeatureFlags
-  );
+  const [flags, setFlags] = useState<FeatureFlags>({ ...DEFAULT_FLAGS });
 
   const refreshFromRemote = useCallback(async () => {
     const merged = await fetchAndMergeFlags();
