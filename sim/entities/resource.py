@@ -202,6 +202,8 @@ class Resource:
                         if task_station is not None:
                             task_position = task_station.get_station_position()
                             yield self.env.process(self.travel_to(task_position))
+                            if self.position == task_position:
+                                self.service_task(next_task)
 
             # Wait for next tick
             yield self.env.timeout(1)
