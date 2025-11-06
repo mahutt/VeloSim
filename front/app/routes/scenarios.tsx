@@ -23,6 +23,7 @@
  */
 
 import { useState, useEffect } from 'react';
+import useError from '~/hooks/use-error';
 import { useNavigate } from 'react-router';
 import type { Scenario, ScenarioListResponse } from '~/types';
 import api from '~/api';
@@ -36,7 +37,7 @@ import useError from '~/hooks/use-error';
 export default function ScenarioEditor() {
   const [scenarioContent, setScenarioContent] = useState('');
   const [scenarioName, setScenarioName] = useState('');
-  const [error, setError] = useState<string | null>(null);
+  const [scenarioDescription, setScenarioDescription] = useState('');
   const [savedScenarios, setSavedScenarios] = useState<Scenario[]>([]);
   const [selectedScenarioId, setSelectedScenarioId] = useState<number | null>(
     null
@@ -99,11 +100,9 @@ export default function ScenarioEditor() {
     navigate('/simulation');
   };
 
-  const handleSaveScenario = () => {
+  const handleSaveScenario = async () => {
     // Validate content first, then check for name
-    // This provides faster feedback if content is invalid
-    const parsedContent = validateContent(scenarioContent);
-
+    const parsedContent = await validateContent(scenarioContent);
     if (!parsedContent) {
       // Validation failed, error already displayed
       return;
@@ -114,14 +113,14 @@ export default function ScenarioEditor() {
       setPendingAction('save');
       setNameDialogOpen(true);
     } else {
-      saveScenario(scenarioContent, scenarioName);
+      saveScenario(scenarioContent, scenarioName, scenarioDescription);
     }
   };
 
-  const handleExportScenario = () => {
+  const handleExportScenario = async () => {
     // Validate content first, then check for name
     // This provides faster feedback if content is invalid
-    const parsedContent = validateContent(scenarioContent);
+    const parsedContent = await validateContent(scenarioContent);
 
     if (!parsedContent) {
       // Validation failed, error already displayed
@@ -145,7 +144,7 @@ export default function ScenarioEditor() {
     if (pendingAction === 'export') {
       exportScenario(scenarioContent, name);
     } else if (pendingAction === 'save') {
-      saveScenario(scenarioContent, name);
+      saveScenario(scenarioContent, name, scenarioDescription);
     }
 
     // Clear pending action
@@ -155,7 +154,7 @@ export default function ScenarioEditor() {
   const handleNewScenario = () => {
     setScenarioContent('');
     setScenarioName('');
-    setError(null);
+    setScenarioDescription('');
     setSelectedScenarioId(null);
   };
 
@@ -163,10 +162,13 @@ export default function ScenarioEditor() {
     try {
       setScenarioContent(JSON.stringify(scenario.content, null, 2));
       setScenarioName(scenario.name);
+      setScenarioDescription(scenario.description ?? '');
       setSelectedScenarioId(scenario.id);
-      setError(null);
     } catch {
-      setError('Unable to load scenario.');
+      displayError(
+        'Unable to load scenario',
+        'The scenario could not be parsed as JSON.'
+      );
     }
   };
 
@@ -184,7 +186,8 @@ export default function ScenarioEditor() {
       <div className="flex flex-col lg:flex-row gap-6">
         <ScenarioTextArea
           scenarioData={scenarioContent}
-          error={error}
+          scenarioDescription={scenarioDescription}
+          onDescriptionChange={setScenarioDescription}
           onChange={setScenarioContent}
           onSave={handleSaveScenario}
           onExport={handleExportScenario}

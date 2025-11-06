@@ -25,9 +25,16 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { renderHook } from '@testing-library/react';
 import { useScenarioOperations } from '../../app/hooks/use-scenario-operations';
-import * as scenarioValidation from '../../app/lib/scenario-validation';
 import { ErrorProvider } from '../../app/providers/error-provider';
 import type { ReactNode } from 'react';
+import api from '../../app/api';
+
+// Mock the api module
+vi.mock('../../app/api', () => ({
+  default: {
+    post: vi.fn(),
+  },
+}));
 
 // Wrapper component to provide ErrorProvider context
 const Wrapper = ({ children }: { children: ReactNode }) => (
@@ -35,24 +42,17 @@ const Wrapper = ({ children }: { children: ReactNode }) => (
 );
 
 describe('useScenarioOperations', () => {
-  let container: HTMLDivElement;
   let mockCreateObjectURL: ReturnType<typeof vi.fn>;
   let mockRevokeObjectURL: ReturnType<typeof vi.fn>;
-  let mockCreateElement: ReturnType<typeof vi.fn>;
-  let mockAppendChild: ReturnType<typeof vi.fn>;
-  let mockRemoveChild: ReturnType<typeof vi.fn>;
   let mockClick: ReturnType<typeof vi.fn>;
   let mockConsoleLog: ReturnType<typeof vi.spyOn>;
   let mockConsoleWarn: ReturnType<typeof vi.spyOn>;
   let mockConsoleError: ReturnType<typeof vi.spyOn>;
   let mockAlert: ReturnType<typeof vi.fn>;
+  let originalCreateElement: typeof document.createElement;
 
   beforeEach(() => {
     vi.clearAllMocks();
-
-    // Create a container for renderHook BEFORE mocking document.createElement
-    container = document.createElement('div');
-    document.body.appendChild(container);
 
     // Mock URL methods
     mockCreateObjectURL = vi.fn(() => 'blob:mock-url');
@@ -60,27 +60,32 @@ describe('useScenarioOperations', () => {
     global.URL.createObjectURL = mockCreateObjectURL;
     global.URL.revokeObjectURL = mockRevokeObjectURL;
 
-    // Mock document methods (AFTER creating container)
+    // Store original createElement
+    originalCreateElement = document.createElement.bind(document);
+
+    // Store created anchors for testing
+    let lastAnchor: HTMLAnchorElement | null = null;
+
+    // Mock document.createElement to intercept only 'a' element creation
     mockClick = vi.fn();
-    const originalCreateElement = document.createElement.bind(document);
-    mockCreateElement = vi.fn((tagName: string) => {
-      // For 'a' tags used in download, return mock
+    document.createElement = vi.fn((tagName: string) => {
       if (tagName === 'a') {
-        return {
-          href: '',
-          download: '',
-          click: mockClick,
-        };
+        // Create a real anchor element but spy on its click method
+        const realAnchor = originalCreateElement('a') as HTMLAnchorElement;
+        realAnchor.click = mockClick as unknown as () => void;
+        lastAnchor = realAnchor;
+        return realAnchor;
       }
-      // For other elements, use original createElement
+      // Use original for all other elements (important for React Testing Library)
       return originalCreateElement(tagName);
-    });
-    mockAppendChild = vi.fn();
-    mockRemoveChild = vi.fn();
-    document.createElement =
-      mockCreateElement as unknown as typeof document.createElement;
-    document.body.appendChild = mockAppendChild;
-    document.body.removeChild = mockRemoveChild;
+    }) as unknown as typeof document.createElement;
+
+    // Add helper to get last created anchor
+    (
+      document.createElement as typeof document.createElement & {
+        getLastAnchor: () => HTMLAnchorElement | null;
+      }
+    ).getLastAnchor = () => lastAnchor;
 
     // Mock console methods
     mockConsoleLog = vi.spyOn(console, 'log').mockImplementation(() => {});
@@ -93,108 +98,109 @@ describe('useScenarioOperations', () => {
   });
 
   afterEach(() => {
-    // Cleanup container
-    if (container) {
-      document.body.removeChild(container);
-    }
     vi.restoreAllMocks();
+    // Restore original createElement
+    document.createElement = originalCreateElement;
   });
 
   describe('validateContent', () => {
-    it('returns null and displays error for empty content', () => {
+    it('returns null and displays error for empty content', async () => {
       const { result } = renderHook(() => useScenarioOperations(), {
         wrapper: Wrapper,
-        container,
       });
 
-      const validatedContent = result.current.validateContent('');
+      const validatedContent = await result.current.validateContent('');
 
       expect(validatedContent).toBeNull();
     });
 
-    it('returns null and displays error for whitespace-only content', () => {
+    it('returns null and displays error for whitespace-only content', async () => {
       const { result } = renderHook(() => useScenarioOperations(), {
         wrapper: Wrapper,
-        container,
-      });
-
-      const validatedContent = result.current.validateContent('   \n  \t  ');
-
-      expect(validatedContent).toBeNull();
-    });
-
-    it('returns null and displays error for invalid JSON', () => {
-      const { result } = renderHook(() => useScenarioOperations(), {
-        wrapper: Wrapper,
-        container,
       });
 
       const validatedContent =
-        result.current.validateContent('{ invalid json }');
+        await result.current.validateContent('   \n  \t  ');
 
       expect(validatedContent).toBeNull();
     });
 
-    it('returns null and displays error for content that fails validation', () => {
+    it('returns null and displays error for invalid JSON', async () => {
       const { result } = renderHook(() => useScenarioOperations(), {
         wrapper: Wrapper,
-        container,
       });
 
-      vi.spyOn(scenarioValidation, 'validateScenario').mockReturnValue({
-        valid: false,
-        errors: ['Missing required field: stations'],
-        warnings: [],
+      const validatedContent =
+        await result.current.validateContent('{ invalid json }');
+
+      expect(validatedContent).toBeNull();
+    });
+
+    it('returns null and displays error for content that fails validation', async () => {
+      const { result } = renderHook(() => useScenarioOperations(), {
+        wrapper: Wrapper,
       });
 
-      const validatedContent = result.current.validateContent(
+      // Mock API to return validation failure
+      vi.mocked(api.post).mockResolvedValue({
+        data: {
+          valid: false,
+          errors: ['Missing required field: end_time'],
+          warnings: [],
+        },
+      });
+
+      const validatedContent = await result.current.validateContent(
         '{"scenario_title": "Test"}'
       );
-
       expect(validatedContent).toBeNull();
     });
 
-    it('returns parsed content and logs warnings for content with warnings', () => {
+    it('returns parsed content and logs warnings for content with warnings', async () => {
       const { result } = renderHook(() => useScenarioOperations(), {
         wrapper: Wrapper,
-        container,
       });
 
       const mockContent = { scenario_title: 'Test', stations: [] };
-      vi.spyOn(scenarioValidation, 'validateScenario').mockReturnValue({
-        valid: true,
-        errors: [],
-        warnings: ['No stations defined'],
+
+      // Mock API to return validation success with warnings
+      vi.mocked(api.post).mockResolvedValue({
+        data: {
+          valid: true,
+          errors: [],
+          warnings: ['No stations defined'],
+        },
       });
 
-      const validatedContent = result.current.validateContent(
+      const validatedContent = await result.current.validateContent(
         JSON.stringify(mockContent)
       );
-
       expect(validatedContent).toEqual(mockContent);
       expect(mockConsoleWarn).toHaveBeenCalledWith(
         'Scenario warnings:',
-        expect.stringContaining('No stations defined')
+        'No stations defined'
       );
     });
 
-    it('returns parsed content for valid content without warnings', () => {
+    it('returns parsed content for valid content without warnings', async () => {
       const { result } = renderHook(() => useScenarioOperations(), {
         wrapper: Wrapper,
-        container,
       });
 
       const mockContent = { scenario_title: 'Test', stations: [{ id: 1 }] };
-      vi.spyOn(scenarioValidation, 'validateScenario').mockReturnValue({
-        valid: true,
-        errors: [],
-        warnings: [],
+
+      // Mock API to return validation success
+      vi.mocked(api.post).mockResolvedValue({
+        data: {
+          valid: true,
+          errors: [],
+          warnings: [],
+        },
       });
 
-      const validatedContent = result.current.validateContent(
+      const validatedContent = await result.current.validateContent(
         JSON.stringify(mockContent)
       );
-
       expect(validatedContent).toEqual(mockContent);
       expect(mockConsoleWarn).not.toHaveBeenCalled();
     });
@@ -204,7 +210,6 @@ describe('useScenarioOperations', () => {
     it('creates blob and triggers download with correct filename', () => {
       const { result } = renderHook(() => useScenarioOperations(), {
         wrapper: Wrapper,
-        container,
       });
 
       const content = '{"scenario_title": "Test"}';
@@ -213,7 +218,7 @@ describe('useScenarioOperations', () => {
       result.current.downloadJSON(content, filename);
 
       expect(mockCreateObjectURL).toHaveBeenCalledWith(expect.any(Blob));
-      expect(mockCreateElement).toHaveBeenCalledWith('a');
+      expect(document.createElement).toHaveBeenCalledWith('a');
       expect(mockClick).toHaveBeenCalled();
       expect(mockRevokeObjectURL).toHaveBeenCalledWith('blob:mock-url');
     });
@@ -221,28 +226,24 @@ describe('useScenarioOperations', () => {
     it('sanitizes filename by replacing spaces with underscores', () => {
       const { result } = renderHook(() => useScenarioOperations(), {
         wrapper: Wrapper,
-        container,
       });
-
-      const mockElement = {
-        href: '',
-        download: '',
-        click: mockClick,
-      };
-      mockCreateElement.mockReturnValue(mockElement);
 
       const content = '{"scenario_title": "Test"}';
       const filename = 'my test scenario';
 
       result.current.downloadJSON(content, filename);
 
-      expect(mockElement.download).toBe('my_test_scenario.json');
+      const lastAnchor = (
+        document.createElement as typeof document.createElement & {
+          getLastAnchor: () => HTMLAnchorElement | null;
+        }
+      ).getLastAnchor();
+      expect(lastAnchor?.download).toBe('my_test_scenario.json');
     });
 
     it('handles download errors gracefully', () => {
       const { result } = renderHook(() => useScenarioOperations(), {
         wrapper: Wrapper,
-        container,
       });
 
       mockCreateObjectURL.mockImplementation(() => {
@@ -260,20 +261,22 @@ describe('useScenarioOperations', () => {
   });
 
   describe('exportScenario', () => {
-    it('exports valid scenario successfully', () => {
+    it('validates content and triggers download for valid scenario', async () => {
       const { result } = renderHook(() => useScenarioOperations(), {
         wrapper: Wrapper,
-        container,
       });
 
-      vi.spyOn(scenarioValidation, 'validateScenario').mockReturnValue({
-        valid: true,
-        errors: [],
-        warnings: [],
+      // Mock API to return validation success
+      vi.mocked(api.post).mockResolvedValue({
+        data: {
+          valid: true,
+          errors: [],
+          warnings: [],
+        },
       });
 
       const mockContent = { stations: [] };
-      const exported = result.current.exportScenario(
+      const exported = await result.current.exportScenario(
         JSON.stringify(mockContent),
         'Test Scenario'
       );
@@ -283,29 +286,30 @@ describe('useScenarioOperations', () => {
       expect(mockClick).toHaveBeenCalled();
     });
 
-    it('returns false and does not download for invalid content', () => {
+    it('returns false and does not download for invalid content', async () => {
       const { result } = renderHook(() => useScenarioOperations(), {
         wrapper: Wrapper,
-        container,
       });
 
-      const exported = result.current.exportScenario('', 'Test Scenario');
+      const exported = await result.current.exportScenario('', 'Test Scenario');
 
       expect(exported).toBe(false);
       expect(mockCreateObjectURL).not.toHaveBeenCalled();
       expect(mockClick).not.toHaveBeenCalled();
     });
 
-    it('includes scenario_title in exported content', () => {
+    it('includes scenario_title in exported content', async () => {
       const { result } = renderHook(() => useScenarioOperations(), {
         wrapper: Wrapper,
-        container,
       });
 
-      vi.spyOn(scenarioValidation, 'validateScenario').mockReturnValue({
-        valid: true,
-        errors: [],
-        warnings: [],
+      // Mock API to return validation success
+      vi.mocked(api.post).mockResolvedValue({
+        data: {
+          valid: true,
+          errors: [],
+          warnings: [],
+        },
       });
 
       let capturedBlob: Blob | undefined;
@@ -315,50 +319,53 @@ describe('useScenarioOperations', () => {
       });
 
       const mockContent = { stations: [] };
-      result.current.exportScenario(JSON.stringify(mockContent), 'My Scenario');
-
+      await result.current.exportScenario(
+        JSON.stringify(mockContent),
+        'My Scenario'
+      );
       expect(capturedBlob).toBeDefined();
       // Read blob content to verify it matches the original content
-      capturedBlob!.text().then((text) => {
-        const exported = JSON.parse(text);
-        expect(exported).toEqual(mockContent);
-      });
+      const text = await capturedBlob!.text();
+      const exported = JSON.parse(text);
+      expect(exported).toEqual(mockContent);
     });
   });
 
   describe('saveScenario', () => {
-    it('validates content and shows alert for valid scenario', () => {
+    it('validates content and shows alert for valid scenario', async () => {
       const { result } = renderHook(() => useScenarioOperations(), {
         wrapper: Wrapper,
-        container,
       });
 
-      vi.spyOn(scenarioValidation, 'validateScenario').mockReturnValue({
-        valid: true,
-        errors: [],
-        warnings: [],
+      // Mock API validation success
+      vi.mocked(api.post).mockResolvedValueOnce({
+        data: {
+          valid: true,
+          errors: [],
+          warnings: [],
+        },
+      });
+
+      // Mock API save success
+      vi.mocked(api.post).mockResolvedValueOnce({
+        data: { id: 1 },
       });
 
       const mockContent = { stations: [] };
-      const saved = result.current.saveScenario(
+      const saved = await result.current.saveScenario(
         JSON.stringify(mockContent),
         'Test Scenario'
       );
-
       expect(saved).toBe(true);
-      expect(mockAlert).toHaveBeenCalledWith(
-        'Save Scenario - TODO: Implement backend integration'
-      );
+      expect(mockAlert).toHaveBeenCalledWith('Scenario saved successfully!');
     });
 
-    it('returns false for invalid content', () => {
+    it('returns false for invalid content', async () => {
       const { result } = renderHook(() => useScenarioOperations(), {
         wrapper: Wrapper,
-        container,
       });
 
-      const saved = result.current.saveScenario('', 'Test Scenario');
-
+      const saved = await result.current.saveScenario('', 'Test Scenario');
       expect(saved).toBe(false);
       expect(mockAlert).not.toHaveBeenCalled();
     });
@@ -368,7 +375,6 @@ describe('useScenarioOperations', () => {
     it('logs scenario ID and shows alert', () => {
       const { result } = renderHook(() => useScenarioOperations(), {
         wrapper: Wrapper,
-        container,
       });
 
       result.current.loadScenario(123);
@@ -384,7 +390,6 @@ describe('useScenarioOperations', () => {
     it('logs import action and shows alert', () => {
       const { result } = renderHook(() => useScenarioOperations(), {
         wrapper: Wrapper,
-        container,
       });
 
       result.current.importScenario();

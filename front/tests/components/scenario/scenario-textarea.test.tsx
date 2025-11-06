@@ -30,8 +30,9 @@ describe('ScenarioTextArea', () => {
   const setup = (propsOverride = {}) => {
     const props = {
       scenarioData: '{"foo":"bar"}',
-      error: null,
+      scenarioDescription: '',
       onChange: vi.fn(),
+      onDescriptionChange: vi.fn(),
       onSave: vi.fn(),
       onExport: vi.fn(),
       onStart: vi.fn(),
@@ -57,10 +58,7 @@ describe('ScenarioTextArea', () => {
     expect(onChange).toHaveBeenCalledWith('{"baz":"qux"}');
   });
 
-  it('renders error message when error is provided', () => {
-    setup({ error: 'Invalid JSON' });
-    expect(screen.getByText('Invalid JSON')).toBeInTheDocument();
-  });
+  // Inline error rendering test removed: errors are now shown in a global dialog/modal.
 
   it('calls onSave when Save button is clicked', () => {
     const { onSave } = setup();

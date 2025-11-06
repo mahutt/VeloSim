@@ -26,7 +26,8 @@ import { Button } from '~/components/ui/button';
 
 interface ScenarioTextAreaProps {
   scenarioData: string;
-  error: string | null;
+  scenarioDescription: string;
+  onDescriptionChange: (desc: string) => void;
   onChange: (data: string) => void;
   onSave: () => void;
   onExport: () => void;
@@ -35,7 +36,8 @@ interface ScenarioTextAreaProps {
 
 export default function ScenarioTextArea({
   scenarioData,
-  error,
+  scenarioDescription,
+  onDescriptionChange,
   onChange,
   onSave,
   onExport,
@@ -63,21 +65,34 @@ export default function ScenarioTextArea({
   };
 
   return (
-    <div className="flex-1 flex flex-col">
+    <div className="flex-1 flex flex-col h-[40rem]">
+      <label
+        htmlFor="scenario-description"
+        className="block text-sm font-medium mb-1"
+      >
+        Description
+      </label>
       <textarea
-        className="w-full h-[32rem] p-3 border rounded-md font-mono text-sm mb-4 resize-none overflow-y-auto"
+        id="scenario-description"
+        value={scenarioDescription}
+        onChange={(e) => onDescriptionChange(e.target.value)}
+        placeholder="Enter scenario description"
+        className="w-full p-3 h-20 border rounded-md font-mono text-sm mb-4 resize-none"
+        aria-label="Scenario description"
+      />
+
+      <label htmlFor="scenario-json" className="block text-sm font-medium mb-1">
+        Scenario JSON
+      </label>
+      <textarea
+        id="scenario-json"
+        className="w-full h-[28rem] p-3 border rounded-md font-mono text-sm mb-4 resize-none"
         placeholder="Paste or type your JSON scenario here..."
         value={scenarioData}
         onChange={(e) => onChange(e.target.value)}
         onKeyDown={handleKeyDown}
         aria-label="Scenario JSON data"
       />
-
-      {error && (
-        <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-md text-red-600 text-sm">
-          {error}
-        </div>
-      )}
 
       <div className="flex flex-col gap-2 mt-4 sm:flex-row sm:justify-between sm:items-center">
         <div className="flex flex-col gap-2 w-full sm:flex-row sm:w-auto">

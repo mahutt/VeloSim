@@ -22,12 +22,9 @@
  * SOFTWARE.
  */
 
-import {
-  validateScenario,
-  formatValidationResults,
-} from '~/lib/scenario-validation';
 import useError from '~/hooks/use-error';
 import { log, LogLevel } from '~/lib/logger';
+import api from '~/api';
 
 /**
  * Custom hook for scenario operations (export, save, load, import)
@@ -39,8 +36,7 @@ export function useScenarioOperations() {
    * Validates scenario content and returns parsed JSON
    * @returns Parsed content if valid, null if invalid
    */
-  const validateContent = (content: string) => {
-    // Validate that there's content
+  const validateContent = async (content: string) => {
     if (!content.trim()) {
       displayError(
         'No content to process',
@@ -60,26 +56,38 @@ export function useScenarioOperations() {
       );
       return null;
     }
-
-    // Validate scenario structure
-    const validationResult = validateScenario(parsedContent);
-    if (!validationResult.valid) {
-      displayError(
-        'Scenario validation failed',
-        formatValidationResults(validationResult)
-      );
+    try {
+      const response = await api.post('/scenarios/validate', {
+        content: parsedContent,
+      });
+      const result = response.data;
+      if (!result.valid) {
+        const errors = Array.isArray(result.errors)
+          ? result.errors
+          : [result.errors].filter(Boolean);
+        displayError(
+          'Scenario validation failed',
+          errors.map((e: string) => `• ${e}`).join('\n')
+        );
+        return null;
+      }
+      if (result.warnings && result.warnings.length > 0) {
+        console.warn('Scenario warnings:', result.warnings.join('\n'));
+      }
+      return parsedContent;
+    } catch (error: unknown) {
+      let message = 'Unknown error';
+      if (error && typeof error === 'object') {
+        const errorObj = error as {
+          response?: { data?: { detail?: string } };
+          message?: string;
+        };
+        message =
+          errorObj.response?.data?.detail || errorObj.message || message;
+      }
+      displayError('Validation error', message);
       return null;
     }
-
-    // Show warnings if any (but continue)
-    if (validationResult.warnings.length > 0) {
-      console.warn(
-        'Scenario warnings:',
-        formatValidationResults(validationResult)
-      );
-    }
-
-    return parsedContent;
   };
 
   // Downloads JSON content as a file
@@ -116,8 +124,8 @@ export function useScenarioOperations() {
   };
 
   // Exports scenario content as a JSON file
-  const exportScenario = (content: string, scenarioName: string) => {
-    const parsedContent = validateContent(content);
+  const exportScenario = async (content: string, scenarioName: string) => {
+    const parsedContent = await validateContent(content);
     if (!parsedContent) return false;
 
     const contentToExport = JSON.stringify(parsedContent, null, 2);
@@ -130,13 +138,34 @@ export function useScenarioOperations() {
   };
 
   // Saves scenario to backend
-  const saveScenario = (content: string, scenarioName: string) => {
-    const parsedContent = validateContent(content);
+  const saveScenario = async (
+    content: string,
+    scenarioName: string,
+    description: string = ''
+  ) => {
+    const parsedContent = await validateContent(content);
     if (!parsedContent) return false;
 
-    // TODO: Add API call to backend
-    console.log('Save scenario:', scenarioName);
-    alert('Save Scenario - TODO: Implement backend integration');
+    try {
+      await api.post('/scenarios', {
+        name: scenarioName,
+        content: parsedContent,
+        description,
+        allow_duplicate_name: true,
+      });
+      alert('Scenario saved successfully!');
+    } catch (error: unknown) {
+      let message = 'Unknown error';
+      if (error && typeof error === 'object') {
+        const errorObj = error as {
+          response?: { data?: { detail?: string } };
+          message?: string;
+        };
+        message =
+          errorObj.response?.data?.detail || errorObj.message || message;
+      }
+      displayError('Failed to save scenario', message);
+    }
     return true;
   };
 

@@ -51,7 +51,7 @@ export default function ErrorDialog({
       <DialogContent data-testid="error-dialog">
         <DialogHeader>
           <DialogTitle data-testid="error-dialog-title">{title}</DialogTitle>
-          <DialogDescription>
+          <DialogDescription className="whitespace-pre-line">
             {message}
             <br />
           </DialogDescription>
