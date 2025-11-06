@@ -25,7 +25,7 @@ SOFTWARE.
 import simpy
 
 from sim.controller.MapController import MapController
-from typing import Optional, TYPE_CHECKING, Generator
+from typing import Optional, TYPE_CHECKING
 from .task_state import State
 from sim.entities.route import Route
 from typing import Generator, Any
@@ -146,7 +146,6 @@ class Resource:
     def travel_to(self, position: "Position") -> Generator[Any, None, None]:
 
         if self.position == position:
-            print("*************** Already here **************")
             return
 
         route = self.map_controller.getRoute(self.position, position)
@@ -166,7 +165,7 @@ class Resource:
         # Allows a traveling resource to be interrupted by other simpy entities
         except simpy.Interrupt:
             # TODO Implement interrupt logic
-            print(f"Resource: {self.id} travel interrupted")
+            pass
 
     # continous process that runs throughout the simulation
     def run(self):  # type: ignore[no-untyped-def]
@@ -193,7 +192,6 @@ class Resource:
                 else:
                     # No task in progress, select and dispatch next task
                     next_task = self.sim_behaviour.RCNT_strategy.select_next_task(self)
-                    print(f"next task: {next_task}")
                     if next_task:
                         # Dispatch the task to mark it as in-progress
                         self.dispatch_task(next_task)

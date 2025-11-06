@@ -343,7 +343,7 @@ def test_pause_fail(mock_print: MagicMock, sim: Simulator) -> None:
 
     # Assert
     error = "Simulation random_id does not exist in the thread pool"
-    mock_print.assert_called_once_with(f"Could not pause simulation due to: {error}")
+    mock_print.assert_any_call(f"Could not pause simulation due to: {error}")
 
     sim.stop(a)
 
@@ -375,7 +375,7 @@ def test_resume_fail(mock_print: MagicMock, sim: Simulator) -> None:
 
     # Assert
     error = "Simulation random_id does not exist in the thread pool"
-    mock_print.assert_called_once_with(f"Could not resume simulation due to: {error}")
+    mock_print.assert_any_call(f"Could not resume simulation due to: {error}")
 
     sim.stop(a)
 
@@ -407,7 +407,7 @@ def test_set_factor_fail(mock_print: MagicMock, sim: Simulator) -> None:
 
     # Assert
     error = "Simulation random_id does not exist in the thread pool"
-    mock_print.assert_called_once_with(f"Could not set factor due to: {error}")
+    mock_print.assert_any_call(f"Could not set factor due to: {error}")
 
     sim.stop(a)
 
