@@ -26,6 +26,11 @@ from typing import Dict, List
 from sqlalchemy.orm import Session
 from back.models import User
 from back.models.sim_instance import SimInstance
+from back.schemas import (
+    PlaybackSpeedBase,
+    PlaybackSpeedResponse,
+    SimulationPlaybackStatus,
+)
 from sim.simulator import Simulator
 from sim.entities.inputParameters import InputParameter
 from back.crud import sim_instance_crud, user_crud
@@ -291,6 +296,95 @@ class SimulationService:
     def get_simulator(self) -> Simulator:
         """Get the underlying simulator instance for advanced operations"""
         return self.simulator
+
+    def set_playback_speed(
+        self,
+        db: Session,
+        sim_id: str,
+        playback_speed: PlaybackSpeedBase,
+        requesting_user: int,
+    ) -> PlaybackSpeedResponse:
+        user = self._get_requesting_user(db, requesting_user)
+
+        if sim_id not in self.active_simulations:
+            raise ItemNotFoundError(sim_id, "Simulation not found")
+
+        sim_data = self.active_simulations[sim_id]
+        db_id: int = sim_data["db_id"]  # type: ignore
+        db_sim_instance = sim_instance_crud.get(db, db_id)
+        if db_sim_instance is None:
+            raise ItemNotFoundError(db_id, "Simulation instance record not found")
+
+        if db_sim_instance.user_id != user.id and not user.is_admin:
+            raise VelosimPermissionError("Unauthorized to modify this simulation.")
+
+        sim_info = self.simulator.get_sim_by_id(sim_id)
+        if sim_info is None:
+            raise RuntimeError(f"Simulation {sim_id} not found in simulator")
+        driver = sim_info["simController"].realTimeDriver
+
+        # Adjust playback based on requested speed
+        speed_value = playback_speed.playback_speed
+
+        if speed_value == 0:  # the requested value is equivalent to pausing
+            driver.pause()
+        else:  # handle any other valid playback speed properly
+            driver.resume()
+            driver.set_real_time_factor(speed_value)
+
+        status = (
+            SimulationPlaybackStatus.RUNNING
+            if driver.running
+            else SimulationPlaybackStatus.PAUSED
+        )
+
+        return PlaybackSpeedResponse(
+            simulation_id=sim_id, playback_speed=speed_value, status=status
+        )
+
+    def get_playback_speed(
+        self,
+        db: Session,
+        sim_id: str,
+        requesting_user: int,
+    ) -> PlaybackSpeedResponse:
+        """
+        Return the current playback speed and runtime status for a simulation.
+        """
+        user = self._get_requesting_user(db, requesting_user)
+
+        if sim_id not in self.active_simulations:
+            raise ItemNotFoundError(sim_id, "Simulation not found")
+
+        sim_data = self.active_simulations[sim_id]
+        db_id: int = sim_data["db_id"]  # type: ignore
+        db_sim_instance = sim_instance_crud.get(db, db_id)
+        if db_sim_instance is None:
+            raise ItemNotFoundError(db_id, "Simulation instance record not found")
+
+        if db_sim_instance.user_id != user.id and not user.is_admin:
+            raise VelosimPermissionError("Unauthorized to access this simulation.")
+
+        # Get simulator runtime information from the sim package
+        sim_info = self.simulator.get_sim_by_id(sim_id)
+        if sim_info is None:
+            raise RuntimeError(f"Simulation {sim_id} not found in simulator")
+        # Retrieve the corresponding realTimeDriver
+        driver = sim_info["simController"].realTimeDriver
+
+        # Determine status based on the boolean value of 'running' attribute
+        # from realTimeDriver
+        status = (
+            SimulationPlaybackStatus.RUNNING
+            if driver.running
+            else SimulationPlaybackStatus.PAUSED
+        )
+
+        return PlaybackSpeedResponse(
+            simulation_id=sim_id,
+            playback_speed=float(driver.real_time_factor),
+            status=status,
+        )
 
 
 # Global simulation service instance

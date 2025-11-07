@@ -38,6 +38,7 @@ from sqlalchemy.orm import Session
 
 from back.auth.dependency import get_user_id
 from back.exceptions import VelosimPermissionError, ItemNotFoundError
+from back.schemas import PlaybackSpeedBase, PlaybackSpeedResponse
 from back.schemas.sim_instance import SimInstanceResponse
 from sim.entities.frame import Frame
 from sim.utils.subscriber import Subscriber
@@ -210,7 +211,7 @@ async def get_simulation_status(
         raise HTTPException(status_code=500, detail=str(err))
 
 
-@router.post("/stop-all")
+@router.post("/stopAll")
 async def stop_all_simulations(
     db: Session = Depends(get_db),
     requesting_user: int = Depends(get_user_id),
@@ -230,6 +231,50 @@ async def stop_all_simulations(
         raise HTTPException(
             status_code=500, detail=f"Failed to stop all simulations: {str(err)}"
         )
+
+
+@router.get("/{sim_id}/playbackSpeed", response_model=PlaybackSpeedResponse)
+async def get_playback_speed(
+    sim_id: str,
+    db: Session = Depends(get_db),
+    requesting_user: int = Depends(get_user_id),
+) -> PlaybackSpeedResponse:
+    """Get the playback status and playback speed of an in-memory simulation."""
+    try:
+        result = simulation_service.get_playback_speed(
+            db=db, sim_id=sim_id, requesting_user=requesting_user
+        )
+        return result
+    except ItemNotFoundError as err:
+        raise HTTPException(status_code=404, detail=str(err))
+    except VelosimPermissionError as err:
+        raise HTTPException(status_code=403, detail=str(err))
+    except Exception as err:
+        raise HTTPException(status_code=500, detail=str(err))
+
+
+@router.post("/{sim_id}/playbackSpeed", response_model=PlaybackSpeedResponse)
+async def set_playback_speed(
+    sim_id: str,
+    playback_speed: PlaybackSpeedBase,
+    db: Session = Depends(get_db),
+    requesting_user: int = Depends(get_user_id),
+) -> PlaybackSpeedResponse:
+    """Set the playback speed for a specified in-memory simulation."""
+    try:
+        result = simulation_service.set_playback_speed(
+            db=db,
+            sim_id=sim_id,
+            playback_speed=playback_speed,
+            requesting_user=requesting_user,
+        )
+        return result
+    except ItemNotFoundError as err:
+        raise HTTPException(status_code=404, detail=str(err))
+    except VelosimPermissionError as err:
+        raise HTTPException(status_code=403, detail=str(err))
+    except Exception as err:
+        raise HTTPException(status_code=500, detail=str(err))
 
 
 @router.websocket("/stream/{sim_id}")

@@ -61,6 +61,11 @@ from .user import (
     UserResponse,
     UsersResponse,
 )
+from .playback_speed import (
+    PlaybackSpeedBase,
+    SimulationPlaybackStatus,
+    PlaybackSpeedResponse,
+)
 from .frontend_log import (
     LogLevel,
     FrontendLogEntry,
@@ -104,6 +109,9 @@ __all__ = [
     "UserRoleUpdate",
     "UserResponse",
     "UsersResponse",
+    "PlaybackSpeedBase",
+    "SimulationPlaybackStatus",
+    "PlaybackSpeedResponse",
     "LogLevel",
     "FrontendLogEntry",
     "FrontendLogResponse",
