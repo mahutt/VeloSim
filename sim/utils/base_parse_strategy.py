@@ -23,6 +23,7 @@ SOFTWARE.
 """
 
 from abc import ABC, abstractmethod
+from typing import Dict
 
 import simpy
 from sim.entities.inputParameters import InputParameter
@@ -32,5 +33,5 @@ class BaseParseStrategy(ABC):
     """Abstract base class for all scenario parsing strategies."""
 
     @abstractmethod
-    def parse(self, env: simpy.Environment, source: str) -> InputParameter:
+    def parse(self, env: simpy.Environment, source: str) -> Dict[int, InputParameter]:
         pass

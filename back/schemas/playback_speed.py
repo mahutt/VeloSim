@@ -22,21 +22,30 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 """
 
-from pydantic import BaseModel, Field
+from enum import Enum
+from pydantic import BaseModel, Field, field_validator
+
+ALLOWED_SPEEDS = {0.0, 0.5, 1.0, 2.0, 4.0, 8.0}
 
 
 class PlaybackSpeedBase(BaseModel):
     """Base schema for playback speed."""
 
-    simulation_id: int = Field(
-        ..., description="The Simulation id that was undergo the playback speed change"
-    )
-    playback_speed: float = Field(
-        ..., description="The new playback speed that will be set"
-    )
+    playback_speed: float = Field(...)
+
+    @field_validator("playback_speed")
+    def validate_speed(cls, v: float) -> float:
+        if v not in ALLOWED_SPEEDS:
+            raise ValueError(f"Playback speed must be one of {sorted(ALLOWED_SPEEDS)}")
+        return v
+
+
+class SimulationPlaybackStatus(str, Enum):
+    INITIALIZED = "initialized"
+    RUNNING = "running"
+    PAUSED = "paused"
 
 
 class PlaybackSpeedResponse(PlaybackSpeedBase):
-    """Schema for the response after updating playback speed."""
-
-    message: str = Field(..., description="Confirmation message returned by the API")
+    simulation_id: str
+    status: SimulationPlaybackStatus

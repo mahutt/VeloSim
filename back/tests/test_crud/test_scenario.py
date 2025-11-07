@@ -124,6 +124,28 @@ class TestScenarioCRUD:
         with pytest.raises(ItemNotFoundError):
             scenario_crud.get(db, 99999, user_id=another_user.id)
 
+    def test_get_by_name_and_user(
+        self, db: Session, scenario: Scenario, test_user: User, another_user: User
+    ) -> None:
+        """Test getting scenario by name and user."""
+        # Should find the existing scenario
+        found = scenario_crud.get_by_name_and_user(db, scenario.name, test_user.id)
+        assert found is not None
+        assert found.id == scenario.id
+        assert found.name == scenario.name
+
+        # Should not find scenario for different user
+        not_found = scenario_crud.get_by_name_and_user(
+            db, scenario.name, another_user.id
+        )
+        assert not_found is None
+
+        # Should not find non-existent scenario name
+        not_found2 = scenario_crud.get_by_name_and_user(
+            db, "Non-existent Scenario", test_user.id
+        )
+        assert not_found2 is None
+
     # ------------------ UPDATE ------------------ #
     def test_update_valid(
         self, db: Session, scenario: Scenario, test_user: User

@@ -32,7 +32,8 @@ import asyncio
 from back.main import app
 from back.auth.dependency import get_user_id
 from back.exceptions import VelosimPermissionError, ItemNotFoundError
-from back.services.simulation_service import simulation_service
+from back.schemas import PlaybackSpeedResponse, SimulationPlaybackStatus
+from back.services import simulation_service
 from back.api.v1.simulation import WebSocketSubscriber
 from fastapi import WebSocket
 
@@ -360,7 +361,7 @@ class TestSimulationAPI:
     def test_stop_all_simulations_success(
         self, mock_stop_all: MagicMock, authenticated_client: TestClient, db: Session
     ) -> None:
-        response = authenticated_client.post("/api/v1/simulation/stop-all")
+        response = authenticated_client.post("/api/v1/simulation/stopAll")
         assert response.status_code == 200
         assert "stopped" in response.json()["message"].lower()
         mock_stop_all.assert_called_once_with(ANY, 1)
@@ -370,7 +371,7 @@ class TestSimulationAPI:
         self, mock_stop_all: MagicMock, non_admin_client: TestClient, db: Session
     ) -> None:
         mock_stop_all.side_effect = VelosimPermissionError("No permission")
-        response = non_admin_client.post("/api/v1/simulation/stop-all")
+        response = non_admin_client.post("/api/v1/simulation/stopAll")
         assert response.status_code == 403
         assert "No permission" in response.json()["detail"]
 
@@ -379,8 +380,129 @@ class TestSimulationAPI:
         self, mock_stop_all: MagicMock, authenticated_client: TestClient, db: Session
     ) -> None:
         mock_stop_all.side_effect = Exception("Unexpected")
-        response = authenticated_client.post("/api/v1/simulation/stop-all")
+        response = authenticated_client.post("/api/v1/simulation/stopAll")
         assert response.status_code == 500
+
+    @patch("back.services.simulation_service.simulation_service.get_playback_speed")
+    def test_get_playback_speed_success(
+        self, mock_get_speed: MagicMock, authenticated_client: TestClient, db: Session
+    ) -> None:
+        """Successfully get playback speed and status."""
+
+        mock_get_speed.return_value = PlaybackSpeedResponse(
+            simulation_id="sim123",
+            playback_speed=2.0,
+            status=SimulationPlaybackStatus.RUNNING,
+        )
+
+        response = authenticated_client.get("/api/v1/simulation/sim123/playbackSpeed")
+        assert response.status_code == 200
+        data = response.json()
+        assert data["simulation_id"] == "sim123"
+        assert data["playback_speed"] == 2.0
+        assert data["status"] == "running"
+
+        mock_get_speed.assert_called()
+
+    @patch("back.services.simulation_service.simulation_service.get_playback_speed")
+    def test_get_playback_speed_not_found(
+        self, mock_get_speed: MagicMock, authenticated_client: TestClient, db: Session
+    ) -> None:
+        mock_get_speed.side_effect = ItemNotFoundError("Simulation not found")
+
+        response = authenticated_client.get("/api/v1/simulation/unknown/playbackSpeed")
+        assert response.status_code == 404
+        assert "Simulation not found" in response.json()["detail"]
+
+    @patch("back.services.simulation_service.simulation_service.get_playback_speed")
+    def test_get_playback_speed_permission_error(
+        self, mock_get_speed: MagicMock, non_admin_client: TestClient, db: Session
+    ) -> None:
+        mock_get_speed.side_effect = VelosimPermissionError("Forbidden")
+
+        response = non_admin_client.get("/api/v1/simulation/sim123/playbackSpeed")
+        assert response.status_code == 403
+        assert "Forbidden" in response.json()["detail"]
+
+    @patch("back.services.simulation_service.simulation_service.get_playback_speed")
+    def test_get_playback_speed_generic_error(
+        self, mock_get_speed: MagicMock, authenticated_client: TestClient, db: Session
+    ) -> None:
+        mock_get_speed.side_effect = Exception("Unexpected")
+
+        response = authenticated_client.get("/api/v1/simulation/sim123/playbackSpeed")
+        assert response.status_code == 500
+
+    @patch("back.services.simulation_service.simulation_service.set_playback_speed")
+    def test_set_playback_speed_success(
+        self, mock_set_speed: MagicMock, authenticated_client: TestClient, db: Session
+    ) -> None:
+        """Successfully set playback speed."""
+        mock_set_speed.return_value = PlaybackSpeedResponse(
+            simulation_id="sim123",
+            playback_speed=4.0,
+            status=SimulationPlaybackStatus.RUNNING,
+        )
+
+        payload = {"playback_speed": 4.0}
+        response = authenticated_client.post(
+            "/api/v1/simulation/sim123/playbackSpeed", json=payload
+        )
+        assert response.status_code == 200
+        data = response.json()
+        assert data["simulation_id"] == "sim123"
+        assert data["playback_speed"] == 4.0
+        assert data["status"] == "running"
+
+        mock_set_speed.assert_called()
+
+    @patch("back.services.simulation_service.simulation_service.set_playback_speed")
+    def test_set_playback_speed_not_found(
+        self, mock_set_speed: MagicMock, authenticated_client: TestClient, db: Session
+    ) -> None:
+        mock_set_speed.side_effect = ItemNotFoundError("Simulation not found")
+
+        response = authenticated_client.post(
+            "/api/v1/simulation/unknown/playbackSpeed",
+            json={"playback_speed": 2.0},
+        )
+        assert response.status_code == 404
+        assert "Simulation not found" in response.json()["detail"]
+
+    @patch("back.services.simulation_service.simulation_service.set_playback_speed")
+    def test_set_playback_speed_permission_error(
+        self, mock_set_speed: MagicMock, non_admin_client: TestClient, db: Session
+    ) -> None:
+        mock_set_speed.side_effect = VelosimPermissionError("Forbidden")
+
+        response = non_admin_client.post(
+            "/api/v1/simulation/sim123/playbackSpeed",
+            json={"playback_speed": 1.0},
+        )
+        assert response.status_code == 403
+        assert "Forbidden" in response.json()["detail"]
+
+    @patch("back.services.simulation_service.simulation_service.set_playback_speed")
+    def test_set_playback_speed_generic_error(
+        self, mock_set_speed: MagicMock, authenticated_client: TestClient, db: Session
+    ) -> None:
+        mock_set_speed.side_effect = Exception("Unexpected")
+
+        response = authenticated_client.post(
+            "/api/v1/simulation/sim123/playbackSpeed",
+            json={"playback_speed": 1.0},
+        )
+        assert response.status_code == 500
+
+    def test_set_playback_speed_invalid_payload(
+        self, authenticated_client: TestClient
+    ) -> None:
+        """Invalid payload should raise validation error (422)."""
+        response = authenticated_client.post(
+            "/api/v1/simulation/sim123/playbackSpeed",
+            json={"playback_speed": 3.14159},  # invalid speed not in ALLOWED_SPEEDS
+        )
+        assert response.status_code == 422
 
     def test_websocket_subscriber_on_frame(self) -> None:
         """Test that WebSocketSubscriber schedules frames correctly."""

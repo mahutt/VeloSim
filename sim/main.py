@@ -210,6 +210,32 @@ params2 = InputParameter(
     key_frame_freq=3000,  # Key frame every 3000 frames
 )
 
+# Create InputParameter for second simulation
+params2 = InputParameter(
+    station_entities={
+        7: station7,
+        8: station8,
+        9: station9,
+        10: station10,
+        11: station11,
+        12: station12,
+    },
+    resource_entities={
+        201: resource5,
+        202: resource6,
+        203: resource7,
+        204: resource8,
+    },
+    task_entities={
+        5: task5,
+        6: task6,
+        7: task7,
+        8: task8,
+    },
+    real_time_factor=1,  # Real-time simulation
+    key_frame_freq=3000,  # Key frame every 3000 frames
+)
+
 
 sim1_sub = WebSocketSubscriber("SIM-1 WebSock")
 sim_1_db_logger = LoggerSubscriber("Database-1_Logger")
