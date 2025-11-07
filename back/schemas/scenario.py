@@ -86,7 +86,7 @@ class ScenarioContent(BaseModel):
         description=(
             "Simulation end time (RFC 3339 format like "
             "'2025-11-06T17:00:00Z' or simple 'HH:MM'). "
-            "Can span multiple days."
+            "Cannot exceed 24 hours from start_time."
         ),
     )
     stations: List[Station] = Field(
@@ -323,3 +323,21 @@ class ScenarioListResponse(BaseModel):
     page: int = Field(..., description="Current page number")
     per_page: int = Field(..., description="Items per page")
     total_pages: int = Field(..., description="Total number of pages")
+
+
+class ScenarioValidationRequest(BaseModel):
+    """Schema for scenario validation requests."""
+
+    content: Dict[str, Any] = Field(..., description="Scenario content to validate")
+
+
+class ScenarioValidationResponse(BaseModel):
+    """Schema for scenario validation responses."""
+
+    valid: bool = Field(..., description="Whether the scenario is valid")
+    errors: List[str] = Field(
+        default_factory=list, description="List of validation errors"
+    )
+    warnings: List[str] = Field(
+        default_factory=list, description="List of validation warnings"
+    )

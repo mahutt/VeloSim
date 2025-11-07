@@ -160,11 +160,20 @@ def test_rfc3339_datetime_format(validator: ScenarioValidator) -> None:
 
 
 def test_multi_day_scenario(validator: ScenarioValidator) -> None:
-    """Test that scenarios spanning multiple days are supported."""
+    """Test that scenarios exceeding 24 hours are rejected."""
     scenario: Dict[str, Any] = VALID_SCENARIO.copy()
-    # Start on one day, end on the next
+    # Start on one day, end on the next (more than 24 hours)
     scenario["content"]["start_time"] = "2025-11-06T08:00:00Z"
-    scenario["content"]["end_time"] = "2025-11-07T08:00:00Z"  # 24 hours later
+    scenario["content"]["end_time"] = "2025-11-07T08:00:01Z"  # 24 hours and 1 second
+    errors: List[Dict[str, str]] = validator.validate_all(scenario)
+    assert any("cannot exceed 24 hours" in e["message"] for e in errors)
+
+
+def test_exactly_24_hours_allowed(validator: ScenarioValidator) -> None:
+    """Test that scenarios of exactly 24 hours are allowed."""
+    scenario: Dict[str, Any] = VALID_SCENARIO.copy()
+    scenario["content"]["start_time"] = "2025-11-06T08:00:00Z"
+    scenario["content"]["end_time"] = "2025-11-07T08:00:00Z"  # Exactly 24 hours
     errors: List[Dict[str, str]] = validator.validate_all(scenario)
     assert len(errors) == 0
 

@@ -37,6 +37,8 @@ from back.schemas.scenario import (
     ScenarioResponse,
     ScenarioUpdate,
     ScenarioUpdateRequest,
+    ScenarioValidationRequest,
+    ScenarioValidationResponse,
 )
 from back.services.scenario_validation_service import ScenarioValidator
 
@@ -69,6 +71,116 @@ def get_scenarios(
         page=page,
         per_page=limit,
         total_pages=total_pages,
+    )
+
+
+@router.get("/template")
+def get_scenario_template(
+    requesting_user: int = Depends(get_user_id),
+) -> dict:
+    """
+    Get a template for creating a new scenario.
+
+    This endpoint provides an example scenario structure with comments
+    explaining each field to help users understand the expected format.
+
+    Returns:
+        dict: A template scenario with example data and documentation.
+    """
+    return {
+        "content": {
+            "scenario_title": "Example Scenario",
+            "start_time": "2025-11-06T08:00:00Z",
+            "end_time": "2025-11-06T17:00:00Z",
+            "stations": [
+                {
+                    "station_id": 1,
+                    "station_name": "Station 1",
+                    "task_count": 2,
+                    "station_position": [40.7128, -74.0060],
+                }
+            ],
+            "resources": [
+                {
+                    "resource_id": 1,
+                    "task_count": 2,
+                    "resource_position": [40.7128, -74.0060],
+                }
+            ],
+            "initial_tasks": [
+                {
+                    "id": "task_1",
+                    "station_id": "1",
+                    "time": "08:30",
+                }
+            ],
+        },
+        "description": (
+            "Template fields:\n"
+            "- scenario_title: Name of the scenario\n"
+            "- start_time: RFC 3339 datetime (e.g., '2025-11-06T08:00:00Z') "
+            "or simple time (e.g., '08:00')\n"
+            "- end_time: RFC 3339 datetime or simple time (can span multiple days)\n"
+            "- stations: List of station objects with id, name, task_count, "
+            "and position [lat, lon]\n"
+            "- resources: List of resource objects with id, task_count, "
+            "and position [lat, lon]\n"
+            "- initial_tasks: List of task objects with id, station_id, and time"
+        ),
+    }
+
+
+@router.post("/validate", response_model=ScenarioValidationResponse)
+def validate_scenario(
+    request: ScenarioValidationRequest,
+    requesting_user: int = Depends(get_user_id),
+) -> ScenarioValidationResponse:
+    """
+    Validate scenario content without saving it.
+
+    This endpoint uses the existing Pydantic-based ScenarioValidator to check
+    scenario content for structural and semantic errors. It leverages the same
+    validation logic used in create and update operations.
+
+    Args:
+        request: ScenarioValidationRequest containing the content to validate.
+
+    Returns:
+        ScenarioValidationResponse with validation results including:
+        - valid: Boolean indicating if scenario is valid
+        - errors: List of validation error messages
+        - warnings: List of non-critical warnings
+
+    Example:
+        POST /scenarios/validate
+        {
+            "content": {
+                "scenario_title": "Test Scenario",
+                "start_time": "08:00",
+                "end_time": "17:00",
+                "stations": [...],
+                "resources": [...],
+                "initial_tasks": [...]
+            }
+        }
+    """
+    validator = ScenarioValidator()
+    validation_errors = validator.validate_all({"content": request.content})
+
+    # Convert validation errors to simple string messages
+    errors = [err["message"] for err in validation_errors]
+    warnings = []
+
+    # Add warnings for missing but not invalid data
+    if not request.content.get("resources"):
+        warnings.append("No resources defined - scenario may not function properly")
+    if not request.content.get("stations"):
+        warnings.append("No stations defined - scenario may not function properly")
+
+    return ScenarioValidationResponse(
+        valid=len(errors) == 0,
+        errors=errors,
+        warnings=warnings,
     )
 
 

@@ -26,7 +26,7 @@ import pytest
 from datetime import datetime, timezone
 from unittest.mock import patch, MagicMock
 from fastapi.testclient import TestClient
-from typing import Generator
+from typing import Any, Generator
 
 from back.main import app
 from back.auth.dependency import get_user_id
@@ -470,3 +470,272 @@ class TestScenariosAPI:
         """Test deleting scenario without authentication returns 401."""
         response = client.delete("/api/v1/scenarios/1")
         assert response.status_code == 401
+
+    # ============= Template Endpoint Tests =============
+
+    def test_get_scenario_template_success(
+        self, authenticated_client: TestClient
+    ) -> None:
+        """Test getting scenario template returns valid structure."""
+        response = authenticated_client.get("/api/v1/scenarios/template")
+
+        assert response.status_code == 200
+        data = response.json()
+
+        # Verify response has content and description
+        assert "content" in data
+        assert "description" in data
+
+        # Verify template has all required fields
+        content = data["content"]
+        assert "scenario_title" in content
+        assert "start_time" in content
+        assert "end_time" in content
+        assert "stations" in content
+        assert "resources" in content
+        assert "initial_tasks" in content
+
+        # Verify stations structure
+        assert isinstance(content["stations"], list)
+        assert len(content["stations"]) > 0
+        station = content["stations"][0]
+        assert "station_id" in station
+        assert "station_name" in station
+        assert "task_count" in station
+        assert "station_position" in station
+        assert isinstance(station["station_position"], list)
+        assert len(station["station_position"]) == 2
+
+        # Verify resources structure
+        assert isinstance(content["resources"], list)
+        assert len(content["resources"]) > 0
+        resource = content["resources"][0]
+        assert "resource_id" in resource
+        assert "task_count" in resource
+        assert "resource_position" in resource
+        assert isinstance(resource["resource_position"], list)
+        assert len(resource["resource_position"]) == 2
+
+        # Verify initial_tasks structure
+        assert isinstance(content["initial_tasks"], list)
+        assert len(content["initial_tasks"]) > 0
+        task = content["initial_tasks"][0]
+        assert "id" in task
+        assert "station_id" in task
+        assert "time" in task
+
+    def test_get_scenario_template_requires_authentication(
+        self, client: TestClient
+    ) -> None:
+        """Test template endpoint requires authentication."""
+        response = client.get("/api/v1/scenarios/template")
+        assert response.status_code == 401
+
+    # ============= Validate Endpoint Tests =============
+
+    @patch("back.services.scenario_validation_service.ScenarioValidator.validate_all")
+    def test_validate_scenario_success(
+        self,
+        mock_validate: MagicMock,
+        authenticated_client: TestClient,
+    ) -> None:
+        """Test validating valid scenario returns no errors."""
+        mock_validate.return_value = []
+
+        request_data = {
+            "content": {
+                "scenario_title": "Test Scenario",
+                "start_time": "08:00",
+                "end_time": "17:00",
+                "stations": [
+                    {
+                        "station_id": 1,
+                        "station_name": "Station 1",
+                        "task_count": 5,
+                        "station_position": [40.7128, -74.0060],
+                    }
+                ],
+                "resources": [
+                    {
+                        "resource_id": 1,
+                        "task_count": 10,
+                        "resource_position": [40.7128, -74.0060],
+                    }
+                ],
+                "initial_tasks": [{"id": "task_1", "station_id": "1", "time": "08:30"}],
+            }
+        }
+
+        response = authenticated_client.post(
+            "/api/v1/scenarios/validate", json=request_data
+        )
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["valid"] is True
+        assert data["errors"] == []
+        assert isinstance(data["warnings"], list)
+
+    @patch("back.services.scenario_validation_service.ScenarioValidator.validate_all")
+    def test_validate_scenario_with_errors(
+        self,
+        mock_validate: MagicMock,
+        authenticated_client: TestClient,
+    ) -> None:
+        """Test validating invalid scenario returns errors."""
+        mock_validate.return_value = [
+            {"message": "Invalid latitude/longitude range"},
+            {"message": "Duplicate station ID"},
+        ]
+
+        request_data = {
+            "content": {
+                "scenario_title": "Invalid Scenario",
+                "start_time": "08:00",
+                "end_time": "17:00",
+                "stations": [],
+                "resources": [],
+                "initial_tasks": [],
+            }
+        }
+
+        response = authenticated_client.post(
+            "/api/v1/scenarios/validate", json=request_data
+        )
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["valid"] is False
+        assert len(data["errors"]) == 2
+        assert "Invalid latitude/longitude range" in data["errors"]
+        assert "Duplicate station ID" in data["errors"]
+
+    @patch("back.services.scenario_validation_service.ScenarioValidator.validate_all")
+    def test_validate_scenario_with_warnings(
+        self,
+        mock_validate: MagicMock,
+        authenticated_client: TestClient,
+    ) -> None:
+        """Test validation includes warnings for missing optional data."""
+        mock_validate.return_value = []
+
+        request_data = {
+            "content": {
+                "scenario_title": "Test Scenario",
+                "start_time": "08:00",
+                "end_time": "17:00",
+                "stations": [],  # No stations
+                "resources": [],  # No resources
+                "initial_tasks": [],
+            }
+        }
+
+        response = authenticated_client.post(
+            "/api/v1/scenarios/validate", json=request_data
+        )
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["valid"] is True
+        assert len(data["warnings"]) == 2
+        assert any("resources" in w.lower() for w in data["warnings"])
+        assert any("stations" in w.lower() for w in data["warnings"])
+
+    @patch("back.services.scenario_validation_service.ScenarioValidator.validate_all")
+    def test_validate_scenario_rfc3339_datetime(
+        self,
+        mock_validate: MagicMock,
+        authenticated_client: TestClient,
+    ) -> None:
+        """Test validation works with RFC 3339 datetime format."""
+        mock_validate.return_value = []
+
+        request_data = {
+            "content": {
+                "scenario_title": "Full Day Scenario",
+                "start_time": "2025-11-06T08:00:00Z",
+                "end_time": "2025-11-07T08:00:00Z",  # Exactly 24 hours
+                "stations": [
+                    {
+                        "station_id": 1,
+                        "station_name": "Station 1",
+                        "task_count": 5,
+                        "station_position": [40.7128, -74.0060],
+                    }
+                ],
+                "resources": [
+                    {
+                        "resource_id": 1,
+                        "task_count": 10,
+                        "resource_position": [40.7128, -74.0060],
+                    }
+                ],
+                "initial_tasks": [],
+            }
+        }
+
+        response = authenticated_client.post(
+            "/api/v1/scenarios/validate", json=request_data
+        )
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["valid"] is True
+
+    def test_validate_scenario_requires_authentication(
+        self, authenticated_client: TestClient
+    ) -> None:
+        """Test validate endpoint requires authentication."""
+        request_data = {
+            "content": {
+                "scenario_title": "Test",
+                "start_time": "08:00",
+                "end_time": "17:00",
+                "stations": [],
+                "resources": [],
+                "initial_tasks": [],
+            }
+        }
+
+        # Should work with authentication
+        response = authenticated_client.post(
+            "/api/v1/scenarios/validate", json=request_data
+        )
+        assert response.status_code == 200
+
+    def test_validate_scenario_missing_content(
+        self, authenticated_client: TestClient
+    ) -> None:
+        """Test validation fails with missing content field."""
+        request_data: dict[str, Any] = {}  # Missing content
+
+        response = authenticated_client.post(
+            "/api/v1/scenarios/validate", json=request_data
+        )
+
+        # Should return 422 for validation error (missing required field)
+        assert response.status_code == 422
+
+    @patch("back.services.scenario_validation_service.ScenarioValidator.validate_all")
+    def test_validate_scenario_empty_content(
+        self,
+        mock_validate: MagicMock,
+        authenticated_client: TestClient,
+    ) -> None:
+        """Test validation with minimal empty content."""
+        mock_validate.return_value = [
+            {"message": "Missing required field 'scenario_title'"},
+            {"message": "Missing required field 'start_time'"},
+            {"message": "Missing required field 'end_time'"},
+        ]
+
+        request_data: dict[str, Any] = {"content": {}}
+
+        response = authenticated_client.post(
+            "/api/v1/scenarios/validate", json=request_data
+        )
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["valid"] is False
+        assert len(data["errors"]) >= 3
