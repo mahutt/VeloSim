@@ -62,7 +62,7 @@ class TestBuildCHNetwork:
         instance = OSMConnection()
 
         # Mock absolute path resolution
-        mock_abspath.return_value = "/tmp/path/to/sim/DAO/OSMConnection.py"
+        mock_abspath.return_value = "/tmp/sim/DAO/OSMConnection.py"
 
         # Mock cache exists
         mock_exists.return_value = True
@@ -95,7 +95,7 @@ class TestBuildCHNetwork:
         mock_print.reset_mock()
 
         # Mock absolute path resolution
-        mock_abspath.return_value = "/tmp/path/to/sim/DAO/OSMConnection.py"
+        mock_abspath.return_value = "/tmp/sim/DAO/OSMConnection.py"
 
         # Set up nodes and edges
         nodes = gpd.GeoDataFrame(
@@ -154,7 +154,7 @@ class TestBuildCHNetwork:
         instance = OSMConnection()
 
         # Mock absolute path resolution
-        mock_abspath.return_value = "/tmp/path/to/sim/DAO/OSMConnection.py"
+        mock_abspath.return_value = "/tmp/sim/DAO/OSMConnection.py"
 
         # No cache available
         mock_exists.return_value = False
@@ -213,7 +213,7 @@ class TestBuildCHNetwork:
         instance = OSMConnection()
 
         # Mock absolute path resolution
-        mock_abspath.return_value = "/tmp/path/to/sim/DAO/OSMConnection.py"
+        mock_abspath.return_value = "/tmp/sim/DAO/OSMConnection.py"
         mock_exists.return_value = False
 
         # Create edges with parallel edges (same u,v pairs)
