@@ -77,7 +77,7 @@ class SimulatorController:
             station.set_behaviour(self.sim_behaviour)
             # Rebind to the actual simulation environment
             station.env = self.simEnv
-            # station.action = self.simEnv.process(station.run())
+            self.simEnv.process(station.run())
 
         for _, task in self.task_entities.items():
             task.set_behaviour(self.sim_behaviour)
@@ -89,7 +89,7 @@ class SimulatorController:
             resource.set_map_controller(self.map_controller)
             # Rebind to the actual simulation environment
             resource.env = self.simEnv
-            # resource.action = self.simEnv.process(resource.run())
+            self.simEnv.process(resource.run())
 
     def start(self, sim_time: int) -> None:
         # Build CH network for fast routing (with caching and progress bar)

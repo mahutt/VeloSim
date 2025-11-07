@@ -140,26 +140,71 @@ station12.add_task(task8)
 resource5.assign_task(task5)
 
 # Create InputParameter with example entities and simulation settings
+env = simpy.Environment()
+
+# Stations
+station_1 = Station(env, 1, "Station A", Position([-73.569000, 45.453140]))
+station_2 = Station(env, 2, "Station B", Position([-73.586273, 45.523064]))
+
+# Resources
+resource_1 = Resource(env, 1, Position([-73.583092, 45.477344]))
+resource_2 = Resource(env, 2, Position([-73.628571, 45.534180]))
+
+# Tasks
+task_1 = BatterySwapTask(env, 1, station_1)  # will be assigned
+task_2 = BatterySwapTask(env, 2, station_1)  # unassigned
+task_3 = BatterySwapTask(env, 3, station_2)  # will be assigned
+task_4 = BatterySwapTask(env, 4, station_2)  # unassigned
+
+# Assign tasks to stations
+station_1.add_task(task_1)
+station_1.add_task(task_2)
+station_2.add_task(task_3)
+station_2.add_task(task_4)
+
+# Assign some tasks to resources
+resource_1.assign_task(task_1)  # Assigned to Station A
+resource_2.assign_task(task_3)  # Assigned to Station B
+
+# Mark a task as in-progress
+resource_1.dispatch_task(task_1)
+
+# Wrap entities in dictionaries
+stations = {station_1.id: station_1, station_2.id: station_2}
+resources = {resource_1.id: resource_1, resource_2.id: resource_2}
+tasks = {task_1.id: task_1, task_2.id: task_2, task_3.id: task_3, task_4.id: task_4}
+
+# Build and return the InputParameter
 params = InputParameter(
+    station_entities=stations,
+    resource_entities=resources,
+    task_entities=tasks,
+    real_time_factor=1.0,
+    key_frame_freq=10,
+)
+
+
+# Create InputParameter for second simulation
+params2 = InputParameter(
     station_entities={
-        1: station1,
-        2: station2,
-        3: station3,
-        4: station4,
-        5: station5,
-        6: station6,
+        7: station7,
+        8: station8,
+        9: station9,
+        10: station10,
+        11: station11,
+        12: station12,
     },
     resource_entities={
-        101: resource1,
-        102: resource2,
-        103: resource3,
-        104: resource4,
+        201: resource5,
+        202: resource6,
+        203: resource7,
+        204: resource8,
     },
     task_entities={
-        1: task1,
-        2: task2,
-        3: task3,
-        4: task4,
+        5: task5,
+        6: task6,
+        7: task7,
+        8: task8,
     },
     real_time_factor=1,  # Real-time simulation
     key_frame_freq=3000,  # Key frame every 3000 frames
@@ -218,14 +263,14 @@ if __name__ == "__main__":
     print("Initial frames sent. Starting simulation loops...")
 
     # Start the simulation loops
-    sim.start(r1, 5)
+    sim.start(r1, 3000)
     thread = sim.thread_pool[r1]["thread"]
-    if thread is not None:
-        thread.join()
+    # if thread is not None:
+    #     thread.join()
 
     time.sleep(5)
 
-    sim.start(r2, 5)
+    # sim.start(r2, 5)
     # # Let first resource run for a bit
     # print("Resource 101 started with task 1 (Concordia)...")
     # time.sleep(5)

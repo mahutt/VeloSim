@@ -41,7 +41,7 @@ class Resource:
 
     map_controller: MapController
     sim_behaviour: "SimBehaviour"
-    current_route: Route
+    current_route: Route | None
 
     def __init__(
         self,
@@ -53,6 +53,7 @@ class Resource:
         self.env = env
         self.id = resource_id
         self.position = position
+        self.current_route = None
         if task_list is not None:
             self.task_list = task_list
             for task in self.task_list:
@@ -60,9 +61,6 @@ class Resource:
         else:
             self.task_list = []
         self.has_updated = False  # flag to track if a resource was updated
-
-        # starting the process for periodic resource operations
-        self.action = env.process(self.run())
 
     def get_resource_position(self) -> "Position":
         return self.position
@@ -188,6 +186,10 @@ class Resource:
                         and self.position == task_station.get_station_position()
                     ):
                         self.service_task(in_progress)
+                    elif task_station and not self.current_route:
+                        yield self.env.process(
+                            self.travel_to(task_station.get_station_position())
+                        )
                     # If not at station, travel_to is still in progress
                 else:
                     # No task in progress, select and dispatch next task

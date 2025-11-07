@@ -206,7 +206,7 @@ def test_resource_run_waits_for_initialization() -> None:
     resource.set_behaviour(mock_behaviour)
     mock_map = Mock()
     resource.set_map_controller(mock_map)
-
+    env.process(resource.run())
     # Run for 3 time units (1 for initial yield, then at least one iteration)
     env.run(until=3)
 
@@ -243,6 +243,7 @@ def test_resource_run_selects_and_dispatches_task() -> None:
     resource.set_map_controller(mock_map)
 
     # Run simulation for just enough time to dispatch but not complete
+    env.process(resource.run())
     env.run(until=3)
 
     # Task should be dispatched (in progress) or already closed if it completed
@@ -276,6 +277,7 @@ def test_resource_run_services_task_when_at_station() -> None:
     resource.set_map_controller(mock_map)
 
     # Run simulation - need enough time for initial timeout + processing
+    env.process(resource.run())
     env.run(until=5)
 
     # Task should be serviced (closed and removed)

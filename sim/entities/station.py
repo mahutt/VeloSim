@@ -54,9 +54,6 @@ class Station:
         self.has_updated = False
         self.pop_up_tasks: list["Task"] = []
 
-        # starting the process for periodic station operations
-        self.action = env.process(self.run())
-
     def add_task(self, task: "Task") -> None:
         self.tasks.append(task)
         task.set_station(self)
