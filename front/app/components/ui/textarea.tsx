@@ -22,44 +22,21 @@
  * SOFTWARE.
  */
 
-import { Input } from '~/components/ui/input';
-import { Button } from '~/components/ui/button';
+import * as React from 'react';
 
-interface ScenarioToolbarProps {
-  scenarioName: string;
-  onNameChange: (name: string) => void;
-  onImport: () => void;
-  onNew: () => void;
-  isEditMode: boolean;
-  isExistingScenario: boolean;
-}
+import { cn } from '~/lib/utils';
 
-export default function ScenarioToolbar({
-  scenarioName,
-  onNameChange,
-  onImport,
-  onNew,
-  isEditMode,
-  isExistingScenario,
-}: ScenarioToolbarProps) {
+function Textarea({ className, ...props }: React.ComponentProps<'textarea'>) {
   return (
-    <div className="flex flex-col gap-4 mb-6 sm:flex-row sm:items-end sm:gap-6">
-      <div className="flex gap-2 w-full mb-2 sm:mb-0 sm:w-64 sm:order-2">
-        <Button onClick={onImport} variant="outline" className="flex-1">
-          Import
-        </Button>
-        <Button onClick={onNew} className="flex-1">
-          New
-        </Button>
-      </div>
-      <Input
-        value={scenarioName}
-        onChange={(e) => onNameChange(e.target.value)}
-        placeholder="Scenario name"
-        className="flex-1 sm:order-1"
-        aria-label="Scenario name"
-        disabled={isExistingScenario && !isEditMode}
-      />
-    </div>
+    <textarea
+      data-slot="textarea"
+      className={cn(
+        'border-input placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-ring/50 aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive dark:bg-input/30 flex field-sizing-content min-h-16 w-full rounded-md border bg-transparent px-3 py-2 text-base shadow-xs transition-[color,box-shadow] outline-none focus-visible:ring-[3px] disabled:cursor-not-allowed disabled:opacity-50 md:text-sm',
+        className
+      )}
+      {...props}
+    />
   );
 }
+
+export { Textarea };

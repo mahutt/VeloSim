@@ -25,6 +25,7 @@
 import useError from '~/hooks/use-error';
 import { log, LogLevel } from '~/lib/logger';
 import api from '~/api';
+import { toast } from 'sonner';
 
 /**
  * Custom hook for scenario operations (export, save, load, import)
@@ -144,16 +145,17 @@ export function useScenarioOperations() {
     description: string = ''
   ) => {
     const parsedContent = await validateContent(content);
-    if (!parsedContent) return false;
+    if (!parsedContent) return null;
 
     try {
-      await api.post('/scenarios', {
+      const response = await api.post('/scenarios', {
         name: scenarioName,
         content: parsedContent,
         description,
-        allow_duplicate_name: true,
+        allow_duplicate_name: false,
       });
-      alert('Scenario saved successfully!');
+      toast.success('Scenario saved successfully!');
+      return response.data?.id ?? null;
     } catch (error: unknown) {
       let message = 'Unknown error';
       if (error && typeof error === 'object') {
@@ -165,26 +167,52 @@ export function useScenarioOperations() {
           errorObj.response?.data?.detail || errorObj.message || message;
       }
       displayError('Failed to save scenario', message);
+      return null;
     }
-    return true;
-  };
-
-  // Loads scenario from backend
-  const loadScenario = (scenarioId: number) => {
-    // TODO: Add API call to backend
-    console.log('Load scenario:', scenarioId);
-    alert('Load Scenario - TODO: Implement backend integration');
   };
 
   // Imports scenario from file
   const importScenario = () => {
     // TODO: Add file picker and import logic
     console.log('Import scenario clicked');
-    alert('Import Scenario - TODO: Implement import functionality');
+    toast.info('Import Scenario - TODO: Implement import functionality');
     log({
       message: 'Scenario imported',
       level: LogLevel.INFO,
     });
+  };
+
+  // Overwrites scenario in backend
+  const overwriteScenario = async (
+    scenarioId: number,
+    content: string,
+    scenarioName: string,
+    description: string = ''
+  ) => {
+    const parsedContent = await validateContent(content);
+    if (!parsedContent) return null;
+
+    try {
+      const response = await api.put(`/scenarios/${scenarioId}`, {
+        name: scenarioName,
+        content: parsedContent,
+        description,
+      });
+      toast.success('Scenario overwritten successfully!');
+      return response.data?.id ?? scenarioId;
+    } catch (error: unknown) {
+      let message = 'Unknown error';
+      if (error && typeof error === 'object') {
+        const errorObj = error as {
+          response?: { data?: { detail?: string } };
+          message?: string;
+        };
+        message =
+          errorObj.response?.data?.detail || errorObj.message || message;
+      }
+      displayError('Failed to overwrite scenario', message);
+      return null;
+    }
   };
 
   return {
@@ -192,7 +220,7 @@ export function useScenarioOperations() {
     downloadJSON,
     exportScenario,
     saveScenario,
-    loadScenario,
     importScenario,
+    overwriteScenario,
   };
 }

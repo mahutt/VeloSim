@@ -28,11 +28,23 @@ import { useScenarioOperations } from '../../app/hooks/use-scenario-operations';
 import { ErrorProvider } from '../../app/providers/error-provider';
 import type { ReactNode } from 'react';
 import api from '../../app/api';
+import { toast } from 'sonner';
+
+// Mock Sonner toast
+vi.mock('sonner', () => ({
+  toast: {
+    success: vi.fn(),
+    error: vi.fn(),
+    info: vi.fn(),
+    warning: vi.fn(),
+  },
+}));
 
 // Mock the api module
 vi.mock('../../app/api', () => ({
   default: {
     post: vi.fn(),
+    put: vi.fn(),
   },
 }));
 
@@ -48,7 +60,6 @@ describe('useScenarioOperations', () => {
   let mockConsoleLog: ReturnType<typeof vi.spyOn>;
   let mockConsoleWarn: ReturnType<typeof vi.spyOn>;
   let mockConsoleError: ReturnType<typeof vi.spyOn>;
-  let mockAlert: ReturnType<typeof vi.fn>;
   let originalCreateElement: typeof document.createElement;
 
   beforeEach(() => {
@@ -91,10 +102,6 @@ describe('useScenarioOperations', () => {
     mockConsoleLog = vi.spyOn(console, 'log').mockImplementation(() => {});
     mockConsoleWarn = vi.spyOn(console, 'warn').mockImplementation(() => {});
     mockConsoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
-
-    // Mock window.alert
-    mockAlert = vi.fn();
-    global.alert = mockAlert;
   });
 
   afterEach(() => {
@@ -204,6 +211,38 @@ describe('useScenarioOperations', () => {
       expect(validatedContent).toEqual(mockContent);
       expect(mockConsoleWarn).not.toHaveBeenCalled();
     });
+
+    it('handles API network errors gracefully', async () => {
+      const { result } = renderHook(() => useScenarioOperations(), {
+        wrapper: Wrapper,
+      });
+
+      // Mock API to throw a network error
+      vi.mocked(api.post).mockRejectedValue(new Error('Network error'));
+
+      const validatedContent = await result.current.validateContent(
+        '{"scenario_title": "Test"}'
+      );
+
+      expect(validatedContent).toBeNull();
+    });
+
+    it('handles API errors without response data', async () => {
+      const { result } = renderHook(() => useScenarioOperations(), {
+        wrapper: Wrapper,
+      });
+
+      // Mock API to throw an error without response
+      vi.mocked(api.post).mockRejectedValue({
+        message: 'Request failed',
+      });
+
+      const validatedContent = await result.current.validateContent(
+        '{"scenario_title": "Test"}'
+      );
+
+      expect(validatedContent).toBeNull();
+    });
   });
 
   describe('downloadJSON', () => {
@@ -254,6 +293,23 @@ describe('useScenarioOperations', () => {
       const filename = 'test';
 
       // The function catches and logs the error instead of throwing
+      result.current.downloadJSON(content, filename);
+
+      expect(mockConsoleError).toHaveBeenCalled();
+    });
+
+    it('handles non-Error exceptions during download', () => {
+      const { result } = renderHook(() => useScenarioOperations(), {
+        wrapper: Wrapper,
+      });
+
+      mockCreateObjectURL.mockImplementation(() => {
+        throw 'String error'; // Not an Error object
+      });
+
+      const content = '{"scenario_title": "Test"}';
+      const filename = 'test';
+
       result.current.downloadJSON(content, filename);
 
       expect(mockConsoleError).toHaveBeenCalled();
@@ -332,7 +388,7 @@ describe('useScenarioOperations', () => {
   });
 
   describe('saveScenario', () => {
-    it('validates content and shows alert for valid scenario', async () => {
+    it('validates content and shows toast for valid scenario', async () => {
       const { result } = renderHook(() => useScenarioOperations(), {
         wrapper: Wrapper,
       });
@@ -356,38 +412,85 @@ describe('useScenarioOperations', () => {
         JSON.stringify(mockContent),
         'Test Scenario'
       );
-      expect(saved).toBe(true);
-      expect(mockAlert).toHaveBeenCalledWith('Scenario saved successfully!');
+      expect(saved).toBe(1);
+      expect(toast.success).toHaveBeenCalledWith(
+        'Scenario saved successfully!'
+      );
     });
 
-    it('returns false for invalid content', async () => {
+    it('returns null for invalid content', async () => {
       const { result } = renderHook(() => useScenarioOperations(), {
         wrapper: Wrapper,
       });
 
       const saved = await result.current.saveScenario('', 'Test Scenario');
-      expect(saved).toBe(false);
-      expect(mockAlert).not.toHaveBeenCalled();
+      expect(saved).toBeNull();
+      expect(toast.success).not.toHaveBeenCalled();
     });
-  });
 
-  describe('loadScenario', () => {
-    it('logs scenario ID and shows alert', () => {
+    it('handles API errors without response data during save', async () => {
       const { result } = renderHook(() => useScenarioOperations(), {
         wrapper: Wrapper,
       });
 
-      result.current.loadScenario(123);
+      // Mock API validation success
+      vi.mocked(api.post).mockResolvedValueOnce({
+        data: {
+          valid: true,
+          errors: [],
+          warnings: [],
+        },
+      });
 
-      expect(mockConsoleLog).toHaveBeenCalledWith('Load scenario:', 123);
-      expect(mockAlert).toHaveBeenCalledWith(
-        'Load Scenario - TODO: Implement backend integration'
+      // Mock API save failure without response
+      vi.mocked(api.post).mockRejectedValueOnce({
+        message: 'Network timeout',
+      });
+
+      const mockContent = { stations: [] };
+      const saved = await result.current.saveScenario(
+        JSON.stringify(mockContent),
+        'Test Scenario'
+      );
+
+      expect(saved).toBeNull();
+      expect(toast.success).not.toHaveBeenCalled();
+    });
+
+    it('handles API response without id', async () => {
+      const { result } = renderHook(() => useScenarioOperations(), {
+        wrapper: Wrapper,
+      });
+
+      // Mock API validation success
+      vi.mocked(api.post).mockResolvedValueOnce({
+        data: {
+          valid: true,
+          errors: [],
+          warnings: [],
+        },
+      });
+
+      // Mock API save success without id
+      vi.mocked(api.post).mockResolvedValueOnce({
+        data: {},
+      });
+
+      const mockContent = { stations: [] };
+      const saved = await result.current.saveScenario(
+        JSON.stringify(mockContent),
+        'Test Scenario'
+      );
+
+      expect(saved).toBeNull();
+      expect(toast.success).toHaveBeenCalledWith(
+        'Scenario saved successfully!'
       );
     });
   });
 
   describe('importScenario', () => {
-    it('logs import action and shows alert', () => {
+    it('logs import action and shows toast', () => {
       const { result } = renderHook(() => useScenarioOperations(), {
         wrapper: Wrapper,
       });
@@ -395,9 +498,97 @@ describe('useScenarioOperations', () => {
       result.current.importScenario();
 
       expect(mockConsoleLog).toHaveBeenCalledWith('Import scenario clicked');
-      expect(mockAlert).toHaveBeenCalledWith(
+      expect(toast.info).toHaveBeenCalledWith(
         'Import Scenario - TODO: Implement import functionality'
       );
+    });
+  });
+
+  describe('overwriteScenario', () => {
+    it('validates content and shows toast for successful overwrite', async () => {
+      const { result } = renderHook(() => useScenarioOperations(), {
+        wrapper: Wrapper,
+      });
+
+      // Mock API validation success
+      vi.mocked(api.post).mockResolvedValueOnce({
+        data: {
+          valid: true,
+          errors: [],
+          warnings: [],
+        },
+      });
+
+      // Mock API put success
+      vi.mocked(api.put).mockResolvedValueOnce({
+        data: { id: 1 },
+      });
+
+      const mockContent = { stations: [] };
+      const overwritten = await result.current.overwriteScenario(
+        1,
+        JSON.stringify(mockContent),
+        'Test Scenario',
+        'Test Description'
+      );
+
+      expect(overwritten).toBe(1);
+      expect(toast.success).toHaveBeenCalledWith(
+        'Scenario overwritten successfully!'
+      );
+      expect(api.put).toHaveBeenCalledWith('/scenarios/1', {
+        name: 'Test Scenario',
+        content: mockContent,
+        description: 'Test Description',
+      });
+    });
+
+    it('returns null for invalid content', async () => {
+      const { result } = renderHook(() => useScenarioOperations(), {
+        wrapper: Wrapper,
+      });
+
+      const overwritten = await result.current.overwriteScenario(
+        1,
+        '',
+        'Test Scenario'
+      );
+
+      expect(overwritten).toBeNull();
+      expect(toast.success).not.toHaveBeenCalled();
+      expect(api.put).not.toHaveBeenCalled();
+    });
+
+    it('handles API errors gracefully', async () => {
+      const { result } = renderHook(() => useScenarioOperations(), {
+        wrapper: Wrapper,
+      });
+
+      // Mock API validation success
+      vi.mocked(api.post).mockResolvedValueOnce({
+        data: {
+          valid: true,
+          errors: [],
+          warnings: [],
+        },
+      });
+
+      // Mock API put failure
+      vi.mocked(api.put).mockRejectedValueOnce({
+        response: { data: { detail: 'Server error' } },
+      });
+
+      const mockContent = { stations: [] };
+      const result2 = await result.current.overwriteScenario(
+        1,
+        JSON.stringify(mockContent),
+        'Test Scenario'
+      );
+
+      // Should return null due to error
+      expect(result2).toBeNull();
+      // Should not show success toast
+      expect(toast.success).not.toHaveBeenCalled();
     });
   });
 });

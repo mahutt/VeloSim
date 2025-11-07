@@ -22,44 +22,56 @@
  * SOFTWARE.
  */
 
-import { Input } from '~/components/ui/input';
+import React from 'react';
 import { Button } from '~/components/ui/button';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '~/components/ui/dialog';
 
-interface ScenarioToolbarProps {
+interface OverwriteSaveDialogProps {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  onOverwrite: () => void;
+  onSaveAsNew: () => void;
   scenarioName: string;
-  onNameChange: (name: string) => void;
-  onImport: () => void;
-  onNew: () => void;
-  isEditMode: boolean;
-  isExistingScenario: boolean;
 }
 
-export default function ScenarioToolbar({
+const OverwriteSaveDialog: React.FC<OverwriteSaveDialogProps> = ({
+  open,
+  onOpenChange,
+  onOverwrite,
+  onSaveAsNew,
   scenarioName,
-  onNameChange,
-  onImport,
-  onNew,
-  isEditMode,
-  isExistingScenario,
-}: ScenarioToolbarProps) {
-  return (
-    <div className="flex flex-col gap-4 mb-6 sm:flex-row sm:items-end sm:gap-6">
-      <div className="flex gap-2 w-full mb-2 sm:mb-0 sm:w-64 sm:order-2">
-        <Button onClick={onImport} variant="outline" className="flex-1">
-          Import
+}) => (
+  <Dialog open={open} onOpenChange={onOpenChange}>
+    <DialogContent>
+      <DialogHeader>
+        <DialogTitle>Overwrite or Save As New?</DialogTitle>
+        <DialogDescription>
+          You are editing the scenario <strong>{scenarioName}</strong>.
+          <br />
+          Would you like to overwrite the existing scenario or save as a new
+          one?
+        </DialogDescription>
+      </DialogHeader>
+      <DialogFooter>
+        <Button onClick={() => onOpenChange(false)} variant="outline">
+          Cancel
         </Button>
-        <Button onClick={onNew} className="flex-1">
-          New
+        <Button onClick={onSaveAsNew} variant="secondary">
+          Save As New
         </Button>
-      </div>
-      <Input
-        value={scenarioName}
-        onChange={(e) => onNameChange(e.target.value)}
-        placeholder="Scenario name"
-        className="flex-1 sm:order-1"
-        aria-label="Scenario name"
-        disabled={isExistingScenario && !isEditMode}
-      />
-    </div>
-  );
-}
+        <Button onClick={onOverwrite} variant="default">
+          Overwrite
+        </Button>
+      </DialogFooter>
+    </DialogContent>
+  </Dialog>
+);
+
+export default OverwriteSaveDialog;

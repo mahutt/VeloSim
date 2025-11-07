@@ -38,7 +38,7 @@ export default function ScenarioSidebar({
 }: ScenarioSidebarProps) {
   return (
     <div className="w-full lg:w-64">
-      <div className="bg-gray-50 border rounded-md p-4 h-[40rem] flex flex-col">
+      <div className="bg-gray-50 border rounded-md p-4 h-[41rem] flex flex-col">
         <h2 className="text-lg font-semibold mb-3">Saved Scenarios</h2>
 
         <div className="flex-1 overflow-y-auto space-y-2">

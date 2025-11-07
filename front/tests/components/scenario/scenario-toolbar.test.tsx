@@ -33,6 +33,8 @@ describe('ScenarioToolbar', () => {
       onNameChange: vi.fn(),
       onImport: vi.fn(),
       onNew: vi.fn(),
+      isEditMode: false,
+      isExistingScenario: false,
       ...propsOverride,
     };
     const utils = render(<ScenarioToolbar {...props} />);

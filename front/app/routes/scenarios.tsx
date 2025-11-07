@@ -22,8 +22,7 @@
  * SOFTWARE.
  */
 
-import { useState, useEffect } from 'react';
-import useError from '~/hooks/use-error';
+import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router';
 import type { Scenario, ScenarioListResponse } from '~/types';
 import api from '~/api';
@@ -31,10 +30,12 @@ import ScenarioToolbar from '~/components/scenario/scenario-toolbar';
 import ScenarioTextArea from '~/components/scenario/scenario-textarea';
 import ScenarioSidebar from '~/components/scenario/scenario-sidebar';
 import ScenarioNameDialog from '~/components/scenario/scenario-name-dialog';
+import OverwriteSaveDialog from '~/components/scenario/overwrite-save-dialog';
 import { useScenarioOperations } from '~/hooks/use-scenario-operations';
 import useError from '~/hooks/use-error';
 
 export default function ScenarioEditor() {
+  // State
   const [scenarioContent, setScenarioContent] = useState('');
   const [scenarioName, setScenarioName] = useState('');
   const [scenarioDescription, setScenarioDescription] = useState('');
@@ -42,20 +43,29 @@ export default function ScenarioEditor() {
   const [selectedScenarioId, setSelectedScenarioId] = useState<number | null>(
     null
   );
+  const [isEditMode, setIsEditMode] = useState(false);
   const [nameDialogOpen, setNameDialogOpen] = useState(false);
+  const [overwriteDialogOpen, setOverwriteDialogOpen] = useState(false);
   const [pendingAction, setPendingAction] = useState<'export' | 'save' | null>(
     null
   );
+
+  // Hooks
   const navigate = useNavigate();
   const { displayError } = useError();
-  const { validateContent, exportScenario, saveScenario, importScenario } =
-    useScenarioOperations();
+  const {
+    validateContent,
+    exportScenario,
+    saveScenario,
+    importScenario,
+    overwriteScenario,
+  } = useScenarioOperations();
 
   /**
    * Load all saved scenarios for the current user
    * Fetches paginated data and returns all scenarios
    */
-  async function loadSavedScenarios(): Promise<Scenario[]> {
+  const loadSavedScenarios = useCallback(async (): Promise<Scenario[]> => {
     const scenarios: Scenario[] = [];
     let page = 1;
     const perPage = 10;
@@ -77,6 +87,7 @@ export default function ScenarioEditor() {
         break;
       }
     }
+
     if (failureOccurred) {
       displayError(
         'Failure loading scenarios',
@@ -87,24 +98,100 @@ export default function ScenarioEditor() {
       );
     }
     return scenarios;
-  }
-
-  useEffect(() => {
-    // Load scenarios from backend API
-    loadSavedScenarios().then(setSavedScenarios);
   }, [displayError]);
 
-  // TODO: Implement with backend API call
-  const handleStartScenario = () => {
+  // Load scenarios on mount only
+  useEffect(() => {
+    loadSavedScenarios().then(setSavedScenarios);
+  }, []); // Only run once on mount
+
+  // Sync scenarioName with scenario_title in JSON content
+  useEffect(() => {
+    if (!scenarioContent) return;
+    try {
+      const parsed = JSON.parse(scenarioContent);
+      if (parsed.scenario_title && parsed.scenario_title !== scenarioName) {
+        setScenarioName(parsed.scenario_title);
+      }
+    } catch {
+      // ignore if not valid JSON
+    }
+  }, [scenarioContent, scenarioName]);
+
+  // Keep scenario_title in sync with scenarioName
+  const setScenarioNameAndSyncTitle = useCallback(
+    (name: string) => {
+      setScenarioName(name);
+      try {
+        if (scenarioContent) {
+          const parsed = JSON.parse(scenarioContent);
+          parsed.scenario_title = name;
+          setScenarioContent(JSON.stringify(parsed, null, 2));
+        }
+      } catch {
+        // ignore if content is not valid JSON
+      }
+    },
+    [scenarioContent]
+  );
+
+  // Helper function to generate incremented name
+  const generateIncrementedName = useCallback(
+    (baseName: string, scenarios: Scenario[]): string => {
+      const existingNames = scenarios.map((s) => s.name);
+
+      // Match a name ending with optional space and (number), e.g., "Test (2)"
+      const match = baseName.match(/^(.*?)(?:\s*\((\d+)\))?$/);
+      let nameWithoutNumber = baseName;
+      let startCounter = 1;
+
+      if (match) {
+        nameWithoutNumber = match[1].trim();
+        if (match[2]) {
+          startCounter = parseInt(match[2], 10) + 1;
+        }
+      }
+
+      let counter = startCounter;
+      let newName = `${nameWithoutNumber} (${counter})`;
+
+      while (existingNames.includes(newName)) {
+        counter++;
+        newName = `${nameWithoutNumber} (${counter})`;
+      }
+
+      return newName;
+    },
+    []
+  );
+
+  const handleStartScenario = useCallback(() => {
     console.log('Start scenario clicked');
     navigate('/simulation');
-  };
+  }, [navigate]);
 
-  const handleSaveScenario = async () => {
+  const handleSaveScenario = useCallback(async () => {
     // Validate content first, then check for name
-    const parsedContent = await validateContent(scenarioContent);
+    let contentToSave = scenarioContent;
+    try {
+      if (scenarioContent) {
+        const parsed = JSON.parse(scenarioContent);
+        parsed.scenario_title = scenarioName;
+        contentToSave = JSON.stringify(parsed, null, 2);
+      }
+    } catch {
+      // ignore if content is not valid JSON
+    }
+
+    const parsedContent = await validateContent(contentToSave);
     if (!parsedContent) {
       // Validation failed, error already displayed
+      return;
+    }
+
+    // If editing an existing scenario, show Overwrite/Save As New dialog
+    if (isEditMode && selectedScenarioId) {
+      setOverwriteDialogOpen(true);
       return;
     }
 
@@ -113,11 +200,78 @@ export default function ScenarioEditor() {
       setPendingAction('save');
       setNameDialogOpen(true);
     } else {
-      saveScenario(scenarioContent, scenarioName, scenarioDescription);
+      const newId = await saveScenario(
+        contentToSave,
+        scenarioName,
+        scenarioDescription
+      );
+      if (newId) setSelectedScenarioId(newId);
+      // Refresh sidebar after save
+      const scenarios = await loadSavedScenarios();
+      setSavedScenarios(scenarios);
     }
-  };
+  }, [
+    scenarioContent,
+    scenarioName,
+    scenarioDescription,
+    isEditMode,
+    selectedScenarioId,
+    validateContent,
+    saveScenario,
+    loadSavedScenarios,
+  ]);
 
-  const handleExportScenario = async () => {
+  // Overwrite/Save As New dialog actions
+  const handleOverwrite = useCallback(async () => {
+    if (selectedScenarioId) {
+      const newId = await overwriteScenario(
+        selectedScenarioId,
+        scenarioContent,
+        scenarioName,
+        scenarioDescription
+      );
+      if (newId) setSelectedScenarioId(newId);
+      setOverwriteDialogOpen(false);
+      setIsEditMode(false);
+      // Refresh sidebar after overwrite
+      const scenarios = await loadSavedScenarios();
+      setSavedScenarios(scenarios);
+    }
+  }, [
+    selectedScenarioId,
+    scenarioContent,
+    scenarioName,
+    scenarioDescription,
+    overwriteScenario,
+    loadSavedScenarios,
+  ]);
+
+  const handleSaveAsNew = useCallback(async () => {
+    // Auto-increment the scenario name
+    const newName = generateIncrementedName(scenarioName, savedScenarios);
+    const newId = await saveScenario(
+      scenarioContent,
+      newName,
+      scenarioDescription
+    );
+    setScenarioName(newName);
+    setOverwriteDialogOpen(false);
+    setIsEditMode(false);
+    if (newId) setSelectedScenarioId(newId);
+    // Refresh sidebar after save as new
+    const scenarios = await loadSavedScenarios();
+    setSavedScenarios(scenarios);
+  }, [
+    scenarioName,
+    savedScenarios,
+    scenarioContent,
+    scenarioDescription,
+    generateIncrementedName,
+    saveScenario,
+    loadSavedScenarios,
+  ]);
+
+  const handleExportScenario = useCallback(async () => {
     // Validate content first, then check for name
     // This provides faster feedback if content is invalid
     const parsedContent = await validateContent(scenarioContent);
@@ -134,43 +288,86 @@ export default function ScenarioEditor() {
     } else {
       exportScenario(scenarioContent, scenarioName);
     }
-  };
+  }, [scenarioContent, scenarioName, validateContent, exportScenario]);
 
-  const handleNameDialogConfirm = (name: string) => {
-    // Update the scenario name
-    setScenarioName(name);
+  const handleNameDialogConfirm = useCallback(
+    async (name: string) => {
+      // Update the scenario name
+      setScenarioName(name);
 
-    // Perform the pending action
-    if (pendingAction === 'export') {
-      exportScenario(scenarioContent, name);
-    } else if (pendingAction === 'save') {
-      saveScenario(scenarioContent, name, scenarioDescription);
-    }
+      // Perform the pending action
+      if (pendingAction === 'export') {
+        await exportScenario(scenarioContent, name);
+      } else if (pendingAction === 'save') {
+        const newId = await saveScenario(
+          scenarioContent,
+          name,
+          scenarioDescription
+        );
+        if (newId) {
+          setSelectedScenarioId(newId);
+          // Refresh sidebar after save
+          const scenarios = await loadSavedScenarios();
+          setSavedScenarios(scenarios);
+        }
+      }
 
-    // Clear pending action
-    setPendingAction(null);
-  };
+      // Clear pending action
+      setPendingAction(null);
+    },
+    [
+      pendingAction,
+      scenarioContent,
+      scenarioDescription,
+      exportScenario,
+      saveScenario,
+      loadSavedScenarios,
+    ]
+  );
 
-  const handleNewScenario = () => {
-    setScenarioContent('');
+  const handleNewScenario = useCallback(() => {
+    api
+      .get('/scenarios/template')
+      .then((response) => {
+        setScenarioContent(JSON.stringify(response.data, null, 2));
+      })
+      .catch(() => {
+        setScenarioContent('');
+      });
     setScenarioName('');
     setScenarioDescription('');
     setSelectedScenarioId(null);
-  };
+    setIsEditMode(false); // Reset edit mode
+  }, []);
 
-  const handleSelectScenario = (scenario: Scenario) => {
-    try {
-      setScenarioContent(JSON.stringify(scenario.content, null, 2));
-      setScenarioName(scenario.name);
-      setScenarioDescription(scenario.description ?? '');
-      setSelectedScenarioId(scenario.id);
-    } catch {
-      displayError(
-        'Unable to load scenario',
-        'The scenario could not be parsed as JSON.'
-      );
-    }
-  };
+  const handleSelectScenario = useCallback(
+    (scenario: Scenario) => {
+      try {
+        // Reorder keys for consistent display
+        const c = scenario.content;
+        const ordered = {
+          scenario_title: c.scenario_title,
+          start_time: c.start_time,
+          end_time: c.end_time,
+          resources: c.resources,
+          stations: c.stations,
+          initial_tasks: c.initial_tasks,
+          scheduled_tasks: c.scheduled_tasks,
+        };
+        setScenarioContent(JSON.stringify(ordered, null, 2));
+        setScenarioName(scenario.name);
+        setScenarioDescription(scenario.description ?? '');
+        setSelectedScenarioId(scenario.id);
+        setIsEditMode(false);
+      } catch {
+        displayError(
+          'Unable to load scenario',
+          'The scenario could not be parsed as JSON.'
+        );
+      }
+    },
+    [displayError]
+  );
 
   return (
     <div className="container mx-auto max-w-6xl py-8 px-4">
@@ -178,9 +375,11 @@ export default function ScenarioEditor() {
 
       <ScenarioToolbar
         scenarioName={scenarioName}
-        onNameChange={setScenarioName}
+        onNameChange={setScenarioNameAndSyncTitle}
         onImport={importScenario}
         onNew={handleNewScenario}
+        isEditMode={isEditMode}
+        isExistingScenario={!!selectedScenarioId}
       />
 
       <div className="flex flex-col lg:flex-row gap-6">
@@ -192,6 +391,9 @@ export default function ScenarioEditor() {
           onSave={handleSaveScenario}
           onExport={handleExportScenario}
           onStart={handleStartScenario}
+          isEditMode={isEditMode}
+          isExistingScenario={!!selectedScenarioId}
+          onEdit={() => setIsEditMode(true)}
         />
 
         <ScenarioSidebar
@@ -206,6 +408,14 @@ export default function ScenarioEditor() {
         onOpenChange={setNameDialogOpen}
         currentName={scenarioName}
         onConfirm={handleNameDialogConfirm}
+      />
+
+      <OverwriteSaveDialog
+        open={overwriteDialogOpen}
+        onOpenChange={setOverwriteDialogOpen}
+        onOverwrite={handleOverwrite}
+        onSaveAsNew={handleSaveAsNew}
+        scenarioName={scenarioName}
       />
     </div>
   );

@@ -36,6 +36,10 @@ describe('ScenarioTextArea', () => {
       onSave: vi.fn(),
       onExport: vi.fn(),
       onStart: vi.fn(),
+      isEditMode: false,
+      hasExistingFilename: false,
+      isExistingScenario: false,
+      onEdit: vi.fn(),
       ...propsOverride,
     };
     render(<ScenarioTextArea {...props} />);
@@ -45,7 +49,7 @@ describe('ScenarioTextArea', () => {
   it('renders textarea with scenario data', () => {
     setup();
     const textarea = screen.getByLabelText(
-      'Scenario JSON data'
+      'Scenario JSON'
     ) as HTMLTextAreaElement;
     expect(textarea).toBeInTheDocument();
     expect(textarea.value).toBe('{"foo":"bar"}');
@@ -53,7 +57,7 @@ describe('ScenarioTextArea', () => {
 
   it('calls onChange when textarea value changes', () => {
     const { onChange } = setup();
-    const textarea = screen.getByLabelText('Scenario JSON data');
+    const textarea = screen.getByLabelText('Scenario JSON');
     fireEvent.change(textarea, { target: { value: '{"baz":"qux"}' } });
     expect(onChange).toHaveBeenCalledWith('{"baz":"qux"}');
   });
@@ -87,7 +91,7 @@ describe('ScenarioTextArea', () => {
     it('inserts 2 spaces when Tab is pressed', () => {
       const { onChange } = setup({ scenarioData: 'test' });
       const textarea = screen.getByLabelText(
-        'Scenario JSON data'
+        'Scenario JSON'
       ) as HTMLTextAreaElement;
 
       // Set cursor position at the end
@@ -102,7 +106,7 @@ describe('ScenarioTextArea', () => {
     it('inserts 2 spaces at cursor position in middle of text', () => {
       const { onChange } = setup({ scenarioData: 'before after' });
       const textarea = screen.getByLabelText(
-        'Scenario JSON data'
+        'Scenario JSON'
       ) as HTMLTextAreaElement;
 
       // Set cursor position between "before" and " after"
@@ -117,7 +121,7 @@ describe('ScenarioTextArea', () => {
     it('replaces selected text with 2 spaces when Tab is pressed', () => {
       const { onChange } = setup({ scenarioData: 'select this text' });
       const textarea = screen.getByLabelText(
-        'Scenario JSON data'
+        'Scenario JSON'
       ) as HTMLTextAreaElement;
 
       // Select "this"
@@ -132,7 +136,7 @@ describe('ScenarioTextArea', () => {
     it('inserts 2 spaces at beginning of empty textarea', () => {
       const { onChange } = setup({ scenarioData: '' });
       const textarea = screen.getByLabelText(
-        'Scenario JSON data'
+        'Scenario JSON'
       ) as HTMLTextAreaElement;
 
       textarea.selectionStart = 0;
@@ -145,7 +149,7 @@ describe('ScenarioTextArea', () => {
 
     it('does not affect other key presses', () => {
       const { onChange } = setup({ scenarioData: 'test' });
-      const textarea = screen.getByLabelText('Scenario JSON data');
+      const textarea = screen.getByLabelText('Scenario JSON');
 
       fireEvent.keyDown(textarea, { key: 'Enter' });
       fireEvent.keyDown(textarea, { key: 'a' });
@@ -161,7 +165,7 @@ describe('ScenarioTextArea', () => {
         scenarioData: '{\n  "key": "value"\n}',
       });
       const textarea = screen.getByLabelText(
-        'Scenario JSON data'
+        'Scenario JSON'
       ) as HTMLTextAreaElement;
 
       // Set cursor at the end of first line
