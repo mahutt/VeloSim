@@ -52,7 +52,6 @@ class TestStation:
         assert station.position == default_position
         assert station.tasks == []
         assert station.env == simpy_env
-        assert station.action is not None
 
     def test_station_creation_with_tasks(
         self, simpy_env: simpy.Environment, default_position: Position

@@ -56,6 +56,8 @@ class WebSocketSubscriber(Subscriber):
 # Create a temporary environment for entity creation
 temp_env = simpy.Environment()
 
+temp_env2 = simpy.Environment()
+
 # Montreal coordinates - various stations
 ikea = Position([-73.691993, 45.490198])  # IKEA
 concordia = Position([-73.577797, 45.495009])  # Concordia University
@@ -97,27 +99,112 @@ station6.add_task(task4)
 # Assign initial task to first resource
 resource1.assign_task(task1)
 
+# ===== SECOND SIMULATION ENTITIES =====
+# Additional Montreal locations for second simulation
+verdun = Position([-73.569000, 45.453140])  # Verdun
+plateau = Position([-73.586273, 45.523064])  # Plateau Mont-Royal
+chinatown = Position([-73.561989, 45.508614])  # Chinatown
+atwater_market = Position([-73.583092, 45.477344])  # Atwater Market
+parc_jarry = Position([-73.628571, 45.534180])  # Parc Jarry
+notre_dame = Position([-73.553810, 45.504722])  # Notre-Dame Basilica
+
+# Create stations for second simulation
+station7 = Station(temp_env2, station_id=7, name="Verdun", position=verdun)
+station8 = Station(temp_env2, station_id=8, name="Plateau", position=plateau)
+station9 = Station(temp_env2, station_id=9, name="Chinatown", position=chinatown)
+station10 = Station(
+    temp_env2, station_id=10, name="Atwater Market", position=atwater_market
+)
+station11 = Station(temp_env2, station_id=11, name="Parc Jarry", position=parc_jarry)
+station12 = Station(temp_env2, station_id=12, name="Notre-Dame", position=notre_dame)
+
+# Create resources for second simulation
+resource5 = Resource(temp_env2, resource_id=201, position=verdun)
+resource6 = Resource(temp_env2, resource_id=202, position=plateau)
+resource7 = Resource(temp_env2, resource_id=203, position=atwater_market)
+resource8 = Resource(temp_env2, resource_id=204, position=parc_jarry)
+
+# Create tasks for second simulation
+task5 = BatterySwapTask(temp_env2, 5, station8)  # Task at Plateau
+task6 = BatterySwapTask(temp_env2, 6, station9)  # Task at Chinatown
+task7 = BatterySwapTask(temp_env2, 7, station10)  # Task at Atwater Market
+task8 = BatterySwapTask(temp_env2, 8, station12)  # Task at Notre-Dame
+
+# Add tasks to their respective stations
+station8.add_task(task5)
+station9.add_task(task6)
+station10.add_task(task7)
+station12.add_task(task8)
+
+# Assign initial task to first resource of second simulation
+resource5.assign_task(task5)
+
 # Create InputParameter with example entities and simulation settings
+env = simpy.Environment()
+
+# Stations
+station_1 = Station(env, 1, "Station A", Position([-73.569000, 45.453140]))
+station_2 = Station(env, 2, "Station B", Position([-73.586273, 45.523064]))
+
+# Resources
+resource_1 = Resource(env, 1, Position([-73.583092, 45.477344]))
+resource_2 = Resource(env, 2, Position([-73.628571, 45.534180]))
+
+# Tasks
+task_1 = BatterySwapTask(env, 1, station_1)  # will be assigned
+task_2 = BatterySwapTask(env, 2, station_1)  # unassigned
+task_3 = BatterySwapTask(env, 3, station_2)  # will be assigned
+task_4 = BatterySwapTask(env, 4, station_2)  # unassigned
+
+# Assign tasks to stations
+station_1.add_task(task_1)
+station_1.add_task(task_2)
+station_2.add_task(task_3)
+station_2.add_task(task_4)
+
+# Assign some tasks to resources
+resource_1.assign_task(task_1)  # Assigned to Station A
+resource_2.assign_task(task_3)  # Assigned to Station B
+
+# Mark a task as in-progress
+resource_1.dispatch_task(task_1)
+
+# Wrap entities in dictionaries
+stations = {station_1.id: station_1, station_2.id: station_2}
+resources = {resource_1.id: resource_1, resource_2.id: resource_2}
+tasks = {task_1.id: task_1, task_2.id: task_2, task_3.id: task_3, task_4.id: task_4}
+
+# Build and return the InputParameter
 params = InputParameter(
+    station_entities=stations,
+    resource_entities=resources,
+    task_entities=tasks,
+    real_time_factor=1.0,
+    key_frame_freq=10,
+)
+
+
+# Create InputParameter for second simulation
+params2 = InputParameter(
     station_entities={
-        1: station1,
-        2: station2,
-        3: station3,
-        4: station4,
-        5: station5,
-        6: station6,
+        7: station7,
+        8: station8,
+        9: station9,
+        10: station10,
+        11: station11,
+        12: station12,
     },
     resource_entities={
-        101: resource1,
-        102: resource2,
-        103: resource3,
-        104: resource4,
+        201: resource5,
+        202: resource6,
+        203: resource7,
+        204: resource8,
     },
     task_entities={
-        1: task1,
-        2: task2,
-        3: task3,
-        4: task4,
+        5: task5,
+        6: task6,
+        7: task7,
+        8: task8,
     },
     real_time_factor=1,  # Real-time simulation
     key_frame_freq=3000,  # Key frame every 3000 frames
@@ -144,26 +231,28 @@ if __name__ == "__main__":
 
     # Initialize simulations and send initial frames
     print("Initializing simulations...")
-    r1 = sim.initialize(
-        params, sub_list_1, sim_env=temp_env, sim_behaviour=sim_behaviour
-    )
+    r1 = sim.initialize(params, sub_list_1, sim_behaviour=sim_behaviour)
+    r2 = sim.initialize(params2, sub_list_1, sim_behaviour=sim_behaviour)
 
     print("Initial frames sent. Starting simulation loops...")
 
     # Start the simulation loops
-    sim.start(r1, 3600)
+    sim.start(r1, 3000)
     thread = sim.thread_pool[r1]["thread"]
-    if thread is not None:
-        thread.join()
+    # if thread is not None:
+    #     thread.join()
 
-    # Let first resource run for a bit
-    print("Resource 101 started with task 1 (Concordia)...")
     time.sleep(5)
 
-    # Assign task to second resource after 5 seconds
-    print("\nAssigning task 2 to resource 102 (McGill)...")
-    sim.assign_task_to_resource(r1, task_id=2, resource_id=102)
-    time.sleep(5)
+    # sim.start(r2, 5)
+    # # Let first resource run for a bit
+    # print("Resource 101 started with task 1 (Concordia)...")
+    # time.sleep(5)
+
+    # # Assign task to second resource after 5 seconds
+    # print("\nAssigning task 2 to resource 102 (McGill)...")
+    # sim.assign_task_to_resource(r1, task_id=2, resource_id=102)
+    # time.sleep(5)
 
     # Assign task to third resource after another 5 seconds
     # print("\nAssigning task 3 to resource 103 (Old Montreal)...")

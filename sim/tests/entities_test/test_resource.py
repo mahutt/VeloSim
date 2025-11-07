@@ -65,7 +65,6 @@ class TestResource:
         assert resource.position == default_position
         assert resource.task_list == []
         assert resource.has_updated == False
-        assert resource.action is not None
 
     def test_resource_initialization_with_task_list(
         self, simpy_env: simpy.Environment, default_position: Position
@@ -81,7 +80,6 @@ class TestResource:
         assert resource.position == default_position
         assert resource.task_list == task_list
         assert resource.has_updated == False
-        assert resource.action is not None
 
     def test_get_resource_position(
         self, resource: Resource, default_position: Position

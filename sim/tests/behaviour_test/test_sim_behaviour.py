@@ -66,6 +66,7 @@ def test_station_uses_tpu_strategy_in_run_loop() -> None:
     beh.set_TPU_strategy(tpu)  # type: ignore[arg-type]
     station.set_behaviour(beh)
 
+    env.process(station.run())
     # Run long enough for the station to call check_for_new_task once
     env.run(until=2)
 
