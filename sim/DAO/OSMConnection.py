@@ -33,7 +33,7 @@ from shapely.geometry import Point, LineString
 import numpy as np
 from scipy.spatial import cKDTree  # type: ignore[import-untyped]
 from pyproj import Transformer
-import pandana as pdna  # type: ignore[import-untyped]
+import pandana as pdna
 from tqdm import tqdm  # type: ignore[import-untyped]
 import pandas as pd
 
