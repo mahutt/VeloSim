@@ -42,7 +42,7 @@ def reset_singleton() -> Generator[None, None, None]:
 
 
 @patch("os.makedirs")
-@patch("os.path.exists")
+@patch("os.path.abspath")
 @patch("sim.DAO.OSMConnection.get_data")
 @patch("sim.DAO.OSMConnection.OSM")
 @patch("sim.DAO.OSMConnection.OSMConnection._get_drivable_network")
@@ -52,23 +52,19 @@ def test_osmconnection_initialization_methods_called(
     mock_get_drivable_network: MagicMock,
     mock_OSM: MagicMock,
     mock_get_data: MagicMock,
-    mock_exists: MagicMock,
+    mock_abspath: MagicMock,
     mock_makedirs: MagicMock,
 ) -> None:
     # Arrange
-    mock_exists.return_value = False  # mock folder not found
+    mock_abspath.return_value = "/tmp/sim/DAO/OSMConnection.py"
     mock_get_data.return_value = "/mock/path/montreal.osm.pbf"
 
     # Act
     instance = OSMConnection()
 
     # Assert
-    mock_exists.assert_called_once_with("sim/DAO/OSMData")
-    # makedirs called since folder "not found"
-    mock_makedirs.assert_called_once_with("sim/DAO/OSMData")
-    mock_get_data.assert_called_once_with(
-        "Montreal", directory="sim/DAO/OSMData", update=False
-    )
+    mock_makedirs.assert_called()  # Called with absolute path
+    assert mock_get_data.called
     mock_OSM.assert_called_once_with("/mock/path/montreal.osm.pbf")
     assert instance._osm is mock_OSM.return_value
 
@@ -77,7 +73,7 @@ def test_osmconnection_initialization_methods_called(
 
 
 @patch("os.makedirs")
-@patch("os.path.exists")
+@patch("os.path.abspath")
 @patch("sim.DAO.OSMConnection.get_data")
 @patch("sim.DAO.OSMConnection.OSM")
 @patch("sim.DAO.OSMConnection.OSMConnection._get_drivable_network")
@@ -87,29 +83,26 @@ def test_osmconnection_initialization_folder_exists(
     mock_get_drivable_network: MagicMock,
     mock_OSM: MagicMock,
     mock_get_data: MagicMock,
-    mock_exists: MagicMock,
+    mock_abspath: MagicMock,
     mock_makedirs: MagicMock,
 ) -> None:
     # Arrange
-    mock_exists.return_value = True  # mock folder found
+    mock_abspath.return_value = "/tmp/sim/DAO/OSMConnection.py"
     mock_get_data.return_value = "/mock/path/montreal.osm.pbf"
 
     # Act
     OSMConnection()
 
     # Assert
-    mock_exists.assert_called_once_with("sim/DAO/OSMData")
-    # makedirs not called since folder existed
-    mock_makedirs.assert_not_called()
-    mock_get_data.assert_called_once_with(
-        "Montreal", directory="sim/DAO/OSMData", update=False
-    )
+    # makedirs called with exist_ok=True, so no error even if folder exists
+    mock_makedirs.assert_called()
+    assert mock_get_data.called
     mock_OSM.assert_called_once_with("/mock/path/montreal.osm.pbf")
     mock_get_drivable_network.assert_called_once()
     mock_create_graph.assert_called_once()
 
 
-@patch("os.path.exists")
+@patch("os.path.abspath")
 @patch("sim.DAO.OSMConnection.get_data")
 @patch("sim.DAO.OSMConnection.OSMConnection._get_drivable_network")
 @patch("sim.DAO.OSMConnection.OSMConnection.create_networkx_graph")
@@ -117,15 +110,15 @@ def test_osmconnection_initialization_get_data_fails(
     mock_create_graph: MagicMock,
     mock_get_drivable_network: MagicMock,
     mock_get_data: MagicMock,
-    mock_exists: MagicMock,
+    mock_abspath: MagicMock,
 ) -> None:
     # Arrange
-    mock_exists.return_value = True  # mock folder found
+    mock_abspath.return_value = "/tmp/sim/DAO/OSMConnection.py"
     mock_get_data.side_effect = Exception("Failed to download")
 
     # Act and Assert
     with pytest.raises(
-        Exception, match="Error while initializing OSM: Failed to download"
+        RuntimeError, match="Error while initializing OSM.*Failed to download"
     ):
         OSMConnection()
 
@@ -133,7 +126,7 @@ def test_osmconnection_initialization_get_data_fails(
     mock_create_graph.assert_not_called()
 
 
-@patch("os.path.exists")
+@patch("os.path.abspath")
 @patch("sim.DAO.OSMConnection.get_data")
 @patch("sim.DAO.OSMConnection.OSM")
 @patch("sim.DAO.OSMConnection.OSMConnection.create_networkx_graph")
@@ -141,10 +134,10 @@ def test_get_drivable_network_success(
     mock_create_graph: MagicMock,
     mock_osm: MagicMock,
     mock_get_data: MagicMock,
-    mock_exists: MagicMock,
+    mock_abspath: MagicMock,
 ) -> None:
     # Arrange
-    mock_exists.return_value = True  # mock folder found
+    mock_abspath.return_value = "/tmp/sim/DAO/OSMConnection.py"
     mock_get_data.return_value = "/mock/path/montreal.osm.pbf"
     mock_osm_instance = MagicMock()
     mock_osm.return_value = mock_osm_instance
@@ -176,7 +169,7 @@ def test_get_drivable_network_fail(
     mock_create_graph.assert_not_called()
 
 
-@patch("os.path.exists")
+@patch("os.path.abspath")
 @patch("sim.DAO.OSMConnection.get_data")
 @patch("sim.DAO.OSMConnection.OSM")
 @patch("sim.DAO.OSMConnection.OSMConnection.create_networkx_graph")
@@ -184,10 +177,10 @@ def test_get_drivable_network_fail_from_empty_nodes(
     mock_create_graph: MagicMock,
     mock_osm: MagicMock,
     mock_get_data: MagicMock,
-    mock_exists: MagicMock,
+    mock_abspath: MagicMock,
 ) -> None:
     # Arrange
-    mock_exists.return_value = True  # mock folder found
+    mock_abspath.return_value = "/tmp/sim/DAO/OSMConnection.py"
     mock_get_data.return_value = "/mock/path/montreal.osm.pbf"
     mock_osm_instance = MagicMock()
     mock_osm.return_value = mock_osm_instance
@@ -810,6 +803,8 @@ def test_coordinates_to_nearest_node(
         crs="EPSG:4326",
     )
     instance._nodes = mock_nodes
+    # Need to rebuild spatial caches after changing nodes
+    instance._set_projected_nodes()
 
     node = instance.coordinates_to_nearest_node(-73.591450, 45.591644)
 

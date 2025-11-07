@@ -31,10 +31,14 @@ from back.schemas import (
     PlaybackSpeedResponse,
     SimulationPlaybackStatus,
 )
+from back.services.utils.create_input_params import create_default_input_parameters
 from sim.simulator import Simulator
 from sim.entities.inputParameters import InputParameter
 from back.crud import sim_instance_crud, user_crud
-from back.schemas.sim_instance import SimInstanceCreate
+from back.schemas.sim_instance import (
+    SimInstanceCreate,
+    SimulationResponse,
+)
 from back.exceptions import VelosimPermissionError, ItemNotFoundError
 
 
@@ -88,42 +92,67 @@ class SimulationService:
 
         return user.is_admin or db_sim_instance.user_id == user.id
 
-    def start_simulation(
+    def initialize_simulation(
         self, db: Session, requesting_user: int, params: InputParameter | None = None
-    ) -> tuple[str, int]:
+    ) -> SimulationResponse:
         """
-        Start a new simulation and return its ID.
-
-        Args:
-            db: Database session
-            requesting_user: Requesting user's ID
-            params: Optional input parameters for the simulation
-
-        Returns:
-            Tuple of (sim_id, db_id) where sim_id is the UUID from the simulator
-            and db_id is the database record ID
+        Initialize a new simulation and return a confirmation response.
         """
         user = self._get_requesting_user(db, requesting_user)
 
         if params is None:
-            params = InputParameter()
+            params = create_default_input_parameters()
 
         # Create database record first
         sim_instance_data = SimInstanceCreate(user_id=user.id)
         db_sim_instance = sim_instance_crud.create(db, sim_instance_data)
         db.commit()
 
-        # Initialize and start the simulator
+        # Initialize the simulation
         sim_id = self.simulator.initialize(params, subscribers=[])
-        self.simulator.start(sim_id, simTime=3600)
 
-        # Track simulator UUID and DB ID
+        # Track simulation
         self.active_simulations[sim_id] = {
             "db_id": db_sim_instance.id,
-            "status": "running",
+            "status": "initialized",
         }
 
-        return sim_id, db_sim_instance.id
+        return SimulationResponse(
+            sim_id=sim_id,
+            db_id=db_sim_instance.id,
+            status="initialized",
+        )
+
+    def start_simulation(
+        self, db: Session, sim_id: str, requesting_user: int
+    ) -> SimulationResponse:
+        """
+        Start an initialized simulation and return a confirmation response.
+        """
+        if not self.verify_access(db, sim_id, requesting_user):
+            raise VelosimPermissionError("Unauthorized to start this simulation.")
+
+        if sim_id not in self.active_simulations:
+            raise ItemNotFoundError(sim_id, "Simulation not found")
+
+        sim_data = self.active_simulations[sim_id]
+        db_id: int = sim_data["db_id"]  # type: ignore[assignment]
+
+        db_sim_instance = sim_instance_crud.get(db, db_id)
+        if db_sim_instance is None:
+            raise ItemNotFoundError(db_id, "Simulation instance record not found")
+
+        # Start the simulation asynchronously
+        self.simulator.start(sim_id, simTime=30)
+
+        # Update state
+        self.active_simulations[sim_id]["status"] = "running"
+
+        return SimulationResponse(
+            sim_id=sim_id,
+            db_id=db_sim_instance.id,
+            status="running",
+        )
 
     def stop_simulation(
         self,

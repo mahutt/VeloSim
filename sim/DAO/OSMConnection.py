@@ -76,19 +76,29 @@ class OSMConnection(object):
         # Note: CH network will be built lazily when needed or via build_ch_network()
 
     def _initialize_osm_data_file(self) -> None:
-        # creates OSMData folder if doesnt exist
-        if not os.path.exists("sim/DAO/OSMData"):
-            os.makedirs("sim/DAO/OSMData")
-
         try:
-            # downloads the OSM data if doesnt exist and
-            # updates the file if corrupted/old
-            # Note: Tests expect update=True
-            fp = get_data("Montreal", directory="sim/DAO/OSMData", update=False)
+            # Find the absolute path to the *real* sim package root
+            sim_root = os.path.dirname(
+                os.path.dirname(os.path.abspath(__file__))
+            )  # -> /path/to/sim
 
-            self._osm = OSM(fp)  # initializes OSM parser
+            dao_dir = os.path.join(sim_root, "DAO")
+            osm_data_dir = os.path.join(dao_dir, "OSMData")
+
+            # Ensure the folder exists
+            os.makedirs(osm_data_dir, exist_ok=True)
+
+            # Use absolute path, so pyrosm never writes into cwd (/back)
+            osm_file_path = get_data("Montreal", directory=osm_data_dir, update=False)
+            print(osm_file_path)
+
+            # Initialize the OSM parser
+            self._osm = OSM(osm_file_path)
+
         except Exception as e:
-            raise Exception(f"Error while initializing OSM: {e}")
+            raise RuntimeError(
+                f"Error while initializing OSM (expected in {osm_data_dir}): {e}"
+            )
 
     # gets roads and intersections (edges and nodes)
     # takes around a minute to get the full network
@@ -177,9 +187,7 @@ class OSMConnection(object):
 
     # KD-tree built and caches ready
 
-    def build_ch_network(
-        self, cache_path: str = "sim/DAO/OSMData/montreal_ch_network.h5"
-    ) -> None:
+    def build_ch_network(self, cache_path: Optional[str] = None) -> None:
         """
         Build Contraction Hierarchy network from nodes/edges GeoDataFrames.
         This method should be called explicitly when you want to enable CH
@@ -188,6 +196,15 @@ class OSMConnection(object):
         Args:
             cache_path: Path to save/load the preprocessed CH network
         """
+        # Generate absolute path if not provided
+        if cache_path is None:
+            file_path = os.path.abspath(__file__)
+            sim_root = os.path.dirname(os.path.dirname(file_path))
+            dao_dir = os.path.join(sim_root, "DAO")
+            osm_data_dir = os.path.join(dao_dir, "OSMData")
+            os.makedirs(osm_data_dir, exist_ok=True)
+            cache_path = os.path.join(osm_data_dir, "montreal_ch_network.h5")
+
         # Check if cached network exists
         if os.path.exists(cache_path):
             print(f"Loading cached CH network from {cache_path}...")
@@ -251,14 +268,12 @@ class OSMConnection(object):
             # Step 5: Cache the network for future use
             pbar.set_description("Caching CH network")
             try:
-                # Ensure directory exists
                 os.makedirs(os.path.dirname(cache_path), exist_ok=True)
                 self._ch_network.save_hdf5(cache_path)
                 self._save_node_id_mapping()
                 print(f"CH network cached to {cache_path}")
             except Exception as e:
                 print(f"Warning: Could not cache CH network: {e}")
-            pbar.update(1)
 
         print("CH network build complete!")
 
@@ -273,7 +288,15 @@ class OSMConnection(object):
 
     def _save_node_id_mapping(self) -> None:
         """Save node ID mapping to disk for future use"""
-        mapping_path = "sim/DAO/OSMData/node_id_mapping.npz"
+        sim_root = os.path.dirname(
+            os.path.dirname(os.path.abspath(__file__))
+        )  # -> /path/to/sim
+        dao_dir = os.path.join(sim_root, "DAO")
+        osm_data_dir = os.path.join(dao_dir, "OSMData")
+        # Ensure the folder exists
+        os.makedirs(osm_data_dir, exist_ok=True)
+        # Use absolute path, so pyrosm never writes into cwd (/back)
+        mapping_path = os.path.join(osm_data_dir, "node_id_mapping.npz")
         try:
             # Convert dict to arrays for efficient storage
             if self._node_id_mapping is not None:
@@ -287,7 +310,16 @@ class OSMConnection(object):
 
     def _load_node_id_mapping(self) -> None:
         """Load node ID mapping from disk"""
-        mapping_path = "sim/DAO/OSMData/node_id_mapping.npz"
+        sim_root = os.path.dirname(
+            os.path.dirname(os.path.abspath(__file__))
+        )  # -> /path/to/sim
+        dao_dir = os.path.join(sim_root, "DAO")
+        osm_data_dir = os.path.join(dao_dir, "OSMData")
+        # Ensure the folder exists
+        os.makedirs(osm_data_dir, exist_ok=True)
+        # Use absolute path, so pyrosm never writes into cwd (/back)
+        mapping_path = os.path.join(osm_data_dir, "node_id_mapping.npz")
+        print(mapping_path)
         try:
             data = np.load(mapping_path)
             osm_ids = data["osm_ids"]

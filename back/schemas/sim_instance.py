@@ -23,6 +23,7 @@ SOFTWARE.
 """
 
 from datetime import datetime
+from typing import List
 from pydantic import BaseModel, ConfigDict, computed_field
 
 
@@ -64,3 +65,17 @@ class SimInstanceResponse(SimInstanceBase):
     def task_count(self) -> int:
         """Compute the number of tasks."""
         return len(self.tasks) if hasattr(self, "tasks") else 0
+
+
+class SimulationResponse(BaseModel):
+    sim_id: str
+    db_id: int
+    status: str
+
+
+class SimulationListResponse(BaseModel):
+    simulations: List[SimInstanceResponse]
+    total: int
+    page: int
+    per_page: int
+    total_pages: int

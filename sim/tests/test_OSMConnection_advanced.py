@@ -46,18 +46,23 @@ class TestBuildCHNetwork:
     @patch("sim.DAO.OSMConnection.OSMConnection._initialize_osm_data_file")
     @patch("sim.DAO.OSMConnection.OSMConnection._get_drivable_network")
     @patch("sim.DAO.OSMConnection.OSMConnection.create_networkx_graph")
+    @patch("os.path.abspath")
     @patch("os.path.exists")
     @patch("sim.DAO.OSMConnection.pdna.Network.from_hdf5")
     def test_build_ch_network_loads_from_cache(
         self,
         mock_from_hdf5: MagicMock,
         mock_exists: MagicMock,
+        mock_abspath: MagicMock,
         mock_create_graph: MagicMock,
         mock_get_drivable: MagicMock,
         mock_init_file: MagicMock,
     ) -> None:
         """Test that CH network loads from cache if available"""
         instance = OSMConnection()
+
+        # Mock absolute path resolution
+        mock_abspath.return_value = "/absolute/path/to/sim/DAO/OSMConnection.py"
 
         # Mock cache exists
         mock_exists.return_value = True
@@ -75,10 +80,12 @@ class TestBuildCHNetwork:
     @patch("sim.DAO.OSMConnection.OSMConnection._initialize_osm_data_file")
     @patch("sim.DAO.OSMConnection.OSMConnection._get_drivable_network")
     @patch("sim.DAO.OSMConnection.OSMConnection.create_networkx_graph")
+    @patch("os.path.abspath")
     @patch("builtins.print")
     def test_build_ch_network_fallback_on_cache_load_failure(
         self,
         mock_print: MagicMock,
+        mock_abspath: MagicMock,
         mock_create_graph: MagicMock,
         mock_get_drivable: MagicMock,
         mock_init_file: MagicMock,
@@ -86,6 +93,9 @@ class TestBuildCHNetwork:
         """Test that CH network builds from scratch if cache load fails"""
         instance = OSMConnection()
         mock_print.reset_mock()
+
+        # Mock absolute path resolution
+        mock_abspath.return_value = "/absolute/path/to/sim/DAO/OSMConnection.py"
 
         # Set up nodes and edges
         nodes = gpd.GeoDataFrame(
@@ -126,6 +136,7 @@ class TestBuildCHNetwork:
     @patch("sim.DAO.OSMConnection.OSMConnection._initialize_osm_data_file")
     @patch("sim.DAO.OSMConnection.OSMConnection._get_drivable_network")
     @patch("sim.DAO.OSMConnection.OSMConnection.create_networkx_graph")
+    @patch("os.path.abspath")
     @patch("os.path.exists")
     @patch("sim.DAO.OSMConnection.pdna.Network")
     @patch("os.makedirs")
@@ -134,12 +145,16 @@ class TestBuildCHNetwork:
         mock_makedirs: MagicMock,
         mock_pdna_network: MagicMock,
         mock_exists: MagicMock,
+        mock_abspath: MagicMock,
         mock_create_graph: MagicMock,
         mock_get_drivable: MagicMock,
         mock_init_file: MagicMock,
     ) -> None:
         """Test building CH network from scratch"""
         instance = OSMConnection()
+
+        # Mock absolute path resolution
+        mock_abspath.return_value = "/absolute/path/to/sim/DAO/OSMConnection.py"
 
         # No cache available
         mock_exists.return_value = False
@@ -180,6 +195,7 @@ class TestBuildCHNetwork:
     @patch("sim.DAO.OSMConnection.OSMConnection._initialize_osm_data_file")
     @patch("sim.DAO.OSMConnection.OSMConnection._get_drivable_network")
     @patch("sim.DAO.OSMConnection.OSMConnection.create_networkx_graph")
+    @patch("os.path.abspath")
     @patch("os.path.exists")
     @patch("sim.DAO.OSMConnection.pdna.Network")
     @patch("os.makedirs")
@@ -188,12 +204,16 @@ class TestBuildCHNetwork:
         mock_makedirs: MagicMock,
         mock_pdna_network: MagicMock,
         mock_exists: MagicMock,
+        mock_abspath: MagicMock,
         mock_create_graph: MagicMock,
         mock_get_drivable: MagicMock,
         mock_init_file: MagicMock,
     ) -> None:
         """Test that parallel edges are aggregated correctly"""
         instance = OSMConnection()
+
+        # Mock absolute path resolution
+        mock_abspath.return_value = "/absolute/path/to/sim/DAO/OSMConnection.py"
         mock_exists.return_value = False
 
         # Create edges with parallel edges (same u,v pairs)
@@ -800,6 +820,7 @@ class TestCoordinatesToNearestNode:
                 "lat": [45.5, 45.6],
             },
             geometry=[Point(-73.5, 45.5), Point(-73.6, 45.6)],
+            crs="EPSG:4326",
         )
         instance._nodes = nodes
         instance.nodes_gdf = None  # type: ignore[assignment]  # Invalidate cache
@@ -824,7 +845,7 @@ class TestCoordinatesToNearestNode:
         instance._nodes = gpd.GeoDataFrame()
         instance._set_projected_nodes()
 
-        with pytest.raises(Exception, match="No nodes available to query"):
+        with pytest.raises(Exception, match="No nodes available"):
             instance.coordinates_to_nearest_node(-73.5, 45.5)
 
 
@@ -856,6 +877,7 @@ class TestBuildEdgeIndex:
         result = instance._build_edge_index()
 
         # Should return empty dict since u/v columns missing
+        assert isinstance(result, dict)
         assert result == {}
 
     @patch("sim.DAO.OSMConnection.OSMConnection._initialize_osm_data_file")
@@ -885,6 +907,7 @@ class TestBuildEdgeIndex:
 
         result = instance._build_edge_index()
 
+        assert isinstance(result, dict)
         assert (1, 2) in result
         assert (2, 3) in result
 

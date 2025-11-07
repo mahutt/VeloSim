@@ -24,7 +24,7 @@ SOFTWARE.
 
 import simpy
 import pytest
-from typing import List, Any
+from typing import List, Any, Generator
 from unittest.mock import Mock, patch
 
 from sim.SimulatorController import SimulatorController
@@ -81,6 +81,16 @@ class FakeSubscriber(Subscriber):
 
     def on_frame(self, frame: Frame) -> None:
         self.received.append(frame)
+
+
+@pytest.fixture(autouse=True)
+def reset_singleton() -> Generator[None, None, None]:
+    """Reset OSMConnection singleton before each test"""
+    from sim.DAO.OSMConnection import OSMConnection
+
+    OSMConnection.reset_instance()
+    yield
+    OSMConnection.reset_instance()
 
 
 @pytest.fixture()
@@ -141,13 +151,22 @@ def simulator_controller(
     input_params: InputParameter,
     fake_time: MockClock,
 ) -> SimulatorController:
-    return SimulatorController(
-        simEnv=env,
-        frameEmitter=frame_emitter,
-        inputParameters=input_params,
-        sim_behaviour=FakeSimBehaviour(),
-        strict=False,
-    )
+    # Mock OSMConnection initialization to avoid file I/O
+    with (
+        patch("sim.DAO.OSMConnection.OSMConnection._initialize_osm_data_file"),
+        patch("sim.DAO.OSMConnection.OSMConnection._get_drivable_network"),
+        patch("sim.DAO.OSMConnection.OSMConnection.create_networkx_graph"),
+        patch("sim.DAO.OSMConnection.OSMConnection._set_projected_nodes"),
+        patch("sim.DAO.OSMConnection.OSMConnection._build_edge_index"),
+    ):
+        controller = SimulatorController(
+            simEnv=env,
+            frameEmitter=frame_emitter,
+            inputParameters=input_params,
+            sim_behaviour=FakeSimBehaviour(),
+            strict=False,
+        )
+    return controller
 
 
 def test_simulator_controller_initialization(
