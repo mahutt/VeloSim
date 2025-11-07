@@ -39,6 +39,7 @@ class InputParameter:
         task_entities: Optional[Mapping[int, Task]] = None,
         real_time_factor: Optional[float] = None,
         key_frame_freq: Optional[int] = None,
+        sim_time: Optional[int] = 0,
     ) -> None:
         self.station_entities: Dict[int, Station] = (
             station_entities if station_entities is not None else {}
@@ -51,6 +52,7 @@ class InputParameter:
 
         self.realTimeFactor: Optional[float] = real_time_factor
         self.keyFrameFreq: Optional[int] = key_frame_freq
+        self.sim_time: int = sim_time if sim_time is not None else 0
 
     # Getter methods
     def get_station_entities(self) -> Dict[int, Station]:
@@ -67,6 +69,9 @@ class InputParameter:
 
     def get_key_frame_freq(self) -> Optional[int]:
         return self.keyFrameFreq
+
+    def set_sim_time(self, sim_time: int) -> None:
+        self.sim_time = sim_time
 
     # Setter methods
     def set_station_entities(self, station_entities: Dict[int, Station]) -> None:
@@ -130,20 +135,24 @@ class InputParameter:
                 for rid, resource in self.resource_entities.items()
             },
             "tasks": {
-                tid: (
-                    task.station.name
-                    if (task.station is not None and hasattr(task.station, "name"))
-                    else "-"
-                )
+                tid: {
+                    "station": (
+                        task.station.name
+                        if (task.station is not None and hasattr(task.station, "name"))
+                        else "-"
+                    ),
+                    "spawn_time": (
+                        round(task.spawn_time, 2)
+                        if hasattr(task, "spawn_time")
+                        else None
+                    ),
+                    "state": str(task.state),
+                }
                 for tid, task in self.task_entities.items()
             },
             "realTimeFactor": self.realTimeFactor,
+            "sim_time": self.sim_time,
             "keyFrameFreq": self.keyFrameFreq,
-            "counts": {
-                "stations": len(self.station_entities),
-                "resources": len(self.resource_entities),
-                "tasks": len(self.task_entities),
-            },
         }
 
         return json.dumps(data, indent=2)
