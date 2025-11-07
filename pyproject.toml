@@ -159,6 +159,7 @@ module = [
     "uvicorn.*",
     "simpy.*",
     "argon2.*",
-    "jwt.*"
+    "jwt.*",
+    "pandana.*"
 ]
 ignore_missing_imports = true
