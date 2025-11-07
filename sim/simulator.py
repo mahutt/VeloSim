@@ -51,7 +51,6 @@ class Simulator:
         self,
         input_parameters: InputParameter,
         subscribers: List[Subscriber],
-        sim_env: simpy.Environment = simpy.Environment(),
         sim_behaviour: SimBehaviour = SimBehaviour(),
     ) -> str:
         # Initialize a simulation and send the initial frame, but don't start
@@ -62,7 +61,7 @@ class Simulator:
         for sub in subscribers:
             emitter.attach(sub)
 
-        env = sim_env
+        env = simpy.Environment()
 
         simController = SimulatorController(
             simEnv=env,
