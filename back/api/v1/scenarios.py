@@ -23,14 +23,22 @@ SOFTWARE.
 """
 
 import math
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
 from back.database.session import get_db
 from back.auth.dependency import get_user_id
 from back.crud.scenario import scenario_crud
 from back.exceptions import BadRequestError, ItemNotFoundError, VelosimPermissionError
-from back.schemas.scenario import ScenarioListResponse, ScenarioResponse
+from back.schemas.scenario import (
+    ScenarioCreate,
+    ScenarioCreateRequest,
+    ScenarioListResponse,
+    ScenarioResponse,
+    ScenarioUpdate,
+    ScenarioUpdateRequest,
+)
+from back.services.scenario_validation_service import ScenarioValidator
 
 router = APIRouter(prefix="/scenarios", tags=["scenarios"])
 
@@ -80,3 +88,124 @@ def get_scenario(
         raise HTTPException(status_code=400, detail=str(err))
     except VelosimPermissionError as err:
         raise HTTPException(status_code=403, detail=str(err))
+
+
+@router.post("/", response_model=ScenarioResponse, status_code=status.HTTP_201_CREATED)
+def create_scenario(
+    request: ScenarioCreateRequest,
+    requesting_user: int = Depends(get_user_id),
+    db: Session = Depends(get_db),
+) -> ScenarioResponse:
+    """
+    Create a new scenario.
+    """
+    try:
+        # Check for duplicate name if not allowed
+        if not request.allow_duplicate_name:
+            existing = scenario_crud.get_by_name_and_user(
+                db, request.name, requesting_user
+            )
+            if existing:
+                raise BadRequestError(
+                    f"A scenario with name '{request.name}' already exists. "
+                    f"Set allow_duplicate_name=true to create anyway."
+                )
+
+        # Validate scenario content against ScenarioContent schema
+        # Supports RFC 3339 datetime format for multi-day scenarios
+        validator = ScenarioValidator()
+        validation_errors = validator.validate_all(request.content)
+        if validation_errors:
+            error_details = "; ".join(
+                [f"{err['field']}: {err['message']}" for err in validation_errors]
+            )
+            raise BadRequestError(f"Invalid scenario content: {error_details}")
+
+        # Create the scenario
+        scenario_data = ScenarioCreate(
+            name=request.name,
+            content=request.content,
+            description=request.description,
+            user_id=requesting_user,
+        )
+        db_scenario = scenario_crud.create(db, scenario_data)
+        return ScenarioResponse.model_validate(db_scenario)
+
+    except BadRequestError as err:
+        raise HTTPException(status_code=400, detail=str(err))
+    except VelosimPermissionError as err:
+        raise HTTPException(status_code=403, detail=str(err))
+    except Exception as err:
+        # Handle unexpected database errors
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to create scenario: {str(err)}",
+        )
+
+
+@router.put("/{scenario_id}", response_model=ScenarioResponse)
+def update_scenario(
+    scenario_id: int,
+    request: ScenarioUpdateRequest,
+    requesting_user: int = Depends(get_user_id),
+    db: Session = Depends(get_db),
+) -> ScenarioResponse:
+    """
+    Update an existing scenario.
+    """
+    try:
+        # Validate scenario content if it's being updated
+        if request.content is not None:
+            validator = ScenarioValidator()
+            validation_errors = validator.validate_all(request.content)
+            if validation_errors:
+                error_details = "; ".join(
+                    [f"{err['field']}: {err['message']}" for err in validation_errors]
+                )
+                raise BadRequestError(f"Invalid scenario content: {error_details}")
+
+        scenario_data = ScenarioUpdate(
+            name=request.name,
+            content=request.content,
+            description=request.description,
+        )
+        db_scenario = scenario_crud.update(
+            db, scenario_id, requesting_user, scenario_data
+        )
+        return ScenarioResponse.model_validate(db_scenario)
+
+    except ItemNotFoundError as err:
+        raise HTTPException(status_code=404, detail=str(err))
+    except BadRequestError as err:
+        raise HTTPException(status_code=400, detail=str(err))
+    except VelosimPermissionError as err:
+        raise HTTPException(status_code=403, detail=str(err))
+    except Exception as err:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to update scenario: {str(err)}",
+        )
+
+
+@router.delete("/{scenario_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_scenario(
+    scenario_id: int,
+    requesting_user: int = Depends(get_user_id),
+    db: Session = Depends(get_db),
+) -> None:
+    """
+    Delete a scenario.
+    """
+    try:
+        scenario_crud.delete(db, scenario_id, requesting_user)
+    except ItemNotFoundError as err:
+        raise HTTPException(status_code=404, detail=str(err))
+    except BadRequestError as err:
+        raise HTTPException(status_code=400, detail=str(err))
+    except VelosimPermissionError as err:
+        raise HTTPException(status_code=403, detail=str(err))
+    except Exception as err:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to delete scenario: {str(err)}",
+        )

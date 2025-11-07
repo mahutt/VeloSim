@@ -23,8 +23,8 @@ SOFTWARE.
 """
 
 from typing import Any, Dict, List, Set
-from pydantic import BaseModel, ValidationError, model_validator
-from datetime import time, datetime as dt_time
+from pydantic import BaseModel, ValidationError, model_validator, field_validator
+from datetime import datetime
 
 from back.schemas.scenario import ScenarioResponse
 
@@ -68,12 +68,87 @@ class StationValidator(BaseModel):
 class TaskValidator(BaseModel):
     id: str
     station_id: str
-    time: dt_time | None = None
+    time: datetime | None = None
+
+    @field_validator("time", mode="before")
+    @classmethod
+    def parse_time(cls, v: Any) -> datetime | None:
+        """Parse time from various formats to datetime object.
+
+        Supports:
+        - RFC 3339 / ISO 8601 datetime strings (e.g., "2025-11-06T08:00:00Z")
+        - Simple time strings (e.g., "08:00") - converted to today's date
+        - datetime objects (passed through)
+        """
+        if v is None or isinstance(v, datetime):
+            return v
+
+        if isinstance(v, str):
+            # Try RFC 3339 / ISO 8601 format first
+            try:
+                return datetime.fromisoformat(v.replace("Z", "+00:00"))
+            except ValueError:
+                pass
+
+            # Try simple time format (HH:MM or HH:MM:SS)
+            for fmt in ["%H:%M:%S", "%H:%M"]:
+                try:
+                    parsed_time = datetime.strptime(v, fmt).time()
+                    # Combine with today's date
+                    return datetime.combine(datetime.today().date(), parsed_time)
+                except ValueError:
+                    continue
+
+            raise ValueError(
+                f"Invalid time format: {v}. Use RFC 3339 format "
+                "(e.g., '2025-11-06T08:00:00Z') or simple time "
+                "(e.g., '08:00')"
+            )
+
+        raise ValueError(f"Time must be a string or datetime, got {type(v)}")
 
 
 class ScenarioTimes(BaseModel):
-    start_time: time
-    end_time: time
+    start_time: datetime
+    end_time: datetime
+
+    @field_validator("start_time", "end_time", mode="before")
+    @classmethod
+    def parse_time(cls, v: Any) -> datetime:
+        """Parse time from various formats to datetime object.
+
+        Supports:
+        - RFC 3339 / ISO 8601 datetime strings
+          (e.g., "2025-11-06T08:00:00Z")
+        - Simple time strings (e.g., "08:00") - converted to today's date
+        - datetime objects (passed through)
+        """
+        if isinstance(v, datetime):
+            return v
+
+        if isinstance(v, str):
+            # Try RFC 3339 / ISO 8601 format first
+            try:
+                return datetime.fromisoformat(v.replace("Z", "+00:00"))
+            except ValueError:
+                pass
+
+            # Try simple time format (HH:MM or HH:MM:SS)
+            for fmt in ["%H:%M:%S", "%H:%M"]:
+                try:
+                    parsed_time = datetime.strptime(v, fmt).time()
+                    # Combine with today's date
+                    return datetime.combine(datetime.today().date(), parsed_time)
+                except ValueError:
+                    continue
+
+            raise ValueError(
+                f"Invalid time format: {v}. Use RFC 3339 format "
+                "(e.g., '2025-11-06T08:00:00Z') or simple time "
+                "(e.g., '08:00')"
+            )
+
+        raise ValueError(f"Time must be a string or datetime, got {type(v)}")
 
 
 class ScenarioValidator:
@@ -84,7 +159,7 @@ class ScenarioValidator:
         item: Dict[str, Any], required_fields: List[str]
     ) -> List[Dict[str, str]]:
         return [
-            {"field": f, "error": f"Missing required field '{f}'"}
+            {"field": f, "message": f"Missing required field '{f}'"}
             for f in required_fields
             if f not in item
         ]
@@ -106,10 +181,10 @@ class ScenarioValidator:
             except ValidationError as e:
                 for err in e.errors():
                     field_path = "content." + ".".join(map(str, err["loc"]))
-                    errors.append({"field": field_path, "error": err["msg"]})
+                    errors.append({"field": field_path, "message": err["msg"]})
         else:
             errors.append(
-                {"field": "content", "error": "Missing required field 'content'"}
+                {"field": "content", "message": "Missing required field 'content'"}
             )
 
         return errors
@@ -136,7 +211,7 @@ class ScenarioValidator:
                     errors.append(
                         {
                             "field": f"stations[{idx}].station_id",
-                            "error": "Duplicate station ID",
+                            "message": "Duplicate station ID",
                         }
                     )
                 seen_ids.add(station_id_raw)
@@ -146,7 +221,7 @@ class ScenarioValidator:
             except ValidationError as e:
                 for err in e.errors():
                     field_name = f"stations[{idx}].{'.'.join(map(str, err['loc']))}"
-                    errors.append({"field": field_name, "error": err["msg"]})
+                    errors.append({"field": field_name, "message": err["msg"]})
 
         return errors
 
@@ -168,14 +243,14 @@ class ScenarioValidator:
                     errors.append(
                         {
                             "field": f"resources[{idx}].resource_id",
-                            "error": "Duplicate resource ID",
+                            "message": "Duplicate resource ID",
                         }
                     )
                 seen_ids.add(validated.resource_id)
             except ValidationError as e:
                 for err in e.errors():
                     field_name = f"resources[{idx}].{'.'.join(map(str, err['loc']))}"
-                    errors.append({"field": field_name, "error": err["msg"]})
+                    errors.append({"field": field_name, "message": err["msg"]})
 
         return errors
 
@@ -191,7 +266,7 @@ class ScenarioValidator:
                 validated: TaskValidator = TaskValidator(**task)
                 if validated.id in seen_task_ids:
                     errors.append(
-                        {"field": f"tasks[{idx}].id", "error": "Duplicate task ID"}
+                        {"field": f"tasks[{idx}].id", "message": "Duplicate task ID"}
                     )
                 seen_task_ids.add(validated.id)
 
@@ -199,7 +274,7 @@ class ScenarioValidator:
                     errors.append(
                         {
                             "field": f"tasks[{idx}].station_id",
-                            "error": (
+                            "message": (
                                 f"Station ID {validated.station_id} does not exist"
                             ),
                         }
@@ -207,35 +282,44 @@ class ScenarioValidator:
             except ValidationError as e:
                 for err in e.errors():
                     field_name = f"tasks[{idx}].{'.'.join(map(str, err['loc']))}"
-                    errors.append({"field": field_name, "error": err["msg"]})
+                    errors.append({"field": field_name, "message": err["msg"]})
 
         return errors
 
     def validate_simulation_params(
         self, params: Dict[str, Any]
     ) -> List[Dict[str, str]]:
-        errors: List[Dict[str, str]] = []
-        start_str: Any = params.get("start_time")
-        end_str: Any = params.get("end_time")
+        """Validate simulation time parameters.
 
-        if isinstance(start_str, str) and isinstance(end_str, str):
+        Ensures start_time and end_time are valid and that end_time is after start_time.
+        Supports scenarios that span multiple days.
+        """
+        errors: List[Dict[str, str]] = []
+        start_val: Any = params.get("start_time")
+        end_val: Any = params.get("end_time")
+
+        if start_val is not None and end_val is not None:
             try:
-                start_dt: time = dt_time.strptime(start_str, "%H:%M").time()
-                end_dt: time = dt_time.strptime(end_str, "%H:%M").time()
-                if end_dt <= start_dt:
+                # Parse times using ScenarioTimes validator
+                scenario_times = ScenarioTimes(start_time=start_val, end_time=end_val)
+
+                # Validate that end_time is after start_time
+                if scenario_times.end_time <= scenario_times.start_time:
                     errors.append(
                         {
                             "field": "end_time",
-                            "error": "end_time must be after start_time",
+                            "message": "end_time must be after start_time",
                         }
                     )
-            except ValueError as e:
-                errors.append(
-                    {
-                        "field": "start_time/end_time",
-                        "error": f"Invalid time format: {e}",
-                    }
-                )
+            except ValidationError as e:
+                for err in e.errors():
+                    field_path = ".".join(map(str, err["loc"]))
+                    errors.append(
+                        {
+                            "field": field_path,
+                            "message": err["msg"],
+                        }
+                    )
 
         return errors
 

@@ -64,6 +64,21 @@ class ScenarioCRUD:
 
         return scenario
 
+    def get_by_name_and_user(
+        self, db: Session, name: str, user_id: int
+    ) -> Scenario | None:
+        """
+        Get a scenario by name for a specific user.
+
+        Returns None if no scenario with that name exists for the user.
+        Used for duplicate name checking.
+        """
+        return (
+            db.query(Scenario)
+            .filter(Scenario.name == name, Scenario.user_id == user_id)
+            .first()
+        )
+
     def get_by_user(
         self, db: Session, user_id: int, skip: int = 0, limit: int = 100
     ) -> Tuple[List[Scenario], int]:
