@@ -165,7 +165,7 @@ def test_start_creates_thread_and_emits_output(
     We use fake_time to avoid real time delays.
     """
     # Initialize first, then start
-    sim_id = sim.initialize(params, subList, simpy_env, FakeSimBehaviour())
+    sim_id = sim.initialize(params, subList, FakeSimBehaviour())
     uuid.UUID(sim_id)  # should not raise
 
     # Patch heavy map building and routing before start
@@ -200,7 +200,7 @@ def test_start_with_non_existant_sim_id(
     sim: Simulator, fake_time: MockClock, simpy_env: simpy.Environment
 ) -> None:
     # Arrange
-    sim.initialize(params, subList, simpy_env, FakeSimBehaviour())
+    sim.initialize(params, subList, FakeSimBehaviour())
 
     # Act and Assert
     with pytest.raises(
@@ -213,7 +213,7 @@ def test_start_with_already_running_sim(
     sim: Simulator, fake_time: MockClock, simpy_env: simpy.Environment
 ) -> None:
     # Arrange
-    sim_id = sim.initialize(params, subList, simpy_env, FakeSimBehaviour())
+    sim_id = sim.initialize(params, subList, FakeSimBehaviour())
     sim_info = sim.get_sim_by_id(sim_id)
     assert sim_info is not None
     ctrl = sim_info["simController"]
@@ -238,7 +238,7 @@ def test_stop_removes_thread_from_pool(
     simpy_env: simpy.Environment,
 ) -> None:
     # Initialize and start simulation
-    sim_id = sim.initialize(params, subList, simpy_env, FakeSimBehaviour())
+    sim_id = sim.initialize(params, subList, FakeSimBehaviour())
     sim_info = sim.get_sim_by_id(sim_id)
     assert sim_info is not None
     ctrl = sim_info["simController"]
@@ -275,8 +275,8 @@ def test_multiple_parallel_sims(
     simpy_env: simpy.Environment,
 ) -> None:
     # Initialize and start multiple simulations
-    a = sim.initialize(params, subList, simpy_env, FakeSimBehaviour())
-    b = sim.initialize(params, subList, simpy_env, FakeSimBehaviour())
+    a = sim.initialize(params, subList, FakeSimBehaviour())
+    b = sim.initialize(params, subList, FakeSimBehaviour())
 
     a_info = sim.get_sim_by_id(a)
     b_info = sim.get_sim_by_id(b)
@@ -425,7 +425,7 @@ def test_get_sim_by_id_success(
     simpy_env: simpy.Environment,
 ) -> None:
     # Arrange
-    a = sim.initialize(params, subList, simpy_env, FakeSimBehaviour())
+    a = sim.initialize(params, subList, FakeSimBehaviour())
     a_info = sim.get_sim_by_id(a)
     assert a_info is not None
     ctrl = a_info["simController"]
@@ -455,7 +455,7 @@ def test_get_sim_by_id_fail(
     simpy_env: simpy.Environment,
 ) -> None:
     # Arrange
-    a = sim.initialize(params, subList, simpy_env, FakeSimBehaviour())
+    a = sim.initialize(params, subList, FakeSimBehaviour())
     a_info = sim.get_sim_by_id(a)
     assert a_info is not None
     ctrl = a_info["simController"]
@@ -485,7 +485,7 @@ def test_add_task_to_sim_success(
     default_station: Station,
 ) -> None:
     # Arrange
-    a = sim.initialize(params, subList, simpy_env, FakeSimBehaviour())
+    a = sim.initialize(params, subList, FakeSimBehaviour())
     a_info = sim.get_sim_by_id(a)
     assert a_info is not None
     ctrl = a_info["simController"]
@@ -528,7 +528,7 @@ def test_add_task_to_sim_fail(
     default_station: Station,
 ) -> None:
     # Arrange
-    a = sim.initialize(params, subList, simpy_env, FakeSimBehaviour())
+    a = sim.initialize(params, subList, FakeSimBehaviour())
     a_info = sim.get_sim_by_id(a)
     assert a_info is not None
     ctrl = a_info["simController"]
@@ -560,7 +560,7 @@ def test_assign_task_to_resource_success(
     sim: Simulator, input_params: InputParameter, simpy_env: simpy.Environment
 ) -> None:
     # Arrange
-    a = sim.initialize(input_params, subList, simpy_env, FakeSimBehaviour())
+    a = sim.initialize(input_params, subList, FakeSimBehaviour())
     a_info = sim.get_sim_by_id(a)
     assert a_info is not None
     ctrl = a_info["simController"]
@@ -593,8 +593,7 @@ def test_assign_task_to_resource_fail(
     mock_print: MagicMock, sim: Simulator, input_params: InputParameter
 ) -> None:
     # Arrange
-    env = simpy.Environment()
-    a = sim.initialize(input_params, subList, env, FakeSimBehaviour())
+    a = sim.initialize(input_params, subList, FakeSimBehaviour())
     a_info = sim.get_sim_by_id(a)
     assert a_info is not None
     ctrl = a_info["simController"]
@@ -620,7 +619,7 @@ def test_unassign_task_from_resource_success(
     sim: Simulator, input_params: InputParameter, simpy_env: simpy.Environment
 ) -> None:
     # Arrange
-    a = sim.initialize(input_params, subList, simpy_env, FakeSimBehaviour())
+    a = sim.initialize(input_params, subList, FakeSimBehaviour())
     a_info = sim.get_sim_by_id(a)
     assert a_info is not None
     ctrl = a_info["simController"]
@@ -652,8 +651,7 @@ def test_unassign_task_from_resource_fail(
     mock_print: MagicMock, sim: Simulator, input_params: InputParameter
 ) -> None:
     # Arrange
-    env = simpy.Environment()
-    a = sim.initialize(input_params, subList, env, FakeSimBehaviour())
+    a = sim.initialize(input_params, subList, FakeSimBehaviour())
     a_info = sim.get_sim_by_id(a)
     assert a_info is not None
     ctrl = a_info["simController"]
@@ -677,9 +675,7 @@ def test_unassign_task_from_resource_fail(
 
 def test_reassign_task_success(sim: Simulator, input_params: InputParameter) -> None:
     # Arrange
-    # Create a fresh environment
-    env = simpy.Environment()
-    a = sim.initialize(input_params, subList, env, FakeSimBehaviour())
+    a = sim.initialize(input_params, subList, FakeSimBehaviour())
     a_info = sim.get_sim_by_id(a)
     assert a_info is not None
     ctrl = a_info["simController"]
@@ -719,7 +715,7 @@ def test_reassign_task_fail(
     simpy_env: simpy.Environment,
 ) -> None:
     # Arrange
-    a = sim.initialize(input_params, subList, simpy_env, FakeSimBehaviour())
+    a = sim.initialize(input_params, subList, FakeSimBehaviour())
     a_info = sim.get_sim_by_id(a)
     assert a_info is not None
     ctrl = a_info["simController"]
@@ -759,7 +755,7 @@ def test_stop_all_stops_everything_and_is_idempotent(
     # Initialize and start multiple simulations
     sim_ids = []
     for _ in range(3):
-        sim_id = sim.initialize(params, subList, simpy_env, FakeSimBehaviour())
+        sim_id = sim.initialize(params, subList, FakeSimBehaviour())
         sim_info = sim.get_sim_by_id(sim_id)
         assert sim_info is not None
         ctrl = sim_info["simController"]
