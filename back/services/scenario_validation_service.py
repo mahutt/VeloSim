@@ -292,7 +292,7 @@ class ScenarioValidator:
         """Validate simulation time parameters.
 
         Ensures start_time and end_time are valid and that end_time is after start_time.
-        Supports scenarios that span multiple days.
+        Simulations cannot span more than 24 hours.
         """
         errors: List[Dict[str, str]] = []
         start_val: Any = params.get("start_time")
@@ -309,6 +309,16 @@ class ScenarioValidator:
                         {
                             "field": "end_time",
                             "message": "end_time must be after start_time",
+                        }
+                    )
+
+                # Validate that simulation doesn't span more than 24 hours
+                duration = scenario_times.end_time - scenario_times.start_time
+                if duration.total_seconds() > 86400:  # 24 hours in seconds
+                    errors.append(
+                        {
+                            "field": "end_time",
+                            "message": "Simulation duration cannot exceed 24 hours",
                         }
                     )
             except ValidationError as e:
