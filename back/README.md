@@ -16,6 +16,8 @@ back/
 ├── models/              # SQLAlchemy database models
 ├── schemas/             # Pydantic request/response schemas
 ├── crud/                # Database CRUD operations
+├── services/            # Business logic
+├── auth/                # User authentiation and JWT handling
 ├── api/                 # FastAPI route definitions
 ├── alembic/             # Database migration files
 └── tests/
@@ -127,10 +129,14 @@ See the [Logging System README](./grafana_logging/README.md) for complete loggin
 
 The following settings are configured in `back/core/config.py`:
 
-| Setting           | Value                   | Description                          |
-| ----------------- | ----------------------- | ------------------------------------ |
-| `API_V1_PREFIX`   | `/api/v1`               | API version prefix for all endpoints |
-| `ALLOWED_ORIGINS` | Multiple localhost URLs | CORS allowed origins for development |
+| Setting                                 | Value                      | Description                                    |
+| --------------------------------------- | -------------------------- | ---------------------------------------------- |
+| `API_V1_PREFIX`                         | `/api/v1`                  | API version prefix for all endpoints           |
+| `ALLOWED_ORIGINS`                       | Multiple localhost URLs    | CORS allowed origins for development           |
+| `FEATURE_STATIONS_API_ROUTER`           | `true` / `false`           | Feature flag for Stations API endpoints        |
+| `FEATURE_STATION_TASKS_API_ROUTER`      | `true` / `false`           | Feature flag for Station Tasks API endpoints   |
+| `FEATURE_RESOURCES_API_ROUTER`          | `true` / `false`           | Feature flag for Resources API endpoints       |
+
 
 ## 🛠️ Development
 

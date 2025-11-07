@@ -35,9 +35,15 @@ from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, Session
 
+# Enable any feature flags for testing **before** importing 'app'
+os.environ["FEATURE_STATIONS_API_ROUTER"] = "true"
+os.environ["FEATURE_STATION_TASKS_API_ROUTER"] = "true"
+os.environ["FEATURE_RESOURCES_API_ROUTER"] = "true"
+
 # Add the back directory to Python path for relative imports
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
+# 'app' can now safely be imported
 from back.main import app  # noqa: E402
 from back.database.session import get_db, Base  # noqa: E402
 import back.models  # noqa: F401, E402

@@ -22,10 +22,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 """
 
-from .simulation_service import simulation_service
-from .resource_service import resource_service
+# import all utilities here for easy access
+from .create_input_params import create_default_input_parameters
 
-__all__ = [
-    "simulation_service",
-    "resource_service",
-]
+__all__ = ["create_default_input_parameters"]

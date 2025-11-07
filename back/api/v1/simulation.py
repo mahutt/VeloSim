@@ -22,9 +22,8 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 """
 
-import asyncio
 import math
-from typing import Dict, List
+from typing import Dict
 from fastapi import (
     APIRouter,
     HTTPException,
@@ -33,84 +32,46 @@ from fastapi import (
     Depends,
     Query,
 )
-from pydantic import BaseModel
+from back.api.v1.utils import (
+    attach_subscriber,
+    cleanup_simulation,
+    get_simulation_or_error,
+    safe_send_json,
+    start_or_resume_simulation,
+)
+from back.schemas import (
+    ResourceTaskAssignRequest,
+    ResourceTaskUnassignRequest,
+    ResourceTaskReassignRequest,
+    ResourceTaskAssignResponse,
+    ResourceTaskUnassignResponse,
+    ResourceTaskReassignResponse,
+)
 from sqlalchemy.orm import Session
 
 from back.auth.dependency import get_user_id
 from back.exceptions import VelosimPermissionError, ItemNotFoundError
+from back.services.resource_service import resource_service
 from back.schemas import PlaybackSpeedBase, PlaybackSpeedResponse
-from back.schemas.sim_instance import SimInstanceResponse
-from sim.entities.frame import Frame
-from sim.utils.subscriber import Subscriber
+from back.schemas.sim_instance import (
+    SimInstanceResponse,
+    SimulationListResponse,
+    SimulationResponse,
+)
 from back.services.simulation_service import simulation_service
 from back.database.session import get_db
 
 router = APIRouter(prefix="/simulation", tags=["simulation"])
 
 
-class WebSocketSubscriber(Subscriber):
-    """Subscriber that forwards frames to a WebSocket connection."""
-
-    def __init__(self, websocket: WebSocket, sim_id: str):
-        self.websocket = websocket
-        self.sim_id = sim_id
-        self._loop: asyncio.AbstractEventLoop | None = None
-
-    def set_event_loop(self, loop: asyncio.AbstractEventLoop) -> None:
-        """Set the event loop for async operations."""
-        self._loop = loop
-
-    def on_frame(self, frame: Frame) -> None:
-        """Called when a new frame is available from the simulator."""
-        if self._loop is None:
-            return
-
-        # Convert frame to dictionary for JSON serialization
-        frame_data = {
-            "sim_id": self.sim_id,
-            "seq_numb": frame.seq_number,
-            "payload": frame.payload_str,
-            "timestamp": frame.timestamp_ms,
-        }
-
-        # Schedule the coroutine in the event loop
-        asyncio.run_coroutine_threadsafe(self._send_frame(frame_data), self._loop)
-
-    async def _send_frame(self, frame_data: Dict) -> None:
-        """Send frame data over WebSocket."""
-        try:
-            await self.websocket.send_json(frame_data)
-        except Exception as err:
-            print(f"Error sending frame over WebSocket: {err}")
-
-
-class SimulationResponse(BaseModel):
-    """Response model for simulation operations"""
-
-    sim_id: str
-    db_id: int
-    status: str
-
-
-class SimulationListResponse(BaseModel):
-    """Response model for listing simulations with pagination"""
-
-    simulations: List[SimInstanceResponse]
-    total: int
-    page: int
-    per_page: int
-    total_pages: int
-
-
-@router.post("/start", response_model=SimulationResponse)
-async def start_simulation(
+@router.post("/initialize", response_model=SimulationResponse)
+async def initialize_simulation(
     db: Session = Depends(get_db),
     requesting_user: int = Depends(get_user_id),
 ) -> SimulationResponse:
-    """Start a new simulation and return its ID."""
+    """Initialize a new simulation and return a confirmation response."""
     try:
-        sim_id, db_id = simulation_service.start_simulation(db, requesting_user)
-        return SimulationResponse(sim_id=sim_id, db_id=db_id, status="started")
+        return simulation_service.initialize_simulation(db, requesting_user)
     except VelosimPermissionError as err:
         raise HTTPException(status_code=403, detail=str(err))
     except Exception as err:
@@ -278,66 +239,143 @@ async def set_playback_speed(
 
 
 @router.websocket("/stream/{sim_id}")
-async def websocket_simulation_stream(websocket: WebSocket, sim_id: str) -> None:
+async def websocket_simulation_stream(
+    websocket: WebSocket,
+    sim_id: str,
+    requesting_user: int = Depends(get_user_id),
+    db: Session = Depends(get_db),
+) -> None:
     """
-    WebSocket endpoint for receiving real-time simulation frames.
+    WebSocket endpoint for starting an initialized sim instance and
+    receiving real-time simulation frames.
 
     The frontend connects to this endpoint to receive frame updates
     from the running simulation via the FrameEmitter.
     """
     await websocket.accept()
 
-    # Check if simulation exists
-    if sim_id not in simulation_service.active_simulations:
-        await websocket.send_json({"error": "Simulation not found", "sim_id": sim_id})
-        await websocket.close(code=4004, reason="Simulation not found")
+    try:
+        has_access = simulation_service.verify_access(db, sim_id, requesting_user)
+        if not has_access:
+            await websocket.send_json(
+                {"type": "error", "message": "Unauthorized access to this simulation."}
+            )
+            await websocket.close()
+            return
+    except ItemNotFoundError as e:
+        await websocket.send_json({"type": "error", "message": str(e)})
+        await websocket.close()
+        return
+    except VelosimPermissionError as e:
+        await websocket.send_json({"type": "error", "message": str(e)})
+        await websocket.close()
         return
 
-    # Create a subscriber for this WebSocket connection
-    subscriber = WebSocketSubscriber(websocket, sim_id)
-    subscriber.set_event_loop(asyncio.get_event_loop())
+    sim_info = await get_simulation_or_error(sim_id, websocket)
+    if not sim_info:
+        return
 
-    # Attach subscriber to the simulation's FrameEmitter
-    # Access emitter through the simulator's thread pool
-    simulator = simulation_service.get_simulator()
-
-    # The emitter is stored in the thread_pool dictionary
-    with simulator.thread_pool_lock:
-        if sim_id not in simulator.thread_pool:
-            await websocket.send_json(
-                {"error": "Simulation not found in thread pool", "sim_id": sim_id}
-            )
-            await websocket.close(code=4004, reason="Simulation not active")
-            return
-
-        emitter = simulator.thread_pool[sim_id]["emitter"]
-
-    emitter.attach(subscriber)
+    subscriber = attach_subscriber(sim_info, websocket, sim_id)
+    await start_or_resume_simulation(sim_info, sim_id, requesting_user, websocket)
 
     try:
-        # Send initial connection confirmation
-        await websocket.send_json(
-            {
-                "type": "connection_established",
-                "sim_id": sim_id,
-                "message": "Connected to simulation frame stream",
-            }
-        )
-
-        # Keep connection alive and handle incoming messages (if any)
         while True:
-            # Wait for any messages from client (e.g., ping/pong)
-            data = await websocket.receive_text()
+            try:
+                msg = await websocket.receive_json()
+            except WebSocketDisconnect:
+                break
 
-            # Handle simple ping/pong for connection health
-            if data == "ping":
-                await websocket.send_json({"type": "pong"})
-
-    except WebSocketDisconnect:
-        print(f"WebSocket disconnected for sim {sim_id}")
-    except Exception as err:
-        print(f"WebSocket error for sim {sim_id}: {err}")
+            if msg.get("action") != "ping":
+                # send a warning for any client-side message received that is not
+                # a "ping" (which is used to check the liveness of the connection)
+                await safe_send_json(
+                    websocket,
+                    {
+                        "type": "warning",
+                        "event": "unknown_action",
+                        "message": "Unrecognized action.",
+                    },
+                )
     finally:
-        # Detach subscriber when connection closes
-        emitter.detach(subscriber)
-        print(f"Detached subscriber for sim {sim_id}")
+        await cleanup_simulation(sim_info, subscriber, websocket)
+
+
+@router.post(
+    "/{sim_id}/resources/assign",
+    status_code=200,
+    response_model=ResourceTaskAssignResponse,
+)
+def assign_task_to_resource(
+    sim_id: str,
+    task_assign_data: ResourceTaskAssignRequest,
+    requesting_user: int = Depends(get_user_id),
+    db: Session = Depends(get_db),
+) -> ResourceTaskAssignResponse:
+    """Assign a task to a resource in a running simulation."""
+    try:
+        return resource_service.assign_task(
+            db=db,
+            sim_uuid=sim_id,
+            requesting_user=requesting_user,
+            task_assign_data=task_assign_data,
+        )
+    except ItemNotFoundError as err:
+        raise HTTPException(status_code=404, detail=str(err))
+    except VelosimPermissionError as err:
+        raise HTTPException(status_code=403, detail=str(err))
+    except RuntimeError as err:
+        raise HTTPException(status_code=500, detail=str(err))
+
+
+@router.post(
+    "/{sim_id}/resources/unassign",
+    status_code=200,
+    response_model=ResourceTaskUnassignResponse,
+)
+def unassign_task_from_resource(
+    sim_id: str,
+    task_unassign_data: ResourceTaskUnassignRequest,
+    requesting_user: int = Depends(get_user_id),
+    db: Session = Depends(get_db),
+) -> ResourceTaskUnassignResponse:
+    """Unassign a task from a resource in a running simulation."""
+    try:
+        return resource_service.unassign_task(
+            db=db,
+            sim_uuid=sim_id,
+            requesting_user=requesting_user,
+            task_unassign_data=task_unassign_data,
+        )
+    except ItemNotFoundError as err:
+        raise HTTPException(status_code=404, detail=str(err))
+    except VelosimPermissionError as err:
+        raise HTTPException(status_code=403, detail=str(err))
+    except RuntimeError as err:
+        raise HTTPException(status_code=500, detail=str(err))
+
+
+@router.post(
+    "/{sim_id}/resources/reassign",
+    status_code=200,
+    response_model=ResourceTaskReassignResponse,
+)
+def reassign_task_between_resources(
+    sim_id: str,
+    task_reassign_data: ResourceTaskReassignRequest,
+    requesting_user: int = Depends(get_user_id),
+    db: Session = Depends(get_db),
+) -> ResourceTaskReassignResponse:
+    """Reassign a task from one resource to another in a running simulation."""
+    try:
+        return resource_service.reassign_task(
+            db=db,
+            sim_uuid=sim_id,
+            requesting_user=requesting_user,
+            task_reassign_data=task_reassign_data,
+        )
+    except ItemNotFoundError as err:
+        raise HTTPException(status_code=404, detail=str(err))
+    except VelosimPermissionError as err:
+        raise HTTPException(status_code=403, detail=str(err))
+    except RuntimeError as err:
+        raise HTTPException(status_code=500, detail=str(err))

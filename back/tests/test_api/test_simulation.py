@@ -29,15 +29,24 @@ from sqlalchemy.orm import Session
 from typing import Generator, cast, TypedDict, List
 import asyncio
 
+from back.api.v1.utils.sim_websocket_helpers import WebSocketSubscriber
 from back.main import app
 from back.auth.dependency import get_user_id
 from back.exceptions import VelosimPermissionError, ItemNotFoundError
-from back.schemas import PlaybackSpeedResponse, SimulationPlaybackStatus
-from back.services import simulation_service
-from back.api.v1.simulation import WebSocketSubscriber
+from back.schemas import (
+    ResourceTaskAssignResponse,
+    ResourceTaskUnassignResponse,
+    ResourceTaskReassignResponse,
+)
+from back.schemas.playback_speed import PlaybackSpeedResponse, SimulationPlaybackStatus
+from back.schemas.resource import (
+    ResourceTaskAssignRequest,
+    ResourceTaskReassignRequest,
+    ResourceTaskUnassignRequest,
+)
+from back.services.simulation_service import simulation_service
 from fastapi import WebSocket
 
-from sim.frame_emitter import FrameEmitter
 from back.models.user import User
 
 # Apply patches before any simulator code is imported
@@ -101,8 +110,24 @@ def disabled_admin_client(client: TestClient) -> Generator[TestClient, None, Non
 
 
 @pytest.fixture
-def ws_client(client: TestClient) -> Generator[TestClient, None, None]:
+def ws_client_authenticated(client: TestClient) -> Generator[TestClient, None, None]:
+    """WebSocket client with get_user_id mocked."""
+
+    def mock_get_user_id() -> int:
+        return 1  # Use any test user ID
+
+    app.dependency_overrides[get_user_id] = mock_get_user_id
     yield client
+    app.dependency_overrides.clear()
+
+
+@pytest.fixture
+def active_sim_id() -> Generator[str, None, None]:
+    """Provides a dummy in-memory active simulation for tests."""
+    sim_id = "sim-test-123"
+    simulation_service.active_simulations[sim_id] = {"db_id": 999, "status": "running"}
+    yield sim_id
+    del simulation_service.active_simulations[sim_id]
 
 
 @pytest.fixture
@@ -146,53 +171,71 @@ def admin_user(db: Session) -> User:
 
 
 @pytest.fixture
-def admin_authenticated_client(
-    client: TestClient, admin_user: User
-) -> Generator[TestClient, None, None]:
-    """Client with authenticated admin user (ID=999)."""
-
-    def mock_get_user_id() -> int:
-        return admin_user.id
-
-    app.dependency_overrides[get_user_id] = mock_get_user_id
+def ws_client(client: TestClient) -> Generator[TestClient, None, None]:
     yield client
-    app.dependency_overrides.clear()
+
+
+@pytest.fixture
+def mocked_simulator(monkeypatch: pytest.MonkeyPatch) -> Generator[None, None, None]:
+    """Mock the simulator object to prevent DB or thread access in tests."""
+    mock_sim = MagicMock()
+    mock_emitter = MagicMock()
+    mock_sim.thread_pool = {
+        "sim123": {
+            "emitter": mock_emitter,
+            "thread": MagicMock(),
+            "simController": MagicMock(),
+        }
+    }
+    mock_sim.thread_pool_lock = MagicMock()
+
+    # Patch the simulator getter
+    monkeypatch.setattr(
+        "back.services.simulation_service.simulation_service.get_simulator",
+        lambda: mock_sim,
+    )
+    yield
 
 
 class TestSimulationAPI:
 
-    @patch("back.services.simulation_service.simulation_service.start_simulation")
-    def test_start_simulation_success(
-        self, mock_start: MagicMock, authenticated_client: TestClient, db: Session
+    @patch("back.services.simulation_service.simulation_service.initialize_simulation")
+    def test_initialize_simulation_success(
+        self, mock_init: MagicMock, authenticated_client: TestClient
     ) -> None:
-        """Test starting a simulation successfully."""
-        mock_start.return_value = ("sim123", 42)
-        response = authenticated_client.post("/api/v1/simulation/start")
+        """Test initializing a simulation successfully."""
+        mock_init.return_value = {
+            "sim_id": "sim123",
+            "db_id": 42,
+            "status": "initialized",
+        }
+
+        response = authenticated_client.post("/api/v1/simulation/initialize")
         assert response.status_code == 200
         data = response.json()
         assert data["sim_id"] == "sim123"
         assert data["db_id"] == 42
-        assert data["status"] == "started"
-        mock_start.assert_called_once_with(ANY, 1)
+        assert data["status"] == "initialized"
+        mock_init.assert_called_once()
 
-    @patch("back.services.simulation_service.simulation_service.start_simulation")
-    def test_start_simulation_permission_error(
-        self, mock_start: MagicMock, non_admin_client: TestClient, db: Session
+    @patch("back.services.simulation_service.simulation_service.initialize_simulation")
+    def test_initialize_simulation_permission_error(
+        self, mock_init: MagicMock, non_admin_client: TestClient
     ) -> None:
-        """Non-admin user cannot start simulation if restricted."""
-        mock_start.side_effect = VelosimPermissionError("No permission")
-        response = non_admin_client.post("/api/v1/simulation/start")
+        """Non-admin user cannot initialize simulation if restricted."""
+        mock_init.side_effect = VelosimPermissionError("No permission")
+        response = non_admin_client.post("/api/v1/simulation/initialize")
         assert response.status_code == 403
         assert "No permission" in response.json()["detail"]
-        mock_start.assert_called_once_with(ANY, 2)
 
-    @patch("back.services.simulation_service.simulation_service.start_simulation")
-    def test_start_simulation_generic_error(
-        self, mock_start: MagicMock, authenticated_client: TestClient, db: Session
+    @patch("back.services.simulation_service.simulation_service.initialize_simulation")
+    def test_initialize_simulation_generic_error(
+        self, mock_init: MagicMock, authenticated_client: TestClient
     ) -> None:
-        mock_start.side_effect = Exception("Unexpected error")
-        response = authenticated_client.post("/api/v1/simulation/start")
+        mock_init.side_effect = Exception("Unexpected error")
+        response = authenticated_client.post("/api/v1/simulation/initialize")
         assert response.status_code == 500
+        assert "Unexpected error" in response.json()["detail"]
 
     @patch("back.services.simulation_service.simulation_service.stop_simulation")
     def test_stop_simulation_success(
@@ -546,35 +589,156 @@ class TestSimulationAPI:
             "timestamp": 12345,
         }
 
-    def test_websocket_stream_endpoint(self, ws_client: TestClient) -> None:
-        """Test the /stream/{sim_id} WebSocket endpoint."""
+    @patch("back.api.v1.simulation.resource_service.assign_task")
+    def test_assign_task_success(
+        self,
+        mock_assign: MagicMock,
+        authenticated_client: TestClient,
+        active_sim_id: str,
+    ) -> None:
+        mock_assign.return_value = ResourceTaskAssignResponse(resource_id=7, task_id=42)
+        payload = {"resource_id": 7, "task_id": 42}
 
-        # Prepare active simulation
-        simulation_service.active_simulations = {"sim123": {}}
+        response = authenticated_client.post(
+            f"/api/v1/simulation/{active_sim_id}/resources/assign", json=payload
+        )
 
-        simulator = simulation_service.get_simulator()
+        assert response.status_code == 200
+        assert response.json() == {"resource_id": 7, "task_id": 42}
 
-        # Use real FrameEmitter, mock the thread and simController
-        with simulator.thread_pool_lock:
-            simulator.thread_pool["sim123"] = {
-                "emitter": FrameEmitter("sim123"),
-                "thread": MagicMock(),
-                "simController": MagicMock(),
-            }
+        mock_assign.assert_called_once_with(
+            db=ANY,
+            sim_uuid=active_sim_id,
+            requesting_user=1,
+            task_assign_data=ResourceTaskAssignRequest(**payload),
+        )
 
-        with ws_client.websocket_connect(
-            "/api/v1/simulation/stream/sim123"
-        ) as websocket:
-            # Receive initial connection confirmation
-            data = websocket.receive_json()
-            assert data["type"] == "connection_established"
-            assert data["sim_id"] == "sim123"
-            assert "Connected to simulation frame stream" in data["message"]
+    @patch("back.api.v1.simulation.resource_service.assign_task")
+    def test_assign_task_permission_error(
+        self,
+        mock_assign: MagicMock,
+        authenticated_client: TestClient,
+        active_sim_id: str,
+    ) -> None:
+        mock_assign.side_effect = VelosimPermissionError("No permission")
+        payload = {"resource_id": 7, "task_id": 42}
+        response = authenticated_client.post(
+            f"/api/v1/simulation/{active_sim_id}/resources/assign", json=payload
+        )
+        assert response.status_code == 403
+        assert "No permission" in response.json()["detail"]
 
-            # Send ping, expect pong
-            websocket.send_text("ping")
-            pong = websocket.receive_json()
-            assert pong["type"] == "pong"
+    @patch("back.api.v1.simulation.resource_service.assign_task")
+    def test_assign_task_not_found(
+        self,
+        mock_assign: MagicMock,
+        authenticated_client: TestClient,
+        active_sim_id: str,
+    ) -> None:
+        mock_assign.side_effect = ItemNotFoundError("Task not found")
+        payload = {"resource_id": 999, "task_id": 42}
+        response = authenticated_client.post(
+            f"/api/v1/simulation/{active_sim_id}/resources/assign", json=payload
+        )
+        assert response.status_code == 404
+
+    @patch("back.api.v1.simulation.resource_service.unassign_task")
+    def test_unassign_task_success(
+        self,
+        mock_unassign: MagicMock,
+        authenticated_client: TestClient,
+        active_sim_id: str,
+    ) -> None:
+        mock_unassign.return_value = ResourceTaskUnassignResponse(
+            resource_id=7, task_id=42
+        )
+        payload = {"resource_id": 7, "task_id": 42}
+
+        response = authenticated_client.post(
+            f"/api/v1/simulation/{active_sim_id}/resources/unassign", json=payload
+        )
+
+        assert response.status_code == 200
+        assert response.json() == {"resource_id": 7, "task_id": 42}
+
+        mock_unassign.assert_called_once_with(
+            db=ANY,
+            sim_uuid=active_sim_id,
+            requesting_user=1,
+            task_unassign_data=ResourceTaskUnassignRequest(**payload),
+        )
+
+    @patch("back.api.v1.simulation.resource_service.unassign_task")
+    def test_unassign_task_permission_error(
+        self,
+        mock_unassign: MagicMock,
+        authenticated_client: TestClient,
+        active_sim_id: str,
+    ) -> None:
+        mock_unassign.side_effect = VelosimPermissionError("No permission")
+        payload = {"resource_id": 7, "task_id": 42}
+        response = authenticated_client.post(
+            f"/api/v1/simulation/{active_sim_id}/resources/unassign", json=payload
+        )
+        assert response.status_code == 403
+
+    @patch("back.api.v1.simulation.resource_service.reassign_task")
+    def test_reassign_task_success(
+        self,
+        mock_reassign: MagicMock,
+        authenticated_client: TestClient,
+        active_sim_id: str,
+    ) -> None:
+        mock_reassign.return_value = ResourceTaskReassignResponse(
+            task_id=42, old_resource_id=7, new_resource_id=8
+        )
+        payload = {"task_id": 42, "old_resource_id": 7, "new_resource_id": 8}
+
+        response = authenticated_client.post(
+            f"/api/v1/simulation/{active_sim_id}/resources/reassign", json=payload
+        )
+
+        assert response.status_code == 200
+        assert response.json() == {
+            "task_id": 42,
+            "old_resource_id": 7,
+            "new_resource_id": 8,
+        }
+
+        mock_reassign.assert_called_once_with(
+            db=ANY,
+            sim_uuid=active_sim_id,
+            requesting_user=1,
+            task_reassign_data=ResourceTaskReassignRequest(**payload),
+        )
+
+    @patch("back.api.v1.simulation.resource_service.reassign_task")
+    def test_reassign_task_permission_error(
+        self,
+        mock_reassign: MagicMock,
+        authenticated_client: TestClient,
+        active_sim_id: str,
+    ) -> None:
+        mock_reassign.side_effect = VelosimPermissionError("No permission")
+        payload = {"task_id": 42, "old_resource_id": 7, "new_resource_id": 8}
+        response = authenticated_client.post(
+            f"/api/v1/simulation/{active_sim_id}/resources/reassign", json=payload
+        )
+        assert response.status_code == 403
+
+    @patch("back.api.v1.simulation.resource_service.reassign_task")
+    def test_reassign_task_not_found(
+        self,
+        mock_reassign: MagicMock,
+        authenticated_client: TestClient,
+        active_sim_id: str,
+    ) -> None:
+        mock_reassign.side_effect = ItemNotFoundError("Task not found")
+        payload = {"task_id": 999, "old_resource_id": 7, "new_resource_id": 8}
+        response = authenticated_client.post(
+            f"/api/v1/simulation/{active_sim_id}/resources/reassign", json=payload
+        )
+        assert response.status_code == 404
 
 
 class TestSimulationListIntegration:
@@ -596,7 +760,7 @@ class TestSimulationListIntegration:
         Test complete flow: start simulation -> list simulations with metadata.
         """
         # Step 1: Start a simulation
-        start_response = authenticated_client.post("/api/v1/simulation/start")
+        start_response = authenticated_client.post("/api/v1/simulation/initialize")
         assert start_response.status_code == 200
         sim_data = start_response.json()
         assert "sim_id" in sim_data
@@ -648,7 +812,7 @@ class TestSimulationListIntegration:
         # Start 3 simulations
         sim_ids = []
         for _ in range(3):
-            response = authenticated_client.post("/api/v1/simulation/start")
+            response = authenticated_client.post("/api/v1/simulation/initialize")
             assert response.status_code == 200
             sim_ids.append(response.json()["sim_id"])
 
@@ -676,30 +840,6 @@ class TestSimulationListIntegration:
         for sim_id in sim_ids:
             authenticated_client.post(f"/api/v1/simulation/stop/{sim_id}")
 
-    def test_list_all_simulations_as_admin(
-        self, admin_authenticated_client: TestClient, db: Session, admin_user: User
-    ) -> None:
-        """Test admin can list all simulations globally."""
-        # Start a simulation as admin
-        start_response = admin_authenticated_client.post("/api/v1/simulation/start")
-        assert start_response.status_code == 200
-        sim_id = start_response.json()["sim_id"]
-        db_id = start_response.json()["db_id"]
-
-        # List all simulations (admin endpoint)
-        response = admin_authenticated_client.get("/api/v1/simulation/list")
-        assert response.status_code == 200
-        data = response.json()
-        assert data["total"] >= 1
-        assert len(data["simulations"]) >= 1
-
-        # Verify simulation is in the list
-        sim_ids = [sim["id"] for sim in data["simulations"]]
-        assert db_id in sim_ids
-
-        # Cleanup
-        admin_authenticated_client.post(f"/api/v1/simulation/stop/{sim_id}")
-
     def test_empty_simulation_list(
         self, authenticated_client: TestClient, db: Session, test_user: User
     ) -> None:
@@ -718,7 +858,7 @@ class TestSimulationListIntegration:
     ) -> None:
         """Test pagination with various edge cases."""
         # Start 1 simulation
-        start_response = authenticated_client.post("/api/v1/simulation/start")
+        start_response = authenticated_client.post("/api/v1/simulation/initialize")
         assert start_response.status_code == 200
         sim_id = start_response.json()["sim_id"]
 

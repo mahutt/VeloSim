@@ -22,10 +22,21 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 """
 
-from .simulation_service import simulation_service
-from .resource_service import resource_service
+# Include all utilities here for easy access
+from .sim_websocket_helpers import (
+    WebSocketSubscriber,
+    safe_send_json,
+    get_simulation_or_error,
+    attach_subscriber,
+    start_or_resume_simulation,
+    cleanup_simulation,
+)
 
 __all__ = [
-    "simulation_service",
-    "resource_service",
+    "WebSocketSubscriber",
+    "safe_send_json",
+    "get_simulation_or_error",
+    "attach_subscriber",
+    "start_or_resume_simulation",
+    "cleanup_simulation",
 ]
