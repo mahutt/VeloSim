@@ -88,7 +88,7 @@ def test_end_time_before_start_time(validator: ScenarioValidator) -> None:
     scenario["content"]["start_time"] = "12:00"
     scenario["content"]["end_time"] = "08:00"
     errors: List[Dict[str, str]] = validator.validate_all(scenario)
-    assert any(e["field"] == "end_time" and "after" in e["error"] for e in errors)
+    assert any(e["field"] == "end_time" and "after" in e["message"] for e in errors)
 
 
 def test_duplicate_station_id(validator: ScenarioValidator) -> None:
@@ -102,7 +102,7 @@ def test_duplicate_station_id(validator: ScenarioValidator) -> None:
         }
     )
     errors: List[Dict[str, str]] = validator.validate_all(scenario)
-    assert any("Duplicate station ID" in e["error"] for e in errors)
+    assert any("Duplicate station ID" in e["message"] for e in errors)
 
 
 def test_duplicate_resource_id(validator: ScenarioValidator) -> None:
@@ -111,7 +111,7 @@ def test_duplicate_resource_id(validator: ScenarioValidator) -> None:
         {"resource_id": 1, "task_count": 1, "resource_position": [45.6, -73.6]}
     )
     errors: List[Dict[str, str]] = validator.validate_all(scenario)
-    assert any("Duplicate resource ID" in e["error"] for e in errors)
+    assert any("Duplicate resource ID" in e["message"] for e in errors)
 
 
 def test_invalid_lat_lon(validator: ScenarioValidator) -> None:
@@ -128,7 +128,7 @@ def test_task_with_nonexistent_station(validator: ScenarioValidator) -> None:
     scenario["content"]["initial_tasks"][0]["station_id"] = "999"
     errors: List[Dict[str, str]] = validator.validate_all(scenario)
     assert any(
-        "station_id" in e["field"] and "does not exist" in e["error"] for e in errors
+        "station_id" in e["field"] and "does not exist" in e["message"] for e in errors
     )
 
 
@@ -147,3 +147,68 @@ def test_missing_content_key(validator: ScenarioValidator) -> None:
     scenario.pop("content")
     errors: List[Dict[str, str]] = validator.validate_all(scenario)
     assert any(e["field"] == "content" for e in errors)
+
+
+def test_rfc3339_datetime_format(validator: ScenarioValidator) -> None:
+    """Test that RFC 3339 / ISO 8601 datetime strings are accepted."""
+    scenario: Dict[str, Any] = VALID_SCENARIO.copy()
+    # Use RFC 3339 format with timezone
+    scenario["content"]["start_time"] = "2025-11-06T08:00:00Z"
+    scenario["content"]["end_time"] = "2025-11-06T17:00:00Z"
+    errors: List[Dict[str, str]] = validator.validate_all(scenario)
+    assert len(errors) == 0
+
+
+def test_multi_day_scenario(validator: ScenarioValidator) -> None:
+    """Test that scenarios spanning multiple days are supported."""
+    scenario: Dict[str, Any] = VALID_SCENARIO.copy()
+    # Start on one day, end on the next
+    scenario["content"]["start_time"] = "2025-11-06T08:00:00Z"
+    scenario["content"]["end_time"] = "2025-11-07T08:00:00Z"  # 24 hours later
+    errors: List[Dict[str, str]] = validator.validate_all(scenario)
+    assert len(errors) == 0
+
+
+def test_datetime_with_seconds(validator: ScenarioValidator) -> None:
+    """Test that datetime strings with seconds precision are accepted."""
+    scenario: Dict[str, Any] = VALID_SCENARIO.copy()
+    scenario["content"]["start_time"] = "2025-11-06T08:00:00Z"
+    scenario["content"]["end_time"] = "2025-11-06T17:30:45Z"
+    errors: List[Dict[str, str]] = validator.validate_all(scenario)
+    assert len(errors) == 0
+
+
+def test_simple_time_format_still_works(validator: ScenarioValidator) -> None:
+    """Test backward compatibility with simple HH:MM format."""
+    scenario: Dict[str, Any] = VALID_SCENARIO.copy()
+    scenario["content"]["start_time"] = "08:00"
+    scenario["content"]["end_time"] = "17:00"
+    errors: List[Dict[str, str]] = validator.validate_all(scenario)
+    assert len(errors) == 0
+
+
+def test_task_time_with_rfc3339(validator: ScenarioValidator) -> None:
+    """Test that task times support RFC 3339 format."""
+    import copy
+
+    scenario: Dict[str, Any] = copy.deepcopy(VALID_SCENARIO)
+    # Ensure we have at least one station with id="1"
+    if (
+        len(scenario["content"]["stations"]) == 0
+        or scenario["content"]["stations"][0]["station_id"] != 1
+    ):
+        scenario["content"]["stations"] = [
+            {
+                "station_id": 1,
+                "station_name": "Test Station",
+                "task_count": 2,
+                "station_position": [45.5, -73.5],
+            }
+        ]
+
+    # Add task with RFC 3339 time format
+    scenario["content"]["initial_tasks"] = [
+        {"id": "t1", "station_id": "1", "time": "2025-11-06T10:30:00Z"}
+    ]
+    errors: List[Dict[str, str]] = validator.validate_all(scenario)
+    assert len(errors) == 0

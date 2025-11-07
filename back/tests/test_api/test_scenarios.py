@@ -181,3 +181,292 @@ class TestScenariosAPI:
         """Test unauthenticated request returns 401."""
         response = client.get("/api/v1/scenarios/1")
         assert response.status_code == 401
+
+    # ==================== CREATE SCENARIO TESTS ====================
+
+    @patch("back.api.v1.scenarios.ScenarioValidator")
+    @patch("back.crud.scenario.scenario_crud.get_by_name_and_user")
+    @patch("back.crud.scenario.scenario_crud.create")
+    def test_create_scenario_success(
+        self,
+        mock_create: MagicMock,
+        mock_get_by_name: MagicMock,
+        mock_validator_class: MagicMock,
+        authenticated_client: TestClient,
+        test_scenario: ScenarioResponse,
+    ) -> None:
+        """Test creating a scenario successfully."""
+        # Mock the validator to return no errors
+        mock_validator = MagicMock()
+        mock_validator.validate_all.return_value = []
+        mock_validator_class.return_value = mock_validator
+
+        mock_get_by_name.return_value = None  # No duplicate
+        mock_create.return_value = test_scenario
+
+        response = authenticated_client.post(
+            "/api/v1/scenarios/",
+            json={
+                "name": "Test Scenario",
+                "content": {"foo": "bar"},
+                "description": "A test scenario",
+            },
+        )
+        assert response.status_code == 201
+        data = ScenarioResponse.model_validate(response.json())
+        assert data.name == test_scenario.name
+        assert data.content == test_scenario.content
+
+    @patch("back.api.v1.scenarios.ScenarioValidator")
+    @patch("back.crud.scenario.scenario_crud.get_by_name_and_user")
+    @patch("back.crud.scenario.scenario_crud.create")
+    def test_create_scenario_duplicate_name_not_allowed(
+        self,
+        mock_create: MagicMock,
+        mock_get_by_name: MagicMock,
+        mock_validator_class: MagicMock,
+        authenticated_client: TestClient,
+        test_scenario: ScenarioResponse,
+    ) -> None:
+        """Test creating scenario with duplicate name raises 400."""
+        # Mock the validator to return no errors
+        mock_validator = MagicMock()
+        mock_validator.validate_all.return_value = []
+        mock_validator_class.return_value = mock_validator
+
+        mock_get_by_name.return_value = test_scenario  # Duplicate exists
+
+        response = authenticated_client.post(
+            "/api/v1/scenarios/",
+            json={
+                "name": "Test Scenario",
+                "content": {"foo": "bar"},
+                "allow_duplicate_name": False,
+            },
+        )
+        assert response.status_code == 400
+        assert "already exists" in response.json()["detail"]
+
+    @patch("back.api.v1.scenarios.ScenarioValidator")
+    @patch("back.crud.scenario.scenario_crud.get_by_name_and_user")
+    @patch("back.crud.scenario.scenario_crud.create")
+    def test_create_scenario_duplicate_name_allowed(
+        self,
+        mock_create: MagicMock,
+        mock_get_by_name: MagicMock,
+        mock_validator_class: MagicMock,
+        authenticated_client: TestClient,
+        test_scenario: ScenarioResponse,
+    ) -> None:
+        """Test creating scenario with duplicate name when explicitly allowed."""
+        # Mock the validator to return no errors
+        mock_validator = MagicMock()
+        mock_validator.validate_all.return_value = []
+        mock_validator_class.return_value = mock_validator
+
+        mock_get_by_name.return_value = test_scenario  # Duplicate exists
+        mock_create.return_value = test_scenario
+
+        response = authenticated_client.post(
+            "/api/v1/scenarios/",
+            json={
+                "name": "Test Scenario",
+                "content": {"foo": "bar"},
+                "allow_duplicate_name": True,
+            },
+        )
+        assert response.status_code == 201
+
+    @patch("back.api.v1.scenarios.ScenarioValidator")
+    @patch("back.crud.scenario.scenario_crud.get_by_name_and_user")
+    def test_create_scenario_validation_error(
+        self,
+        mock_get_by_name: MagicMock,
+        mock_validator_class: MagicMock,
+        authenticated_client: TestClient,
+    ) -> None:
+        """Test creating scenario with invalid content triggers validation errors."""
+        # Mock the validator to return validation errors
+        mock_validator = MagicMock()
+        mock_validator.validate_all.return_value = [
+            {"field": "content.stations", "message": "At least one station is required"}
+        ]
+        mock_validator_class.return_value = mock_validator
+
+        mock_get_by_name.return_value = None
+
+        response = authenticated_client.post(
+            "/api/v1/scenarios/",
+            json={
+                "name": "Test",
+                "content": {"foo": "bar"},  # Invalid content
+            },
+        )
+        assert response.status_code == 400
+        assert "Invalid scenario content" in response.json()["detail"]
+
+    def test_create_scenario_requires_authentication(self, client: TestClient) -> None:
+        """Test creating scenario without authentication returns 401."""
+        response = client.post(
+            "/api/v1/scenarios/",
+            json={"name": "Test", "content": {"foo": "bar"}},
+        )
+        assert response.status_code == 401
+
+    # ==================== UPDATE SCENARIO TESTS ====================
+
+    @patch("back.api.v1.scenarios.ScenarioValidator")
+    @patch("back.crud.scenario.scenario_crud.update")
+    def test_update_scenario_success(
+        self,
+        mock_update: MagicMock,
+        mock_validator_class: MagicMock,
+        authenticated_client: TestClient,
+        test_scenario: ScenarioResponse,
+    ) -> None:
+        """Test updating a scenario successfully."""
+        # Mock the validator (not called when only updating name)
+        mock_validator = MagicMock()
+        mock_validator.validate_all.return_value = []
+        mock_validator_class.return_value = mock_validator
+
+        updated_scenario = test_scenario.model_copy()
+        updated_scenario.name = "Updated Name"
+        mock_update.return_value = updated_scenario
+
+        response = authenticated_client.put(
+            "/api/v1/scenarios/1",
+            json={"name": "Updated Name"},
+        )
+        assert response.status_code == 200
+        data = ScenarioResponse.model_validate(response.json())
+        assert data.name == "Updated Name"
+        # Validator should not be called when content is not being updated
+        mock_validator.validate_all.assert_not_called()
+
+    @patch("back.crud.scenario.scenario_crud.update")
+    def test_update_scenario_not_found(
+        self,
+        mock_update: MagicMock,
+        authenticated_client: TestClient,
+    ) -> None:
+        """Test updating non-existent scenario returns 404."""
+        mock_update.side_effect = ItemNotFoundError("Scenario not found")
+
+        response = authenticated_client.put(
+            "/api/v1/scenarios/999",
+            json={"name": "Updated"},
+        )
+        assert response.status_code == 404
+
+    @patch("back.crud.scenario.scenario_crud.update")
+    def test_update_scenario_no_fields(
+        self,
+        mock_update: MagicMock,
+        authenticated_client: TestClient,
+    ) -> None:
+        """Test updating scenario with no fields returns 400."""
+        mock_update.side_effect = BadRequestError("No valid fields to update")
+
+        response = authenticated_client.put("/api/v1/scenarios/1", json={})
+        assert response.status_code == 400
+
+    @patch("back.api.v1.scenarios.ScenarioValidator")
+    @patch("back.crud.scenario.scenario_crud.update")
+    def test_update_scenario_with_content_validation(
+        self,
+        mock_update: MagicMock,
+        mock_validator_class: MagicMock,
+        authenticated_client: TestClient,
+        test_scenario: ScenarioResponse,
+    ) -> None:
+        """Test updating scenario content triggers validation."""
+        # Mock the validator to return no errors
+        mock_validator = MagicMock()
+        mock_validator.validate_all.return_value = []
+        mock_validator_class.return_value = mock_validator
+
+        updated_scenario = test_scenario.model_copy()
+        updated_scenario.content = {"new": "content"}
+        mock_update.return_value = updated_scenario
+
+        response = authenticated_client.put(
+            "/api/v1/scenarios/1",
+            json={"content": {"new": "content"}},
+        )
+        assert response.status_code == 200
+        # Validator should be called when content is being updated
+        mock_validator.validate_all.assert_called_once_with({"new": "content"})
+
+    @patch("back.api.v1.scenarios.ScenarioValidator")
+    def test_update_scenario_validation_error(
+        self,
+        mock_validator_class: MagicMock,
+        authenticated_client: TestClient,
+    ) -> None:
+        """Test updating scenario with invalid content triggers validation errors."""
+        # Mock the validator to return validation errors
+        mock_validator = MagicMock()
+        mock_validator.validate_all.return_value = [
+            {"field": "content.resources", "message": "Invalid resource configuration"}
+        ]
+        mock_validator_class.return_value = mock_validator
+
+        response = authenticated_client.put(
+            "/api/v1/scenarios/1",
+            json={"content": {"invalid": "data"}},
+        )
+        assert response.status_code == 400
+        assert "Invalid scenario content" in response.json()["detail"]
+
+    def test_update_scenario_requires_authentication(self, client: TestClient) -> None:
+        """Test updating scenario without authentication returns 401."""
+        response = client.put(
+            "/api/v1/scenarios/1",
+            json={"name": "Updated"},
+        )
+        assert response.status_code == 401
+
+    # ==================== DELETE SCENARIO TESTS ====================
+
+    @patch("back.crud.scenario.scenario_crud.delete")
+    def test_delete_scenario_success(
+        self,
+        mock_delete: MagicMock,
+        authenticated_client: TestClient,
+    ) -> None:
+        """Test deleting a scenario successfully."""
+        mock_delete.return_value = None
+
+        response = authenticated_client.delete("/api/v1/scenarios/1")
+        assert response.status_code == 204
+        assert response.content == b""
+
+    @patch("back.crud.scenario.scenario_crud.delete")
+    def test_delete_scenario_not_found(
+        self,
+        mock_delete: MagicMock,
+        authenticated_client: TestClient,
+    ) -> None:
+        """Test deleting non-existent scenario returns 404."""
+        mock_delete.side_effect = ItemNotFoundError("Scenario not found")
+
+        response = authenticated_client.delete("/api/v1/scenarios/999")
+        assert response.status_code == 404
+
+    @patch("back.crud.scenario.scenario_crud.delete")
+    def test_delete_scenario_permission_error(
+        self,
+        mock_delete: MagicMock,
+        authenticated_client: TestClient,
+    ) -> None:
+        """Test deleting another user's scenario returns 403."""
+        mock_delete.side_effect = VelosimPermissionError("Not authorized")
+
+        response = authenticated_client.delete("/api/v1/scenarios/1")
+        assert response.status_code == 403
+
+    def test_delete_scenario_requires_authentication(self, client: TestClient) -> None:
+        """Test deleting scenario without authentication returns 401."""
+        response = client.delete("/api/v1/scenarios/1")
+        assert response.status_code == 401
