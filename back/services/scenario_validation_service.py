@@ -24,8 +24,7 @@ SOFTWARE.
 
 from typing import Any, Dict, List, Set
 from pydantic import BaseModel, ValidationError, model_validator
-from datetime import time, datetime
-import re
+from datetime import time, datetime as dt_time
 
 from back.schemas.scenario import ScenarioResponse
 
@@ -69,14 +68,7 @@ class StationValidator(BaseModel):
 class TaskValidator(BaseModel):
     id: str
     station_id: str
-    time: str | None = None
-
-    @model_validator(mode="before")
-    def validate_time_format(cls, values: Dict[str, Any]) -> Dict[str, Any]:
-        t: str | None = values.get("time")
-        if t is not None and not re.match(r"^\d{2}:\d{2}$", t):
-            raise ValueError(f"time must be in HH:MM format, got '{t}'")
-        return values
+    time: dt_time | None = None
 
 
 class ScenarioTimes(BaseModel):
@@ -228,8 +220,8 @@ class ScenarioValidator:
 
         if isinstance(start_str, str) and isinstance(end_str, str):
             try:
-                start_dt: datetime = datetime.strptime(start_str, "%H:%M")
-                end_dt: datetime = datetime.strptime(end_str, "%H:%M")
+                start_dt: time = dt_time.strptime(start_str, "%H:%M").time()
+                end_dt: time = dt_time.strptime(end_str, "%H:%M").time()
                 if end_dt <= start_dt:
                     errors.append(
                         {
