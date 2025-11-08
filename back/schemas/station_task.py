@@ -24,7 +24,7 @@ SOFTWARE.
 
 from datetime import datetime
 from typing import List
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 from back.models import StationTaskType, TaskStatus
 
 
@@ -59,8 +59,7 @@ class StationTaskResponse(StationTaskBase):
     date_created: datetime = Field(..., description="Creation timestamp")
     date_updated: datetime = Field(..., description="Last update timestamp")
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class StationTaskListResponse(BaseModel):

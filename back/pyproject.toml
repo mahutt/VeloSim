@@ -8,6 +8,9 @@ addopts = [
     "--strict-config",
     "--verbose",
 ]
+filterwarnings = [
+    "ignore::DeprecationWarning:pyproj.transformer",
+]
 
 [tool.coverage.run]
 source = [
