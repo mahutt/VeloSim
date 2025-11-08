@@ -4,8 +4,8 @@
     "description": "VeloSim monorepo workspace scripts",
     "scripts": {
         "test": "node scripts/run-python.js -m pytest back && node scripts/run-python.js -m pytest sim",
-        "test:coverage": "node scripts/run-python.js -m coverage run --source=back,sim -m pytest && node scripts/run-python.js -m coverage report && node scripts/run-python.js -m coverage html",
-        "test:coverage-check": "node scripts/run-python.js -m coverage run --source=back,sim -m pytest && node scripts/run-python.js -m coverage report --fail-under=70",
+        "test:coverage": "node scripts/run-python.js -m coverage run --source=back -m pytest back && node scripts/run-python.js -m coverage run --append --source=sim -m pytest sim && node scripts/run-python.js -m coverage report && node scripts/run-python.js -m coverage html",
+        "test:coverage-check": "node scripts/run-python.js -m coverage run --source=back -m pytest back && node scripts/run-python.js -m coverage run --append --source=sim -m pytest sim && node scripts/run-python.js -m coverage report --fail-under=70",
         "test:e2e": "cd front && npm run test:e2e",
         "test:e2e:video": "cd front && npm run test:e2e:video",
         "test:e2e:ui": "cd front && npx playwright test --ui",

@@ -23,7 +23,7 @@ SOFTWARE.
 """
 
 from typing import List, Optional
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class UserBase(BaseModel):
@@ -64,8 +64,7 @@ class UserResponse(UserBase):
     is_admin: bool = Field(..., description="Whether the user is an administrator")
     is_enabled: bool = Field(..., description="Whether the account is enabled")
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class UsersResponse(BaseModel):
