@@ -197,6 +197,23 @@ def mocked_simulator(monkeypatch: pytest.MonkeyPatch) -> Generator[None, None, N
     yield
 
 
+class FrameData(TypedDict):
+    sim_id: str
+    seq_numb: int
+    payload: str
+    timestamp: int
+
+
+class DummyWebSocket:
+    """Fake WebSocket to capture JSON messages."""
+
+    def __init__(self) -> None:
+        self.sent: List[FrameData] = []
+
+    async def send_json(self, data: FrameData) -> None:
+        self.sent.append(data)
+
+
 class TestSimulationAPI:
 
     @patch("back.services.simulation_service.simulation_service.initialize_simulation")
@@ -550,21 +567,6 @@ class TestSimulationAPI:
     def test_websocket_subscriber_on_frame(self) -> None:
         """Test that WebSocketSubscriber schedules frames correctly."""
 
-        class FrameData(TypedDict):
-            sim_id: str
-            seq_numb: int
-            payload: str
-            timestamp: int
-
-        class DummyWebSocket:
-            """Fake WebSocket to capture JSON messages."""
-
-            def __init__(self) -> None:
-                self.sent: List[FrameData] = []
-
-            async def send_json(self, data: FrameData) -> None:
-                self.sent.append(data)
-
         dummy_ws = DummyWebSocket()
         subscriber = WebSocketSubscriber(cast(WebSocket, dummy_ws), "sim123")
         subscriber.set_event_loop(asyncio.get_event_loop())
@@ -588,6 +590,80 @@ class TestSimulationAPI:
             "payload": "payload",
             "timestamp": 12345,
         }
+
+    def test_websocket_subscriber_multiple_frames(self) -> None:
+        dummy_ws = DummyWebSocket()
+        subscriber = WebSocketSubscriber(cast(WebSocket, dummy_ws), "sim123")
+        subscriber.set_event_loop(asyncio.get_event_loop())
+
+        frames = [
+            MagicMock(seq_number=i, payload_str=f"payload{i}", timestamp_ms=1000 + i)
+            for i in range(3)
+        ]
+
+        for frame in frames:
+            subscriber.on_frame(frame)
+
+        asyncio.get_event_loop().run_until_complete(asyncio.sleep(0.01))
+
+        for i, frame in enumerate(frames):
+            assert dummy_ws.sent[i] == {
+                "sim_id": "sim123",
+                "seq_numb": frame.seq_number,
+                "payload": frame.payload_str,
+                "timestamp": frame.timestamp_ms,
+            }
+
+    def test_websocket_subscriber_send_error(self) -> None:
+        class FailingWS(DummyWebSocket):
+            async def send_json(self, data: FrameData) -> None:
+                raise RuntimeError("send failed")
+
+        failing_ws = FailingWS()
+        subscriber = WebSocketSubscriber(cast(WebSocket, failing_ws), "sim123")
+        subscriber.set_event_loop(asyncio.get_event_loop())
+
+        frame = MagicMock(seq_number=1, payload_str="payload", timestamp_ms=123)
+        subscriber.on_frame(frame)
+
+        # Just ensure no unhandled exception propagates
+        asyncio.get_event_loop().run_until_complete(asyncio.sleep(0.01))
+
+    def test_websocket_subscriber_init_and_loop(self) -> None:
+        dummy_ws = DummyWebSocket()
+        subscriber = WebSocketSubscriber(cast(WebSocket, dummy_ws), "sim123")
+
+        # Setting the event loop should not raise
+        loop = asyncio.get_event_loop()
+        subscriber.set_event_loop(loop)
+
+        # Verify that sending a frame works using the event loop
+        frame = MagicMock(seq_number=1, payload_str="payload", timestamp_ms=123)
+        subscriber.on_frame(frame)
+
+        # Wait briefly to allow async send_json to run
+        asyncio.get_event_loop().run_until_complete(asyncio.sleep(0.01))
+
+        # Check that frame was sent
+        assert len(dummy_ws.sent) == 1
+        assert dummy_ws.sent[0]["seq_numb"] == 1
+        assert dummy_ws.sent[0]["payload"] == "payload"
+
+    def test_websocket_subscriber_malformed_frame(self) -> None:
+        dummy_ws = DummyWebSocket()
+        subscriber = WebSocketSubscriber(cast(WebSocket, dummy_ws), "sim123")
+        subscriber.set_event_loop(asyncio.get_event_loop())
+
+        # Frame missing seq_number
+        frame = MagicMock(payload_str="payload", timestamp_ms=123)
+        frame.seq_number = None  # simulate missing
+
+        subscriber.on_frame(frame)
+        asyncio.get_event_loop().run_until_complete(asyncio.sleep(0.01))
+
+        # Either no frame sent or sent with None seq_numb
+        assert len(dummy_ws.sent) == 1
+        assert dummy_ws.sent[0]["seq_numb"] is None
 
     @patch("back.api.v1.simulation.resource_service.assign_task")
     def test_assign_task_success(

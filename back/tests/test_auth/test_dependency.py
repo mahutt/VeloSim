@@ -22,11 +22,13 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 """
 
+from typing import Dict, Protocol
 import pytest
 import asyncio
 from unittest.mock import patch, MagicMock
 from fastapi import HTTPException
-from back.auth.dependency import get_user_id, oauth2_scheme
+from back.auth.dependency import get_user_id, get_user_id_over_websocket, oauth2_scheme
+from back.exceptions import WebSocketAuthError
 
 
 class TestGetUserId:
@@ -144,3 +146,98 @@ class TestOAuth2Scheme:
     def test_oauth2_scheme_callable(self) -> None:
         """Test that oauth2_scheme is callable."""
         assert callable(oauth2_scheme)
+
+
+class WebSocketProtocol(Protocol):
+    headers: Dict[str, str]
+
+    async def close(self, code: int) -> None: ...
+
+
+class MockWebSocket:
+    """Mock WebSocket implementing the protocol for type checking."""
+
+    def __init__(self, headers: Dict[str, str]):
+        self.headers = headers
+        self.closed = False
+        self.close_called_with: int | None = None
+
+    async def close(self, code: int) -> None:
+        self.closed = True
+        self.close_called_with = code
+
+
+class TestGetUserIdOverWebSocket:
+    """Test get_user_id_over_websocket dependency function."""
+
+    @patch("back.auth.dependency.validate_access_token")
+    def test_valid_token_in_header(self, mock_validate_token: MagicMock) -> None:
+        mock_validate_token.return_value = 42
+        websocket = MockWebSocket(headers={"authorization": "Bearer good_token"})
+
+        result: int = asyncio.run(
+            get_user_id_over_websocket(websocket)  # type: ignore[arg-type]
+        )
+
+        assert result == 42
+        mock_validate_token.assert_called_once_with("good_token")
+        assert not websocket.closed
+
+    @patch("back.auth.dependency.validate_access_token")
+    def test_valid_token_in_cookie(self, mock_validate_token: MagicMock) -> None:
+        mock_validate_token.return_value = 99
+        websocket = MockWebSocket(headers={})
+
+        result: int = asyncio.run(
+            get_user_id_over_websocket(
+                websocket, access_token="cookie_token"  # type: ignore[arg-type]
+            )
+        )
+
+        assert result == 99
+        mock_validate_token.assert_called_once_with("cookie_token")
+        assert not websocket.closed
+
+    @patch("back.auth.dependency.validate_access_token")
+    def test_no_token_provided_raises(self, mock_validate_token: MagicMock) -> None:
+        mock_validate_token.return_value = None
+        websocket = MockWebSocket(headers={})
+
+        with pytest.raises(WebSocketAuthError):
+            asyncio.run(
+                get_user_id_over_websocket(
+                    websocket, access_token=None  # type: ignore[arg-type]
+                )
+            )
+
+        mock_validate_token.assert_not_called()
+        assert not websocket.closed
+
+    @patch("back.auth.dependency.validate_access_token")
+    def test_invalid_token_raises(self, mock_validate_token: MagicMock) -> None:
+        mock_validate_token.return_value = None
+        websocket = MockWebSocket(headers={"authorization": "Bearer bad_token"})
+
+        with pytest.raises(WebSocketAuthError):
+            asyncio.run(
+                get_user_id_over_websocket(
+                    websocket, access_token=None  # type: ignore[arg-type]
+                )
+            )
+
+        mock_validate_token.assert_called_once_with("bad_token")
+        assert not websocket.closed
+
+    @patch("back.auth.dependency.validate_access_token")
+    def test_validate_raises_exception(self, mock_validate_token: MagicMock) -> None:
+        mock_validate_token.side_effect = Exception("Token validation error")
+        websocket = MockWebSocket(headers={"authorization": "Bearer problem_token"})
+
+        with pytest.raises(Exception, match="Token validation error"):
+            asyncio.run(
+                get_user_id_over_websocket(
+                    websocket, access_token=None  # type: ignore[arg-type]
+                )
+            )
+
+        assert not websocket.closed

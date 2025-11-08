@@ -22,11 +22,12 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 """
 
-from typing import Annotated
-from fastapi import Depends, HTTPException
+from typing import Annotated, Optional
+from fastapi import Depends, WebSocket, Cookie, HTTPException
 from fastapi.security import OAuth2PasswordBearer
 
 from back.auth.auth import validate_access_token
+from back.exceptions import WebSocketAuthError
 
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
@@ -40,4 +41,32 @@ async def get_user_id(token: Annotated[str, Depends(oauth2_scheme)]) -> int:
             detail="Access token invalid",
             headers={"WWW-Authenticate": "Bearer"},
         )
+    return user_id
+
+
+async def get_user_id_over_websocket(
+    websocket: WebSocket,
+    access_token: Optional[str] = Cookie(None),
+) -> int:
+    """
+    WebSocket-compatible authentication.
+    Raises a WebSocketAuthError with the appropriate WebSocket error code if
+    authentication fails.
+    """
+    token_to_use: Optional[str] = None
+
+    auth_header: Optional[str] = websocket.headers.get("authorization")
+    if auth_header and auth_header.lower().startswith("bearer "):
+        token_to_use = auth_header[7:]  # strip "Bearer "
+
+    elif access_token:
+        token_to_use = access_token
+
+    if not token_to_use:
+        raise WebSocketAuthError(websocket, code=1008)
+
+    user_id = validate_access_token(token_to_use)
+    if user_id is None:
+        raise WebSocketAuthError(websocket, code=1008)
+
     return user_id

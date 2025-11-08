@@ -39,6 +39,7 @@ from back.api.v1.utils import (
     safe_send_json,
     start_or_resume_simulation,
 )
+from back.exceptions.websocket_auth_error import WebSocketAuthError
 from back.schemas import (
     ResourceTaskAssignRequest,
     ResourceTaskUnassignRequest,
@@ -49,7 +50,7 @@ from back.schemas import (
 )
 from sqlalchemy.orm import Session
 
-from back.auth.dependency import get_user_id
+from back.auth.dependency import get_user_id, get_user_id_over_websocket
 from back.exceptions import VelosimPermissionError, ItemNotFoundError
 from back.services.resource_service import resource_service
 from back.schemas import PlaybackSpeedBase, PlaybackSpeedResponse
@@ -242,7 +243,7 @@ async def set_playback_speed(
 async def websocket_simulation_stream(
     websocket: WebSocket,
     sim_id: str,
-    requesting_user: int = Depends(get_user_id),
+    requesting_user: int = Depends(get_user_id_over_websocket),
     db: Session = Depends(get_db),
 ) -> None:
     """
@@ -252,6 +253,12 @@ async def websocket_simulation_stream(
     The frontend connects to this endpoint to receive frame updates
     from the running simulation via the FrameEmitter.
     """
+    try:
+        await websocket.accept()
+    except WebSocketAuthError as e:
+        await e.websocket.close(code=e.code)
+        return
+
     await websocket.accept()
 
     try:
