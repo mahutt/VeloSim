@@ -79,6 +79,7 @@ async def initialize_simulation(
     db: Session = Depends(get_db),
     requesting_user: int = Depends(get_user_id),
 ) -> SimulationResponse:
+    """Initialize a new simulation and return a confirmation response."""
     try:
         scenario_dict = load_scenario_dict(db, scenario, scenario_id)
         scenario_params = parse_scenario(scenario_dict)
