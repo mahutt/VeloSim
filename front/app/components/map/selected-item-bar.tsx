@@ -29,6 +29,7 @@ import { Separator } from '~/components/ui/separator';
 import { useSimulation } from '~/providers/simulation-provider';
 import { SelectedItemType, type Station, type Resource } from '~/types';
 import { TaskItem } from '../task/task-item';
+import { useTaskAssignment } from '~/providers/task-assignment-provider';
 
 export default function SelectedItemBar() {
   const { selectedItem, clearSelection } = useSimulation();
@@ -78,6 +79,9 @@ export default function SelectedItemBar() {
 }
 
 function StationInfo({ station }: { station: Station }) {
+  const { resourcesRef } = useSimulation();
+  const { requestUnassignment } = useTaskAssignment();
+
   return (
     <div className="space-y-2">
       <div>
@@ -94,21 +98,37 @@ function StationInfo({ station }: { station: Station }) {
         <p className="text-sm text-muted-foreground">
           Tasks ({station.tasks.length})
         </p>
-        <div className="space-y-2">
-          {station.tasks.length > 0 ? (
-            station.tasks.map((task) => (
-              <TaskItem key={task.id} taskId={task.id} />
-            ))
-          ) : (
-            <p className="text-sm">No tasks assigned</p>
-          )}
-        </div>
+        {station.tasks.length > 0 ? (
+          <div className="space-y-2">
+            {station.tasks.map((task) => {
+              const assignedResource = Array.from(
+                resourcesRef.current.values()
+              ).find((r) => r.taskList && r.taskList.includes(task.id));
+
+              return (
+                <TaskItem
+                  key={task.id}
+                  taskId={task.id}
+                  onUnassign={
+                    assignedResource
+                      ? () => requestUnassignment(assignedResource.id, task.id)
+                      : undefined
+                  }
+                />
+              );
+            })}
+          </div>
+        ) : (
+          <p className="text-sm">No tasks</p>
+        )}
       </div>
     </div>
   );
 }
 
 function ResourceInfo({ resource }: { resource: Resource }) {
+  const { requestUnassignment } = useTaskAssignment();
+
   return (
     <div className="space-y-2">
       <div>
@@ -121,13 +141,19 @@ function ResourceInfo({ resource }: { resource: Resource }) {
         <p className="text-sm text-muted-foreground">
           Tasks ({resource.taskList.length})
         </p>
-        <div className="space-y-2">
-          {resource.taskList.length > 0 ? (
-            resource.taskList.map((id) => <TaskItem key={id} taskId={id} />)
-          ) : (
-            <p className="text-sm">No tasks assigned</p>
-          )}
-        </div>
+        {resource.taskList.length > 0 ? (
+          <div className="space-y-2">
+            {resource.taskList.map((id) => (
+              <TaskItem
+                key={id}
+                taskId={id}
+                onUnassign={() => requestUnassignment(resource.id, id)}
+              />
+            ))}
+          </div>
+        ) : (
+          <p className="text-sm">No tasks assigned</p>
+        )}
       </div>
     </div>
   );

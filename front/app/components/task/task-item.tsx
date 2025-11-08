@@ -24,8 +24,16 @@
 
 import { Item, ItemContent, ItemTitle } from '~/components/ui/item';
 import { useFeature } from '~/hooks/use-feature';
+import { Button } from '~/components/ui/button';
+import { X } from 'lucide-react';
 
-export function TaskItem({ taskId }: { taskId: number }) {
+export function TaskItem({
+  taskId,
+  onUnassign,
+}: {
+  taskId: number;
+  onUnassign?: () => void;
+}) {
   const dragEnabled = useFeature('taskDragAndDrop');
 
   const handleDragStart = (e: React.DragEvent<HTMLDivElement>) => {
@@ -37,13 +45,26 @@ export function TaskItem({ taskId }: { taskId: number }) {
     <Item
       draggable={dragEnabled}
       onDragStart={handleDragStart}
-      className="rounded-lg px-3 py-2 bg-white border border-gray-200
-                 hover:border-gray-300 transition-all duration-200
-                 cursor-grab hover:shadow-sm active:cursor-grabbing active:opacity-50"
+      className={`rounded-lg px-3 py-2 bg-white border border-gray-200
+        hover:border-gray-300 transition-all duration-200 ${
+          dragEnabled
+            ? 'cursor-grab hover:shadow-sm active:cursor-grabbing active:opacity-50'
+            : 'cursor-default'
+        }`}
     >
       <ItemContent>
         <ItemTitle>Task #{taskId}</ItemTitle>
       </ItemContent>
+      {onUnassign ? (
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={onUnassign}
+          className="h-6 w-6"
+        >
+          <X className="h-4 w-4" />
+        </Button>
+      ) : null}
     </Item>
   );
 }

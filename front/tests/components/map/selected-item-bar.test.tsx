@@ -29,6 +29,7 @@ import { useSimulation } from '~/providers/simulation-provider';
 import SelectedItemBar from '~/components/map/selected-item-bar';
 import { SelectedItemType } from '~/types';
 import { FeatureToggleProvider } from '~/providers/feature-toggle-provider';
+import { TaskAssignmentProvider } from '~/providers/task-assignment-provider';
 
 // Mock the useSimulation hook
 vi.mock('~/providers/simulation-provider', () => ({
@@ -45,7 +46,9 @@ describe('SelectedItemBar', () => {
       selectedItem: null,
       selectItem: vi.fn(),
       clearSelection: vi.fn(),
-      assignTaskToResource: vi.fn(),
+      assignTask: vi.fn(),
+      unassignTask: vi.fn(),
+      reassignTask: vi.fn(),
       simId: null,
       isConnected: false,
       simulationStatus: 'idle',
@@ -54,7 +57,9 @@ describe('SelectedItemBar', () => {
 
     const { container } = render(
       <FeatureToggleProvider>
-        <SelectedItemBar />
+        <TaskAssignmentProvider>
+          <SelectedItemBar />
+        </TaskAssignmentProvider>
       </FeatureToggleProvider>
     );
     expect(container.firstChild).toBeNull();
@@ -80,7 +85,9 @@ describe('SelectedItemBar', () => {
       stationsRef: { current: new Map() },
       resourcesRef: { current: new Map() },
       resources: [],
-      assignTaskToResource: vi.fn(),
+      assignTask: vi.fn(),
+      unassignTask: vi.fn(),
+      reassignTask: vi.fn(),
       simId: null,
       isConnected: false,
       startSimulation: vi.fn(),
@@ -89,7 +96,9 @@ describe('SelectedItemBar', () => {
 
     render(
       <FeatureToggleProvider>
-        <SelectedItemBar />
+        <TaskAssignmentProvider>
+          <SelectedItemBar />
+        </TaskAssignmentProvider>
       </FeatureToggleProvider>
     );
 
@@ -124,7 +133,9 @@ describe('SelectedItemBar', () => {
       stationsRef: { current: new Map() },
       resourcesRef: { current: new Map() },
       resources: [],
-      assignTaskToResource: vi.fn(),
+      assignTask: vi.fn(),
+      unassignTask: vi.fn(),
+      reassignTask: vi.fn(),
       simId: null,
       isConnected: false,
       startSimulation: vi.fn(),
@@ -133,7 +144,9 @@ describe('SelectedItemBar', () => {
 
     render(
       <FeatureToggleProvider>
-        <SelectedItemBar />
+        <TaskAssignmentProvider>
+          <SelectedItemBar />
+        </TaskAssignmentProvider>
       </FeatureToggleProvider>
     );
 
@@ -167,7 +180,9 @@ describe('SelectedItemBar', () => {
       stationsRef: { current: new Map() },
       resourcesRef: { current: new Map() },
       resources: [],
-      assignTaskToResource: vi.fn(),
+      assignTask: vi.fn(),
+      unassignTask: vi.fn(),
+      reassignTask: vi.fn(),
       simId: null,
       isConnected: false,
       startSimulation: vi.fn(),
@@ -176,7 +191,9 @@ describe('SelectedItemBar', () => {
 
     render(
       <FeatureToggleProvider>
-        <SelectedItemBar />
+        <TaskAssignmentProvider>
+          <SelectedItemBar />
+        </TaskAssignmentProvider>
       </FeatureToggleProvider>
     );
 
@@ -207,7 +224,9 @@ describe('SelectedItemBar', () => {
       stationsRef: { current: new Map() },
       resourcesRef: { current: new Map() },
       resources: [],
-      assignTaskToResource: vi.fn(),
+      assignTask: vi.fn(),
+      unassignTask: vi.fn(),
+      reassignTask: vi.fn(),
       simId: null,
       isConnected: false,
       startSimulation: vi.fn(),
@@ -216,7 +235,9 @@ describe('SelectedItemBar', () => {
 
     render(
       <FeatureToggleProvider>
-        <SelectedItemBar />
+        <TaskAssignmentProvider>
+          <SelectedItemBar />
+        </TaskAssignmentProvider>
       </FeatureToggleProvider>
     );
 

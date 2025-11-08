@@ -86,7 +86,13 @@ type SimulationContextType = {
   selectedItem: SelectedItem | null;
   selectItem: (type: SelectedItemType, id: number) => void;
   clearSelection: () => void;
-  assignTaskToResource: (resourceId: number, taskId: number) => void;
+  assignTask: (resourceId: number, taskId: number) => Promise<void>;
+  unassignTask: (resourceId: number, taskId: number) => Promise<void>;
+  reassignTask: (
+    prevResourceId: number,
+    newResourceId: number,
+    taskId: number
+  ) => Promise<void>;
   simId: string | null;
   isConnected: boolean;
   simulationStatus: SimulationStatus;
@@ -132,6 +138,129 @@ export const SimulationProvider = ({
 
   // Selection state
   const [selectedItem, setSelectedItem] = useState<SelectedItem | null>(null);
+
+  const assignTask = async (resourceId: number, taskId: number) => {
+    const resource = resourcesRef.current.get(resourceId);
+
+    if (!resource) {
+      throw new Error(`Resource #${resourceId} not found.`);
+    }
+
+    try {
+      const payload = { task_id: taskId, resource_id: resourceId };
+      await api.post(`/simulation/${simId!}/resources/assign`, payload);
+
+      const updatedResource = {
+        ...resource,
+        taskList: [...(resource.taskList ?? [])],
+      };
+
+      if (!updatedResource.taskList.includes(taskId)) {
+        updatedResource.taskList.push(taskId);
+      }
+
+      resourcesRef.current.set(resourceId, updatedResource);
+      setResources(Array.from(resourcesRef.current.values()));
+      updateSelectedItem(resourceId, updatedResource);
+    } catch (error) {
+      displayError(
+        'Assignment failed',
+        'An error occurred while assigning a task to a resource. Please try again later.'
+      );
+      throw error;
+    }
+  };
+
+  const unassignTask = async (resourceId: number, taskId: number) => {
+    const resource = resourcesRef.current.get(resourceId);
+    if (!resource) {
+      throw new Error(`Resource #${resourceId} not found.`);
+    }
+
+    try {
+      const payload = { task_id: taskId, resource_id: resourceId };
+      await api.post(`/simulation/${simId!}/resources/unassign`, payload);
+
+      if (Array.isArray(resource.taskList)) {
+        const updatedResource = {
+          ...resource,
+          taskList: resource.taskList.filter((t) => t !== taskId),
+        };
+        resourcesRef.current.set(resourceId, updatedResource);
+        setResources(Array.from(resourcesRef.current.values()));
+        updateSelectedItem(resourceId, updatedResource);
+      }
+    } catch (error) {
+      displayError(
+        'Unassignment failed',
+        'An error occurred while unassigning a task from a resource. Please try again later.'
+      );
+      throw error;
+    }
+  };
+
+  const reassignTask = async (
+    prevResourceId: number,
+    newResourceId: number,
+    taskId: number
+  ) => {
+    const prevResource = resourcesRef.current.get(prevResourceId);
+    const newResource = resourcesRef.current.get(newResourceId);
+    if (!prevResource) {
+      throw new Error(`Previous resource #${prevResourceId} not found.`);
+    }
+    if (!newResource) {
+      throw new Error(`New resource #${newResourceId} not found.`);
+    }
+
+    try {
+      const payload = {
+        task_id: taskId,
+        old_resource_id: prevResourceId,
+        new_resource_id: newResourceId,
+      };
+
+      await api.post(`/simulation/${simId!}/resources/reassign`, payload);
+
+      if (Array.isArray(prevResource.taskList)) {
+        const updatedPrevResource = {
+          ...prevResource,
+          taskList: prevResource.taskList.filter((t) => t !== taskId),
+        };
+        resourcesRef.current.set(prevResourceId, updatedPrevResource);
+      }
+
+      const updatedNewResource = {
+        ...newResource,
+        taskList: Array.isArray(newResource.taskList)
+          ? [...newResource.taskList]
+          : [],
+      };
+
+      if (!updatedNewResource.taskList.includes(taskId)) {
+        updatedNewResource.taskList.push(taskId);
+      }
+
+      resourcesRef.current.set(newResourceId, updatedNewResource);
+      setResources(Array.from(resourcesRef.current.values()));
+      if (selectedItem?.type === SelectedItemType.Resource) {
+        if ((selectedItem.value as Resource).id === prevResourceId) {
+          const updated = resourcesRef.current.get(prevResourceId);
+          if (updated) {
+            updateSelectedItem(prevResourceId, updated);
+          }
+        } else if ((selectedItem.value as Resource).id === newResourceId) {
+          updateSelectedItem(newResourceId, updatedNewResource);
+        }
+      }
+    } catch (error) {
+      displayError(
+        'Reassign failed',
+        `An error occurred while reassigning task ${taskId} from resource ${prevResourceId} to resource ${newResourceId}. Please try again later.`
+      );
+      throw error;
+    }
+  };
 
   // Hover state - use refs so animation loop always has latest values
   const hoveredStationIdRef = useRef<number | null>(null);
@@ -302,6 +431,26 @@ export const SimulationProvider = ({
         hoveredResourceIdRef.current ?? undefined
       );
       setMapSource(MapSource.Resources, geojson, map);
+    }
+  };
+
+  const updateSelectedItem = (
+    resourceId: number,
+    updatedResource: Resource
+  ) => {
+    if (
+      selectedItem?.type === SelectedItemType.Resource &&
+      (selectedItem.value as Resource).id === resourceId
+    ) {
+      setSelectedItem({
+        type: SelectedItemType.Resource,
+        value: updatedResource,
+      });
+      selectedResourceIdRef.current = resourceId;
+      updateMapSources(
+        selectedStationIdRef.current,
+        selectedResourceIdRef.current
+      );
     }
   };
 
@@ -546,15 +695,6 @@ export const SimulationProvider = ({
 
     // Continue animation loop
     animationFrameRef.current = requestAnimationFrame(animateResources);
-  };
-
-  const assignTaskToResource = (resourceId: number, taskId: number) => {
-    try {
-      // TODO: use /assign endpoint
-      console.log('assignTaskToResource', { resourceId, taskId });
-    } catch (error) {
-      console.error('Error assigning task to resource:', error);
-    }
   };
 
   // ============================================================================
@@ -803,7 +943,9 @@ export const SimulationProvider = ({
         selectedItem,
         selectItem,
         clearSelection,
-        assignTaskToResource,
+        assignTask,
+        unassignTask,
+        reassignTask,
         simId,
         isConnected,
         simulationStatus,

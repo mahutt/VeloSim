@@ -203,3 +203,6 @@ export interface BackendPayload {
     realMinutesPassed: number;
   };
 }
+
+// Task assignment types
+export type TaskAction = 'assign' | 'reassign' | 'unassign';
