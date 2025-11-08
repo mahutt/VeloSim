@@ -41,6 +41,19 @@ import { logSimulationError } from '~/utils/simulation-error-utils';
 import { SimulationProvider } from '~/providers/simulation-provider';
 import { TaskAssignmentProvider } from '~/providers/task-assignment-provider';
 
+// Mock useAuth hook
+vi.mock('~/hooks/use-auth', () => ({
+  default: () => ({
+    user: { id: 1, username: 'test_user', is_admin: false },
+    setUser: vi.fn(),
+    loading: false,
+    setLoading: vi.fn(),
+    logout: vi.fn(),
+    refreshUser: vi.fn(),
+    setToken: vi.fn(),
+  }),
+}));
+
 // Mocking setup map helpers that are called by MapProvider
 vi.mock('~/lib/map-helpers.ts', async (importOriginal) => {
   const actual = await importOriginal<typeof import('~/lib/map-helpers.ts')>();

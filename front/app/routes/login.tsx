@@ -38,7 +38,6 @@ import axios from 'axios';
 import LoginAlert from '~/components/login/login-alert';
 import { useState } from 'react';
 import useAuth from '~/hooks/use-auth';
-import { TOKEN_STORAGE_KEY } from '~/constants';
 
 export function meta() {
   return [{ title: 'Login' }];
@@ -53,7 +52,7 @@ const loginFormSchema = z.object({
 });
 
 export default function Signin() {
-  const { refreshUser } = useAuth();
+  const { refreshUser, setToken } = useAuth();
   const [responseCode, setResponseCode] = useState<number | null>(null);
 
   const loginForm = useForm<z.infer<typeof loginFormSchema>>({
@@ -73,7 +72,7 @@ export default function Signin() {
         `${import.meta.env.VITE_BACKEND_URL}/api/token`,
         formData
       );
-      sessionStorage.setItem(TOKEN_STORAGE_KEY, response.data.access_token);
+      setToken(response.data.access_token);
       refreshUser();
     } catch (e) {
       console.error('Login error', e);

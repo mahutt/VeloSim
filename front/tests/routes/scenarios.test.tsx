@@ -167,20 +167,7 @@ describe('ScenarioEditor', () => {
     });
 
     const nameInput = screen.getByPlaceholderText('Scenario name');
-    const textarea = screen.getByLabelText('Scenario JSON');
-
-    // Name is now synced from JSON content's scenario_title field
-    const contentWithTitle = JSON.stringify(
-      {
-        scenario_title: 'New Scenario',
-        start_time: '2024-01-01T00:00:00Z',
-        end_time: '2024-01-01T01:00:00Z',
-      },
-      null,
-      2
-    );
-
-    fireEvent.change(textarea, { target: { value: contentWithTitle } });
+    fireEvent.change(nameInput, { target: { value: 'New Scenario' } });
 
     await waitFor(() => {
       expect(nameInput).toHaveValue('New Scenario');
@@ -498,23 +485,6 @@ describe('ScenarioEditor', () => {
     });
   });
 
-  it('navigates to simulation when Start Simulation is clicked', async () => {
-    render(
-      <BrowserRouter>
-        <ScenarioEditor />
-      </BrowserRouter>
-    );
-
-    await waitFor(() => {
-      expect(screen.getByText('Scenario Editor')).toBeInTheDocument();
-    });
-
-    const startButton = screen.getByText('Start Simulation');
-    fireEvent.click(startButton);
-
-    expect(mockNavigate).toHaveBeenCalledWith('/simulation');
-  });
-
   it('shows error when trying to export empty content', async () => {
     render(
       <BrowserRouter>
@@ -700,58 +670,6 @@ describe('ScenarioEditor', () => {
     fireEvent.click(saveButton);
   });
 
-  it('syncs scenario_title with scenarioName when content changes', async () => {
-    render(
-      <BrowserRouter>
-        <ScenarioEditor />
-      </BrowserRouter>
-    );
-
-    await waitFor(() => {
-      expect(screen.getByText('Scenario Editor')).toBeInTheDocument();
-    });
-
-    const textarea = screen.getByPlaceholderText(
-      'Paste or type your JSON scenario here...'
-    );
-
-    // Add content with scenario_title
-    fireEvent.change(textarea, {
-      target: { value: '{"scenario_title": "Auto Title", "stations": []}' },
-    });
-
-    await waitFor(() => {
-      const nameInput = screen.getByPlaceholderText('Scenario name');
-      expect(nameInput).toHaveValue('Auto Title');
-    });
-  });
-
-  it('displays scenario_title from JSON content in name field', async () => {
-    render(
-      <BrowserRouter>
-        <ScenarioEditor />
-      </BrowserRouter>
-    );
-
-    await waitFor(() => {
-      expect(screen.getByText('Scenario Editor')).toBeInTheDocument();
-    });
-
-    // Add content with scenario_title
-    const textarea = screen.getByPlaceholderText(
-      'Paste or type your JSON scenario here...'
-    );
-    fireEvent.change(textarea, {
-      target: { value: '{"scenario_title": "My Scenario", "stations": []}' },
-    });
-
-    // Check that name input displays the scenario_title from JSON
-    const nameInput = screen.getByPlaceholderText('Scenario name');
-    await waitFor(() => {
-      expect(nameInput).toHaveValue('My Scenario');
-    });
-  });
-
   it('handles template fetch failure when clicking New', async () => {
     // Mock template endpoint to fail
     vi.mocked(api.get).mockImplementation((url) => {
@@ -902,32 +820,6 @@ describe('ScenarioEditor', () => {
       expect(toast.success).toHaveBeenCalledWith(
         'Scenario saved successfully!'
       );
-    });
-  });
-
-  it('opens name dialog when exporting without name', async () => {
-    render(
-      <BrowserRouter>
-        <ScenarioEditor />
-      </BrowserRouter>
-    );
-
-    await waitFor(() => {
-      expect(screen.getByText('Scenario Editor')).toBeInTheDocument();
-    });
-
-    const textarea = screen.getByPlaceholderText(
-      'Paste or type your JSON scenario here...'
-    );
-    fireEvent.change(textarea, {
-      target: { value: '{"stations": []}' },
-    });
-
-    const exportButton = screen.getByText('Export');
-    fireEvent.click(exportButton);
-
-    await waitFor(() => {
-      expect(screen.getByText('Scenario Name Required')).toBeInTheDocument();
     });
   });
 
@@ -1281,67 +1173,6 @@ describe('ScenarioEditor', () => {
     });
   });
   describe('ScenarioEditor - Additional Coverage', () => {
-    it('handles scenario content sync with scenario_title on content change', async () => {
-      render(
-        <BrowserRouter>
-          <ScenarioEditor />
-        </BrowserRouter>
-      );
-
-      await waitFor(() => {
-        expect(screen.getByText('Scenario Editor')).toBeInTheDocument();
-      });
-
-      const textarea = screen.getByPlaceholderText(
-        'Paste or type your JSON scenario here...'
-      );
-
-      // Add content with scenario_title
-      fireEvent.change(textarea, {
-        target: {
-          value: JSON.stringify({
-            scenario_title: 'Auto Title from JSON',
-            stations: [],
-          }),
-        },
-      });
-
-      await waitFor(() => {
-        const nameInput = screen.getByPlaceholderText('Scenario name');
-        expect(nameInput).toHaveValue('Auto Title from JSON');
-      });
-    });
-
-    it('syncs scenario name from scenario_title in valid JSON content', async () => {
-      render(
-        <BrowserRouter>
-          <ScenarioEditor />
-        </BrowserRouter>
-      );
-
-      await waitFor(() => {
-        expect(screen.getByText('Scenario Editor')).toBeInTheDocument();
-      });
-
-      // Add content with scenario_title
-      const textarea = screen.getByPlaceholderText(
-        'Paste or type your JSON scenario here...'
-      );
-      const contentWithTitle = JSON.stringify({
-        scenario_title: 'Updated Name',
-        stations: [],
-      });
-      fireEvent.change(textarea, {
-        target: { value: contentWithTitle },
-      });
-
-      // Check that name input displays the scenario_title
-      const nameInput = screen.getByPlaceholderText('Scenario name');
-      await waitFor(() => {
-        expect(nameInput).toHaveValue('Updated Name');
-      });
-    });
-
     it('handles invalid JSON content without crashing', async () => {
       render(
         <BrowserRouter>
@@ -1569,46 +1400,6 @@ describe('ScenarioEditor', () => {
       expect(fileInput.value).toBe('');
     });
 
-    it('handles handleSaveScenario with invalid JSON content during sync', async () => {
-      render(
-        <BrowserRouter>
-          <ScenarioEditor />
-        </BrowserRouter>
-      );
-
-      await waitFor(() => {
-        expect(screen.getByText('Scenario Editor')).toBeInTheDocument();
-      });
-
-      // Add content with a scenario_title first so there's a name
-      const textarea = screen.getByPlaceholderText(
-        'Paste or type your JSON scenario here...'
-      );
-      fireEvent.change(textarea, {
-        target: { value: JSON.stringify({ scenario_title: 'Test Name' }) },
-      });
-
-      // Wait for name to sync
-      await waitFor(() => {
-        const nameInput = screen.getByPlaceholderText('Scenario name');
-        expect(nameInput).toHaveValue('Test Name');
-      });
-
-      // Then change to invalid JSON
-      fireEvent.change(textarea, { target: { value: 'invalid json' } });
-
-      // Try to save
-      const saveButton = screen.getByText('Save');
-      fireEvent.click(saveButton);
-
-      await waitFor(() => {
-        expect(mockDisplayError).toHaveBeenCalledWith(
-          'Invalid JSON format',
-          'The scenario content is not valid JSON. Please fix the formatting.'
-        );
-      });
-    });
-
     it('handles handleSelectScenario with missing optional fields', async () => {
       const scenarioMinimal = {
         id: 3,
@@ -1654,54 +1445,6 @@ describe('ScenarioEditor', () => {
         const content = JSON.parse((textarea as HTMLTextAreaElement).value);
         expect(content.initial_tasks).toBeUndefined();
         expect(content.scheduled_tasks).toBeUndefined();
-      });
-    });
-
-    it('handles multiple consecutive scenario_title changes in JSON', async () => {
-      render(
-        <BrowserRouter>
-          <ScenarioEditor />
-        </BrowserRouter>
-      );
-
-      await waitFor(() => {
-        expect(screen.getByText('Scenario Editor')).toBeInTheDocument();
-      });
-
-      const textarea = screen.getByPlaceholderText(
-        'Paste or type your JSON scenario here...'
-      );
-      const nameInput = screen.getByPlaceholderText('Scenario name');
-
-      // Change scenario_title in JSON multiple times
-      fireEvent.change(textarea, {
-        target: {
-          value: JSON.stringify({ scenario_title: 'Name 1', stations: [] }),
-        },
-      });
-
-      await waitFor(() => {
-        expect(nameInput).toHaveValue('Name 1');
-      });
-
-      fireEvent.change(textarea, {
-        target: {
-          value: JSON.stringify({ scenario_title: 'Name 2', stations: [] }),
-        },
-      });
-
-      await waitFor(() => {
-        expect(nameInput).toHaveValue('Name 2');
-      });
-
-      fireEvent.change(textarea, {
-        target: {
-          value: JSON.stringify({ scenario_title: 'Name 3', stations: [] }),
-        },
-      });
-
-      await waitFor(() => {
-        expect(nameInput).toHaveValue('Name 3');
       });
     });
 

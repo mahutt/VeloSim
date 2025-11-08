@@ -41,7 +41,7 @@ const mainNavItems = [
   },
   {
     title: 'Scenarios',
-    url: '/scenarios',
+    url: '/',
     icon: FileSliders,
   },
 ];

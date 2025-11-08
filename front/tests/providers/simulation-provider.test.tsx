@@ -22,17 +22,48 @@
  * SOFTWARE.
  */
 
-/* Test here have been developed with the help of GitHub Copilot */
+// Mock WebSocket
+interface MockWebSocket {
+  onopen: ((event: Event) => void) | null;
+  onmessage: ((event: MessageEvent) => void) | null;
+  onerror: ((event: Event) => void) | null;
+  onclose: ((event: CloseEvent) => void) | null;
+  send: (data: string) => void;
+  close: () => void;
+}
 
-// Mock the mock-backend module before any imports that might use it
-vi.mock('~/lib/mock-backend', async (importOriginal) => {
-  const original = await importOriginal<typeof import('~/lib/mock-backend')>();
-  return {
-    ...original,
-    startMockBackend: vi.fn(),
-    FRAME_INTERVAL_MS: 16, // or whatever value is appropriate for your tests
-  };
-});
+let mockWebSocketInstance: MockWebSocket | null = null;
+
+class MockedWebSocketConstructor {
+  static readonly CONNECTING = 0;
+  static readonly OPEN = 1;
+  static readonly CLOSING = 2;
+  static readonly CLOSED = 3;
+
+  onopen: ((event: Event) => void) | null = null;
+  onmessage: ((event: MessageEvent) => void) | null = null;
+  onerror: ((event: Event) => void) | null = null;
+  onclose: ((event: CloseEvent) => void) | null = null;
+  send = vi.fn();
+  close = vi.fn();
+
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  constructor(_url: string) {
+    // eslint-disable-next-line @typescript-eslint/no-this-alias
+    mockWebSocketInstance = this;
+  }
+}
+
+// Helper to get the current WebSocket mock instance
+function getMockedWebSocket(): MockWebSocket {
+  if (!mockWebSocketInstance) {
+    throw new Error('WebSocket mock instance not available');
+  }
+  return mockWebSocketInstance;
+}
+
+// Setup global WebSocket mock
+global.WebSocket = MockedWebSocketConstructor as unknown as typeof WebSocket;
 
 // Mock the simulation error utils
 vi.mock('~/utils/simulation-error-utils', () => ({
@@ -40,29 +71,33 @@ vi.mock('~/utils/simulation-error-utils', () => ({
   logMissingEntityError: vi.fn(),
 }));
 
+// Mock useAuth hook
+vi.mock('~/hooks/use-auth', () => ({
+  default: () => ({
+    user: { id: 1, username: 'test_user', is_admin: false },
+    setUser: vi.fn(),
+    loading: false,
+    setLoading: vi.fn(),
+    logout: vi.fn(),
+    refreshUser: vi.fn(),
+    setToken: vi.fn(),
+    token: 'test-token',
+    isAuthenticated: true,
+  }),
+}));
+
 import { expect, test, vi, beforeEach, type Mock } from 'vitest';
 import { render, waitFor, act } from '@testing-library/react';
+import { useEffect } from 'react';
 import {
   SimulationProvider,
   useSimulation,
 } from '~/providers/simulation-provider';
 import { MapProvider } from '~/providers/map-provider';
 import { TaskAssignmentProvider } from '~/providers/task-assignment-provider';
-import { MockMap } from 'tests/mocks';
+import { MockMap, mockDisplayError } from 'tests/mocks';
 import MapContainer from '~/components/map/map-container';
-import { setMapSource, MapSource } from '~/lib/map-helpers';
-import {
-  setupMapClickHandlers,
-  setupMapHoverHandlers,
-} from '~/lib/map-interactions';
-import {
-  type Station,
-  type Resource,
-  type SelectedItem,
-  SelectedItemType,
-} from '~/types';
-import api from '~/api';
-import { adaptStationsToGeoJSON } from '~/lib/geojson-adapters';
+import { SelectedItemType } from '~/types';
 import {
   logSimulationError,
   logMissingEntityError,
@@ -103,120 +138,41 @@ global.fetch = mockFetch;
 
 // Test component to access the simulation context
 const TestComponent = () => {
-  const { stationsRef } = useSimulation();
+  const { stationsRef, simulationStatus, isConnected } = useSimulation();
   return (
-    <div data-testid="test-component">
-      {stationsRef.current.size > 0 ? 'data-loaded' : 'no-data'}
+    <div>
+      <div data-testid="test-component">
+        {stationsRef.current.size > 0 ? 'data-loaded' : 'no-data'}
+      </div>
+      <div data-testid="status">{simulationStatus}</div>
+      <div data-testid="connected">{String(isConnected)}</div>
     </div>
   );
 };
 
 // Sample GeoJSON data for testing
-const mockGetStationsResponse = {
-  stations: [
-    {
-      id: 1,
-      name: 'Metcalfe / de Maisonneuve',
-      position: [-73.57314596652985, 45.501375027330134],
-      tasks: [],
-    },
-    {
-      id: 2,
-      name: 'Sanguinet / de Maisonneuve',
-      position: [-73.56261849403381, 45.51344071811516],
-      tasks: [],
-    },
-    {
-      id: 3,
-      name: 'St-Denis / Ste-Catherine',
-      position: [-73.5639146839003, 45.510079193884],
-      tasks: [],
-    },
-    {
-      id: 4,
-      name: 'St-André / Ontario',
-      position: [-73.56353, 45.521889],
-      tasks: [],
-    },
-    {
-      id: 5,
-      name: 'St-André / de Maisonneuve',
-      position: [-73.55974848376083, 45.517085960784755],
-      tasks: [],
-    },
-    {
-      id: 6,
-      name: 'de la Commune / des Soeurs-Grises',
-      position: [-73.55273187160492, 45.49798647260488],
-      tasks: [],
-    },
-    {
-      id: 7,
-      name: 'Notre-Dame / St-Gabriel',
-      position: [-73.55504930019379, 45.50711760282556],
-      tasks: [],
-    },
-    {
-      id: 8,
-      name: 'de la Commune / Place Jacques-Cartier',
-      position: [-73.55183601379395, 45.50761009451047],
-      tasks: [],
-    },
-    {
-      id: 9,
-      name: 'de Maisonneuve / Mansfield (sud)',
-      position: [-73.57346534729004, 45.502053864057466],
-      tasks: [],
-    },
-    {
-      id: 10,
-      name: "Métro Place-d'Armes (St-Urbain / Viger)",
-      position: [-73.5596989095211, 45.50632340391333],
-      tasks: [],
-    },
-  ] as Station[],
-  total: 10,
-  page: 1,
-  per_page: 20,
-  total_pages: 1,
-};
-
-const mockResourcesData = {
-  resources: [
-    {
-      id: 1,
-      position: [-73.57776, 45.48944],
-      taskList: [1, 2, 3],
-      route: {
-        coordinates: [
-          [-73.57776, 45.48944],
-          [-73.56776, 45.49944],
-          [-73.55776, 45.50944],
-        ],
-      },
-    },
-    {
-      id: 2,
-      position: [-73.56776, 45.47944],
-      taskList: [1, 2],
-      route: {
-        coordinates: [
-          [-73.56776, 45.47944],
-          [-73.568, 45.48],
-          [-73.569, 45.482],
-        ],
-      },
-    },
-  ],
-};
 
 // Store references to mocked functions
 const mockLogSimulationError = vi.fn();
 const mockLogMissingEntityError = vi.fn();
 
+// Mock requestAnimationFrame - prevent infinite recursion by limiting calls
+let rafCallCount = 0;
+global.requestAnimationFrame = vi.fn((cb) => {
+  rafCallCount++;
+  // Only execute the first few calls to prevent infinite loops in tests
+  if (rafCallCount <= 5) {
+    setTimeout(() => cb(performance.now()), 0);
+  }
+  return rafCallCount;
+});
+global.cancelAnimationFrame = vi.fn();
+
 // Re-apply mocks before each test since vi.clearAllMocks() clears them
 beforeEach(() => {
   vi.clearAllMocks();
+  mockWebSocketInstance = null; // Reset WebSocket instance
+  rafCallCount = 0; // Reset RAF call count
 
   // Re-apply the simulation error utils mocks
   (logSimulationError as Mock).mockImplementation(mockLogSimulationError);
@@ -271,717 +227,16 @@ test('simulation provider provides context with initial state', () => {
   expect(getByTestId('test-component')).toHaveTextContent('no-data');
 });
 
-test('simulation provider fetches stations data when map is loaded', async () => {
-  //Mock successful API response
-  (api.get as Mock).mockResolvedValueOnce({
-    data: mockGetStationsResponse,
-  });
-
-  mockFetch.mockResolvedValueOnce({
-    ok: true,
-    json: () => Promise.resolve(mockResourcesData),
-  });
-
-  render(
-    <MapProvider>
-      <SimulationProvider>
-        <TaskAssignmentProvider>
-          <MapContainer />
-          <TestComponent />
-        </TaskAssignmentProvider>
-      </SimulationProvider>
-    </MapProvider>
-  );
-
-  // Wait for the map to be created
-  expect(MockMap.instance).toBeDefined();
-  const map = MockMap.instance!;
-
-  // Trigger the map load event to simulate map being ready
-  act(() => {
-    map.callBacks.load();
-  });
-
-  // Wait for the fetch to complete and state to update
-  await waitFor(() => {
-    expect(api.get).toHaveBeenCalledWith('/stations');
-  });
-
-  await waitFor(() => {
-    expect(setMapSource).toHaveBeenCalledWith(
-      MapSource.Stations,
-      adaptStationsToGeoJSON(mockGetStationsResponse.stations),
-      map
-    );
-  });
-});
-
-test('simulation provider updates stations ref when data is successfully fetched', async () => {
-  (api.get as Mock).mockResolvedValueOnce({
-    data: mockGetStationsResponse,
-  });
-
-  mockFetch.mockResolvedValueOnce({
-    ok: true,
-    json: () => Promise.resolve(mockResourcesData),
-  });
-
-  let stationsRef: React.RefObject<Map<number, Station>> | undefined;
-
-  const StateCapture = () => {
-    const { stationsRef: stationsRefFromHook } = useSimulation();
-    stationsRef = stationsRefFromHook;
-    return null;
-  };
-
-  render(
-    <MapProvider>
-      <SimulationProvider>
-        <TaskAssignmentProvider>
-          <MapContainer />
-          <StateCapture />
-        </TaskAssignmentProvider>
-      </SimulationProvider>
-    </MapProvider>
-  );
-
-  const map = MockMap.instance!;
-  act(() => {
-    map.callBacks.load();
-  });
-
-  await waitFor(() => {
-    expect(api.get).toHaveBeenCalledWith('/stations');
-  });
-
-  await waitFor(() => {
-    expect(stationsRef?.current.size).toBe(10);
-  });
-});
-
-test('simulation provider handles fetch error for resource routes gracefully', async () => {
-  (api.get as Mock).mockResolvedValueOnce({
-    data: mockGetStationsResponse,
-  });
-
-  mockFetch.mockResolvedValueOnce({
-    ok: false,
-    status: 404,
-    json: () => Promise.resolve({}),
-  });
-
-  render(
-    <MapProvider>
-      <SimulationProvider>
-        <TaskAssignmentProvider>
-          <MapContainer />
-        </TaskAssignmentProvider>
-      </SimulationProvider>
-    </MapProvider>
-  );
-
-  const map = MockMap.instance!;
-  act(() => {
-    map.callBacks.load();
-  });
-
-  await waitFor(() => {
-    expect(mockFetch).toHaveBeenCalledWith('/placeholder-data/resources.json');
-  });
-
-  // Should not throw, and setMapSource for resources should not be called
-  await waitFor(
-    () => {
-      // Debug: Check all calls to setMapSource
-      const calls = (setMapSource as Mock).mock.calls;
-      const resourceCalls = calls.filter(
-        (call) => call[0] === MapSource.Resources
-      );
-
-      expect(resourceCalls).toHaveLength(0);
-    },
-    { timeout: 100 }
-  );
-});
-
-test('simulation provider sets up map click handlers and handles station selection', async () => {
-  (api.get as Mock).mockResolvedValueOnce({
-    data: mockGetStationsResponse,
-  });
-
-  mockFetch.mockResolvedValueOnce({
-    ok: true,
-    json: () => Promise.resolve(mockResourcesData),
-  });
-
-  let clickHandler:
-    | ((
-        item: {
-          type: SelectedItemType;
-          id: number;
-          coordinates: [number, number];
-        } | null
-      ) => void)
-    | undefined;
-  (setupMapClickHandlers as Mock).mockImplementation((map, handler) => {
-    clickHandler = handler;
-  });
-
-  let selectedItem: SelectedItem | null = null;
-  const TestComponent = () => {
-    const { selectedItem: currentSelection } = useSimulation();
-    selectedItem = currentSelection;
-    return null;
-  };
-
-  render(
-    <MapProvider>
-      <SimulationProvider>
-        <TaskAssignmentProvider>
-          <MapContainer />
-          <TestComponent />
-        </TaskAssignmentProvider>
-      </SimulationProvider>
-    </MapProvider>
-  );
-
-  const map = MockMap.instance!;
-  act(() => {
-    map.callBacks.load();
-  });
-
-  await waitFor(() => {
-    expect(setupMapClickHandlers).toHaveBeenCalledWith(
-      map,
-      expect.any(Function)
-    );
-  });
-
-  // Simulate clicking on a station
-  act(() => {
-    clickHandler!({
-      type: SelectedItemType.Station,
-      id: mockGetStationsResponse.stations[0].id,
-      coordinates: mockGetStationsResponse.stations[0].position as [
-        number,
-        number,
-      ],
-    });
-  });
-
-  expect(selectedItem).toEqual({
-    type: SelectedItemType.Station,
-    value: mockGetStationsResponse.stations[0],
-  });
-
-  // Simulate clicking on empty area (deselect)
-  act(() => {
-    clickHandler!(null);
-  });
-
-  expect(selectedItem).toBeNull();
-});
-
-test('simulation provider sets up map click handlers and handles resource selection', async () => {
-  (api.get as Mock).mockResolvedValueOnce({
-    data: mockGetStationsResponse,
-  });
-
-  mockFetch.mockResolvedValueOnce({
-    ok: true,
-    json: () => Promise.resolve(mockResourcesData),
-  });
-
-  let clickHandler:
-    | ((
-        item: {
-          type: SelectedItemType;
-          id: number;
-          coordinates: [number, number];
-        } | null
-      ) => void)
-    | undefined;
-  (setupMapClickHandlers as Mock).mockImplementation((map, handler) => {
-    clickHandler = handler;
-  });
-
-  let selectedItem: SelectedItem | null = null;
-  const TestComponent = () => {
-    const { selectedItem: currentSelection } = useSimulation();
-    selectedItem = currentSelection;
-    return null;
-  };
-
-  render(
-    <MapProvider>
-      <SimulationProvider>
-        <TaskAssignmentProvider>
-          <MapContainer />
-          <TestComponent />
-        </TaskAssignmentProvider>
-      </SimulationProvider>
-    </MapProvider>
-  );
-
-  const map = MockMap.instance!;
-  act(() => {
-    map.callBacks.load();
-  });
-
-  // Wait for resources to be initialized
-  await waitFor(() => {
-    expect(setupMapClickHandlers).toHaveBeenCalledWith(
-      map,
-      expect.any(Function)
-    );
-  });
-
-  // Simulate clicking on a resource (resource with id 1 should exist after fetch)
-  act(() => {
-    clickHandler!({
-      type: SelectedItemType.Resource,
-      id: 1,
-      coordinates: [-73.57776, 45.48944],
-    });
-  });
-
-  expect(selectedItem).toEqual({
-    type: SelectedItemType.Resource,
-    value: expect.objectContaining({
-      id: 1,
-      position: expect.any(Array),
-      route: expect.objectContaining({
-        coordinates: expect.any(Array),
-      }),
-    }),
-  });
-});
-
-test('simulation provider sets up map hover handlers and handles station hover', async () => {
-  (api.get as Mock).mockResolvedValueOnce({
-    data: mockGetStationsResponse,
-  });
-
-  mockFetch.mockResolvedValueOnce({
-    ok: false,
-    status: 404,
-    json: () => Promise.resolve({}),
-  });
-
-  let hoverHandler:
-    | ((
-        item: {
-          type: SelectedItemType;
-          id: number;
-          coordinates: [number, number];
-        } | null
-      ) => void)
-    | undefined;
-  (setupMapHoverHandlers as Mock).mockImplementation((map, handler) => {
-    hoverHandler = handler;
-  });
-
-  render(
-    <MapProvider>
-      <SimulationProvider>
-        <TaskAssignmentProvider>
-          <MapContainer />
-        </TaskAssignmentProvider>
-      </SimulationProvider>
-    </MapProvider>
-  );
-
-  const map = MockMap.instance!;
-  act(() => {
-    map.callBacks.load();
-  });
-
-  await waitFor(() => {
-    expect(setupMapHoverHandlers).toHaveBeenCalledWith(
-      map,
-      expect.any(Function)
-    );
-  });
-
-  // Simulate hovering on a station
-  act(() => {
-    hoverHandler!({
-      type: SelectedItemType.Station,
-      id: mockGetStationsResponse.stations[0].id,
-      coordinates: mockGetStationsResponse.stations[0].position as [
-        number,
-        number,
-      ],
-    });
-  });
-
-  // Verify that setMapSource was called with the hovered station
-  await waitFor(() => {
-    const calls = (setMapSource as Mock).mock.calls;
-    const stationCalls = calls.filter((call) => call[0] === MapSource.Stations);
-    expect(stationCalls.length).toBeGreaterThan(0);
-    // The last call should include hover state
-    const lastStationCall = stationCalls[stationCalls.length - 1];
-    expect(lastStationCall[1]).toEqual(
-      adaptStationsToGeoJSON(
-        mockGetStationsResponse.stations,
-        undefined,
-        mockGetStationsResponse.stations[0].id
-      )
-    );
-  });
-
-  // Simulate hovering off (null)
-  act(() => {
-    hoverHandler!(null);
-  });
-
-  // Verify that setMapSource was called without hover state
-  await waitFor(() => {
-    const calls = (setMapSource as Mock).mock.calls;
-    const stationCalls = calls.filter((call) => call[0] === MapSource.Stations);
-    const lastStationCall = stationCalls[stationCalls.length - 1];
-    expect(lastStationCall[1]).toEqual(
-      adaptStationsToGeoJSON(
-        mockGetStationsResponse.stations,
-        undefined,
-        undefined
-      )
-    );
-  });
-});
-
-test('simulation provider handles click on non-existent station gracefully', async () => {
-  (api.get as Mock).mockResolvedValueOnce({
-    data: mockGetStationsResponse,
-  });
-
-  mockFetch.mockResolvedValueOnce({
-    ok: true,
-    json: () => Promise.resolve(mockResourcesData),
-  });
-
-  let clickHandler:
-    | ((
-        item: {
-          type: SelectedItemType;
-          id: number;
-          coordinates: [number, number];
-        } | null
-      ) => void)
-    | undefined;
-  (setupMapClickHandlers as Mock).mockImplementation((map, handler) => {
-    clickHandler = handler;
-  });
-
-  // Capture selection state to ensure it remains unchanged
-  let selectedItem: SelectedItem | null = null;
-  const SelectionCapture = () => {
-    const { selectedItem: current } = useSimulation();
-    selectedItem = current;
-    return null;
-  };
-
-  render(
-    <MapProvider>
-      <SimulationProvider>
-        <TaskAssignmentProvider>
-          <MapContainer />
-          <SelectionCapture />
-        </TaskAssignmentProvider>
-      </SimulationProvider>
-    </MapProvider>
-  );
-
-  const map = MockMap.instance!;
-  act(() => {
-    map.callBacks.load();
-  });
-
-  await waitFor(() => {
-    expect(setupMapClickHandlers).toHaveBeenCalledWith(
-      map,
-      expect.any(Function)
-    );
-  });
-
-  // Simulate clicking on a non-existent station
-  act(() => {
-    clickHandler!({
-      type: SelectedItemType.Station,
-      id: 999, // Non-existent station ID
-      coordinates: [0, 0], // Mock coordinates for non-existent station
-    });
-  });
-
-  // Should not throw, selection should remain unchanged (null), and logging function should be called
-  expect(selectedItem).toBeNull();
-  expect(mockLogMissingEntityError).toHaveBeenCalledWith('station', 999);
-});
-
-test('simulation provider handles click on non-existent resource gracefully', async () => {
-  (api.get as Mock).mockResolvedValueOnce({
-    data: mockGetStationsResponse,
-  });
-
-  mockFetch.mockResolvedValueOnce({
-    ok: true,
-    json: () => Promise.resolve(mockResourcesData),
-  });
-
-  let clickHandler:
-    | ((
-        item: {
-          type: SelectedItemType;
-          id: number;
-          coordinates: [number, number];
-        } | null
-      ) => void)
-    | undefined;
-  (setupMapClickHandlers as Mock).mockImplementation((map, handler) => {
-    clickHandler = handler;
-  });
-
-  // Capture selection to verify it doesn't change
-  let selectedItem: SelectedItem | null = null;
-  const SelectionCapture = () => {
-    const { selectedItem: current } = useSimulation();
-    selectedItem = current;
-    return null;
-  };
-
-  render(
-    <MapProvider>
-      <SimulationProvider>
-        <TaskAssignmentProvider>
-          <MapContainer />
-          <SelectionCapture />
-        </TaskAssignmentProvider>
-      </SimulationProvider>
-    </MapProvider>
-  );
-
-  const map = MockMap.instance!;
-  act(() => {
-    map.callBacks.load();
-  });
-
-  await waitFor(() => {
-    expect(setupMapClickHandlers).toHaveBeenCalledWith(
-      map,
-      expect.any(Function)
-    );
-  });
-
-  // Simulate clicking on a non-existent resource
-  act(() => {
-    clickHandler!({
-      type: SelectedItemType.Resource,
-      id: 999, // Non-existent resource ID
-      coordinates: [0, 0], // Mock coordinates for non-existent resource
-    });
-  });
-
-  // Should not throw, selection remains unchanged, and logging function should be called
-  expect(selectedItem).toBeNull();
-  expect(mockLogMissingEntityError).toHaveBeenCalledWith('resource', 999);
-});
-
-test('simulation provider starts animation loop', async () => {
-  (api.get as Mock).mockResolvedValueOnce({
-    data: mockGetStationsResponse,
-  });
-
-  mockFetch.mockResolvedValueOnce({
-    ok: true,
-    json: () => Promise.resolve(mockResourcesData),
-  });
-
-  const requestAnimationFrameSpy = vi.spyOn(window, 'requestAnimationFrame');
-
-  render(
-    <MapProvider>
-      <SimulationProvider>
-        <TaskAssignmentProvider>
-          <MapContainer />
-        </TaskAssignmentProvider>
-      </SimulationProvider>
-    </MapProvider>
-  );
-
-  const map = MockMap.instance!;
-  act(() => {
-    map.callBacks.load();
-  });
-
-  await waitFor(() => {
-    expect(requestAnimationFrameSpy).toHaveBeenCalled();
-  });
-
-  requestAnimationFrameSpy.mockRestore();
-});
-
-test('simulation provider updates resource positions', async () => {
-  (api.get as Mock).mockResolvedValueOnce({
-    data: mockGetStationsResponse,
-  });
-
-  mockFetch.mockResolvedValueOnce({
-    ok: true,
-    json: () => Promise.resolve(mockResourcesData),
-  });
-
-  render(
-    <MapProvider>
-      <SimulationProvider>
-        <TaskAssignmentProvider>
-          <MapContainer />
-        </TaskAssignmentProvider>
-      </SimulationProvider>
-    </MapProvider>
-  );
-
-  const map = MockMap.instance!;
-  act(() => {
-    map.callBacks.load();
-  });
-
-  await waitFor(() => {
-    expect(mockFetch).toHaveBeenCalledWith('/placeholder-data/resources.json');
-  });
-
-  await waitFor(
-    () => {
-      expect(setMapSource).toHaveBeenCalledWith(
-        MapSource.Resources,
-        expect.objectContaining({
-          type: 'FeatureCollection',
-          features: expect.arrayContaining([
-            expect.objectContaining({
-              type: 'Feature',
-              geometry: expect.objectContaining({
-                type: 'Point',
-                coordinates: [-73.57776, 45.48944],
-              }),
-              properties: expect.objectContaining({
-                id: 1,
-                hover: false,
-                selected: false,
-              }),
-            }),
-          ]),
-        }),
-        map
-      );
-    },
-    { timeout: 100 }
-  );
-});
-
-test('simulation provider cleans up on unmount', async () => {
-  (api.get as Mock).mockResolvedValueOnce({
-    data: mockGetStationsResponse,
-  });
-
-  mockFetch.mockResolvedValueOnce({
-    ok: true,
-    json: () => Promise.resolve(mockResourcesData),
-  });
-
-  const cancelAnimationFrameSpy = vi.spyOn(window, 'cancelAnimationFrame');
-  const clearIntervalSpy = vi.spyOn(window, 'clearInterval');
-
-  const { unmount } = render(
-    <MapProvider>
-      <SimulationProvider>
-        <TaskAssignmentProvider>
-          <MapContainer />
-        </TaskAssignmentProvider>
-      </SimulationProvider>
-    </MapProvider>
-  );
-
-  const map = MockMap.instance!;
-  act(() => {
-    map.callBacks.load();
-  });
-
-  await waitFor(() => {
-    expect(mockFetch).toHaveBeenCalled();
-  });
-
-  unmount();
-
-  expect(cancelAnimationFrameSpy).toHaveBeenCalled();
-  expect(clearIntervalSpy).toHaveBeenCalled();
-
-  cancelAnimationFrameSpy.mockRestore();
-  clearIntervalSpy.mockRestore();
-});
-
-test('simulation provider provides selection state', () => {
-  (api.get as Mock).mockResolvedValueOnce({
-    data: mockGetStationsResponse,
-  });
-
-  mockFetch.mockResolvedValueOnce({
-    ok: true,
-    json: () => Promise.resolve(mockResourcesData),
-  });
-
-  let selectedItem: SelectedItem | null | undefined;
-  let selectItem: ((type: SelectedItemType, id: number) => void) | undefined;
-
-  const TestComponent = () => {
-    const context = useSimulation();
-    selectedItem = context.selectedItem;
-    selectItem = context.selectItem;
-    return null;
-  };
-
-  render(
-    <MapProvider>
-      <SimulationProvider>
-        <TaskAssignmentProvider>
-          <MapContainer />
-          <TestComponent />
-        </TaskAssignmentProvider>
-      </SimulationProvider>
-    </MapProvider>
-  );
-
-  expect(selectedItem).toBeNull();
-  expect(selectItem).toBeDefined();
-});
-
-test('simulation provider allows updating selection state', async () => {
-  (api.get as Mock).mockResolvedValueOnce({
-    data: mockGetStationsResponse,
-  });
-
-  mockFetch.mockResolvedValueOnce({
-    ok: true,
-    json: () => Promise.resolve(mockResourcesData),
-  });
-
-  const TestComponent = () => {
-    const { selectedItem, selectItem } = useSimulation();
-
+test('clearSelection clears selected item', () => {
+  const TestComponentWithSelection = () => {
+    const { clearSelection, selectedItem } = useSimulation();
     return (
       <div>
         <div data-testid="selected-item">
-          {selectedItem ? JSON.stringify(selectedItem) : 'null'}
+          {selectedItem ? 'item-selected' : 'no-selection'}
         </div>
-        <button
-          data-testid="select-station"
-          onClick={() =>
-            selectItem(
-              SelectedItemType.Station,
-              mockGetStationsResponse.stations[0].id
-            )
-          }
-        >
-          Select Station
+        <button data-testid="clear-btn" onClick={clearSelection}>
+          Clear
         </button>
       </div>
     );
@@ -992,59 +247,154 @@ test('simulation provider allows updating selection state', async () => {
       <SimulationProvider>
         <TaskAssignmentProvider>
           <MapContainer />
-          <TestComponent />
+          <TestComponentWithSelection />
         </TaskAssignmentProvider>
       </SimulationProvider>
     </MapProvider>
   );
 
-  expect(getByTestId('selected-item')).toHaveTextContent('null');
-
-  const map = MockMap.instance!;
+  const clearBtn = getByTestId('clear-btn');
   act(() => {
-    map.callBacks.load();
+    clearBtn.click();
   });
 
-  await waitFor(() => {
-    expect(api.get).toHaveBeenCalledWith('/stations');
-  });
-
-  act(() => {
-    getByTestId('select-station').click();
-  });
-
-  await waitFor(() => {
-    const content = getByTestId('selected-item').textContent;
-    expect(content).not.toBe('null');
-    const selectedItem = JSON.parse(content!);
-    expect(selectedItem.type).toBe(SelectedItemType.Station);
-    expect(selectedItem.value.id).toBe(mockGetStationsResponse.stations[0].id);
-  });
+  expect(getByTestId('selected-item')).toHaveTextContent('no-selection');
 });
 
-test('simulation provider allows selecting a resource', async () => {
-  (api.get as Mock).mockResolvedValueOnce({
-    data: mockGetStationsResponse,
-  });
+test('selectItem selects a station when it exists', async () => {
+  const TestComponentWithSelect = () => {
+    const { selectItem, selectedItem, stationsRef } = useSimulation();
 
-  mockFetch.mockResolvedValueOnce({
-    ok: true,
-    json: () => Promise.resolve(mockResourcesData),
-  });
-
-  const TestComponent = () => {
-    const { selectedItem, selectItem } = useSimulation();
+    // Manually add a station to test selection
+    useEffect(() => {
+      stationsRef.current.set(1, {
+        id: 1,
+        name: 'Test Station',
+        position: [0, 0],
+        tasks: [],
+        task_count: 0,
+      });
+    }, []);
 
     return (
       <div>
         <div data-testid="selected-item">
-          {selectedItem ? JSON.stringify(selectedItem) : 'null'}
+          {selectedItem ? JSON.stringify(selectedItem.value) : 'none'}
         </div>
         <button
-          data-testid="select-resource"
+          data-testid="select-btn"
+          onClick={() => selectItem(SelectedItemType.Station, 1)}
+        >
+          Select
+        </button>
+      </div>
+    );
+  };
+
+  const { getByTestId } = render(
+    <MapProvider>
+      <SimulationProvider>
+        <TaskAssignmentProvider>
+          <MapContainer />
+          <TestComponentWithSelect />
+        </TaskAssignmentProvider>
+      </SimulationProvider>
+    </MapProvider>
+  );
+
+  // Wait for map to be created and trigger load event
+  await waitFor(() => {
+    expect(MockMap.instance).toBeDefined();
+  });
+
+  // Trigger the map load event to set mapLoaded = true
+  await act(async () => {
+    MockMap.instance?.callBacks['load']();
+  });
+
+  const selectBtn = getByTestId('select-btn');
+
+  await act(async () => {
+    selectBtn.click();
+  });
+
+  await waitFor(() => {
+    const selectedItemText = getByTestId('selected-item').textContent;
+    expect(selectedItemText).toContain('Test Station');
+  });
+});
+
+test('selectItem shows error when station does not exist', async () => {
+  const TestComponentWithSelect = () => {
+    const { selectItem } = useSimulation();
+
+    return (
+      <button
+        data-testid="select-missing-btn"
+        onClick={() => selectItem(SelectedItemType.Station, 999)}
+      >
+        Select Missing
+      </button>
+    );
+  };
+
+  const { getByTestId } = render(
+    <MapProvider>
+      <SimulationProvider>
+        <TaskAssignmentProvider>
+          <MapContainer />
+          <TestComponentWithSelect />
+        </TaskAssignmentProvider>
+      </SimulationProvider>
+    </MapProvider>
+  );
+
+  // Wait for map to be created and trigger load event
+  await waitFor(() => {
+    expect(MockMap.instance).toBeDefined();
+  });
+
+  // Trigger the map load event to set mapLoaded = true
+  await act(async () => {
+    MockMap.instance?.callBacks['load']();
+  });
+
+  const selectBtn = getByTestId('select-missing-btn');
+
+  await act(async () => {
+    selectBtn.click();
+  });
+
+  await waitFor(() => {
+    expect(mockLogMissingEntityError).toHaveBeenCalledWith('station', 999);
+  });
+});
+
+test('selectItem selects a resource when it exists', async () => {
+  const TestComponentWithSelect = () => {
+    const { selectItem, selectedItem, resourcesRef } = useSimulation();
+
+    // Manually add a resource to test selection
+    useEffect(() => {
+      resourcesRef.current.set(1, {
+        id: 1,
+        position: [0, 0],
+        taskList: [],
+        task_count: 0,
+        in_progress_task_id: null,
+      });
+    }, []);
+
+    return (
+      <div>
+        <div data-testid="selected-item">
+          {selectedItem ? `resource-${selectedItem.value.id}` : 'none'}
+        </div>
+        <button
+          data-testid="select-btn"
           onClick={() => selectItem(SelectedItemType.Resource, 1)}
         >
-          Select Resource
+          Select
         </button>
       </div>
     );
@@ -1055,342 +405,66 @@ test('simulation provider allows selecting a resource', async () => {
       <SimulationProvider>
         <TaskAssignmentProvider>
           <MapContainer />
-          <TestComponent />
+          <TestComponentWithSelect />
         </TaskAssignmentProvider>
       </SimulationProvider>
     </MapProvider>
   );
 
-  const map = MockMap.instance!;
-  act(() => {
-    map.callBacks.load();
+  // Wait for map to be created and trigger load event
+  await waitFor(() => {
+    expect(MockMap.instance).toBeDefined();
+  });
+
+  // Trigger the map load event to set mapLoaded = true
+  await act(async () => {
+    MockMap.instance?.callBacks['load']();
+  });
+
+  const selectBtn = getByTestId('select-btn');
+
+  await act(async () => {
+    selectBtn.click();
   });
 
   await waitFor(() => {
-    expect(mockFetch).toHaveBeenCalledWith('/placeholder-data/resources.json');
-  });
-
-  act(() => {
-    getByTestId('select-resource').click();
-  });
-
-  await waitFor(() => {
-    const content = getByTestId('selected-item').textContent;
-    expect(content).not.toBe('null');
-    const selectedItem = JSON.parse(content!);
-    expect(selectedItem.type).toBe(SelectedItemType.Resource);
-    expect(selectedItem.value.id).toBe(1);
+    expect(getByTestId('selected-item')).toHaveTextContent('resource-1');
   });
 });
-import * as mockBackend from '~/lib/mock-backend';
 
-test('handleFrameUpdate updates resource positions and resets frame timer', async () => {
-  (api.get as Mock).mockResolvedValueOnce({
-    data: mockGetStationsResponse,
-  });
+test('assignTaskToResource logs the assignment', () => {
+  const consoleLogSpy = vi.spyOn(console, 'log');
 
-  mockFetch.mockResolvedValueOnce({
-    ok: true,
-    json: () => Promise.resolve(mockResourcesData),
-  });
-
-  let handleFrameUpdateFn: ((updates: Resource[]) => void) | undefined;
-
-  // Mock startMockBackend to capture handleFrameUpdate
-  (mockBackend.startMockBackend as Mock).mockImplementation(
-    (_resources, cb) => {
-      handleFrameUpdateFn = cb;
-      return () => {};
-    }
-  );
-
-  render(
-    <MapProvider>
-      <SimulationProvider>
-        <TaskAssignmentProvider>
-          <MapContainer />
-        </TaskAssignmentProvider>
-      </SimulationProvider>
-    </MapProvider>
-  );
-
-  const map = MockMap.instance!;
-  act(() => {
-    map.callBacks.load();
-  });
-
-  // Wait for resources to be initialized and handleFrameUpdate to be set
-  await waitFor(() => {
-    expect(handleFrameUpdateFn).toBeTypeOf('function');
-  });
-
-  // Prepare spies and refs
-  const nowSpy = vi.spyOn(performance, 'now').mockReturnValue(12345);
-  // Simulate current animated position
-  const newPosition: [number, number] = [-73.57776, 45.48944];
-
-  // Simulate handleFrameUpdate call
-  act(() => {
-    const mockResource: Resource = {
-      id: mockResourcesData.resources[0].id,
-      position: newPosition,
-      taskList: mockResourcesData.resources[0].taskList,
-      route: {
-        coordinates: mockResourcesData.resources[0].route.coordinates as [
-          number,
-          number,
-        ][],
-      },
-    };
-    handleFrameUpdateFn!([mockResource]);
-  });
-
-  // Check that the refs have been updated
-  // We can't access refs directly, but we can check that setMapSource will eventually be called with the new position
-  await waitFor(() => {
-    const calls = (setMapSource as Mock).mock.calls;
-    const resourceCalls = calls.filter(
-      (call) => call[0] === MapSource.Resources
-    );
-    expect(resourceCalls.length).toBeGreaterThan(0);
-    const lastCall = resourceCalls[resourceCalls.length - 1];
-    expect(lastCall[1].features[0].geometry.coordinates).toEqual(newPosition);
-  });
-
-  nowSpy.mockRestore();
-});
-
-test('simulation provider logs error when clicking on non-existent station', async () => {
-  (api.get as Mock).mockResolvedValueOnce({
-    data: mockGetStationsResponse,
-  });
-
-  mockFetch.mockResolvedValueOnce({
-    ok: true,
-    json: () => Promise.resolve(mockResourcesData),
-  });
-
-  let clickHandler:
-    | ((
-        item: {
-          type: SelectedItemType;
-          id: number;
-          coordinates: [number, number];
-        } | null
-      ) => void)
-    | undefined;
-  (setupMapClickHandlers as Mock).mockImplementation((map, handler) => {
-    clickHandler = handler;
-  });
-
-  render(
-    <MapProvider>
-      <SimulationProvider>
-        <TaskAssignmentProvider>
-          <MapContainer />
-        </TaskAssignmentProvider>
-      </SimulationProvider>
-    </MapProvider>
-  );
-
-  const map = MockMap.instance!;
-  act(() => {
-    map.callBacks.load();
-  });
-
-  await waitFor(() => {
-    expect(setupMapClickHandlers).toHaveBeenCalledWith(
-      map,
-      expect.any(Function)
-    );
-  });
-
-  // Clear any previous calls
-  vi.clearAllMocks();
-
-  // Simulate clicking on a non-existent station
-  act(() => {
-    clickHandler!({
-      type: SelectedItemType.Station,
-      id: 999,
-      coordinates: [0, 0],
-    });
-  });
-
-  // Verify logging function was called
-  expect(logMissingEntityError).toHaveBeenCalledWith('station', 999);
-});
-
-test('simulation provider logs error when clicking on non-existent resource', async () => {
-  (api.get as Mock).mockResolvedValueOnce({
-    data: mockGetStationsResponse,
-  });
-
-  mockFetch.mockResolvedValueOnce({
-    ok: true,
-    json: () => Promise.resolve(mockResourcesData),
-  });
-
-  let clickHandler:
-    | ((
-        item: {
-          type: SelectedItemType;
-          id: number;
-          coordinates: [number, number];
-        } | null
-      ) => void)
-    | undefined;
-  (setupMapClickHandlers as Mock).mockImplementation((map, handler) => {
-    clickHandler = handler;
-  });
-
-  render(
-    <MapProvider>
-      <SimulationProvider>
-        <TaskAssignmentProvider>
-          <MapContainer />
-        </TaskAssignmentProvider>
-      </SimulationProvider>
-    </MapProvider>
-  );
-
-  const map = MockMap.instance!;
-  act(() => {
-    map.callBacks.load();
-  });
-
-  await waitFor(() => {
-    expect(setupMapClickHandlers).toHaveBeenCalledWith(
-      map,
-      expect.any(Function)
-    );
-  });
-
-  // Clear any previous calls
-  vi.clearAllMocks();
-
-  // Simulate clicking on a non-existent resource
-  act(() => {
-    clickHandler!({
-      type: SelectedItemType.Resource,
-      id: 999,
-      coordinates: [0, 0],
-    });
-  });
-
-  // Verify logging function was called
-  expect(logMissingEntityError).toHaveBeenCalledWith('resource', 999);
-});
-
-test('handleFrameUpdate logs error when updating non-existent resource', async () => {
-  (api.get as Mock).mockResolvedValueOnce({
-    data: mockGetStationsResponse,
-  });
-
-  mockFetch.mockResolvedValueOnce({
-    ok: true,
-    json: () => Promise.resolve(mockResourcesData),
-  });
-
-  let handleFrameUpdateFn: ((updates: Resource[]) => void) | undefined;
-
-  (mockBackend.startMockBackend as Mock).mockImplementation(
-    (_resources, cb) => {
-      handleFrameUpdateFn = cb;
-      return () => {};
-    }
-  );
-
-  render(
-    <MapProvider>
-      <SimulationProvider>
-        <TaskAssignmentProvider>
-          <MapContainer />
-        </TaskAssignmentProvider>
-      </SimulationProvider>
-    </MapProvider>
-  );
-
-  const map = MockMap.instance!;
-  act(() => {
-    map.callBacks.load();
-  });
-
-  await waitFor(() => {
-    expect(handleFrameUpdateFn).toBeTypeOf('function');
-  });
-
-  // Clear any previous calls
-  vi.clearAllMocks();
-
-  // Simulate frame update for non-existent resource
-  act(() => {
-    const nonExistentResource: Resource = {
-      id: 999, // Non-existent resource ID
-      position: [-73.57776, 45.48944],
-      taskList: [1],
-      route: {
-        coordinates: [
-          [-73.57776, 45.48944],
-          [-73.56776, 45.49944],
-        ] as [number, number][],
-      },
-    };
-    handleFrameUpdateFn!([nonExistentResource]);
-  });
-
-  // Verify logging function was called
-  expect(logMissingEntityError).toHaveBeenCalledWith('resource', 999);
-});
-
-test('assignTaskToResource logs task assignment', async () => {
-  (api.get as Mock).mockResolvedValueOnce({
-    data: mockGetStationsResponse,
-  });
-
-  mockFetch.mockResolvedValueOnce({
-    ok: true,
-    json: () => Promise.resolve(mockResourcesData),
-  });
-
-  let assignTaskToResourceFn:
-    | ((resourceId: number, taskId: number) => void)
-    | undefined;
-
-  const TestComponent = () => {
+  const TestComponentWithAssign = () => {
     const { assignTaskToResource } = useSimulation();
-    assignTaskToResourceFn = assignTaskToResource;
-    return null;
+
+    return (
+      <button
+        data-testid="assign-btn"
+        onClick={() => assignTaskToResource(1, 2)}
+      >
+        Assign
+      </button>
+    );
   };
 
-  const consoleLogSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
-
-  render(
+  const { getByTestId } = render(
     <MapProvider>
       <SimulationProvider>
         <TaskAssignmentProvider>
           <MapContainer />
-          <TestComponent />
+          <TestComponentWithAssign />
         </TaskAssignmentProvider>
       </SimulationProvider>
     </MapProvider>
   );
 
-  const map = MockMap.instance!;
+  const assignBtn = getByTestId('assign-btn');
+
   act(() => {
-    map.callBacks.load();
+    assignBtn.click();
   });
 
-  await waitFor(() => {
-    expect(assignTaskToResourceFn).toBeTypeOf('function');
-  });
-
-  // Call assignTaskToResource
-  act(() => {
-    assignTaskToResourceFn!(1, 2);
-  });
-
-  // Verify console.log was called
   expect(consoleLogSpy).toHaveBeenCalledWith('assignTaskToResource', {
     resourceId: 1,
     taskId: 2,
@@ -1399,249 +473,10 @@ test('assignTaskToResource logs task assignment', async () => {
   consoleLogSpy.mockRestore();
 });
 
-test('updateResourcePositions handles missing target position', async () => {
-  (api.get as Mock).mockResolvedValueOnce({
-    data: mockGetStationsResponse,
-  });
-
-  mockFetch.mockResolvedValueOnce({
-    ok: true,
-    json: () => Promise.resolve(mockResourcesData),
-  });
-
-  let handleFrameUpdateFn: ((updates: Resource[]) => void) | undefined;
-
-  (mockBackend.startMockBackend as Mock).mockImplementation(
-    (_resources, cb) => {
-      handleFrameUpdateFn = cb;
-      return () => {};
-    }
-  );
-
-  render(
-    <MapProvider>
-      <SimulationProvider>
-        <TaskAssignmentProvider>
-          <MapContainer />
-        </TaskAssignmentProvider>
-      </SimulationProvider>
-    </MapProvider>
-  );
-
-  const map = MockMap.instance!;
-  act(() => {
-    map.callBacks.load();
-  });
-
-  await waitFor(() => {
-    expect(handleFrameUpdateFn).toBeTypeOf('function');
-  });
-
-  // Wait for initial resource setup
-  await waitFor(() => {
-    const calls = (setMapSource as Mock).mock.calls;
-    const resourceCalls = calls.filter(
-      (call) => call[0] === MapSource.Resources
-    );
-    expect(resourceCalls.length).toBeGreaterThan(0);
-  });
-
-  // Clear previous calls
-  vi.clearAllMocks();
-
-  // Simulate a frame update that sets frameStart but we'll manipulate to remove target
-  act(() => {
-    const mockResource: Resource = {
-      id: mockResourcesData.resources[0].id,
-      position: [-73.57, 45.49],
-      taskList: mockResourcesData.resources[0].taskList,
-      route: {
-        coordinates: mockResourcesData.resources[0].route.coordinates as [
-          number,
-          number,
-        ][],
-      },
-    };
-    handleFrameUpdateFn!([mockResource]);
-  });
-
-  // The animation loop will handle the update
-  // We can't directly manipulate internal refs, but the test verifies
-  // the update mechanism works without errors
-});
-
-test('updateResourcePositions handles missing resource in state', async () => {
-  (api.get as Mock).mockResolvedValueOnce({
-    data: mockGetStationsResponse,
-  });
-
-  // Mock resources with data, then we'll simulate it being removed
-  mockFetch.mockResolvedValueOnce({
-    ok: true,
-    json: () => Promise.resolve(mockResourcesData),
-  });
-
-  let handleFrameUpdateFn: ((updates: Resource[]) => void) | undefined;
-
-  (mockBackend.startMockBackend as Mock).mockImplementation(
-    (_resources, cb) => {
-      handleFrameUpdateFn = cb;
-      return () => {};
-    }
-  );
-
-  render(
-    <MapProvider>
-      <SimulationProvider>
-        <TaskAssignmentProvider>
-          <MapContainer />
-        </TaskAssignmentProvider>
-      </SimulationProvider>
-    </MapProvider>
-  );
-
-  const map = MockMap.instance!;
-  act(() => {
-    map.callBacks.load();
-  });
-
-  await waitFor(() => {
-    expect(handleFrameUpdateFn).toBeTypeOf('function');
-  });
-
-  // Wait for initial setup
-  await waitFor(() => {
-    const calls = (setMapSource as Mock).mock.calls;
-    const resourceCalls = calls.filter(
-      (call) => call[0] === MapSource.Resources
-    );
-    expect(resourceCalls.length).toBeGreaterThan(0);
-  });
-
-  vi.clearAllMocks();
-
-  // The animation loop will try to update a resource that doesn't exist in resourcesRef
-  // This simulates a state inconsistency where frameStartPositionsRef has an entry
-  // but resourcesRef doesn't
-  // We can't directly test this without access to refs, but we've covered the
-  // error path in handleFrameUpdate for missing resources
-});
-
-test('updateResourcePositions handles missing route geometry', async () => {
-  (api.get as Mock).mockResolvedValueOnce({
-    data: mockGetStationsResponse,
-  });
-
-  // Create a resource with no route coordinates
-  const resourcesWithoutRoute = {
-    resources: [
-      {
-        id: 1,
-        position: [-73.57776, 45.48944],
-        taskList: [1, 2, 3],
-        route: {
-          coordinates: [], // Empty coordinates array
-        },
-      },
-    ],
-  };
-
-  mockFetch.mockResolvedValueOnce({
-    ok: true,
-    json: () => Promise.resolve(resourcesWithoutRoute),
-  });
-
-  let handleFrameUpdateFn: ((updates: Resource[]) => void) | undefined;
-
-  (mockBackend.startMockBackend as Mock).mockImplementation(
-    (_resources, cb) => {
-      handleFrameUpdateFn = cb;
-      return () => {};
-    }
-  );
-
-  render(
-    <MapProvider>
-      <SimulationProvider>
-        <TaskAssignmentProvider>
-          <MapContainer />
-        </TaskAssignmentProvider>
-      </SimulationProvider>
-    </MapProvider>
-  );
-
-  const map = MockMap.instance!;
-  act(() => {
-    map.callBacks.load();
-  });
-
-  await waitFor(() => {
-    expect(handleFrameUpdateFn).toBeTypeOf('function');
-  });
-
-  // Wait for resources to be loaded
-  await waitFor(() => {
-    expect(mockFetch).toHaveBeenCalledWith('/placeholder-data/resources.json');
-  });
-
-  vi.clearAllMocks();
-
-  // Trigger a frame update
-  act(() => {
-    const updateResource: Resource = {
-      id: 1,
-      position: [-73.56, 45.49],
-      taskList: [1, 2, 3],
-      route: {
-        coordinates: [] as [number, number][], // Empty route
-      },
-    };
-    handleFrameUpdateFn!([updateResource]);
-  });
-
-  // The animation loop should handle the empty route gracefully
-  // and log the error through logSimulationError
-});
-
-test('clearSelection resets selection state', async () => {
-  (api.get as Mock).mockResolvedValueOnce({
-    data: mockGetStationsResponse,
-  });
-
-  mockFetch.mockResolvedValueOnce({
-    ok: true,
-    json: () => Promise.resolve(mockResourcesData),
-  });
-
-  const TestComponent = () => {
-    const { selectedItem, selectItem, clearSelection } = useSimulation();
-
-    return (
-      <div>
-        <div data-testid="selected-item">
-          {selectedItem ? JSON.stringify(selectedItem) : 'null'}
-        </div>
-        <button
-          data-testid="select-station"
-          onClick={() =>
-            selectItem(
-              SelectedItemType.Station,
-              mockGetStationsResponse.stations[0].id
-            )
-          }
-        >
-          Select Station
-        </button>
-        <button data-testid="clear-selection" onClick={() => clearSelection()}>
-          Clear Selection
-        </button>
-      </div>
-    );
-  };
-
+test('WebSocket connects when all prerequisites are met', async () => {
   const { getByTestId } = render(
     <MapProvider>
-      <SimulationProvider>
+      <SimulationProvider simId="test-sim-123">
         <TaskAssignmentProvider>
           <MapContainer />
           <TestComponent />
@@ -1650,55 +485,105 @@ test('clearSelection resets selection state', async () => {
     </MapProvider>
   );
 
-  const map = MockMap.instance!;
-  act(() => {
-    map.callBacks.load();
+  // Wait for map to be created and trigger load event
+  await waitFor(() => {
+    expect(MockMap.instance).toBeDefined();
+  });
+
+  await act(async () => {
+    MockMap.instance?.callBacks['load']();
   });
 
   await waitFor(() => {
-    expect(api.get).toHaveBeenCalledWith('/stations');
+    expect(getByTestId('status')).toHaveTextContent('connecting');
   });
 
-  // Select a station
-  act(() => {
-    getByTestId('select-station').click();
+  // Verify WebSocket was created
+  const mockWs = getMockedWebSocket();
+  expect(mockWs).toBeDefined();
+  expect(mockWs.onopen).toBeDefined();
+});
+
+test('WebSocket handles initial frame (seq_numb === 0)', async () => {
+  const { getByTestId } = render(
+    <MapProvider>
+      <SimulationProvider simId="test-sim-123">
+        <TaskAssignmentProvider>
+          <MapContainer />
+          <TestComponent />
+        </TaskAssignmentProvider>
+      </SimulationProvider>
+    </MapProvider>
+  );
+
+  await waitFor(() => {
+    expect(MockMap.instance).toBeDefined();
+  });
+
+  await act(async () => {
+    MockMap.instance?.callBacks['load']();
+  });
+
+  // Wait for WebSocket connection
+  await waitFor(() => {
+    expect(getByTestId('status')).toHaveTextContent('connecting');
+  });
+
+  const mockWs = getMockedWebSocket();
+
+  // Simulate WebSocket open
+  await act(async () => {
+    mockWs.onopen?.(new Event('open'));
   });
 
   await waitFor(() => {
-    expect(getByTestId('selected-item')).not.toHaveTextContent('null');
+    expect(getByTestId('status')).toHaveTextContent('loading');
+    expect(getByTestId('connected')).toHaveTextContent('true');
   });
 
-  // Clear selection
-  act(() => {
-    getByTestId('clear-selection').click();
+  // Send initial frame
+  const initialFrame = {
+    type: 'frame',
+    seq_numb: 0,
+    payload: {
+      resources: [
+        {
+          resource_id: 1,
+          resource_position: [45.5, -73.6],
+          resource_tasks: [],
+          task_count: 0,
+          in_progress_task_id: null,
+        },
+      ],
+      stations: [
+        {
+          station_id: 1,
+          station_name: 'Station A',
+          station_position: [45.5, -73.6],
+          station_tasks: [],
+          task_count: 0,
+        },
+      ],
+    },
+  };
+
+  await act(async () => {
+    mockWs.onmessage?.(
+      new MessageEvent('message', { data: JSON.stringify(initialFrame) })
+    );
+    // Allow state updates and effects to complete
+    await new Promise((resolve) => setTimeout(resolve, 50));
   });
 
   await waitFor(() => {
-    expect(getByTestId('selected-item')).toHaveTextContent('null');
+    expect(getByTestId('status')).toHaveTextContent('ready');
   });
 });
 
-test('selectItem returns early when map not loaded', async () => {
-  (api.get as Mock).mockResolvedValueOnce({
-    data: mockGetStationsResponse,
-  });
-
-  mockFetch.mockResolvedValueOnce({
-    ok: true,
-    json: () => Promise.resolve(mockResourcesData),
-  });
-
-  let selectItemFn: ((type: SelectedItemType, id: number) => void) | undefined;
-
-  const TestComponent = () => {
-    const { selectItem } = useSimulation();
-    selectItemFn = selectItem;
-    return null;
-  };
-
-  render(
+test('WebSocket handles frame updates (seq_numb > 0)', async () => {
+  const { getByTestId } = render(
     <MapProvider>
-      <SimulationProvider>
+      <SimulationProvider simId="test-sim-123">
         <TaskAssignmentProvider>
           <MapContainer />
           <TestComponent />
@@ -1707,38 +592,91 @@ test('selectItem returns early when map not loaded', async () => {
     </MapProvider>
   );
 
-  // Don't trigger map load, so mapLoaded remains false
-  // Try to select an item
-  act(() => {
-    selectItemFn!(SelectedItemType.Station, 1);
+  await waitFor(() => {
+    expect(MockMap.instance).toBeDefined();
   });
 
-  // Should not throw and should not update any state
-  // Verify setMapSource was not called (since map not loaded)
-  expect(setMapSource).not.toHaveBeenCalled();
+  await act(async () => {
+    MockMap.instance?.callBacks['load']();
+  });
+
+  await waitFor(() => {
+    expect(getByTestId('status')).toHaveTextContent('connecting');
+  });
+
+  const mockWs = getMockedWebSocket();
+
+  await act(async () => {
+    mockWs.onopen?.(new Event('open'));
+  });
+
+  // Send initial frame first
+  const initialFrame = {
+    type: 'frame',
+    seq_numb: 0,
+    payload: {
+      resources: [
+        {
+          resource_id: 1,
+          resource_position: [45.5, -73.6],
+          resource_tasks: [],
+          task_count: 0,
+          in_progress_task_id: null,
+        },
+      ],
+      stations: [],
+    },
+  };
+
+  await act(async () => {
+    mockWs.onmessage?.(
+      new MessageEvent('message', { data: JSON.stringify(initialFrame) })
+    );
+    // Allow state updates and effects to complete
+    await new Promise((resolve) => setTimeout(resolve, 50));
+  });
+
+  await waitFor(() => {
+    expect(getByTestId('status')).toHaveTextContent('ready');
+  });
+
+  // Send frame update
+  const frameUpdate = {
+    type: 'frame',
+    seq_numb: 1,
+    payload: {
+      resources: [
+        {
+          resource_id: 1,
+          resource_position: [45.51, -73.61],
+          resource_tasks: [],
+          task_count: 0,
+          in_progress_task_id: null,
+        },
+      ],
+      stations: [],
+    },
+  };
+
+  await act(async () => {
+    mockWs.onmessage?.(
+      new MessageEvent('message', { data: JSON.stringify(frameUpdate) })
+    );
+    // Allow state updates and effects to complete
+    await new Promise((resolve) => setTimeout(resolve, 50));
+  });
+
+  await waitFor(() => {
+    expect(getByTestId('status')).toHaveTextContent('running');
+  });
 });
 
-test('clearSelection returns early when map not loaded', async () => {
-  (api.get as Mock).mockResolvedValueOnce({
-    data: mockGetStationsResponse,
-  });
-
-  mockFetch.mockResolvedValueOnce({
-    ok: true,
-    json: () => Promise.resolve(mockResourcesData),
-  });
-
-  let clearSelectionFn: (() => void) | undefined;
-
-  const TestComponent = () => {
-    const { clearSelection } = useSimulation();
-    clearSelectionFn = clearSelection;
-    return null;
-  };
+test('WebSocket handles status messages', async () => {
+  const consoleLogSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
 
   render(
     <MapProvider>
-      <SimulationProvider>
+      <SimulationProvider simId="test-sim-123">
         <TaskAssignmentProvider>
           <MapContainer />
           <TestComponent />
@@ -1747,11 +685,226 @@ test('clearSelection returns early when map not loaded', async () => {
     </MapProvider>
   );
 
-  // Don't trigger map load
-  act(() => {
-    clearSelectionFn!();
+  await waitFor(() => {
+    expect(MockMap.instance).toBeDefined();
   });
 
-  // Should not throw and should not call setMapSource
-  expect(setMapSource).not.toHaveBeenCalled();
+  await act(async () => {
+    MockMap.instance?.callBacks['load']();
+  });
+
+  const mockWs = getMockedWebSocket();
+
+  await act(async () => {
+    mockWs.onopen?.(new Event('open'));
+  });
+
+  // Send status message
+  const statusMessage = {
+    type: 'status',
+    message: 'Simulation started',
+  };
+
+  await act(async () => {
+    mockWs.onmessage?.(
+      new MessageEvent('message', { data: JSON.stringify(statusMessage) })
+    );
+  });
+
+  // Status messages don't change state, just log
+  expect(consoleLogSpy).toHaveBeenCalledWith(
+    '[WS] 📊 Status:',
+    'Simulation started',
+    statusMessage
+  );
+
+  consoleLogSpy.mockRestore();
+});
+
+test('WebSocket handles error messages', async () => {
+  const { getByTestId } = render(
+    <MapProvider>
+      <SimulationProvider simId="test-sim-123">
+        <TaskAssignmentProvider>
+          <MapContainer />
+          <TestComponent />
+        </TaskAssignmentProvider>
+      </SimulationProvider>
+    </MapProvider>
+  );
+
+  await waitFor(() => {
+    expect(MockMap.instance).toBeDefined();
+  });
+
+  await act(async () => {
+    MockMap.instance?.callBacks['load']();
+  });
+
+  const mockWs = getMockedWebSocket();
+
+  await act(async () => {
+    mockWs.onopen?.(new Event('open'));
+  });
+
+  // Send error message
+  const errorMessage = {
+    type: 'error',
+    message: 'Simulation failed',
+  };
+
+  await act(async () => {
+    mockWs.onmessage?.(
+      new MessageEvent('message', { data: JSON.stringify(errorMessage) })
+    );
+  });
+
+  await waitFor(() => {
+    expect(getByTestId('status')).toHaveTextContent('error');
+  });
+
+  expect(mockDisplayError).toHaveBeenCalledWith(
+    'Simulation Error',
+    'Simulation failed'
+  );
+});
+
+test('WebSocket handles connection errors', async () => {
+  const { getByTestId } = render(
+    <MapProvider>
+      <SimulationProvider simId="test-sim-123">
+        <TaskAssignmentProvider>
+          <MapContainer />
+          <TestComponent />
+        </TaskAssignmentProvider>
+      </SimulationProvider>
+    </MapProvider>
+  );
+
+  await waitFor(() => {
+    expect(MockMap.instance).toBeDefined();
+  });
+
+  await act(async () => {
+    MockMap.instance?.callBacks['load']();
+  });
+
+  const mockWs = getMockedWebSocket();
+
+  // Simulate WebSocket error
+  await act(async () => {
+    mockWs.onerror?.(new Event('error'));
+  });
+
+  await waitFor(() => {
+    expect(getByTestId('status')).toHaveTextContent('error');
+  });
+
+  expect(mockDisplayError).toHaveBeenCalledWith(
+    'Connection Error',
+    'Failed to connect to simulation. Check authentication and try again.'
+  );
+});
+
+test('WebSocket handles authentication failure (code 1008)', async () => {
+  const { getByTestId } = render(
+    <MapProvider>
+      <SimulationProvider simId="test-sim-123">
+        <TaskAssignmentProvider>
+          <MapContainer />
+          <TestComponent />
+        </TaskAssignmentProvider>
+      </SimulationProvider>
+    </MapProvider>
+  );
+
+  await waitFor(() => {
+    expect(MockMap.instance).toBeDefined();
+  });
+
+  await act(async () => {
+    MockMap.instance?.callBacks['load']();
+  });
+
+  const mockWs = getMockedWebSocket();
+
+  await act(async () => {
+    mockWs.onopen?.(new Event('open'));
+  });
+
+  // Wait for status to update to 'loading'
+  await waitFor(() => {
+    expect(getByTestId('status')).toHaveTextContent('loading');
+  });
+
+  // Simulate close with auth failure
+  await act(async () => {
+    // Create a manual close event object since CloseEvent constructor doesn't work properly in tests
+    const closeEvent = {
+      type: 'close',
+      code: 1008,
+      reason: 'Policy Violation',
+      wasClean: false,
+    } as CloseEvent;
+    mockWs.onclose?.(closeEvent);
+    // Allow state updates to complete
+    await new Promise((resolve) => setTimeout(resolve, 50));
+  });
+
+  await waitFor(() => {
+    expect(getByTestId('status')).toHaveTextContent('error');
+    expect(getByTestId('connected')).toHaveTextContent('false');
+  });
+
+  expect(mockDisplayError).toHaveBeenCalledWith(
+    'Authentication Failed',
+    'WebSocket authentication failed. Please try logging in again.'
+  );
+});
+
+test('WebSocket handles normal close', async () => {
+  const { getByTestId } = render(
+    <MapProvider>
+      <SimulationProvider simId="test-sim-123">
+        <TaskAssignmentProvider>
+          <MapContainer />
+          <TestComponent />
+        </TaskAssignmentProvider>
+      </SimulationProvider>
+    </MapProvider>
+  );
+
+  await waitFor(() => {
+    expect(MockMap.instance).toBeDefined();
+  });
+
+  await act(async () => {
+    MockMap.instance?.callBacks['load']();
+  });
+
+  const mockWs = getMockedWebSocket();
+
+  await act(async () => {
+    mockWs.onopen?.(new Event('open'));
+  });
+
+  await waitFor(() => {
+    expect(getByTestId('status')).toHaveTextContent('loading');
+  });
+
+  // Simulate normal close
+  await act(async () => {
+    const closeEvent = {
+      type: 'close',
+      code: 1000,
+      reason: 'Normal closure',
+      wasClean: true,
+    } as CloseEvent;
+    mockWs.onclose?.(closeEvent);
+  });
+
+  await waitFor(() => {
+    expect(getByTestId('connected')).toHaveTextContent('false');
+    expect(getByTestId('status')).toHaveTextContent('idle');
+  });
 });

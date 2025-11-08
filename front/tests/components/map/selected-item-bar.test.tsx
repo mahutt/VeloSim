@@ -38,13 +38,17 @@ vi.mock('~/providers/simulation-provider', () => ({
 describe('SelectedItemBar', () => {
   it('should not render when no item is selected', () => {
     vi.mocked(useSimulation).mockReturnValue({
-      selectedItem: null,
-      clearSelection: vi.fn(),
-      selectItem: vi.fn(),
       stationsRef: { current: new Map() },
       resourcesRef: { current: new Map() },
       resources: [],
+      selectedItem: null,
+      selectItem: vi.fn(),
+      clearSelection: vi.fn(),
       assignTaskToResource: vi.fn(),
+      simId: null,
+      isConnected: false,
+      simulationStatus: 'idle',
+      isLoading: false,
     });
 
     const { container } = render(
@@ -63,17 +67,23 @@ describe('SelectedItemBar', () => {
       tasks: [],
     };
 
-    vi.mocked(useSimulation).mockReturnValue({
+    const clearSelectionMock = vi.fn();
+
+    (useSimulation as unknown as ReturnType<typeof vi.fn>).mockReturnValue({
       selectedItem: {
         type: SelectedItemType.Station,
         value: mockStation,
       },
-      clearSelection: vi.fn(),
+      clearSelection: clearSelectionMock,
       selectItem: vi.fn(),
       stationsRef: { current: new Map() },
       resourcesRef: { current: new Map() },
       resources: [],
       assignTaskToResource: vi.fn(),
+      simId: null,
+      isConnected: false,
+      startSimulation: vi.fn(),
+      simulationStatus: 'idle',
     });
 
     render(
@@ -103,7 +113,7 @@ describe('SelectedItemBar', () => {
       },
     };
 
-    vi.mocked(useSimulation).mockReturnValue({
+    (useSimulation as unknown as ReturnType<typeof vi.fn>).mockReturnValue({
       selectedItem: {
         type: SelectedItemType.Resource,
         value: mockResource,
@@ -114,6 +124,10 @@ describe('SelectedItemBar', () => {
       resourcesRef: { current: new Map() },
       resources: [],
       assignTaskToResource: vi.fn(),
+      simId: null,
+      isConnected: false,
+      startSimulation: vi.fn(),
+      simulationStatus: 'idle',
     });
 
     render(
@@ -142,7 +156,7 @@ describe('SelectedItemBar', () => {
       tasks: [],
     };
 
-    vi.mocked(useSimulation).mockReturnValue({
+    (useSimulation as unknown as ReturnType<typeof vi.fn>).mockReturnValue({
       selectedItem: {
         type: SelectedItemType.Station,
         value: mockStation,
@@ -153,6 +167,10 @@ describe('SelectedItemBar', () => {
       resourcesRef: { current: new Map() },
       resources: [],
       assignTaskToResource: vi.fn(),
+      simId: null,
+      isConnected: false,
+      startSimulation: vi.fn(),
+      simulationStatus: 'idle',
     });
 
     render(
@@ -178,7 +196,7 @@ describe('SelectedItemBar', () => {
       ],
     };
 
-    vi.mocked(useSimulation).mockReturnValue({
+    (useSimulation as unknown as ReturnType<typeof vi.fn>).mockReturnValue({
       selectedItem: {
         type: SelectedItemType.Station,
         value: mockStation,
@@ -189,6 +207,10 @@ describe('SelectedItemBar', () => {
       resourcesRef: { current: new Map() },
       resources: [],
       assignTaskToResource: vi.fn(),
+      simId: null,
+      isConnected: false,
+      startSimulation: vi.fn(),
+      simulationStatus: 'idle',
     });
 
     render(

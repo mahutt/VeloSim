@@ -22,12 +22,25 @@
  * SOFTWARE.
  */
 
-import { expect, test } from 'vitest';
+import { expect, test, vi } from 'vitest';
 import { render } from '@testing-library/react';
 import MapContainer from '~/components/map/map-container';
 import { MapProvider } from '~/providers/map-provider';
 import { SimulationProvider } from '~/providers/simulation-provider';
 import { TaskAssignmentProvider } from '~/providers/task-assignment-provider';
+
+// Mock useAuth hook
+vi.mock('~/hooks/use-auth', () => ({
+  default: () => ({
+    user: { id: 1, username: 'test_user', is_admin: false },
+    setUser: vi.fn(),
+    loading: false,
+    setLoading: vi.fn(),
+    logout: vi.fn(),
+    refreshUser: vi.fn(),
+    setToken: vi.fn(),
+  }),
+}));
 
 test('map container render should fail without a map provider', async () => {
   expect(() => {

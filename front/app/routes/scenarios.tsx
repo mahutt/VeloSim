@@ -25,7 +25,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router';
 import type { Scenario, ScenarioListResponse } from '~/types';
-import api from '~/api';
 import ScenarioToolbar from '~/components/scenario/scenario-toolbar';
 import ScenarioTextArea from '~/components/scenario/scenario-textarea';
 import ScenarioSidebar from '~/components/scenario/scenario-sidebar';
@@ -33,6 +32,7 @@ import ScenarioNameDialog from '~/components/scenario/scenario-name-dialog';
 import OverwriteSaveDialog from '~/components/scenario/overwrite-save-dialog';
 import { useScenarioOperations } from '~/hooks/use-scenario-operations';
 import useError from '~/hooks/use-error';
+import api from '~/api';
 
 export default function ScenarioEditor() {
   // Refs
@@ -107,19 +107,6 @@ export default function ScenarioEditor() {
   useEffect(() => {
     loadSavedScenarios().then(setSavedScenarios);
   }, []); // Only run once on mount
-
-  // Sync scenarioName with scenario_title in JSON content
-  useEffect(() => {
-    if (!scenarioContent) return;
-    try {
-      const parsed = JSON.parse(scenarioContent);
-      if (parsed.scenario_title && parsed.scenario_title !== scenarioName) {
-        setScenarioName(parsed.scenario_title);
-      }
-    } catch {
-      // ignore if not valid JSON
-    }
-  }, [scenarioContent, scenarioName]);
 
   // Helper function to generate incremented name
   const generateIncrementedName = useCallback(
@@ -198,10 +185,28 @@ export default function ScenarioEditor() {
     [saveScenario, displayError, loadSavedScenarios]
   );
 
-  const handleStartScenario = useCallback(() => {
-    console.log('Start scenario clicked');
-    navigate('/simulation');
-  }, [navigate]);
+  // Call /simulation/initialize via HTTP POST to initialize simulation
+  const handleStartScenario = async () => {
+    try {
+      // Call backend API to initialize simulation
+      const response = await api.post('/simulation/initialize');
+      const data = response.data;
+      if (data && data.sim_id) {
+        const simId = data.sim_id;
+        console.log('Received sim_id:', simId);
+        // Navigate to simulation page with sim_id
+        navigate(`/simulation/${simId}`);
+      } else {
+        throw new Error('No sim_id received from server');
+      }
+    } catch (error) {
+      console.error('Error starting simulation:', error);
+      displayError(
+        'Initialization Failed',
+        'Failed to initialize simulation. Please try again.'
+      );
+    }
+  };
 
   const handleSaveScenario = useCallback(async () => {
     // Sync scenario_title with scenarioName

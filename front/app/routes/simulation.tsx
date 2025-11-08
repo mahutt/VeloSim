@@ -29,16 +29,19 @@ import { MapProvider } from '~/providers/map-provider';
 import { SimulationProvider } from '~/providers/simulation-provider';
 import ResourceBar from '~/components/resource/resource-bar';
 import { TaskAssignmentProvider } from '~/providers/task-assignment-provider';
+import { useParams } from 'react-router';
 
 export function meta() {
   return [{ title: 'Simulation' }];
 }
 
 export default function Simulation() {
+  const { sim_id } = useParams<{ sim_id: string }>();
+
   return (
     <>
       <MapProvider>
-        <SimulationProvider>
+        <SimulationProvider simId={sim_id}>
           <TaskAssignmentProvider>
             <MapContainer />
             <ResourceBar />

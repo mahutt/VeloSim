@@ -33,9 +33,7 @@ import {
 
 import { useMap } from './map-provider';
 import { MapSource, setMapSource } from '~/lib/map-helpers';
-import api from '~/api';
 import {
-  type GetStationsResponse,
   type Station,
   type Resource,
   type SelectedItem,
@@ -46,16 +44,28 @@ import {
   adaptResourcesToGeoJSON,
 } from '~/lib/geojson-adapters';
 import { interpolateAlongRoute } from '~/lib/animation-helpers';
-import { startMockBackend, FRAME_INTERVAL_MS } from '~/lib/mock-backend';
 import {
   setupMapClickHandlers,
   setupMapHoverHandlers,
 } from '~/lib/map-interactions';
 import useError from '~/hooks/use-error';
-import {
-  logMissingEntityError,
-  logSimulationError,
-} from '~/utils/simulation-error-utils';
+import useAuth from '~/hooks/use-auth';
+import { logMissingEntityError } from '~/utils/simulation-error-utils';
+
+// Expect to receive frames every 1 second
+const FRAME_INTERVAL_MS = 1000;
+
+// WebSocket reconnection settings
+const MAX_RETRIES = 5;
+const INITIAL_DELAY = 1000; // 1 second
+
+type SimulationStatus =
+  | 'idle' // Not connected
+  | 'connecting' // WebSocket connecting
+  | 'loading' // Connected, waiting for initial frame
+  | 'ready' // Initial frame received, can interact
+  | 'running' // Frames streaming
+  | 'error'; // Error state
 
 type SimulationContextType = {
   stationsRef: React.RefObject<Map<number, Station>>;
@@ -65,121 +75,50 @@ type SimulationContextType = {
   selectItem: (type: SelectedItemType, id: number) => void;
   clearSelection: () => void;
   assignTaskToResource: (resourceId: number, taskId: number) => void;
+  simId: string | null;
+  isConnected: boolean;
+  simulationStatus: SimulationStatus;
+  isLoading: boolean; // Convenience flag for UI
 };
 
 const SimulationContext = createContext<SimulationContextType | undefined>(
   undefined
 );
 
-export const SimulationProvider = ({ children }: { children: ReactNode }) => {
+interface SimulationProviderProps {
+  children: ReactNode;
+  simId?: string;
+}
+
+export const SimulationProvider = ({
+  children,
+  simId: initialSimId,
+}: SimulationProviderProps) => {
   const { displayError } = useError();
+  const { token, isAuthenticated } = useAuth();
   const { mapRef, mapLoaded } = useMap();
   const stationsRef = useRef<Map<number, Station>>(new Map());
   const resourcesRef = useRef<Map<number, Resource>>(new Map());
+
+  // Simulation state
+  const [simId] = useState<string | null>(initialSimId || null);
+  const [isConnected, setIsConnected] = useState(false);
+  const [simulationStatus, setSimulationStatus] =
+    useState<SimulationStatus>('idle');
+  const [connectionAttempts, setConnectionAttempts] = useState(0);
+
+  // Derived loading state for convenience
+  const isLoading =
+    simulationStatus === 'connecting' || simulationStatus === 'loading';
+
+  // WebSocket reference
+  const wsRef = useRef<WebSocket | null>(null);
 
   // Resources state for components that need to react to changes
   const [resources, setResources] = useState<Resource[]>([]);
 
   // Selection state
   const [selectedItem, setSelectedItem] = useState<SelectedItem | null>(null);
-
-  // Selection function
-  const selectItem = (type: SelectedItemType, id: number) => {
-    if (!mapLoaded) return;
-
-    // Get the item and validate it exists
-    const item =
-      type === SelectedItemType.Station
-        ? stationsRef.current.get(id)
-        : resourcesRef.current.get(id);
-
-    if (!item) {
-      // Log missing entity data and notify user
-      const entityType =
-        type === SelectedItemType.Station ? 'station' : 'resource';
-      logMissingEntityError(entityType, id);
-
-      // Display error to user
-      const capitalizedType =
-        entityType.charAt(0).toUpperCase() + entityType.slice(1);
-      displayError(
-        `${capitalizedType} not found`,
-        `Failed to load ${entityType} details. Please try again later.`
-      );
-      return; // Don't throw - let the app continue running
-    }
-
-    // Update state
-    setSelectedItem({ type, value: item! }); // Update refs for animation loop
-    if (type === SelectedItemType.Station) {
-      selectedStationIdRef.current = id;
-      selectedResourceIdRef.current = undefined;
-    } else {
-      selectedResourceIdRef.current = id;
-      selectedStationIdRef.current = undefined;
-    }
-
-    // Update map sources - selected type gets the ID, other type gets cleared
-    updateMapSources(
-      type === SelectedItemType.Station ? id : undefined,
-      type === SelectedItemType.Resource ? id : undefined
-    );
-  };
-
-  // Helper function to update both map sources
-  const updateMapSources = (
-    selectedStationId?: number,
-    selectedResourceId?: number
-  ) => {
-    // Update stations
-    if (stationsRef.current.size > 0) {
-      const stations = Array.from(stationsRef.current.values());
-      setMapSource(
-        MapSource.Stations,
-        adaptStationsToGeoJSON(
-          stations,
-          selectedStationId,
-          hoveredStationIdRef.current ?? undefined
-        ),
-        mapRef.current!
-      );
-    }
-
-    // Update resources
-    if (resourcesRef.current.size > 0) {
-      const resources = Array.from(resourcesRef.current.values());
-      const geojson = adaptResourcesToGeoJSON(
-        resources,
-        selectedResourceId,
-        hoveredResourceIdRef.current ?? undefined
-      );
-      setMapSource(MapSource.Resources, geojson, mapRef.current!);
-    }
-  };
-
-  // Clear selection function
-  const clearSelection = () => {
-    if (!mapLoaded) return;
-
-    // Update state
-    setSelectedItem(null);
-
-    // Update refs for animation loop
-    selectedStationIdRef.current = undefined;
-    selectedResourceIdRef.current = undefined;
-
-    // Clear selection on both map sources
-    updateMapSources(undefined, undefined);
-  };
-
-  const assignTaskToResource = (resourceId: number, taskId: number) => {
-    try {
-      // TODO: use /assign endpoint
-      console.log('assignTaskToResource', { resourceId, taskId });
-    } catch (error) {
-      console.error('Error assigning task to resource:', error);
-    }
-  };
 
   // Hover state - use refs so animation loop always has latest values
   const hoveredStationIdRef = useRef<number | null>(null);
@@ -204,245 +143,176 @@ export const SimulationProvider = ({ children }: { children: ReactNode }) => {
 
   // Animation and cleanup refs
   const animationFrameRef = useRef<number>(0);
-  const stopMockBackendRef = useRef<(() => void) | null>(null);
 
-  // Initialize data loading and animation when map is ready
-  useEffect(() => {
+  // ============================================================================
+  // HELPER FUNCTIONS
+  // ============================================================================
+
+  // Backend WebSocket payload types (snake_case from backend)
+  interface BackendTask {
+    id: number;
+    station_id: number;
+    state: 'open' | 'assigned' | 'inprogress' | 'completed';
+    assigned_resource_id: number | null;
+  }
+
+  interface BackendStation {
+    station_id: number;
+    station_name: string;
+    station_position: [number, number];
+    station_tasks: BackendTask[];
+    task_count: number;
+  }
+
+  interface BackendResource {
+    resource_id: number;
+    resource_position: [number, number];
+    resource_tasks: BackendTask[];
+    task_count: number;
+    in_progress_task_id: number | null;
+  }
+
+  interface BackendPayload {
+    stations?: BackendStation[];
+    resources?: BackendResource[];
+  }
+
+  // Convert WebSocket simulation data to frontend format
+  const adaptSimulationData = (payload: BackendPayload) => {
+    // Merge stations (don't clear, just update what's in the payload)
+    if (payload.stations) {
+      payload.stations.forEach((station: BackendStation) => {
+        const adaptedStation: Station = {
+          id: station.station_id,
+          name: station.station_name,
+          position: station.station_position,
+          tasks: station.station_tasks.map((task: BackendTask) => ({
+            id: task.id,
+            stationId: task.station_id,
+            type: 'battery_swap',
+            state: task.state,
+            assigned_resource_id: task.assigned_resource_id,
+          })),
+          task_count: station.task_count,
+        };
+        stationsRef.current.set(adaptedStation.id, adaptedStation);
+      });
+    }
+
+    // Merge resources (don't clear, just update what's in the payload)
+    if (payload.resources) {
+      payload.resources.forEach((resource: BackendResource) => {
+        const adaptedResource: Resource = {
+          id: resource.resource_id,
+          position: resource.resource_position,
+          taskList: resource.resource_tasks.map((t: BackendTask) => t.id),
+          task_count: resource.task_count,
+          in_progress_task_id: resource.in_progress_task_id,
+        };
+        resourcesRef.current.set(adaptedResource.id, adaptedResource);
+      });
+    }
+
+    // Return all resources for state update
+    return Array.from(resourcesRef.current.values());
+  };
+
+  // Helper function to update both map sources
+  const updateMapSources = (
+    selectedStationId?: number,
+    selectedResourceId?: number
+  ) => {
+    if (!mapRef.current) {
+      console.log('[Map] mapRef is null');
+      return;
+    }
+
+    const map = mapRef.current;
+
+    // Check if map style is loaded
+    if (!map.isStyleLoaded()) {
+      console.log('[Map] Style not loaded yet, waiting...');
+      map.once('styledata', () => {
+        console.log('[Map] Style loaded, retrying update');
+        updateMapSources(selectedStationId, selectedResourceId);
+      });
+      return;
+    }
+
+    console.log('[Map] Updating sources');
+
+    // Update stations
+    if (stationsRef.current.size > 0) {
+      const stations = Array.from(stationsRef.current.values());
+      const geojson = adaptStationsToGeoJSON(
+        stations,
+        selectedStationId,
+        hoveredStationIdRef.current ?? undefined
+      );
+      setMapSource(MapSource.Stations, geojson, map);
+    }
+
+    // Update resources
+    if (resourcesRef.current.size > 0) {
+      const resources = Array.from(resourcesRef.current.values());
+      const geojson = adaptResourcesToGeoJSON(
+        resources,
+        selectedResourceId,
+        hoveredResourceIdRef.current ?? undefined
+      );
+      setMapSource(MapSource.Resources, geojson, map);
+    }
+  };
+
+  // Clear selection function
+  const clearSelection = () => {
     if (!mapLoaded) return;
 
-    loadStations();
-    fetch('/placeholder-data/resources.json')
-      .then((res) => res.json())
-      .then((data: { resources: Resource[] }) => {
-        const resources = data.resources.map((resource) => ({
-          id: resource.id,
-          position: resource.position,
-          taskList: resource.taskList,
-          route: {
-            coordinates: resource.route.coordinates,
-          },
-        }));
+    setSelectedItem(null);
+    selectedStationIdRef.current = undefined;
+    selectedResourceIdRef.current = undefined;
 
-        resources.forEach((resource) => {
-          resourcesRef.current.set(resource.id, resource);
-        });
-
-        // Update state so components can react to the loaded resources
-        setResources(resources);
-
-        initializeResourcePositions(data.resources);
-        startAnimation();
-        startBackendSimulation(data.resources);
-      })
-      .catch((error) => {
-        console.error('Error loading resource routes:', error);
-        logSimulationError(error, 'Resource loading', {
-          errorType: 'RESOURCE_LOAD_FAILED',
-        });
-        displayError(
-          'Resource load error',
-          'Failed to load resources from server.'
-        );
-      });
-
-    // Set up map click handlers for selection
-    setupMapClickHandlers(mapRef.current!, (item) => {
-      if (!item) {
-        clearSelection();
-        return;
-      }
-      const { type, id } = item;
-      selectItem(type, id);
-    });
-
-    // Set up map hover handlers
-    setupMapHoverHandlers(mapRef.current!, (item) => {
-      if (!item) {
-        updateHoverState(null, null);
-        return;
-      }
-
-      const { type, id } = item;
-      if (type === SelectedItemType.Station) {
-        updateHoverState(id, null);
-      } else if (type === SelectedItemType.Resource) {
-        updateHoverState(null, id);
-      }
-    });
-
-    // Cleanup on unmount
-    return cleanup;
-  }, [mapLoaded]);
-
-  // Load station data from backend API
-  const loadStations = () => {
-    api
-      .get<GetStationsResponse>('/stations')
-      .then((response) => {
-        const stations = response.data.stations.map((station) => ({
-          ...station,
-          tasks: [], // Initialize empty tasks array until API supports it
-        }));
-
-        stations.forEach((station) => {
-          stationsRef.current.set(station.id, station);
-        });
-
-        setMapSource(
-          MapSource.Stations,
-          adaptStationsToGeoJSON(stations),
-          mapRef.current!
-        );
-      })
-      .catch((error) => {
-        console.error('Error fetching stations:', error);
-        logSimulationError(error, 'Station loading', {
-          errorType: 'STATION_LOAD_FAILED',
-        });
-        displayError(
-          'Station load error',
-          'Failed to load stations from server.'
-        );
-      });
+    updateMapSources(undefined, undefined);
   };
 
-  // Initialize all resources at their route starting positions
-  const initializeResourcePositions = (resources: Resource[]) => {
-    resources.forEach((resource) => {
-      const startPos = resource.route.coordinates[0];
-      currentPositionsRef.current.set(resource.id, startPos);
-      frameStartPositionsRef.current.set(resource.id, startPos);
-      targetPositionsRef.current.set(resource.id, startPos);
-    });
-  };
+  // Selection function
+  const selectItem = (type: SelectedItemType, id: number) => {
+    if (!mapLoaded) return;
 
-  // Start mock backend that emits position updates every second
-  const startBackendSimulation = (resources: Resource[]) => {
-    stopMockBackendRef.current = startMockBackend(resources, handleFrameUpdate);
-  };
+    // Get the item and validate it exists
+    const item =
+      type === SelectedItemType.Station
+        ? stationsRef.current.get(id)
+        : resourcesRef.current.get(id);
 
-  /**
-   * TO-DO: Handle position updates from backend frame
-   * In #21, this becomes the websocket message handler
-   */
-  const handleFrameUpdate = (updates: Resource[]) => {
-    updates.forEach((update) => {
-      // Verify resource exists before updating
-      const existingResource = resourcesRef.current.get(update.id);
-      if (!existingResource) {
-        logMissingEntityError('resource', update.id);
-        displayError(
-          'Resource not found',
-          'Failed to load resource details. Please try again later.'
-        );
-        return;
-      }
+    if (!item) {
+      const entityType =
+        type === SelectedItemType.Station ? 'station' : 'resource';
+      logMissingEntityError(entityType, id);
 
-      // Capture current animated position as start for next interpolation
-      const currentAnimatedPos = currentPositionsRef.current.get(update.id);
-
-      if (currentAnimatedPos) {
-        frameStartPositionsRef.current.set(update.id, currentAnimatedPos);
-      }
-
-      // Set new target position from backend
-      targetPositionsRef.current.set(update.id, update.position);
-
-      // Update resource in ref
-      resourcesRef.current.set(update.id, update);
-    });
-
-    // Reset global frame timer when new frame arrives
-    lastFrameTimeRef.current = performance.now();
-  };
-
-  // Start animation loop running at 60fps
-  const startAnimation = () => {
-    lastFrameTimeRef.current = performance.now();
-
-    const animate = (currentTime: number) => {
-      updateResourcePositions(currentTime);
-      animationFrameRef.current = requestAnimationFrame(animate);
-    };
-
-    animationFrameRef.current = requestAnimationFrame(animate);
-  };
-
-  // Update all resource positions using shared global progress
-  // Called 60 times per second by requestAnimationFrame
-  const updateResourcePositions = (currentTime: number) => {
-    const timeSinceLastFrame = currentTime - lastFrameTimeRef.current;
-
-    // Global progress shared by all resources (0.0 to 1.0 over 1 second)
-    const globalProgress = Math.min(
-      timeSinceLastFrame / FRAME_INTERVAL_MS,
-      1.0
-    );
-
-    // Interpolate each resource from frame start to target
-    frameStartPositionsRef.current.forEach((startPos, resourceId) => {
-      const targetPos = targetPositionsRef.current.get(resourceId);
-      const resource = resourcesRef.current.get(resourceId);
-
-      if (!targetPos) {
-        // Target position missing - state inconsistency
-        logSimulationError(
-          new Error(`Target position missing for resource ${resourceId}`),
-          'Animation frame update',
-          { resourceId, errorType: 'MISSING_TARGET_POSITION' }
-        );
-        displayError('Animation error', 'Failed to update resource position.');
-        return;
-      }
-
-      if (!resource) {
-        // Resource missing from state - state inconsistency
-        logMissingEntityError('resource', resourceId);
-        displayError(
-          'Resource not found',
-          'Failed to load resource details. Please try again later.'
-        );
-        return;
-      }
-
-      const routeGeometry = resource.route.coordinates;
-      if (!routeGeometry) {
-        // Route geometry missing - state inconsistency
-        logSimulationError(
-          new Error(`Route geometry missing for resource ${resourceId}`),
-          'Animation frame update',
-          { resourceId, errorType: 'MISSING_ROUTE_GEOMETRY' }
-        );
-        displayError('Animation error', 'Failed to animate resource movement.');
-        return;
-      }
-
-      // Interpolate along route using global progress
-      const interpolatedPos = interpolateAlongRoute(
-        routeGeometry,
-        startPos, // Where we were when frame arrived
-        targetPos, // Where backend says we should be
-        globalProgress // Only this changes: 0→1 over 1 second
+      const capitalizedType =
+        entityType.charAt(0).toUpperCase() + entityType.slice(1);
+      displayError(
+        `${capitalizedType} not found`,
+        `Failed to load ${entityType} details. Please try again later.`
       );
+      return;
+    }
 
-      // Update current position for next frame's start
-      currentPositionsRef.current.set(resourceId, interpolatedPos);
+    setSelectedItem({ type, value: item });
 
-      // Update resource position in ref
-      if (resource) {
-        resource.position = interpolatedPos;
-      }
-    });
+    if (type === SelectedItemType.Station) {
+      selectedStationIdRef.current = id;
+      selectedResourceIdRef.current = undefined;
+    } else {
+      selectedResourceIdRef.current = id;
+      selectedStationIdRef.current = undefined;
+    }
 
-    // Create GeoJSON from all resources
-    const resources = Array.from(resourcesRef.current.values());
-    const geojson = adaptResourcesToGeoJSON(
-      resources,
-      selectedResourceIdRef.current,
-      hoveredResourceIdRef.current ?? undefined
+    updateMapSources(
+      type === SelectedItemType.Station ? id : undefined,
+      type === SelectedItemType.Resource ? id : undefined
     );
-
-    setMapSource(MapSource.Resources, geojson, mapRef.current!);
   };
 
   // Update hover state with immediate visual feedback
@@ -450,56 +320,347 @@ export const SimulationProvider = ({ children }: { children: ReactNode }) => {
     stationId: number | null,
     resourceId: number | null
   ) => {
-    // Update refs immediately for cursor changes
     hoveredStationIdRef.current = stationId;
-    hoveredResourceIdRef.current = resourceId; // Clear any pending debounced map update
+    hoveredResourceIdRef.current = resourceId;
+
     if (hoverDebounceTimeoutRef.current) {
       clearTimeout(hoverDebounceTimeoutRef.current);
     }
 
-    // Debounce only the expensive map source updates
     hoverDebounceTimeoutRef.current = setTimeout(() => {
-      if (!mapRef.current) return;
-
-      // Update stations with hover state
-      if (stationsRef.current.size > 0) {
-        const stations = Array.from(stationsRef.current.values());
-        setMapSource(
-          MapSource.Stations,
-          adaptStationsToGeoJSON(
-            stations,
-            selectedStationIdRef.current,
-            stationId ?? undefined
-          ),
-          mapRef.current
-        );
-      }
-
-      // Update resources with hover state
-      if (resourcesRef.current.size > 0) {
-        const resources = Array.from(resourcesRef.current.values());
-        const geojson = adaptResourcesToGeoJSON(
-          resources,
-          selectedResourceIdRef.current,
-          resourceId ?? undefined
-        );
-        setMapSource(MapSource.Resources, geojson, mapRef.current);
-      }
-    }, 16); // ~60fps throttle for map updates only
+      updateMapSources(
+        selectedStationIdRef.current,
+        selectedResourceIdRef.current
+      );
+    }, 16); // ~60fps
   };
 
-  // Cleanup animation and mock backend on unmount
+  // Handle initial frame from WebSocket
+  const handleInitialFrame = (payload: BackendPayload) => {
+    console.log('[WS] Handling initial frame:', payload);
+
+    // Store initial data
+    const updatedResources = adaptSimulationData(payload);
+    setResources(updatedResources);
+
+    // Initialize positions for all resources
+    if (payload.resources) {
+      payload.resources.forEach((resource: BackendResource) => {
+        const position: [number, number] = resource.resource_position;
+        frameStartPositionsRef.current.set(resource.resource_id, position);
+        currentPositionsRef.current.set(resource.resource_id, position);
+        targetPositionsRef.current.set(resource.resource_id, position);
+      });
+    }
+
+    // Update initial frame time
+    lastFrameTimeRef.current = performance.now();
+
+    // Start animation loop
+    console.log('[Animation] Starting animation loop');
+    animationFrameRef.current = requestAnimationFrame(animateResources);
+
+    // Update map with initial data
+    updateMapSources(
+      selectedStationIdRef.current,
+      selectedResourceIdRef.current
+    );
+
+    // Transition from loading to ready
+    setSimulationStatus('ready');
+  };
+
+  // Handle frame updates from WebSocket
+  const handleFrameUpdate = (payload: BackendPayload) => {
+    console.log('[WS] Handling frame update:', payload);
+
+    // Update data
+    const updatedResources = adaptSimulationData(payload);
+    setResources(updatedResources);
+
+    // Update frame start time and positions for new frame
+    const now = performance.now();
+    lastFrameTimeRef.current = now;
+
+    // For each resource, update the frame start position and target
+    if (payload.resources) {
+      payload.resources.forEach((resource: BackendResource) => {
+        const newPosition: [number, number] = resource.resource_position;
+
+        // Set frame start to current animated position
+        const currentPos = currentPositionsRef.current.get(
+          resource.resource_id
+        );
+        if (currentPos) {
+          frameStartPositionsRef.current.set(resource.resource_id, currentPos);
+        } else {
+          frameStartPositionsRef.current.set(resource.resource_id, newPosition);
+        }
+
+        // Set new target
+        targetPositionsRef.current.set(resource.resource_id, newPosition);
+      });
+    }
+
+    // Ensure we're in running state
+    if (simulationStatus !== 'running') {
+      setSimulationStatus('running');
+    }
+  };
+
+  // Animation loop to interpolate resource positions
+  const animateResources = () => {
+    const now = performance.now();
+    const frameElapsedMs = now - lastFrameTimeRef.current;
+
+    // Calculate interpolation progress (0 to 1)
+    const t = Math.min(frameElapsedMs / FRAME_INTERVAL_MS, 1);
+
+    let needsUpdate = false;
+
+    // Update position for each resource
+    resourcesRef.current.forEach((resource) => {
+      const start = frameStartPositionsRef.current.get(resource.id);
+      const target = targetPositionsRef.current.get(resource.id);
+
+      if (!start || !target) return;
+
+      // Interpolate position
+      const routeGeometry = resource.route?.coordinates || [];
+      const currentPos = interpolateAlongRoute(routeGeometry, start, target, t);
+
+      // Update current position
+      const prevPos = currentPositionsRef.current.get(resource.id);
+      if (
+        !prevPos ||
+        prevPos[0] !== currentPos[0] ||
+        prevPos[1] !== currentPos[1]
+      ) {
+        currentPositionsRef.current.set(resource.id, currentPos);
+        needsUpdate = true;
+      }
+
+      // Update the resource object's position
+      resource.position = currentPos;
+    });
+
+    // Only update map if positions changed
+    if (needsUpdate) {
+      updateMapSources(
+        selectedStationIdRef.current,
+        selectedResourceIdRef.current
+      );
+    }
+
+    // Continue animation loop
+    animationFrameRef.current = requestAnimationFrame(animateResources);
+  };
+
+  const assignTaskToResource = (resourceId: number, taskId: number) => {
+    try {
+      // TODO: use /assign endpoint
+      console.log('assignTaskToResource', { resourceId, taskId });
+    } catch (error) {
+      console.error('Error assigning task to resource:', error);
+    }
+  };
+
+  // Cleanup animation and WebSocket on unmount
   const cleanup = () => {
     if (animationFrameRef.current) {
       cancelAnimationFrame(animationFrameRef.current);
     }
-    if (stopMockBackendRef.current) {
-      stopMockBackendRef.current();
+    if (wsRef.current) {
+      wsRef.current.close();
     }
     if (hoverDebounceTimeoutRef.current) {
       clearTimeout(hoverDebounceTimeoutRef.current);
     }
   };
+
+  // ============================================================================
+  // WEBSOCKET CONNECTION EFFECT
+  // ============================================================================
+
+  useEffect(() => {
+    if (!mapLoaded || !simId || !isAuthenticated || !token) {
+      console.log('[WS] ⏳ Waiting for prerequisites...', {
+        mapLoaded,
+        simId: !!simId,
+        isAuthenticated,
+        hasToken: !!token,
+      });
+      return;
+    }
+
+    console.log('[WS] 🚀 Connecting to WebSocket...');
+
+    // Build WebSocket URL
+    const apiBaseUrl = import.meta.env.VITE_BACKEND_URL;
+    const url = apiBaseUrl ? new URL(apiBaseUrl) : null;
+    const wsProtocol =
+      url?.protocol === 'https:' || window.location.protocol === 'https:'
+        ? 'wss:'
+        : 'ws:';
+    const wsHost = url?.host || window.location.host;
+    const wsUrl = `${wsProtocol}//${wsHost}/api/v1/simulation/stream/${simId}`;
+
+    console.log('[WS] URL:', wsUrl);
+    console.log('[WS] Cookie will be sent automatically by browser');
+
+    setSimulationStatus('connecting');
+
+    const ws = new WebSocket(wsUrl);
+    wsRef.current = ws;
+
+    ws.onopen = () => {
+      console.log('[WS] ✅ Connection opened');
+      setIsConnected(true);
+      setConnectionAttempts(0);
+      // Set to loading state - waiting for initial frame
+      setSimulationStatus('loading');
+    };
+
+    ws.onmessage = (event) => {
+      try {
+        const message = JSON.parse(event.data);
+
+        // Handle status messages
+        if (message.type === 'status') {
+          console.log('[WS] 📊 Status:', message.message, message);
+          // Status messages are informational, don't change state
+          return;
+        }
+
+        // Handle error messages
+        if (message.type === 'error') {
+          console.error('[WS] ❌ Server Error:', message.message);
+          displayError(
+            'Simulation Error',
+            message.message || 'An error occurred'
+          );
+          setSimulationStatus('error');
+          return;
+        }
+
+        // Parse payload if it's a string
+        let payload = message.payload;
+        if (typeof payload === 'string') {
+          payload = JSON.parse(payload);
+        }
+
+        // Handle initial frame (seq_numb === 0)
+        if (message.seq_numb === 0) {
+          console.log('[WS] 🎬 Initial frame received');
+          handleInitialFrame(payload);
+          return;
+        }
+
+        // Handle regular frames (seq_numb > 0)
+        if (message.seq_numb > 0) {
+          console.log('[WS] 🎞️  Frame', message.seq_numb);
+          handleFrameUpdate(payload);
+          return;
+        }
+
+        console.warn('[WS] ⚠️  Unknown message:', message);
+      } catch (error) {
+        console.error('[WS] ❌ Parse error:', error);
+        console.error('[WS] Raw data:', event.data);
+      }
+    };
+
+    ws.onerror = (error) => {
+      console.error('[WS] ❌ WebSocket error:', error);
+      displayError(
+        'Connection Error',
+        'Failed to connect to simulation. Check authentication and try again.'
+      );
+      setSimulationStatus('error');
+    };
+
+    ws.onclose = (event) => {
+      console.log('[WS] 🔌 Connection closed:', {
+        code: event.code,
+        reason: event.reason,
+        wasClean: event.wasClean,
+      });
+
+      setIsConnected(false);
+
+      // Code 1008 = Policy Violation (auth failure)
+      if (event.code === 1008) {
+        console.error('[WS] ❌ Authentication failed (code 1008)');
+        displayError(
+          'Authentication Failed',
+          'WebSocket authentication failed. Please try logging in again.'
+        );
+        setSimulationStatus('error');
+        return;
+      }
+
+      if (simulationStatus !== 'error') {
+        setSimulationStatus('idle');
+      }
+
+      // Retry logic for network errors
+      if (connectionAttempts < MAX_RETRIES && event.code === 1006) {
+        const delay = INITIAL_DELAY * Math.pow(2, connectionAttempts);
+        console.log(
+          `[WS] 🔄 Retry ${connectionAttempts + 1}/${MAX_RETRIES} in ${delay}ms`
+        );
+
+        setTimeout(() => {
+          setConnectionAttempts((prev) => prev + 1);
+        }, delay);
+      }
+    };
+
+    // Set up map interactions
+    if (mapRef.current) {
+      setupMapClickHandlers(mapRef.current, (item) => {
+        if (!item) {
+          clearSelection();
+          return;
+        }
+        const { type, id } = item;
+        selectItem(type, id);
+      });
+
+      setupMapHoverHandlers(mapRef.current, (item) => {
+        if (!item) {
+          updateHoverState(null, null);
+          return;
+        }
+        const { type, id } = item;
+        if (type === SelectedItemType.Station) {
+          updateHoverState(id, null);
+        } else if (type === SelectedItemType.Resource) {
+          updateHoverState(null, id);
+        }
+      });
+    }
+
+    // Cleanup on unmount
+    return cleanup;
+  }, [mapLoaded, simId, isAuthenticated, token, connectionAttempts]);
+
+  // Render existing data when map loads
+  useEffect(() => {
+    if (!mapLoaded || !mapRef.current) return;
+
+    if (stationsRef.current.size > 0 || resourcesRef.current.size > 0) {
+      console.log('[Map] Map loaded, rendering existing data');
+      updateMapSources(
+        selectedStationIdRef.current,
+        selectedResourceIdRef.current
+      );
+    }
+  }, [mapLoaded]);
+
+  // ============================================================================
+  // CONTEXT PROVIDER
+  // ============================================================================
 
   return (
     <SimulationContext.Provider
@@ -511,6 +672,10 @@ export const SimulationProvider = ({ children }: { children: ReactNode }) => {
         selectItem,
         clearSelection,
         assignTaskToResource,
+        simId,
+        isConnected,
+        simulationStatus,
+        isLoading,
       }}
     >
       {children}

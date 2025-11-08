@@ -57,6 +57,9 @@ export class MockMap {
   on = vi.fn((type: eventType, cb: (arg?: unknown) => void) => {
     this.callBacks[type] = cb;
   });
+  once = vi.fn((type: eventType, cb: (arg?: unknown) => void) => {
+    this.callBacks[type] = cb;
+  });
   remove = vi.fn();
   getCenter = vi.fn(() => this.center);
   getZoom = vi.fn(() => this.zoom);
@@ -68,6 +71,7 @@ export class MockMap {
   addSource = vi.fn();
   addLayer = vi.fn();
   getSource = vi.fn();
+  isStyleLoaded = vi.fn(() => true);
   static clear() {
     MockMap.instance = undefined;
   }

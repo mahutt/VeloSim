@@ -106,6 +106,11 @@ test('renders all resources from provider', () => {
     resourcesRef: { current: new Map() },
     selectedItem: null,
     clearSelection: vi.fn(),
+    assignTaskToResource: vi.fn(),
+    simId: null,
+    isConnected: false,
+    startSimulation: vi.fn(),
+    simulationStatus: 'idle',
   });
 
   render(<ResourceBar />);
@@ -126,6 +131,11 @@ test('renders search bar with correct placeholder', () => {
     resourcesRef: { current: new Map() },
     selectedItem: null,
     clearSelection: vi.fn(),
+    assignTaskToResource: vi.fn(),
+    simId: null,
+    isConnected: false,
+    startSimulation: vi.fn(),
+    simulationStatus: 'idle',
   });
 
   render(<ResourceBar />);
@@ -141,6 +151,11 @@ test('calls selectItem with correct arguments when resource is clicked', () => {
     resourcesRef: { current: new Map() },
     selectedItem: null,
     clearSelection: vi.fn(),
+    assignTaskToResource: vi.fn(),
+    simId: null,
+    isConnected: false,
+    startSimulation: vi.fn(),
+    simulationStatus: 'idle',
   });
 
   render(<ResourceBar />);
@@ -161,6 +176,11 @@ test('filters resources by ID match', async () => {
     resourcesRef: { current: new Map() },
     selectedItem: null,
     clearSelection: vi.fn(),
+    assignTaskToResource: vi.fn(),
+    simId: null,
+    isConnected: false,
+    startSimulation: vi.fn(),
+    simulationStatus: 'idle',
   });
 
   render(<ResourceBar />);
@@ -184,6 +204,11 @@ test('filters resources by partial ID match', async () => {
     resourcesRef: { current: new Map() },
     selectedItem: null,
     clearSelection: vi.fn(),
+    assignTaskToResource: vi.fn(),
+    simId: null,
+    isConnected: false,
+    startSimulation: vi.fn(),
+    simulationStatus: 'idle',
   });
 
   render(<ResourceBar />);
@@ -207,6 +232,11 @@ test('shows no resources when search query does not match any ID', async () => {
     resourcesRef: { current: new Map() },
     selectedItem: null,
     clearSelection: vi.fn(),
+    assignTaskToResource: vi.fn(),
+    simId: null,
+    isConnected: false,
+    startSimulation: vi.fn(),
+    simulationStatus: 'idle',
   });
 
   render(<ResourceBar />);
@@ -229,6 +259,11 @@ test('shows all resources when search query is empty', async () => {
     resourcesRef: { current: new Map() },
     selectedItem: null,
     clearSelection: vi.fn(),
+    assignTaskToResource: vi.fn(),
+    simId: null,
+    isConnected: false,
+    startSimulation: vi.fn(),
+    simulationStatus: 'idle',
   });
 
   render(<ResourceBar />);
@@ -257,6 +292,11 @@ test('clears search when clear button is clicked', async () => {
     resourcesRef: { current: new Map() },
     selectedItem: null,
     clearSelection: vi.fn(),
+    assignTaskToResource: vi.fn(),
+    simId: null,
+    isConnected: false,
+    startSimulation: vi.fn(),
+    simulationStatus: 'idle',
   });
 
   render(<ResourceBar />);
@@ -289,6 +329,11 @@ test('search is case insensitive for partial matches', async () => {
     resourcesRef: { current: new Map() },
     selectedItem: null,
     clearSelection: vi.fn(),
+    assignTaskToResource: vi.fn(),
+    simId: null,
+    isConnected: false,
+    startSimulation: vi.fn(),
+    simulationStatus: 'idle',
   });
 
   render(<ResourceBar />);
@@ -315,6 +360,11 @@ test('maintains selection state while filtering', async () => {
       value: selectedResource,
     },
     clearSelection: vi.fn(),
+    assignTaskToResource: vi.fn(),
+    simId: null,
+    isConnected: false,
+    startSimulation: vi.fn(),
+    simulationStatus: 'idle',
   });
 
   render(<ResourceBar />);
@@ -338,6 +388,11 @@ test('shows "No resources currently available" when resources array is empty', (
     resourcesRef: { current: new Map() },
     selectedItem: null,
     clearSelection: vi.fn(),
+    assignTaskToResource: vi.fn(),
+    simId: null,
+    isConnected: false,
+    startSimulation: vi.fn(),
+    simulationStatus: 'idle',
   });
 
   render(<ResourceBar />);
@@ -356,6 +411,11 @@ test('shows "No resources match your search" when search yields no results', asy
     resourcesRef: { current: new Map() },
     selectedItem: null,
     clearSelection: vi.fn(),
+    assignTaskToResource: vi.fn(),
+    simId: null,
+    isConnected: false,
+    startSimulation: vi.fn(),
+    simulationStatus: 'idle',
   });
 
   render(<ResourceBar />);

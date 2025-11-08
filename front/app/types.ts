@@ -37,12 +37,15 @@ export interface Station {
   name: string;
   position: [number, number]; // [longitude, latitude]
   tasks: StationTask[];
+  task_count?: number;
 }
 
 export interface StationTask {
   id: number;
   stationId: number;
   type: 'battery_swap';
+  state?: 'open' | 'assigned' | 'inprogress' | 'completed';
+  assigned_resource_id?: number | null;
 }
 
 // API response types
@@ -80,9 +83,46 @@ export interface Resource {
   id: number;
   position: [number, number];
   taskList: number[]; // list of task IDs
-  route: {
+  route?: {
     coordinates: [number, number][];
   };
+  task_count?: number;
+  in_progress_task_id?: number | null;
+}
+
+// Clock type for simulation timing
+export interface Clock {
+  realSecondsPassed: number;
+  realMinutesPassed: number;
+  simSecondsPassed: number;
+  simMinutesPassed: number;
+}
+
+// WebSocket simulation frame types
+export interface FramePayload {
+  sim_id: string;
+  tasks: StationTask[];
+  stations: Station[];
+  resources: Resource[];
+  clock: Clock;
+}
+
+export interface SimulationFrame {
+  seq_numb: number;
+  timestamp: number;
+  is_key: boolean;
+  payload: FramePayload;
+}
+
+export interface WebSocketSimulationMessage {
+  sim_id: string;
+  db_id: number;
+  status: 'started' | 'running' | 'paused' | 'completed' | 'error';
+  initial_frame: SimulationFrame;
+}
+
+export interface WebSocketFrameMessage {
+  frame: SimulationFrame;
 }
 
 // Selection types

@@ -22,10 +22,47 @@
  * SOFTWARE.
  */
 
-import { expect, test } from 'vitest';
+import { expect, test, vi, beforeEach } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import Simulation, { meta } from '~/routes/simulation';
 import { createRoutesStub } from 'react-router';
+
+// Mock MapContainer component
+vi.mock('~/components/map/map-container', () => ({
+  default: () => <div data-testid="map-container">Map Container</div>,
+}));
+
+// Mock other components
+vi.mock('~/components/map/selected-item-bar', () => ({
+  default: () => <div>Selected Item Bar</div>,
+}));
+
+vi.mock('~/components/resource/resource-bar', () => ({
+  default: () => <div>Resource Bar</div>,
+}));
+
+// Mock providers to render children without context logic
+vi.mock('~/providers/map-provider', () => ({
+  MapProvider: ({ children }: { children: React.ReactNode }) => (
+    <div>{children}</div>
+  ),
+}));
+
+vi.mock('~/providers/simulation-provider', () => ({
+  SimulationProvider: ({ children }: { children: React.ReactNode }) => (
+    <div>{children}</div>
+  ),
+}));
+
+vi.mock('~/providers/task-assignment-provider', () => ({
+  TaskAssignmentProvider: ({ children }: { children: React.ReactNode }) => (
+    <div>{children}</div>
+  ),
+}));
+
+beforeEach(() => {
+  vi.clearAllMocks();
+});
 
 test('meta function sets all fields', () => {
   const metaInfo = meta();

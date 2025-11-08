@@ -63,6 +63,9 @@ vi.mock('~/components/login/login-alert.tsx', () => ({
 describe('Login Page', () => {
   const mockSetUser = vi.fn();
   const mockRefreshUser = vi.fn();
+  const mockSetToken = vi.fn((token: string) => {
+    sessionStorage.setItem(TOKEN_STORAGE_KEY, token);
+  });
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -79,6 +82,9 @@ describe('Login Page', () => {
           setLoading: vi.fn(),
           logout: vi.fn(),
           refreshUser: mockRefreshUser,
+          setToken: mockSetToken,
+          token: null,
+          isAuthenticated: false,
         }}
       >
         <Signin />
