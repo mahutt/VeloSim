@@ -22,7 +22,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 """
 
-from typing import Dict, List
+from typing import Dict, List, Union
 from sqlalchemy.orm import Session
 from back.models import User
 from back.models.sim_instance import SimInstance
@@ -46,8 +46,9 @@ class SimulationService:
 
     def __init__(self) -> None:
         self.simulator = Simulator()
-        # Maps sim_id (UUID from simulator) -> (db_id, status)
-        self.active_simulations: Dict[str, Dict[str, int | str]] = {}
+        # Maps sim_id (UUID from simulator) -> (db_id, status, sim_time)
+        # sim_time comes from InputParameter.sim_time
+        self.active_simulations: Dict[str, Dict[str, Union[int, str]]] = {}
 
     # Internal helper
     def _get_requesting_user(self, db: Session, requesting_user: int) -> User:
@@ -111,6 +112,7 @@ class SimulationService:
         self.active_simulations[sim_id] = {
             "db_id": db_sim_instance.id,
             "status": "initialized",
+            "sim_time": params.sim_time,
         }
 
         return SimulationResponse(
@@ -138,8 +140,21 @@ class SimulationService:
         if db_sim_instance is None:
             raise ItemNotFoundError(db_id, "Simulation instance record not found")
 
-        # Start the simulation asynchronously
-        self.simulator.start(sim_id, simTime=30)
+        # Fetch the sim_controller from the simulator
+        sim_info = self.simulator.get_sim_by_id(sim_id)
+        if sim_info is None:
+            raise RuntimeError(f"Simulation {sim_id} not found in simulator")
+
+        # Retrieve sim_time from active_simulations
+        sim_time_value = sim_data.get("sim_time")
+        if sim_time_value is None:
+            raise ValueError(
+                f"Simulation {sim_id} does not have a valid sim_time defined."
+            )
+
+        # Start simulation using sim_time
+        sim_time = int(sim_time_value)
+        self.simulator.start(sim_id, simTime=sim_time)
 
         # Update state
         self.active_simulations[sim_id]["status"] = "running"

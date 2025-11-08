@@ -276,8 +276,6 @@ async def websocket_simulation_stream(
         await e.websocket.close(code=e.code)
         return
 
-    await websocket.accept()
-
     try:
         has_access = simulation_service.verify_access(db, sim_id, requesting_user)
         if not has_access:
