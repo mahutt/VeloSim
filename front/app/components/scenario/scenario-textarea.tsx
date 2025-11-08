@@ -23,24 +23,36 @@
  */
 
 import { Button } from '~/components/ui/button';
+import { Textarea } from '~/components/ui/textarea';
+import { Field, FieldLabel } from '~/components/ui/field';
 
 interface ScenarioTextAreaProps {
   scenarioData: string;
-  error: string | null;
+  scenarioDescription: string;
+  onDescriptionChange: (desc: string) => void;
   onChange: (data: string) => void;
   onSave: () => void;
   onExport: () => void;
   onStart: () => void;
+  isEditMode: boolean;
+  isExistingScenario: boolean;
+  onEdit: () => void;
 }
 
 export default function ScenarioTextArea({
   scenarioData,
-  error,
+  scenarioDescription,
+  onDescriptionChange,
   onChange,
   onSave,
   onExport,
   onStart,
+  isEditMode,
+  isExistingScenario,
+  onEdit,
 }: ScenarioTextAreaProps) {
+  const isDisabled = isExistingScenario && !isEditMode;
+
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     // Allow Tab key to insert spaces for indentation
     if (e.key === 'Tab') {
@@ -63,27 +75,43 @@ export default function ScenarioTextArea({
   };
 
   return (
-    <div className="flex-1 flex flex-col">
-      <textarea
-        className="w-full h-[32rem] p-3 border rounded-md font-mono text-sm mb-4 resize-none overflow-y-auto"
-        placeholder="Paste or type your JSON scenario here..."
-        value={scenarioData}
-        onChange={(e) => onChange(e.target.value)}
-        onKeyDown={handleKeyDown}
-        aria-label="Scenario JSON data"
-      />
+    <div className="flex-1 flex flex-col h-[40rem]">
+      <Field data-disabled={isDisabled}>
+        <FieldLabel htmlFor="scenario-description">Description</FieldLabel>
+        <Textarea
+          id="scenario-description"
+          value={scenarioDescription}
+          onChange={(e) => onDescriptionChange(e.target.value)}
+          placeholder="Enter scenario description"
+          className="h-20 resize-none font-mono"
+          disabled={isDisabled}
+        />
+      </Field>
 
-      {error && (
-        <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-md text-red-600 text-sm">
-          {error}
-        </div>
-      )}
+      <Field data-disabled={isDisabled} className="mt-4">
+        <FieldLabel htmlFor="scenario-json">Scenario JSON</FieldLabel>
+        <Textarea
+          id="scenario-json"
+          className="h-[28rem] resize-none font-mono"
+          placeholder="Paste or type your JSON scenario here..."
+          value={scenarioData}
+          onChange={(e) => onChange(e.target.value)}
+          onKeyDown={handleKeyDown}
+          disabled={isDisabled}
+        />
+      </Field>
 
       <div className="flex flex-col gap-2 mt-4 sm:flex-row sm:justify-between sm:items-center">
         <div className="flex flex-col gap-2 w-full sm:flex-row sm:w-auto">
-          <Button onClick={onSave} className="w-full sm:w-32">
-            Save
-          </Button>
+          {isExistingScenario && !isEditMode ? (
+            <Button onClick={onEdit} className="w-full sm:w-32">
+              Edit
+            </Button>
+          ) : (
+            <Button onClick={onSave} className="w-full sm:w-32">
+              Save
+            </Button>
+          )}
           <Button
             onClick={onExport}
             variant="outline"

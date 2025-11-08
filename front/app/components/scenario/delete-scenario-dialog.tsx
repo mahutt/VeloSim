@@ -22,63 +22,64 @@
  * SOFTWARE.
  */
 
-import { Button } from '~/components/ui/button';
 import {
   Dialog,
-  DialogClose,
   DialogContent,
   DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
+  DialogTrigger,
+  DialogClose,
 } from '~/components/ui/dialog';
+import { Button } from '~/components/ui/button';
+import { Trash2 } from 'lucide-react';
+import type { ReactNode } from 'react';
 
-export default function ErrorDialog({
-  open,
-  onOpenChange,
-  title,
-  message,
-  retryCallback,
-}: {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-  title: string;
-  message: string;
-  retryCallback?: () => void;
-}) {
+interface DeleteScenarioDialogProps {
+  scenarioName: string;
+  onConfirm: () => void;
+  trigger?: ReactNode;
+}
+
+export default function DeleteScenarioDialog({
+  scenarioName,
+  onConfirm,
+  trigger,
+}: DeleteScenarioDialogProps) {
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent data-testid="error-dialog">
+    <Dialog>
+      <DialogTrigger asChild>
+        {trigger || (
+          <Button
+            variant="ghost"
+            size="icon"
+            className="opacity-0 group-hover:opacity-100 transition-opacity shrink-0 hover:bg-destructive/10 h-8 w-8"
+            aria-label={`Delete ${scenarioName}`}
+          >
+            <Trash2 className="h-4 w-4 text-destructive" />
+          </Button>
+        )}
+      </DialogTrigger>
+      <DialogContent>
         <DialogHeader>
-          <DialogTitle data-testid="error-dialog-title">{title}</DialogTitle>
-          <DialogDescription className="whitespace-pre-line">
-            {message}
-            <br />
+          <DialogTitle>Delete Scenario</DialogTitle>
+          <DialogDescription>
+            Are you sure you want to delete &quot;{scenarioName}&quot;? This
+            action cannot be undone.
           </DialogDescription>
         </DialogHeader>
         <DialogFooter>
           <DialogClose asChild>
-            <Button
-              data-testid="error-dialog-close"
-              variant="outline"
-              onClick={() => {
-                onOpenChange(false);
-              }}
-            >
-              Close
+            <Button variant="outline" type="button">
+              Cancel
             </Button>
           </DialogClose>
-          {retryCallback && (
-            <Button
-              data-testid="error-dialog-retry"
-              onClick={() => {
-                onOpenChange(false);
-                retryCallback();
-              }}
-            >
-              Retry
+          <DialogClose asChild>
+            <Button variant="destructive" onClick={onConfirm}>
+              Delete
             </Button>
-          )}
+          </DialogClose>
         </DialogFooter>
       </DialogContent>
     </Dialog>

@@ -33,6 +33,8 @@ describe('ScenarioToolbar', () => {
       onNameChange: vi.fn(),
       onImport: vi.fn(),
       onNew: vi.fn(),
+      isEditMode: false,
+      isExistingScenario: false,
       ...propsOverride,
     };
     const utils = render(<ScenarioToolbar {...props} />);
@@ -45,11 +47,31 @@ describe('ScenarioToolbar', () => {
     expect(input.value).toBe('Test Scenario');
   });
 
-  it('calls onNameChange when input changes', () => {
-    const { getByLabelText, props } = setup();
+  it('disables input when isExistingScenario is true and not in edit mode', () => {
+    const { getByLabelText } = setup({
+      isExistingScenario: true,
+      isEditMode: false,
+    });
     const input = getByLabelText('Scenario name') as HTMLInputElement;
-    fireEvent.change(input, { target: { value: 'New Name' } });
-    expect(props.onNameChange).toHaveBeenCalledWith('New Name');
+    expect(input).toBeDisabled();
+  });
+
+  it('enables input when isExistingScenario is true but in edit mode', () => {
+    const { getByLabelText } = setup({
+      isExistingScenario: true,
+      isEditMode: true,
+    });
+    const input = getByLabelText('Scenario name') as HTMLInputElement;
+    expect(input).not.toBeDisabled();
+  });
+
+  it('enables input when isExistingScenario is false', () => {
+    const { getByLabelText } = setup({
+      isExistingScenario: false,
+      isEditMode: false,
+    });
+    const input = getByLabelText('Scenario name') as HTMLInputElement;
+    expect(input).not.toBeDisabled();
   });
 
   it('calls onImport when Import button is clicked', () => {
@@ -70,5 +92,23 @@ describe('ScenarioToolbar', () => {
     const { getByText } = setup();
     expect(getByText('Import')).toBeInTheDocument();
     expect(getByText('New')).toBeInTheDocument();
+  });
+
+  it('calls onNameChange when input value changes', () => {
+    const { getByLabelText, props } = setup();
+    const input = getByLabelText('Scenario name') as HTMLInputElement;
+    fireEvent.change(input, { target: { value: 'New Scenario Name' } });
+    expect(props.onNameChange).toHaveBeenCalledWith('New Scenario Name');
+  });
+
+  it('does not call onNameChange when input is disabled', () => {
+    const { getByLabelText, props } = setup({
+      isExistingScenario: true,
+      isEditMode: false,
+    });
+    const input = getByLabelText('Scenario name') as HTMLInputElement;
+    // Input is disabled, so onChange won't trigger
+    expect(input).toBeDisabled();
+    expect(props.onNameChange).not.toHaveBeenCalled();
   });
 });

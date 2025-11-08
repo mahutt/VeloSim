@@ -26,12 +26,30 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { BrowserRouter } from 'react-router';
 import ScenarioEditor from '~/routes/scenarios';
-import { log } from '~/lib/logger';
-import api from '~/api';
 import type { ScenarioListResponse } from '~/types';
+import api from '~/api';
+import { toast } from 'sonner';
 
-// Mock the API
-vi.mock('~/api');
+// Mock Sonner toast
+vi.mock('sonner', () => ({
+  toast: {
+    success: vi.fn(),
+    error: vi.fn(),
+    info: vi.fn(),
+    warning: vi.fn(),
+  },
+  Toaster: () => null,
+}));
+
+// Mock the API module
+vi.mock('~/api', () => ({
+  default: {
+    get: vi.fn(),
+    post: vi.fn(),
+    put: vi.fn(),
+    delete: vi.fn(),
+  },
+}));
 
 const mockNavigate = vi.fn();
 vi.mock('react-router', async () => {
@@ -82,16 +100,28 @@ describe('ScenarioEditor', () => {
         total_pages: 1,
       },
     } as { data: ScenarioListResponse });
+
+    // Mock successful validation by default
+    vi.mocked(api.post).mockResolvedValue({
+      data: {
+        valid: true,
+        errors: [],
+        warnings: [],
+      },
+    });
   });
 
-  it('renders the scenario editor page', () => {
+  it('renders the scenario editor page', async () => {
     render(
       <BrowserRouter>
         <ScenarioEditor />
       </BrowserRouter>
     );
 
-    expect(screen.getByText('Scenario Editor')).toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.getByText('Scenario Editor')).toBeInTheDocument();
+    });
+
     expect(screen.getByPlaceholderText('Scenario name')).toBeInTheDocument();
     expect(
       screen.getByPlaceholderText('Paste or type your JSON scenario here...')
@@ -125,25 +155,48 @@ describe('ScenarioEditor', () => {
     });
   });
 
-  it('updates scenario name when input changes', () => {
+  it('updates scenario name when input changes', async () => {
     render(
       <BrowserRouter>
         <ScenarioEditor />
       </BrowserRouter>
     );
+
+    await waitFor(() => {
+      expect(screen.getByText('Scenario Editor')).toBeInTheDocument();
+    });
 
     const nameInput = screen.getByPlaceholderText('Scenario name');
-    fireEvent.change(nameInput, { target: { value: 'New Scenario' } });
+    const textarea = screen.getByLabelText('Scenario JSON');
 
-    expect(nameInput).toHaveValue('New Scenario');
+    // Name is now synced from JSON content's scenario_title field
+    const contentWithTitle = JSON.stringify(
+      {
+        scenario_title: 'New Scenario',
+        start_time: '2024-01-01T00:00:00Z',
+        end_time: '2024-01-01T01:00:00Z',
+      },
+      null,
+      2
+    );
+
+    fireEvent.change(textarea, { target: { value: contentWithTitle } });
+
+    await waitFor(() => {
+      expect(nameInput).toHaveValue('New Scenario');
+    });
   });
 
-  it('updates scenario content when textarea changes', () => {
+  it('updates scenario content when textarea changes', async () => {
     render(
       <BrowserRouter>
         <ScenarioEditor />
       </BrowserRouter>
     );
+
+    await waitFor(() => {
+      expect(screen.getByText('Scenario Editor')).toBeInTheDocument();
+    });
 
     const textarea = screen.getByPlaceholderText(
       'Paste or type your JSON scenario here...'
@@ -153,12 +206,32 @@ describe('ScenarioEditor', () => {
     expect(textarea).toHaveValue('{"test": "data"}');
   });
 
-  it('clears form when New button is clicked', () => {
+  it('clears form when New button is clicked', async () => {
+    // Mock the template endpoint
+    vi.mocked(api.get).mockImplementation((url) => {
+      if (url === '/scenarios/template') {
+        return Promise.resolve({ data: {} });
+      }
+      return Promise.resolve({
+        data: {
+          scenarios: mockScenarios,
+          total: mockScenarios.length,
+          page: 1,
+          per_page: 10,
+          total_pages: 1,
+        },
+      });
+    });
+
     render(
       <BrowserRouter>
         <ScenarioEditor />
       </BrowserRouter>
     );
+
+    await waitFor(() => {
+      expect(screen.getByText('Scenario Editor')).toBeInTheDocument();
+    });
 
     const nameInput = screen.getByPlaceholderText('Scenario name');
     const textarea = screen.getByPlaceholderText(
@@ -171,11 +244,12 @@ describe('ScenarioEditor', () => {
     const newButton = screen.getByText('New');
     fireEvent.click(newButton);
 
-    expect(nameInput).toHaveValue('');
-    expect(textarea).toHaveValue('');
+    await waitFor(() => {
+      expect(nameInput).toHaveValue('');
+    });
   });
 
-  it('loads selected scenario into editor', async () => {
+  it('loads selected scenario into editor and shows Edit button', async () => {
     render(
       <BrowserRouter>
         <ScenarioEditor />
@@ -189,55 +263,108 @@ describe('ScenarioEditor', () => {
     const scenario1 = screen.getByText('Test Scenario 1');
     fireEvent.click(scenario1);
 
-    const nameInput = screen.getByPlaceholderText('Scenario name');
+    await waitFor(() => {
+      const nameInput = screen.getByPlaceholderText('Scenario name');
+      expect(nameInput).toHaveValue('Test Scenario 1');
+      expect(nameInput).toBeDisabled();
+    });
+
     const textarea = screen.getByPlaceholderText(
       'Paste or type your JSON scenario here...'
     );
+    expect(textarea).toBeDisabled();
 
-    expect(nameInput).toHaveValue('Test Scenario 1');
-    expect(textarea).toHaveValue(
-      JSON.stringify(mockScenarios[0].content, null, 2)
-    );
+    // Should show Edit button instead of Save
+    expect(screen.getByText('Edit')).toBeInTheDocument();
+    expect(screen.queryByText('Save')).not.toBeInTheDocument();
   });
 
-  it('shows alert when Save button is clicked', () => {
-    const alertSpy = vi.spyOn(window, 'alert').mockImplementation(() => {});
-
+  it('enables editing when Edit button is clicked', async () => {
     render(
       <BrowserRouter>
         <ScenarioEditor />
       </BrowserRouter>
     );
 
-    // Set a scenario name so save doesn't prompt for name
-    const nameInput = screen.getByPlaceholderText('Scenario name');
-    fireEvent.change(nameInput, { target: { value: 'Test Scenario' } });
+    await waitFor(() => {
+      expect(screen.getByText('Test Scenario 1')).toBeInTheDocument();
+    });
 
-    // Add valid content so validation passes
+    // Load a scenario
+    const scenario1 = screen.getByText('Test Scenario 1');
+    fireEvent.click(scenario1);
+
+    await waitFor(() => {
+      expect(screen.getByText('Edit')).toBeInTheDocument();
+    });
+
+    // Click Edit button
+    const editButton = screen.getByText('Edit');
+    fireEvent.click(editButton);
+
+    // Fields should now be enabled
+    const nameInput = screen.getByPlaceholderText('Scenario name');
+    const textarea = screen.getByPlaceholderText(
+      'Paste or type your JSON scenario here...'
+    );
+
+    expect(nameInput).not.toBeDisabled();
+    expect(textarea).not.toBeDisabled();
+
+    // Should show Save button instead of Edit
+    expect(screen.getByText('Save')).toBeInTheDocument();
+    expect(screen.queryByText('Edit')).not.toBeInTheDocument();
+  });
+
+  it('shows overwrite dialog when saving edited loaded scenario', async () => {
+    render(
+      <BrowserRouter>
+        <ScenarioEditor />
+      </BrowserRouter>
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText('Test Scenario 1')).toBeInTheDocument();
+    });
+
+    // Load a scenario
+    const scenario1 = screen.getByText('Test Scenario 1');
+    fireEvent.click(scenario1);
+
+    await waitFor(() => {
+      expect(screen.getByText('Edit')).toBeInTheDocument();
+    });
+
+    // Enter edit mode
+    const editButton = screen.getByText('Edit');
+    fireEvent.click(editButton);
+
+    // Make a change
     const textarea = screen.getByPlaceholderText(
       'Paste or type your JSON scenario here...'
     );
     fireEvent.change(textarea, {
-      target: {
-        value: JSON.stringify({
-          stations: [{ id: 's1' }],
-        }),
-      },
+      target: { value: '{"stations": [{"id": "new"}]}' },
     });
 
+    // Click Save
     const saveButton = screen.getByText('Save');
     fireEvent.click(saveButton);
 
-    expect(alertSpy).toHaveBeenCalledWith(
-      'Save Scenario - TODO: Implement backend integration'
-    );
-    alertSpy.mockRestore();
+    // Should show overwrite dialog
+    await waitFor(() => {
+      expect(screen.getByText('Overwrite or Save As New?')).toBeInTheDocument();
+    });
   });
 
-  it('triggers download when Export button is clicked with valid content and no name', () => {
-    // Mock URL.createObjectURL and URL.revokeObjectURL
-    global.URL.createObjectURL = vi.fn(() => 'blob:mock-url');
-    global.URL.revokeObjectURL = vi.fn();
+  it('overwrites scenario when Overwrite is clicked', async () => {
+    // Mock validation success
+    vi.mocked(api.post).mockResolvedValue({
+      data: { valid: true, errors: [], warnings: [] },
+    });
+
+    // Mock PUT success
+    vi.mocked(api.put).mockResolvedValue({ data: { id: 1 } });
 
     render(
       <BrowserRouter>
@@ -245,61 +372,142 @@ describe('ScenarioEditor', () => {
       </BrowserRouter>
     );
 
-    // Add some valid scenario content to export
+    await waitFor(() => {
+      expect(screen.getByText('Test Scenario 1')).toBeInTheDocument();
+    });
+
+    // Load, edit, and save
+    fireEvent.click(screen.getByText('Test Scenario 1'));
+
+    await waitFor(() => {
+      expect(screen.getByText('Edit')).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByText('Edit'));
+
     const textarea = screen.getByPlaceholderText(
       'Paste or type your JSON scenario here...'
     );
     fireEvent.change(textarea, {
-      target: {
-        value: JSON.stringify({
-          scenario_title: 'Test Scenario',
-          stations: [{ id: 's1', name: 'Station 1' }],
-        }),
+      target: { value: '{"stations": [{"id": "new"}]}' },
+    });
+
+    fireEvent.click(screen.getByText('Save'));
+
+    await waitFor(() => {
+      expect(screen.getByText('Overwrite')).toBeInTheDocument();
+    });
+
+    // Click Overwrite
+    fireEvent.click(screen.getByText('Overwrite'));
+
+    await waitFor(() => {
+      expect(api.put).toHaveBeenCalledWith(
+        '/scenarios/1',
+        expect.objectContaining({
+          name: 'Test Scenario 1',
+          content: { stations: [{ id: 'new' }] },
+        })
+      );
+    });
+
+    await waitFor(() => {
+      expect(toast.success).toHaveBeenCalledWith(
+        'Scenario overwritten successfully!'
+      );
+    });
+  });
+
+  it('saves as new scenario with incremented name when Save As New is clicked', async () => {
+    render(
+      <BrowserRouter>
+        <ScenarioEditor />
+      </BrowserRouter>
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText('Test Scenario 1')).toBeInTheDocument();
+    });
+
+    // Load, edit, and save
+    fireEvent.click(screen.getByText('Test Scenario 1'));
+
+    await waitFor(() => {
+      expect(screen.getByText('Edit')).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByText('Edit'));
+
+    const textarea = screen.getByPlaceholderText(
+      'Paste or type your JSON scenario here...'
+    );
+    fireEvent.change(textarea, {
+      target: { value: '{"stations": [{"id": "new"}]}' },
+    });
+
+    fireEvent.click(screen.getByText('Save'));
+
+    await waitFor(() => {
+      expect(screen.getByText('Save As New')).toBeInTheDocument();
+    });
+
+    // Clear all previous mock calls
+    vi.mocked(api.post).mockClear();
+    vi.mocked(api.get).mockClear();
+
+    // Mock validation for the save
+    vi.mocked(api.post).mockResolvedValueOnce({
+      data: { valid: true, errors: [], warnings: [] },
+    });
+
+    // Mock the actual save call
+    vi.mocked(api.post).mockResolvedValueOnce({ data: { id: 3 } });
+
+    // Mock the refresh call after save
+    vi.mocked(api.get).mockResolvedValue({
+      data: {
+        scenarios: mockScenarios,
+        total: mockScenarios.length,
+        page: 1,
+        per_page: 10,
+        total_pages: 1,
       },
     });
 
-    const exportButton = screen.getByText('Export');
-    fireEvent.click(exportButton);
+    // Click Save As New
+    fireEvent.click(screen.getByText('Save As New'));
 
-    // Should open the name dialog since no name is set
-    expect(screen.getByText('Scenario Name Required')).toBeInTheDocument();
-    expect(mockDisplayError).not.toHaveBeenCalled();
+    await waitFor(() => {
+      // Find the POST call to /scenarios (not /scenarios/validate)
+      const saveCalls = vi
+        .mocked(api.post)
+        .mock.calls.filter((call) => call[0] === '/scenarios');
 
-    // Enter a name and confirm
-    const nameInput = screen.getByPlaceholderText('Enter scenario name');
-    fireEvent.change(nameInput, { target: { value: 'My Export' } });
+      expect(saveCalls.length).toBeGreaterThan(0);
+      expect(saveCalls[0][1]).toMatchObject({
+        name: 'Test Scenario 1 (1)', // Should be incremented with parentheses
+        content: { stations: [{ id: 'new' }] },
+        allow_duplicate_name: false,
+      });
+    });
 
-    const confirmButton = screen.getByRole('button', { name: /continue/i });
-    fireEvent.click(confirmButton);
-
-    // Verify blob was created and cleaned up
-    expect(log).toHaveBeenCalled();
+    await waitFor(() => {
+      expect(toast.success).toHaveBeenCalledWith(
+        'Scenario saved successfully!'
+      );
+    });
   });
 
-  it('shows alert when Import button is clicked', () => {
-    const alertSpy = vi.spyOn(window, 'alert').mockImplementation(() => {});
-
+  it('navigates to simulation when Start Simulation is clicked', async () => {
     render(
       <BrowserRouter>
         <ScenarioEditor />
       </BrowserRouter>
     );
 
-    const importButton = screen.getByText('Import');
-    fireEvent.click(importButton);
-
-    expect(alertSpy).toHaveBeenCalledWith(
-      'Import Scenario - TODO: Implement import functionality'
-    );
-    alertSpy.mockRestore();
-  });
-
-  it('navigates to simulation when Start Simulation is clicked', () => {
-    render(
-      <BrowserRouter>
-        <ScenarioEditor />
-      </BrowserRouter>
-    );
+    await waitFor(() => {
+      expect(screen.getByText('Scenario Editor')).toBeInTheDocument();
+    });
 
     const startButton = screen.getByText('Start Simulation');
     fireEvent.click(startButton);
@@ -307,26 +515,7 @@ describe('ScenarioEditor', () => {
     expect(mockNavigate).toHaveBeenCalledWith('/simulation');
   });
 
-  it('loads scenario content from backend when selected', async () => {
-    const testScenario = {
-      id: 3,
-      name: 'Backend Scenario',
-      user_id: 1,
-      content: { stations: [{ id: 1, name: 'Station 1' }], resources: [] },
-      date_created: '2025-01-17T09:00:00Z',
-      date_updated: '2025-01-17T09:00:00Z',
-    };
-
-    vi.mocked(api.get).mockResolvedValue({
-      data: {
-        scenarios: [testScenario],
-        total: 1,
-        page: 1,
-        per_page: 10,
-        total_pages: 1,
-      },
-    } as { data: ScenarioListResponse });
-
+  it('shows error when trying to export empty content', async () => {
     render(
       <BrowserRouter>
         <ScenarioEditor />
@@ -334,54 +523,37 @@ describe('ScenarioEditor', () => {
     );
 
     await waitFor(() => {
-      expect(screen.getByText('Backend Scenario')).toBeInTheDocument();
+      expect(screen.getByText('Scenario Editor')).toBeInTheDocument();
     });
 
-    const scenarioItem = screen.getByText('Backend Scenario');
-    fireEvent.click(scenarioItem);
-
-    // Content should be stringified and displayed in textarea
-    const textarea = screen.getByLabelText('Scenario JSON data');
-    await waitFor(() => {
-      expect(textarea).toHaveValue(
-        JSON.stringify(testScenario.content, null, 2)
-      );
-    });
-  });
-
-  it('shows error when trying to export empty content', () => {
-    render(
-      <BrowserRouter>
-        <ScenarioEditor />
-      </BrowserRouter>
-    );
-
-    // Set scenario name so validation runs immediately
     const nameInput = screen.getByPlaceholderText('Scenario name');
     fireEvent.change(nameInput, { target: { value: 'Test' } });
 
     const exportButton = screen.getByText('Export');
     fireEvent.click(exportButton);
 
-    // Should call displayError since content is empty
-    expect(mockDisplayError).toHaveBeenCalledWith(
-      'No content to process',
-      'Please enter or load a scenario first.'
-    );
+    await waitFor(() => {
+      expect(mockDisplayError).toHaveBeenCalledWith(
+        'No content to process',
+        'Please enter or load a scenario first.'
+      );
+    });
   });
 
-  it('shows error when trying to export invalid JSON', () => {
+  it('shows error when trying to export invalid JSON', async () => {
     render(
       <BrowserRouter>
         <ScenarioEditor />
       </BrowserRouter>
     );
 
-    // Set scenario name so validation runs immediately
+    await waitFor(() => {
+      expect(screen.getByText('Scenario Editor')).toBeInTheDocument();
+    });
+
     const nameInput = screen.getByPlaceholderText('Scenario name');
     fireEvent.change(nameInput, { target: { value: 'Test' } });
 
-    // Add invalid JSON content
     const textarea = screen.getByPlaceholderText(
       'Paste or type your JSON scenario here...'
     );
@@ -392,16 +564,17 @@ describe('ScenarioEditor', () => {
     const exportButton = screen.getByText('Export');
     fireEvent.click(exportButton);
 
-    // Should call displayError since JSON is invalid
-    expect(mockDisplayError).toHaveBeenCalledWith(
-      'Invalid JSON format',
-      'The scenario content is not valid JSON. Please fix the formatting.'
-    );
+    await waitFor(() => {
+      expect(mockDisplayError).toHaveBeenCalledWith(
+        'Invalid JSON format',
+        'The scenario content is not valid JSON. Please fix the formatting.'
+      );
+    });
   });
 
-  it('exports with scenario name when name is provided', () => {
-    global.URL.createObjectURL = vi.fn(() => 'blob:mock-url');
-    global.URL.revokeObjectURL = vi.fn();
+  it('handles API error when loading scenarios fails', async () => {
+    // Mock API to fail
+    vi.mocked(api.get).mockRejectedValue(new Error('Network error'));
 
     render(
       <BrowserRouter>
@@ -409,74 +582,192 @@ describe('ScenarioEditor', () => {
       </BrowserRouter>
     );
 
-    // Set scenario name
-    const nameInput = screen.getByPlaceholderText('Scenario name');
-    fireEvent.change(nameInput, { target: { value: 'My Test Scenario' } });
+    await waitFor(() => {
+      expect(mockDisplayError).toHaveBeenCalledWith(
+        'Failure loading scenarios',
+        'All scenarios failed to load.',
+        expect.any(Function)
+      );
+    });
+  });
 
-    // Add content - use valid scenario structure
+  it('handles partial failure when loading scenarios', async () => {
+    // Mock first page success, second page failure
+    vi.mocked(api.get)
+      .mockResolvedValueOnce({
+        data: {
+          scenarios: [mockScenarios[0]],
+          total: 20,
+          page: 1,
+          per_page: 10,
+          total_pages: 2,
+        },
+      })
+      .mockRejectedValueOnce(new Error('Network error'));
+
+    render(
+      <BrowserRouter>
+        <ScenarioEditor />
+      </BrowserRouter>
+    );
+
+    await waitFor(() => {
+      expect(mockDisplayError).toHaveBeenCalledWith(
+        'Failure loading scenarios',
+        'Some scenarios may be missing from the list.',
+        undefined
+      );
+    });
+  });
+
+  it('handles save scenario with name update', async () => {
+    // Mock validation and save
+    vi.mocked(api.post)
+      .mockResolvedValueOnce({
+        data: { valid: true, errors: [], warnings: [] },
+      })
+      .mockResolvedValueOnce({
+        data: { id: 5 },
+      });
+
+    // Mock refresh call
+    vi.mocked(api.get).mockResolvedValue({
+      data: {
+        scenarios: mockScenarios,
+        total: mockScenarios.length,
+        page: 1,
+        per_page: 10,
+        total_pages: 1,
+      },
+    });
+
+    render(
+      <BrowserRouter>
+        <ScenarioEditor />
+      </BrowserRouter>
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText('Scenario Editor')).toBeInTheDocument();
+    });
+
+    // Add content and name
+    const nameInput = screen.getByPlaceholderText('Scenario name');
+    fireEvent.change(nameInput, { target: { value: 'New Test Scenario' } });
+
     const textarea = screen.getByPlaceholderText(
       'Paste or type your JSON scenario here...'
     );
     fireEvent.change(textarea, {
-      target: {
-        value: JSON.stringify({
-          scenario_title: 'Test',
-          stations: [{ id: 's1' }],
-        }),
-      },
+      target: { value: '{"stations": []}' },
     });
 
-    const exportButton = screen.getByText('Export');
-    fireEvent.click(exportButton);
-
-    // Should export directly without showing dialog since name is provided
-    expect(
-      screen.queryByText('Scenario Name Required')
-    ).not.toBeInTheDocument();
-    expect(mockDisplayError).not.toHaveBeenCalled();
-    expect(log).toHaveBeenCalled();
+    const saveButton = screen.getByText('Save');
+    fireEvent.click(saveButton);
   });
 
-  it('shows error when exporting scenario with validation errors', () => {
+  it('handles save scenario without returning ID', async () => {
+    // Mock validation and save without ID
+    vi.mocked(api.post)
+      .mockResolvedValueOnce({
+        data: { valid: true, errors: [], warnings: [] },
+      })
+      .mockResolvedValueOnce({
+        data: {},
+      });
+
     render(
       <BrowserRouter>
         <ScenarioEditor />
       </BrowserRouter>
     );
 
-    // Set scenario name to avoid name dialog
+    await waitFor(() => {
+      expect(screen.getByText('Scenario Editor')).toBeInTheDocument();
+    });
+
     const nameInput = screen.getByPlaceholderText('Scenario name');
     fireEvent.change(nameInput, { target: { value: 'Test' } });
 
-    // Add scenario with validation errors
     const textarea = screen.getByPlaceholderText(
       'Paste or type your JSON scenario here...'
     );
     fireEvent.change(textarea, {
-      target: {
-        value: JSON.stringify({
-          start_time: 'invalid-time',
-          end_time: '25:00',
-        }),
-      },
+      target: { value: '{"stations": []}' },
     });
 
-    const exportButton = screen.getByText('Export');
-    fireEvent.click(exportButton);
-
-    // Should show validation error
-    expect(mockDisplayError).toHaveBeenCalledWith(
-      'Scenario validation failed',
-      expect.stringContaining('Errors:')
-    );
+    const saveButton = screen.getByText('Save');
+    fireEvent.click(saveButton);
   });
 
-  it('exports valid scenario with warnings', () => {
-    global.URL.createObjectURL = vi.fn(() => 'blob:mock-url');
-    global.URL.revokeObjectURL = vi.fn();
-    const consoleWarnSpy = vi
-      .spyOn(console, 'warn')
-      .mockImplementation(() => {});
+  it('syncs scenario_title with scenarioName when content changes', async () => {
+    render(
+      <BrowserRouter>
+        <ScenarioEditor />
+      </BrowserRouter>
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText('Scenario Editor')).toBeInTheDocument();
+    });
+
+    const textarea = screen.getByPlaceholderText(
+      'Paste or type your JSON scenario here...'
+    );
+
+    // Add content with scenario_title
+    fireEvent.change(textarea, {
+      target: { value: '{"scenario_title": "Auto Title", "stations": []}' },
+    });
+
+    await waitFor(() => {
+      const nameInput = screen.getByPlaceholderText('Scenario name');
+      expect(nameInput).toHaveValue('Auto Title');
+    });
+  });
+
+  it('displays scenario_title from JSON content in name field', async () => {
+    render(
+      <BrowserRouter>
+        <ScenarioEditor />
+      </BrowserRouter>
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText('Scenario Editor')).toBeInTheDocument();
+    });
+
+    // Add content with scenario_title
+    const textarea = screen.getByPlaceholderText(
+      'Paste or type your JSON scenario here...'
+    );
+    fireEvent.change(textarea, {
+      target: { value: '{"scenario_title": "My Scenario", "stations": []}' },
+    });
+
+    // Check that name input displays the scenario_title from JSON
+    const nameInput = screen.getByPlaceholderText('Scenario name');
+    await waitFor(() => {
+      expect(nameInput).toHaveValue('My Scenario');
+    });
+  });
+
+  it('handles template fetch failure when clicking New', async () => {
+    // Mock template endpoint to fail
+    vi.mocked(api.get).mockImplementation((url) => {
+      if (url === '/scenarios/template') {
+        return Promise.reject(new Error('Template not found'));
+      }
+      return Promise.resolve({
+        data: {
+          scenarios: mockScenarios,
+          total: mockScenarios.length,
+          page: 1,
+          per_page: 10,
+          total_pages: 1,
+        },
+      });
+    });
 
     render(
       <BrowserRouter>
@@ -484,76 +775,1008 @@ describe('ScenarioEditor', () => {
       </BrowserRouter>
     );
 
-    // Add scenario with warnings but no errors
+    await waitFor(() => {
+      expect(screen.getByText('Scenario Editor')).toBeInTheDocument();
+    });
+
+    const newButton = screen.getByText('New');
+    fireEvent.click(newButton);
+
+    await waitFor(() => {
+      const textarea = screen.getByPlaceholderText(
+        'Paste or type your JSON scenario here...'
+      );
+      expect(textarea).toHaveValue('');
+    });
+  });
+
+  it('handles overwrite without returning ID', async () => {
+    // Mock validation success
+    vi.mocked(api.post).mockResolvedValue({
+      data: { valid: true, errors: [], warnings: [] },
+    });
+
+    // Mock PUT success without id
+    vi.mocked(api.put).mockResolvedValue({ data: {} });
+
+    render(
+      <BrowserRouter>
+        <ScenarioEditor />
+      </BrowserRouter>
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText('Test Scenario 1')).toBeInTheDocument();
+    });
+
+    // Load, edit, and save
+    fireEvent.click(screen.getByText('Test Scenario 1'));
+
+    await waitFor(() => {
+      expect(screen.getByText('Edit')).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByText('Edit'));
+
     const textarea = screen.getByPlaceholderText(
       'Paste or type your JSON scenario here...'
     );
     fireEvent.change(textarea, {
-      target: {
-        value: JSON.stringify({
-          stations: [],
-        }),
+      target: { value: '{"stations": [{"id": "new"}]}' },
+    });
+
+    fireEvent.click(screen.getByText('Save'));
+
+    await waitFor(() => {
+      expect(screen.getByText('Overwrite')).toBeInTheDocument();
+    });
+
+    // Click Overwrite
+    fireEvent.click(screen.getByText('Overwrite'));
+
+    await waitFor(() => {
+      expect(toast.success).toHaveBeenCalledWith(
+        'Scenario overwritten successfully!'
+      );
+    });
+  });
+
+  it('handles save as new without returning ID', async () => {
+    render(
+      <BrowserRouter>
+        <ScenarioEditor />
+      </BrowserRouter>
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText('Test Scenario 1')).toBeInTheDocument();
+    });
+
+    // Load, edit, and save
+    fireEvent.click(screen.getByText('Test Scenario 1'));
+
+    await waitFor(() => {
+      expect(screen.getByText('Edit')).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByText('Edit'));
+
+    const textarea = screen.getByPlaceholderText(
+      'Paste or type your JSON scenario here...'
+    );
+    fireEvent.change(textarea, {
+      target: { value: '{"stations": [{"id": "new"}]}' },
+    });
+
+    fireEvent.click(screen.getByText('Save'));
+
+    await waitFor(() => {
+      expect(screen.getByText('Save As New')).toBeInTheDocument();
+    });
+
+    // Clear and mock for save as new without ID
+    vi.mocked(api.post).mockClear();
+    vi.mocked(api.get).mockClear();
+
+    vi.mocked(api.post)
+      .mockResolvedValueOnce({
+        data: { valid: true, errors: [], warnings: [] },
+      })
+      .mockResolvedValueOnce({
+        data: {}, // No ID
+      });
+
+    vi.mocked(api.get).mockResolvedValue({
+      data: {
+        scenarios: mockScenarios,
+        total: mockScenarios.length,
+        page: 1,
+        per_page: 10,
+        total_pages: 1,
       },
+    });
+
+    fireEvent.click(screen.getByText('Save As New'));
+
+    await waitFor(() => {
+      expect(toast.success).toHaveBeenCalledWith(
+        'Scenario saved successfully!'
+      );
+    });
+  });
+
+  it('opens name dialog when exporting without name', async () => {
+    render(
+      <BrowserRouter>
+        <ScenarioEditor />
+      </BrowserRouter>
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText('Scenario Editor')).toBeInTheDocument();
+    });
+
+    const textarea = screen.getByPlaceholderText(
+      'Paste or type your JSON scenario here...'
+    );
+    fireEvent.change(textarea, {
+      target: { value: '{"stations": []}' },
     });
 
     const exportButton = screen.getByText('Export');
     fireEvent.click(exportButton);
 
-    // Dialog should open since no name is set (warnings don't block export)
-    expect(screen.getByText('Scenario Name Required')).toBeInTheDocument();
-    expect(mockDisplayError).not.toHaveBeenCalled();
+    await waitFor(() => {
+      expect(screen.getByText('Scenario Name Required')).toBeInTheDocument();
+    });
+  });
 
-    // Enter a name and confirm export
-    const nameInput = screen.getByPlaceholderText('Enter scenario name');
-    fireEvent.change(nameInput, { target: { value: 'Warning Test' } });
+  it('opens name dialog when saving without name', async () => {
+    render(
+      <BrowserRouter>
+        <ScenarioEditor />
+      </BrowserRouter>
+    );
 
-    const confirmButton = screen.getByRole('button', { name: /continue/i });
+    await waitFor(() => {
+      expect(screen.getByText('Scenario Editor')).toBeInTheDocument();
+    });
+
+    const textarea = screen.getByPlaceholderText(
+      'Paste or type your JSON scenario here...'
+    );
+    fireEvent.change(textarea, {
+      target: { value: '{"stations": []}' },
+    });
+
+    const saveButton = screen.getByText('Save');
+    fireEvent.click(saveButton);
+
+    await waitFor(() => {
+      expect(screen.getByText('Scenario Name Required')).toBeInTheDocument();
+    });
+  });
+
+  it('handles name dialog confirmation for save', async () => {
+    vi.mocked(api.post)
+      .mockResolvedValueOnce({
+        data: { valid: true, errors: [], warnings: [] },
+      })
+      .mockResolvedValueOnce({
+        data: { id: 10 },
+      });
+
+    render(
+      <BrowserRouter>
+        <ScenarioEditor />
+      </BrowserRouter>
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText('Scenario Editor')).toBeInTheDocument();
+    });
+
+    const textarea = screen.getByPlaceholderText(
+      'Paste or type your JSON scenario here...'
+    );
+    fireEvent.change(textarea, {
+      target: { value: '{"stations": []}' },
+    });
+
+    const saveButton = screen.getByText('Save');
+    fireEvent.click(saveButton);
+
+    await waitFor(() => {
+      expect(screen.getByText('Scenario Name Required')).toBeInTheDocument();
+    });
+
+    // Enter name and confirm
+    const dialogInput = screen.getByPlaceholderText('Enter scenario name');
+    fireEvent.change(dialogInput, { target: { value: 'Save Test' } });
+
+    const confirmButton = screen.getByText('Continue');
     fireEvent.click(confirmButton);
-
-    // Warning should have been logged when export was confirmed
-    expect(consoleWarnSpy).toHaveBeenCalled();
-
-    // Should still export
-    expect(log).toHaveBeenCalled();
-
-    consoleWarnSpy.mockRestore();
   });
 
-  it('does not export when user cancels the export dialog', () => {
-    global.URL.createObjectURL = vi.fn(() => 'blob:mock-url');
-    global.URL.revokeObjectURL = vi.fn();
+  describe('ScenarioEditor - Delete Functionality', () => {
+    it('opens delete confirmation dialog when delete button is clicked', async () => {
+      render(
+        <BrowserRouter>
+          <ScenarioEditor />
+        </BrowserRouter>
+      );
 
-    render(
-      <BrowserRouter>
-        <ScenarioEditor />
-      </BrowserRouter>
-    );
+      await waitFor(() => {
+        expect(screen.getByText('Test Scenario 1')).toBeInTheDocument();
+      });
 
-    // Add valid content
-    const textarea = screen.getByPlaceholderText(
-      'Paste or type your JSON scenario here...'
-    );
-    fireEvent.change(textarea, {
-      target: {
-        value: JSON.stringify({
-          scenario_title: 'Test',
-          stations: [{ id: 's1' }],
-        }),
-      },
+      // Find and click the delete button
+      const deleteButtons = screen.getAllByLabelText(/Delete Test Scenario/i);
+      fireEvent.click(deleteButtons[0]);
+
+      await waitFor(() => {
+        expect(screen.getByText('Delete')).toBeInTheDocument();
+        expect(
+          screen.getByText(/Are you sure you want to delete "Test Scenario 1"/i)
+        ).toBeInTheDocument();
+      });
     });
 
-    const exportButton = screen.getByText('Export');
-    fireEvent.click(exportButton);
+    it('deletes scenario and clears editor when confirmed', async () => {
+      vi.mocked(api.delete).mockResolvedValueOnce({ data: {} });
 
-    // Dialog should open
-    expect(screen.getByText('Scenario Name Required')).toBeInTheDocument();
+      render(
+        <BrowserRouter>
+          <ScenarioEditor />
+        </BrowserRouter>
+      );
 
-    // Cancel the export
-    const cancelButton = screen.getByRole('button', { name: /cancel/i });
-    fireEvent.click(cancelButton);
+      await waitFor(() => {
+        expect(screen.getByText('Test Scenario 1')).toBeInTheDocument();
+      });
 
-    // No download should happen
-    expect(global.URL.createObjectURL).not.toHaveBeenCalled();
-    expect(global.URL.revokeObjectURL).not.toHaveBeenCalled();
+      // Select the scenario first
+      fireEvent.click(screen.getByText('Test Scenario 1'));
+
+      await waitFor(() => {
+        const nameInput = screen.getByPlaceholderText('Scenario name');
+        expect(nameInput).toHaveValue('Test Scenario 1');
+      });
+
+      // Click delete button
+      const deleteButtons = screen.getAllByLabelText(/Delete Test Scenario 1/i);
+      fireEvent.click(deleteButtons[0]);
+
+      await waitFor(() => {
+        expect(screen.getByText('Delete Scenario')).toBeInTheDocument();
+      });
+
+      // Confirm deletion - look for the Delete button inside DialogFooter
+      const deleteConfirmButton = screen.getByRole('button', {
+        name: /^Delete$/i,
+      });
+      fireEvent.click(deleteConfirmButton);
+
+      await waitFor(() => {
+        expect(api.delete).toHaveBeenCalledWith('/scenarios/1');
+        expect(toast.success).toHaveBeenCalledWith(
+          'Scenario deleted successfully!'
+        );
+      });
+
+      // Editor should be cleared
+      await waitFor(() => {
+        const nameInput = screen.getByPlaceholderText('Scenario name');
+        expect(nameInput).toHaveValue('');
+      });
+    });
+
+    it('closes dialog when cancel is clicked', async () => {
+      render(
+        <BrowserRouter>
+          <ScenarioEditor />
+        </BrowserRouter>
+      );
+
+      await waitFor(() => {
+        expect(screen.getByText('Test Scenario 1')).toBeInTheDocument();
+      });
+
+      // Click delete button
+      const deleteButtons = screen.getAllByLabelText(/Delete Test Scenario 1/i);
+      fireEvent.click(deleteButtons[0]);
+
+      await waitFor(() => {
+        expect(screen.getByText('Delete')).toBeInTheDocument();
+      });
+
+      // Click cancel
+      const cancelButton = screen.getByRole('button', { name: /Cancel/i });
+      fireEvent.click(cancelButton);
+
+      // Dialog should close
+      await waitFor(() => {
+        expect(screen.queryByText('Delete')).not.toBeInTheDocument();
+      });
+
+      expect(api.delete).not.toHaveBeenCalled();
+    });
+
+    it('deletes non-selected scenario without clearing editor', async () => {
+      vi.mocked(api.delete).mockResolvedValueOnce({ data: {} });
+
+      // Mock the refresh to return only scenario 1 after deleting scenario 2
+      vi.mocked(api.get)
+        .mockResolvedValueOnce({
+          data: {
+            scenarios: mockScenarios,
+            total: mockScenarios.length,
+            page: 1,
+            per_page: 10,
+            total_pages: 1,
+          },
+        })
+        .mockResolvedValueOnce({
+          data: {
+            scenarios: [mockScenarios[0]], // Only scenario 1 remains
+            total: 1,
+            page: 1,
+            per_page: 10,
+            total_pages: 1,
+          },
+        });
+
+      render(
+        <BrowserRouter>
+          <ScenarioEditor />
+        </BrowserRouter>
+      );
+
+      await waitFor(() => {
+        expect(screen.getByText('Test Scenario 1')).toBeInTheDocument();
+        expect(screen.getByText('Test Scenario 2')).toBeInTheDocument();
+      });
+
+      // Select scenario 1
+      fireEvent.click(screen.getByText('Test Scenario 1'));
+
+      await waitFor(() => {
+        const nameInput = screen.getByPlaceholderText('Scenario name');
+        expect(nameInput).toHaveValue('Test Scenario 1');
+      });
+
+      // Delete scenario 2 (not selected) - find it specifically
+      const scenario2Card = screen
+        .getByText('Test Scenario 2')
+        .closest('.group');
+      const deleteButton = scenario2Card?.querySelector(
+        '[aria-label*="Delete Test Scenario 2"]'
+      ) as HTMLElement;
+
+      expect(deleteButton).toBeTruthy();
+      fireEvent.click(deleteButton);
+
+      await waitFor(() => {
+        expect(screen.getByText('Delete')).toBeInTheDocument();
+        expect(
+          screen.getByText(/Are you sure you want to delete "Test Scenario 2"/i)
+        ).toBeInTheDocument();
+      });
+
+      const deleteConfirmButton = screen.getByRole('button', {
+        name: /^Delete$/i,
+      });
+      fireEvent.click(deleteConfirmButton);
+
+      await waitFor(() => {
+        expect(api.delete).toHaveBeenCalledWith('/scenarios/2');
+        expect(toast.success).toHaveBeenCalledWith(
+          'Scenario deleted successfully!'
+        );
+      });
+
+      // Scenario 2 should be gone from sidebar
+      await waitFor(() => {
+        expect(screen.queryByText('Test Scenario 2')).not.toBeInTheDocument();
+        expect(screen.getByText('Test Scenario 1')).toBeInTheDocument();
+      });
+    });
+
+    it('handles delete API error gracefully', async () => {
+      vi.mocked(api.delete).mockRejectedValueOnce({
+        response: { data: { detail: 'Cannot delete scenario' } },
+      });
+
+      render(
+        <BrowserRouter>
+          <ScenarioEditor />
+        </BrowserRouter>
+      );
+
+      await waitFor(() => {
+        expect(screen.getByText('Test Scenario 1')).toBeInTheDocument();
+      });
+
+      const deleteButtons = screen.getAllByLabelText(/Delete Test Scenario 1/i);
+      fireEvent.click(deleteButtons[0]);
+
+      await waitFor(() => {
+        expect(screen.getByText('Delete')).toBeInTheDocument();
+      });
+
+      const deleteConfirmButton = screen.getByRole('button', {
+        name: /^Delete$/i,
+      });
+      fireEvent.click(deleteConfirmButton);
+
+      await waitFor(() => {
+        expect(mockDisplayError).toHaveBeenCalledWith(
+          'Failed to delete scenario',
+          'Cannot delete scenario'
+        );
+      });
+    });
+
+    it('shows scenario name in delete confirmation dialog', async () => {
+      render(
+        <BrowserRouter>
+          <ScenarioEditor />
+        </BrowserRouter>
+      );
+
+      await waitFor(() => {
+        expect(screen.getByText('Test Scenario 1')).toBeInTheDocument();
+      });
+
+      // Click delete button for scenario 1
+      const deleteButtons = screen.getAllByLabelText(/Delete Test Scenario 1/i);
+      fireEvent.click(deleteButtons[0]);
+
+      await waitFor(() => {
+        expect(screen.getByText('Delete Scenario')).toBeInTheDocument();
+        expect(
+          screen.getByText(/Are you sure you want to delete "Test Scenario 1"/i)
+        ).toBeInTheDocument();
+      });
+
+      // Close dialog
+      const cancelButton = screen.getByRole('button', { name: /Cancel/i });
+      fireEvent.click(cancelButton);
+
+      // Click delete for scenario 2
+      const deleteButtons2 = screen.getAllByLabelText(
+        /Delete Test Scenario 2/i
+      );
+      fireEvent.click(deleteButtons2[0]);
+
+      await waitFor(() => {
+        expect(
+          screen.getByText(/Are you sure you want to delete "Test Scenario 2"/i)
+        ).toBeInTheDocument();
+      });
+    });
+
+    it('prevents scenario selection when clicking delete button', async () => {
+      render(
+        <BrowserRouter>
+          <ScenarioEditor />
+        </BrowserRouter>
+      );
+
+      await waitFor(() => {
+        expect(screen.getByText('Test Scenario 1')).toBeInTheDocument();
+      });
+
+      // Click delete button (should not select scenario)
+      const deleteButtons = screen.getAllByLabelText(/Delete Test Scenario 1/i);
+      fireEvent.click(deleteButtons[0]);
+
+      // Dialog should open, but scenario should not be selected
+      await waitFor(() => {
+        expect(screen.getByText('Delete')).toBeInTheDocument();
+      });
+
+      const nameInput = screen.getByPlaceholderText('Scenario name');
+      expect(nameInput).toHaveValue(''); // Editor should be empty
+    });
+  });
+  describe('ScenarioEditor - Additional Coverage', () => {
+    it('handles scenario content sync with scenario_title on content change', async () => {
+      render(
+        <BrowserRouter>
+          <ScenarioEditor />
+        </BrowserRouter>
+      );
+
+      await waitFor(() => {
+        expect(screen.getByText('Scenario Editor')).toBeInTheDocument();
+      });
+
+      const textarea = screen.getByPlaceholderText(
+        'Paste or type your JSON scenario here...'
+      );
+
+      // Add content with scenario_title
+      fireEvent.change(textarea, {
+        target: {
+          value: JSON.stringify({
+            scenario_title: 'Auto Title from JSON',
+            stations: [],
+          }),
+        },
+      });
+
+      await waitFor(() => {
+        const nameInput = screen.getByPlaceholderText('Scenario name');
+        expect(nameInput).toHaveValue('Auto Title from JSON');
+      });
+    });
+
+    it('syncs scenario name from scenario_title in valid JSON content', async () => {
+      render(
+        <BrowserRouter>
+          <ScenarioEditor />
+        </BrowserRouter>
+      );
+
+      await waitFor(() => {
+        expect(screen.getByText('Scenario Editor')).toBeInTheDocument();
+      });
+
+      // Add content with scenario_title
+      const textarea = screen.getByPlaceholderText(
+        'Paste or type your JSON scenario here...'
+      );
+      const contentWithTitle = JSON.stringify({
+        scenario_title: 'Updated Name',
+        stations: [],
+      });
+      fireEvent.change(textarea, {
+        target: { value: contentWithTitle },
+      });
+
+      // Check that name input displays the scenario_title
+      const nameInput = screen.getByPlaceholderText('Scenario name');
+      await waitFor(() => {
+        expect(nameInput).toHaveValue('Updated Name');
+      });
+    });
+
+    it('handles invalid JSON content without crashing', async () => {
+      render(
+        <BrowserRouter>
+          <ScenarioEditor />
+        </BrowserRouter>
+      );
+
+      await waitFor(() => {
+        expect(screen.getByText('Scenario Editor')).toBeInTheDocument();
+      });
+
+      // Add invalid JSON
+      const textarea = screen.getByPlaceholderText(
+        'Paste or type your JSON scenario here...'
+      );
+      fireEvent.change(textarea, { target: { value: 'invalid json' } });
+
+      // Name should remain empty since there's no valid scenario_title
+      const nameInput = screen.getByPlaceholderText('Scenario name');
+      expect(nameInput).toHaveValue('');
+    });
+
+    it('handles generateIncrementedName with base name', async () => {
+      const scenarioWithNumber = {
+        id: 3,
+        name: 'Test Scenario 1 (2)',
+        user_id: 1,
+        content: { stations: [] },
+        date_created: '2025-01-17T09:00:00Z',
+        date_updated: '2025-01-17T09:00:00Z',
+      };
+
+      vi.mocked(api.get).mockResolvedValue({
+        data: {
+          scenarios: [mockScenarios[0], scenarioWithNumber],
+          total: 2,
+          page: 1,
+          per_page: 10,
+          total_pages: 1,
+        },
+      });
+
+      render(
+        <BrowserRouter>
+          <ScenarioEditor />
+        </BrowserRouter>
+      );
+
+      await waitFor(() => {
+        expect(screen.getByText('Test Scenario 1')).toBeInTheDocument();
+        expect(screen.getByText('Test Scenario 1 (2)')).toBeInTheDocument();
+      });
+
+      // Load and edit scenario with number
+      fireEvent.click(screen.getByText('Test Scenario 1 (2)'));
+
+      await waitFor(() => {
+        expect(screen.getByText('Edit')).toBeInTheDocument();
+      });
+
+      fireEvent.click(screen.getByText('Edit'));
+
+      const textarea = screen.getByPlaceholderText(
+        'Paste or type your JSON scenario here...'
+      );
+      fireEvent.change(textarea, {
+        target: { value: '{"stations": [{"id": "new"}]}' },
+      });
+
+      fireEvent.click(screen.getByText('Save'));
+
+      await waitFor(() => {
+        expect(screen.getByText('Save As New')).toBeInTheDocument();
+      });
+
+      // Clear mocks
+      vi.mocked(api.post).mockClear();
+      vi.mocked(api.get).mockClear();
+
+      vi.mocked(api.post)
+        .mockResolvedValueOnce({
+          data: { valid: true, errors: [], warnings: [] },
+        })
+        .mockResolvedValueOnce({
+          data: { id: 4 },
+        });
+
+      vi.mocked(api.get).mockResolvedValue({
+        data: {
+          scenarios: [mockScenarios[0], scenarioWithNumber],
+          total: 2,
+          page: 1,
+          per_page: 10,
+          total_pages: 1,
+        },
+      });
+
+      fireEvent.click(screen.getByText('Save As New'));
+
+      await waitFor(() => {
+        const saveCalls = vi
+          .mocked(api.post)
+          .mock.calls.filter((call) => call[0] === '/scenarios');
+
+        expect(saveCalls.length).toBeGreaterThan(0);
+        expect(saveCalls[0][1]).toMatchObject({
+          name: 'Test Scenario 1 (3)', // Should increment to 3
+        });
+      });
+    });
+
+    it('handles import with no file selected', async () => {
+      render(
+        <BrowserRouter>
+          <ScenarioEditor />
+        </BrowserRouter>
+      );
+
+      await waitFor(() => {
+        expect(screen.getByText('Scenario Editor')).toBeInTheDocument();
+      });
+
+      const fileInput = document.querySelector(
+        'input[type="file"]'
+      ) as HTMLInputElement;
+
+      // Simulate change event with no files
+      Object.defineProperty(fileInput, 'files', {
+        value: null,
+        writable: false,
+      });
+
+      fireEvent.change(fileInput);
+
+      // Should not call any APIs
+      expect(api.post).not.toHaveBeenCalled();
+    });
+
+    it('handles import with file that has no scenario_title', async () => {
+      const file = new File(
+        [JSON.stringify({ stations: [], description: 'Test desc' })],
+        'scenario.json',
+        { type: 'application/json' }
+      );
+
+      vi.mocked(api.post)
+        .mockResolvedValueOnce({
+          data: { valid: true, errors: [], warnings: [] },
+        })
+        .mockResolvedValueOnce({
+          data: { id: 10 },
+        });
+
+      render(
+        <BrowserRouter>
+          <ScenarioEditor />
+        </BrowserRouter>
+      );
+
+      await waitFor(() => {
+        expect(screen.getByText('Scenario Editor')).toBeInTheDocument();
+      });
+
+      const fileInput = document.querySelector(
+        'input[type="file"]'
+      ) as HTMLInputElement;
+
+      Object.defineProperty(fileInput, 'files', {
+        value: [file],
+        writable: false,
+      });
+
+      fireEvent.change(fileInput);
+
+      await waitFor(() => {
+        const nameInput = screen.getByPlaceholderText('Scenario name');
+        expect(nameInput).toHaveValue('scenario');
+      });
+
+      await waitFor(() => {
+        const descInput = screen.getByPlaceholderText(
+          'Enter scenario description'
+        );
+        expect(descInput).toHaveValue('Test desc');
+      });
+    });
+
+    it('resets file input value after import', async () => {
+      const file = new File(
+        [JSON.stringify({ scenario_title: 'Test', stations: [] })],
+        'scenario.json',
+        { type: 'application/json' }
+      );
+
+      vi.mocked(api.post)
+        .mockResolvedValueOnce({
+          data: { valid: true, errors: [], warnings: [] },
+        })
+        .mockResolvedValueOnce({
+          data: { id: 10 },
+        });
+
+      render(
+        <BrowserRouter>
+          <ScenarioEditor />
+        </BrowserRouter>
+      );
+
+      await waitFor(() => {
+        expect(screen.getByText('Scenario Editor')).toBeInTheDocument();
+      });
+
+      const fileInput = document.querySelector(
+        'input[type="file"]'
+      ) as HTMLInputElement;
+
+      Object.defineProperty(fileInput, 'files', {
+        value: [file],
+        writable: false,
+      });
+
+      fireEvent.change(fileInput);
+
+      // File input value should be reset
+      expect(fileInput.value).toBe('');
+    });
+
+    it('handles handleSaveScenario with invalid JSON content during sync', async () => {
+      render(
+        <BrowserRouter>
+          <ScenarioEditor />
+        </BrowserRouter>
+      );
+
+      await waitFor(() => {
+        expect(screen.getByText('Scenario Editor')).toBeInTheDocument();
+      });
+
+      // Add content with a scenario_title first so there's a name
+      const textarea = screen.getByPlaceholderText(
+        'Paste or type your JSON scenario here...'
+      );
+      fireEvent.change(textarea, {
+        target: { value: JSON.stringify({ scenario_title: 'Test Name' }) },
+      });
+
+      // Wait for name to sync
+      await waitFor(() => {
+        const nameInput = screen.getByPlaceholderText('Scenario name');
+        expect(nameInput).toHaveValue('Test Name');
+      });
+
+      // Then change to invalid JSON
+      fireEvent.change(textarea, { target: { value: 'invalid json' } });
+
+      // Try to save
+      const saveButton = screen.getByText('Save');
+      fireEvent.click(saveButton);
+
+      await waitFor(() => {
+        expect(mockDisplayError).toHaveBeenCalledWith(
+          'Invalid JSON format',
+          'The scenario content is not valid JSON. Please fix the formatting.'
+        );
+      });
+    });
+
+    it('handles handleSelectScenario with missing optional fields', async () => {
+      const scenarioMinimal = {
+        id: 3,
+        name: 'Minimal Scenario',
+        user_id: 1,
+        content: {
+          scenario_title: 'Min',
+          start_time: '08:00',
+          end_time: '17:00',
+          resources: [],
+          stations: [],
+        },
+        date_created: '2025-01-17T09:00:00Z',
+        date_updated: '2025-01-17T09:00:00Z',
+      };
+
+      vi.mocked(api.get).mockResolvedValue({
+        data: {
+          scenarios: [scenarioMinimal],
+          total: 1,
+          page: 1,
+          per_page: 10,
+          total_pages: 1,
+        },
+      });
+
+      render(
+        <BrowserRouter>
+          <ScenarioEditor />
+        </BrowserRouter>
+      );
+
+      await waitFor(() => {
+        expect(screen.getByText('Minimal Scenario')).toBeInTheDocument();
+      });
+
+      fireEvent.click(screen.getByText('Minimal Scenario'));
+
+      await waitFor(() => {
+        const textarea = screen.getByPlaceholderText(
+          'Paste or type your JSON scenario here...'
+        );
+        const content = JSON.parse((textarea as HTMLTextAreaElement).value);
+        expect(content.initial_tasks).toBeUndefined();
+        expect(content.scheduled_tasks).toBeUndefined();
+      });
+    });
+
+    it('handles multiple consecutive scenario_title changes in JSON', async () => {
+      render(
+        <BrowserRouter>
+          <ScenarioEditor />
+        </BrowserRouter>
+      );
+
+      await waitFor(() => {
+        expect(screen.getByText('Scenario Editor')).toBeInTheDocument();
+      });
+
+      const textarea = screen.getByPlaceholderText(
+        'Paste or type your JSON scenario here...'
+      );
+      const nameInput = screen.getByPlaceholderText('Scenario name');
+
+      // Change scenario_title in JSON multiple times
+      fireEvent.change(textarea, {
+        target: {
+          value: JSON.stringify({ scenario_title: 'Name 1', stations: [] }),
+        },
+      });
+
+      await waitFor(() => {
+        expect(nameInput).toHaveValue('Name 1');
+      });
+
+      fireEvent.change(textarea, {
+        target: {
+          value: JSON.stringify({ scenario_title: 'Name 2', stations: [] }),
+        },
+      });
+
+      await waitFor(() => {
+        expect(nameInput).toHaveValue('Name 2');
+      });
+
+      fireEvent.change(textarea, {
+        target: {
+          value: JSON.stringify({ scenario_title: 'Name 3', stations: [] }),
+        },
+      });
+
+      await waitFor(() => {
+        expect(nameInput).toHaveValue('Name 3');
+      });
+    });
+
+    it('handles loadSavedScenarios retry functionality', async () => {
+      // This tests the retry button in the error dialog
+      vi.mocked(api.get).mockRejectedValueOnce(new Error('Network error'));
+
+      render(
+        <BrowserRouter>
+          <ScenarioEditor />
+        </BrowserRouter>
+      );
+
+      await waitFor(() => {
+        expect(mockDisplayError).toHaveBeenCalledWith(
+          'Failure loading scenarios',
+          'All scenarios failed to load.',
+          expect.any(Function)
+        );
+      });
+
+      // The third parameter is the retry function
+      const retryFunction = mockDisplayError.mock.calls[0][2];
+      expect(typeof retryFunction).toBe('function');
+    });
+  });
+
+  describe('ScenarioEditor - Edge Cases with Empty States', () => {
+    it('handles empty content without crashing', async () => {
+      render(
+        <BrowserRouter>
+          <ScenarioEditor />
+        </BrowserRouter>
+      );
+
+      await waitFor(() => {
+        expect(screen.getByText('Scenario Editor')).toBeInTheDocument();
+      });
+
+      // Name input should be empty when there's no content
+      const nameInput = screen.getByPlaceholderText('Scenario name');
+      expect(nameInput).toHaveValue('');
+    });
+
+    it('handles scenario selection with malformed content', async () => {
+      const malformedScenario = {
+        id: 3,
+        name: 'Malformed',
+        user_id: 1,
+        content: 'not an object' as unknown as object, // Intentionally wrong type
+        date_created: '2025-01-17T09:00:00Z',
+        date_updated: '2025-01-17T09:00:00Z',
+      };
+
+      vi.mocked(api.get).mockResolvedValue({
+        data: {
+          scenarios: [malformedScenario],
+          total: 1,
+          page: 1,
+          per_page: 10,
+          total_pages: 1,
+        },
+      });
+
+      render(
+        <BrowserRouter>
+          <ScenarioEditor />
+        </BrowserRouter>
+      );
+
+      await waitFor(() => {
+        expect(screen.getByText('Malformed')).toBeInTheDocument();
+      });
+
+      fireEvent.click(screen.getByText('Malformed'));
+    });
   });
 });

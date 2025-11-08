@@ -23,22 +23,27 @@
  */
 
 import { Card, CardContent } from '~/components/ui/card';
+import { Button } from '~/components/ui/button';
+import { Trash2 } from 'lucide-react';
 import type { Scenario } from '~/types';
+import DeleteScenarioDialog from './delete-scenario-dialog';
 
 interface ScenarioSidebarProps {
   scenarios: Scenario[];
   selectedScenarioId: number | null;
   onSelect: (scenario: Scenario) => void;
+  onDelete: (scenarioId: number) => void;
 }
 
 export default function ScenarioSidebar({
   scenarios,
   selectedScenarioId,
   onSelect,
+  onDelete,
 }: ScenarioSidebarProps) {
   return (
     <div className="w-full lg:w-64">
-      <div className="bg-gray-50 border rounded-md p-4 h-[32rem] flex flex-col">
+      <div className="bg-gray-50 border rounded-md p-4 h-[41rem] flex flex-col">
         <h2 className="text-lg font-semibold mb-3">Saved Scenarios</h2>
 
         <div className="flex-1 overflow-y-auto space-y-2">
@@ -53,20 +58,37 @@ export default function ScenarioSidebar({
               <Card
                 key={scenario.id}
                 onClick={() => onSelect(scenario)}
-                className={`cursor-pointer transition-all hover:shadow-md ${
+                className={`group cursor-pointer transition-all hover:shadow-md ${
                   isSelected ? 'border-2 border-red-500 bg-red-50' : 'bg-white'
                 }`}
               >
-                <CardContent className="px-3">
-                  <div className="flex flex-col gap-1.5">
-                    <div className="text-sm font-semibold truncate">
-                      {scenario.name}
-                    </div>
-                    {scenario.description && (
-                      <div className="text-xs text-gray-600 line-clamp-2">
-                        {scenario.description}
+                <CardContent>
+                  <div className="flex items-center">
+                    <div className="flex-1 flex flex-col gap-1 min-w-0 cursor-pointer">
+                      <div className="text-sm font-semibold truncate">
+                        {scenario.name}
                       </div>
-                    )}
+                      {scenario.description && (
+                        <div className="text-xs text-muted-foreground line-clamp-2">
+                          {scenario.description}
+                        </div>
+                      )}
+                    </div>
+                    <DeleteScenarioDialog
+                      scenarioName={scenario.name}
+                      onConfirm={() => onDelete(scenario.id)}
+                      trigger={
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="opacity-0 group-hover:opacity-100 transition-opacity shrink-0 hover:bg-destructive/10 h-8 w-8 -mt-1"
+                          onClick={(e) => e.stopPropagation()}
+                          aria-label={`Delete ${scenario.name}`}
+                        >
+                          <Trash2 className="h-4 w-4 text-destructive" />
+                        </Button>
+                      }
+                    />
                   </div>
                 </CardContent>
               </Card>

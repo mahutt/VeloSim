@@ -22,10 +22,10 @@
  * SOFTWARE.
  */
 
+import React from 'react';
 import { Button } from '~/components/ui/button';
 import {
   Dialog,
-  DialogClose,
   DialogContent,
   DialogDescription,
   DialogFooter,
@@ -33,54 +33,47 @@ import {
   DialogTitle,
 } from '~/components/ui/dialog';
 
-export default function ErrorDialog({
-  open,
-  onOpenChange,
-  title,
-  message,
-  retryCallback,
-}: {
+interface OverwriteSaveDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  title: string;
-  message: string;
-  retryCallback?: () => void;
-}) {
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent data-testid="error-dialog">
-        <DialogHeader>
-          <DialogTitle data-testid="error-dialog-title">{title}</DialogTitle>
-          <DialogDescription className="whitespace-pre-line">
-            {message}
-            <br />
-          </DialogDescription>
-        </DialogHeader>
-        <DialogFooter>
-          <DialogClose asChild>
-            <Button
-              data-testid="error-dialog-close"
-              variant="outline"
-              onClick={() => {
-                onOpenChange(false);
-              }}
-            >
-              Close
-            </Button>
-          </DialogClose>
-          {retryCallback && (
-            <Button
-              data-testid="error-dialog-retry"
-              onClick={() => {
-                onOpenChange(false);
-                retryCallback();
-              }}
-            >
-              Retry
-            </Button>
-          )}
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-  );
+  onOverwrite: () => void;
+  onSaveAsNew: () => void;
+  scenarioName: string;
 }
+
+const OverwriteSaveDialog: React.FC<OverwriteSaveDialogProps> = ({
+  open,
+  onOpenChange,
+  onOverwrite,
+  onSaveAsNew,
+  scenarioName,
+}) => (
+  <Dialog open={open} onOpenChange={onOpenChange}>
+    <DialogContent>
+      <DialogHeader>
+        <DialogTitle>Overwrite or Save As New?</DialogTitle>
+        <DialogDescription>
+          You are editing the scenario <strong>{scenarioName}</strong>.
+          <br />
+          Would you like to overwrite the existing scenario or save as a new
+          one?
+        </DialogDescription>
+      </DialogHeader>
+      <DialogFooter className="sm:justify-between">
+        <Button onClick={() => onOpenChange(false)} variant="outline">
+          Cancel
+        </Button>
+        <div className="flex gap-2">
+          <Button onClick={onSaveAsNew} variant="outline">
+            Save As New
+          </Button>
+          <Button onClick={onOverwrite} variant="default">
+            Overwrite
+          </Button>
+        </div>
+      </DialogFooter>
+    </DialogContent>
+  </Dialog>
+);
+
+export default OverwriteSaveDialog;

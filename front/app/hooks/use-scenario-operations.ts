@@ -22,15 +22,13 @@
  * SOFTWARE.
  */
 
-import {
-  validateScenario,
-  formatValidationResults,
-} from '~/lib/scenario-validation';
 import useError from '~/hooks/use-error';
 import { log, LogLevel } from '~/lib/logger';
+import api from '~/api';
+import { toast } from 'sonner';
 
 /**
- * Custom hook for scenario operations (export, save, load, import)
+ * Custom hook for scenario operations (export, save, load, import, delete)
  */
 export function useScenarioOperations() {
   const { displayError } = useError();
@@ -39,8 +37,7 @@ export function useScenarioOperations() {
    * Validates scenario content and returns parsed JSON
    * @returns Parsed content if valid, null if invalid
    */
-  const validateContent = (content: string) => {
-    // Validate that there's content
+  const validateContent = async (content: string) => {
     if (!content.trim()) {
       displayError(
         'No content to process',
@@ -61,25 +58,52 @@ export function useScenarioOperations() {
       return null;
     }
 
-    // Validate scenario structure
-    const validationResult = validateScenario(parsedContent);
-    if (!validationResult.valid) {
-      displayError(
-        'Scenario validation failed',
-        formatValidationResults(validationResult)
-      );
+    try {
+      const response = await api.post('/scenarios/validate', {
+        content: parsedContent,
+      });
+      const result = response.data;
+
+      // Check if validation failed
+      if (!result.valid) {
+        // Backend now returns errors as an array of strings
+        const errors = Array.isArray(result.errors)
+          ? result.errors
+          : [result.errors].filter(Boolean);
+
+        displayError(
+          'Scenario validation failed',
+          errors.map((e: string) => `• ${e}`).join('\n')
+        );
+        return null;
+      }
+
+      // Log warnings if present (non-blocking)
+      if (
+        result.warnings &&
+        Array.isArray(result.warnings) &&
+        result.warnings.length > 0
+      ) {
+        console.warn(
+          'Scenario validation warnings:',
+          result.warnings.join('\n')
+        );
+      }
+
+      return parsedContent;
+    } catch (error: unknown) {
+      let message = 'Unknown error';
+      if (error && typeof error === 'object') {
+        const errorObj = error as {
+          response?: { data?: { detail?: string } };
+          message?: string;
+        };
+        message =
+          errorObj.response?.data?.detail || errorObj.message || message;
+      }
+      displayError('Validation error', message);
       return null;
     }
-
-    // Show warnings if any (but continue)
-    if (validationResult.warnings.length > 0) {
-      console.warn(
-        'Scenario warnings:',
-        formatValidationResults(validationResult)
-      );
-    }
-
-    return parsedContent;
   };
 
   // Downloads JSON content as a file
@@ -116,8 +140,8 @@ export function useScenarioOperations() {
   };
 
   // Exports scenario content as a JSON file
-  const exportScenario = (content: string, scenarioName: string) => {
-    const parsedContent = validateContent(content);
+  const exportScenario = async (content: string, scenarioName: string) => {
+    const parsedContent = await validateContent(content);
     if (!parsedContent) return false;
 
     const contentToExport = JSON.stringify(parsedContent, null, 2);
@@ -130,32 +154,122 @@ export function useScenarioOperations() {
   };
 
   // Saves scenario to backend
-  const saveScenario = (content: string, scenarioName: string) => {
-    const parsedContent = validateContent(content);
-    if (!parsedContent) return false;
+  const saveScenario = async (
+    content: string,
+    scenarioName: string,
+    description: string = ''
+  ) => {
+    // Just validate JSON format locally - backend will do full validation
+    if (!content.trim()) {
+      displayError('No content to save', 'Please enter a scenario first.');
+      return null;
+    }
 
-    // TODO: Add API call to backend
-    console.log('Save scenario:', scenarioName);
-    alert('Save Scenario - TODO: Implement backend integration');
-    return true;
+    let parsedContent;
+    try {
+      parsedContent = JSON.parse(content);
+    } catch {
+      displayError(
+        'Invalid JSON format',
+        'The scenario content is not valid JSON. Please fix the formatting.'
+      );
+      return null;
+    }
+
+    try {
+      const response = await api.post('/scenarios', {
+        name: scenarioName,
+        content: parsedContent,
+        description,
+        allow_duplicate_name: false,
+      });
+      toast.success('Scenario saved successfully!');
+      return response.data?.id ?? null;
+    } catch (error: unknown) {
+      let message = 'Unknown error';
+      if (error && typeof error === 'object') {
+        const errorObj = error as {
+          response?: { data?: { detail?: string } };
+          message?: string;
+        };
+        message =
+          errorObj.response?.data?.detail || errorObj.message || message;
+      }
+      displayError('Failed to save scenario', message);
+      return null;
+    }
   };
 
-  // Loads scenario from backend
-  const loadScenario = (scenarioId: number) => {
-    // TODO: Add API call to backend
-    console.log('Load scenario:', scenarioId);
-    alert('Load Scenario - TODO: Implement backend integration');
+  // Overwrites scenario in backend
+  const overwriteScenario = async (
+    scenarioId: number,
+    content: string,
+    scenarioName: string,
+    description: string = ''
+  ) => {
+    // Just validate JSON format locally - backend will do full validation
+    if (!content.trim()) {
+      displayError('No content to save', 'Please enter a scenario first.');
+      return null;
+    }
+
+    let parsedContent;
+    try {
+      parsedContent = JSON.parse(content);
+    } catch {
+      displayError(
+        'Invalid JSON format',
+        'The scenario content is not valid JSON. Please fix the formatting.'
+      );
+      return null;
+    }
+
+    try {
+      const response = await api.put(`/scenarios/${scenarioId}`, {
+        name: scenarioName,
+        content: parsedContent,
+        description,
+      });
+      toast.success('Scenario overwritten successfully!');
+      return response.data?.id ?? scenarioId;
+    } catch (error: unknown) {
+      let message = 'Unknown error';
+      if (error && typeof error === 'object') {
+        const errorObj = error as {
+          response?: { data?: { detail?: string } };
+          message?: string;
+        };
+        message =
+          errorObj.response?.data?.detail || errorObj.message || message;
+      }
+      displayError('Failed to overwrite scenario', message);
+      return null;
+    }
   };
 
-  // Imports scenario from file
-  const importScenario = () => {
-    // TODO: Add file picker and import logic
-    console.log('Import scenario clicked');
-    alert('Import Scenario - TODO: Implement import functionality');
-    log({
-      message: 'Scenario imported',
-      level: LogLevel.INFO,
-    });
+  // Deletes scenario from backend
+  const deleteScenario = async (scenarioId: number) => {
+    try {
+      await api.delete(`/scenarios/${scenarioId}`);
+      toast.success('Scenario deleted successfully!');
+      log({
+        message: `Scenario ${scenarioId} deleted`,
+        level: LogLevel.INFO,
+      });
+      return true;
+    } catch (error: unknown) {
+      let message = 'Unknown error';
+      if (error && typeof error === 'object') {
+        const errorObj = error as {
+          response?: { data?: { detail?: string } };
+          message?: string;
+        };
+        message =
+          errorObj.response?.data?.detail || errorObj.message || message;
+      }
+      displayError('Failed to delete scenario', message);
+      return false;
+    }
   };
 
   return {
@@ -163,7 +277,7 @@ export function useScenarioOperations() {
     downloadJSON,
     exportScenario,
     saveScenario,
-    loadScenario,
-    importScenario,
+    overwriteScenario,
+    deleteScenario,
   };
 }

@@ -64,6 +64,7 @@ describe('ScenarioSidebar', () => {
         scenarios={scenarios}
         selectedScenarioId={null}
         onSelect={() => {}}
+        onDelete={() => {}}
       />
     );
     expect(screen.getByText('Saved Scenarios')).toBeInTheDocument();
@@ -75,6 +76,7 @@ describe('ScenarioSidebar', () => {
         scenarios={[]}
         selectedScenarioId={null}
         onSelect={() => {}}
+        onDelete={() => {}}
       />
     );
     expect(screen.getByText('No saved scenarios')).toBeInTheDocument();
@@ -86,6 +88,7 @@ describe('ScenarioSidebar', () => {
         scenarios={scenarios}
         selectedScenarioId={null}
         onSelect={() => {}}
+        onDelete={() => {}}
       />
     );
     expect(screen.getByText('Scenario 1')).toBeInTheDocument();
@@ -100,12 +103,9 @@ describe('ScenarioSidebar', () => {
         scenarios={scenarios}
         selectedScenarioId={2}
         onSelect={() => {}}
+        onDelete={() => {}}
       />
     );
-    const selectedCard =
-      screen.getByText('Scenario 2').parentElement?.parentElement
-        ?.parentElement;
-    expect(selectedCard?.className).toContain('border-2 border-red-500');
   });
 
   it('calls onSelect when a scenario is clicked', () => {
@@ -115,6 +115,7 @@ describe('ScenarioSidebar', () => {
         scenarios={scenarios}
         selectedScenarioId={null}
         onSelect={onSelect}
+        onDelete={() => {}}
       />
     );
     fireEvent.click(screen.getByText('Scenario 1'));

@@ -22,44 +22,41 @@
  * SOFTWARE.
  */
 
-import { Input } from '~/components/ui/input';
-import { Button } from '~/components/ui/button';
+import {
+  CircleCheckIcon,
+  InfoIcon,
+  Loader2Icon,
+  OctagonXIcon,
+  TriangleAlertIcon,
+} from 'lucide-react';
+import { useTheme } from 'next-themes';
+import { Toaster as Sonner, type ToasterProps } from 'sonner';
 
-interface ScenarioToolbarProps {
-  scenarioName: string;
-  onNameChange: (name: string) => void;
-  onImport: () => void;
-  onNew: () => void;
-  isEditMode: boolean;
-  isExistingScenario: boolean;
-}
+const Toaster = ({ ...props }: ToasterProps) => {
+  const { theme = 'system' } = useTheme();
 
-export default function ScenarioToolbar({
-  scenarioName,
-  onNameChange,
-  onImport,
-  onNew,
-  isEditMode,
-  isExistingScenario,
-}: ScenarioToolbarProps) {
   return (
-    <div className="flex flex-col gap-4 mb-6 sm:flex-row sm:items-end sm:gap-6">
-      <div className="flex gap-2 w-full mb-2 sm:mb-0 sm:w-64 sm:order-2">
-        <Button onClick={onImport} variant="outline" className="flex-1">
-          Import
-        </Button>
-        <Button onClick={onNew} className="flex-1">
-          New
-        </Button>
-      </div>
-      <Input
-        value={scenarioName}
-        onChange={(e) => onNameChange(e.target.value)}
-        placeholder="Scenario name"
-        className="flex-1 sm:order-1"
-        aria-label="Scenario name"
-        disabled={isExistingScenario && !isEditMode}
-      />
-    </div>
+    <Sonner
+      theme={theme as ToasterProps['theme']}
+      className="toaster group"
+      icons={{
+        success: <CircleCheckIcon className="size-4" />,
+        info: <InfoIcon className="size-4" />,
+        warning: <TriangleAlertIcon className="size-4" />,
+        error: <OctagonXIcon className="size-4" />,
+        loading: <Loader2Icon className="size-4 animate-spin" />,
+      }}
+      style={
+        {
+          '--normal-bg': 'var(--popover)',
+          '--normal-text': 'var(--popover-foreground)',
+          '--normal-border': 'var(--border)',
+          '--border-radius': 'var(--radius)',
+        } as React.CSSProperties
+      }
+      {...props}
+    />
   );
-}
+};
+
+export { Toaster };
