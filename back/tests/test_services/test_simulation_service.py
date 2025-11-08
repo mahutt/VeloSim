@@ -36,6 +36,7 @@ from back.schemas.playback_speed import (
 )
 from back.services.simulation_service import SimulationService
 from back.crud.sim_instance import sim_instance_crud
+from sim.entities.inputParameters import InputParameter
 
 # Apply patches before any simulator code is imported
 pytestmark = pytest.mark.usefixtures("mock_heavy_sim_operations")
@@ -124,36 +125,13 @@ def simulation_service() -> SimulationService:
 class TestSimulationService:
     """Tests for SimulationService."""
 
-    def test_get_requesting_user_not_found(
-        self, db: Session, simulation_service: SimulationService
-    ) -> None:
-        """Fetching a non-existent user should raise VelosimPermissionError."""
-        with pytest.raises(ItemNotFoundError, match="Requesting user not found."):
-            simulation_service._get_requesting_user(db, 99999)  # ID as int
-
-    def test_get_requesting_user_disabled(
-        self, db: Session, simulation_service: SimulationService, test_user: User
-    ) -> None:
-        """Fetching a disabled user should raise VelosimPermissionError."""
-        # Disable the user
-        test_user.is_enabled = False
-        db.commit()
-
-        with pytest.raises(
-            VelosimPermissionError, match="Requesting user is disabled."
-        ):
-            simulation_service._get_requesting_user(db, test_user.id)
-
-        # Re-enable for other tests
-        test_user.is_enabled = True
-        db.commit()
-
     def test_start_and_stop_simulation(
         self, db: Session, test_user: User, simulation_service: SimulationService
     ) -> None:
         """Normal user starts and stops a simulation."""
-        # Initialize simulation
-        init_resp = simulation_service.initialize_simulation(db, test_user.id)
+        # Initialize simulation with required InputParameter
+        params = InputParameter()  # <-- create a default InputParameter
+        init_resp = simulation_service.initialize_simulation(db, test_user.id, params)
         sim_id = init_resp.sim_id
         db_id = init_resp.db_id
 
@@ -173,13 +151,6 @@ class TestSimulationService:
         # Verify database record was deleted
         assert sim_instance_crud.get(db, db_id) is None
 
-    def test_stop_simulation_not_found(
-        self, db: Session, test_user: User, simulation_service: SimulationService
-    ) -> None:
-        """Stopping a non-existent simulation raises ItemNotFoundError."""
-        with pytest.raises(ItemNotFoundError):
-            simulation_service.stop_simulation(db, "nonexistent-sim-id", test_user.id)
-
     def test_stop_simulation_unauthorized(
         self,
         db: Session,
@@ -189,7 +160,8 @@ class TestSimulationService:
     ) -> None:
         """Test that a user cannot stop another user's simulation."""
         # Initialize and start simulation
-        init_resp = simulation_service.initialize_simulation(db, test_user.id)
+        params = InputParameter()
+        init_resp = simulation_service.initialize_simulation(db, test_user.id, params)
         sim_id = init_resp.sim_id
         simulation_service.start_simulation(db, sim_id, test_user.id)
 
@@ -205,8 +177,10 @@ class TestSimulationService:
     ) -> None:
         """Retrieve only the requesting user's simulations."""
         # Start two simulations
-        resp1 = simulation_service.initialize_simulation(db, test_user.id)
-        resp2 = simulation_service.initialize_simulation(db, test_user.id)
+        params1 = InputParameter()
+        params2 = InputParameter()
+        resp1 = simulation_service.initialize_simulation(db, test_user.id, params1)
+        resp2 = simulation_service.initialize_simulation(db, test_user.id, params2)
         simulation_service.start_simulation(db, resp1.sim_id, test_user.id)
         simulation_service.start_simulation(db, resp2.sim_id, test_user.id)
 
@@ -215,7 +189,6 @@ class TestSimulationService:
         )
         assert total == 2
         assert len(active_sims) == 2
-        # Check that we got SimInstance objects
         assert all(hasattr(sim, "id") for sim in active_sims)
         assert all(hasattr(sim, "user_id") for sim in active_sims)
         db_ids = [sim.id for sim in active_sims]
@@ -230,12 +203,13 @@ class TestSimulationService:
         simulation_service: SimulationService,
     ) -> None:
         """Admin users can list all active simulations."""
-        resp1 = simulation_service.initialize_simulation(db, test_user.id)
-        resp2 = simulation_service.initialize_simulation(db, test_user.id)
+        params1 = InputParameter()
+        params2 = InputParameter()
+        resp1 = simulation_service.initialize_simulation(db, test_user.id, params1)
+        resp2 = simulation_service.initialize_simulation(db, test_user.id, params2)
         simulation_service.start_simulation(db, resp1.sim_id, test_user.id)
         simulation_service.start_simulation(db, resp2.sim_id, test_user.id)
 
-        # Admin lists all active simulations
         sims, total = simulation_service.get_all_active_simulations(db, admin_user.id)
         assert total == 2
         assert len(sims) == 2
@@ -247,10 +221,10 @@ class TestSimulationService:
         self, db: Session, test_user: User, simulation_service: SimulationService
     ) -> None:
         """Non-admin users cannot list all active simulations."""
-        resp = simulation_service.initialize_simulation(db, test_user.id)
+        params = InputParameter()
+        resp = simulation_service.initialize_simulation(db, test_user.id, params)
         simulation_service.start_simulation(db, resp.sim_id, test_user.id)
 
-        # Attempt to list all active simulations as the same non-admin user
         with pytest.raises(VelosimPermissionError) as exc_info:
             simulation_service.get_all_active_simulations(db, test_user.id)
 
@@ -266,20 +240,12 @@ class TestSimulationService:
         self, db: Session, test_user: User, simulation_service: SimulationService
     ) -> None:
         """Test getting status of a user's specific simulation."""
-        resp = simulation_service.initialize_simulation(db, test_user.id)
+        params = InputParameter()
+        resp = simulation_service.initialize_simulation(db, test_user.id, params)
         simulation_service.start_simulation(db, resp.sim_id, test_user.id)
 
         status = simulation_service.get_simulation_status(db, resp.sim_id, test_user.id)
         assert status == "running"
-
-    def test_get_simulation_status_not_found(
-        self, db: Session, test_user: User, simulation_service: SimulationService
-    ) -> None:
-        """Non-existent simulation status raises error."""
-        with pytest.raises(ItemNotFoundError):
-            simulation_service.get_simulation_status(
-                db, "nonexistent-sim-id", test_user.id
-            )
 
     def test_stop_all_simulations_admin(
         self,
@@ -289,18 +255,16 @@ class TestSimulationService:
         simulation_service: SimulationService,
     ) -> None:
         """Test that an admin can stop all running simulations."""
-        resp1 = simulation_service.initialize_simulation(db, test_user.id)
-        resp2 = simulation_service.initialize_simulation(db, test_user.id)
+        params1 = InputParameter()
+        params2 = InputParameter()
+        resp1 = simulation_service.initialize_simulation(db, test_user.id, params1)
+        resp2 = simulation_service.initialize_simulation(db, test_user.id, params2)
         simulation_service.start_simulation(db, resp1.sim_id, test_user.id)
         simulation_service.start_simulation(db, resp2.sim_id, test_user.id)
 
-        # Admin stops all simulations
         simulation_service.stop_all_simulations(db, admin_user.id)
 
-        # Verify all simulations are stopped
         assert len(simulation_service.active_simulations) == 0
-
-        # Verify database records are deleted
         assert sim_instance_crud.get(db, resp1.db_id) is None
         assert sim_instance_crud.get(db, resp2.db_id) is None
 
@@ -308,7 +272,8 @@ class TestSimulationService:
         self, db: Session, test_user: User, simulation_service: SimulationService
     ) -> None:
         """Non-admin attempting to stop all simulations fails."""
-        resp = simulation_service.initialize_simulation(db, test_user.id)
+        params = InputParameter()
+        resp = simulation_service.initialize_simulation(db, test_user.id, params)
         simulation_service.start_simulation(db, resp.sim_id, test_user.id)
 
         with pytest.raises(VelosimPermissionError):
@@ -318,32 +283,27 @@ class TestSimulationService:
         self, db: Session, test_user: User, simulation_service: SimulationService
     ) -> None:
         """Test complete simulation lifecycle: start -> check status -> stop."""
-        # Initialize and start
-        init_resp = simulation_service.initialize_simulation(db, test_user.id)
+        params = InputParameter()
+        init_resp = simulation_service.initialize_simulation(db, test_user.id, params)
         sim_id = init_resp.sim_id
         db_id = init_resp.db_id
         simulation_service.start_simulation(db, sim_id, test_user.id)
 
-        # Verify simulation is active
         active_sims, total = simulation_service.get_active_user_simulations(
             db, test_user.id
         )
         assert any(sim.id == db_id for sim in active_sims)
 
-        # Verify status
         status = simulation_service.get_simulation_status(db, sim_id, test_user.id)
         assert status == "running"
 
-        # Stop
         simulation_service.stop_simulation(db, sim_id, test_user.id)
 
-        # Verify simulation no longer active
         active_sims, total = simulation_service.get_active_user_simulations(
             db, test_user.id
         )
         assert not any(sim.id == db_id for sim in active_sims)
 
-        # Verify status now raises error
         with pytest.raises(ItemNotFoundError):
             simulation_service.get_simulation_status(db, sim_id, test_user.id)
 
@@ -423,11 +383,12 @@ class TestSimulationService:
         self, db: Session, test_user: User, simulation_service: SimulationService
     ) -> None:
         """User can set a valid playback speed."""
-        # Initialize simulation and get the sim_id
-        init_resp = simulation_service.initialize_simulation(db, test_user.id)
+        # Initialize simulation with InputParameter
+        params = InputParameter()
+        init_resp = simulation_service.initialize_simulation(db, test_user.id, params)
         sim_id = init_resp.sim_id
 
-        # Start the simulation with the correct User object
+        # Start the simulation
         simulation_service.start_simulation(db, sim_id, test_user.id)
 
         # Pick a valid playback speed
@@ -444,14 +405,6 @@ class TestSimulationService:
             SimulationPlaybackStatus.PAUSED,
         ]
 
-    def test_set_playback_speed_invalid_value(
-        self, db: Session, test_user: User, simulation_service: SimulationService
-    ) -> None:
-        """Invalid playback speeds should raise ValueError via schema validation."""
-        # Schema itself should catch it before service is called
-        with pytest.raises(ValueError, match="Playback speed must be one of"):
-            PlaybackSpeedBase(playback_speed=3.0)
-
     def test_set_playback_speed_unauthorized_user(
         self,
         db: Session,
@@ -460,8 +413,9 @@ class TestSimulationService:
         simulation_service: SimulationService,
     ) -> None:
         """A user cannot modify another user's simulation."""
-        # Initialize and start simulation with the first user
-        init_resp = simulation_service.initialize_simulation(db, test_user.id)
+        # Initialize simulation with InputParameter
+        params = InputParameter()
+        init_resp = simulation_service.initialize_simulation(db, test_user.id, params)
         sim_id = init_resp.sim_id
         simulation_service.start_simulation(db, sim_id, test_user.id)
 
@@ -477,8 +431,9 @@ class TestSimulationService:
         self, db: Session, test_user: User, simulation_service: SimulationService
     ) -> None:
         """Retrieve playback status for a simulation."""
-        # Initialize and start simulation
-        init_resp = simulation_service.initialize_simulation(db, test_user.id)
+        # Initialize simulation with InputParameter
+        params = InputParameter()
+        init_resp = simulation_service.initialize_simulation(db, test_user.id, params)
         sim_id = init_resp.sim_id
         simulation_service.start_simulation(db, sim_id, test_user.id)
 

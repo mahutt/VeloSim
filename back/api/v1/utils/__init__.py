@@ -32,6 +32,11 @@ from .sim_websocket_helpers import (
     cleanup_simulation,
 )
 
+from .intialize_sim_request_helpers import (
+    load_scenario_dict,
+    parse_scenario,
+)
+
 __all__ = [
     "WebSocketSubscriber",
     "safe_send_json",
@@ -39,4 +44,6 @@ __all__ = [
     "attach_subscriber",
     "start_or_resume_simulation",
     "cleanup_simulation",
+    "load_scenario_dict",
+    "parse_scenario",
 ]

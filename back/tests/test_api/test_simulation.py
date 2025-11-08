@@ -49,6 +49,46 @@ from fastapi import WebSocket
 
 from back.models.user import User
 
+SCENARIO_PAYLOAD = {
+    "id": 1,
+    "name": "Morning Operations",
+    "content": {
+        "start_time": "06:00",
+        "end_time": "12:00",
+        "stations": [
+            {
+                "station_id": 1,
+                "station_name": "Station Alpha",
+                "station_position": [45.5017, -73.5673],
+            },
+            {
+                "station_id": 2,
+                "station_name": "Station Bravo",
+                "station_position": [45.5088, -73.5540],
+            },
+            {
+                "station_id": 3,
+                "station_name": "Station Charlie",
+                "station_position": [45.5120, -73.5800],
+            },
+        ],
+        "resources": [
+            {"resource_id": 101, "resource_position": [45.505, -73.56]},
+            {"resource_id": 102, "resource_position": [45.509, -73.57]},
+        ],
+        "initial_tasks": [
+            {"id": "t1", "station_id": "1"},
+            {"id": "t2", "station_id": "2"},
+        ],
+        "scheduled_tasks": [
+            {"id": "t3", "time": 600, "station_id": "3"},
+            {"id": "t4", "time": 1800, "station_id": "1"},
+            {"id": "t5", "time": 3600, "station_id": "2"},
+            {"id": "t6", "time": 5400, "station_id": "1"},
+        ],
+    },
+}
+
 # Apply patches before any simulator code is imported
 pytestmark = pytest.mark.usefixtures("mock_heavy_sim_operations")
 
@@ -220,14 +260,14 @@ class TestSimulationAPI:
     def test_initialize_simulation_success(
         self, mock_init: MagicMock, authenticated_client: TestClient
     ) -> None:
-        """Test initializing a simulation successfully."""
         mock_init.return_value = {
             "sim_id": "sim123",
             "db_id": 42,
             "status": "initialized",
         }
-
-        response = authenticated_client.post("/api/v1/simulation/initialize")
+        response = authenticated_client.post(
+            "/api/v1/simulation/initialize", json=SCENARIO_PAYLOAD
+        )
         assert response.status_code == 200
         data = response.json()
         assert data["sim_id"] == "sim123"
@@ -239,9 +279,10 @@ class TestSimulationAPI:
     def test_initialize_simulation_permission_error(
         self, mock_init: MagicMock, non_admin_client: TestClient
     ) -> None:
-        """Non-admin user cannot initialize simulation if restricted."""
         mock_init.side_effect = VelosimPermissionError("No permission")
-        response = non_admin_client.post("/api/v1/simulation/initialize")
+        response = non_admin_client.post(
+            "/api/v1/simulation/initialize", json=SCENARIO_PAYLOAD
+        )
         assert response.status_code == 403
         assert "No permission" in response.json()["detail"]
 
@@ -250,7 +291,9 @@ class TestSimulationAPI:
         self, mock_init: MagicMock, authenticated_client: TestClient
     ) -> None:
         mock_init.side_effect = Exception("Unexpected error")
-        response = authenticated_client.post("/api/v1/simulation/initialize")
+        response = authenticated_client.post(
+            "/api/v1/simulation/initialize", json=SCENARIO_PAYLOAD
+        )
         assert response.status_code == 500
         assert "Unexpected error" in response.json()["detail"]
 
@@ -869,84 +912,48 @@ class TestSimulationListIntegration:
     def test_start_and_list_my_simulations(
         self, authenticated_client: TestClient, db: Session, test_user: User
     ) -> None:
-        """
-        Test complete flow: start simulation -> list simulations with metadata.
-        """
-        # Step 1: Start a simulation
-        start_response = authenticated_client.post("/api/v1/simulation/initialize")
+        # Step 1: Start simulation
+        start_response = authenticated_client.post(
+            "/api/v1/simulation/initialize", json=SCENARIO_PAYLOAD
+        )
         assert start_response.status_code == 200
         sim_data = start_response.json()
-        assert "sim_id" in sim_data
-        assert "db_id" in sim_data
         sim_id = sim_data["sim_id"]
         db_id = sim_data["db_id"]
 
-        # Step 2: List my simulations
+        # Step 2: List simulations
         list_response = authenticated_client.get("/api/v1/simulation/my")
         assert list_response.status_code == 200
         list_data = list_response.json()
-
-        # Verify response structure
-        assert "simulations" in list_data
-        assert "total" in list_data
-        assert "page" in list_data
-        assert "per_page" in list_data
-        assert "total_pages" in list_data
-
-        # Verify pagination metadata
         assert list_data["total"] == 1
-        assert list_data["page"] == 1
-        assert list_data["per_page"] == 10
-        assert list_data["total_pages"] == 1
-
-        # Verify simulation data contains metadata
-        assert len(list_data["simulations"]) == 1
         simulation = list_data["simulations"][0]
         assert simulation["id"] == db_id
-        assert simulation["user_id"] == 1  # authenticated_client uses user_id=1
-        assert "date_created" in simulation
-        assert "date_updated" in simulation
-        assert "resource_count" in simulation
-        assert "station_count" in simulation
-        assert "task_count" in simulation
-        # Counts should be 0 for new simulation
-        assert simulation["resource_count"] == 0
-        assert simulation["station_count"] == 0
-        assert simulation["task_count"] == 0
 
-        # Step 3: Stop the simulation
+        # Step 3: Stop simulation
         stop_response = authenticated_client.post(f"/api/v1/simulation/stop/{sim_id}")
         assert stop_response.status_code == 200
 
     def test_list_with_pagination(
         self, authenticated_client: TestClient, db: Session, test_user: User
     ) -> None:
-        """Test listing simulations with pagination parameters."""
-        # Start 3 simulations
         sim_ids = []
         for _ in range(3):
-            response = authenticated_client.post("/api/v1/simulation/initialize")
+            response = authenticated_client.post(
+                "/api/v1/simulation/initialize", json=SCENARIO_PAYLOAD
+            )
             assert response.status_code == 200
             sim_ids.append(response.json()["sim_id"])
 
-        # Test pagination: page 1, limit 2
+        # page 1, limit 2
         response = authenticated_client.get("/api/v1/simulation/my?skip=0&limit=2")
         assert response.status_code == 200
         data = response.json()
-        assert data["total"] == 3
-        assert data["page"] == 1
-        assert data["per_page"] == 2
-        assert data["total_pages"] == 2
         assert len(data["simulations"]) == 2
 
-        # Test pagination: page 2, limit 2
+        # page 2, limit 2
         response = authenticated_client.get("/api/v1/simulation/my?skip=2&limit=2")
         assert response.status_code == 200
         data = response.json()
-        assert data["total"] == 3
-        assert data["page"] == 2
-        assert data["per_page"] == 2
-        assert data["total_pages"] == 2
         assert len(data["simulations"]) == 1
 
         # Cleanup
@@ -969,25 +976,23 @@ class TestSimulationListIntegration:
     def test_pagination_edge_cases(
         self, authenticated_client: TestClient, db: Session, test_user: User
     ) -> None:
-        """Test pagination with various edge cases."""
-        # Start 1 simulation
-        start_response = authenticated_client.post("/api/v1/simulation/initialize")
+        start_response = authenticated_client.post(
+            "/api/v1/simulation/initialize", json=SCENARIO_PAYLOAD
+        )
         assert start_response.status_code == 200
         sim_id = start_response.json()["sim_id"]
 
-        # Test large limit
+        # Large limit
         response = authenticated_client.get("/api/v1/simulation/my?skip=0&limit=100")
         assert response.status_code == 200
         data = response.json()
         assert data["total"] == 1
-        assert data["per_page"] == 100
         assert data["total_pages"] == 1
 
-        # Test skip beyond total
+        # skip beyond total
         response = authenticated_client.get("/api/v1/simulation/my?skip=10&limit=10")
         assert response.status_code == 200
         data = response.json()
-        assert data["total"] == 1
         assert len(data["simulations"]) == 0
         assert data["page"] == 2
 

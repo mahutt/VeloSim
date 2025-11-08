@@ -84,6 +84,7 @@ from .scenario import (
     ScenarioUpdate,
     ScenarioResponse,
     ScenarioListResponse,
+    ScenarioInitializationRequest,
 )
 
 __all__ = [
@@ -132,4 +133,5 @@ __all__ = [
     "ScenarioUpdate",
     "ScenarioResponse",
     "ScenarioListResponse",
+    "ScenarioInitializationRequest",
 ]

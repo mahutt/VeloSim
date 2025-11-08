@@ -106,7 +106,14 @@ class JsonParseStrategy(BaseParseStrategy):
                 try:
                     tid = int(str(t["id"]).strip("t"))
                     station_ref = stations.get(int(t["station_id"]))
-                    delay = float(t.get("time", 0))
+
+                    # Handle cases of "HH:MM" for scheduled_task times
+                    raw_time = t.get("time", 0)
+                    if isinstance(raw_time, str):
+                        delay = self._time_to_seconds(raw_time)
+                    else:  # The value is already numeric (assumed as seconds)
+                        delay = int(float(raw_time))
+
                     tasks[tid] = BatterySwapTask(
                         env=env,
                         task_id=tid,

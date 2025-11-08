@@ -26,6 +26,7 @@ import math
 from typing import Dict
 from fastapi import (
     APIRouter,
+    Body,
     HTTPException,
     WebSocket,
     WebSocketDisconnect,
@@ -40,6 +41,11 @@ from back.api.v1.utils import (
     start_or_resume_simulation,
 )
 from back.exceptions.websocket_auth_error import WebSocketAuthError
+from back.api.v1.utils.intialize_sim_request_helpers import (
+    ScenarioInitializationRequest,
+    load_scenario_dict,
+    parse_scenario,
+)
 from back.schemas import (
     ResourceTaskAssignRequest,
     ResourceTaskUnassignRequest,
@@ -62,19 +68,29 @@ from back.schemas.sim_instance import (
 from back.services.simulation_service import simulation_service
 from back.database.session import get_db
 
+
 router = APIRouter(prefix="/simulation", tags=["simulation"])
 
 
 @router.post("/initialize", response_model=SimulationResponse)
 async def initialize_simulation(
+    scenario: ScenarioInitializationRequest | None = Body(None),
+    scenario_id: int | None = Query(None),
     db: Session = Depends(get_db),
     requesting_user: int = Depends(get_user_id),
 ) -> SimulationResponse:
-    """Initialize a new simulation and return a confirmation response."""
     try:
-        return simulation_service.initialize_simulation(db, requesting_user)
+        scenario_dict = load_scenario_dict(db, scenario, scenario_id)
+        scenario_params = parse_scenario(scenario_dict)
+        return simulation_service.initialize_simulation(
+            db, requesting_user, scenario_params
+        )
     except VelosimPermissionError as err:
         raise HTTPException(status_code=403, detail=str(err))
+    except ItemNotFoundError as ve:
+        raise HTTPException(
+            status_code=404 if "not found" in str(ve) else 400, detail=str(ve)
+        )
     except Exception as err:
         raise HTTPException(status_code=500, detail=str(err))
 

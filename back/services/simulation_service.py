@@ -31,7 +31,6 @@ from back.schemas import (
     PlaybackSpeedResponse,
     SimulationPlaybackStatus,
 )
-from back.services.utils.create_input_params import create_default_input_parameters
 from sim.simulator import Simulator
 from sim.entities.inputParameters import InputParameter
 from back.crud import sim_instance_crud, user_crud
@@ -93,15 +92,12 @@ class SimulationService:
         return user.is_admin or db_sim_instance.user_id == user.id
 
     def initialize_simulation(
-        self, db: Session, requesting_user: int, params: InputParameter | None = None
+        self, db: Session, requesting_user: int, params: InputParameter
     ) -> SimulationResponse:
         """
         Initialize a new simulation and return a confirmation response.
         """
         user = self._get_requesting_user(db, requesting_user)
-
-        if params is None:
-            params = create_default_input_parameters()
 
         # Create database record first
         sim_instance_data = SimInstanceCreate(user_id=user.id)
