@@ -95,7 +95,7 @@ export const SimulationProvider = ({
   simId: initialSimId,
 }: SimulationProviderProps) => {
   const { displayError } = useError();
-  const { token, isAuthenticated } = useAuth();
+  const { user } = useAuth();
   const { mapRef, mapLoaded } = useMap();
   const stationsRef = useRef<Map<number, Station>>(new Map());
   const resourcesRef = useRef<Map<number, Resource>>(new Map());
@@ -483,12 +483,11 @@ export const SimulationProvider = ({
   // ============================================================================
 
   useEffect(() => {
-    if (!mapLoaded || !simId || !isAuthenticated || !token) {
+    if (!mapLoaded || !simId || !user) {
       console.log('[WS] ⏳ Waiting for prerequisites...', {
         mapLoaded,
         simId: !!simId,
-        isAuthenticated,
-        hasToken: !!token,
+        hasUser: !!user,
       });
       return;
     }
@@ -643,7 +642,7 @@ export const SimulationProvider = ({
 
     // Cleanup on unmount
     return cleanup;
-  }, [mapLoaded, simId, isAuthenticated, token, connectionAttempts]);
+  }, [mapLoaded, simId, user, connectionAttempts]);
 
   // Render existing data when map loads
   useEffect(() => {

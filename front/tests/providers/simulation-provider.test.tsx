@@ -71,18 +71,17 @@ vi.mock('~/utils/simulation-error-utils', () => ({
   logMissingEntityError: vi.fn(),
 }));
 
-// Mock useAuth hook
+// Mock useAuth hook with stable user reference
+const mockUser = { id: 1, username: 'test_user', is_admin: false };
 vi.mock('~/hooks/use-auth', () => ({
   default: () => ({
-    user: { id: 1, username: 'test_user', is_admin: false },
+    user: mockUser,
     setUser: vi.fn(),
     loading: false,
     setLoading: vi.fn(),
     logout: vi.fn(),
     refreshUser: vi.fn(),
     setToken: vi.fn(),
-    token: 'test-token',
-    isAuthenticated: true,
   }),
 }));
 

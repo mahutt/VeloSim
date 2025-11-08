@@ -40,8 +40,6 @@ export interface AuthState {
   setLoading: React.Dispatch<React.SetStateAction<boolean>>;
   logout: () => void;
   refreshUser: () => Promise<void>;
-  token: string | null;
-  isAuthenticated: boolean;
   setToken: (token: string) => void;
 }
 
@@ -66,18 +64,10 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const navigate = useNavigate();
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
-  const [token, setTokenState] = useState<string | null>(
-    typeof window !== 'undefined'
-      ? sessionStorage.getItem(TOKEN_STORAGE_KEY)
-      : null
-  );
-
-  const isAuthenticated = !!user && !!token;
 
   const setToken = (newToken: string) => {
     sessionStorage.setItem(TOKEN_STORAGE_KEY, newToken);
     setAuthCookie(newToken);
-    setTokenState(newToken);
   };
 
   const refreshUser = async () => {
@@ -92,14 +82,13 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   };
 
   useEffect(() => {
-    if (
-      typeof window !== 'undefined' &&
-      sessionStorage.getItem(TOKEN_STORAGE_KEY)
-    ) {
-      const storedToken = sessionStorage.getItem(TOKEN_STORAGE_KEY);
-      if (storedToken) {
-        setAuthCookie(storedToken);
-      }
+    const storedToken =
+      typeof window !== 'undefined'
+        ? sessionStorage.getItem(TOKEN_STORAGE_KEY)
+        : null;
+
+    if (storedToken) {
+      setAuthCookie(storedToken);
       refreshUser();
     } else {
       setLoading(false);
@@ -110,7 +99,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     sessionStorage.removeItem(TOKEN_STORAGE_KEY);
     removeAuthCookie();
     setUser(null);
-    setTokenState(null);
     navigate('/login');
   };
 
@@ -121,8 +109,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     setLoading,
     logout,
     refreshUser,
-    token,
-    isAuthenticated,
     setToken,
   };
 

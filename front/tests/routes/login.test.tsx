@@ -83,8 +83,6 @@ describe('Login Page', () => {
           logout: vi.fn(),
           refreshUser: mockRefreshUser,
           setToken: mockSetToken,
-          token: null,
-          isAuthenticated: false,
         }}
       >
         <Signin />
