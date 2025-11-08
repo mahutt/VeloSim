@@ -59,16 +59,18 @@ const OverwriteSaveDialog: React.FC<OverwriteSaveDialogProps> = ({
           one?
         </DialogDescription>
       </DialogHeader>
-      <DialogFooter>
+      <DialogFooter className="sm:justify-between">
         <Button onClick={() => onOpenChange(false)} variant="outline">
           Cancel
         </Button>
-        <Button onClick={onSaveAsNew} variant="secondary">
-          Save As New
-        </Button>
-        <Button onClick={onOverwrite} variant="default">
-          Overwrite
-        </Button>
+        <div className="flex gap-2">
+          <Button onClick={onSaveAsNew} variant="outline">
+            Save As New
+          </Button>
+          <Button onClick={onOverwrite} variant="default">
+            Overwrite
+          </Button>
+        </div>
       </DialogFooter>
     </DialogContent>
   </Dialog>

@@ -28,7 +28,7 @@ import api from '~/api';
 import { toast } from 'sonner';
 
 /**
- * Custom hook for scenario operations (export, save, load, import)
+ * Custom hook for scenario operations (export, save, load, import, delete)
  */
 export function useScenarioOperations() {
   const { displayError } = useError();
@@ -57,24 +57,39 @@ export function useScenarioOperations() {
       );
       return null;
     }
+
     try {
       const response = await api.post('/scenarios/validate', {
         content: parsedContent,
       });
       const result = response.data;
+
+      // Check if validation failed
       if (!result.valid) {
+        // Backend now returns errors as an array of strings
         const errors = Array.isArray(result.errors)
           ? result.errors
           : [result.errors].filter(Boolean);
+
         displayError(
           'Scenario validation failed',
           errors.map((e: string) => `• ${e}`).join('\n')
         );
         return null;
       }
-      if (result.warnings && result.warnings.length > 0) {
-        console.warn('Scenario warnings:', result.warnings.join('\n'));
+
+      // Log warnings if present (non-blocking)
+      if (
+        result.warnings &&
+        Array.isArray(result.warnings) &&
+        result.warnings.length > 0
+      ) {
+        console.warn(
+          'Scenario validation warnings:',
+          result.warnings.join('\n')
+        );
       }
+
       return parsedContent;
     } catch (error: unknown) {
       let message = 'Unknown error';
@@ -144,8 +159,22 @@ export function useScenarioOperations() {
     scenarioName: string,
     description: string = ''
   ) => {
-    const parsedContent = await validateContent(content);
-    if (!parsedContent) return null;
+    // Just validate JSON format locally - backend will do full validation
+    if (!content.trim()) {
+      displayError('No content to save', 'Please enter a scenario first.');
+      return null;
+    }
+
+    let parsedContent;
+    try {
+      parsedContent = JSON.parse(content);
+    } catch {
+      displayError(
+        'Invalid JSON format',
+        'The scenario content is not valid JSON. Please fix the formatting.'
+      );
+      return null;
+    }
 
     try {
       const response = await api.post('/scenarios', {
@@ -171,17 +200,6 @@ export function useScenarioOperations() {
     }
   };
 
-  // Imports scenario from file
-  const importScenario = () => {
-    // TODO: Add file picker and import logic
-    console.log('Import scenario clicked');
-    toast.info('Import Scenario - TODO: Implement import functionality');
-    log({
-      message: 'Scenario imported',
-      level: LogLevel.INFO,
-    });
-  };
-
   // Overwrites scenario in backend
   const overwriteScenario = async (
     scenarioId: number,
@@ -189,8 +207,22 @@ export function useScenarioOperations() {
     scenarioName: string,
     description: string = ''
   ) => {
-    const parsedContent = await validateContent(content);
-    if (!parsedContent) return null;
+    // Just validate JSON format locally - backend will do full validation
+    if (!content.trim()) {
+      displayError('No content to save', 'Please enter a scenario first.');
+      return null;
+    }
+
+    let parsedContent;
+    try {
+      parsedContent = JSON.parse(content);
+    } catch {
+      displayError(
+        'Invalid JSON format',
+        'The scenario content is not valid JSON. Please fix the formatting.'
+      );
+      return null;
+    }
 
     try {
       const response = await api.put(`/scenarios/${scenarioId}`, {
@@ -215,12 +247,37 @@ export function useScenarioOperations() {
     }
   };
 
+  // Deletes scenario from backend
+  const deleteScenario = async (scenarioId: number) => {
+    try {
+      await api.delete(`/scenarios/${scenarioId}`);
+      toast.success('Scenario deleted successfully!');
+      log({
+        message: `Scenario ${scenarioId} deleted`,
+        level: LogLevel.INFO,
+      });
+      return true;
+    } catch (error: unknown) {
+      let message = 'Unknown error';
+      if (error && typeof error === 'object') {
+        const errorObj = error as {
+          response?: { data?: { detail?: string } };
+          message?: string;
+        };
+        message =
+          errorObj.response?.data?.detail || errorObj.message || message;
+      }
+      displayError('Failed to delete scenario', message);
+      return false;
+    }
+  };
+
   return {
     validateContent,
     downloadJSON,
     exportScenario,
     saveScenario,
-    importScenario,
     overwriteScenario,
+    deleteScenario,
   };
 }

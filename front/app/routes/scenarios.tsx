@@ -22,7 +22,7 @@
  * SOFTWARE.
  */
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router';
 import type { Scenario, ScenarioListResponse } from '~/types';
 import api from '~/api';
@@ -35,6 +35,9 @@ import { useScenarioOperations } from '~/hooks/use-scenario-operations';
 import useError from '~/hooks/use-error';
 
 export default function ScenarioEditor() {
+  // Refs
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+
   // State
   const [scenarioContent, setScenarioContent] = useState('');
   const [scenarioName, setScenarioName] = useState('');
@@ -57,8 +60,8 @@ export default function ScenarioEditor() {
     validateContent,
     exportScenario,
     saveScenario,
-    importScenario,
     overwriteScenario,
+    deleteScenario,
   } = useScenarioOperations();
 
   /**
@@ -118,23 +121,6 @@ export default function ScenarioEditor() {
     }
   }, [scenarioContent, scenarioName]);
 
-  // Keep scenario_title in sync with scenarioName
-  const setScenarioNameAndSyncTitle = useCallback(
-    (name: string) => {
-      setScenarioName(name);
-      try {
-        if (scenarioContent) {
-          const parsed = JSON.parse(scenarioContent);
-          parsed.scenario_title = name;
-          setScenarioContent(JSON.stringify(parsed, null, 2));
-        }
-      } catch {
-        // ignore if content is not valid JSON
-      }
-    },
-    [scenarioContent]
-  );
-
   // Helper function to generate incremented name
   const generateIncrementedName = useCallback(
     (baseName: string, scenarios: Scenario[]): string => {
@@ -165,13 +151,60 @@ export default function ScenarioEditor() {
     []
   );
 
+  // Import scenario handler
+  const handleImportScenario = useCallback(
+    async (event: React.ChangeEvent<HTMLInputElement>): Promise<void> => {
+      const file = event.target.files?.[0];
+      if (!file) return;
+
+      const reader = new FileReader();
+      reader.onload = async (e) => {
+        try {
+          const text = e.target?.result as string;
+          const parsed = JSON.parse(text);
+          const contentToSave = JSON.stringify(parsed, null, 2);
+
+          const fileName = file.name.replace(/\.[^/.]+$/, '');
+          const name = fileName || 'Imported Scenario';
+
+          setScenarioContent(contentToSave);
+          setScenarioName(name);
+          setScenarioDescription(parsed.description || '');
+
+          // Save to backend - backend will validate
+          const newId = await saveScenario(
+            contentToSave,
+            name,
+            parsed.description || ''
+          );
+
+          if (newId) {
+            setSelectedScenarioId(newId);
+            // Refresh sidebar after successful import
+            const scenarios = await loadSavedScenarios();
+            setSavedScenarios(scenarios);
+          }
+        } catch {
+          displayError(
+            'Import Failed',
+            'The file is not a valid JSON scenario.'
+          );
+        }
+      };
+      reader.readAsText(file);
+      // Reset input value so same file can be imported again if needed
+      event.target.value = '';
+    },
+    [saveScenario, displayError, loadSavedScenarios]
+  );
+
   const handleStartScenario = useCallback(() => {
     console.log('Start scenario clicked');
     navigate('/simulation');
   }, [navigate]);
 
   const handleSaveScenario = useCallback(async () => {
-    // Validate content first, then check for name
+    // Sync scenario_title with scenarioName
     let contentToSave = scenarioContent;
     try {
       if (scenarioContent) {
@@ -180,13 +213,7 @@ export default function ScenarioEditor() {
         contentToSave = JSON.stringify(parsed, null, 2);
       }
     } catch {
-      // ignore if content is not valid JSON
-    }
-
-    const parsedContent = await validateContent(contentToSave);
-    if (!parsedContent) {
-      // Validation failed, error already displayed
-      return;
+      // If not valid JSON, saveScenario will handle the error
     }
 
     // If editing an existing scenario, show Overwrite/Save As New dialog
@@ -216,7 +243,6 @@ export default function ScenarioEditor() {
     scenarioDescription,
     isEditMode,
     selectedScenarioId,
-    validateContent,
     saveScenario,
     loadSavedScenarios,
   ]);
@@ -329,13 +355,30 @@ export default function ScenarioEditor() {
     api
       .get('/scenarios/template')
       .then((response) => {
-        setScenarioContent(JSON.stringify(response.data, null, 2));
+        const template = response.data;
+        // Extract scenario_title and description from template
+        let name = '';
+        let description = '';
+        let content = {};
+        if (template.content) {
+          // Remove scenario_title from content
+          const { scenario_title, ...rest } = template.content;
+          name = scenario_title || '';
+          content = rest;
+        }
+        // Use top-level description if present
+        if (template.description) {
+          description = template.description;
+        }
+        setScenarioName(name);
+        setScenarioDescription(description);
+        setScenarioContent(JSON.stringify({ ...content }, null, 2));
       })
       .catch(() => {
         setScenarioContent('');
+        setScenarioName('');
+        setScenarioDescription('');
       });
-    setScenarioName('');
-    setScenarioDescription('');
     setSelectedScenarioId(null);
     setIsEditMode(false); // Reset edit mode
   }, []);
@@ -346,7 +389,6 @@ export default function ScenarioEditor() {
         // Reorder keys for consistent display
         const c = scenario.content;
         const ordered = {
-          scenario_title: c.scenario_title,
           start_time: c.start_time,
           end_time: c.end_time,
           resources: c.resources,
@@ -369,14 +411,45 @@ export default function ScenarioEditor() {
     [displayError]
   );
 
+  const handleDeleteScenario = useCallback(
+    async (scenarioId: number) => {
+      const success = await deleteScenario(scenarioId);
+
+      if (success) {
+        // If the deleted scenario was selected, clear the editor
+        if (selectedScenarioId === scenarioId) {
+          setScenarioContent('');
+          setScenarioName('');
+          setScenarioDescription('');
+          setSelectedScenarioId(null);
+          setIsEditMode(false);
+        }
+
+        // Refresh sidebar
+        const scenarios = await loadSavedScenarios();
+        setSavedScenarios(scenarios);
+      }
+    },
+    [selectedScenarioId, deleteScenario, loadSavedScenarios]
+  );
+
   return (
     <div className="container mx-auto max-w-6xl py-8 px-4">
       <h1 className="text-2xl font-bold mb-6">Scenario Editor</h1>
 
+      {/* Hidden file input for import */}
+      <input
+        type="file"
+        accept="application/json"
+        ref={fileInputRef}
+        className="hidden"
+        onChange={handleImportScenario}
+      />
+
       <ScenarioToolbar
         scenarioName={scenarioName}
-        onNameChange={setScenarioNameAndSyncTitle}
-        onImport={importScenario}
+        onNameChange={setScenarioName}
+        onImport={() => fileInputRef.current?.click()}
         onNew={handleNewScenario}
         isEditMode={isEditMode}
         isExistingScenario={!!selectedScenarioId}
@@ -400,6 +473,7 @@ export default function ScenarioEditor() {
           scenarios={savedScenarios}
           selectedScenarioId={selectedScenarioId}
           onSelect={handleSelectScenario}
+          onDelete={handleDeleteScenario}
         />
       </div>
 

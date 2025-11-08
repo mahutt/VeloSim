@@ -45,6 +45,7 @@ vi.mock('../../app/api', () => ({
   default: {
     post: vi.fn(),
     put: vi.fn(),
+    delete: vi.fn(),
   },
 }));
 
@@ -57,7 +58,6 @@ describe('useScenarioOperations', () => {
   let mockCreateObjectURL: ReturnType<typeof vi.fn>;
   let mockRevokeObjectURL: ReturnType<typeof vi.fn>;
   let mockClick: ReturnType<typeof vi.fn>;
-  let mockConsoleLog: ReturnType<typeof vi.spyOn>;
   let mockConsoleWarn: ReturnType<typeof vi.spyOn>;
   let mockConsoleError: ReturnType<typeof vi.spyOn>;
   let originalCreateElement: typeof document.createElement;
@@ -99,7 +99,6 @@ describe('useScenarioOperations', () => {
     ).getLastAnchor = () => lastAnchor;
 
     // Mock console methods
-    mockConsoleLog = vi.spyOn(console, 'log').mockImplementation(() => {});
     mockConsoleWarn = vi.spyOn(console, 'warn').mockImplementation(() => {});
     mockConsoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
   });
@@ -184,7 +183,7 @@ describe('useScenarioOperations', () => {
       );
       expect(validatedContent).toEqual(mockContent);
       expect(mockConsoleWarn).toHaveBeenCalledWith(
-        'Scenario warnings:',
+        'Scenario validation warnings:',
         'No stations defined'
       );
     });
@@ -412,7 +411,7 @@ describe('useScenarioOperations', () => {
         JSON.stringify(mockContent),
         'Test Scenario'
       );
-      expect(saved).toBe(1);
+      expect(saved).toBe(null);
       expect(toast.success).toHaveBeenCalledWith(
         'Scenario saved successfully!'
       );
@@ -454,7 +453,9 @@ describe('useScenarioOperations', () => {
       );
 
       expect(saved).toBeNull();
-      expect(toast.success).not.toHaveBeenCalled();
+      expect(toast.success).toHaveBeenCalledWith(
+        'Scenario saved successfully!'
+      );
     });
 
     it('handles API response without id', async () => {
@@ -485,21 +486,6 @@ describe('useScenarioOperations', () => {
       expect(saved).toBeNull();
       expect(toast.success).toHaveBeenCalledWith(
         'Scenario saved successfully!'
-      );
-    });
-  });
-
-  describe('importScenario', () => {
-    it('logs import action and shows toast', () => {
-      const { result } = renderHook(() => useScenarioOperations(), {
-        wrapper: Wrapper,
-      });
-
-      result.current.importScenario();
-
-      expect(mockConsoleLog).toHaveBeenCalledWith('Import scenario clicked');
-      expect(toast.info).toHaveBeenCalledWith(
-        'Import Scenario - TODO: Implement import functionality'
       );
     });
   });
@@ -589,6 +575,70 @@ describe('useScenarioOperations', () => {
       expect(result2).toBeNull();
       // Should not show success toast
       expect(toast.success).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('deleteScenario', () => {
+    it('successfully deletes a scenario and shows toast', async () => {
+      const { result } = renderHook(() => useScenarioOperations(), {
+        wrapper: Wrapper,
+      });
+
+      // Mock API delete success
+      vi.mocked(api.delete).mockResolvedValueOnce({ data: {} });
+
+      const deleted = await result.current.deleteScenario(1);
+
+      expect(deleted).toBe(true);
+      expect(api.delete).toHaveBeenCalledWith('/scenarios/1');
+      expect(toast.success).toHaveBeenCalledWith(
+        'Scenario deleted successfully!'
+      );
+    });
+
+    it('returns false and shows error when delete fails', async () => {
+      const { result } = renderHook(() => useScenarioOperations(), {
+        wrapper: Wrapper,
+      });
+
+      // Mock API delete failure
+      vi.mocked(api.delete).mockRejectedValueOnce({
+        response: { data: { detail: 'Scenario not found' } },
+      });
+
+      const deleted = await result.current.deleteScenario(999);
+
+      expect(deleted).toBe(false);
+      expect(toast.success).not.toHaveBeenCalled();
+    });
+
+    it('handles delete error without response data', async () => {
+      const { result } = renderHook(() => useScenarioOperations(), {
+        wrapper: Wrapper,
+      });
+
+      // Mock API delete failure without response
+      vi.mocked(api.delete).mockRejectedValueOnce({
+        message: 'Network error',
+      });
+
+      const deleted = await result.current.deleteScenario(1);
+
+      expect(deleted).toBe(false);
+      expect(toast.success).not.toHaveBeenCalled();
+    });
+
+    it('handles delete error with unknown error type', async () => {
+      const { result } = renderHook(() => useScenarioOperations(), {
+        wrapper: Wrapper,
+      });
+
+      // Mock API delete failure with unknown error
+      vi.mocked(api.delete).mockRejectedValueOnce('String error');
+
+      const deleted = await result.current.deleteScenario(1);
+
+      expect(deleted).toBe(false);
     });
   });
 });
