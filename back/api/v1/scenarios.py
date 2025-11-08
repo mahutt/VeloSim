@@ -23,8 +23,10 @@ SOFTWARE.
 """
 
 import math
+from typing import Dict, Any, List
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
+from pydantic import BaseModel
 
 from back.database.session import get_db
 from back.auth.dependency import get_user_id
@@ -37,40 +39,33 @@ from back.schemas.scenario import (
     ScenarioResponse,
     ScenarioUpdate,
     ScenarioUpdateRequest,
-    ScenarioValidationRequest,
-    ScenarioValidationResponse,
 )
 from back.services.scenario_validation_service import ScenarioValidator
 
 router = APIRouter(prefix="/scenarios", tags=["scenarios"])
 
 
-@router.get("/", response_model=ScenarioListResponse)
-def get_scenarios(
-    skip: int = Query(0, ge=0, description="Number of scenarios to skip"),
-    limit: int = Query(10, ge=1, le=100, description="Number of scenarios to retrieve"),
-    requesting_user: int = Depends(get_user_id),
-    db: Session = Depends(get_db),
-) -> ScenarioListResponse:
-    """Get all scenarios with pagination."""
-    try:
-        scenarios, total = scenario_crud.get_by_user(db, requesting_user, skip, limit)
-    except BadRequestError as err:
-        raise HTTPException(status_code=400, detail=str(err))
-    except VelosimPermissionError as err:
-        raise HTTPException(status_code=403, detail=str(err))
-    except ItemNotFoundError as err:
-        raise HTTPException(status_code=404, detail=str(err))
+class ValidationRequest(BaseModel):
+    """Request schema for validating scenario content only."""
 
-    total_pages = math.ceil(total / limit) if total > 0 else 0
-    page = (skip // limit) + 1
+    content: Dict[str, Any]
 
-    return ScenarioListResponse(
-        scenarios=[ScenarioResponse.model_validate(scenario) for scenario in scenarios],
-        total=total,
-        page=page,
-        per_page=limit,
-        total_pages=total_pages,
+
+class ValidationResponse(BaseModel):
+    """Response schema for validation endpoint."""
+
+    valid: bool
+    errors: List[Dict[str, str]] = []
+
+
+@router.post("/validate", response_model=ValidationResponse)
+def validate_scenario_content(request: ValidationRequest) -> ValidationResponse:
+    """Validate scenario content without creating a scenario."""
+    validator = ScenarioValidator()
+    validation_errors = validator.validate_all(request.content)
+
+    return ValidationResponse(
+        valid=len(validation_errors) == 0, errors=validation_errors
     )
 
 
@@ -130,57 +125,32 @@ def get_scenario_template(
     }
 
 
-@router.post("/validate", response_model=ScenarioValidationResponse)
-def validate_scenario(
-    request: ScenarioValidationRequest,
+@router.get("/", response_model=ScenarioListResponse)
+def get_scenarios(
+    skip: int = Query(0, ge=0, description="Number of scenarios to skip"),
+    limit: int = Query(10, ge=1, le=100, description="Number of scenarios to retrieve"),
     requesting_user: int = Depends(get_user_id),
-) -> ScenarioValidationResponse:
-    """
-    Validate scenario content without saving it.
+    db: Session = Depends(get_db),
+) -> ScenarioListResponse:
+    """Get all scenarios with pagination."""
+    try:
+        scenarios, total = scenario_crud.get_by_user(db, requesting_user, skip, limit)
+    except BadRequestError as err:
+        raise HTTPException(status_code=400, detail=str(err))
+    except VelosimPermissionError as err:
+        raise HTTPException(status_code=403, detail=str(err))
+    except ItemNotFoundError as err:
+        raise HTTPException(status_code=404, detail=str(err))
 
-    This endpoint uses the existing Pydantic-based ScenarioValidator to check
-    scenario content for structural and semantic errors. It leverages the same
-    validation logic used in create and update operations.
+    total_pages = math.ceil(total / limit) if total > 0 else 0
+    page = (skip // limit) + 1
 
-    Args:
-        request: ScenarioValidationRequest containing the content to validate.
-
-    Returns:
-        ScenarioValidationResponse with validation results including:
-        - valid: Boolean indicating if scenario is valid
-        - errors: List of validation error messages
-        - warnings: List of non-critical warnings
-
-    Example:
-        POST /scenarios/validate
-        {
-            "content": {
-                "scenario_title": "Test Scenario",
-                "start_time": "08:00",
-                "end_time": "17:00",
-                "stations": [...],
-                "resources": [...],
-                "initial_tasks": [...]
-            }
-        }
-    """
-    validator = ScenarioValidator()
-    validation_errors = validator.validate_all({"content": request.content})
-
-    # Convert validation errors to simple string messages
-    errors = [err["message"] for err in validation_errors]
-    warnings = []
-
-    # Add warnings for missing but not invalid data
-    if not request.content.get("resources"):
-        warnings.append("No resources defined - scenario may not function properly")
-    if not request.content.get("stations"):
-        warnings.append("No stations defined - scenario may not function properly")
-
-    return ScenarioValidationResponse(
-        valid=len(errors) == 0,
-        errors=errors,
-        warnings=warnings,
+    return ScenarioListResponse(
+        scenarios=[ScenarioResponse.model_validate(scenario) for scenario in scenarios],
+        total=total,
+        page=page,
+        per_page=limit,
+        total_pages=total_pages,
     )
 
 

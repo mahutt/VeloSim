@@ -26,8 +26,6 @@ from typing import Any, Dict, List, Set
 from pydantic import BaseModel, ValidationError, model_validator, field_validator
 from datetime import datetime
 
-from back.schemas.scenario import ScenarioResponse
-
 
 class PositionValidator(BaseModel):
     lat: float
@@ -165,27 +163,20 @@ class ScenarioValidator:
         ]
 
     def validate_syntax(self, content: Dict[str, Any]) -> List[Dict[str, str]]:
+        """Validate the syntax of scenario content only."""
         errors: List[Dict[str, str]] = []
 
-        required_fields = [
-            name
-            for name, field in ScenarioResponse.model_fields.items()
-            if getattr(field, "is_required", False)
-        ]
+        # Validate start_time and end_time exist and are properly formatted
+        required_fields = ["start_time", "end_time"]
         errors.extend(self.check_required_fields(content, required_fields))
 
-        if "content" in content:
-            scenario_content = content["content"]
-            try:
-                ScenarioTimes(**scenario_content)
-            except ValidationError as e:
-                for err in e.errors():
-                    field_path = "content." + ".".join(map(str, err["loc"]))
-                    errors.append({"field": field_path, "message": err["msg"]})
-        else:
-            errors.append(
-                {"field": "content", "message": "Missing required field 'content'"}
-            )
+        # Validate time format and constraints
+        try:
+            ScenarioTimes(**content)
+        except ValidationError as e:
+            for err in e.errors():
+                field_path = ".".join(map(str, err["loc"]))
+                errors.append({"field": field_path, "message": err["msg"]})
 
         return errors
 
@@ -333,14 +324,16 @@ class ScenarioValidator:
 
         return errors
 
-    def validate_all(self, scenario: Dict[str, Any]) -> List[Dict[str, str]]:
-        errors: List[Dict[str, str]] = self.validate_syntax(scenario)
+    def validate_all(self, scenario_content: Dict[str, Any]) -> List[Dict[str, str]]:
+        """Validate all aspects of scenario content."""
+        errors: List[Dict[str, str]] = self.validate_syntax(scenario_content)
 
-        content: Dict[str, Any] = scenario.get("content", {})
-        stations: List[Dict[str, Any]] = content.get("stations", [])
-        resources: List[Dict[str, Any]] = content.get("resources", [])
-        initial_tasks: List[Dict[str, Any]] = content.get("initial_tasks", [])
-        scheduled_tasks: List[Dict[str, Any]] = content.get("scheduled_tasks", [])
+        stations: List[Dict[str, Any]] = scenario_content.get("stations", [])
+        resources: List[Dict[str, Any]] = scenario_content.get("resources", [])
+        initial_tasks: List[Dict[str, Any]] = scenario_content.get("initial_tasks", [])
+        scheduled_tasks: List[Dict[str, Any]] = scenario_content.get(
+            "scheduled_tasks", []
+        )
 
         errors.extend(self.validate_stations(stations))
         errors.extend(self.validate_resources(resources))
@@ -349,5 +342,5 @@ class ScenarioValidator:
         for task_list in [initial_tasks, scheduled_tasks]:
             errors.extend(self.validate_tasks(task_list, valid_station_ids))
 
-        errors.extend(self.validate_simulation_params(content))
+        errors.extend(self.validate_simulation_params(scenario_content))
         return errors
