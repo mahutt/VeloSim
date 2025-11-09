@@ -91,36 +91,53 @@ def get_scenario_template(
                 {
                     "station_id": 1,
                     "station_name": "Station 1",
-                    "task_count": 2,
-                    "station_position": [40.7128, -74.0060],
+                    "station_position": [-74.0060, 40.7128],
                 }
             ],
             "resources": [
                 {
                     "resource_id": 1,
-                    "task_count": 2,
-                    "resource_position": [40.7128, -74.0060],
+                    "resource_position": [-74.0060, 40.7128],
                 }
             ],
             "initial_tasks": [
                 {
-                    "id": "task_1",
-                    "station_id": "1",
-                    "time": "08:30",
+                    "id": "t1",
+                    "station_id": 1,
                 }
+            ],
+            "scheduled_tasks": [
+                {
+                    "id": "t2",
+                    "station_id": 1,
+                    "time": 1800,
+                },
+                {
+                    "id": "t3",
+                    "station_id": 1,
+                    "time": 3600,
+                },
             ],
         },
         "description": (
-            "Template fields:\n"
+            "Template for scenario creation. Format requirements:\n\n"
             "- scenario_title: Name of the scenario\n"
             "- start_time: RFC 3339 datetime (e.g., '2025-11-06T08:00:00Z') "
             "or simple time (e.g., '08:00')\n"
             "- end_time: RFC 3339 datetime or simple time (can span multiple days)\n"
-            "- stations: List of station objects with id, name, task_count, "
-            "and position [lat, lon]\n"
-            "- resources: List of resource objects with id, task_count, "
-            "and position [lat, lon]\n"
-            "- initial_tasks: List of task objects with id, station_id, and time"
+            "- stations: List of station objects with id, name, "
+            "and position [lon, lat]\n"
+            "- resources: List of resource objects with id "
+            "and position [lon, lat]\n"
+            "- initial_tasks: Tasks to spawn immediately at simulation start.\n"
+            "  * id: Unique task identifier (string format: 't1', 't2', etc.)\n"
+            "  * station_id: Target station ID (integer)\n"
+            "  * time: NOT REQUIRED (tasks spawn immediately)\n"
+            "- scheduled_tasks: Tasks to spawn after a delay.\n"
+            "  * id: Unique task identifier (string format: 't1', 't2', etc.)\n"
+            "  * station_id: Target station ID (integer)\n"
+            "  * time: REQUIRED - delay in seconds (numeric, "
+            "e.g., 1800 for 30 min, 3600 for 1 hour)\n\n"
         ),
     }
 
