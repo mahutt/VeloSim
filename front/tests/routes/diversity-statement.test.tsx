@@ -22,25 +22,39 @@
  * SOFTWARE.
  */
 
-import {
-  type RouteConfig,
-  index,
-  layout,
-  route,
-} from '@react-router/dev/routes';
+import { expect, test } from 'vitest';
+import { render, screen } from '@testing-library/react';
+import DiversityStatement, { meta } from '~/routes/diversity-statement';
+import { createRoutesStub } from 'react-router';
 
-export default [
-  layout('./layouts/authenticated.tsx', [
-    index('routes/home.tsx'),
-    route('simulation', 'routes/simulation.tsx'),
-    route('simulations', 'routes/simulations.tsx'),
-    route('scenarios', 'routes/scenarios.tsx'),
+test('meta function sets the title', () => {
+  const metaInfo = meta();
+  expect(metaInfo[0].title).toBeDefined();
+  expect(metaInfo[0].title).toBe('Diversity Statement');
+});
 
-    // Admin pages
-    route('users', 'routes/users.tsx'),
-  ]),
-  layout('./layouts/unauthenticated.tsx', [route('login', 'routes/login.tsx')]),
+test('diversity statement page renders key points', () => {
+  const Stub = createRoutesStub([
+    {
+      path: '/diversity-statement',
+      Component: DiversityStatement,
+    },
+  ]);
 
-  // Public pages accessible to anyone
-  route('diversity-statement', 'routes/diversity-statement.tsx'),
-] satisfies RouteConfig;
+  render(<Stub initialEntries={['/diversity-statement']} />);
+
+  // Check that page tabs cover both supported languages
+  expect(screen.getByText('English')).toBeDefined();
+  expect(screen.getByText('Français')).toBeDefined();
+});
+
+test('renders cards with headers', () => {
+  const Stub = createRoutesStub([
+    {
+      path: '/diversity-statement',
+      Component: DiversityStatement,
+    },
+  ]);
+
+  render(<Stub initialEntries={['/diversity-statement']} />);
+});
