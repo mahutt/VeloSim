@@ -150,11 +150,6 @@ export class VeloSimStack extends cdk.Stack {
       ],
     });
 
-    // Create instance profile
-    const instanceProfile = new iam.CfnInstanceProfile(this, 'ECSInstanceProfile', {
-      roles: [ecsInstanceRole.roleName],
-    });
-
     // ============================================================================
     // ECS Task Definition
     // ============================================================================
@@ -338,33 +333,6 @@ export class VeloSimStack extends cdk.Stack {
     const migrationTaskDefinition = new ecs.Ec2TaskDefinition(this, 'VeloSimMigrationTaskDef', {
       networkMode: ecs.NetworkMode.BRIDGE,
       family: 'velosim-migration',
-    });
-
-    // CloudWatch Log Group for migration logs
-    const migrationLogGroup = new logs.LogGroup(this, 'VeloSimMigrationLogGroup', {
-      logGroupName: '/ecs/velosim-migrations',
-      retention: logs.RetentionDays.ONE_WEEK,
-      removalPolicy: cdk.RemovalPolicy.DESTROY,
-    });
-
-    const migrationContainer = migrationTaskDefinition.addContainer('migrations', {
-      image: ecs.ContainerImage.fromEcrRepository(ecrRepository, 'latest'),
-      logging: ecs.LogDrivers.awsLogs({ streamPrefix: 'migrations', logGroup }),
-      memoryLimitMiB: 512,
-      environment: {
-        DB_HOST: database.dbInstanceEndpointAddress,
-        DB_PORT: database.dbInstanceEndpointPort,
-        DB_NAME: 'velosim',
-        ENVIRONMENT: 'production',
-        DEBUG: 'false',
-      },
-      secrets: {
-        DB_USERNAME: ecs.Secret.fromSecretsManager(dbCredentials, 'username'),
-        DB_PASSWORD: ecs.Secret.fromSecretsManager(dbCredentials, 'password'),
-      },
-      // Run in /app/back so alembic.ini is picked up automatically
-      workingDirectory: '/app/back',
-      command: ['alembic', 'upgrade', 'head'],
     });
 
     // ============================================================================
