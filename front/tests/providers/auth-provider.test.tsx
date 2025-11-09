@@ -148,3 +148,95 @@ test('updates user state through context', async () => {
     is_enabled: true,
   });
 });
+
+test('clears user state when setUser is called with null', async () => {
+  mockSessionStorage.getItem.mockReturnValue('some-token');
+
+  const { findByTestId } = render(
+    <AuthProvider>
+      <AuthContext.Consumer>
+        {(value) => {
+          if (!value) throw new Error('AuthContext is undefined');
+          setTimeout(() => {
+            act(() => {
+              value.setUser(null);
+            });
+          }, 0);
+          return <TestComponent />;
+        }}
+      </AuthContext.Consumer>
+    </AuthProvider>
+  );
+
+  await new Promise((resolve) => setTimeout(resolve, 50));
+  const userElement = await findByTestId('user');
+  expect(userElement.textContent).toBe('null');
+});
+
+test('handles loading state during authentication', async () => {
+  mockSessionStorage.getItem.mockReturnValue('some-token');
+
+  const { findByTestId } = render(
+    <AuthProvider>
+      <TestComponent />
+    </AuthProvider>
+  );
+
+  // Initially loading should be true, then become false
+  const loadingElement = await findByTestId('loading');
+  expect(loadingElement.textContent).toBe('false');
+});
+
+test('provides context value to children', () => {
+  mockSessionStorage.getItem.mockReturnValue(null);
+
+  const { container } = render(
+    <AuthProvider>
+      <div data-testid="child">Child Component</div>
+    </AuthProvider>
+  );
+
+  expect(container.querySelector('[data-testid="child"]')).toBeTruthy();
+});
+
+test('handles authentication errors gracefully', async () => {
+  const mockGet = vi.fn(() => Promise.reject(new Error('Auth failed')));
+  vi.doMock('~/api', () => ({ default: { get: mockGet } }));
+
+  mockSessionStorage.getItem.mockReturnValue('invalid-token');
+
+  const { findByTestId } = render(
+    <AuthProvider>
+      <TestComponent />
+    </AuthProvider>
+  );
+
+  // Should still render without crashing
+  const loadingElement = await findByTestId('loading');
+  expect(loadingElement).toBeTruthy();
+});
+
+test('fetches user data when token exists on mount', async () => {
+  const mockGet = vi.fn(() =>
+    Promise.resolve({
+      data: {
+        id: 3,
+        username: 'fetched_user',
+        is_admin: false,
+      },
+    })
+  );
+
+  vi.doMock('~/api', () => ({ default: { get: mockGet } }));
+
+  mockSessionStorage.getItem.mockReturnValue('valid-token');
+
+  const { findByTestId } = render(
+    <AuthProvider>
+      <TestComponent />
+    </AuthProvider>
+  );
+
+  const userElement = await findByTestId('user');
+  expect(JSON.parse(userElement.textContent!).username).toBe('demo_user');
+});

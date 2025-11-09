@@ -43,14 +43,17 @@ import {
   adaptStationsToGeoJSON,
   adaptResourcesToGeoJSON,
 } from '~/lib/geojson-adapters';
-import { interpolateAlongRoute } from '~/lib/animation-helpers';
 import {
   setupMapClickHandlers,
   setupMapHoverHandlers,
 } from '~/lib/map-interactions';
 import useError from '~/hooks/use-error';
 import useAuth from '~/hooks/use-auth';
-import { logMissingEntityError } from '~/utils/simulation-error-utils';
+import {
+  logMissingEntityError,
+  logFrameProcessingError,
+  logSimulationError,
+} from '~/utils/simulation-error-utils';
 
 // Expect to receive frames every 1 second
 const FRAME_INTERVAL_MS = 1000;
@@ -150,10 +153,12 @@ export const SimulationProvider = ({
 
   // Backend WebSocket payload types (snake_case from backend)
   interface BackendTask {
-    id: number;
+    task_id: number;
+    task_state: 'open' | 'assigned' | 'inprogress' | 'completed' | 'scheduled';
     station_id: number;
-    state: 'open' | 'assigned' | 'inprogress' | 'completed';
+    station_name: string;
     assigned_resource_id: number | null;
+    scheduled_time?: number;
   }
 
   interface BackendStation {
@@ -173,27 +178,77 @@ export const SimulationProvider = ({
   }
 
   interface BackendPayload {
+    sim_id?: string;
+    tasks?: BackendTask[];
     stations?: BackendStation[];
     resources?: BackendResource[];
+    new_tasks?: BackendTask[];
+    clock?: {
+      simSecondsPassed: number;
+      simMinutesPassed: number;
+      realSecondsPassed: number;
+      realMinutesPassed: number;
+    };
   }
 
   // Convert WebSocket simulation data to frontend format
-  const adaptSimulationData = (payload: BackendPayload) => {
+  const adaptSimulationData = (
+    payload: BackendPayload,
+    isInitialFrame: boolean = false
+  ) => {
+    // Build a map of tasks by station_id for efficient lookup
+    const tasksByStation = new Map<number, BackendTask[]>();
+    const tasksByResource = new Map<number, BackendTask[]>();
+
+    if (payload.tasks) {
+      payload.tasks.forEach((task: BackendTask) => {
+        // Group by station
+        const stationTasks = tasksByStation.get(task.station_id) || [];
+        stationTasks.push(task);
+        tasksByStation.set(task.station_id, stationTasks);
+
+        // Group by assigned resource
+        if (task.assigned_resource_id !== null) {
+          const resourceTasks =
+            tasksByResource.get(task.assigned_resource_id) || [];
+          resourceTasks.push(task);
+          tasksByResource.set(task.assigned_resource_id, resourceTasks);
+        }
+      });
+    }
+
     // Merge stations (don't clear, just update what's in the payload)
     if (payload.stations) {
       payload.stations.forEach((station: BackendStation) => {
+        // Get existing station to preserve tasks if not in payload (only for updates)
+        const existingStation = !isInitialFrame
+          ? stationsRef.current.get(station.station_id)
+          : undefined;
+
+        // Get tasks for this station from the top-level tasks array
+        const stationTasks = tasksByStation.get(station.station_id);
+
+        // Backend sends [lon, lat] which is what GeoJSON expects
+        const position: [number, number] = station.station_position;
+
         const adaptedStation: Station = {
           id: station.station_id,
           name: station.station_name,
-          position: station.station_position,
-          tasks: station.station_tasks.map((task: BackendTask) => ({
-            id: task.id,
-            stationId: task.station_id,
-            type: 'battery_swap',
-            state: task.state,
-            assigned_resource_id: task.assigned_resource_id,
-          })),
-          task_count: station.task_count,
+          position: position,
+          // Only update tasks if they're in the payload, otherwise preserve existing (for updates only)
+          tasks: stationTasks
+            ? stationTasks.map((task: BackendTask) => ({
+                id: task.task_id,
+                stationId: task.station_id,
+                type: 'battery_swap',
+                state:
+                  task.task_state === 'scheduled' ? 'open' : task.task_state,
+                assigned_resource_id: task.assigned_resource_id,
+              }))
+            : existingStation?.tasks || [],
+          task_count: stationTasks
+            ? stationTasks.length
+            : existingStation?.task_count || 0,
         };
         stationsRef.current.set(adaptedStation.id, adaptedStation);
       });
@@ -202,11 +257,27 @@ export const SimulationProvider = ({
     // Merge resources (don't clear, just update what's in the payload)
     if (payload.resources) {
       payload.resources.forEach((resource: BackendResource) => {
+        // Get existing resource to preserve tasks if not in payload (only for updates)
+        const existingResource = !isInitialFrame
+          ? resourcesRef.current.get(resource.resource_id)
+          : undefined;
+
+        // Get tasks for this resource from the top-level tasks array
+        const resourceTasks = tasksByResource.get(resource.resource_id);
+
+        // Backend sends [lon, lat] which is what GeoJSON expects
+        const position: [number, number] = resource.resource_position;
+
         const adaptedResource: Resource = {
           id: resource.resource_id,
-          position: resource.resource_position,
-          taskList: resource.resource_tasks.map((t: BackendTask) => t.id),
-          task_count: resource.task_count,
+          position: position,
+          // Only update tasks if they're in the payload, otherwise preserve existing (for updates only)
+          taskList: resourceTasks
+            ? resourceTasks.map((t: BackendTask) => t.task_id)
+            : existingResource?.taskList || [],
+          task_count: resourceTasks
+            ? resourceTasks.length
+            : existingResource?.task_count || 0,
           in_progress_task_id: resource.in_progress_task_id,
         };
         resourcesRef.current.set(adaptedResource.id, adaptedResource);
@@ -231,15 +302,11 @@ export const SimulationProvider = ({
 
     // Check if map style is loaded
     if (!map.isStyleLoaded()) {
-      console.log('[Map] Style not loaded yet, waiting...');
       map.once('styledata', () => {
-        console.log('[Map] Style loaded, retrying update');
         updateMapSources(selectedStationId, selectedResourceId);
       });
       return;
     }
-
-    console.log('[Map] Updating sources');
 
     // Update stations
     if (stationsRef.current.size > 0) {
@@ -339,72 +406,101 @@ export const SimulationProvider = ({
   const handleInitialFrame = (payload: BackendPayload) => {
     console.log('[WS] Handling initial frame:', payload);
 
-    // Store initial data
-    const updatedResources = adaptSimulationData(payload);
-    setResources(updatedResources);
+    try {
+      // Store initial data (pass true to indicate this is initial frame)
+      const updatedResources = adaptSimulationData(payload, true);
+      setResources(updatedResources);
 
-    // Initialize positions for all resources
-    if (payload.resources) {
-      payload.resources.forEach((resource: BackendResource) => {
-        const position: [number, number] = resource.resource_position;
-        frameStartPositionsRef.current.set(resource.resource_id, position);
-        currentPositionsRef.current.set(resource.resource_id, position);
-        targetPositionsRef.current.set(resource.resource_id, position);
+      // Initialize positions for all resources
+      if (payload.resources) {
+        payload.resources.forEach((resource: BackendResource) => {
+          // Backend sends [lon, lat] which is what GeoJSON expects
+          const position: [number, number] = resource.resource_position;
+          frameStartPositionsRef.current.set(resource.resource_id, position);
+          currentPositionsRef.current.set(resource.resource_id, position);
+          targetPositionsRef.current.set(resource.resource_id, position);
+        });
+      }
+
+      // Update initial frame time
+      lastFrameTimeRef.current = performance.now();
+
+      // Start animation loop
+      console.log('[Animation] Starting animation loop');
+      animationFrameRef.current = requestAnimationFrame(animateResources);
+
+      // Update map with initial data
+      updateMapSources(
+        selectedStationIdRef.current,
+        selectedResourceIdRef.current
+      );
+
+      // Transition from loading to ready
+      setSimulationStatus('ready');
+    } catch (error) {
+      logSimulationError(error, 'Failed to process initial frame', {
+        errorType: 'INITIAL_FRAME_ERROR',
+        payloadKeys: Object.keys(payload),
       });
+      displayError(
+        'Initialization Error',
+        'Failed to initialize simulation. Please refresh and try again.'
+      );
+      setSimulationStatus('error');
     }
-
-    // Update initial frame time
-    lastFrameTimeRef.current = performance.now();
-
-    // Start animation loop
-    console.log('[Animation] Starting animation loop');
-    animationFrameRef.current = requestAnimationFrame(animateResources);
-
-    // Update map with initial data
-    updateMapSources(
-      selectedStationIdRef.current,
-      selectedResourceIdRef.current
-    );
-
-    // Transition from loading to ready
-    setSimulationStatus('ready');
   };
 
   // Handle frame updates from WebSocket
   const handleFrameUpdate = (payload: BackendPayload) => {
     console.log('[WS] Handling frame update:', payload);
 
-    // Update data
-    const updatedResources = adaptSimulationData(payload);
-    setResources(updatedResources);
+    try {
+      // Update data (pass false to preserve existing tasks if not in payload)
+      const updatedResources = adaptSimulationData(payload, false);
+      setResources(updatedResources);
 
-    // Update frame start time and positions for new frame
-    const now = performance.now();
-    lastFrameTimeRef.current = now;
+      // Update frame start time and positions for new frame
+      const now = performance.now();
+      lastFrameTimeRef.current = now;
 
-    // For each resource, update the frame start position and target
-    if (payload.resources) {
-      payload.resources.forEach((resource: BackendResource) => {
-        const newPosition: [number, number] = resource.resource_position;
+      // For each resource, update the frame start position and target
+      if (payload.resources) {
+        payload.resources.forEach((resource: BackendResource) => {
+          // Backend sends [lon, lat] which is what GeoJSON expects
+          const newPosition: [number, number] = resource.resource_position;
 
-        // Set frame start to current animated position
-        const currentPos = currentPositionsRef.current.get(
-          resource.resource_id
-        );
-        if (currentPos) {
-          frameStartPositionsRef.current.set(resource.resource_id, currentPos);
-        } else {
-          frameStartPositionsRef.current.set(resource.resource_id, newPosition);
-        }
+          // Set frame start to current animated position
+          const currentPos = currentPositionsRef.current.get(
+            resource.resource_id
+          );
+          if (currentPos) {
+            frameStartPositionsRef.current.set(
+              resource.resource_id,
+              currentPos
+            );
+          } else {
+            frameStartPositionsRef.current.set(
+              resource.resource_id,
+              newPosition
+            );
+          }
 
-        // Set new target
-        targetPositionsRef.current.set(resource.resource_id, newPosition);
+          // Set new target
+          targetPositionsRef.current.set(resource.resource_id, newPosition);
+        });
+      }
+
+      // Ensure we're in running state
+      if (simulationStatus !== 'running') {
+        setSimulationStatus('running');
+      }
+    } catch (error) {
+      logSimulationError(error, 'Failed to process frame update', {
+        errorType: 'FRAME_UPDATE_ERROR',
+        payloadKeys: Object.keys(payload),
       });
-    }
-
-    // Ensure we're in running state
-    if (simulationStatus !== 'running') {
-      setSimulationStatus('running');
+      // Don't show error dialog for individual frame failures - just log it
+      // The simulation will continue with the last good state
     }
   };
 
@@ -425,9 +521,11 @@ export const SimulationProvider = ({
 
       if (!start || !target) return;
 
-      // Interpolate position
-      const routeGeometry = resource.route?.coordinates || [];
-      const currentPos = interpolateAlongRoute(routeGeometry, start, target, t);
+      // Linear interpolation between start and target positions
+      const currentPos: [number, number] = [
+        start[0] + (target[0] - start[0]) * t, // longitude
+        start[1] + (target[1] - start[1]) * t, // latitude
+      ];
 
       // Update current position
       const prevPos = currentPositionsRef.current.get(resource.id);
@@ -548,16 +646,16 @@ export const SimulationProvider = ({
           payload = JSON.parse(payload);
         }
 
-        // Handle initial frame (seq_numb === 0)
-        if (message.seq_numb === 0) {
+        // Handle initial frame (seq === 0)
+        if (message.seq === 0) {
           console.log('[WS] 🎬 Initial frame received');
           handleInitialFrame(payload);
           return;
         }
 
-        // Handle regular frames (seq_numb > 0)
-        if (message.seq_numb > 0) {
-          console.log('[WS] 🎞️  Frame', message.seq_numb);
+        // Handle regular frames (seq > 0)
+        if (message.seq > 0) {
+          console.log('[WS] 🎞️  Frame', message.seq);
           handleFrameUpdate(payload);
           return;
         }
@@ -566,6 +664,11 @@ export const SimulationProvider = ({
       } catch (error) {
         console.error('[WS] ❌ Parse error:', error);
         console.error('[WS] Raw data:', event.data);
+        logFrameProcessingError(error, event.data?.seq || -1);
+        displayError(
+          'Simulation Frame Error',
+          'An error occurred while processing simulation data. The simulation may not display correctly.'
+        );
       }
     };
 

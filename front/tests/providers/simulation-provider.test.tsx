@@ -69,6 +69,7 @@ global.WebSocket = MockedWebSocketConstructor as unknown as typeof WebSocket;
 vi.mock('~/utils/simulation-error-utils', () => ({
   logSimulationError: vi.fn(),
   logMissingEntityError: vi.fn(),
+  logFrameProcessingError: vi.fn(),
 }));
 
 // Mock useAuth hook with stable user reference
@@ -543,7 +544,7 @@ test('WebSocket handles initial frame (seq_numb === 0)', async () => {
   // Send initial frame
   const initialFrame = {
     type: 'frame',
-    seq_numb: 0,
+    seq: 0,
     payload: {
       resources: [
         {
@@ -612,7 +613,7 @@ test('WebSocket handles frame updates (seq_numb > 0)', async () => {
   // Send initial frame first
   const initialFrame = {
     type: 'frame',
-    seq_numb: 0,
+    seq: 0,
     payload: {
       resources: [
         {
@@ -642,7 +643,7 @@ test('WebSocket handles frame updates (seq_numb > 0)', async () => {
   // Send frame update
   const frameUpdate = {
     type: 'frame',
-    seq_numb: 1,
+    seq: 1,
     payload: {
       resources: [
         {

@@ -108,6 +108,19 @@ export default function ScenarioEditor() {
     loadSavedScenarios().then(setSavedScenarios);
   }, []); // Only run once on mount
 
+  // Sync scenarioName with scenario_title in JSON content
+  useEffect(() => {
+    if (!scenarioContent) return;
+    try {
+      const parsed = JSON.parse(scenarioContent);
+      if (parsed.scenario_title && parsed.scenario_title !== scenarioName) {
+        setScenarioName(parsed.scenario_title);
+      }
+    } catch {
+      // ignore if not valid JSON
+    }
+  }, [scenarioContent, scenarioName]);
+
   // Helper function to generate incremented name
   const generateIncrementedName = useCallback(
     (baseName: string, scenarios: Scenario[]): string => {
@@ -185,12 +198,40 @@ export default function ScenarioEditor() {
     [saveScenario, displayError, loadSavedScenarios]
   );
 
-  // Call /simulation/initialize via HTTP POST to initialize simulation
   const handleStartScenario = async () => {
     try {
-      // Call backend API to initialize simulation
-      const response = await api.post('/simulation/initialize');
+      // Validate content first
+      if (!scenarioContent.trim()) {
+        displayError(
+          'No Scenario',
+          'Please create or load a scenario before starting simulation.'
+        );
+        return;
+      }
+
+      // Parse the scenario content
+      let content;
+      try {
+        content = JSON.parse(scenarioContent);
+      } catch {
+        displayError(
+          'Invalid Scenario',
+          'The scenario content is not valid JSON. Please fix it before starting.'
+        );
+        return;
+      }
+
+      // Wrap scenario content in the expected format
+      const scenarioData = {
+        id: selectedScenarioId || 0, // Use 0 for unsaved scenarios
+        name: scenarioName || 'Untitled Scenario',
+        content: content,
+      };
+
+      // Call backend API to initialize simulation with scenario data
+      const response = await api.post('/simulation/initialize', scenarioData);
       const data = response.data;
+
       if (data && data.sim_id) {
         const simId = data.sim_id;
         console.log('Received sim_id:', simId);
