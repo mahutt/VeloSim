@@ -473,7 +473,11 @@ class TestSimulationService:
             simulation_service.get_simulation_status(db, sim_id, test_user2.id)
 
     def test_stop_all_simulations_admin(
-        self, db: Session, test_user: User, admin_user: User, simulation_service: SimulationService
+        self,
+        db: Session,
+        test_user: User,
+        admin_user: User,
+        simulation_service: SimulationService,
     ) -> None:
         """Test that admin can stop all simulations."""
         resp1 = simulation_service.initialize_simulation(
@@ -585,7 +589,9 @@ class TestSimulationService:
         mock_sim = sim_data["simulator"]
         with patch.object(mock_sim, "get_sim_by_id", return_value=None):
             playback_speed = PlaybackSpeedBase(playback_speed=2.0)
-            with pytest.raises(RuntimeError, match="Simulation .* not found in simulator"):
+            with pytest.raises(
+                RuntimeError, match="Simulation .* not found in simulator"
+            ):
                 simulation_service.set_playback_speed(
                     db, sim_id, playback_speed, test_user.id
                 )
