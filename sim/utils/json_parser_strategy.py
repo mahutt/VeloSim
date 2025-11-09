@@ -22,7 +22,6 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 """
 
-import json
 import simpy
 from datetime import datetime
 from typing import Dict
@@ -44,109 +43,81 @@ class JsonParseStrategy(BaseParseStrategy):
             print(f"Invalid time format '{time_str}', defaulting to 0s.")
             return 0
 
-    def parse(self, env: simpy.Environment, source: str) -> Dict[int, InputParameter]:
-        try:
-            data = json.loads(source)
-        except json.JSONDecodeError as e:
-            raise ValueError(f"Invalid JSON input: {e}") from e
+    def parse(self, scenario_json: dict) -> InputParameter:
+        """
+        Parse a single scenario JSON and return InputParameter
+        """
+        env = simpy.Environment()
+        content = scenario_json.get("content", {})
+        start_time = self._time_to_seconds(str(content.get("start_time", "00:00")))
+        end_time = self._time_to_seconds(str(content.get("end_time", "00:00")))
 
-        scenarios = data.get("scenarios", [])
-        if not isinstance(scenarios, list) or not scenarios:
-            raise ValueError("No scenarios found in JSON")
+        sim_time = end_time - start_time
+        if sim_time < 0:
+            sim_time += 24 * 3600
 
-        parsed: Dict[int, InputParameter] = {}
-
-        for scenario in scenarios:
-            sid = scenario.get("id")
-            content = scenario.get("content", {})
-            name = scenario.get("name", f"Scenario {sid}")
-
-            # Convers HH:MM to seconds for the sim
-            start_str = str(content.get("start_time", "00:00"))
-            end_str = str(content.get("end_time", "00:00"))
-            start_time = self._time_to_seconds(start_str)
-            end_time = self._time_to_seconds(end_str)
-
-            sim_time = end_time - start_time
-            if sim_time < 0:
-                sim_time += 24 * 3600
-            sim_time = int(sim_time)
-            # Stations
-            stations: Dict[int, Station] = {}
-            for s in content.get("stations", []):
-                try:
-                    station_id = int(s["station_id"])
-                    pos = s.get("station_position", [0, 0])
-                    stations[station_id] = Station(
-                        env=env,
-                        station_id=station_id,
-                        name=s.get("station_name", f"Station {station_id}"),
-                        position=Position(pos),
-                    )
-                except Exception as e:
-                    print(f"[WARN] Failed to parse station {s}: {e}")
-
-            # Tasks
-            tasks: Dict[int, BatterySwapTask] = {}
-
-            for t in content.get("initial_tasks", []):
-                try:
-                    tid = int(str(t["id"]).strip("t"))
-                    station_ref = stations.get(int(t["station_id"]))
-                    tasks[tid] = BatterySwapTask(
-                        env=env,
-                        task_id=tid,
-                        station=station_ref,
-                        spawn_delay=0.0,
-                    )
-                except Exception as e:
-                    print(f"[WARN] Failed to parse initial task {t}: {e}")
-
-            for t in content.get("scheduled_tasks", []):
-                try:
-                    tid = int(str(t["id"]).strip("t"))
-                    station_ref = stations.get(int(t["station_id"]))
-                    delay = float(t.get("time", 0))
-                    tasks[tid] = BatterySwapTask(
-                        env=env,
-                        task_id=tid,
-                        station=station_ref,
-                        spawn_delay=delay,
-                    )
-                except Exception as e:
-                    print(f"[WARN] Failed to parse scheduled task {t}: {e}")
-
-            # Ressources
-            resources: Dict[int, Resource] = {}
-            for r in content.get("resources", []):
-                try:
-                    rid = int(r["resource_id"])
-                    pos = r.get("resource_position", [0, 0])
-
-                    resources[rid] = Resource(
-                        env=env,
-                        resource_id=rid,
-                        position=Position(pos),
-                        task_list=[],
-                    )
-                except Exception as e:
-                    print(f"[WARN] Failed to parse resource {r}: {e}")
-
-            params = InputParameter(
-                station_entities=stations,
-                resource_entities=resources,
-                task_entities=tasks,
-                real_time_factor=1.0,
-                key_frame_freq=3000,
-                sim_time=int(sim_time),
+        # Build stations
+        stations: Dict[int, Station] = {}
+        for s in content.get("stations", []):
+            station_id = int(s["station_id"])
+            pos = Position(s.get("station_position", [0, 0]))
+            stations[station_id] = Station(
+                env=env,
+                station_id=station_id,
+                name=s.get("station_name", f"Station {station_id}"),
+                position=pos,
             )
 
-            parsed[sid] = params
-
-            print(
-                f"Parsed Scenario '{name}' (id={sid}) → "
-                f"{len(stations)} stations, {len(resources)} resources, "
-                f"{len(tasks)} tasks, sim_time={sim_time:.0f}s"
+        # Build resources
+        resources: Dict[int, Resource] = {}
+        for r in content.get("resources", []):
+            rid = int(r["resource_id"])
+            pos = Position(r.get("resource_position", [0, 0]))
+            resources[rid] = Resource(
+                env=env, resource_id=rid, position=pos, task_list=[]
             )
 
-        return parsed
+        # Build tasks
+        tasks: Dict[int, BatterySwapTask] = {}
+
+        # Initial tasks
+        for t in content.get("initial_tasks", []):
+            tid = int(str(t["id"]).strip("t"))
+            station_ref = stations[int(t["station_id"])]
+            task = BatterySwapTask(
+                env=env, task_id=tid, station=station_ref, spawn_delay=0.0
+            )
+            tasks[tid] = task
+            station_ref.add_task(task)
+
+            # Assign to resource if specified
+            assigned_rid = t.get("assigned_resource_id")
+            if assigned_rid is not None:
+                resources[int(assigned_rid)].assign_task(task)
+
+        # Scheduled tasks
+        for t in content.get("scheduled_tasks", []):
+            tid = int(str(t["id"]).strip("t"))
+            station_ref = stations[int(t["station_id"])]
+            raw_time = t.get("time", 0)
+            if isinstance(raw_time, str):
+                delay = self._time_to_seconds(raw_time)
+            else:
+                delay = int(raw_time)
+
+            task = BatterySwapTask(
+                env=env, task_id=tid, station=station_ref, spawn_delay=delay
+            )
+            tasks[tid] = task
+            station_ref.add_task(task)
+
+        params = InputParameter(
+            station_entities=stations,
+            resource_entities=resources,
+            task_entities=tasks,
+            real_time_factor=content.get("real_time_factor", 1.0),
+            key_frame_freq=content.get("key_frame_freq", 20),
+            sim_time=sim_time,
+        )
+
+        return params

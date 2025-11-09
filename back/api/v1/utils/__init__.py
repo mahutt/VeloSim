@@ -27,7 +27,7 @@ from .sim_websocket_helpers import (
     WebSocketSubscriber,
     safe_send_json,
     get_simulation_or_error,
-    attach_subscriber,
+    attach_ws_subscriber,
     start_or_resume_simulation,
     cleanup_simulation,
 )
@@ -36,7 +36,7 @@ __all__ = [
     "WebSocketSubscriber",
     "safe_send_json",
     "get_simulation_or_error",
-    "attach_subscriber",
+    "attach_ws_subscriber",
     "start_or_resume_simulation",
     "cleanup_simulation",
 ]

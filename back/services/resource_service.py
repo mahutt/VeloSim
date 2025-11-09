@@ -56,7 +56,7 @@ class ResourceService:
     def assign_task(
         self,
         db: Session,
-        sim_uuid: str,
+        sim_id: str,
         requesting_user: int,
         task_assign_data: ResourceTaskAssignRequest,
     ) -> ResourceTaskAssignResponse:
@@ -69,7 +69,7 @@ class ResourceService:
 
         Args:
             db: Database session
-            sim_uuid: UUID of the active in-memory simulation
+            sim_id: UUID of the active in-memory simulation
             requesting_user: Database ID of the user performing the action
             task_assign_data: Data containing the task ID to assign
 
@@ -83,15 +83,21 @@ class ResourceService:
         """
 
         # Verify that the requesting user has permission to access the sim
-        if not simulation_service.verify_access(db, sim_uuid, requesting_user):
+        if not simulation_service.verify_access(db, sim_id, requesting_user):
             raise VelosimPermissionError("Unauthorized to access this simulation")
 
         # Get the simulator manager that tracks all active simulations
-        simulator = simulation_service.get_simulator()
+        sim_data = simulation_service.active_simulations.get(sim_id)
+        if not sim_data:
+            raise ItemNotFoundError(sim_id, "Simulation not found")
+
+        simulator = sim_data.get("simulator")
+        if simulator is None:
+            raise RuntimeError(f"Simulator for simulation {sim_id} not found")
         try:
             # Assign task to resource in the running sim
             simulator.assign_task_to_resource(
-                sim_id=sim_uuid,
+                sim_id=sim_id,
                 task_id=task_assign_data.task_id,
                 resource_id=task_assign_data.resource_id,
             )
@@ -119,7 +125,7 @@ class ResourceService:
     def unassign_task(
         self,
         db: Session,
-        sim_uuid: str,
+        sim_id: str,
         requesting_user: int,
         task_unassign_data: ResourceTaskUnassignRequest,
     ) -> ResourceTaskUnassignResponse:
@@ -132,7 +138,7 @@ class ResourceService:
 
         Args:
             db: Database session
-            sim_uuid: UUID of the active in-memory simulation
+            sim_id: UUID of the active in-memory simulation
             requesting_user: Database ID of the user performing the action
             task_unassign_data: Data containing the task ID to unassign
 
@@ -146,14 +152,21 @@ class ResourceService:
         """
 
         # Verify that the requesting user has permission to access the sim
-        if not simulation_service.verify_access(db, sim_uuid, requesting_user):
+        if not simulation_service.verify_access(db, sim_id, requesting_user):
             raise VelosimPermissionError("Unauthorized to access this simulation")
 
         # Get the simulator manager that tracks all active simulations
-        simulator = simulation_service.get_simulator()
+        sim_data = simulation_service.active_simulations.get(sim_id)
+        if not sim_data:
+            raise ItemNotFoundError(sim_id, "Simulation not found")
+
+        simulator = sim_data.get("simulator")
+        if simulator is None:
+            raise RuntimeError(f"Simulator for simulation {sim_id} not found")
+
         try:
             simulator.unassign_task_from_resource(
-                sim_id=sim_uuid,
+                sim_id=sim_id,
                 task_id=task_unassign_data.task_id,
                 resource_id=task_unassign_data.resource_id,
             )
@@ -181,7 +194,7 @@ class ResourceService:
     def reassign_task(
         self,
         db: Session,
-        sim_uuid: str,
+        sim_id: str,
         requesting_user: int,
         task_reassign_data: ResourceTaskReassignRequest,
     ) -> ResourceTaskReassignResponse:
@@ -194,7 +207,7 @@ class ResourceService:
 
         Args:
             db: Database session
-            sim_uuid: UUID of the active in-memory simulation
+            sim_id: UUID of the active in-memory simulation
             requesting_user: Database ID of the user performing the action
             task_reassign_data: Data containing the task ID to reassign
 
@@ -208,14 +221,21 @@ class ResourceService:
         """
 
         # Verify that the requesting user has permission to access the sim
-        if not simulation_service.verify_access(db, sim_uuid, requesting_user):
+        if not simulation_service.verify_access(db, sim_id, requesting_user):
             raise VelosimPermissionError("Unauthorized to access this simulation")
 
         # Get the simulator manager that tracks all active simulations
-        simulator = simulation_service.get_simulator()
+        sim_data = simulation_service.active_simulations.get(sim_id)
+        if not sim_data:
+            raise ItemNotFoundError(sim_id, "Simulation not found")
+
+        simulator = sim_data.get("simulator")
+        if simulator is None:
+            raise RuntimeError(f"Simulator for simulation {sim_id} not found")
+
         try:
             simulator.reassign_task(
-                sim_id=sim_uuid,
+                sim_id=sim_id,
                 task_id=task_reassign_data.task_id,
                 old_resource_id=task_reassign_data.old_resource_id,
                 new_resource_id=task_reassign_data.new_resource_id,

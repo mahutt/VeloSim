@@ -22,163 +22,160 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 """
 
-import asyncio
-from datetime import datetime, timedelta, timezone
-from typing import Optional
+from typing import Optional, Tuple
 from fastapi import WebSocket
 from fastapi.websockets import WebSocketState
+import asyncio
 
 from back.database.session import get_db
-from back.services.simulation_service import simulation_service
-from sim.RealTimeDriver import RealTimeDriver
+from back.services import simulation_service
 from sim.entities.frame import Frame
 from sim.simulator import RunInfo
 from sim.utils.subscriber import Subscriber
 
 
 class WebSocketSubscriber(Subscriber):
-    def __init__(
-        self,
-        websocket: WebSocket,
-        sim_id: str,
-        timeout: float = 5.0,
-        initial_delay: float = 10.0,
-    ):
-        """
-        Initialize a WebSocketSubscriber for streaming simulation frames to a client.
-
-        Args:
-            websocket (WebSocket): FastAPI WebSocket connection to the client.
-            sim_id (str): UUID of the in-memory simulation being subscribed to.
-            timeout (float, optional): Maximum allowed time (in seconds)
-            between frames before closing the connection. Defaults to 5.0.
-            initial_delay (float, optional): Time (in seconds) to wait before
-            starting frame timeout monitoring. Defaults to 10.0.
-        """
-        self.websocket: WebSocket = websocket
-        """WebSocket connection for sending JSON frames and status messages."""
-        self.sim_id: str = sim_id
-        """Simulation identifier used for tagging frames and messages."""
-        self.timeout: float = timeout
-        """
-        Maximum allowed time between frames before the subscriber closes the
-        connection.
-        """
-        self.initial_delay: float = initial_delay
-        """Time to wait before starting periodic checks for missing frames."""
-        self._loop: Optional[asyncio.AbstractEventLoop] = None
+    def __init__(self, websocket: WebSocket):
+        self.websocket = websocket
+        """WebSocket connection for he current running loop."""
+        try:
+            self.loop = asyncio.get_running_loop()
+        except RuntimeError:
+            # No running loop - will be set manually (e.g., in tests)
+            self.loop = None  # type: ignore
         """Event loop used to run asynchronous tasks from synchronous callbacks."""
-        self.last_frame_time: Optional[datetime] = None
-        """Timestamp of the most recent frame received used to detect missing frames."""
-        self._closed: bool = False
+        self.closed = False
         """Internal flag indicating whether the WebSocket connection has been closed."""
 
     def set_event_loop(self, loop: asyncio.AbstractEventLoop) -> None:
-        self._loop = loop
+        """Set the event loop manually (primarily for testing)."""
+        self.loop = loop
+
+    def close(self) -> None:
+        """Mark the subscriber as closed to prevent further frame sends."""
+        self.closed = True
 
     def on_frame(self, frame: Frame) -> None:
-        self.last_frame_time = datetime.now(timezone.utc)
-        if self._loop and not self._closed:
-            asyncio.run_coroutine_threadsafe(
-                self._send_frame(
-                    {
-                        "sim_id": self.sim_id,
-                        "seq_numb": frame.seq_number,
-                        "payload": frame.payload_str,
-                        "timestamp": frame.timestamp_ms,
-                    }
-                ),
-                self._loop,
-            )
+        # Check if closed or websocket disconnected before scheduling
+        if self.closed:
+            return
+        if self.websocket.client_state != WebSocketState.CONNECTED:
+            return
+        if self.loop is not None and not self.loop.is_closed():
+            # schedule the coroutine in the main event loop
+            asyncio.run_coroutine_threadsafe(self._send_frame(frame), self.loop)
 
-    async def _send_frame(self, frame_data: dict) -> None:
+    async def _send_frame(self, frame: Frame) -> None:
+        # Double-check state before attempting to send
+        if self.closed:
+            return
+        if self.websocket.client_state != WebSocketState.CONNECTED:
+            self.closed = True
+            return
+
         try:
-            if not self._closed:
-                await self.websocket.send_json(frame_data)
-        except Exception as err:
-            print(f"Error sending frame: {err}")
-
-    async def watch_for_no_frames(self) -> None:
-        """Start checking after initial_delay, then periodically close if no frames."""
-        await asyncio.sleep(self.initial_delay)
-        while not self._closed:
-            await asyncio.sleep(self.timeout)
-            if self.last_frame_time is None:
-                # No frames ever received, skip for now
-                continue
-            if datetime.now(timezone.utc) - self.last_frame_time > timedelta(
-                seconds=self.timeout
-            ):
-                try:
-                    await self.websocket.send_json(
-                        {
-                            "type": "status",
-                            "event": "no_frames_detected",
-                            "sim_id": self.sim_id,
-                            "message": f"No frames received in {self.timeout} seconds.",
-                        }
-                    )
-                    await self.websocket.close(
-                        code=1000, reason="No more frames available"
-                    )
-                except Exception:
-                    # Already closed or error sending, ignore
-                    pass
-                finally:
-                    self._closed = True
-                    break
+            await self.websocket.send_json(
+                {
+                    "seq": frame.seq_number,
+                    "timestamp": frame.timestamp_ms,
+                    "is_key": frame.is_key,
+                    "payload": frame.payload_dict,
+                }
+            )
+        except RuntimeError as e:
+            # Silently catch ASGI message errors when connection is already closed
+            # These occur when frames are queued but WebSocket
+            # closes before they're sent
+            if "websocket.send" in str(e) or "websocket.close" in str(e):
+                self.closed = True
+            else:
+                # Re-raise unexpected RuntimeErrors
+                raise
+        except Exception:
+            # Mark as closed to prevent further send attempts
+            # Silently ignore other exceptions (e.g., connection errors)
+            self.closed = True
 
 
 async def safe_send_json(websocket: WebSocket, payload: dict) -> None:
     """Send JSON through websocket and ignore if connection closed."""
-    try:
-        await websocket.send_json(payload)
-    except Exception:
-        pass
+    if websocket.client_state != WebSocketState.CONNECTED:
+        # Socket already closed therefore do not attempt to send JSON
+        return
+    await websocket.send_json(payload)
 
 
 async def get_simulation_or_error(
     sim_id: str, websocket: WebSocket
-) -> Optional[RunInfo]:
+) -> Optional[Tuple[dict, RunInfo]]:
     """Fetch simulation info or send an error and close websocket."""
-    try:
-        sim_info: RunInfo | None = simulation_service.get_simulator().get_sim_by_id(
-            sim_id
-        )
-        return sim_info
-    except Exception:
+    sim_data = simulation_service.active_simulations.get(sim_id)
+    if not sim_data:
         await safe_send_json(
             websocket,
             {
                 "type": "error",
                 "event": "simulation_not_found",
                 "sim_id": sim_id,
-                "message": f"Simulation '{sim_id}' not found.",
+                "message": f"Simulation '{sim_id}' is not active.",
             },
         )
         await websocket.close(code=4004)
         return None
 
+    sim_info: Optional[RunInfo] = sim_data["simulator"].get_sim_by_id(sim_id)
+    if not sim_info:
+        await safe_send_json(
+            websocket,
+            {
+                "type": "error",
+                "event": "simulation_not_found",
+                "sim_id": sim_id,
+                "message": f"Simulation '{sim_id}' not found in its simulator.",
+            },
+        )
+        return None
 
-def attach_subscriber(
-    sim_info: RunInfo, websocket: WebSocket, sim_id: str
+    return sim_data, sim_info
+
+
+def attach_ws_subscriber(
+    sim_data: dict,
+    sim_info: RunInfo,
+    websocket: WebSocket,
 ) -> WebSocketSubscriber:
-    """Attach a WebSocketSubscriber to the simulation emitter."""
-    subscriber = WebSocketSubscriber(websocket, sim_id)
-    subscriber.set_event_loop(asyncio.get_event_loop())
+    """
+    Attach a new WebSocketSubscriber to the simulation emitter.
+    Detach and close any previous subscriber first.
+    """
+    old_sub: Optional[WebSocketSubscriber] = sim_data.get("ws_subscriber")
+    if old_sub:
+        old_sub.close()  # Mark old subscriber as closed to stop sending
+        sim_info["emitter"].detach(old_sub)
+
+    # Extra safety: close and detach ALL subscribers to prevent duplicates
+    # This handles edge cases where cleanup didn't run properly
+    for sub in list(sim_info["emitter"].subscribers):
+        if isinstance(sub, WebSocketSubscriber):
+            sub.close()
+            sim_info["emitter"].detach(sub)
+
+    subscriber = WebSocketSubscriber(websocket)
     sim_info["emitter"].attach(subscriber)
-    asyncio.create_task(subscriber.watch_for_no_frames())
+    sim_data["ws_subscriber"] = subscriber
+
     return subscriber
 
 
 async def start_or_resume_simulation(
-    sim_info: RunInfo, sim_id: str, requesting_user: int, websocket: WebSocket
+    sim_info: RunInfo, sim_id: str, websocket: WebSocket, requesting_user: int
 ) -> None:
-    """Start or resume a running simulation."""
-    driver: RealTimeDriver = sim_info["simController"].realTimeDriver
+    """Start or resume simulation and notify the client."""
+    driver = sim_info["simController"].realTimeDriver
+
     if sim_info["thread"] is None:
         db = next(get_db())
-        simulation_service.start_simulation(db, sim_id, requesting_user)
+        simulation_service.start_simulation(db, sim_id, requesting_user, websocket)
         await safe_send_json(
             websocket,
             {
@@ -215,13 +212,21 @@ async def start_or_resume_simulation(
 
 
 async def cleanup_simulation(
-    sim_info: RunInfo, subscriber: Subscriber, websocket: WebSocket
+    sim_data: dict,
+    sim_info: RunInfo,
+    subscriber: WebSocketSubscriber,
+    websocket: WebSocket,
 ) -> None:
-    """Detach subscriber and pause simulation if websocket is active."""
+    """Detach subscriber and pause simulation if no active subscribers remain."""
+    subscriber.close()  # Stop the subscriber from attempting to send frames
     sim_info["emitter"].detach(subscriber)
-    driver: RealTimeDriver = sim_info["simController"].realTimeDriver
-    if websocket.client_state != WebSocketState.DISCONNECTED:
+    sim_data.pop("ws_subscriber", None)
+
+    driver = sim_info["simController"].realTimeDriver
+    if not sim_info["emitter"].subscribers:
         driver.pause()
+
+    if websocket.client_state != WebSocketState.DISCONNECTED:
         try:
             await websocket.close(code=1000)
         except Exception:
