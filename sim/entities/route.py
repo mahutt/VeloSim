@@ -92,10 +92,17 @@ class Route:
                 edge = all_edges.loc[edge_idx]
                 road_segments.append(road(edge))  # type: ignore[arg-type]
             else:
+                # Try reverse direction
                 edge_idx = edge_index.get((end_node_id, start_node_id))
                 if edge_idx is not None:
                     edge = all_edges.loc[edge_idx]
-                    road_segments.append(road(edge))  # type: ignore[arg-type]
+                    road_segment = road(edge)  # type: ignore[arg-type]
+                    # Reverse the point collection since we're traversing
+                    # the edge backwards
+                    road_segment.pointcollection = list(
+                        reversed(road_segment.pointcollection)
+                    )
+                    road_segments.append(road_segment)
                 else:
                     print(
                         f"Warning: Could not find edge "
@@ -246,8 +253,30 @@ class Route:
         # Find next non-duplicate position
         point_to_return = None
         while point_to_return is None and not self.is_finished:
-            # Get the current road.
+            # Determine the max index for this road
+            # (exclude last point if not the final road)
+            is_last_road = self.current_road_index >= len(self.roads) - 1
             current_road = self.roads[self.current_road_index]
+            max_index = (
+                len(current_road.pointcollection)
+                if is_last_road
+                else len(current_road.pointcollection) - 1
+            )
+
+            # Check if we need to move to the next road
+            if self.current_point_index >= max_index:
+                # Unsubscribe from the road we just finished traversing
+                self.unsubscribe_from_road(current_road.id)
+
+                self.current_point_index = 0
+                self.current_road_index += 1
+                if self.current_road_index >= len(self.roads):
+                    # if there are no roads left, we are done.
+                    self.is_finished = True
+                    break
+                # Update current_road after moving to next road
+                current_road = self.roads[self.current_road_index]
+
             # Get the current position.
             candidate_point = current_road.pointcollection[self.current_point_index]
 
@@ -259,28 +288,8 @@ class Route:
                 point_to_return = candidate_point
                 self._last_returned_position = candidate_point.get_position()
 
-            self.current_point_index += 1  # move to the next position
-
-            # Determine the max index for this road
-            # (exclude last point if not the final road)
-            is_last_road = self.current_road_index >= len(self.roads) - 1
-            max_index = (
-                len(current_road.pointcollection)
-                if is_last_road
-                else len(current_road.pointcollection) - 1
-            )
-
-            if self.current_point_index >= max_index:
-                # if the next position is out of bounds, we should go to the next road.
-
-                # Unsubscribe from the road we just finished traversing
-                self.unsubscribe_from_road(current_road.id)
-
-                self.current_point_index = 0
-                self.current_road_index += 1
-                if self.current_road_index >= len(self.roads):
-                    # if there are no roads left, we are done.
-                    self.is_finished = True
+            # Move to next position (whether it was duplicate or not)
+            self.current_point_index += 1
 
         if point_to_return is None:
             return None
