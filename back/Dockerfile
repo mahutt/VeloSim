@@ -25,6 +25,7 @@ RUN apt-get update && \
 
 COPY back/ ./back
 COPY sim/  ./sim
+COPY scripts/ ./scripts
 
 ENV PYTHONPATH=/app
 EXPOSE 8000
