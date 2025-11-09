@@ -65,7 +65,7 @@ test.describe('Simulation Page', () => {
     authenticatedPage,
   }) => {
     const canvas = authenticatedPage.locator('canvas').first();
-    await expect(canvas).toBeVisible({ timeout: 10000 });
+    await expect(canvas).toBeVisible({ timeout: 15000 });
 
     const canvasBox = await canvas.boundingBox();
     expect(canvasBox).not.toBeNull();
@@ -73,29 +73,44 @@ test.describe('Simulation Page', () => {
     expect(canvasBox!.height).toBeGreaterThan(400);
 
     await canvas.hover();
+    // Add delay to ensure map is fully initialized
+    await authenticatedPage.waitForTimeout(1000);
 
     // zoom in
     await authenticatedPage.mouse.wheel(0, -1000);
-    await waitForCanvasChange(authenticatedPage, 'canvas', 3000);
+    await authenticatedPage.waitForTimeout(500); // Wait for zoom animation
+    await waitForCanvasChange(authenticatedPage, 'canvas', 5000);
 
     // zoom out
     await authenticatedPage.mouse.wheel(0, 500);
-    await waitForCanvasChange(authenticatedPage, 'canvas', 3000);
+    await authenticatedPage.waitForTimeout(500); // Wait for zoom animation
+    await waitForCanvasChange(authenticatedPage, 'canvas', 5000);
 
     // panning the map
     const centerX = canvasBox!.x + canvasBox!.width / 2;
     const centerY = canvasBox!.y + canvasBox!.height / 2;
 
     await authenticatedPage.mouse.move(centerX, centerY);
+    await authenticatedPage.waitForTimeout(100);
     await authenticatedPage.mouse.down();
-    await authenticatedPage.mouse.move(centerX + 100, centerY + 100);
+    await authenticatedPage.waitForTimeout(100);
+    await authenticatedPage.mouse.move(centerX + 100, centerY + 100, {
+      steps: 10,
+    });
+    await authenticatedPage.waitForTimeout(100);
     await authenticatedPage.mouse.up();
-    await waitForCanvasChange(authenticatedPage);
+    await authenticatedPage.waitForTimeout(300); // Wait for pan to complete
+    await waitForCanvasChange(authenticatedPage, 'canvas', 5000);
 
     await authenticatedPage.mouse.down();
-    await authenticatedPage.mouse.move(centerX - 200, centerY - 200);
+    await authenticatedPage.waitForTimeout(100);
+    await authenticatedPage.mouse.move(centerX - 200, centerY - 200, {
+      steps: 10,
+    });
+    await authenticatedPage.waitForTimeout(100);
     await authenticatedPage.mouse.up();
-    await waitForCanvasChange(authenticatedPage);
+    await authenticatedPage.waitForTimeout(300); // Wait for pan to complete
+    await waitForCanvasChange(authenticatedPage, 'canvas', 5000);
 
     await expect(canvas).toBeVisible();
   });

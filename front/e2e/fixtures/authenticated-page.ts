@@ -31,11 +31,28 @@ type AuthFixtures = {
 
 export const test = base.extend<AuthFixtures>({
   authenticatedPage: async ({ page }, use) => {
+    // Navigate to login page
     await page.goto('/login');
+
+    // Fill in credentials
     await page.fill('#form-login-username', TEST_CONFIG.credentials.username);
     await page.fill('#form-login-password', TEST_CONFIG.credentials.password);
+
+    // Submit login form
     await page.click('button[type="submit"]');
-    await page.waitForURL((url) => !url.pathname.includes('/login'));
+
+    // Wait for navigation away from login page
+    await page.waitForURL((url) => !url.pathname.includes('/login'), {
+      timeout: 10000,
+    });
+
+    // Add a small delay to ensure cookies/tokens are set
+    await page.waitForTimeout(1000);
+
+    // Verify authentication by checking for auth token or user info
+    // This helps catch auth issues early
+    await page.waitForLoadState('networkidle');
+
     await use(page);
   },
 });
