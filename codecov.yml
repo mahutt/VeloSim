@@ -38,6 +38,11 @@ coverage:
     - "**/*spec*"
     # Ignore documentation
     - "**/*.md"
+    # Ignore database migrations
+    - "**/alembic/**"
+    - "back/alembic/**"
+    # Ignore core configuration
+    - "back/core/**"
     # Ignore specific files
     - "front/app/root.tsx"
     - "front/app/routes.ts"

@@ -1,22 +1,20 @@
-FROM node:20-alpine AS development-dependencies-env
-COPY . /app
+# Build stage
+FROM node:20-alpine AS build
 WORKDIR /app
+COPY front/package.json front/package-lock.json ./
 RUN npm ci
-
-FROM node:20-alpine AS production-dependencies-env
-COPY ./package.json package-lock.json /app/
-WORKDIR /app
-RUN npm ci --omit=dev
-
-FROM node:20-alpine AS build-env
-COPY . /app/
-COPY --from=development-dependencies-env /app/node_modules /app/node_modules
-WORKDIR /app
+COPY front/ ./
+ARG VITE_MAPBOX_ACCESS_TOKEN
+ARG VITE_BACKEND_URL
+ENV VITE_MAPBOX_ACCESS_TOKEN=$VITE_MAPBOX_ACCESS_TOKEN
+ENV VITE_BACKEND_URL=$VITE_BACKEND_URL
 RUN npm run build
 
+# Runtime stage
 FROM node:20-alpine
-COPY ./package.json package-lock.json /app/
-COPY --from=production-dependencies-env /app/node_modules /app/node_modules
-COPY --from=build-env /app/build /app/build
 WORKDIR /app
-CMD ["npm", "run", "start"]
+COPY front/package.json front/package-lock.json ./
+RUN npm ci --omit=dev
+COPY --from=build /app/build ./build
+EXPOSE 3000
+CMD ["npm","run","start","--","-H","0.0.0.0","-p","3000"]
