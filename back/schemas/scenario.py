@@ -39,9 +39,8 @@ class Station(BaseModel):
 
     station_id: int = Field(..., description="Unique station identifier")
     station_name: str = Field(..., description="Name of the station")
-    task_count: int = Field(..., ge=0, description="Number of tasks at this station")
     station_position: List[float] | Position = Field(
-        ..., description="Position as [lat, lon] or Position object"
+        ..., description="Position as [lon, lat] or Position object"
     )
 
 
@@ -49,20 +48,25 @@ class Resource(BaseModel):
     """Schema for a resource in the scenario."""
 
     resource_id: int = Field(..., description="Unique resource identifier")
-    task_count: int = Field(..., ge=0, description="Number of tasks for this resource")
     resource_position: List[float] | Position = Field(
-        ..., description="Position as [lat, lon] or Position object"
+        ..., description="Position as [lon, lat] or Position object"
     )
 
 
 class Task(BaseModel):
     """Schema for a task in the scenario."""
 
-    id: str = Field(..., description="Unique task identifier")
-    station_id: str = Field(..., description="ID of the station this task belongs to")
-    time: Optional[datetime | str] = Field(
+    id: str = Field(
+        ..., description="Unique task identifier (format: 't1', 't2', etc.)"
+    )
+    station_id: int = Field(..., description="ID of the station this task belongs to")
+    time: Optional[int | float] = Field(
         None,
-        description="Task scheduled time (RFC 3339 format or HH:MM)",
+        description=(
+            "Task scheduled time in seconds (e.g., 600, 1800). "
+            "Optional for initial_tasks (spawns immediately if omitted). "
+            "Required for scheduled_tasks with the delay in seconds."
+        ),
     )
 
 
@@ -128,7 +132,7 @@ class ScenarioContent(BaseModel):
                     {
                         "id": "t2",
                         "station_id": "1",
-                        "time": "2025-11-06T14:30:00Z",
+                        "time": 1800,  # 1800 seconds = 30 minutes after start
                     }
                 ],
             }
@@ -193,7 +197,11 @@ class ScenarioCreateRequest(BaseModel):
                     ],
                     "initial_tasks": [{"id": "t1", "station_id": "1"}],
                     "scheduled_tasks": [
-                        {"id": "t2", "station_id": "1", "time": "09:30"}
+                        {
+                            "id": "t2",
+                            "station_id": "1",
+                            "time": 5400,
+                        }  # 5400 seconds = 1.5 hours
                     ],
                 },
                 "description": "A sample scenario for testing",
@@ -240,7 +248,11 @@ class ScenarioUpdateRequest(BaseModel):
                     ],
                     "initial_tasks": [{"id": "t1", "station_id": "1"}],
                     "scheduled_tasks": [
-                        {"id": "t2", "station_id": "1", "time": "09:30"}
+                        {
+                            "id": "t2",
+                            "station_id": "1",
+                            "time": 5400,
+                        }  # 5400 seconds = 1.5 hours
                     ],
                 },
                 "description": "Updated scenario description",
@@ -289,7 +301,11 @@ class ScenarioResponse(BaseModel):
                     ],
                     "initial_tasks": [{"id": "t1", "station_id": "1"}],
                     "scheduled_tasks": [
-                        {"id": "t2", "station_id": "1", "time": "09:30"}
+                        {
+                            "id": "t2",
+                            "station_id": "1",
+                            "time": 5400,
+                        }  # 5400 seconds = 1.5 hours
                     ],
                 },
                 "description": "Test description for Scenario",

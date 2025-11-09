@@ -36,9 +36,9 @@ class PositionValidator(BaseModel):
         if isinstance(values, (list, tuple)):
             if len(values) != 2:
                 raise ValueError(
-                    "Position must contain exactly two coordinates [lat, lon]"
+                    "Position must contain exactly two coordinates [lon, lat]"
                 )
-            values = {"lat": float(values[0]), "lon": float(values[1])}
+            values = {"lon": float(values[0]), "lat": float(values[1])}
         elif not isinstance(values, dict):
             raise ValueError("Position must be a dict or list/tuple")
 
@@ -52,58 +52,50 @@ class PositionValidator(BaseModel):
 
 class ResourceValidator(BaseModel):
     resource_id: int
-    task_count: int
     resource_position: PositionValidator
 
 
 class StationValidator(BaseModel):
     station_id: int
-    task_count: int
     station_name: str
     station_position: PositionValidator
 
 
 class TaskValidator(BaseModel):
     id: str
-    station_id: str
-    time: datetime | None = None
+    station_id: int
+    time: int | float | None = None
 
     @field_validator("time", mode="before")
     @classmethod
-    def parse_time(cls, v: Any) -> datetime | None:
-        """Parse time from various formats to datetime object.
+    def parse_time(cls, v: Any) -> int | float | None:
+        """Parse time in simulator format.
 
-        Supports:
-        - RFC 3339 / ISO 8601 datetime strings (e.g., "2025-11-06T08:00:00Z")
-        - Simple time strings (e.g., "08:00") - converted to today's date
-        - datetime objects (passed through)
+        Simulator expects:
+        - None or omitted for initial_tasks (spawns immediately)
+        - Integer/float seconds for scheduled_tasks (e.g., 600, 1800.5)
+
+        This validator enforces the simulator's expected format as the source of truth.
         """
-        if v is None or isinstance(v, datetime):
+        if v is None:
             return v
 
+        # Accept only numeric seconds (simulator format)
+        if isinstance(v, (int, float)):
+            if v < 0:
+                raise ValueError("Time in seconds cannot be negative")
+            return v
+
+        # Reject string formats - simulator doesn't accept them
         if isinstance(v, str):
-            # Try RFC 3339 / ISO 8601 format first
-            try:
-                return datetime.fromisoformat(v.replace("Z", "+00:00"))
-            except ValueError:
-                pass
-
-            # Try simple time format (HH:MM or HH:MM:SS)
-            for fmt in ["%H:%M:%S", "%H:%M"]:
-                try:
-                    parsed_time = datetime.strptime(v, fmt).time()
-                    # Combine with today's date
-                    return datetime.combine(datetime.today().date(), parsed_time)
-                except ValueError:
-                    continue
-
             raise ValueError(
-                f"Invalid time format: {v}. Use RFC 3339 format "
-                "(e.g., '2025-11-06T08:00:00Z') or simple time "
-                "(e.g., '08:00')"
+                f"Time must be numeric seconds (e.g., 600, 1800), not string '{v}'. "
+                "The simulator expects numeric seconds only."
             )
 
-        raise ValueError(f"Time must be a string or datetime, got {type(v)}")
+        raise ValueError(
+            f"Time must be numeric seconds or None, got {type(v).__name__}"
+        )
 
 
 class ScenarioTimes(BaseModel):
@@ -191,7 +183,6 @@ class ScenarioValidator:
                     [
                         "station_id",
                         "station_name",
-                        "task_count",
                         "station_position",
                     ],
                 )
@@ -224,9 +215,7 @@ class ScenarioValidator:
 
         for idx, r in enumerate(resources):
             errors.extend(
-                self.check_required_fields(
-                    r, ["resource_id", "task_count", "resource_position"]
-                )
+                self.check_required_fields(r, ["resource_id", "resource_position"])
             )
             try:
                 validated: ResourceValidator = ResourceValidator(**r)
@@ -246,7 +235,7 @@ class ScenarioValidator:
         return errors
 
     def validate_tasks(
-        self, tasks: List[Dict[str, Any]], valid_station_ids: Set[str]
+        self, tasks: List[Dict[str, Any]], valid_station_ids: Set[int]
     ) -> List[Dict[str, str]]:
         errors: List[Dict[str, str]] = []
         seen_task_ids: Set[str] = set()
@@ -338,7 +327,9 @@ class ScenarioValidator:
         errors.extend(self.validate_stations(stations))
         errors.extend(self.validate_resources(resources))
 
-        valid_station_ids: Set[str] = {str(s["station_id"]) for s in stations}
+        valid_station_ids: Set[int] = {
+            int(s["station_id"]) for s in stations if "station_id" in s
+        }
         for task_list in [initial_tasks, scheduled_tasks]:
             errors.extend(self.validate_tasks(task_list, valid_station_ids))
 
