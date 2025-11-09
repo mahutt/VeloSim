@@ -37,12 +37,15 @@ export interface Station {
   name: string;
   position: [number, number]; // [longitude, latitude]
   tasks: StationTask[];
+  task_count?: number;
 }
 
 export interface StationTask {
   id: number;
   stationId: number;
   type: 'battery_swap';
+  state?: 'open' | 'assigned' | 'inprogress' | 'completed';
+  assigned_resource_id?: number | null;
 }
 
 // API response types
@@ -75,14 +78,57 @@ export interface ScenarioListResponse extends PaginatedResponse {
   scenarios: Scenario[];
 }
 
+export interface InitializeSimulationResponse {
+  sim_id: string;
+  db_id: number;
+  status: string;
+}
+
 // Resource types
 export interface Resource {
   id: number;
   position: [number, number];
   taskList: number[]; // list of task IDs
-  route: {
+  route?: {
     coordinates: [number, number][];
   };
+  task_count?: number;
+  in_progress_task_id?: number | null;
+}
+
+// Clock type for simulation timing
+export interface Clock {
+  realSecondsPassed: number;
+  realMinutesPassed: number;
+  simSecondsPassed: number;
+  simMinutesPassed: number;
+}
+
+// WebSocket simulation frame types
+export interface FramePayload {
+  sim_id: string;
+  tasks: StationTask[];
+  stations: Station[];
+  resources: Resource[];
+  clock: Clock;
+}
+
+export interface SimulationFrame {
+  seq_numb: number;
+  timestamp: number;
+  is_key: boolean;
+  payload: FramePayload;
+}
+
+export interface WebSocketSimulationMessage {
+  sim_id: string;
+  db_id: number;
+  status: 'started' | 'running' | 'paused' | 'completed' | 'error';
+  initial_frame: SimulationFrame;
+}
+
+export interface WebSocketFrameMessage {
+  frame: SimulationFrame;
 }
 
 // Selection types
@@ -116,4 +162,44 @@ export interface Simulation {
   resource_count: number;
   station_count: number;
   task_count: number;
+}
+
+// Backend WebSocket payload types (snake_case from backend)
+export interface BackendTask {
+  task_id: number;
+  task_state: 'open' | 'assigned' | 'inprogress' | 'completed' | 'scheduled';
+  station_id: number;
+  station_name: string;
+  assigned_resource_id: number | null;
+  scheduled_time?: number;
+}
+
+export interface BackendStation {
+  station_id: number;
+  station_name: string;
+  station_position: [number, number];
+  station_tasks: BackendTask[];
+  task_count: number;
+}
+
+export interface BackendResource {
+  resource_id: number;
+  resource_position: [number, number];
+  resource_tasks: BackendTask[];
+  task_count: number;
+  in_progress_task_id: number | null;
+}
+
+export interface BackendPayload {
+  sim_id?: string;
+  tasks?: BackendTask[];
+  stations?: BackendStation[];
+  resources?: BackendResource[];
+  new_tasks?: BackendTask[];
+  clock?: {
+    simSecondsPassed: number;
+    simMinutesPassed: number;
+    realSecondsPassed: number;
+    realMinutesPassed: number;
+  };
 }

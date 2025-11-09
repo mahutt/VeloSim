@@ -59,7 +59,7 @@ export function adaptResourcesToGeoJSON(
       type: 'Feature',
       properties: {
         id: resource.id,
-        route: resource.route.coordinates,
+        route: resource.route?.coordinates || [],
         taskList: resource.taskList,
         selected: resource.id === selectedId,
         hover: resource.id === hoveredId,

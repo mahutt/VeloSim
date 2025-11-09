@@ -25,8 +25,21 @@
 import { log, LogLevel } from '~/lib/logger';
 
 /**
+ * Represents the three states of simulation data:
+ * - Server: Simulation state in memory on the server
+ * - Frontend: Simulation state in memory on the browser
+ * - Mapbox: Partial representation of state managed by mapbox-gl
+ */
+export enum SimulationStateLayer {
+  Server = 'server',
+  Frontend = 'frontend',
+  Mapbox = 'mapbox',
+}
+
+/**
  * Logs an error for debugging and monitoring.
  * This logs to console with structured data that can be picked up by logging systems like Grafana.
+ * Also sends the error to the backend logging endpoint.
  *
  * @param error Error object or string
  * @param context Optional context info (e.g., where the error happened)
@@ -47,13 +60,42 @@ export function logSimulationError(
   };
 
   // Log structured error data to console (Grafana/Loki can scrape these logs)
-  console.error('[SIMULATION_ERROR]', JSON.stringify(errorData, null, 2));
+  // Use try-catch to handle circular references
+  try {
+    console.error('[SIMULATION_ERROR]', JSON.stringify(errorData, null, 2));
+  } catch {
+    // Fallback for circular references - log without stringification
+    console.error('[SIMULATION_ERROR]', {
+      message: errorMessage,
+      context,
+      note: 'Additional data contained circular references and was omitted',
+    });
+  }
+
+  // Send to backend logging system
   log(errorData);
+}
+
+/**
+ * Logs simulation errors with standardized context and additional data.
+ * This is a higher-level wrapper around logSimulationError for common simulation scenarios.
+ *
+ * @param error Error object or string
+ * @param context Technical context for logging
+ * @param additionalData Optional additional data to log
+ */
+export function logSimulationErrorWithContext(
+  error: unknown,
+  context: string,
+  additionalData?: Record<string, unknown>
+): void {
+  logSimulationError(error, context, additionalData);
 }
 
 /**
  * Logs a missing entity data error specifically.
  * This is called when a marker is clicked but the entity data doesn't exist.
+ * This indicates a state synchronization issue between Frontend and Mapbox layers.
  *
  * @param entityType Type of entity (e.g., "station", "resource")
  * @param entityId ID of the entity
@@ -62,9 +104,9 @@ export function logMissingEntityError(
   entityType: string,
   entityId: number
 ): void {
-  const context = `Missing ${entityType} data`;
+  const context = `State sync issue: ${entityType} exists in ${SimulationStateLayer.Mapbox} but not in ${SimulationStateLayer.Frontend}`;
   const error = new Error(
-    `${entityType} with ID ${entityId} not found in state`
+    `${entityType} with ID ${entityId} not found in frontend state`
   );
 
   // Log the error with structured data
@@ -72,5 +114,49 @@ export function logMissingEntityError(
     entityType,
     entityId,
     errorType: 'MISSING_ENTITY_DATA',
+    stateLayer: SimulationStateLayer.Frontend,
+    expectedLayer: SimulationStateLayer.Mapbox,
   });
+}
+
+/**
+ * Logs WebSocket frame processing errors.
+ * This is called when there's an issue processing simulation frames from the server.
+ *
+ * @param error Error object
+ * @param frameNumber Frame sequence number
+ */
+export function logFrameProcessingError(
+  error: unknown,
+  frameNumber: number
+): void {
+  logSimulationError(error, 'WebSocket frame processing', {
+    frameNumber,
+    errorType: 'FRAME_PROCESSING_ERROR',
+    stateLayer: SimulationStateLayer.Frontend,
+  });
+}
+
+/**
+ * Logs state synchronization errors between different layers.
+ * This is called when there's a mismatch between server, frontend, and mapbox states.
+ *
+ * @param error Error object
+ * @param sourceLayer The layer where the error originated
+ * @param targetLayer The layer that was expected to have the data
+ */
+export function logStateSyncError(
+  error: unknown,
+  sourceLayer: SimulationStateLayer,
+  targetLayer: SimulationStateLayer
+): void {
+  logSimulationError(
+    error,
+    `State sync between ${sourceLayer} and ${targetLayer}`,
+    {
+      errorType: 'STATE_SYNC_ERROR',
+      sourceLayer,
+      targetLayer,
+    }
+  );
 }

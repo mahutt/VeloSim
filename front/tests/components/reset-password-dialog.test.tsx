@@ -68,6 +68,7 @@ describe('ResetPasswordDialog', () => {
           setLoading: vi.fn(),
           logout: vi.fn(),
           refreshUser: vi.fn(),
+          setToken: vi.fn(),
         }}
       >
         <ResetPasswordDialog

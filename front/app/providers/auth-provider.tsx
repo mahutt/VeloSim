@@ -40,6 +40,7 @@ export interface AuthState {
   setLoading: React.Dispatch<React.SetStateAction<boolean>>;
   logout: () => void;
   refreshUser: () => Promise<void>;
+  setToken: (token: string) => void;
 }
 
 const AuthContext = createContext<AuthState | undefined>(undefined);
@@ -48,10 +49,26 @@ interface AuthProviderProps {
   children: ReactNode;
 }
 
+const setAuthCookie = (token: string) => {
+  // Set cookie with appropriate settings
+  // SameSite=Lax allows cookie to be sent with WebSocket from same site
+  document.cookie = `access_token=${token}; path=/; SameSite=Lax; Secure=${window.location.protocol === 'https:'}`;
+};
+
+const removeAuthCookie = () => {
+  document.cookie =
+    'access_token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT';
+};
+
 export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const navigate = useNavigate();
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
+
+  const setToken = (newToken: string) => {
+    sessionStorage.setItem(TOKEN_STORAGE_KEY, newToken);
+    setAuthCookie(newToken);
+  };
 
   const refreshUser = async () => {
     setLoading(true);
@@ -65,7 +82,13 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   };
 
   useEffect(() => {
-    if (sessionStorage.getItem(TOKEN_STORAGE_KEY)) {
+    const storedToken =
+      typeof window !== 'undefined'
+        ? sessionStorage.getItem(TOKEN_STORAGE_KEY)
+        : null;
+
+    if (storedToken) {
+      setAuthCookie(storedToken);
       refreshUser();
     } else {
       setLoading(false);
@@ -74,6 +97,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   const logout = () => {
     sessionStorage.removeItem(TOKEN_STORAGE_KEY);
+    removeAuthCookie();
     setUser(null);
     navigate('/login');
   };
@@ -85,6 +109,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     setLoading,
     logout,
     refreshUser,
+    setToken,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

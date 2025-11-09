@@ -24,8 +24,11 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router';
-import type { Scenario, ScenarioListResponse } from '~/types';
-import api from '~/api';
+import type {
+  Scenario,
+  ScenarioListResponse,
+  InitializeSimulationResponse,
+} from '~/types';
 import ScenarioToolbar from '~/components/scenario/scenario-toolbar';
 import ScenarioTextArea from '~/components/scenario/scenario-textarea';
 import ScenarioSidebar from '~/components/scenario/scenario-sidebar';
@@ -33,6 +36,7 @@ import ScenarioNameDialog from '~/components/scenario/scenario-name-dialog';
 import OverwriteSaveDialog from '~/components/scenario/overwrite-save-dialog';
 import { useScenarioOperations } from '~/hooks/use-scenario-operations';
 import useError from '~/hooks/use-error';
+import api from '~/api';
 
 export default function ScenarioEditor() {
   // Refs
@@ -107,19 +111,6 @@ export default function ScenarioEditor() {
   useEffect(() => {
     loadSavedScenarios().then(setSavedScenarios);
   }, []); // Only run once on mount
-
-  // Sync scenarioName with scenario_title in JSON content
-  useEffect(() => {
-    if (!scenarioContent) return;
-    try {
-      const parsed = JSON.parse(scenarioContent);
-      if (parsed.scenario_title && parsed.scenario_title !== scenarioName) {
-        setScenarioName(parsed.scenario_title);
-      }
-    } catch {
-      // ignore if not valid JSON
-    }
-  }, [scenarioContent, scenarioName]);
 
   // Helper function to generate incremented name
   const generateIncrementedName = useCallback(
@@ -198,24 +189,54 @@ export default function ScenarioEditor() {
     [saveScenario, displayError, loadSavedScenarios]
   );
 
-  const handleStartScenario = useCallback(() => {
-    console.log('Start scenario clicked');
-    navigate('/simulation');
-  }, [navigate]);
+  const handleStartScenario = async () => {
+    try {
+      // Validate content first
+      if (!scenarioContent.trim()) {
+        displayError(
+          'No Scenario',
+          'Please create or load a scenario before starting simulation.'
+        );
+        return;
+      }
+
+      // Parse the scenario content
+      let content;
+      try {
+        content = JSON.parse(scenarioContent);
+      } catch {
+        displayError(
+          'Invalid Scenario',
+          'The scenario content is not valid JSON. Please fix it before starting.'
+        );
+        return;
+      }
+
+      // Wrap scenario content in the expected format
+      const scenarioData = {
+        id: selectedScenarioId || 0, // Use 0 for unsaved scenarios
+        name: scenarioName || 'Untitled Scenario',
+        content: content,
+      };
+
+      // Call backend API to initialize simulation with scenario data
+      const response = await api.post<InitializeSimulationResponse>(
+        '/simulation/initialize',
+        scenarioData
+      );
+
+      // Navigate to simulation page with sim_id from response
+      navigate(`/simulation/${response.data.sim_id}`);
+    } catch (error) {
+      console.error('Error starting simulation:', error);
+      displayError(
+        'Initialization Failed',
+        'Failed to initialize simulation. Please try again.'
+      );
+    }
+  };
 
   const handleSaveScenario = useCallback(async () => {
-    // Sync scenario_title with scenarioName
-    let contentToSave = scenarioContent;
-    try {
-      if (scenarioContent) {
-        const parsed = JSON.parse(scenarioContent);
-        parsed.scenario_title = scenarioName;
-        contentToSave = JSON.stringify(parsed, null, 2);
-      }
-    } catch {
-      // If not valid JSON, saveScenario will handle the error
-    }
-
     // If editing an existing scenario, show Overwrite/Save As New dialog
     if (isEditMode && selectedScenarioId) {
       setOverwriteDialogOpen(true);
@@ -228,7 +249,7 @@ export default function ScenarioEditor() {
       setNameDialogOpen(true);
     } else {
       const newId = await saveScenario(
-        contentToSave,
+        scenarioContent,
         scenarioName,
         scenarioDescription
       );
@@ -356,23 +377,14 @@ export default function ScenarioEditor() {
       .get('/scenarios/template')
       .then((response) => {
         const template = response.data;
-        // Extract scenario_title and description from template
-        let name = '';
-        let description = '';
-        let content = {};
-        if (template.content) {
-          // Remove scenario_title from content
-          const { scenario_title, ...rest } = template.content;
-          name = scenario_title || '';
-          content = rest;
-        }
-        // Use top-level description if present
-        if (template.description) {
-          description = template.description;
-        }
+        // Use template content directly
+        const content = template.content || {};
+        const name = template.name || '';
+        const description = template.description || '';
+
         setScenarioName(name);
         setScenarioDescription(description);
-        setScenarioContent(JSON.stringify({ ...content }, null, 2));
+        setScenarioContent(JSON.stringify(content, null, 2));
       })
       .catch(() => {
         setScenarioContent('');

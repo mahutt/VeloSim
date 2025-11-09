@@ -31,10 +31,9 @@ import {
 
 export default [
   layout('./layouts/authenticated.tsx', [
-    index('routes/home.tsx'),
-    route('simulation', 'routes/simulation.tsx'),
+    index('routes/scenarios.tsx'),
+    route('simulation/:sim_id', 'routes/simulation.tsx'),
     route('simulations', 'routes/simulations.tsx'),
-    route('scenarios', 'routes/scenarios.tsx'),
 
     // Admin pages
     route('users', 'routes/users.tsx'),
