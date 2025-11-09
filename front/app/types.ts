@@ -78,6 +78,12 @@ export interface ScenarioListResponse extends PaginatedResponse {
   scenarios: Scenario[];
 }
 
+export interface InitializeSimulationResponse {
+  sim_id: string;
+  db_id: number;
+  status: string;
+}
+
 // Resource types
 export interface Resource {
   id: number;
@@ -156,4 +162,44 @@ export interface Simulation {
   resource_count: number;
   station_count: number;
   task_count: number;
+}
+
+// Backend WebSocket payload types (snake_case from backend)
+export interface BackendTask {
+  task_id: number;
+  task_state: 'open' | 'assigned' | 'inprogress' | 'completed' | 'scheduled';
+  station_id: number;
+  station_name: string;
+  assigned_resource_id: number | null;
+  scheduled_time?: number;
+}
+
+export interface BackendStation {
+  station_id: number;
+  station_name: string;
+  station_position: [number, number];
+  station_tasks: BackendTask[];
+  task_count: number;
+}
+
+export interface BackendResource {
+  resource_id: number;
+  resource_position: [number, number];
+  resource_tasks: BackendTask[];
+  task_count: number;
+  in_progress_task_id: number | null;
+}
+
+export interface BackendPayload {
+  sim_id?: string;
+  tasks?: BackendTask[];
+  stations?: BackendStation[];
+  resources?: BackendResource[];
+  new_tasks?: BackendTask[];
+  clock?: {
+    simSecondsPassed: number;
+    simMinutesPassed: number;
+    realSecondsPassed: number;
+    realMinutesPassed: number;
+  };
 }

@@ -24,7 +24,11 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router';
-import type { Scenario, ScenarioListResponse } from '~/types';
+import type {
+  Scenario,
+  ScenarioListResponse,
+  InitializeSimulationResponse,
+} from '~/types';
 import ScenarioToolbar from '~/components/scenario/scenario-toolbar';
 import ScenarioTextArea from '~/components/scenario/scenario-textarea';
 import ScenarioSidebar from '~/components/scenario/scenario-sidebar';
@@ -216,17 +220,13 @@ export default function ScenarioEditor() {
       };
 
       // Call backend API to initialize simulation with scenario data
-      const response = await api.post('/simulation/initialize', scenarioData);
-      const data = response.data;
+      const response = await api.post<InitializeSimulationResponse>(
+        '/simulation/initialize',
+        scenarioData
+      );
 
-      if (data && data.sim_id) {
-        const simId = data.sim_id;
-        console.log('Received sim_id:', simId);
-        // Navigate to simulation page with sim_id
-        navigate(`/simulation/${simId}`);
-      } else {
-        throw new Error('No sim_id received from server');
-      }
+      // Navigate to simulation page with sim_id from response
+      navigate(`/simulation/${response.data.sim_id}`);
     } catch (error) {
       console.error('Error starting simulation:', error);
       displayError(

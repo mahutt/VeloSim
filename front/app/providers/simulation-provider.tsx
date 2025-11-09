@@ -38,6 +38,10 @@ import {
   type Resource,
   type SelectedItem,
   SelectedItemType,
+  type BackendPayload,
+  type BackendStation,
+  type BackendResource,
+  type BackendTask,
 } from '~/types';
 import {
   adaptStationsToGeoJSON,
@@ -152,46 +156,6 @@ export const SimulationProvider = ({
   // HELPER FUNCTIONS
   // ============================================================================
 
-  // Backend WebSocket payload types (snake_case from backend)
-  interface BackendTask {
-    task_id: number;
-    task_state: 'open' | 'assigned' | 'inprogress' | 'completed' | 'scheduled';
-    station_id: number;
-    station_name: string;
-    assigned_resource_id: number | null;
-    scheduled_time?: number;
-  }
-
-  interface BackendStation {
-    station_id: number;
-    station_name: string;
-    station_position: [number, number];
-    station_tasks: BackendTask[];
-    task_count: number;
-  }
-
-  interface BackendResource {
-    resource_id: number;
-    resource_position: [number, number];
-    resource_tasks: BackendTask[];
-    task_count: number;
-    in_progress_task_id: number | null;
-  }
-
-  interface BackendPayload {
-    sim_id?: string;
-    tasks?: BackendTask[];
-    stations?: BackendStation[];
-    resources?: BackendResource[];
-    new_tasks?: BackendTask[];
-    clock?: {
-      simSecondsPassed: number;
-      simMinutesPassed: number;
-      realSecondsPassed: number;
-      realMinutesPassed: number;
-    };
-  }
-
   // Convert WebSocket simulation data to frontend format
   const adaptSimulationData = (
     payload: BackendPayload,
@@ -290,6 +254,10 @@ export const SimulationProvider = ({
   };
 
   // Helper function to update both map sources
+  // TODO: Queue updates and batch them to next animation frame for better performance
+  // Currently each call triggers immediate map re-render. Could maintain consistent RPS
+  // by queueing updates and applying them only during the animation loop.
+  // This would prevent extra renders when user rapidly selects/deselects entities.
   const updateMapSources = (
     selectedStationId?: number,
     selectedResourceId?: number
@@ -537,6 +505,8 @@ export const SimulationProvider = ({
       if (!start || !target) return;
 
       // Linear interpolation between start and target positions
+      // TODO: Replace with route-based interpolation once backend sends GeoJSON routes
+      // This will allow resources to follow actual roadways instead of straight lines
       const currentPos: [number, number] = [
         start[0] + (target[0] - start[0]) * t, // longitude
         start[1] + (target[1] - start[1]) * t, // latitude
@@ -578,22 +548,14 @@ export const SimulationProvider = ({
     }
   };
 
-  // Cleanup animation and WebSocket on unmount
-  const cleanup = () => {
-    if (animationFrameRef.current) {
-      cancelAnimationFrame(animationFrameRef.current);
-      isAnimatingRef.current = false;
-    }
-    if (wsRef.current) {
-      wsRef.current.close();
-    }
-    if (hoverDebounceTimeoutRef.current) {
-      clearTimeout(hoverDebounceTimeoutRef.current);
-    }
-  };
-
   // ============================================================================
   // WEBSOCKET CONNECTION EFFECT
+  // TODO: Extract WebSocket logic into useWebSocket hook for better maintainability
+  // This effect is large and could be split into:
+  // - useWebSocket (connection, message handling, reconnection)
+  // - useSimulationAnimation (RAF loop, position interpolation)
+  // - useSimulationData (data adapters, state management)
+  // See: [Link to ticket/issue if you create one]
   // ============================================================================
 
   useEffect(() => {
@@ -690,6 +652,14 @@ export const SimulationProvider = ({
 
     ws.onerror = (error) => {
       console.error('[WS] ❌ WebSocket error:', error);
+
+      // Log to backend - WebSocket errors are client-side only
+      logSimulationError(error, 'WebSocket connection error', {
+        errorType: 'WEBSOCKET_ERROR',
+        simId,
+        wsUrl,
+      });
+
       displayError(
         'Connection Error',
         'Failed to connect to simulation. Check authentication and try again.'
@@ -719,6 +689,19 @@ export const SimulationProvider = ({
       // Code 1008 = Policy Violation (auth failure)
       if (event.code === 1008) {
         console.error('[WS] ❌ Authentication failed (code 1008)');
+
+        // Log to backend - WebSocket close events are client-side only
+        logSimulationError(
+          new Error('WebSocket authentication failed'),
+          'WebSocket closed due to authentication failure',
+          {
+            errorType: 'WEBSOCKET_AUTH_FAILURE',
+            simId,
+            closeCode: event.code,
+            closeReason: event.reason,
+          }
+        );
+
         displayError(
           'Authentication Failed',
           'WebSocket authentication failed. Please try logging in again.'
@@ -769,8 +752,19 @@ export const SimulationProvider = ({
       });
     }
 
-    // Cleanup on unmount
-    return cleanup;
+    // Cleanup on unmount - defined here to avoid stale closures
+    return () => {
+      if (animationFrameRef.current) {
+        cancelAnimationFrame(animationFrameRef.current);
+        isAnimatingRef.current = false;
+      }
+      if (wsRef.current) {
+        wsRef.current.close();
+      }
+      if (hoverDebounceTimeoutRef.current) {
+        clearTimeout(hoverDebounceTimeoutRef.current);
+      }
+    };
   }, [mapLoaded, simId, user, connectionAttempts]);
 
   // Render existing data when map loads
