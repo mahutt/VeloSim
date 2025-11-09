@@ -86,3 +86,7 @@ export class MockMap {
 }
 
 export const mockDisplayError = vi.fn();
+
+export const consoleErrorSpy = vi
+  .spyOn(console, 'error')
+  .mockImplementation(() => {});
