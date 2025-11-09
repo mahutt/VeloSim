@@ -52,6 +52,19 @@ vi.mock('~/providers/simulation-provider', () => ({
   SimulationProvider: ({ children }: { children: React.ReactNode }) => (
     <div>{children}</div>
   ),
+  useSimulation: () => ({
+    isLoading: false,
+    simulationStatus: 'ready',
+    stationsRef: { current: new Map() },
+    resourcesRef: { current: new Map() },
+    resources: [],
+    selectedItem: null,
+    selectItem: vi.fn(),
+    clearSelection: vi.fn(),
+    assignTaskToResource: vi.fn(),
+    simId: 'test-sim-id',
+    isConnected: true,
+  }),
 }));
 
 vi.mock('~/providers/task-assignment-provider', () => ({

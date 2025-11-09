@@ -26,10 +26,14 @@ import 'mapbox-gl/dist/mapbox-gl.css';
 import MapContainer from '~/components/map/map-container';
 import SelectedItemBar from '~/components/map/selected-item-bar';
 import { MapProvider } from '~/providers/map-provider';
-import { SimulationProvider } from '~/providers/simulation-provider';
+import {
+  SimulationProvider,
+  useSimulation,
+} from '~/providers/simulation-provider';
 import ResourceBar from '~/components/resource/resource-bar';
 import { TaskAssignmentProvider } from '~/providers/task-assignment-provider';
 import { useParams } from 'react-router';
+import { Loader2 } from 'lucide-react';
 
 export function meta() {
   return [{ title: 'Simulation' }];
@@ -43,12 +47,38 @@ export default function Simulation() {
       <MapProvider>
         <SimulationProvider simId={sim_id}>
           <TaskAssignmentProvider>
-            <MapContainer />
-            <ResourceBar />
-            <SelectedItemBar />
+            <SimulationContent />
           </TaskAssignmentProvider>
         </SimulationProvider>
       </MapProvider>
+    </>
+  );
+}
+
+function SimulationContent() {
+  const { isLoading, simulationStatus } = useSimulation();
+
+  return (
+    <>
+      <MapContainer />
+      {isLoading && (
+        <div className="absolute inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm">
+          <div className="flex flex-col items-center gap-4">
+            <Loader2 className="h-12 w-12 animate-spin text-primary" />
+            <p className="text-lg text-muted-foreground">
+              {simulationStatus === 'connecting'
+                ? 'Connecting to simulation...'
+                : 'Loading initial data...'}
+            </p>
+          </div>
+        </div>
+      )}
+      {!isLoading && (
+        <>
+          <ResourceBar />
+          <SelectedItemBar />
+        </>
+      )}
     </>
   );
 }
