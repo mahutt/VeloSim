@@ -52,16 +52,27 @@ class WebSocketSubscriber(Subscriber):
         self.loop = loop
 
     def close(self) -> None:
+        """Mark the subscriber as closed to prevent further frame sends."""
         self.closed = True
 
     def on_frame(self, frame: Frame) -> None:
-        if not self.closed and self.loop is not None:
+        # Check if closed or websocket disconnected before scheduling
+        if self.closed:
+            return
+        if self.websocket.client_state != WebSocketState.CONNECTED:
+            return
+        if self.loop is not None and not self.loop.is_closed():
             # schedule the coroutine in the main event loop
             asyncio.run_coroutine_threadsafe(self._send_frame(frame), self.loop)
 
     async def _send_frame(self, frame: Frame) -> None:
-        if self.closed or self.websocket.client_state != WebSocketState.CONNECTED:
+        # Double-check state before attempting to send
+        if self.closed:
             return
+        if self.websocket.client_state != WebSocketState.CONNECTED:
+            self.closed = True
+            return
+
         try:
             await self.websocket.send_json(
                 {
@@ -71,10 +82,19 @@ class WebSocketSubscriber(Subscriber):
                     "payload": frame.payload_dict,
                 }
             )
+        except RuntimeError as e:
+            # Silently catch ASGI message errors when connection is already closed
+            # These occur when frames are queued but WebSocket
+            # closes before they're sent
+            if "websocket.send" in str(e) or "websocket.close" in str(e):
+                self.closed = True
+            else:
+                # Re-raise unexpected RuntimeErrors
+                raise
         except Exception:
-            if not self.closed:
-                # Already closed or error sending
-                pass
+            # Mark as closed to prevent further send attempts
+            # Silently ignore other exceptions (e.g., connection errors)
+            self.closed = True
 
 
 async def safe_send_json(websocket: WebSocket, payload: dict) -> None:
@@ -126,15 +146,24 @@ def attach_ws_subscriber(
 ) -> WebSocketSubscriber:
     """
     Attach a new WebSocketSubscriber to the simulation emitter.
-    Detach any previous subscriber first.
+    Detach and close any previous subscriber first.
     """
     old_sub: Optional[WebSocketSubscriber] = sim_data.get("ws_subscriber")
     if old_sub:
+        old_sub.close()  # Mark old subscriber as closed to stop sending
         sim_info["emitter"].detach(old_sub)
+
+    # Extra safety: close and detach ALL subscribers to prevent duplicates
+    # This handles edge cases where cleanup didn't run properly
+    for sub in list(sim_info["emitter"].subscribers):
+        if isinstance(sub, WebSocketSubscriber):
+            sub.close()
+            sim_info["emitter"].detach(sub)
 
     subscriber = WebSocketSubscriber(websocket)
     sim_info["emitter"].attach(subscriber)
     sim_data["ws_subscriber"] = subscriber
+
     return subscriber
 
 

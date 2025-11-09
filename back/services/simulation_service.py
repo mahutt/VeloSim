@@ -203,13 +203,6 @@ class SimulationService:
         thread = threading.Thread(target=run_sim, daemon=True)
         thread.start()
 
-        # If a WebSocket is provided, attach a subscriber
-        if websocket:
-            subscriber = WebSocketSubscriber(websocket)
-            sim_info["emitter"].attach(subscriber)
-            # Store for later detachment
-            sim_data["ws_subscriber"] = subscriber
-
         # Update state
         sim_data["status"] = "running"
 

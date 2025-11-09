@@ -177,7 +177,10 @@ class RealTimeDriver:
         self.running = False
 
     def resume(self) -> None:
-        print("Starting")
+        print("Resuming")
+        self.reset_pacing_refs()
+        # Reset pacing since time during
+        # pause makes sim think its lagging.
         self.running = True
 
     def stop(self) -> None:

@@ -680,7 +680,11 @@ class TestSimulationAPI:
     def test_websocket_subscriber_send_error(self) -> None:
         class FailingWS(DummyWebSocket):
             async def send_json(self, data: FrameData) -> None:
-                raise RuntimeError("send failed")
+                # Simulate realistic ASGI error when websocket is closed
+                raise RuntimeError(
+                    "Unexpected ASGI message 'websocket.send'"
+                    ", after sending 'websocket.close'"
+                )
 
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
@@ -697,8 +701,11 @@ class TestSimulationAPI:
                 is_key=False,
             )
 
-            # Should not raise even though send_json fails
+            # Should not raise even though send_json fails with ASGI error
             loop.run_until_complete(subscriber._send_frame(frame))
+
+            # Subscriber should be marked as closed after error
+            assert subscriber.closed is True
         finally:
             loop.close()
             asyncio.set_event_loop(None)
