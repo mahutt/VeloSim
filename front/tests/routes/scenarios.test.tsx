@@ -155,38 +155,6 @@ describe('ScenarioEditor', () => {
     });
   });
 
-  it('updates scenario name when input changes', async () => {
-    render(
-      <BrowserRouter>
-        <ScenarioEditor />
-      </BrowserRouter>
-    );
-
-    await waitFor(() => {
-      expect(screen.getByText('Scenario Editor')).toBeInTheDocument();
-    });
-
-    const nameInput = screen.getByPlaceholderText('Scenario name');
-    const textarea = screen.getByLabelText('Scenario JSON');
-
-    // Name is now synced from JSON content's scenario_title field
-    const contentWithTitle = JSON.stringify(
-      {
-        scenario_title: 'New Scenario',
-        start_time: '2024-01-01T00:00:00Z',
-        end_time: '2024-01-01T01:00:00Z',
-      },
-      null,
-      2
-    );
-
-    fireEvent.change(textarea, { target: { value: contentWithTitle } });
-
-    await waitFor(() => {
-      expect(nameInput).toHaveValue('New Scenario');
-    });
-  });
-
   it('updates scenario content when textarea changes', async () => {
     render(
       <BrowserRouter>
@@ -766,58 +734,6 @@ describe('ScenarioEditor', () => {
     fireEvent.click(saveButton);
   });
 
-  it('syncs scenario_title with scenarioName when content changes', async () => {
-    render(
-      <BrowserRouter>
-        <ScenarioEditor />
-      </BrowserRouter>
-    );
-
-    await waitFor(() => {
-      expect(screen.getByText('Scenario Editor')).toBeInTheDocument();
-    });
-
-    const textarea = screen.getByPlaceholderText(
-      'Paste or type your JSON scenario here...'
-    );
-
-    // Add content with scenario_title
-    fireEvent.change(textarea, {
-      target: { value: '{"scenario_title": "Auto Title", "stations": []}' },
-    });
-
-    await waitFor(() => {
-      const nameInput = screen.getByPlaceholderText('Scenario name');
-      expect(nameInput).toHaveValue('Auto Title');
-    });
-  });
-
-  it('displays scenario_title from JSON content in name field', async () => {
-    render(
-      <BrowserRouter>
-        <ScenarioEditor />
-      </BrowserRouter>
-    );
-
-    await waitFor(() => {
-      expect(screen.getByText('Scenario Editor')).toBeInTheDocument();
-    });
-
-    // Add content with scenario_title
-    const textarea = screen.getByPlaceholderText(
-      'Paste or type your JSON scenario here...'
-    );
-    fireEvent.change(textarea, {
-      target: { value: '{"scenario_title": "My Scenario", "stations": []}' },
-    });
-
-    // Check that name input displays the scenario_title from JSON
-    const nameInput = screen.getByPlaceholderText('Scenario name');
-    await waitFor(() => {
-      expect(nameInput).toHaveValue('My Scenario');
-    });
-  });
-
   it('handles template fetch failure when clicking New', async () => {
     // Mock template endpoint to fail
     vi.mocked(api.get).mockImplementation((url) => {
@@ -1321,67 +1237,6 @@ describe('ScenarioEditor', () => {
     });
   });
   describe('ScenarioEditor - Additional Coverage', () => {
-    it('handles scenario content sync with scenario_title on content change', async () => {
-      render(
-        <BrowserRouter>
-          <ScenarioEditor />
-        </BrowserRouter>
-      );
-
-      await waitFor(() => {
-        expect(screen.getByText('Scenario Editor')).toBeInTheDocument();
-      });
-
-      const textarea = screen.getByPlaceholderText(
-        'Paste or type your JSON scenario here...'
-      );
-
-      // Add content with scenario_title
-      fireEvent.change(textarea, {
-        target: {
-          value: JSON.stringify({
-            scenario_title: 'Auto Title from JSON',
-            stations: [],
-          }),
-        },
-      });
-
-      await waitFor(() => {
-        const nameInput = screen.getByPlaceholderText('Scenario name');
-        expect(nameInput).toHaveValue('Auto Title from JSON');
-      });
-    });
-
-    it('syncs scenario name from scenario_title in valid JSON content', async () => {
-      render(
-        <BrowserRouter>
-          <ScenarioEditor />
-        </BrowserRouter>
-      );
-
-      await waitFor(() => {
-        expect(screen.getByText('Scenario Editor')).toBeInTheDocument();
-      });
-
-      // Add content with scenario_title
-      const textarea = screen.getByPlaceholderText(
-        'Paste or type your JSON scenario here...'
-      );
-      const contentWithTitle = JSON.stringify({
-        scenario_title: 'Updated Name',
-        stations: [],
-      });
-      fireEvent.change(textarea, {
-        target: { value: contentWithTitle },
-      });
-
-      // Check that name input displays the scenario_title
-      const nameInput = screen.getByPlaceholderText('Scenario name');
-      await waitFor(() => {
-        expect(nameInput).toHaveValue('Updated Name');
-      });
-    });
-
     it('handles invalid JSON content without crashing', async () => {
       render(
         <BrowserRouter>
@@ -1399,7 +1254,7 @@ describe('ScenarioEditor', () => {
       );
       fireEvent.change(textarea, { target: { value: 'invalid json' } });
 
-      // Name should remain empty since there's no valid scenario_title
+      // Name should remain empty with invalid JSON
       const nameInput = screen.getByPlaceholderText('Scenario name');
       expect(nameInput).toHaveValue('');
     });
@@ -1520,58 +1375,9 @@ describe('ScenarioEditor', () => {
       expect(api.post).not.toHaveBeenCalled();
     });
 
-    it('handles import with file that has no scenario_title', async () => {
-      const file = new File(
-        [JSON.stringify({ stations: [], description: 'Test desc' })],
-        'scenario.json',
-        { type: 'application/json' }
-      );
-
-      vi.mocked(api.post)
-        .mockResolvedValueOnce({
-          data: { valid: true, errors: [], warnings: [] },
-        })
-        .mockResolvedValueOnce({
-          data: { id: 10 },
-        });
-
-      render(
-        <BrowserRouter>
-          <ScenarioEditor />
-        </BrowserRouter>
-      );
-
-      await waitFor(() => {
-        expect(screen.getByText('Scenario Editor')).toBeInTheDocument();
-      });
-
-      const fileInput = document.querySelector(
-        'input[type="file"]'
-      ) as HTMLInputElement;
-
-      Object.defineProperty(fileInput, 'files', {
-        value: [file],
-        writable: false,
-      });
-
-      fireEvent.change(fileInput);
-
-      await waitFor(() => {
-        const nameInput = screen.getByPlaceholderText('Scenario name');
-        expect(nameInput).toHaveValue('scenario');
-      });
-
-      await waitFor(() => {
-        const descInput = screen.getByPlaceholderText(
-          'Enter scenario description'
-        );
-        expect(descInput).toHaveValue('Test desc');
-      });
-    });
-
     it('resets file input value after import', async () => {
       const file = new File(
-        [JSON.stringify({ scenario_title: 'Test', stations: [] })],
+        [JSON.stringify({ stations: [] })],
         'scenario.json',
         { type: 'application/json' }
       );
@@ -1609,53 +1415,12 @@ describe('ScenarioEditor', () => {
       expect(fileInput.value).toBe('');
     });
 
-    it('handles handleSaveScenario with invalid JSON content during sync', async () => {
-      render(
-        <BrowserRouter>
-          <ScenarioEditor />
-        </BrowserRouter>
-      );
-
-      await waitFor(() => {
-        expect(screen.getByText('Scenario Editor')).toBeInTheDocument();
-      });
-
-      // Add content with a scenario_title first so there's a name
-      const textarea = screen.getByPlaceholderText(
-        'Paste or type your JSON scenario here...'
-      );
-      fireEvent.change(textarea, {
-        target: { value: JSON.stringify({ scenario_title: 'Test Name' }) },
-      });
-
-      // Wait for name to sync
-      await waitFor(() => {
-        const nameInput = screen.getByPlaceholderText('Scenario name');
-        expect(nameInput).toHaveValue('Test Name');
-      });
-
-      // Then change to invalid JSON
-      fireEvent.change(textarea, { target: { value: 'invalid json' } });
-
-      // Try to save
-      const saveButton = screen.getByText('Save');
-      fireEvent.click(saveButton);
-
-      await waitFor(() => {
-        expect(mockDisplayError).toHaveBeenCalledWith(
-          'Invalid JSON format',
-          'The scenario content is not valid JSON. Please fix the formatting.'
-        );
-      });
-    });
-
     it('handles handleSelectScenario with missing optional fields', async () => {
       const scenarioMinimal = {
         id: 3,
         name: 'Minimal Scenario',
         user_id: 1,
         content: {
-          scenario_title: 'Min',
           start_time: '08:00',
           end_time: '17:00',
           resources: [],
@@ -1694,54 +1459,6 @@ describe('ScenarioEditor', () => {
         const content = JSON.parse((textarea as HTMLTextAreaElement).value);
         expect(content.initial_tasks).toBeUndefined();
         expect(content.scheduled_tasks).toBeUndefined();
-      });
-    });
-
-    it('handles multiple consecutive scenario_title changes in JSON', async () => {
-      render(
-        <BrowserRouter>
-          <ScenarioEditor />
-        </BrowserRouter>
-      );
-
-      await waitFor(() => {
-        expect(screen.getByText('Scenario Editor')).toBeInTheDocument();
-      });
-
-      const textarea = screen.getByPlaceholderText(
-        'Paste or type your JSON scenario here...'
-      );
-      const nameInput = screen.getByPlaceholderText('Scenario name');
-
-      // Change scenario_title in JSON multiple times
-      fireEvent.change(textarea, {
-        target: {
-          value: JSON.stringify({ scenario_title: 'Name 1', stations: [] }),
-        },
-      });
-
-      await waitFor(() => {
-        expect(nameInput).toHaveValue('Name 1');
-      });
-
-      fireEvent.change(textarea, {
-        target: {
-          value: JSON.stringify({ scenario_title: 'Name 2', stations: [] }),
-        },
-      });
-
-      await waitFor(() => {
-        expect(nameInput).toHaveValue('Name 2');
-      });
-
-      fireEvent.change(textarea, {
-        target: {
-          value: JSON.stringify({ scenario_title: 'Name 3', stations: [] }),
-        },
-      });
-
-      await waitFor(() => {
-        expect(nameInput).toHaveValue('Name 3');
       });
     });
 

@@ -108,6 +108,7 @@ vi.mock('~/api', () => {
   return {
     default: {
       get: vi.fn(),
+      post: vi.fn().mockResolvedValue({ data: {} }),
     },
   };
 });

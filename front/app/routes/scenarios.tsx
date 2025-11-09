@@ -108,19 +108,6 @@ export default function ScenarioEditor() {
     loadSavedScenarios().then(setSavedScenarios);
   }, []); // Only run once on mount
 
-  // Sync scenarioName with scenario_title in JSON content
-  useEffect(() => {
-    if (!scenarioContent) return;
-    try {
-      const parsed = JSON.parse(scenarioContent);
-      if (parsed.scenario_title && parsed.scenario_title !== scenarioName) {
-        setScenarioName(parsed.scenario_title);
-      }
-    } catch {
-      // ignore if not valid JSON
-    }
-  }, [scenarioContent, scenarioName]);
-
   // Helper function to generate incremented name
   const generateIncrementedName = useCallback(
     (baseName: string, scenarios: Scenario[]): string => {
@@ -250,18 +237,6 @@ export default function ScenarioEditor() {
   };
 
   const handleSaveScenario = useCallback(async () => {
-    // Sync scenario_title with scenarioName
-    let contentToSave = scenarioContent;
-    try {
-      if (scenarioContent) {
-        const parsed = JSON.parse(scenarioContent);
-        parsed.scenario_title = scenarioName;
-        contentToSave = JSON.stringify(parsed, null, 2);
-      }
-    } catch {
-      // If not valid JSON, saveScenario will handle the error
-    }
-
     // If editing an existing scenario, show Overwrite/Save As New dialog
     if (isEditMode && selectedScenarioId) {
       setOverwriteDialogOpen(true);
@@ -274,7 +249,7 @@ export default function ScenarioEditor() {
       setNameDialogOpen(true);
     } else {
       const newId = await saveScenario(
-        contentToSave,
+        scenarioContent,
         scenarioName,
         scenarioDescription
       );
@@ -402,23 +377,14 @@ export default function ScenarioEditor() {
       .get('/scenarios/template')
       .then((response) => {
         const template = response.data;
-        // Extract scenario_title and description from template
-        let name = '';
-        let description = '';
-        let content = {};
-        if (template.content) {
-          // Remove scenario_title from content
-          const { scenario_title, ...rest } = template.content;
-          name = scenario_title || '';
-          content = rest;
-        }
-        // Use top-level description if present
-        if (template.description) {
-          description = template.description;
-        }
+        // Use template content directly
+        const content = template.content || {};
+        const name = template.name || '';
+        const description = template.description || '';
+
         setScenarioName(name);
         setScenarioDescription(description);
-        setScenarioContent(JSON.stringify({ ...content }, null, 2));
+        setScenarioContent(JSON.stringify(content, null, 2));
       })
       .catch(() => {
         setScenarioContent('');

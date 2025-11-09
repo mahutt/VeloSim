@@ -54,6 +54,7 @@ import {
   logFrameProcessingError,
   logSimulationError,
 } from '~/utils/simulation-error-utils';
+import api from '~/api';
 
 // Expect to receive frames every 1 second
 const FRAME_INTERVAL_MS = 1000;
@@ -426,8 +427,7 @@ export const SimulationProvider = ({
       lastFrameTimeRef.current = performance.now();
 
       // Start animation loop
-      console.log('[Animation] Starting animation loop');
-      animationFrameRef.current = requestAnimationFrame(animateResources);
+      ensureAnimationRunning();
 
       // Update map with initial data
       updateMapSources(
@@ -494,6 +494,9 @@ export const SimulationProvider = ({
       if (simulationStatus !== 'running') {
         setSimulationStatus('running');
       }
+
+      // Ensure animation loop is running (in case it stopped)
+      ensureAnimationRunning();
     } catch (error) {
       logSimulationError(error, 'Failed to process frame update', {
         errorType: 'FRAME_UPDATE_ERROR',
@@ -501,6 +504,18 @@ export const SimulationProvider = ({
       });
       // Don't show error dialog for individual frame failures - just log it
       // The simulation will continue with the last good state
+    }
+  };
+
+  // Track if animation loop is running
+  const isAnimatingRef = useRef<boolean>(false);
+
+  // Start animation loop if not already running
+  const ensureAnimationRunning = () => {
+    if (!isAnimatingRef.current) {
+      console.log('[Animation] Starting animation loop');
+      isAnimatingRef.current = true;
+      animationFrameRef.current = requestAnimationFrame(animateResources);
     }
   };
 
@@ -567,6 +582,7 @@ export const SimulationProvider = ({
   const cleanup = () => {
     if (animationFrameRef.current) {
       cancelAnimationFrame(animationFrameRef.current);
+      isAnimatingRef.current = false;
     }
     if (wsRef.current) {
       wsRef.current.close();
@@ -689,6 +705,16 @@ export const SimulationProvider = ({
       });
 
       setIsConnected(false);
+
+      // Pause the simulation by setting playback speed to 0
+      api
+        .post(`/simulation/${simId!}/playbackSpeed`, { playback_speed: 0 })
+        .then(() => {
+          console.log('[WS] ⏸️  Playback paused on disconnect');
+        })
+        .catch((error) => {
+          console.error('[WS] Failed to pause playback:', error);
+        });
 
       // Code 1008 = Policy Violation (auth failure)
       if (event.code === 1008) {
