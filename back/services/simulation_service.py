@@ -22,7 +22,10 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 """
 
-from typing import Dict, List, Union
+import asyncio
+import threading
+from typing import Any, Dict, List
+from fastapi import WebSocket
 from sqlalchemy.orm import Session
 from back.models import User
 from back.models.sim_instance import SimInstance
@@ -31,6 +34,7 @@ from back.schemas import (
     PlaybackSpeedResponse,
     SimulationPlaybackStatus,
 )
+from sim.entities.frame import Frame
 from sim.simulator import Simulator
 from sim.entities.inputParameters import InputParameter
 from back.crud import sim_instance_crud, user_crud
@@ -39,16 +43,47 @@ from back.schemas.sim_instance import (
     SimulationResponse,
 )
 from back.exceptions import VelosimPermissionError, ItemNotFoundError
+from sim.utils.subscriber import Subscriber
+
+
+class WebSocketSubscriber(Subscriber):
+    def __init__(self, websocket: WebSocket) -> None:
+        self.websocket = websocket
+        # get the current running loop of the WebSocket (main uvicorn loop)
+        self.loop = asyncio.get_running_loop()
+
+    def on_frame(self, frame: Frame) -> None:
+        # schedule the coroutine in the main event loop
+        asyncio.run_coroutine_threadsafe(self._send_frame(frame), self.loop)
+
+    async def _send_frame(self, frame: Frame) -> None:
+        try:
+            await self.websocket.send_json(
+                {
+                    "seq": frame.seq_number,
+                    "timestamp": frame.timestamp_ms,
+                    "is_key": frame.is_key,
+                    "payload": frame.payload_dict,
+                }
+            )
+        except Exception as e:
+            print(f"WebSocket send error: {e}")
 
 
 class SimulationService:
     """Service layer for managing the lifecycle and access control of simulations."""
 
     def __init__(self) -> None:
-        self.simulator = Simulator()
-        # Maps sim_id (UUID from simulator) -> (db_id, status, sim_time)
+        # Maps sim_id (UUID from simulator) -> (db_id, status, sim_time, simulator)
         # sim_time comes from InputParameter.sim_time
-        self.active_simulations: Dict[str, Dict[str, Union[int, str]]] = {}
+        self.active_simulations: Dict[str, Dict[str, Any]] = {}
+        # Example of an entry to represent an in-memory simulation instance:
+        # sim_id: {
+        #     "db_id": 123,
+        #     "status": "running",
+        #     "sim_time": 3600,
+        #     "simulator": <Simulator instance from sim package>,
+        # }
 
     # Internal helper
     def _get_requesting_user(self, db: Session, requesting_user: int) -> User:
@@ -67,7 +102,7 @@ class SimulationService:
             raise VelosimPermissionError("Requesting user is disabled.")
         return user
 
-    def verify_access(self, db: Session, sim_uuid: str, requesting_user: int) -> bool:
+    def verify_access(self, db: Session, sim_id: str, requesting_user: int) -> bool:
         """
         Return True if the requesting user has permission to access the simulation
         identified by its in-memory UUID.
@@ -81,11 +116,11 @@ class SimulationService:
         """
         user = self._get_requesting_user(db, requesting_user)
 
-        sim_data = self.active_simulations.get(sim_uuid)
+        sim_data = self.active_simulations.get(sim_id)
         if not sim_data:
-            raise ItemNotFoundError(f"Simulation {sim_uuid} is not currently active")
+            raise ItemNotFoundError(f"Simulation {sim_id} is not currently active")
 
-        db_id: int = sim_data["db_id"]  # type: ignore[assignment]
+        db_id: int = sim_data["db_id"]
         db_sim_instance = sim_instance_crud.get(db, db_id)
         if not db_sim_instance:
             raise ItemNotFoundError(f"Simulation instance record {db_id} not found")
@@ -95,24 +130,25 @@ class SimulationService:
     def initialize_simulation(
         self, db: Session, requesting_user: int, params: InputParameter
     ) -> SimulationResponse:
-        """
-        Initialize a new simulation and return a confirmation response.
-        """
         user = self._get_requesting_user(db, requesting_user)
 
-        # Create database record first
+        # Create DB record
         sim_instance_data = SimInstanceCreate(user_id=user.id)
         db_sim_instance = sim_instance_crud.create(db, sim_instance_data)
         db.commit()
 
-        # Initialize the simulation
-        sim_id = self.simulator.initialize(params, subscribers=[])
+        # Create a fresh Simulator for this simulation
+        sim = Simulator()
 
-        # Track simulation
+        # Initialize simulation with InputParameter
+        sim_id = sim.initialize(params, subscribers=[])
+
+        # Store the Simulator instance per sim_id
         self.active_simulations[sim_id] = {
             "db_id": db_sim_instance.id,
             "status": "initialized",
             "sim_time": params.sim_time,
+            "simulator": sim,
         }
 
         return SimulationResponse(
@@ -122,7 +158,11 @@ class SimulationService:
         )
 
     def start_simulation(
-        self, db: Session, sim_id: str, requesting_user: int
+        self,
+        db: Session,
+        sim_id: str,
+        requesting_user: int,
+        websocket: WebSocket | None = None,
     ) -> SimulationResponse:
         """
         Start an initialized simulation and return a confirmation response.
@@ -134,30 +174,44 @@ class SimulationService:
             raise ItemNotFoundError(sim_id, "Simulation not found")
 
         sim_data = self.active_simulations[sim_id]
-        db_id: int = sim_data["db_id"]  # type: ignore[assignment]
+        db_id: int = sim_data["db_id"]
 
         db_sim_instance = sim_instance_crud.get(db, db_id)
         if db_sim_instance is None:
             raise ItemNotFoundError(db_id, "Simulation instance record not found")
 
-        # Fetch the sim_controller from the simulator
-        sim_info = self.simulator.get_sim_by_id(sim_id)
-        if sim_info is None:
-            raise RuntimeError(f"Simulation {sim_id} not found in simulator")
+        # Use the Simulator instance tied to this sim
+        sim = sim_data.get("simulator")
+        if sim is None:
+            raise RuntimeError(f"Simulator for simulation {sim_id} not found")
 
-        # Retrieve sim_time from active_simulations
+        # Ensure the sim actually contains this sim_id
+        sim_info = sim.get_sim_by_id(sim_id)
+        if sim_info is None:
+            raise RuntimeError(f"Simulation {sim_id} not found in its Simulator")
+
         sim_time_value = sim_data.get("sim_time")
         if sim_time_value is None:
             raise ValueError(
                 f"Simulation {sim_id} does not have a valid sim_time defined."
             )
 
-        # Start simulation using sim_time
-        sim_time = int(sim_time_value)
-        self.simulator.start(sim_id, simTime=sim_time)
+        # Start the simulation in a background thread
+        def run_sim() -> None:
+            sim.start(sim_id, sim_time_value)
+
+        thread = threading.Thread(target=run_sim, daemon=True)
+        thread.start()
+
+        # If a WebSocket is provided, attach a subscriber
+        if websocket:
+            subscriber = WebSocketSubscriber(websocket)
+            sim_info["emitter"].attach(subscriber)
+            # Store for later detachment
+            sim_data["ws_subscriber"] = subscriber
 
         # Update state
-        self.active_simulations[sim_id]["status"] = "running"
+        sim_data["status"] = "running"
 
         return SimulationResponse(
             sim_id=sim_id,
@@ -190,7 +244,7 @@ class SimulationService:
             raise ItemNotFoundError(sim_id, "Simulation not found")
 
         sim_data = self.active_simulations[sim_id]
-        db_id: int = sim_data["db_id"]  # type: ignore[assignment]
+        db_id: int = sim_data["db_id"]
         db_sim_instance = sim_instance_crud.get(db, db_id)
         if db_sim_instance is None:
             raise ItemNotFoundError(db_id, "Simulation instance record not found")
@@ -202,7 +256,10 @@ class SimulationService:
             raise VelosimPermissionError("Unauthorized to stop this simulation.")
 
         # Stop simulator and delete DB record
-        self.simulator.stop(sim_id)
+        sim = sim_data.get("simulator")
+        if sim is None:
+            raise RuntimeError(f"Simulator for simulation {sim_id} not found")
+        sim.stop(sim_id)
         sim_instance_crud.delete(db, db_id)
         db.commit()
 
@@ -298,7 +355,7 @@ class SimulationService:
             raise ItemNotFoundError(sim_id, "Simulation not found")
 
         sim_data = self.active_simulations[sim_id]
-        db_id: int = sim_data["db_id"]  # type: ignore[assignment]
+        db_id: int = sim_data["db_id"]
         db_sim_instance = sim_instance_crud.get(db, db_id)
         if db_sim_instance is None:
             raise ItemNotFoundError(db_id, "Simulation instance record not found")
@@ -317,7 +374,13 @@ class SimulationService:
         """
         try:
             # Stop all simulators
-            self.simulator.stop_all()
+            for sim_id, sim_data in self.active_simulations.items():
+                sim = sim_data.get("simulator")
+                if sim is not None:
+                    try:
+                        sim.stop(sim_id)
+                    except Exception as exc:
+                        print(f"Failed to stop simulation {sim_id}: {exc}")
 
             # Clean up database records in a single batch operation
             if self.active_simulations:
@@ -359,10 +422,6 @@ class SimulationService:
         """
         self._stop_all_simulations_core(db)
 
-    def get_simulator(self) -> Simulator:
-        """Get the underlying simulator instance for advanced operations"""
-        return self.simulator
-
     def set_playback_speed(
         self,
         db: Session,
@@ -376,7 +435,7 @@ class SimulationService:
             raise ItemNotFoundError(sim_id, "Simulation not found")
 
         sim_data = self.active_simulations[sim_id]
-        db_id: int = sim_data["db_id"]  # type: ignore
+        db_id: int = sim_data["db_id"]
         db_sim_instance = sim_instance_crud.get(db, db_id)
         if db_sim_instance is None:
             raise ItemNotFoundError(db_id, "Simulation instance record not found")
@@ -384,7 +443,10 @@ class SimulationService:
         if db_sim_instance.user_id != user.id and not user.is_admin:
             raise VelosimPermissionError("Unauthorized to modify this simulation.")
 
-        sim_info = self.simulator.get_sim_by_id(sim_id)
+        sim = sim_data.get("simulator")
+        if sim is None:
+            raise RuntimeError(f"Simulator for simulation {sim_id} not found")
+        sim_info = sim.get_sim_by_id(sim_id)
         if sim_info is None:
             raise RuntimeError(f"Simulation {sim_id} not found in simulator")
         driver = sim_info["simController"].realTimeDriver
@@ -423,7 +485,7 @@ class SimulationService:
             raise ItemNotFoundError(sim_id, "Simulation not found")
 
         sim_data = self.active_simulations[sim_id]
-        db_id: int = sim_data["db_id"]  # type: ignore
+        db_id: int = sim_data["db_id"]
         db_sim_instance = sim_instance_crud.get(db, db_id)
         if db_sim_instance is None:
             raise ItemNotFoundError(db_id, "Simulation instance record not found")
@@ -432,9 +494,10 @@ class SimulationService:
             raise VelosimPermissionError("Unauthorized to access this simulation.")
 
         # Get simulator runtime information from the sim package
-        sim_info = self.simulator.get_sim_by_id(sim_id)
-        if sim_info is None:
-            raise RuntimeError(f"Simulation {sim_id} not found in simulator")
+        sim = sim_data.get("simulator")
+        if sim is None:
+            raise RuntimeError(f"Simulator for simulation {sim_id} not found")
+        sim_info = sim.get_sim_by_id(sim_id)
         # Retrieve the corresponding realTimeDriver
         driver = sim_info["simController"].realTimeDriver
 

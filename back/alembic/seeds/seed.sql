@@ -202,20 +202,19 @@ VALUES
         "start_time": "08:00",
         "end_time": "12:00",
         "resources": [
-        { "resource_id": 1, "resource_position": [45.5070, -73.5610] },
-        { "resource_id": 2, "resource_position": [45.5090, -73.5670] }
+            { "resource_id": 1, "resource_position": [45.5070, -73.5610] },
+            { "resource_id": 2, "resource_position": [45.5090, -73.5670] }
         ],
         "stations": [
-        { "station_id": 1, "station_name": "Metcalfe / de Maisonneuve", "station_position": [45.50137, -73.57314] },
-        { "station_id": 2, "station_name": "Sanguinet / de Maisonneuve", "station_position": [45.51344, -73.56261] }
+            { "station_id": 1, "station_name": "Metcalfe / de Maisonneuve", "station_position": [45.50137, -73.57314] },
+            { "station_id": 2, "station_name": "Sanguinet / de Maisonneuve", "station_position": [45.51344, -73.56261] }
         ],
         "initial_tasks": [
-        { "id": "t1", "station_id": "1" },
-        { "id": "t2", "station_id": "2" }
+            { "id": "t1", "station_id": 1, "assigned_resource_id": 1 }
         ],
         "scheduled_tasks": [
-        { "id": "t3", "station_id": "1", "time": 5400 },
-        { "id": "t4", "station_id": "2", "time": 6300 }
+            { "id": "t3", "station_id": 1, "time": 5400 },
+            { "id": "t4", "station_id": 2, "time": 6300 }
         ]
     }',
     'Test description for Scenario 1.',
@@ -226,22 +225,21 @@ VALUES
 (
     'Test Scenario 2',
     '{
-    "start_time": "13:00",
-    "end_time": "17:00",
-    "resources": [
-        { "resource_id": 3, "resource_position": [45.5030, -73.5740] }
+        "start_time": "13:00",
+        "end_time": "17:00",
+        "resources": [
+            { "resource_id": 3, "resource_position": [45.5030, -73.5740] }
         ],
         "stations": [
-        { "station_id": 3, "station_name": "St-Denis / Ste-Catherine", "station_position": [45.51007, -73.56391] },
-        { "station_id": 4, "station_name": "St-André / Ontario", "station_position": [45.52188, -73.56353] }
+            { "station_id": 3, "station_name": "St-Denis / Ste-Catherine", "station_position": [45.51007, -73.56391] },
+            { "station_id": 4, "station_name": "St-André / Ontario", "station_position": [45.52188, -73.56353] }
         ],
         "initial_tasks": [
-        { "id": "t5", "station_id": "3" },
-        { "id": "t6", "station_id": "4" }
+            { "id": "t5", "station_id": 3, "assigned_resource_id": 3 }
         ],
         "scheduled_tasks": [
-        { "id": "t7", "station_id": "3", "time": 50400 },
-        { "id": "t8", "station_id": "4", "time": 55800 }
+            { "id": "t7", "station_id": 3, "time": 50400 },
+            { "id": "t8", "station_id": 4, "time": 55800 }
         ]
     }',
     'Test description for Scenario 2.',

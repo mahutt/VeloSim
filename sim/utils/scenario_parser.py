@@ -22,8 +22,6 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 """
 
-import simpy
-from typing import Dict
 from sim.entities.inputParameters import InputParameter
 from sim.utils.base_parse_strategy import BaseParseStrategy
 
@@ -36,5 +34,5 @@ class ScenarioParser:
     def setStrategy(self, strategy: BaseParseStrategy) -> None:
         self._strategy = strategy
 
-    def parse(self, env: simpy.Environment, source: str) -> Dict[int, InputParameter]:
-        return self._strategy.parse(env=env, source=source)
+    def parse(self, scenario_json: dict) -> InputParameter:
+        return self._strategy.parse(scenario_json=scenario_json)

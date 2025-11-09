@@ -22,12 +22,14 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 """
 
+import asyncio
+from fastapi import WebSocket
+from fastapi.websockets import WebSocketState
 import pytest
 from unittest.mock import patch, MagicMock, ANY
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
-from typing import Generator, cast, TypedDict, List
-import asyncio
+from typing import Generator, TypedDict, List, cast
 
 from back.api.v1.utils.sim_websocket_helpers import WebSocketSubscriber
 from back.main import app
@@ -45,7 +47,6 @@ from back.schemas.resource import (
     ResourceTaskUnassignRequest,
 )
 from back.services.simulation_service import simulation_service
-from fastapi import WebSocket
 
 from back.models.user import User
 
@@ -238,10 +239,10 @@ def mocked_simulator(monkeypatch: pytest.MonkeyPatch) -> Generator[None, None, N
 
 
 class FrameData(TypedDict):
-    sim_id: str
-    seq_numb: int
-    payload: str
+    seq: int
     timestamp: int
+    is_key: bool
+    payload: str
 
 
 class DummyWebSocket:
@@ -249,6 +250,7 @@ class DummyWebSocket:
 
     def __init__(self) -> None:
         self.sent: List[FrameData] = []
+        self.client_state = WebSocketState.CONNECTED
 
     async def send_json(self, data: FrameData) -> None:
         self.sent.append(data)
@@ -616,27 +618,26 @@ class TestSimulationAPI:
 
         try:
             dummy_ws = DummyWebSocket()
-            subscriber = WebSocketSubscriber(cast(WebSocket, dummy_ws), "sim123")
+            subscriber = WebSocketSubscriber(cast(WebSocket, dummy_ws))
             subscriber.set_event_loop(loop)
 
             # Mock a frame
             frame = MagicMock()
             frame.seq_number = 1
-            frame.payload_str = "payload"
+            frame.payload_dict = {"some": "data"}
             frame.timestamp_ms = 12345
+            frame.is_key = True
 
-            # Trigger the frame
-            subscriber.on_frame(frame)
-
-            # Wait a little for the coroutine to execute
-            loop.run_until_complete(asyncio.sleep(0.01))
+            # Directly call the async method instead of going through on_frame
+            # which uses run_coroutine_threadsafe (requires running loop in bg)
+            loop.run_until_complete(subscriber._send_frame(frame))
 
             assert len(dummy_ws.sent) == 1
             assert dummy_ws.sent[0] == {
-                "sim_id": "sim123",
-                "seq_numb": 1,
-                "payload": "payload",
+                "seq": 1,
                 "timestamp": 12345,
+                "is_key": True,
+                "payload": {"some": "data"},
             }
         finally:
             loop.close()
@@ -648,27 +649,29 @@ class TestSimulationAPI:
 
         try:
             dummy_ws = DummyWebSocket()
-            subscriber = WebSocketSubscriber(cast(WebSocket, dummy_ws), "sim123")
+            subscriber = WebSocketSubscriber(cast(WebSocket, dummy_ws))
             subscriber.set_event_loop(loop)
 
             frames = [
                 MagicMock(
-                    seq_number=i, payload_str=f"payload{i}", timestamp_ms=1000 + i
+                    seq_number=i,
+                    payload_dict={"data": f"payload{i}"},
+                    timestamp_ms=1000 + i,
+                    is_key=(i == 0),
                 )
                 for i in range(3)
             ]
 
+            # Send frames directly using the async method
             for frame in frames:
-                subscriber.on_frame(frame)
-
-            loop.run_until_complete(asyncio.sleep(0.01))
+                loop.run_until_complete(subscriber._send_frame(frame))
 
             for i, frame in enumerate(frames):
                 assert dummy_ws.sent[i] == {
-                    "sim_id": "sim123",
-                    "seq_numb": frame.seq_number,
-                    "payload": frame.payload_str,
+                    "seq": frame.seq_number,
                     "timestamp": frame.timestamp_ms,
+                    "is_key": frame.is_key,
+                    "payload": frame.payload_dict,
                 }
         finally:
             loop.close()
@@ -684,14 +687,18 @@ class TestSimulationAPI:
 
         try:
             failing_ws = FailingWS()
-            subscriber = WebSocketSubscriber(cast(WebSocket, failing_ws), "sim123")
+            subscriber = WebSocketSubscriber(cast(WebSocket, failing_ws))
             subscriber.set_event_loop(loop)
 
-            frame = MagicMock(seq_number=1, payload_str="payload", timestamp_ms=123)
-            subscriber.on_frame(frame)
-
-            # Just ensure no unhandled exception propagates
-            loop.run_until_complete(asyncio.sleep(0.01))
+            frame = MagicMock(
+                seq_number=1,
+                payload_dict={"data": "payload"},
+                timestamp_ms=123,
+                is_key=False,
+            )
+            
+            # Should not raise even though send_json fails
+            loop.run_until_complete(subscriber._send_frame(frame))
         finally:
             loop.close()
             asyncio.set_event_loop(None)
@@ -702,22 +709,28 @@ class TestSimulationAPI:
 
         try:
             dummy_ws = DummyWebSocket()
-            subscriber = WebSocketSubscriber(cast(WebSocket, dummy_ws), "sim123")
+            subscriber = WebSocketSubscriber(cast(WebSocket, dummy_ws))
 
             # Setting the event loop should not raise
             subscriber.set_event_loop(loop)
 
             # Verify that sending a frame works using the event loop
-            frame = MagicMock(seq_number=1, payload_str="payload", timestamp_ms=123)
-            subscriber.on_frame(frame)
-
-            # Wait briefly to allow async send_json to run
-            loop.run_until_complete(asyncio.sleep(0.01))
+            frame = MagicMock(
+                seq_number=1,
+                payload_dict={"data": "payload"},
+                timestamp_ms=123,
+                is_key=True,
+            )
+            
+            # Directly call the async method
+            loop.run_until_complete(subscriber._send_frame(frame))
 
             # Check that frame was sent
             assert len(dummy_ws.sent) == 1
-            assert dummy_ws.sent[0]["seq_numb"] == 1
-            assert dummy_ws.sent[0]["payload"] == "payload"
+            assert dummy_ws.sent[0]["seq"] == 1
+            assert dummy_ws.sent[0]["payload"] == {"data": "payload"}
+            assert dummy_ws.sent[0]["timestamp"] == 123
+            assert dummy_ws.sent[0]["is_key"] is True
         finally:
             loop.close()
             asyncio.set_event_loop(None)
@@ -728,19 +741,23 @@ class TestSimulationAPI:
 
         try:
             dummy_ws = DummyWebSocket()
-            subscriber = WebSocketSubscriber(cast(WebSocket, dummy_ws), "sim123")
+            subscriber = WebSocketSubscriber(cast(WebSocket, dummy_ws))
             subscriber.set_event_loop(loop)
 
-            # Frame missing seq_number
-            frame = MagicMock(payload_str="payload", timestamp_ms=123)
+            # Frame with missing/None attributes
+            frame = MagicMock(
+                payload_dict={"data": "payload"}, timestamp_ms=123, is_key=False
+            )
             frame.seq_number = None  # simulate missing
 
-            subscriber.on_frame(frame)
-            loop.run_until_complete(asyncio.sleep(0.01))
+            # Directly call the async method
+            loop.run_until_complete(subscriber._send_frame(frame))
 
-            # Either no frame sent or sent with None seq_numb
+            # Frame sent with None seq
             assert len(dummy_ws.sent) == 1
-            assert dummy_ws.sent[0]["seq_numb"] is None
+            assert dummy_ws.sent[0]["seq"] is None
+            assert dummy_ws.sent[0]["payload"] == {"data": "payload"}
+            assert dummy_ws.sent[0]["timestamp"] == 123
         finally:
             loop.close()
             asyncio.set_event_loop(None)
@@ -764,7 +781,7 @@ class TestSimulationAPI:
 
         mock_assign.assert_called_once_with(
             db=ANY,
-            sim_uuid=active_sim_id,
+            sim_id=active_sim_id,
             requesting_user=1,
             task_assign_data=ResourceTaskAssignRequest(**payload),
         )
@@ -819,7 +836,7 @@ class TestSimulationAPI:
 
         mock_unassign.assert_called_once_with(
             db=ANY,
-            sim_uuid=active_sim_id,
+            sim_id=active_sim_id,
             requesting_user=1,
             task_unassign_data=ResourceTaskUnassignRequest(**payload),
         )
@@ -863,7 +880,7 @@ class TestSimulationAPI:
 
         mock_reassign.assert_called_once_with(
             db=ANY,
-            sim_uuid=active_sim_id,
+            sim_id=active_sim_id,
             requesting_user=1,
             task_reassign_data=ResourceTaskReassignRequest(**payload),
         )

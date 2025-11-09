@@ -341,31 +341,3 @@ class ScenarioValidationResponse(BaseModel):
     warnings: List[str] = Field(
         default_factory=list, description="List of validation warnings"
     )
-
-
-class ScenarioInitializationRequest(BaseModel):
-    class TaskModel(BaseModel):
-        id: str
-        station_id: str
-        time: int | None = None  # note that this is optional for initial_tasks
-
-    class StationModel(BaseModel):
-        station_id: int
-        station_name: str
-        station_position: List[float]
-
-    class ResourceModel(BaseModel):
-        resource_id: int
-        resource_position: List[float]
-
-    class ScenarioContentModel(BaseModel):
-        start_time: str
-        end_time: str
-        stations: List["ScenarioInitializationRequest.StationModel"]
-        resources: List["ScenarioInitializationRequest.ResourceModel"]
-        initial_tasks: List["ScenarioInitializationRequest.TaskModel"]
-        scheduled_tasks: List["ScenarioInitializationRequest.TaskModel"] = []
-
-    id: int
-    name: str
-    content: ScenarioContentModel
