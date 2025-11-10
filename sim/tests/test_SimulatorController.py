@@ -27,8 +27,8 @@ import pytest
 from typing import List, Any, Generator
 from unittest.mock import Mock, patch
 
-from sim.SimulatorController import SimulatorController
-from sim.frame_emitter import FrameEmitter
+from sim.core.SimulatorController import SimulatorController
+from sim.core.frame_emitter import FrameEmitter
 from sim.entities.inputParameters import InputParameter
 from sim.entities.frame import Frame
 from sim.entities.station import Station
@@ -37,8 +37,8 @@ from sim.entities.BatterySwapTask import BatterySwapTask
 from sim.entities.position import Position
 from sim.utils.subscriber import Subscriber
 from sim.behaviour.sim_behaviour import SimBehaviour
-import sim.RealTimeDriver as rtd
-import sim.SimulatorController as sc_mod
+import sim.core.RealTimeDriver as rtd
+import sim.core.SimulatorController as sc_mod
 from types import SimpleNamespace
 
 
@@ -86,7 +86,7 @@ class FakeSubscriber(Subscriber):
 @pytest.fixture(autouse=True)
 def reset_singleton() -> Generator[None, None, None]:
     """Reset OSMConnection singleton before each test"""
-    from sim.DAO.OSMConnection import OSMConnection
+    from sim.osm.OSMConnection import OSMConnection
 
     OSMConnection.reset_instance()
     yield
@@ -153,11 +153,11 @@ def simulator_controller(
 ) -> SimulatorController:
     # Mock OSMConnection initialization to avoid file I/O
     with (
-        patch("sim.DAO.OSMConnection.OSMConnection._initialize_osm_data_file"),
-        patch("sim.DAO.OSMConnection.OSMConnection._get_drivable_network"),
-        patch("sim.DAO.OSMConnection.OSMConnection.create_networkx_graph"),
-        patch("sim.DAO.OSMConnection.OSMConnection._set_projected_nodes"),
-        patch("sim.DAO.OSMConnection.OSMConnection._build_edge_index"),
+        patch("sim.osm.OSMConnection.OSMConnection._initialize_osm_data_file"),
+        patch("sim.osm.OSMConnection.OSMConnection._get_drivable_network"),
+        patch("sim.osm.OSMConnection.OSMConnection.create_networkx_graph"),
+        patch("sim.osm.OSMConnection.OSMConnection._set_projected_nodes"),
+        patch("sim.osm.OSMConnection.OSMConnection._build_edge_index"),
     ):
         controller = SimulatorController(
             simEnv=env,
@@ -173,7 +173,7 @@ def test_simulator_controller_initialization(
     simulator_controller: SimulatorController, input_params: InputParameter
 ) -> None:
     """Test that SimulatorController initializes correctly with proper attributes."""
-    # Check that the controller has the expected attributes
+    # Check that the map has the expected attributes
     assert simulator_controller.simEnv is not None
     assert simulator_controller.frameEmitter is not None
     assert simulator_controller.realTimeDriver is not None
@@ -395,7 +395,7 @@ def test_key_frame_includes_new_tasks_and_clears_popups(
     payload = frame.payload_dict
     assert "new_tasks" in payload
     assert any(t["id"] == 99 for t in payload["new_tasks"])
-    # ensure task added to controller task_entities
+    # ensure task added to map task_entities
     assert simulator_controller.get_task_by_id(99) is not None
     # ensure popups cleared after frame generation
     assert station1.pop_up_tasks == []
@@ -463,8 +463,8 @@ def test_add_task_fail(
     # Act and Assert
     with pytest.raises(Exception, match=f"Task with id {task_id} already exists"):
         simulator_controller.add_task(new_task)
-    # Verify controller state was not mutated: the existing task with id=2 remains,
-    # and the controller does not hold a reference to the new_task instance.
+    # Verify map state was not mutated: the existing task with id=2 remains,
+    # and the map does not hold a reference to the new_task instance.
     existing = simulator_controller.get_task_by_id(task_id)
     assert existing is not None
     assert existing is not new_task

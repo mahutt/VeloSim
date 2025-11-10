@@ -29,9 +29,9 @@ import simpy
 
 from sim.entities.inputParameters import InputParameter
 from sim.entities.request_type import RequestType
-from sim.frame_emitter import FrameEmitter
+from sim.core.frame_emitter import FrameEmitter
 from sim.utils.subscriber import Subscriber
-from sim.SimulatorController import SimulatorController
+from sim.core.SimulatorController import SimulatorController
 from sim.entities.task import Task
 from sim.behaviour.sim_behaviour import SimBehaviour
 
@@ -73,7 +73,7 @@ class Simulator:
         with self.thread_pool_lock:
             if run_id in self.thread_pool:
                 raise RuntimeError(f"Run id already present: {run_id}")
-            # Store the controller but don't start the thread yet
+            # Store the map but don't start the thread yet
             self.thread_pool[run_id] = {
                 "thread": None,  # No thread yet
                 "emitter": emitter,

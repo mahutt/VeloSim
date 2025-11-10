@@ -36,7 +36,7 @@ from shapely.geometry import LineString
 from sim.entities.route import Route
 from sim.entities.position import Position
 from sim.entities.road import road
-from sim.DAO.OSMConnection import OSMConnection
+from sim.osm.OSMConnection import OSMConnection
 
 
 @pytest.fixture
@@ -344,7 +344,7 @@ class TestRouteRecalculation:
     def test_recalculate_with_valid_map_controller(
         self, setup_test_environment, sample_route_node_ids
     ) -> None:
-        """Test that recalculate works with a valid map controller."""
+        """Test that recalculate works with a valid map map."""
         # Create a more sophisticated mock OSM connection
         mock_osm = Mock(spec=OSMConnection)
 
@@ -530,7 +530,7 @@ class TestRouteRecalculation:
     def test_recalculate_returns_false_without_map_controller(
         self, setup_test_environment, mock_osm_connection, sample_route_node_ids
     ) -> None:
-        """Test that recalculate returns False if no map controller is set."""
+        """Test that recalculate returns False if no map map is set."""
         route = Route(sample_route_node_ids, mock_osm_connection)
 
         success = route.recalculate()

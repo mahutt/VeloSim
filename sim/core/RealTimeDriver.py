@@ -49,7 +49,7 @@ class RealTimeDriver:
 
     def _load_config(self) -> dict[str, Any]:
         """Load configuration from config.json file."""
-        config_path = os.path.join(os.path.dirname(__file__), "config.json")
+        config_path = os.path.join(os.path.dirname(__file__), "..", "config.json")
         try:
             with open(config_path, "r") as file:
                 config = json.load(file)

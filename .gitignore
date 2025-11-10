@@ -173,7 +173,7 @@ front/.env.test.local
 front/.env.production.local
 
 # Simulator
-sim/DAO/OSMData
+sim/osm/OSMData
 
 # npm
 npm-debug.log*

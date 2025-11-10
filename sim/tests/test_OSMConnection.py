@@ -24,7 +24,7 @@ SOFTWARE.
 
 import pytest
 from unittest.mock import patch, MagicMock
-from sim.DAO.OSMConnection import OSMConnection
+from sim.osm.OSMConnection import OSMConnection
 import geopandas as gpd
 import networkx as nx
 from pandas import Series
@@ -43,10 +43,10 @@ def reset_singleton() -> Generator[None, None, None]:
 
 @patch("os.makedirs")
 @patch("os.path.abspath")
-@patch("sim.DAO.OSMConnection.get_data")
-@patch("sim.DAO.OSMConnection.OSM")
-@patch("sim.DAO.OSMConnection.OSMConnection._get_drivable_network")
-@patch("sim.DAO.OSMConnection.OSMConnection.create_networkx_graph")
+@patch("sim.osm.OSMConnection.get_data")
+@patch("sim.osm.OSMConnection.OSM")
+@patch("sim.osm.OSMConnection.OSMConnection._get_drivable_network")
+@patch("sim.osm.OSMConnection.OSMConnection.create_networkx_graph")
 def test_osmconnection_initialization_methods_called(
     mock_create_graph: MagicMock,
     mock_get_drivable_network: MagicMock,
@@ -56,7 +56,7 @@ def test_osmconnection_initialization_methods_called(
     mock_makedirs: MagicMock,
 ) -> None:
     # Arrange
-    mock_abspath.return_value = "/tmp/sim/DAO/OSMConnection.py"
+    mock_abspath.return_value = "/tmp/sim/osm/OSMConnection.py"
     mock_get_data.return_value = "/mock/path/montreal.osm.pbf"
 
     # Act
@@ -74,10 +74,10 @@ def test_osmconnection_initialization_methods_called(
 
 @patch("os.makedirs")
 @patch("os.path.abspath")
-@patch("sim.DAO.OSMConnection.get_data")
-@patch("sim.DAO.OSMConnection.OSM")
-@patch("sim.DAO.OSMConnection.OSMConnection._get_drivable_network")
-@patch("sim.DAO.OSMConnection.OSMConnection.create_networkx_graph")
+@patch("sim.osm.OSMConnection.get_data")
+@patch("sim.osm.OSMConnection.OSM")
+@patch("sim.osm.OSMConnection.OSMConnection._get_drivable_network")
+@patch("sim.osm.OSMConnection.OSMConnection.create_networkx_graph")
 def test_osmconnection_initialization_folder_exists(
     mock_create_graph: MagicMock,
     mock_get_drivable_network: MagicMock,
@@ -87,7 +87,7 @@ def test_osmconnection_initialization_folder_exists(
     mock_makedirs: MagicMock,
 ) -> None:
     # Arrange
-    mock_abspath.return_value = "/tmp/sim/DAO/OSMConnection.py"
+    mock_abspath.return_value = "/tmp/sim/osm/OSMConnection.py"
     mock_get_data.return_value = "/mock/path/montreal.osm.pbf"
 
     # Act
@@ -103,9 +103,9 @@ def test_osmconnection_initialization_folder_exists(
 
 
 @patch("os.path.abspath")
-@patch("sim.DAO.OSMConnection.get_data")
-@patch("sim.DAO.OSMConnection.OSMConnection._get_drivable_network")
-@patch("sim.DAO.OSMConnection.OSMConnection.create_networkx_graph")
+@patch("sim.osm.OSMConnection.get_data")
+@patch("sim.osm.OSMConnection.OSMConnection._get_drivable_network")
+@patch("sim.osm.OSMConnection.OSMConnection.create_networkx_graph")
 def test_osmconnection_initialization_get_data_fails(
     mock_create_graph: MagicMock,
     mock_get_drivable_network: MagicMock,
@@ -113,7 +113,7 @@ def test_osmconnection_initialization_get_data_fails(
     mock_abspath: MagicMock,
 ) -> None:
     # Arrange
-    mock_abspath.return_value = "/tmp/sim/DAO/OSMConnection.py"
+    mock_abspath.return_value = "/tmp/sim/osm/OSMConnection.py"
     mock_get_data.side_effect = Exception("Failed to download")
 
     # Act and Assert
@@ -127,9 +127,9 @@ def test_osmconnection_initialization_get_data_fails(
 
 
 @patch("os.path.abspath")
-@patch("sim.DAO.OSMConnection.get_data")
-@patch("sim.DAO.OSMConnection.OSM")
-@patch("sim.DAO.OSMConnection.OSMConnection.create_networkx_graph")
+@patch("sim.osm.OSMConnection.get_data")
+@patch("sim.osm.OSMConnection.OSM")
+@patch("sim.osm.OSMConnection.OSMConnection.create_networkx_graph")
 def test_get_drivable_network_success(
     mock_create_graph: MagicMock,
     mock_osm: MagicMock,
@@ -137,7 +137,7 @@ def test_get_drivable_network_success(
     mock_abspath: MagicMock,
 ) -> None:
     # Arrange
-    mock_abspath.return_value = "/tmp/sim/DAO/OSMConnection.py"
+    mock_abspath.return_value = "/tmp/sim/osm/OSMConnection.py"
     mock_get_data.return_value = "/mock/path/montreal.osm.pbf"
     mock_osm_instance = MagicMock()
     mock_osm.return_value = mock_osm_instance
@@ -155,8 +155,8 @@ def test_get_drivable_network_success(
     )
 
 
-@patch("sim.DAO.OSMConnection.OSMConnection._initialize_osm_data_file")
-@patch("sim.DAO.OSMConnection.OSMConnection.create_networkx_graph")
+@patch("sim.osm.OSMConnection.OSMConnection._initialize_osm_data_file")
+@patch("sim.osm.OSMConnection.OSMConnection.create_networkx_graph")
 def test_get_drivable_network_fail(
     mock_create_graph: MagicMock,
     mock_init_file: MagicMock,
@@ -170,9 +170,9 @@ def test_get_drivable_network_fail(
 
 
 @patch("os.path.abspath")
-@patch("sim.DAO.OSMConnection.get_data")
-@patch("sim.DAO.OSMConnection.OSM")
-@patch("sim.DAO.OSMConnection.OSMConnection.create_networkx_graph")
+@patch("sim.osm.OSMConnection.get_data")
+@patch("sim.osm.OSMConnection.OSM")
+@patch("sim.osm.OSMConnection.OSMConnection.create_networkx_graph")
 def test_get_drivable_network_fail_from_empty_nodes(
     mock_create_graph: MagicMock,
     mock_osm: MagicMock,
@@ -180,7 +180,7 @@ def test_get_drivable_network_fail_from_empty_nodes(
     mock_abspath: MagicMock,
 ) -> None:
     # Arrange
-    mock_abspath.return_value = "/tmp/sim/DAO/OSMConnection.py"
+    mock_abspath.return_value = "/tmp/sim/osm/OSMConnection.py"
     mock_get_data.return_value = "/mock/path/montreal.osm.pbf"
     mock_osm_instance = MagicMock()
     mock_osm.return_value = mock_osm_instance
@@ -195,9 +195,9 @@ def test_get_drivable_network_fail_from_empty_nodes(
     mock_create_graph.assert_not_called()
 
 
-@patch("sim.DAO.OSMConnection.OSMConnection._initialize_osm_data_file")
-@patch("sim.DAO.OSMConnection.OSMConnection._get_drivable_network")
-@patch("sim.DAO.OSMConnection.OSMConnection.create_networkx_graph")
+@patch("sim.osm.OSMConnection.OSMConnection._initialize_osm_data_file")
+@patch("sim.osm.OSMConnection.OSMConnection._get_drivable_network")
+@patch("sim.osm.OSMConnection.OSMConnection.create_networkx_graph")
 def test_getters_nodes_edges_graph(
     mock_create_graph: MagicMock,
     mock_get_drivable_network: MagicMock,
@@ -234,9 +234,9 @@ def test_getters_nodes_edges_graph(
     assert graph == mock_graph
 
 
-@patch("sim.DAO.OSMConnection.OSMConnection._initialize_osm_data_file")
-@patch("sim.DAO.OSMConnection.OSMConnection._get_drivable_network")
-@patch("sim.DAO.OSMConnection.OSMConnection.create_networkx_graph")
+@patch("sim.osm.OSMConnection.OSMConnection._initialize_osm_data_file")
+@patch("sim.osm.OSMConnection.OSMConnection._get_drivable_network")
+@patch("sim.osm.OSMConnection.OSMConnection.create_networkx_graph")
 def test_setters_nodes_edges(
     mock_create_graph: MagicMock,
     mock_get_drivable_network: MagicMock,
@@ -261,9 +261,9 @@ def test_setters_nodes_edges(
     assert instance._edges.equals(sample_edges)
 
 
-@patch("sim.DAO.OSMConnection.OSMConnection._initialize_osm_data_file")
-@patch("sim.DAO.OSMConnection.OSMConnection._get_drivable_network")
-@patch("sim.DAO.OSMConnection.OSMConnection.create_networkx_graph")
+@patch("sim.osm.OSMConnection.OSMConnection._initialize_osm_data_file")
+@patch("sim.osm.OSMConnection.OSMConnection._get_drivable_network")
+@patch("sim.osm.OSMConnection.OSMConnection.create_networkx_graph")
 def test_get_node_geometry(
     mock_create_graph: MagicMock,
     mock_get_drivable_network: MagicMock,
@@ -297,9 +297,9 @@ def test_get_node_geometry(
     assert geometry.equals(point)
 
 
-@patch("sim.DAO.OSMConnection.OSMConnection._initialize_osm_data_file")
-@patch("sim.DAO.OSMConnection.OSMConnection._get_drivable_network")
-@patch("sim.DAO.OSMConnection.OSMConnection.create_networkx_graph")
+@patch("sim.osm.OSMConnection.OSMConnection._initialize_osm_data_file")
+@patch("sim.osm.OSMConnection.OSMConnection._get_drivable_network")
+@patch("sim.osm.OSMConnection.OSMConnection.create_networkx_graph")
 @patch("builtins.print")
 def test_get_node_by_id_found(
     mock_print: MagicMock,
@@ -326,9 +326,9 @@ def test_get_node_by_id_found(
     mock_print.assert_not_called()
 
 
-@patch("sim.DAO.OSMConnection.OSMConnection._initialize_osm_data_file")
-@patch("sim.DAO.OSMConnection.OSMConnection._get_drivable_network")
-@patch("sim.DAO.OSMConnection.OSMConnection.create_networkx_graph")
+@patch("sim.osm.OSMConnection.OSMConnection._initialize_osm_data_file")
+@patch("sim.osm.OSMConnection.OSMConnection._get_drivable_network")
+@patch("sim.osm.OSMConnection.OSMConnection.create_networkx_graph")
 @patch("builtins.print")
 def test_get_node_by_id_not_found(
     mock_print: MagicMock,
@@ -355,9 +355,9 @@ def test_get_node_by_id_not_found(
     mock_print.assert_called_once_with("No node could be found")
 
 
-@patch("sim.DAO.OSMConnection.OSMConnection._initialize_osm_data_file")
-@patch("sim.DAO.OSMConnection.OSMConnection._get_drivable_network")
-@patch("sim.DAO.OSMConnection.OSMConnection.create_networkx_graph")
+@patch("sim.osm.OSMConnection.OSMConnection._initialize_osm_data_file")
+@patch("sim.osm.OSMConnection.OSMConnection._get_drivable_network")
+@patch("sim.osm.OSMConnection.OSMConnection.create_networkx_graph")
 def test_get_edge_intersection(
     mock_create_graph: MagicMock,
     mock_get_drivable_network: MagicMock,
@@ -395,9 +395,9 @@ def test_get_edge_intersection(
     assert not intersections[0].empty
 
 
-@patch("sim.DAO.OSMConnection.OSMConnection._initialize_osm_data_file")
-@patch("sim.DAO.OSMConnection.OSMConnection._get_drivable_network")
-@patch("sim.DAO.OSMConnection.OSMConnection.create_networkx_graph")
+@patch("sim.osm.OSMConnection.OSMConnection._initialize_osm_data_file")
+@patch("sim.osm.OSMConnection.OSMConnection._get_drivable_network")
+@patch("sim.osm.OSMConnection.OSMConnection.create_networkx_graph")
 def test_create_node_success(
     mock_create_graph: MagicMock,
     mock_get_drivable_network: MagicMock,
@@ -419,10 +419,10 @@ def test_create_node_success(
     assert node.geometry == point
 
 
-@patch("sim.DAO.OSMConnection.OSMConnection._initialize_osm_data_file")
-@patch("sim.DAO.OSMConnection.OSMConnection._get_drivable_network")
-@patch("sim.DAO.OSMConnection.OSMConnection.create_networkx_graph")
-@patch("sim.DAO.OSMConnection.Point")
+@patch("sim.osm.OSMConnection.OSMConnection._initialize_osm_data_file")
+@patch("sim.osm.OSMConnection.OSMConnection._get_drivable_network")
+@patch("sim.osm.OSMConnection.OSMConnection.create_networkx_graph")
+@patch("sim.osm.OSMConnection.Point")
 @patch("builtins.print")
 def test_create_node_fail(
     mock_print: MagicMock,
@@ -449,9 +449,9 @@ def test_create_node_fail(
     mock_print.assert_called_once_with("Node creation failed: Invalid Coordinates")
 
 
-@patch("sim.DAO.OSMConnection.OSMConnection._initialize_osm_data_file")
-@patch("sim.DAO.OSMConnection.OSMConnection._get_drivable_network")
-@patch("sim.DAO.OSMConnection.OSMConnection.create_networkx_graph")
+@patch("sim.osm.OSMConnection.OSMConnection._initialize_osm_data_file")
+@patch("sim.osm.OSMConnection.OSMConnection._get_drivable_network")
+@patch("sim.osm.OSMConnection.OSMConnection.create_networkx_graph")
 def test_create_edge_success(
     mock_create_graph: MagicMock,
     mock_get_drivable_network: MagicMock,
@@ -487,10 +487,10 @@ def test_create_edge_success(
     assert edge.geometry == linestring
 
 
-@patch("sim.DAO.OSMConnection.OSMConnection._initialize_osm_data_file")
-@patch("sim.DAO.OSMConnection.OSMConnection._get_drivable_network")
-@patch("sim.DAO.OSMConnection.OSMConnection.create_networkx_graph")
-@patch("sim.DAO.OSMConnection.LineString")
+@patch("sim.osm.OSMConnection.OSMConnection._initialize_osm_data_file")
+@patch("sim.osm.OSMConnection.OSMConnection._get_drivable_network")
+@patch("sim.osm.OSMConnection.OSMConnection.create_networkx_graph")
+@patch("sim.osm.OSMConnection.LineString")
 @patch("builtins.print")
 def test_create_edge_fail(
     mock_print: MagicMock,
@@ -532,10 +532,10 @@ def test_create_edge_fail(
     mock_print.assert_called_once_with("Edge creation failed: Invalid LineString")
 
 
-@patch("sim.DAO.OSMConnection.nx.shortest_path")
-@patch("sim.DAO.OSMConnection.OSMConnection._initialize_osm_data_file")
-@patch("sim.DAO.OSMConnection.OSMConnection._get_drivable_network")
-@patch("sim.DAO.OSMConnection.OSMConnection.create_networkx_graph")
+@patch("sim.osm.OSMConnection.nx.shortest_path")
+@patch("sim.osm.OSMConnection.OSMConnection._initialize_osm_data_file")
+@patch("sim.osm.OSMConnection.OSMConnection._get_drivable_network")
+@patch("sim.osm.OSMConnection.OSMConnection.create_networkx_graph")
 def test_shortest_path_success(
     mock_create_graph: MagicMock,
     mock_get_drivable_network: MagicMock,
@@ -596,9 +596,9 @@ def test_shortest_path_success(
     assert route == [1, 2]
 
 
-@patch("sim.DAO.OSMConnection.OSMConnection._initialize_osm_data_file")
-@patch("sim.DAO.OSMConnection.OSMConnection._get_drivable_network")
-@patch("sim.DAO.OSMConnection.OSMConnection.create_networkx_graph")
+@patch("sim.osm.OSMConnection.OSMConnection._initialize_osm_data_file")
+@patch("sim.osm.OSMConnection.OSMConnection._get_drivable_network")
+@patch("sim.osm.OSMConnection.OSMConnection.create_networkx_graph")
 def test_shortest_path_fail_from_empty_graph(
     mock_create_graph: MagicMock,
     mock_get_drivable_network: MagicMock,
@@ -650,10 +650,10 @@ def test_shortest_path_fail_from_empty_graph(
         instance.shortest_path(node1, node2, sample_graph)
 
 
-@patch("sim.DAO.OSMConnection.nx.shortest_path")
-@patch("sim.DAO.OSMConnection.OSMConnection._initialize_osm_data_file")
-@patch("sim.DAO.OSMConnection.OSMConnection._get_drivable_network")
-@patch("sim.DAO.OSMConnection.OSMConnection.create_networkx_graph")
+@patch("sim.osm.OSMConnection.nx.shortest_path")
+@patch("sim.osm.OSMConnection.OSMConnection._initialize_osm_data_file")
+@patch("sim.osm.OSMConnection.OSMConnection._get_drivable_network")
+@patch("sim.osm.OSMConnection.OSMConnection.create_networkx_graph")
 def test_shortest_path_fail_from_missing_id(
     mock_create_graph: MagicMock,
     mock_get_drivable_network: MagicMock,
@@ -714,10 +714,10 @@ def test_shortest_path_fail_from_missing_id(
 
 
 @patch("builtins.print")
-@patch("sim.DAO.OSMConnection.nx.shortest_path")
-@patch("sim.DAO.OSMConnection.OSMConnection._initialize_osm_data_file")
-@patch("sim.DAO.OSMConnection.OSMConnection._get_drivable_network")
-@patch("sim.DAO.OSMConnection.OSMConnection.create_networkx_graph")
+@patch("sim.osm.OSMConnection.nx.shortest_path")
+@patch("sim.osm.OSMConnection.OSMConnection._initialize_osm_data_file")
+@patch("sim.osm.OSMConnection.OSMConnection._get_drivable_network")
+@patch("sim.osm.OSMConnection.OSMConnection.create_networkx_graph")
 def test_shortest_path_fail_from_nx_method_fail(
     mock_create_graph: MagicMock,
     mock_get_drivable_network: MagicMock,
@@ -781,9 +781,9 @@ def test_shortest_path_fail_from_nx_method_fail(
     mock_print.assert_called_once_with("Route creation failed: Shortest Path Failed")
 
 
-@patch("sim.DAO.OSMConnection.OSMConnection._initialize_osm_data_file")
-@patch("sim.DAO.OSMConnection.OSMConnection._get_drivable_network")
-@patch("sim.DAO.OSMConnection.OSMConnection.create_networkx_graph")
+@patch("sim.osm.OSMConnection.OSMConnection._initialize_osm_data_file")
+@patch("sim.osm.OSMConnection.OSMConnection._get_drivable_network")
+@patch("sim.osm.OSMConnection.OSMConnection.create_networkx_graph")
 def test_coordinates_to_nearest_node(
     mock_create_graph: MagicMock,
     mock_get_drivable_network: MagicMock,

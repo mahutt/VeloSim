@@ -25,8 +25,8 @@ SOFTWARE.
 import simpy
 import pytest
 from typing import List, Any
-from sim.RealTimeDriver import RealTimeDriver
-import sim.RealTimeDriver as rtd
+from sim.core.RealTimeDriver import RealTimeDriver
+import sim.core.RealTimeDriver as rtd
 
 
 # Real time driver depends on real time passing by. Too slow for tests.

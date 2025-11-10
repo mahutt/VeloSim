@@ -24,7 +24,7 @@ SOFTWARE.
 
 import simpy
 
-from sim.controller.MapController import MapController
+from sim.map.MapController import MapController
 from typing import Optional, TYPE_CHECKING
 from .task_state import State
 from sim.entities.route import Route

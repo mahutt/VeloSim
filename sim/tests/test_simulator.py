@@ -43,7 +43,7 @@ from sim.entities.position import Position
 from sim.entities.resource import Resource
 from sim.entities.BatterySwapTask import BatterySwapTask
 
-import sim.RealTimeDriver as rtd_mod
+import sim.core.RealTimeDriver as rtd_mod
 from sim.simulator import Simulator
 from sim.utils.subscriber import Subscriber
 from sim.behaviour.sim_behaviour import SimBehaviour
@@ -513,7 +513,7 @@ def test_add_task_to_sim_success(
         assert len(sim_controller.task_entities) != 0
         assert sim_controller.get_task_by_id(3) is not None
 
-    # Cleanup: remove the task from the controller if present
+    # Cleanup: remove the task from the map if present
     if sim_info is not None:
         sim_controller.task_entities.pop(3, None)
     sim.stop(a)

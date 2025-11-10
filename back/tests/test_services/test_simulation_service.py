@@ -49,13 +49,13 @@ def mock_heavy_sim_operations() -> Generator[None, None, None]:
     OSM data loading and CH network building during tests.
     """
     with (
-        patch("sim.DAO.OSMConnection.OSMConnection._initialize_osm_data_file"),
-        patch("sim.DAO.OSMConnection.OSMConnection._get_drivable_network"),
-        patch("sim.DAO.OSMConnection.OSMConnection._set_projected_nodes"),
-        patch("sim.DAO.OSMConnection.OSMConnection._build_edge_index"),
-        patch("sim.DAO.OSMConnection.OSMConnection.create_networkx_graph"),
-        patch("sim.DAO.OSMConnection.OSMConnection.build_ch_network"),
-        patch("sim.SimulatorController.SimulatorController.start") as mock_start,
+        patch("sim.osm.OSMConnection.OSMConnection._initialize_osm_data_file"),
+        patch("sim.osm.OSMConnection.OSMConnection._get_drivable_network"),
+        patch("sim.osm.OSMConnection.OSMConnection._set_projected_nodes"),
+        patch("sim.osm.OSMConnection.OSMConnection._build_edge_index"),
+        patch("sim.osm.OSMConnection.OSMConnection.create_networkx_graph"),
+        patch("sim.osm.OSMConnection.OSMConnection.build_ch_network"),
+        patch("sim.core.SimulatorController.SimulatorController.start") as mock_start,
     ):
         # Make start() a no-op that doesn't spawn threads or do heavy work
         mock_start.return_value = None

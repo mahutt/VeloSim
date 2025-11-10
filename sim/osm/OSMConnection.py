@@ -82,8 +82,8 @@ class OSMConnection(object):
                 os.path.dirname(os.path.abspath(__file__))
             )  # -> /path/to/sim
 
-            dao_dir = os.path.join(sim_root, "DAO")
-            osm_data_dir = os.path.join(dao_dir, "OSMData")
+            osm_dir = os.path.join(sim_root, "osm")
+            osm_data_dir = os.path.join(osm_dir, "OSMData")
 
             # Ensure the folder exists
             os.makedirs(osm_data_dir, exist_ok=True)
@@ -200,8 +200,8 @@ class OSMConnection(object):
         if cache_path is None:
             file_path = os.path.abspath(__file__)
             sim_root = os.path.dirname(os.path.dirname(file_path))
-            dao_dir = os.path.join(sim_root, "DAO")
-            osm_data_dir = os.path.join(dao_dir, "OSMData")
+            osm_dir = os.path.join(sim_root, "osm")
+            osm_data_dir = os.path.join(osm_dir, "OSMData")
             os.makedirs(osm_data_dir, exist_ok=True)
             cache_path = os.path.join(osm_data_dir, "montreal_ch_network.h5")
 
@@ -291,8 +291,8 @@ class OSMConnection(object):
         sim_root = os.path.dirname(
             os.path.dirname(os.path.abspath(__file__))
         )  # -> /path/to/sim
-        dao_dir = os.path.join(sim_root, "DAO")
-        osm_data_dir = os.path.join(dao_dir, "OSMData")
+        osm_dir = os.path.join(sim_root, "osm")
+        osm_data_dir = os.path.join(osm_dir, "OSMData")
         # Ensure the folder exists
         os.makedirs(osm_data_dir, exist_ok=True)
         # Use absolute path, so pyrosm never writes into cwd (/back)
@@ -313,8 +313,8 @@ class OSMConnection(object):
         sim_root = os.path.dirname(
             os.path.dirname(os.path.abspath(__file__))
         )  # -> /path/to/sim
-        dao_dir = os.path.join(sim_root, "DAO")
-        osm_data_dir = os.path.join(dao_dir, "OSMData")
+        osm_dir = os.path.join(sim_root, "osm")
+        osm_data_dir = os.path.join(osm_dir, "OSMData")
         # Ensure the folder exists
         os.makedirs(osm_data_dir, exist_ok=True)
         # Use absolute path, so pyrosm never writes into cwd (/back)

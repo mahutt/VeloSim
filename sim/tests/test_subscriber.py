@@ -27,7 +27,7 @@ from typing import List
 
 from sim.entities.frame import Frame
 from sim.utils.subscriber import Subscriber
-from sim.frame_emitter import FrameEmitter
+from sim.core.frame_emitter import FrameEmitter
 
 
 class FakeSubscriber(Subscriber):

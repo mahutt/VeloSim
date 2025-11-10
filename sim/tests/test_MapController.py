@@ -34,10 +34,10 @@ from pandas import DataFrame
 from shapely.geometry import LineString
 import networkx as nx
 
-from sim.controller.MapController import MapController
+from sim.map.MapController import MapController
 from sim.entities.position import Position
 from sim.entities.route import Route
-from sim.DAO.OSMConnection import OSMConnection
+from sim.osm.OSMConnection import OSMConnection
 
 
 @pytest.fixture
@@ -164,9 +164,7 @@ def map_controller(setup_test_environment, mock_osm_connection):
     # Reset the singleton instance
     MapController._instance = None
 
-    with patch(
-        "sim.controller.MapController.OSMConnection", return_value=mock_osm_connection
-    ):
+    with patch("sim.map.MapController.OSMConnection", return_value=mock_osm_connection):
         controller = MapController()
         return controller
 
@@ -181,7 +179,7 @@ class TestMapControllerSingleton:
         MapController._instance = None
 
         with patch(
-            "sim.controller.MapController.OSMConnection",
+            "sim.map.MapController.OSMConnection",
             return_value=mock_osm_connection,
         ):
             controller1 = MapController()
@@ -196,7 +194,7 @@ class TestMapControllerSingleton:
         MapController._instance = None
 
         with patch(
-            "sim.controller.MapController.OSMConnection",
+            "sim.map.MapController.OSMConnection",
             return_value=mock_osm_connection,
         ):
             controller1 = MapController()

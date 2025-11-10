@@ -24,7 +24,7 @@ SOFTWARE.
 
 from sim.entities.position import Position
 from sim.entities.route import Route
-from sim.DAO.OSMConnection import OSMConnection
+from sim.osm.OSMConnection import OSMConnection
 from typing import Dict, List, Set, Any
 
 

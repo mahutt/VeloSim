@@ -102,13 +102,13 @@ def mock_heavy_sim_operations() -> Generator[None, None, None]:
     OSM data loading and CH network building during tests.
     """
     with (
-        patch("sim.DAO.OSMConnection.OSMConnection._initialize_osm_data_file"),
-        patch("sim.DAO.OSMConnection.OSMConnection._get_drivable_network"),
-        patch("sim.DAO.OSMConnection.OSMConnection._set_projected_nodes"),
-        patch("sim.DAO.OSMConnection.OSMConnection._build_edge_index"),
-        patch("sim.DAO.OSMConnection.OSMConnection.create_networkx_graph"),
-        patch("sim.DAO.OSMConnection.OSMConnection.build_ch_network"),
-        patch("sim.SimulatorController.SimulatorController.start") as mock_start,
+        patch("sim.osm.OSMConnection.OSMConnection._initialize_osm_data_file"),
+        patch("sim.osm.OSMConnection.OSMConnection._get_drivable_network"),
+        patch("sim.osm.OSMConnection.OSMConnection._set_projected_nodes"),
+        patch("sim.osm.OSMConnection.OSMConnection._build_edge_index"),
+        patch("sim.osm.OSMConnection.OSMConnection.create_networkx_graph"),
+        patch("sim.osm.OSMConnection.OSMConnection.build_ch_network"),
+        patch("sim.core.SimulatorController.SimulatorController.start") as mock_start,
     ):
         # Make start() a no-op that doesn't spawn threads or do heavy work
         mock_start.return_value = None
@@ -1217,7 +1217,7 @@ class TestWebSocketSimulationStream:
     @pytest.fixture
     def mock_simulator_with_data(self) -> Generator[dict, None, None]:
         """Provide a mock simulator structure for WebSocket tests"""
-        from sim.frame_emitter import FrameEmitter
+        from sim.core.frame_emitter import FrameEmitter
 
         mock_emitter = FrameEmitter("test_sim_123")
         mock_sim_controller = MagicMock()
@@ -1303,7 +1303,7 @@ class TestWebSocketHelpers:
 
     def test_attach_ws_subscriber_detaches_old_subscriber(self) -> None:
         """Test that attach_ws_subscriber detaches old subscribers"""
-        from sim.frame_emitter import FrameEmitter
+        from sim.core.frame_emitter import FrameEmitter
         from back.api.v1.utils.sim_websocket_helpers import (
             attach_ws_subscriber,
         )
@@ -1328,7 +1328,7 @@ class TestWebSocketHelpers:
 
     def test_attach_ws_subscriber_cleans_all_websocket_subscribers(self) -> None:
         """Test that attach_ws_subscriber removes all WebSocketSubscribers"""
-        from sim.frame_emitter import FrameEmitter
+        from sim.core.frame_emitter import FrameEmitter
         from back.api.v1.utils.sim_websocket_helpers import (
             attach_ws_subscriber,
             WebSocketSubscriber,
@@ -1444,7 +1444,7 @@ class TestWebSocketHelpers:
 
     def test_cleanup_simulation_pauses_when_no_subscribers(self) -> None:
         """Test cleanup pauses simulation when no subscribers remain"""
-        from sim.frame_emitter import FrameEmitter
+        from sim.core.frame_emitter import FrameEmitter
         from back.api.v1.utils.sim_websocket_helpers import (
             cleanup_simulation,
             WebSocketSubscriber,
@@ -1482,7 +1482,7 @@ class TestWebSocketHelpers:
 
     def test_cleanup_simulation_close_exception(self) -> None:
         """Test cleanup handles exception when closing websocket"""
-        from sim.frame_emitter import FrameEmitter
+        from sim.core.frame_emitter import FrameEmitter
         from back.api.v1.utils.sim_websocket_helpers import (
             cleanup_simulation,
             WebSocketSubscriber,

@@ -22,19 +22,19 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 """
 
-from sim.RealTimeDriver import RealTimeDriver
+from sim.core.RealTimeDriver import RealTimeDriver
 import simpy
 import threading
 from typing import Optional, Dict
 from sim.entities.station import Station
-from sim.frame_emitter import FrameEmitter
+from sim.core.frame_emitter import FrameEmitter
 from sim.entities.frame import Frame
 from sim.entities.resource import Resource
 from sim.entities.clock import Clock
 from sim.entities.task import Task
 from sim.entities.inputParameters import InputParameter
 from sim.behaviour.sim_behaviour import SimBehaviour
-from sim.controller.MapController import MapController
+from sim.map.MapController import MapController
 
 
 class SimulatorController:

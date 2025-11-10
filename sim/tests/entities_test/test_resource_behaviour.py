@@ -73,7 +73,7 @@ def test_travel_to_returns_immediately_when_already_at_position() -> None:
     start_pos = Position([0.0, 0.0])
     resource = Resource(env, resource_id=1, position=start_pos)
 
-    # Mock map controller (shouldn't be called)
+    # Mock map map (shouldn't be called)
     mock_map = Mock()
     resource.set_map_controller(mock_map)
 
@@ -81,7 +81,7 @@ def test_travel_to_returns_immediately_when_already_at_position() -> None:
     env.process(resource.travel_to(start_pos))
     env.run(until=1)
 
-    # Should return immediately without calling map controller
+    # Should return immediately without calling map map
     mock_map.getRoute.assert_not_called()
     # Resource should still be at same position
     assert resource.position == start_pos
@@ -107,7 +107,7 @@ def test_travel_to_handles_tuple_return_from_route_next() -> None:
         None,
     ]
 
-    # Mock map controller
+    # Mock map map
     mock_map = Mock()
     mock_map.getRoute.return_value = mock_route
     resource.set_map_controller(mock_map)
@@ -143,7 +143,7 @@ def test_travel_to_handles_single_position_return_from_route_next() -> None:
         None,
     ]
 
-    # Mock map controller
+    # Mock map map
     mock_map = Mock()
     mock_map.getRoute.return_value = mock_route
     resource.set_map_controller(mock_map)
@@ -169,7 +169,7 @@ def test_travel_to_can_be_interrupted() -> None:
 
     mock_route.next.side_effect = [(positions[1], positions)] + positions[2:]
 
-    # Mock map controller
+    # Mock map map
     mock_map = Mock()
     mock_map.getRoute.return_value = mock_route
     resource.set_map_controller(mock_map)
@@ -198,7 +198,7 @@ def test_resource_run_waits_for_initialization() -> None:
     task = FakeTask(env, task_id=1)
     resource.assign_task(task)
 
-    # Set up behaviour and map controller after creation
+    # Set up behaviour and map map after creation
     mock_behaviour = Mock(spec=SimBehaviour)
     mock_behaviour.RCNT_strategy = Mock()
     mock_behaviour.RCNT_strategy.select_next_task.return_value = task
@@ -234,7 +234,7 @@ def test_resource_run_selects_and_dispatches_task() -> None:
 
     resource.set_behaviour(mock_behaviour)
 
-    # Set up map controller with mock route
+    # Set up map map with mock route
     mock_route = Mock()
     mock_route.next.side_effect = [(station_pos, [start_pos, station_pos]), None]
 
