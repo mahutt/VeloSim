@@ -172,6 +172,7 @@ describe('PlaybackControls', () => {
 
     await waitFor(() => {
       expect(mockDisplayError).toHaveBeenCalledWith(
+        'Speed Update Error',
         'Failed to update speed. Please try again.'
       );
       expect(screen.getByText('1x')).toBeInTheDocument();
@@ -222,6 +223,7 @@ describe('PlaybackControls', () => {
 
     await waitFor(() => {
       expect(mockDisplayError).toHaveBeenCalledWith(
+        'Playback Toggle Error',
         'Failed to toggle pause / play simulation. Please try again.'
       );
     });

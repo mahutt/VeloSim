@@ -65,7 +65,10 @@ export default function PlaybackControls() {
       });
     } catch (error) {
       console.error('Failed to update speed:', error);
-      displayError('Failed to update speed. Please try again.');
+      displayError(
+        'Speed Update Error',
+        'Failed to update speed. Please try again.'
+      );
       setSpeed(previousSpeed); // Revert to previous speed on error
       setLoading(false);
       return;
@@ -88,6 +91,7 @@ export default function PlaybackControls() {
     } catch (error) {
       console.error('Failed to toggle pause / play simulation:', error);
       displayError(
+        'Playback Toggle Error',
         'Failed to toggle pause / play simulation. Please try again.'
       );
       setPaused(previousPaused); // Revert to previous paused state on error
@@ -96,7 +100,7 @@ export default function PlaybackControls() {
     }
 
     setLoading(false);
-    speedRef.current = speed;
+    speedRef.current = previousPaused ? speed : 0;
   };
 
   if (!simId) return null;
