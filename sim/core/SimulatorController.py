@@ -28,6 +28,7 @@ import threading
 from typing import Optional, Dict
 from sim.entities.station import Station
 from sim.core.frame_emitter import FrameEmitter
+from sim.entities.task_state import State
 from sim.entities.frame import Frame
 from sim.entities.resource import Resource
 from sim.entities.clock import Clock
@@ -83,6 +84,16 @@ class SimulatorController:
             task.set_behaviour(self.sim_behaviour)
             # Rebind to the actual simulation environment
             task.env = self.simEnv
+
+            # Handle scheduling
+            if task.spawn_delay is not None and task.spawn_delay > 0:
+                # Task starts SCHEDULED, will become OPEN after delay
+                task.state = State.SCHEDULED
+                # Start self-spawning process
+                self.simEnv.process(task._spawn_after_delay(task.spawn_delay))
+            else:
+                # Task is immediately OPEN
+                task.state = State.OPEN
 
         for _, resource in self.resource_entities.items():
             resource.set_behaviour(self.sim_behaviour)
