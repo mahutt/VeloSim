@@ -267,8 +267,10 @@ class SimulatorController:
                 "station_id": station.id,
                 "station_name": station.name,
                 "station_position": (station.get_station_position().get_position()),
-                "station_tasks": [task.to_dict() for task in station.tasks],
-                "task_count": station.get_task_count(),
+                "station_tasks": [
+                    task.to_dict() for task in station.get_visible_tasks()
+                ],
+                "task_count": station.get_visible_task_count(),
             }
             for station in self.station_entities.values()
             if station.has_updated
@@ -306,9 +308,9 @@ class SimulatorController:
                             resource.get_resource_position().get_position()
                         ),
                         "resource_tasks": [
-                            task.to_dict() for task in resource.get_task_list()
+                            task.to_dict() for task in resource.get_visible_task_list()
                         ],
-                        "task_count": resource.get_task_count(),
+                        "task_count": resource.get_visible_task_count(),
                         "in_progress_task_id": (
                             in_progress_task.get_task_id()
                             if in_progress_task is not None
@@ -356,8 +358,10 @@ class SimulatorController:
                 "station_id": station.id,
                 "station_name": station.name,
                 "station_position": (station.get_station_position().get_position()),
-                "station_tasks": [task.to_dict() for task in station.tasks],
-                "task_count": station.get_task_count(),
+                "station_tasks": [
+                    task.to_dict() for task in station.get_visible_tasks()
+                ],
+                "task_count": station.get_visible_task_count(),
             }
             for station in self.station_entities.values()
         ]
@@ -393,9 +397,9 @@ class SimulatorController:
                         resource.get_resource_position().get_position()
                     ),
                     "resource_tasks": [
-                        task.to_dict() for task in resource.get_task_list()
+                        task.to_dict() for task in resource.get_visible_task_list()
                     ],
-                    "task_count": resource.get_task_count(),
+                    "task_count": resource.get_visible_task_count(),
                     "in_progress_task_id": (
                         in_progress_task.get_task_id()
                         if in_progress_task is not None

@@ -138,6 +138,16 @@ class Resource:
     def get_task_list(self) -> list["Task"]:
         return self.task_list
 
+    def get_visible_task_list(self) -> list["Task"]:
+        return [
+            task
+            for task in self.task_list
+            if task.get_state() not in [State.SCHEDULED, State.CLOSED]
+        ]
+
+    def get_visible_task_count(self) -> int:
+        return len(self.get_visible_task_list())
+
     def clear_update(self) -> None:
         self.has_updated = False
 
