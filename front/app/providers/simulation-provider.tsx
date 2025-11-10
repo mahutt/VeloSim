@@ -117,6 +117,7 @@ export const SimulationProvider = ({
   const { mapRef, mapLoaded } = useMap();
   const speedRef = useRef<Speed>(1);
   const stationsRef = useRef<Map<number, Station>>(new Map());
+  const renderOnNextFrameRef = useRef<boolean>(false);
   const resourcesRef = useRef<Map<number, Resource>>(new Map());
 
   // Simulation state
@@ -295,91 +296,47 @@ export const SimulationProvider = ({
     payload: BackendPayload,
     isInitialFrame: boolean = false
   ) => {
-    // Build a map of tasks by station_id for efficient lookup
-    const tasksByStation = new Map<number, BackendTask[]>();
-    const tasksByResource = new Map<number, BackendTask[]>();
-
-    if (payload.tasks) {
-      payload.tasks.forEach((task: BackendTask) => {
-        // Group by station
-        const stationTasks = tasksByStation.get(task.station_id) || [];
-        stationTasks.push(task);
-        tasksByStation.set(task.station_id, stationTasks);
-
-        // Group by assigned resource
-        if (task.assigned_resource_id !== null) {
-          const resourceTasks =
-            tasksByResource.get(task.assigned_resource_id) || [];
-          resourceTasks.push(task);
-          tasksByResource.set(task.assigned_resource_id, resourceTasks);
-        }
-      });
-    }
-
-    // Merge stations (don't clear, just update what's in the payload)
-    if (payload.stations) {
-      payload.stations.forEach((station: BackendStation) => {
-        // Get existing station to preserve tasks if not in payload (only for updates)
-        const existingStation = !isInitialFrame
-          ? stationsRef.current.get(station.station_id)
-          : undefined;
-
-        // Get tasks for this station from the top-level tasks array
-        const stationTasks = tasksByStation.get(station.station_id);
-
-        // Backend sends [lon, lat] which is what GeoJSON expects
-        const position: [number, number] = station.station_position;
-
-        const adaptedStation: Station = {
-          id: station.station_id,
-          name: station.station_name,
+    console.log(isInitialFrame);
+    // Update stations that appear in the payload
+    if (payload.stations && payload.stations.length > 0) {
+      payload.stations.forEach((payloadStation: BackendStation) => {
+        const position: [number, number] = payloadStation.station_position;
+        const updatedStation: Station = {
+          id: payloadStation.station_id,
+          name: payloadStation.station_name,
           position: position,
-          // Only update tasks if they're in the payload, otherwise preserve existing (for updates only)
-          tasks: stationTasks
-            ? stationTasks.map((task: BackendTask) => ({
-                id: task.task_id,
-                stationId: task.station_id,
-                type: 'battery_swap',
-                state:
-                  task.task_state === 'scheduled' ? 'open' : task.task_state,
-                assigned_resource_id: task.assigned_resource_id,
-              }))
-            : existingStation?.tasks || [],
-          task_count: stationTasks
-            ? stationTasks.length
-            : existingStation?.task_count || 0,
+          tasks: payloadStation.station_tasks.map((task: BackendTask) => ({
+            id: task.id,
+            stationId: task.station_id,
+            type: 'battery_swap',
+            state: task.state === 'scheduled' ? 'open' : task.state,
+            assigned_resource_id: task.assigned_resource_id,
+          })),
+          task_count: payloadStation.task_count,
         };
-        stationsRef.current.set(adaptedStation.id, adaptedStation);
+        console.log('Updating station #', updatedStation);
+        stationsRef.current.set(updatedStation.id, updatedStation);
+        renderOnNextFrameRef.current = true;
       });
     }
 
-    // Merge resources (don't clear, just update what's in the payload)
-    if (payload.resources) {
-      payload.resources.forEach((resource: BackendResource) => {
-        // Get existing resource to preserve tasks if not in payload (only for updates)
-        const existingResource = !isInitialFrame
-          ? resourcesRef.current.get(resource.resource_id)
-          : undefined;
-
-        // Get tasks for this resource from the top-level tasks array
-        const resourceTasks = tasksByResource.get(resource.resource_id);
-
+    // Update resources that appear in the payload
+    if (payload.resources && payload.resources.length > 0) {
+      payload.resources.forEach((payloadResource: BackendResource) => {
         // Backend sends [lon, lat] which is what GeoJSON expects
-        const position: [number, number] = resource.resource_position;
+        const position: [number, number] = payloadResource.resource_position;
 
         const adaptedResource: Resource = {
-          id: resource.resource_id,
+          id: payloadResource.resource_id,
           position: position,
-          // Only update tasks if they're in the payload, otherwise preserve existing (for updates only)
-          taskList: resourceTasks
-            ? resourceTasks.map((t: BackendTask) => t.task_id)
-            : existingResource?.taskList || [],
-          task_count: resourceTasks
-            ? resourceTasks.length
-            : existingResource?.task_count || 0,
-          in_progress_task_id: resource.in_progress_task_id,
+          taskList: payloadResource.resource_tasks.map(
+            (t: BackendTask) => t.id
+          ),
+          task_count: payloadResource.task_count,
+          in_progress_task_id: payloadResource.in_progress_task_id,
         };
         resourcesRef.current.set(adaptedResource.id, adaptedResource);
+        renderOnNextFrameRef.current = true;
       });
     }
 
@@ -653,8 +610,6 @@ export const SimulationProvider = ({
         : BASE_FRAME_INTERVAL_MS / speedRef.current; // Adjust interval based on playback speed
     const t = Math.min(frameElapsedMs / adjustedInterval, 1);
 
-    let needsUpdate = false;
-
     // Update position for each resource
     resourcesRef.current.forEach((resource) => {
       const start = frameStartPositionsRef.current.get(resource.id);
@@ -678,19 +633,20 @@ export const SimulationProvider = ({
         prevPos[1] !== currentPos[1]
       ) {
         currentPositionsRef.current.set(resource.id, currentPos);
-        needsUpdate = true;
+        renderOnNextFrameRef.current = true;
       }
 
       // Update the resource object's position
       resource.position = currentPos;
     });
 
-    // Only update map if positions changed
-    if (needsUpdate) {
+    // Only update map if positions or station tasks changed
+    if (renderOnNextFrameRef.current) {
       updateMapSources(
         selectedStationIdRef.current,
         selectedResourceIdRef.current
       );
+      renderOnNextFrameRef.current = false;
     }
 
     // Continue animation loop
