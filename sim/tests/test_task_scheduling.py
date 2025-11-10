@@ -67,6 +67,9 @@ def test_task_scheduled_spawn(env: simpy.Environment, station: Station) -> None:
         task_scheduled.get_state() == State.SCHEDULED
     ), "Delayed task should be SCHEDULED"
 
+    if task_scheduled.spawn_delay is not None and task_scheduled.spawn_delay > 0:
+        env.process(task_scheduled._spawn_after_delay(task_scheduled.spawn_delay))
+
     env.run(until=6.0)
     assert (
         task_scheduled.get_state() == State.OPEN
@@ -78,6 +81,10 @@ def test_multiple_scheduled_tasks(env: simpy.Environment, station: Station) -> N
     creation_time = env.now
     task3 = BatterySwapTask(env, task_id=3, station=station, spawn_delay=2.0)
     task4 = BatterySwapTask(env, task_id=4, station=station, spawn_delay=5.0)
+
+    for t in (task3, task4):
+        if t.spawn_delay is not None and t.spawn_delay > 0:
+            env.process(t._spawn_after_delay(t.spawn_delay))
 
     env.run(until=creation_time + 3.0)
     assert (
@@ -131,6 +138,9 @@ def test_simulation_time_waiting(env: simpy.Environment, station: Station) -> No
     task = BatterySwapTask(env, task_id=1, station=station, spawn_delay=2.0)
     assert task.get_state() == State.SCHEDULED
 
+    if task.spawn_delay is not None and task.spawn_delay > 0:
+        env.process(task._spawn_after_delay(task.spawn_delay))
+
     env.run(until=1.0)
     assert task.get_state() == State.SCHEDULED, "Task should still be SCHEDULED at t=1"
 
@@ -144,6 +154,9 @@ def test_full_lifecycle_with_scheduling(
     # Testing complete task lifecylce with delays
     task = BatterySwapTask(env, task_id=1, station=station, spawn_delay=2.0)
     assert task.get_state() == State.SCHEDULED
+
+    if task.spawn_delay is not None and task.spawn_delay > 0:
+        env.process(task._spawn_after_delay(task.spawn_delay))
 
     env.run(until=3.0)
     assert task.get_state() == State.OPEN
@@ -313,6 +326,10 @@ def test_task_state_string_conversions(
     assert task_dict["state"] == "scheduled"
 
     # Test OPEN state
+    # start spawn process for scheduled task so it will open
+    if task.spawn_delay is not None and task.spawn_delay > 0:
+        env.process(task._spawn_after_delay(task.spawn_delay))
+
     env.run(until=2.0)
     assert str(task.get_state()) == "open"
 
