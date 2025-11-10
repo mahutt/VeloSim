@@ -34,6 +34,7 @@ import ResourceBar from '~/components/resource/resource-bar';
 import { TaskAssignmentProvider } from '~/providers/task-assignment-provider';
 import { useParams } from 'react-router';
 import { Loader2 } from 'lucide-react';
+import PlaybackControls from '~/components/map/playback-controls';
 
 export function meta() {
   return [{ title: 'Simulation' }];
@@ -75,6 +76,7 @@ function SimulationContent() {
       )}
       {!isLoading && (
         <>
+          <PlaybackControls />
           <ResourceBar />
           <SelectedItemBar />
         </>

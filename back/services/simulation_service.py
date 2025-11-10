@@ -451,7 +451,8 @@ class SimulationService:
             driver.pause()
         else:  # handle any other valid playback speed properly
             driver.resume()
-            driver.set_real_time_factor(speed_value)
+            inverted_factor = 1.0 / speed_value
+            driver.set_real_time_factor(inverted_factor)
 
         status = (
             SimulationPlaybackStatus.RUNNING

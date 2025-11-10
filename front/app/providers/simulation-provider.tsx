@@ -61,7 +61,7 @@ import {
 import api from '~/api';
 
 // Expect to receive frames every 1 second
-const FRAME_INTERVAL_MS = 1000;
+const BASE_FRAME_INTERVAL_MS = 1000;
 
 // WebSocket reconnection settings
 const MAX_RETRIES = 5;
@@ -75,7 +75,11 @@ type SimulationStatus =
   | 'running' // Frames streaming
   | 'error'; // Error state
 
+export const SPEED_OPTIONS = [0, 0.5, 1, 2, 4, 8] as const;
+export type Speed = (typeof SPEED_OPTIONS)[number];
+
 type SimulationContextType = {
+  speedRef: React.RefObject<Speed>;
   stationsRef: React.RefObject<Map<number, Station>>;
   resourcesRef: React.RefObject<Map<number, Resource>>;
   resources: Resource[];
@@ -105,6 +109,7 @@ export const SimulationProvider = ({
   const { displayError } = useError();
   const { user } = useAuth();
   const { mapRef, mapLoaded } = useMap();
+  const speedRef = useRef<Speed>(1);
   const stationsRef = useRef<Map<number, Station>>(new Map());
   const resourcesRef = useRef<Map<number, Resource>>(new Map());
 
@@ -493,7 +498,11 @@ export const SimulationProvider = ({
     const frameElapsedMs = now - lastFrameTimeRef.current;
 
     // Calculate interpolation progress (0 to 1)
-    const t = Math.min(frameElapsedMs / FRAME_INTERVAL_MS, 1);
+    const adjustedInterval =
+      speedRef.current === 0
+        ? BASE_FRAME_INTERVAL_MS // If paused, use normal interval to avoid division by zero
+        : BASE_FRAME_INTERVAL_MS / speedRef.current; // Adjust interval based on playback speed
+    const t = Math.min(frameElapsedMs / adjustedInterval, 1);
 
     let needsUpdate = false;
 
@@ -787,6 +796,7 @@ export const SimulationProvider = ({
   return (
     <SimulationContext.Provider
       value={{
+        speedRef,
         stationsRef,
         resourcesRef,
         resources,

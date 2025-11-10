@@ -33,6 +33,10 @@ vi.mock('~/components/map/map-container', () => ({
 }));
 
 // Mock other components
+vi.mock('~/components/map/playback-controls', () => ({
+  default: () => <div>Playback Controls</div>,
+}));
+
 vi.mock('~/components/map/selected-item-bar', () => ({
   default: () => <div>Selected Item Bar</div>,
 }));

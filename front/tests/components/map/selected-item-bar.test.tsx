@@ -38,6 +38,7 @@ vi.mock('~/providers/simulation-provider', () => ({
 describe('SelectedItemBar', () => {
   it('should not render when no item is selected', () => {
     vi.mocked(useSimulation).mockReturnValue({
+      speedRef: { current: 1 },
       stationsRef: { current: new Map() },
       resourcesRef: { current: new Map() },
       resources: [],
