@@ -53,7 +53,10 @@ class Task(ABC):
 
         self.spawn_time: float = env.now + (spawn_delay if spawn_delay else 0)
         self.spawn_delay = spawn_delay
-        self.state = State.OPEN if spawn_delay is None else State.SCHEDULED
+        if spawn_delay is not None and spawn_delay > 0:
+            self.state = State.SCHEDULED
+        else:
+            self.state = State.OPEN
 
     def _spawn_after_delay(self, delay: float) -> Generator[simpy.Event, None, None]:
         # Yield until scheduled time has been reached.
