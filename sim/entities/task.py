@@ -60,6 +60,10 @@ class Task(ABC):
         yield self.env.timeout(delay)
         self.set_state(State.OPEN)
         self.has_updated = True
+        if self.station is not None:
+            self.station.has_updated = True
+        if self.assigned_resource is not None:
+            self.assigned_resource.has_updated = True
 
     @abstractmethod
     def get_state(self) -> State:
