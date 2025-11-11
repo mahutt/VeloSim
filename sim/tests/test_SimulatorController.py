@@ -242,8 +242,8 @@ def test_create_key_frame(simulator_controller: SimulatorController) -> None:
 
     # Check task structure
     task = payload["tasks"][0]
-    assert "task_id" in task
-    assert "task_state" in task
+    assert "id" in task
+    assert "state" in task
     assert "station_id" in task
     assert "station_name" in task
     assert "assigned_resource_id" in task
