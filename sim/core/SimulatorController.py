@@ -92,8 +92,9 @@ class SimulatorController:
                 # Start self-spawning process
                 self.simEnv.process(task._spawn_after_delay(task.spawn_delay))
             else:
-                # Task is immediately OPEN
-                task.state = State.OPEN
+                # Initial (non-scheduled) tasks are automatically
+                # set to assigned in json_parser_strategy
+                pass
 
         for _, resource in self.resource_entities.items():
             resource.set_behaviour(self.sim_behaviour)
