@@ -42,6 +42,7 @@ import {
   type BackendStation,
   type BackendResource,
   type BackendTask,
+  type StationTask,
 } from '~/types';
 import {
   adaptStationsToGeoJSON,
@@ -83,6 +84,7 @@ type SimulationContextType = {
   stationsRef: React.RefObject<Map<number, Station>>;
   resourcesRef: React.RefObject<Map<number, Resource>>;
   resources: Resource[];
+  tasks: StationTask[];
   selectedItem: SelectedItem | null;
   selectItem: (type: SelectedItemType, id: number) => void;
   clearSelection: () => void;
@@ -116,11 +118,7 @@ export const SimulationProvider = ({
   const { user } = useAuth();
   const { mapRef, mapLoaded } = useMap();
   const speedRef = useRef<Speed>(1);
-  const stationsRef = useRef<Map<number, Station>>(new Map());
-  const renderOnNextFrameRef = useRef<boolean>(false);
-  const resourcesRef = useRef<Map<number, Resource>>(new Map());
 
-  // Simulation state
   const [simId] = useState<string | null>(initialSimId || null);
   const [isConnected, setIsConnected] = useState(false);
   const [simulationStatus, setSimulationStatus] =
@@ -134,11 +132,18 @@ export const SimulationProvider = ({
   // WebSocket reference
   const wsRef = useRef<WebSocket | null>(null);
 
-  // Resources state for components that need to react to changes
-  const [resources, setResources] = useState<Resource[]>([]);
+  // Flag to trigger map render on next animation frame
+  const renderOnNextFrameRef = useRef<boolean>(false);
 
-  // Selection state
+  // (TOTAL) NON-REACTIVE SIMULATION ENTITY STATE
+  const stationsRef = useRef<Map<number, Station>>(new Map());
+  const resourcesRef = useRef<Map<number, Resource>>(new Map());
+  const tasksRef = useRef<Map<number, StationTask>>(new Map());
+
+  // (PARTIAL) REACTIVE SIMULATION ENTITY STATE
+  const [resources, setResources] = useState<Resource[]>([]);
   const [selectedItem, setSelectedItem] = useState<SelectedItem | null>(null);
+  const [tasks, setTasks] = useState<StationTask[]>([]);
 
   const assignTask = async (resourceId: number, taskId: number) => {
     const resource = resourcesRef.current.get(resourceId);
@@ -297,6 +302,20 @@ export const SimulationProvider = ({
     isInitialFrame: boolean = false
   ) => {
     console.log(isInitialFrame);
+
+    if (payload.tasks && payload.tasks.length > 0) {
+      payload.tasks.forEach((task) =>
+        tasksRef.current.set(task.id, {
+          id: task.id,
+          stationId: task.station_id,
+          type: 'battery_swap',
+          state: task.state === 'scheduled' ? 'open' : task.state,
+          assigned_resource_id: task.assigned_resource_id,
+        })
+      );
+      setTasks(Array.from(tasksRef.current.values()));
+    }
+
     // Update stations that appear in the payload
     if (payload.stations && payload.stations.length > 0) {
       payload.stations.forEach((payloadStation: BackendStation) => {
@@ -896,6 +915,7 @@ export const SimulationProvider = ({
         stationsRef,
         resourcesRef,
         resources,
+        tasks: tasks,
         selectedItem,
         selectItem,
         clearSelection,

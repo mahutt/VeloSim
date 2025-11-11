@@ -250,8 +250,8 @@ class SimulatorController:
                 assigned_resource = task.get_assigned_resource()
                 tasks.append(
                     {
-                        "task_id": task.get_task_id(),
-                        "task_state": str(task.get_state()),
+                        "id": task.get_task_id(),
+                        "state": str(task.get_state()),
                         "station_id": station.id if station is not None else None,
                         "station_name": station.name if station is not None else None,
                         "assigned_resource_id": (
@@ -343,8 +343,8 @@ class SimulatorController:
             assigned_resource = task.get_assigned_resource()
             tasks.append(
                 {
-                    "task_id": task.get_task_id(),
-                    "task_state": str(task.get_state()),
+                    "id": task.get_task_id(),
+                    "state": str(task.get_state()),
                     "station_id": station.id if station is not None else None,
                     "station_name": station.name if station is not None else None,
                     "assigned_resource_id": (
