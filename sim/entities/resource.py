@@ -189,11 +189,11 @@ class Resource:
                 in_progress = self.get_in_progress_task()
                 # shorter, equivalent print for the in-progress task
                 if in_progress:
-                    # We have a task in progress - check if we're at the station
+                    # We have a task in progress
+                    # Check if we're close enough to the station:
                     task_station = in_progress.get_station()
-                    if (
-                        task_station is not None
-                        and self.position == task_station.get_station_position()
+                    if task_station is not None and self.position.close_enough(
+                        task_station.get_station_position()
                     ):
                         self.service_task(in_progress)
                     elif task_station and not self.current_route:
