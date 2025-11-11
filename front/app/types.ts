@@ -166,8 +166,8 @@ export interface Simulation {
 
 // Backend WebSocket payload types (snake_case from backend)
 export interface BackendTask {
-  task_id: number;
-  task_state: 'open' | 'assigned' | 'inprogress' | 'completed' | 'scheduled';
+  id: number;
+  state: 'open' | 'assigned' | 'inprogress' | 'completed' | 'scheduled';
   station_id: number;
   station_name: string;
   assigned_resource_id: number | null;
@@ -203,3 +203,6 @@ export interface BackendPayload {
     realMinutesPassed: number;
   };
 }
+
+// Task assignment types
+export type TaskAction = 'assign' | 'reassign' | 'unassign';

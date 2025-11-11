@@ -52,21 +52,21 @@ class Task(ABC):
         self.has_updated = False
 
         self.spawn_time: float = env.now + (spawn_delay if spawn_delay else 0)
-
-        # Handle scheduling
+        self.spawn_delay = spawn_delay
         if spawn_delay is not None and spawn_delay > 0:
-            # Task starts SCHEDULED, will become OPEN after delay
             self.state = State.SCHEDULED
-            # Start self-spawning process
-            env.process(self._spawn_after_delay(spawn_delay))
         else:
-            # Task is immediately OPEN
             self.state = State.OPEN
 
     def _spawn_after_delay(self, delay: float) -> Generator[simpy.Event, None, None]:
         # Yield until scheduled time has been reached.
         yield self.env.timeout(delay)
         self.set_state(State.OPEN)
+        self.has_updated = True
+        if self.station is not None:
+            self.station.has_updated = True
+        if self.assigned_resource is not None:
+            self.assigned_resource.has_updated = True
 
     @abstractmethod
     def get_state(self) -> State:

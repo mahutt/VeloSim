@@ -24,10 +24,13 @@
 
 import { AlertCircle } from 'lucide-react';
 import { Button } from '~/components/ui/button';
+import type { TaskAction } from '~/types';
 
 interface TaskAssignmentBannerProps {
   taskId: number;
   resourceId: number;
+  prevResourceId?: number;
+  action: TaskAction;
   onConfirm: () => void;
   onCancel: () => void;
 }
@@ -35,17 +38,30 @@ interface TaskAssignmentBannerProps {
 export function TaskAssignmentBanner({
   taskId,
   resourceId,
+  prevResourceId,
+  action,
   onConfirm,
   onCancel,
 }: TaskAssignmentBannerProps) {
+  const renderMessage = () => {
+    if (action === 'reassign' && prevResourceId !== undefined) {
+      return `Re-assign task #${taskId} from resource #${prevResourceId} to resource #${resourceId}?`;
+    }
+    if (action === 'unassign') {
+      return `Un-assign task #${taskId} from resource #${resourceId}?`;
+    }
+    if (action === 'assign') {
+      return `Assign task #${taskId} to resource #${resourceId}?`;
+    }
+    return null;
+  };
+
   return (
     <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50">
       <div className="bg-white border rounded-lg shadow-lg p-4">
         <div className="flex items-center gap-2 mb-3 justify-center">
           <AlertCircle className="h-5 w-5" />
-          <span className="text-sm">
-            Assign Task #{taskId} to Resource #{resourceId}?
-          </span>
+          <span className="text-sm">{renderMessage()}</span>
         </div>
         <div className="flex gap-2 justify-center">
           <Button onClick={onCancel} size="sm" variant="outline">

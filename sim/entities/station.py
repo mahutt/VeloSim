@@ -25,6 +25,7 @@ SOFTWARE.
 import simpy
 import uuid
 from sim.behaviour.sim_behaviour import SimBehaviour
+from sim.entities.task_state import State
 from .BatterySwapTask import BatterySwapTask
 from typing import TYPE_CHECKING
 
@@ -66,8 +67,18 @@ class Station:
         if task in self.tasks:
             self.tasks.remove(task)
 
+    def get_visible_tasks(self) -> list["Task"]:
+        return [
+            task
+            for task in self.tasks
+            if task.get_state() not in [State.SCHEDULED, State.CLOSED]
+        ]
+
     def get_task_count(self) -> int:
         return len(self.tasks)
+
+    def get_visible_task_count(self) -> int:
+        return len(self.get_visible_tasks())
 
     def get_station_position(self) -> "Position":
         return self.position

@@ -34,6 +34,8 @@ describe('TaskAssignmentBanner', () => {
       <TaskAssignmentBanner
         taskId={1}
         resourceId={4}
+        prevResourceId={2}
+        action="assign"
         onConfirm={() => {}}
         onCancel={() => {}}
       />
@@ -57,6 +59,8 @@ describe('TaskAssignmentBanner', () => {
       <TaskAssignmentBanner
         taskId={1}
         resourceId={2}
+        prevResourceId={4}
+        action="assign"
         onConfirm={onConfirm}
         onCancel={onCancel}
       />
@@ -67,5 +71,38 @@ describe('TaskAssignmentBanner', () => {
 
     await user.click(screen.getByRole('button', { name: /cancel/i }));
     expect(onCancel).toHaveBeenCalledTimes(1);
+  });
+
+  it('renders reassign prompt when action is reassign and previous resource is provided', () => {
+    render(
+      <TaskAssignmentBanner
+        taskId={1}
+        resourceId={2}
+        prevResourceId={4}
+        action="reassign"
+        onConfirm={() => {}}
+        onCancel={() => {}}
+      />
+    );
+
+    expect(
+      screen.getByText(/Re-assign task #1 from resource #4 to resource #2\?/i)
+    ).toBeInTheDocument();
+  });
+
+  it('renders unassign prompt when action is unassign', () => {
+    render(
+      <TaskAssignmentBanner
+        taskId={5}
+        resourceId={3}
+        action="unassign"
+        onConfirm={() => {}}
+        onCancel={() => {}}
+      />
+    );
+
+    expect(
+      screen.getByText(/Un-assign task #5 from resource #3\?/i)
+    ).toBeInTheDocument();
   });
 });

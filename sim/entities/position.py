@@ -40,3 +40,12 @@ class Position:
             other.position[0] == self.position[0]
             and other.position[1] == self.position[1]
         )
+
+    def close_enough(self, other: object) -> bool:
+        """Check if this position is within a certain distance of another position."""
+        if not isinstance(other, Position):
+            return False
+        return (
+            abs(other.position[0] - self.position[0]) < 0.001
+            and abs(other.position[1] - self.position[1]) < 0.001
+        )

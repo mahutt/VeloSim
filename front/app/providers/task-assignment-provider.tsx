@@ -32,11 +32,34 @@ import {
 import { TaskAssignmentBanner } from '~/components/task/task-assignment-banner';
 import { useSimulation } from './simulation-provider';
 
-type PendingAssignment = { taskId: number; resourceId: number } | null;
+type PendingAssignment =
+  | {
+      action: 'assign';
+      taskId: number;
+      resourceId: number;
+    }
+  | {
+      action: 'reassign';
+      taskId: number;
+      resourceId: number;
+      prevResourceId: number;
+    }
+  | {
+      action: 'unassign';
+      taskId: number;
+      resourceId: number;
+    }
+  | null;
 
 type TaskAssignmentContextType = {
   pendingAssignment: PendingAssignment;
   requestAssignment: (resourceId: number, taskId: number) => void;
+  requestReassignment: (
+    previousResourceId: number,
+    newResourceId: number,
+    taskId: number
+  ) => void;
+  requestUnassignment: (resourceId: number, taskId: number) => void;
   confirmAssignment: () => Promise<void>;
   cancelAssignment: () => void;
 };
@@ -46,31 +69,77 @@ const TaskAssignmentContext = createContext<
 >(undefined);
 
 export function TaskAssignmentProvider({ children }: { children: ReactNode }) {
-  const { assignTaskToResource } = useSimulation();
+  const { assignTask, unassignTask, reassignTask, resourcesRef } =
+    useSimulation();
   const [pendingAssignment, setPendingAssignment] =
     useState<PendingAssignment>(null);
 
+  const requestReassignment = useCallback(
+    (prevResourceId: number, resourceId: number, taskId: number) => {
+      setPendingAssignment({
+        taskId,
+        resourceId,
+        prevResourceId,
+        action: 'reassign',
+      });
+    },
+    []
+  );
+
   const requestAssignment = useCallback(
     (resourceId: number, taskId: number) => {
-      setPendingAssignment({ taskId, resourceId });
+      const assignedResource = Array.from(resourcesRef.current.values()).find(
+        (r) => r.taskList && r.taskList.includes(taskId)
+      );
+
+      if (assignedResource) {
+        if (assignedResource.id === resourceId) {
+          return;
+        }
+
+        requestReassignment(assignedResource.id, resourceId, taskId);
+        return;
+      }
+
+      setPendingAssignment({ taskId, resourceId, action: 'assign' });
+    },
+    [resourcesRef, requestReassignment]
+  );
+
+  const requestUnassignment = useCallback(
+    (resourceId: number, taskId: number) => {
+      setPendingAssignment({ taskId, resourceId, action: 'unassign' });
     },
     []
   );
 
   const confirmAssignment = useCallback(async () => {
-    if (pendingAssignment) {
-      try {
-        await assignTaskToResource(
+    if (!pendingAssignment) return;
+
+    try {
+      if (pendingAssignment.action === 'unassign') {
+        await unassignTask(
           pendingAssignment.resourceId,
           pendingAssignment.taskId
         );
-      } catch (error) {
-        console.error('Failed to assign task to resource:', error);
-      } finally {
-        setPendingAssignment(null);
+      } else if (pendingAssignment.action === 'reassign') {
+        await reassignTask(
+          pendingAssignment.prevResourceId,
+          pendingAssignment.resourceId,
+          pendingAssignment.taskId
+        );
+      } else {
+        await assignTask(
+          pendingAssignment.resourceId,
+          pendingAssignment.taskId
+        );
       }
+    } catch (error) {
+      console.error('Failed to complete task assignment action:', error);
+    } finally {
+      setPendingAssignment(null);
     }
-  }, [pendingAssignment, assignTaskToResource]);
+  }, [pendingAssignment, assignTask, unassignTask, reassignTask]);
 
   const cancelAssignment = useCallback(() => {
     setPendingAssignment(null);
@@ -81,6 +150,8 @@ export function TaskAssignmentProvider({ children }: { children: ReactNode }) {
       value={{
         pendingAssignment,
         requestAssignment,
+        requestReassignment,
+        requestUnassignment,
         confirmAssignment,
         cancelAssignment,
       }}
@@ -89,6 +160,12 @@ export function TaskAssignmentProvider({ children }: { children: ReactNode }) {
         <TaskAssignmentBanner
           taskId={pendingAssignment.taskId}
           resourceId={pendingAssignment.resourceId}
+          prevResourceId={
+            pendingAssignment.action === 'reassign'
+              ? pendingAssignment.prevResourceId
+              : undefined
+          }
+          action={pendingAssignment.action}
           onConfirm={confirmAssignment}
           onCancel={cancelAssignment}
         />

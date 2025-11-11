@@ -102,6 +102,7 @@ import {
   logSimulationError,
   logMissingEntityError,
 } from '~/utils/simulation-error-utils';
+import api from '~/api';
 
 // Mock the API module
 vi.mock('~/api', () => {
@@ -433,45 +434,203 @@ test('selectItem selects a resource when it exists', async () => {
   });
 });
 
-test('assignTaskToResource logs the assignment', () => {
-  const consoleLogSpy = vi.spyOn(console, 'log');
+test('assignTask posts to API and updates resource taskList', async () => {
+  const TestAssignComponent = () => {
+    const { assignTask, resourcesRef, resources } = useSimulation();
 
-  const TestComponentWithAssign = () => {
-    const { assignTaskToResource } = useSimulation();
+    useEffect(() => {
+      resourcesRef.current.set(1, {
+        id: 1,
+        position: [0, 0],
+        taskList: [],
+        task_count: 0,
+        in_progress_task_id: null,
+      });
+    }, []);
+
+    const taskCount = resources.find((r) => r.id === 1)?.taskList?.length || 0;
 
     return (
-      <button
-        data-testid="assign-btn"
-        onClick={() => assignTaskToResource(1, 2)}
-      >
-        Assign
-      </button>
+      <div>
+        <div data-testid="task-count">{String(taskCount)}</div>
+        <button data-testid="assign-btn" onClick={() => assignTask(1, 42)}>
+          Assign
+        </button>
+      </div>
     );
   };
 
   const { getByTestId } = render(
     <MapProvider>
-      <SimulationProvider>
+      <SimulationProvider simId="test-sim-123">
         <TaskAssignmentProvider>
           <MapContainer />
-          <TestComponentWithAssign />
+          <TestAssignComponent />
         </TaskAssignmentProvider>
       </SimulationProvider>
     </MapProvider>
   );
 
+  await waitFor(() => {
+    expect(MockMap.instance).toBeDefined();
+  });
+
+  await act(async () => {
+    MockMap.instance?.callBacks['load']();
+  });
+
   const assignBtn = getByTestId('assign-btn');
 
-  act(() => {
+  await act(async () => {
     assignBtn.click();
+    await new Promise((r) => setTimeout(r, 50));
   });
 
-  expect(consoleLogSpy).toHaveBeenCalledWith('assignTaskToResource', {
-    resourceId: 1,
-    taskId: 2,
+  expect(api.post).toHaveBeenCalledWith(
+    '/simulation/test-sim-123/resources/assign',
+    { task_id: 42, resource_id: 1 }
+  );
+
+  await waitFor(() => {
+    expect(getByTestId('task-count')).toHaveTextContent('1');
+  });
+});
+
+test('unassignTask posts to API and removes task from resource', async () => {
+  const TestUnassignComponent = () => {
+    const { unassignTask, resourcesRef, resources } = useSimulation();
+
+    useEffect(() => {
+      resourcesRef.current.set(1, {
+        id: 1,
+        position: [0, 0],
+        taskList: [99],
+        task_count: 1,
+        in_progress_task_id: null,
+      });
+    }, []);
+
+    const taskCount = resources.find((r) => r.id === 1)?.taskList?.length || 0;
+
+    return (
+      <div>
+        <div data-testid="task-count-un">{String(taskCount)}</div>
+        <button data-testid="unassign-btn" onClick={() => unassignTask(1, 99)}>
+          Unassign
+        </button>
+      </div>
+    );
+  };
+
+  const { getByTestId } = render(
+    <MapProvider>
+      <SimulationProvider simId="test-sim-123">
+        <TaskAssignmentProvider>
+          <MapContainer />
+          <TestUnassignComponent />
+        </TaskAssignmentProvider>
+      </SimulationProvider>
+    </MapProvider>
+  );
+
+  await waitFor(() => {
+    expect(MockMap.instance).toBeDefined();
   });
 
-  consoleLogSpy.mockRestore();
+  await act(async () => {
+    MockMap.instance?.callBacks['load']();
+  });
+
+  const unassignBtn = getByTestId('unassign-btn');
+
+  await act(async () => {
+    unassignBtn.click();
+    await new Promise((r) => setTimeout(r, 50));
+  });
+
+  expect(api.post).toHaveBeenCalledWith(
+    '/simulation/test-sim-123/resources/unassign',
+    { task_id: 99, resource_id: 1 }
+  );
+
+  await waitFor(() => {
+    expect(getByTestId('task-count-un')).toHaveTextContent('0');
+  });
+});
+
+test('reassignTask posts to API and moves task between resources', async () => {
+  const TestReassignComponent = () => {
+    const { reassignTask, resourcesRef, resources } = useSimulation();
+
+    useEffect(() => {
+      resourcesRef.current.set(1, {
+        id: 1,
+        position: [0, 0],
+        taskList: [123],
+        task_count: 1,
+        in_progress_task_id: null,
+      });
+      resourcesRef.current.set(2, {
+        id: 2,
+        position: [0, 0],
+        taskList: [],
+        task_count: 0,
+        in_progress_task_id: null,
+      });
+    }, []);
+
+    const prevCount = resources.find((r) => r.id === 1)?.taskList?.length || 0;
+    const newCount = resources.find((r) => r.id === 2)?.taskList?.length || 0;
+
+    return (
+      <div>
+        <div data-testid="prev-count">{String(prevCount)}</div>
+        <div data-testid="new-count">{String(newCount)}</div>
+        <button
+          data-testid="reassign-btn"
+          onClick={() => reassignTask(1, 2, 123)}
+        >
+          Reassign
+        </button>
+      </div>
+    );
+  };
+
+  const { getByTestId } = render(
+    <MapProvider>
+      <SimulationProvider simId="test-sim-123">
+        <TaskAssignmentProvider>
+          <MapContainer />
+          <TestReassignComponent />
+        </TaskAssignmentProvider>
+      </SimulationProvider>
+    </MapProvider>
+  );
+
+  await waitFor(() => {
+    expect(MockMap.instance).toBeDefined();
+  });
+
+  await act(async () => {
+    MockMap.instance?.callBacks['load']();
+  });
+
+  const reassignBtn = getByTestId('reassign-btn');
+
+  await act(async () => {
+    reassignBtn.click();
+    await new Promise((r) => setTimeout(r, 50));
+  });
+
+  expect(api.post).toHaveBeenCalledWith(
+    '/simulation/test-sim-123/resources/reassign',
+    { task_id: 123, old_resource_id: 1, new_resource_id: 2 }
+  );
+
+  await waitFor(() => {
+    expect(getByTestId('prev-count')).toHaveTextContent('0');
+    expect(getByTestId('new-count')).toHaveTextContent('1');
+  });
 });
 
 test('WebSocket connects when all prerequisites are met', async () => {

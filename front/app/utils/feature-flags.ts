@@ -32,7 +32,7 @@ export type FeatureFlags = {
 
 export const DEFAULT_FLAGS: FeatureFlags = {
   sidebar: true,
-  taskDragAndDrop: false,
+  taskDragAndDrop: true,
   simulationsPage: false,
 };
 

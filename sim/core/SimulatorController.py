@@ -28,6 +28,7 @@ import threading
 from typing import Optional, Dict
 from sim.entities.station import Station
 from sim.core.frame_emitter import FrameEmitter
+from sim.entities.task_state import State
 from sim.entities.frame import Frame
 from sim.entities.resource import Resource
 from sim.entities.clock import Clock
@@ -83,6 +84,17 @@ class SimulatorController:
             task.set_behaviour(self.sim_behaviour)
             # Rebind to the actual simulation environment
             task.env = self.simEnv
+
+            # Handle scheduling
+            if task.spawn_delay is not None and task.spawn_delay > 0:
+                # Task starts SCHEDULED, will become OPEN after delay
+                task.state = State.SCHEDULED
+                # Start self-spawning process
+                self.simEnv.process(task._spawn_after_delay(task.spawn_delay))
+            else:
+                # Initial (non-scheduled) tasks are automatically
+                # set to assigned in json_parser_strategy
+                pass
 
         for _, resource in self.resource_entities.items():
             resource.set_behaviour(self.sim_behaviour)
@@ -238,8 +250,8 @@ class SimulatorController:
                 assigned_resource = task.get_assigned_resource()
                 tasks.append(
                     {
-                        "task_id": task.get_task_id(),
-                        "task_state": str(task.get_state()),
+                        "id": task.get_task_id(),
+                        "state": str(task.get_state()),
                         "station_id": station.id if station is not None else None,
                         "station_name": station.name if station is not None else None,
                         "assigned_resource_id": (
@@ -256,8 +268,10 @@ class SimulatorController:
                 "station_id": station.id,
                 "station_name": station.name,
                 "station_position": (station.get_station_position().get_position()),
-                "station_tasks": [task.to_dict() for task in station.tasks],
-                "task_count": station.get_task_count(),
+                "station_tasks": [
+                    task.to_dict() for task in station.get_visible_tasks()
+                ],
+                "task_count": station.get_visible_task_count(),
             }
             for station in self.station_entities.values()
             if station.has_updated
@@ -295,9 +309,9 @@ class SimulatorController:
                             resource.get_resource_position().get_position()
                         ),
                         "resource_tasks": [
-                            task.to_dict() for task in resource.get_task_list()
+                            task.to_dict() for task in resource.get_visible_task_list()
                         ],
-                        "task_count": resource.get_task_count(),
+                        "task_count": resource.get_visible_task_count(),
                         "in_progress_task_id": (
                             in_progress_task.get_task_id()
                             if in_progress_task is not None
@@ -329,8 +343,8 @@ class SimulatorController:
             assigned_resource = task.get_assigned_resource()
             tasks.append(
                 {
-                    "task_id": task.get_task_id(),
-                    "task_state": str(task.get_state()),
+                    "id": task.get_task_id(),
+                    "state": str(task.get_state()),
                     "station_id": station.id if station is not None else None,
                     "station_name": station.name if station is not None else None,
                     "assigned_resource_id": (
@@ -345,8 +359,10 @@ class SimulatorController:
                 "station_id": station.id,
                 "station_name": station.name,
                 "station_position": (station.get_station_position().get_position()),
-                "station_tasks": [task.to_dict() for task in station.tasks],
-                "task_count": station.get_task_count(),
+                "station_tasks": [
+                    task.to_dict() for task in station.get_visible_tasks()
+                ],
+                "task_count": station.get_visible_task_count(),
             }
             for station in self.station_entities.values()
         ]
@@ -382,9 +398,9 @@ class SimulatorController:
                         resource.get_resource_position().get_position()
                     ),
                     "resource_tasks": [
-                        task.to_dict() for task in resource.get_task_list()
+                        task.to_dict() for task in resource.get_visible_task_list()
                     ],
-                    "task_count": resource.get_task_count(),
+                    "task_count": resource.get_visible_task_count(),
                     "in_progress_task_id": (
                         in_progress_task.get_task_id()
                         if in_progress_task is not None

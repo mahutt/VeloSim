@@ -138,6 +138,16 @@ class Resource:
     def get_task_list(self) -> list["Task"]:
         return self.task_list
 
+    def get_visible_task_list(self) -> list["Task"]:
+        return [
+            task
+            for task in self.task_list
+            if task.get_state() not in [State.SCHEDULED, State.CLOSED]
+        ]
+
+    def get_visible_task_count(self) -> int:
+        return len(self.get_visible_task_list())
+
     def clear_update(self) -> None:
         self.has_updated = False
 
@@ -179,11 +189,11 @@ class Resource:
                 in_progress = self.get_in_progress_task()
                 # shorter, equivalent print for the in-progress task
                 if in_progress:
-                    # We have a task in progress - check if we're at the station
+                    # We have a task in progress
+                    # Check if we're close enough to the station:
                     task_station = in_progress.get_station()
-                    if (
-                        task_station is not None
-                        and self.position == task_station.get_station_position()
+                    if task_station is not None and self.position.close_enough(
+                        task_station.get_station_position()
                     ):
                         self.service_task(in_progress)
                     elif task_station and not self.current_route:

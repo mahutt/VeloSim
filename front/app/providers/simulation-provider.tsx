@@ -42,6 +42,7 @@ import {
   type BackendStation,
   type BackendResource,
   type BackendTask,
+  type StationTask,
 } from '~/types';
 import {
   adaptStationsToGeoJSON,
@@ -83,10 +84,17 @@ type SimulationContextType = {
   stationsRef: React.RefObject<Map<number, Station>>;
   resourcesRef: React.RefObject<Map<number, Resource>>;
   resources: Resource[];
+  tasks: StationTask[];
   selectedItem: SelectedItem | null;
   selectItem: (type: SelectedItemType, id: number) => void;
   clearSelection: () => void;
-  assignTaskToResource: (resourceId: number, taskId: number) => void;
+  assignTask: (resourceId: number, taskId: number) => Promise<void>;
+  unassignTask: (resourceId: number, taskId: number) => Promise<void>;
+  reassignTask: (
+    prevResourceId: number,
+    newResourceId: number,
+    taskId: number
+  ) => Promise<void>;
   simId: string | null;
   isConnected: boolean;
   simulationStatus: SimulationStatus;
@@ -110,10 +118,7 @@ export const SimulationProvider = ({
   const { user } = useAuth();
   const { mapRef, mapLoaded } = useMap();
   const speedRef = useRef<Speed>(1);
-  const stationsRef = useRef<Map<number, Station>>(new Map());
-  const resourcesRef = useRef<Map<number, Resource>>(new Map());
 
-  // Simulation state
   const [simId] = useState<string | null>(initialSimId || null);
   const [isConnected, setIsConnected] = useState(false);
   const [simulationStatus, setSimulationStatus] =
@@ -127,11 +132,141 @@ export const SimulationProvider = ({
   // WebSocket reference
   const wsRef = useRef<WebSocket | null>(null);
 
-  // Resources state for components that need to react to changes
-  const [resources, setResources] = useState<Resource[]>([]);
+  // Flag to trigger map render on next animation frame
+  const renderOnNextFrameRef = useRef<boolean>(false);
 
-  // Selection state
+  // (TOTAL) NON-REACTIVE SIMULATION ENTITY STATE
+  const stationsRef = useRef<Map<number, Station>>(new Map());
+  const resourcesRef = useRef<Map<number, Resource>>(new Map());
+  const tasksRef = useRef<Map<number, StationTask>>(new Map());
+
+  // (PARTIAL) REACTIVE SIMULATION ENTITY STATE
+  const [resources, setResources] = useState<Resource[]>([]);
   const [selectedItem, setSelectedItem] = useState<SelectedItem | null>(null);
+  const [tasks, setTasks] = useState<StationTask[]>([]);
+
+  const assignTask = async (resourceId: number, taskId: number) => {
+    const resource = resourcesRef.current.get(resourceId);
+
+    if (!resource) {
+      throw new Error(`Resource #${resourceId} not found.`);
+    }
+
+    try {
+      const payload = { task_id: taskId, resource_id: resourceId };
+      await api.post(`/simulation/${simId!}/resources/assign`, payload);
+
+      const updatedResource = {
+        ...resource,
+        taskList: [...(resource.taskList ?? [])],
+      };
+
+      if (!updatedResource.taskList.includes(taskId)) {
+        updatedResource.taskList.push(taskId);
+      }
+
+      resourcesRef.current.set(resourceId, updatedResource);
+      setResources(Array.from(resourcesRef.current.values()));
+      updateSelectedItem(resourceId, updatedResource);
+    } catch (error) {
+      displayError(
+        'Assignment failed',
+        'An error occurred while assigning a task to a resource. Please try again later.'
+      );
+      throw error;
+    }
+  };
+
+  const unassignTask = async (resourceId: number, taskId: number) => {
+    const resource = resourcesRef.current.get(resourceId);
+    if (!resource) {
+      throw new Error(`Resource #${resourceId} not found.`);
+    }
+
+    try {
+      const payload = { task_id: taskId, resource_id: resourceId };
+      await api.post(`/simulation/${simId!}/resources/unassign`, payload);
+
+      if (Array.isArray(resource.taskList)) {
+        const updatedResource = {
+          ...resource,
+          taskList: resource.taskList.filter((t) => t !== taskId),
+        };
+        resourcesRef.current.set(resourceId, updatedResource);
+        setResources(Array.from(resourcesRef.current.values()));
+        updateSelectedItem(resourceId, updatedResource);
+      }
+    } catch (error) {
+      displayError(
+        'Unassignment failed',
+        'An error occurred while unassigning a task from a resource. Please try again later.'
+      );
+      throw error;
+    }
+  };
+
+  const reassignTask = async (
+    prevResourceId: number,
+    newResourceId: number,
+    taskId: number
+  ) => {
+    const prevResource = resourcesRef.current.get(prevResourceId);
+    const newResource = resourcesRef.current.get(newResourceId);
+    if (!prevResource) {
+      throw new Error(`Previous resource #${prevResourceId} not found.`);
+    }
+    if (!newResource) {
+      throw new Error(`New resource #${newResourceId} not found.`);
+    }
+
+    try {
+      const payload = {
+        task_id: taskId,
+        old_resource_id: prevResourceId,
+        new_resource_id: newResourceId,
+      };
+
+      await api.post(`/simulation/${simId!}/resources/reassign`, payload);
+
+      if (Array.isArray(prevResource.taskList)) {
+        const updatedPrevResource = {
+          ...prevResource,
+          taskList: prevResource.taskList.filter((t) => t !== taskId),
+        };
+        resourcesRef.current.set(prevResourceId, updatedPrevResource);
+      }
+
+      const updatedNewResource = {
+        ...newResource,
+        taskList: Array.isArray(newResource.taskList)
+          ? [...newResource.taskList]
+          : [],
+      };
+
+      if (!updatedNewResource.taskList.includes(taskId)) {
+        updatedNewResource.taskList.push(taskId);
+      }
+
+      resourcesRef.current.set(newResourceId, updatedNewResource);
+      setResources(Array.from(resourcesRef.current.values()));
+      if (selectedItem?.type === SelectedItemType.Resource) {
+        if ((selectedItem.value as Resource).id === prevResourceId) {
+          const updated = resourcesRef.current.get(prevResourceId);
+          if (updated) {
+            updateSelectedItem(prevResourceId, updated);
+          }
+        } else if ((selectedItem.value as Resource).id === newResourceId) {
+          updateSelectedItem(newResourceId, updatedNewResource);
+        }
+      }
+    } catch (error) {
+      displayError(
+        'Reassign failed',
+        `An error occurred while reassigning task ${taskId} from resource ${prevResourceId} to resource ${newResourceId}. Please try again later.`
+      );
+      throw error;
+    }
+  };
 
   // Hover state - use refs so animation loop always has latest values
   const hoveredStationIdRef = useRef<number | null>(null);
@@ -166,91 +301,61 @@ export const SimulationProvider = ({
     payload: BackendPayload,
     isInitialFrame: boolean = false
   ) => {
-    // Build a map of tasks by station_id for efficient lookup
-    const tasksByStation = new Map<number, BackendTask[]>();
-    const tasksByResource = new Map<number, BackendTask[]>();
+    console.log(isInitialFrame);
 
-    if (payload.tasks) {
-      payload.tasks.forEach((task: BackendTask) => {
-        // Group by station
-        const stationTasks = tasksByStation.get(task.station_id) || [];
-        stationTasks.push(task);
-        tasksByStation.set(task.station_id, stationTasks);
-
-        // Group by assigned resource
-        if (task.assigned_resource_id !== null) {
-          const resourceTasks =
-            tasksByResource.get(task.assigned_resource_id) || [];
-          resourceTasks.push(task);
-          tasksByResource.set(task.assigned_resource_id, resourceTasks);
-        }
-      });
+    if (payload.tasks && payload.tasks.length > 0) {
+      payload.tasks.forEach((task) =>
+        tasksRef.current.set(task.id, {
+          id: task.id,
+          stationId: task.station_id,
+          type: 'battery_swap',
+          state: task.state === 'scheduled' ? 'open' : task.state,
+          assigned_resource_id: task.assigned_resource_id,
+        })
+      );
+      setTasks(Array.from(tasksRef.current.values()));
     }
 
-    // Merge stations (don't clear, just update what's in the payload)
-    if (payload.stations) {
-      payload.stations.forEach((station: BackendStation) => {
-        // Get existing station to preserve tasks if not in payload (only for updates)
-        const existingStation = !isInitialFrame
-          ? stationsRef.current.get(station.station_id)
-          : undefined;
-
-        // Get tasks for this station from the top-level tasks array
-        const stationTasks = tasksByStation.get(station.station_id);
-
-        // Backend sends [lon, lat] which is what GeoJSON expects
-        const position: [number, number] = station.station_position;
-
-        const adaptedStation: Station = {
-          id: station.station_id,
-          name: station.station_name,
+    // Update stations that appear in the payload
+    if (payload.stations && payload.stations.length > 0) {
+      payload.stations.forEach((payloadStation: BackendStation) => {
+        const position: [number, number] = payloadStation.station_position;
+        const updatedStation: Station = {
+          id: payloadStation.station_id,
+          name: payloadStation.station_name,
           position: position,
-          // Only update tasks if they're in the payload, otherwise preserve existing (for updates only)
-          tasks: stationTasks
-            ? stationTasks.map((task: BackendTask) => ({
-                id: task.task_id,
-                stationId: task.station_id,
-                type: 'battery_swap',
-                state:
-                  task.task_state === 'scheduled' ? 'open' : task.task_state,
-                assigned_resource_id: task.assigned_resource_id,
-              }))
-            : existingStation?.tasks || [],
-          task_count: stationTasks
-            ? stationTasks.length
-            : existingStation?.task_count || 0,
+          tasks: payloadStation.station_tasks.map((task: BackendTask) => ({
+            id: task.id,
+            stationId: task.station_id,
+            type: 'battery_swap',
+            state: task.state === 'scheduled' ? 'open' : task.state,
+            assigned_resource_id: task.assigned_resource_id,
+          })),
+          task_count: payloadStation.task_count,
         };
-        stationsRef.current.set(adaptedStation.id, adaptedStation);
+        console.log('Updating station #', updatedStation);
+        stationsRef.current.set(updatedStation.id, updatedStation);
+        renderOnNextFrameRef.current = true;
       });
     }
 
-    // Merge resources (don't clear, just update what's in the payload)
-    if (payload.resources) {
-      payload.resources.forEach((resource: BackendResource) => {
-        // Get existing resource to preserve tasks if not in payload (only for updates)
-        const existingResource = !isInitialFrame
-          ? resourcesRef.current.get(resource.resource_id)
-          : undefined;
-
-        // Get tasks for this resource from the top-level tasks array
-        const resourceTasks = tasksByResource.get(resource.resource_id);
-
+    // Update resources that appear in the payload
+    if (payload.resources && payload.resources.length > 0) {
+      payload.resources.forEach((payloadResource: BackendResource) => {
         // Backend sends [lon, lat] which is what GeoJSON expects
-        const position: [number, number] = resource.resource_position;
+        const position: [number, number] = payloadResource.resource_position;
 
         const adaptedResource: Resource = {
-          id: resource.resource_id,
+          id: payloadResource.resource_id,
           position: position,
-          // Only update tasks if they're in the payload, otherwise preserve existing (for updates only)
-          taskList: resourceTasks
-            ? resourceTasks.map((t: BackendTask) => t.task_id)
-            : existingResource?.taskList || [],
-          task_count: resourceTasks
-            ? resourceTasks.length
-            : existingResource?.task_count || 0,
-          in_progress_task_id: resource.in_progress_task_id,
+          taskList: payloadResource.resource_tasks.map(
+            (t: BackendTask) => t.id
+          ),
+          task_count: payloadResource.task_count,
+          in_progress_task_id: payloadResource.in_progress_task_id,
         };
         resourcesRef.current.set(adaptedResource.id, adaptedResource);
+        renderOnNextFrameRef.current = true;
       });
     }
 
@@ -302,6 +407,26 @@ export const SimulationProvider = ({
         hoveredResourceIdRef.current ?? undefined
       );
       setMapSource(MapSource.Resources, geojson, map);
+    }
+  };
+
+  const updateSelectedItem = (
+    resourceId: number,
+    updatedResource: Resource
+  ) => {
+    if (
+      selectedItem?.type === SelectedItemType.Resource &&
+      (selectedItem.value as Resource).id === resourceId
+    ) {
+      setSelectedItem({
+        type: SelectedItemType.Resource,
+        value: updatedResource,
+      });
+      selectedResourceIdRef.current = resourceId;
+      updateMapSources(
+        selectedStationIdRef.current,
+        selectedResourceIdRef.current
+      );
     }
   };
 
@@ -504,8 +629,6 @@ export const SimulationProvider = ({
         : BASE_FRAME_INTERVAL_MS / speedRef.current; // Adjust interval based on playback speed
     const t = Math.min(frameElapsedMs / adjustedInterval, 1);
 
-    let needsUpdate = false;
-
     // Update position for each resource
     resourcesRef.current.forEach((resource) => {
       const start = frameStartPositionsRef.current.get(resource.id);
@@ -529,32 +652,24 @@ export const SimulationProvider = ({
         prevPos[1] !== currentPos[1]
       ) {
         currentPositionsRef.current.set(resource.id, currentPos);
-        needsUpdate = true;
+        renderOnNextFrameRef.current = true;
       }
 
       // Update the resource object's position
       resource.position = currentPos;
     });
 
-    // Only update map if positions changed
-    if (needsUpdate) {
+    // Only update map if positions or station tasks changed
+    if (renderOnNextFrameRef.current) {
       updateMapSources(
         selectedStationIdRef.current,
         selectedResourceIdRef.current
       );
+      renderOnNextFrameRef.current = false;
     }
 
     // Continue animation loop
     animationFrameRef.current = requestAnimationFrame(animateResources);
-  };
-
-  const assignTaskToResource = (resourceId: number, taskId: number) => {
-    try {
-      // TODO: use /assign endpoint
-      console.log('assignTaskToResource', { resourceId, taskId });
-    } catch (error) {
-      console.error('Error assigning task to resource:', error);
-    }
   };
 
   // ============================================================================
@@ -800,10 +915,13 @@ export const SimulationProvider = ({
         stationsRef,
         resourcesRef,
         resources,
+        tasks: tasks,
         selectedItem,
         selectItem,
         clearSelection,
-        assignTaskToResource,
+        assignTask,
+        unassignTask,
+        reassignTask,
         simId,
         isConnected,
         simulationStatus,
