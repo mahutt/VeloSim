@@ -19,7 +19,7 @@ COPY sim/ ./sim
 
 # Install the package with all dependencies
 RUN python -m pip install --upgrade pip setuptools wheel \
-    && python -m pip install --no-cache-dir -e .[dev]
+    && python -m pip install --no-cache-dir -e .
 
 # Copy remaining files into container.
 COPY scripts/ ./scripts
