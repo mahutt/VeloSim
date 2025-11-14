@@ -40,7 +40,7 @@ import { Controller, useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import api from '~/api';
 import { Field, FieldError, FieldGroup, FieldLabel } from './ui/field';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { Alert, AlertTitle } from './ui/alert';
 import { AlertCircleIcon, CheckCircle2Icon } from 'lucide-react';
 
@@ -67,6 +67,7 @@ export default function ResetPasswordDialog({
   const [message, setMessage] = useState<UpdatePasswordFormMessage | null>(
     null
   );
+  const closeDialogTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const title =
     user?.id === targetUser.id
@@ -86,14 +87,16 @@ export default function ResetPasswordDialog({
   });
 
   async function onSubmit(data: z.infer<typeof updatePasswordFormSchema>) {
+    setMessage(null);
     try {
       await api.put<User>(`/users/${targetUser.id}/password`, {
         password: data.password,
       });
       setMessage(UpdatePasswordFormMessage.Success);
       updatePasswordForm.reset();
-      setTimeout(() => {
+      closeDialogTimeoutRef.current = setTimeout(() => {
         onOpenChange(false);
+        setMessage(null);
       }, 2000);
     } catch (e) {
       console.error('Reset password error', e);
@@ -102,7 +105,23 @@ export default function ResetPasswordDialog({
   }
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog
+      open={open}
+      onOpenChange={(newOpen) => {
+        // If the modal is manually opened or closed,
+        // clear the timeout to prevent the modal from closing unexpectedly.
+        if (closeDialogTimeoutRef.current) {
+          clearTimeout(closeDialogTimeoutRef.current);
+          closeDialogTimeoutRef.current = null;
+        }
+        // Reset form & message state when closing the dialog manually
+        if (!newOpen) {
+          updatePasswordForm.reset();
+          setMessage(null);
+        }
+        onOpenChange(newOpen);
+      }}
+    >
       <form id={formId} onSubmit={updatePasswordForm.handleSubmit(onSubmit)}>
         <DialogContent className="sm:max-w-[425px]">
           <DialogHeader>

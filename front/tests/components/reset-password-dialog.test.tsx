@@ -187,4 +187,78 @@ describe('ResetPasswordDialog', () => {
     renderDialog(mockTargetUser, false);
     expect(screen.queryByText(/Update password/i)).not.toBeInTheDocument();
   });
+
+  it('does not show success message after closing and reopening dialog', async () => {
+    const { rerender } = renderDialog();
+    (api.put as Mock).mockResolvedValueOnce({ data: mockTargetUser });
+
+    // Enter valid passwords and submit
+    await userEvent.type(
+      screen.getByLabelText(/^Password$/i),
+      'newpassword123'
+    );
+    await userEvent.type(
+      screen.getByLabelText(/Confirm password/i),
+      'newpassword123'
+    );
+    await userEvent.click(screen.getByRole('button', { name: /update/i }));
+
+    // Wait for success message
+    await waitFor(() => {
+      expect(
+        screen.getByText(/Password updated successfully/i)
+      ).toBeInTheDocument();
+    });
+
+    // Click the X button to close dialog
+    const closeButton = screen.getByRole('button', { name: /close/i });
+    await userEvent.click(closeButton);
+
+    // Rerender with dialog closed
+    rerender(
+      <AuthContext.Provider
+        value={{
+          user: mockUser,
+          setUser: vi.fn(),
+          loading: false,
+          setLoading: vi.fn(),
+          logout: vi.fn(),
+          refreshUser: vi.fn(),
+          setToken: vi.fn(),
+        }}
+      >
+        <ResetPasswordDialog
+          open={false}
+          onOpenChange={mockOnOpenChange}
+          targetUser={mockTargetUser}
+        />
+      </AuthContext.Provider>
+    );
+
+    // Reopen dialog
+    rerender(
+      <AuthContext.Provider
+        value={{
+          user: mockUser,
+          setUser: vi.fn(),
+          loading: false,
+          setLoading: vi.fn(),
+          logout: vi.fn(),
+          refreshUser: vi.fn(),
+          setToken: vi.fn(),
+        }}
+      >
+        <ResetPasswordDialog
+          open={true}
+          onOpenChange={mockOnOpenChange}
+          targetUser={mockTargetUser}
+        />
+      </AuthContext.Provider>
+    );
+
+    // Success message should not be visible
+    expect(
+      screen.queryByText(/Password updated successfully/i)
+    ).not.toBeInTheDocument();
+  });
 });
