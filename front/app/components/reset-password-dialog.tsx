@@ -42,7 +42,7 @@ import api from '~/api';
 import { Field, FieldError, FieldGroup, FieldLabel } from './ui/field';
 import { useRef, useState } from 'react';
 import { Alert, AlertTitle } from './ui/alert';
-import { AlertCircleIcon, CheckCircle2Icon } from 'lucide-react';
+import { AlertCircleIcon, CheckCircle2Icon, Loader2 } from 'lucide-react';
 
 const updatePasswordFormSchema = z
   .object({
@@ -64,6 +64,7 @@ export default function ResetPasswordDialog({
   targetUser: User;
 }) {
   const { user } = useAuth();
+  const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState<UpdatePasswordFormMessage | null>(
     null
   );
@@ -88,6 +89,7 @@ export default function ResetPasswordDialog({
 
   async function onSubmit(data: z.infer<typeof updatePasswordFormSchema>) {
     setMessage(null);
+    setLoading(true);
     try {
       await api.put<User>(`/users/${targetUser.id}/password`, {
         password: data.password,
@@ -101,6 +103,8 @@ export default function ResetPasswordDialog({
     } catch (e) {
       console.error('Reset password error', e);
       setMessage(UpdatePasswordFormMessage.Error);
+    } finally {
+      setLoading(false);
     }
   }
 
@@ -115,7 +119,7 @@ export default function ResetPasswordDialog({
           closeDialogTimeoutRef.current = null;
         }
         // Reset form & message state when closing the dialog manually
-        if (!newOpen) {
+        if (!newOpen && !loading) {
           updatePasswordForm.reset();
           setMessage(null);
         }
@@ -147,6 +151,7 @@ export default function ResetPasswordDialog({
                     placeholder="New password"
                     autoComplete="off"
                     type="password"
+                    disabled={loading}
                   />
                   {fieldState.invalid && (
                     <FieldError errors={[fieldState.error]} />
@@ -169,6 +174,7 @@ export default function ResetPasswordDialog({
                     placeholder="Confirm new password"
                     autoComplete="off"
                     type="password"
+                    disabled={loading}
                   />
                   {fieldState.invalid && (
                     <FieldError errors={[fieldState.error]} />
@@ -179,10 +185,13 @@ export default function ResetPasswordDialog({
           </FieldGroup>
           <DialogFooter>
             <DialogClose asChild>
-              <Button variant="outline">Cancel</Button>
+              <Button variant="outline" disabled={loading}>
+                Cancel
+              </Button>
             </DialogClose>
-            <Button type="submit" form={formId}>
+            <Button type="submit" form={formId} disabled={loading}>
               Update
+              {loading && <Loader2 className="ml-2 h-4 w-4 animate-spin" />}
             </Button>
           </DialogFooter>
         </DialogContent>
