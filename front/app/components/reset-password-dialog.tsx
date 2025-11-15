@@ -40,9 +40,9 @@ import { Controller, useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import api from '~/api';
 import { Field, FieldError, FieldGroup, FieldLabel } from './ui/field';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { Alert, AlertTitle } from './ui/alert';
-import { AlertCircleIcon, CheckCircle2Icon } from 'lucide-react';
+import { AlertCircleIcon, CheckCircle2Icon, Loader2 } from 'lucide-react';
 
 const updatePasswordFormSchema = z
   .object({
@@ -64,9 +64,11 @@ export default function ResetPasswordDialog({
   targetUser: User;
 }) {
   const { user } = useAuth();
+  const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState<UpdatePasswordFormMessage | null>(
     null
   );
+  const closeDialogTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const title =
     user?.id === targetUser.id
@@ -86,23 +88,44 @@ export default function ResetPasswordDialog({
   });
 
   async function onSubmit(data: z.infer<typeof updatePasswordFormSchema>) {
+    setMessage(null);
+    setLoading(true);
     try {
       await api.put<User>(`/users/${targetUser.id}/password`, {
         password: data.password,
       });
       setMessage(UpdatePasswordFormMessage.Success);
       updatePasswordForm.reset();
-      setTimeout(() => {
+      closeDialogTimeoutRef.current = setTimeout(() => {
         onOpenChange(false);
+        setMessage(null);
       }, 2000);
     } catch (e) {
       console.error('Reset password error', e);
       setMessage(UpdatePasswordFormMessage.Error);
+    } finally {
+      setLoading(false);
     }
   }
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog
+      open={open}
+      onOpenChange={(newOpen) => {
+        // If the modal is manually opened or closed,
+        // clear the timeout to prevent the modal from closing unexpectedly.
+        if (closeDialogTimeoutRef.current) {
+          clearTimeout(closeDialogTimeoutRef.current);
+          closeDialogTimeoutRef.current = null;
+        }
+        // Reset form & message state when closing the dialog manually
+        if (!newOpen && !loading) {
+          updatePasswordForm.reset();
+          setMessage(null);
+        }
+        onOpenChange(newOpen);
+      }}
+    >
       <form id={formId} onSubmit={updatePasswordForm.handleSubmit(onSubmit)}>
         <DialogContent className="sm:max-w-[425px]">
           <DialogHeader>
@@ -128,6 +151,7 @@ export default function ResetPasswordDialog({
                     placeholder="New password"
                     autoComplete="off"
                     type="password"
+                    disabled={loading}
                   />
                   {fieldState.invalid && (
                     <FieldError errors={[fieldState.error]} />
@@ -150,6 +174,7 @@ export default function ResetPasswordDialog({
                     placeholder="Confirm new password"
                     autoComplete="off"
                     type="password"
+                    disabled={loading}
                   />
                   {fieldState.invalid && (
                     <FieldError errors={[fieldState.error]} />
@@ -160,10 +185,13 @@ export default function ResetPasswordDialog({
           </FieldGroup>
           <DialogFooter>
             <DialogClose asChild>
-              <Button variant="outline">Cancel</Button>
+              <Button variant="outline" disabled={loading}>
+                Cancel
+              </Button>
             </DialogClose>
-            <Button type="submit" form={formId}>
+            <Button type="submit" form={formId} disabled={loading}>
               Update
+              {loading && <Loader2 className="ml-2 h-4 w-4 animate-spin" />}
             </Button>
           </DialogFooter>
         </DialogContent>
