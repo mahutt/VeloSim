@@ -18,10 +18,10 @@ export default defineConfig(({ mode }) => {
     define: {
       // Expose specific env variables to the client with VITE_ prefix
       'import.meta.env.VITE_MAPBOX_ACCESS_TOKEN': JSON.stringify(
-        env.MAPBOX_ACCESS_TOKEN
+        env.VITE_MAPBOX_ACCESS_TOKEN || env.MAPBOX_ACCESS_TOKEN || ''
       ),
       'import.meta.env.VITE_BACKEND_URL': JSON.stringify(
-        env.BACKEND_URL || 'http://localhost:8000'
+        env.VITE_BACKEND_URL || env.BACKEND_URL || ''
       ),
     },
     resolve: {

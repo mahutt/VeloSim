@@ -1,0 +1,45 @@
+#!/bin/bash
+# VeloSim Backup Monitoring Script
+
+BACKUP_DIR="{{ app_dir }}/backups"
+MAX_AGE_HOURS=25  # Should have backup within last 25 hours
+
+echo "VeloSim Backup Status Report - $(date)"
+echo "=============================================="
+
+# Check if backup directory exists
+if [ ! -d "$BACKUP_DIR" ]; then
+    echo "ERROR: Backup directory not found: $BACKUP_DIR"
+    exit 1
+fi
+
+# Check for recent database backup
+LATEST_DB_BACKUP=$(find "$BACKUP_DIR/postgresql" -name "*.sql.gz" -mtime -1 | head -1)
+if [ -n "$LATEST_DB_BACKUP" ]; then
+    echo "✓ Recent database backup found: $(basename "$LATEST_DB_BACKUP")"
+    echo "  Size: $(du -h "$LATEST_DB_BACKUP" | cut -f1)"
+    echo "  Age: $(stat -c %y "$LATEST_DB_BACKUP")"
+else
+    echo "⚠️  WARNING: No recent database backup found!"
+fi
+
+# Check for recent SSL backup
+LATEST_SSL_BACKUP=$(find "$BACKUP_DIR/ssl" -name "*.tar.gz" -mtime -7 | head -1)
+if [ -n "$LATEST_SSL_BACKUP" ]; then
+    echo "✓ Recent SSL backup found: $(basename "$LATEST_SSL_BACKUP")"
+else
+    echo "⚠️  No recent SSL backup found"
+fi
+
+# Check backup disk usage
+echo ""
+echo "Backup Directory Usage:"
+du -sh "$BACKUP_DIR"/*
+
+echo ""
+echo "Total Backup Size: $(du -sh "$BACKUP_DIR" | cut -f1)"
+
+# Check available disk space
+echo ""
+echo "Available Disk Space:"
+df -h "$BACKUP_DIR" | tail -1

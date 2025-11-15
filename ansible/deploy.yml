@@ -1,0 +1,79 @@
+---
+# VeloSim Production Server Setup Playbook
+# This playbook provisions Ubuntu 24.04 LTS servers for hosting VeloSim
+#
+# Usage:
+#   ansible-playbook -i inventories/production deploy.yml
+#   ansible-playbook -i inventories/production deploy.yml --limit velosim-prod-01
+#   ansible-playbook -i inventories/production deploy.yml --tags "users,security"
+
+- name: VeloSim Production Server Setup
+  hosts: velosim_servers
+  become: true
+  gather_facts: true
+
+  vars:
+    # Environment variables override, pass via -e flag or export before running
+    _postgres_password: "{{ lookup('env', 'POSTGRES_PASSWORD') | default(vault_postgres_password, true) }}"
+    _vite_mapbox_token: "{{ lookup('env', 'VITE_MAPBOX_ACCESS_TOKEN') | default('', true) }}"
+
+  pre_tasks:
+    - name: Update apt cache
+      ansible.builtin.apt:
+        update_cache: true
+        cache_valid_time: 3600
+      tags: always
+
+    - name: Ensure system is up to date
+      ansible.builtin.apt:
+        upgrade: dist
+        autoremove: true
+        autoclean: true
+      register: system_update
+      tags: system
+
+    - name: Reboot if kernel was updated
+      ansible.builtin.reboot:
+        reboot_timeout: 300
+      when: system_update.changed and "linux-image" in (system_update.stdout | default(""))
+      tags: system
+
+  roles:
+    # Security and Base System
+    - role: system_packages
+      tags: [system, packages]
+
+    - role: ssh_hardening
+      tags: [security, ssh]
+
+    - role: ufw_firewall
+      tags: [security, firewall]
+
+    # Application Infrastructure
+    - role: docker
+      tags: [docker, infrastructure]
+
+    - role: user_management
+      tags: [users, security]
+
+    - role: postgresql
+      tags: [database, infrastructure]
+
+    # Application Deployment (before nginx to avoid 403 errors)
+    - role: velosim_app
+      tags: [application, deployment]
+
+    # Web server (after application is deployed)
+    - role: nginx
+      tags: [web, infrastructure]
+
+    - role: ssl_certificates
+      tags: [ssl, certificates, web]
+      when: ssl_enabled | default(false)
+
+    # Monitoring and Maintenance
+    - role: log_rotation
+      tags: [maintenance, logging]
+
+    - role: backup_scripts
+      tags: [backup, maintenance]

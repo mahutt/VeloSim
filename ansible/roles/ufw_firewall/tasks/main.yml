@@ -1,0 +1,77 @@
+---
+# UFW Firewall Configuration for VeloSim
+
+- name: Install UFW
+  ansible.builtin.apt:
+    name: ufw
+    state: present
+    update_cache: true
+
+# Ensure SSH access is allowed FIRST to prevent lockout
+- name: Check if SSH rule already exists
+  ansible.builtin.shell: ufw status numbered | grep "{{ ssh_port | default(22) }}/tcp"
+  register: ssh_rule_check
+  changed_when: false
+  failed_when: false
+
+- name: Ensure SSH access is always allowed (prevent lockout)
+  community.general.ufw:
+    rule: allow
+    port: "{{ ssh_port | default(22) }}"
+    proto: tcp
+    comment: "SSH access (critical - prevent lockout)"
+  when: ssh_rule_check.rc != 0
+  
+- name: Check UFW status
+  ansible.builtin.command: ufw status
+  register: ufw_status
+  changed_when: false
+  failed_when: false
+
+- name: Set UFW default policies only if needed
+  community.general.ufw:
+    default: "{{ item.default }}"
+    direction: "{{ item.direction }}"
+  loop:
+    - { direction: "incoming", default: "deny" }
+    - { direction: "outgoing", default: "allow" }
+  when: 
+    - '"Status: active" not in ufw_status.stdout or "Default:" not in ufw_status.stdout'
+
+- name: Check existing UFW rules
+  ansible.builtin.command: ufw status
+  register: ufw_rules_status
+  changed_when: false
+  failed_when: false
+
+- name: Configure UFW rules for VeloSim services
+  community.general.ufw:
+    rule: "{{ item.rule }}"
+    port: "{{ item.port }}"
+    proto: "{{ item.proto | default('tcp') }}"
+    comment: "{{ item.comment | default('VeloSim service') }}"
+  loop: "{{ ufw_rules }}"
+  when: "(item.port | string) + '/' + (item.proto | default('tcp')) not in ufw_rules_status.stdout"
+
+- name: Allow Docker subnet communication
+  community.general.ufw:
+    rule: allow
+    src: '172.16.0.0/12'
+    comment: 'Docker internal networking'
+  when: "'172.16.0.0/12' not in ufw_rules_status.stdout"
+
+- name: Allow localhost traffic
+  community.general.ufw:
+    rule: allow
+    src: '127.0.0.1'
+    comment: 'Localhost traffic'
+  when: "'127.0.0.1' not in ufw_rules_status.stdout"
+
+- name: Enable UFW only if not already enabled
+  community.general.ufw:
+    state: enabled
+  when: '"Status: active" not in ufw_status.stdout'
+
+- name: Configure UFW logging
+  community.general.ufw:
+    logging: 'low'

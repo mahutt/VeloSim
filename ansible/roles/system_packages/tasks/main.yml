@@ -1,0 +1,54 @@
+---
+# Install essential system packages for VeloSim server
+
+- name: Install essential system packages
+  ansible.builtin.apt:
+    name:
+      - curl
+      - wget
+      - git
+      - unzip
+      - htop
+      - tree
+      - vim
+      - nano
+      - jq
+      - software-properties-common
+      - apt-transport-https
+      - ca-certificates
+      - gnupg
+      - lsb-release
+      - logrotate
+      - cron
+      - rsync
+      - postgresql-client
+    state: present
+    update_cache: true
+
+- name: Configure automatic security updates
+  ansible.builtin.apt:
+    name: unattended-upgrades
+    state: present
+
+- name: Configure unattended-upgrades
+  ansible.builtin.copy:
+    src: 20auto-upgrades
+    dest: /etc/apt/apt.conf.d/20auto-upgrades
+    owner: root
+    group: root
+    mode: '0644'
+
+- name: Set timezone to UTC
+  community.general.timezone:
+    name: UTC
+
+- name: Configure NTP
+  ansible.builtin.apt:
+    name: chrony
+    state: present
+
+- name: Start and enable chrony
+  ansible.builtin.systemd:
+    name: chrony
+    state: started
+    enabled: true

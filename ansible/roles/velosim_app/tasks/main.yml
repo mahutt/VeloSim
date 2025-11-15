@@ -1,0 +1,326 @@
+---
+# VeloSim Application Deployment
+
+- name: Create application directory structure
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: "{{ app_user }}"
+    group: "{{ app_user }}"
+    mode: '0755'
+  loop:
+    - "{{ app_dir }}"
+    - "{{ app_dir }}/scripts"
+    - "{{ app_dir }}/osrm-data"
+    - "{{ app_dir }}/logs"
+    - "{{ app_dir }}/backups"
+
+- name: Copy archive creation script
+  delegate_to: localhost
+  become: false
+  ansible.builtin.copy:
+    src: create-archive.sh
+    dest: /tmp/create-archive.sh
+    mode: '0755'
+
+- name: Set archive path variable
+  set_fact:
+    archive_path: "/tmp/velosim-{{ ansible_date_time.epoch }}.tar.gz"
+
+- name: Create temporary archive of application code
+  delegate_to: localhost
+  become: false
+  ansible.builtin.shell: /tmp/create-archive.sh "{{ playbook_dir }}" "{{ archive_path }}"
+  register: archive_result
+
+- name: Copy application archive to server
+  ansible.builtin.copy:
+    src: "{{ archive_path }}"
+    dest: "/tmp/velosim.tar.gz"
+    owner: "{{ app_user }}"
+    group: "{{ app_user }}"
+    mode: '0644'
+
+- name: Clean up local temporary script and archive
+  delegate_to: localhost
+  become: false
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: absent
+  loop:
+    - /tmp/create-archive.sh
+    - "{{ archive_path }}"
+
+- name: Remove existing source directory
+  ansible.builtin.file:
+    path: "{{ app_dir }}/source"
+    state: absent
+
+- name: Create source directory
+  ansible.builtin.file:
+    path: "{{ app_dir }}/source"
+    state: directory
+    owner: "{{ app_user }}"
+    group: "{{ app_user }}"
+    mode: '0755'
+
+- name: Extract application code
+  ansible.builtin.unarchive:
+    src: "/tmp/velosim.tar.gz"
+    dest: "{{ app_dir }}/source"
+    remote_src: true
+    owner: "{{ app_user }}"
+    group: "{{ app_user }}"
+    extra_opts:
+      - "--strip-components=1"
+
+- name: Clean up macOS resource fork files from extracted code
+  ansible.builtin.shell: |
+    find "{{ app_dir }}/source" -name "._*" -type f -delete 2>/dev/null || true
+    find "{{ app_dir }}/source" -name ".DS_Store" -type f -delete 2>/dev/null || true
+  become_user: "{{ app_user }}"
+
+- name: Clean up temporary file on server
+  ansible.builtin.file:
+    path: "/tmp/velosim.tar.gz"
+    state: absent
+
+- name: Copy permissions script
+  ansible.builtin.copy:
+    src: set-permissions.sh
+    dest: /tmp/set-permissions.sh
+    mode: '0755'
+
+- name: Set executable permissions on shell scripts
+  ansible.builtin.shell: /tmp/set-permissions.sh "{{ app_dir }}"
+
+- name: Clean up temporary scripts
+  ansible.builtin.file:
+    path: /tmp/set-permissions.sh
+    state: absent
+
+- name: Generate JWT secret if not exists
+  ansible.builtin.set_fact:
+    velosim_jwt_secret: "{{ ansible_date_time.epoch | hash('sha256') | regex_replace('[^a-zA-Z0-9]', '') | truncate(64, True, '') }}"
+  when: velosim_jwt_secret is not defined
+
+- name: Check if JWT secret file exists
+  ansible.builtin.stat:
+    path: "{{ app_dir }}/.jwt_secret"
+  register: jwt_secret_file
+
+- name: Load existing JWT secret
+  ansible.builtin.slurp:
+    src: "{{ app_dir }}/.jwt_secret"
+  register: existing_jwt_secret
+  when: jwt_secret_file.stat.exists
+
+- name: Use existing JWT secret if available
+  ansible.builtin.set_fact:
+    velosim_jwt_secret: "{{ existing_jwt_secret.content | b64decode | trim }}"
+  when: jwt_secret_file.stat.exists
+
+- name: Generate new JWT secret if needed
+  ansible.builtin.set_fact:
+    velosim_jwt_secret: "{{ lookup('password', '/dev/null length=64 chars=ascii_letters,digits') }}"
+  when: not jwt_secret_file.stat.exists
+
+- name: Store JWT secret for future deployments
+  ansible.builtin.copy:
+    content: "{{ velosim_jwt_secret }}"
+    dest: "{{ app_dir }}/.jwt_secret"
+    owner: "{{ app_user }}"
+    group: "{{ app_user }}"
+    mode: '0600'
+  when: not jwt_secret_file.stat.exists
+
+- name: Create production environment file
+  ansible.builtin.template:
+    src: env.prod.j2
+    dest: "{{ app_dir }}/.env.prod"
+    owner: "{{ app_user }}"
+    group: "{{ app_user }}"
+    mode: '0644'
+  notify: restart velosim
+
+- name: Create production Docker Compose file
+  ansible.builtin.template:
+    src: docker-compose.prod.yml.j2
+    dest: "{{ app_dir }}/docker-compose.prod.yml"
+    owner: "{{ app_user }}"
+    group: "{{ app_user }}"
+    mode: '0644'
+
+- name: Copy OSRM data preparation script
+  ansible.builtin.template:
+    src: prepare-osrm-data.sh.j2
+    dest: "{{ app_dir }}/scripts/prepare-osrm-data.sh"
+    owner: "{{ app_user }}"
+    group: "{{ app_user }}"
+    mode: '0755'
+
+- name: Prepare OSRM data if not exists
+  ansible.builtin.command: "{{ app_dir }}/scripts/prepare-osrm-data.sh"
+  become_user: "{{ app_user }}"
+  args:
+    creates: "{{ app_dir }}/osrm-data/montreal.osrm"
+  when: setup_osrm_data | default(false)
+  ignore_errors: true
+  register: osrm_result
+
+- name: Display OSRM preparation result
+  ansible.builtin.debug:
+    msg: |
+      OSRM Data Preparation: {{ 'Completed' if osrm_result.rc == 0 else 'Failed or Skipped' }}
+      {% if not (setup_osrm_data | default(false)) %}
+      To enable OSRM data setup, set setup_osrm_data: true in group_vars
+      {% endif %}
+
+- name: Create application management scripts
+  ansible.builtin.template:
+    src: velosim-app.sh.j2
+    dest: "{{ app_dir }}/scripts/velosim-app.sh"
+    owner: "{{ app_user }}"
+    group: "{{ app_user }}"
+    mode: '0755'
+
+- name: Create systemd service for VeloSim
+  ansible.builtin.template:
+    src: velosim.service.j2
+    dest: /etc/systemd/system/velosim.service
+    owner: root
+    group: root
+    mode: '0644'
+  notify:
+    - reload systemd
+    - enable velosim service
+
+- name: Create database migration script
+  ansible.builtin.template:
+    src: migrate-database.sh.j2
+    dest: "{{ app_dir }}/scripts/migrate-database.sh"
+    owner: "{{ app_user }}"
+    group: "{{ app_user }}"
+    mode: '0755'
+
+- name: Ensure PostgreSQL container is running
+  ansible.builtin.command: docker compose -f "{{ app_dir }}/docker-compose.prod.yml" up -d postgres
+  become_user: "{{ app_user }}"
+  args:
+    chdir: "{{ app_dir }}"
+
+- name: Debug - Check container status
+  ansible.builtin.command: docker compose -f "{{ app_dir }}/docker-compose.prod.yml" ps
+  become_user: "{{ app_user }}"
+  args:
+    chdir: "{{ app_dir }}"
+  register: container_debug
+
+- name: Display container status
+  ansible.builtin.debug:
+    msg: |
+      Current container status:
+      {{ container_debug.stdout }}
+
+- name: Wait for PostgreSQL container to be healthy
+  ansible.builtin.command: docker compose -f "{{ app_dir }}/docker-compose.prod.yml" ps postgres
+  become_user: "{{ app_user }}"
+  args:
+    chdir: "{{ app_dir }}"
+  register: postgres_status
+  until: postgres_status.stdout is search("Up.*healthy|Up.*running")
+  retries: 12
+  delay: 10
+
+- name: Wait for PostgreSQL to be ready
+  ansible.builtin.wait_for:
+    port: 5432
+    host: 127.0.0.1
+    delay: 5
+    timeout: 30
+
+- name: Run database migrations
+  ansible.builtin.command:
+    cmd: "{{ app_dir }}/scripts/migrate-database.sh"
+  become_user: "{{ app_user }}"
+  register: migration_result
+  failed_when: false
+  changed_when: migration_result.stdout is search('Database schema created|Database migrations completed')
+
+- name: Display migration results
+  ansible.builtin.debug:
+    msg: |
+      Database migration completed:
+      {{ migration_result.stdout }}
+      {% if migration_result.stderr %}
+      Errors: {{ migration_result.stderr }}
+      {% endif %}
+
+- name: Build and start VeloSim application
+  ansible.builtin.command: "{{ app_dir }}/scripts/velosim-app.sh start"
+  become_user: "{{ app_user }}"
+  register: app_start_result
+
+- name: Check Docker container status
+  ansible.builtin.command: docker ps -a --filter "name=velosim" --format "table {{ '{{.Names}}' }}\t{{ '{{.Status}}' }}\t{{ '{{.Ports}}' }}"
+  register: container_status
+  become_user: "{{ app_user }}"
+
+- name: Display container status
+  ansible.builtin.debug:
+    msg: |
+      Container Status:
+      {{ container_status.stdout }}
+
+      App Start Command Output:
+      {{ app_start_result.stdout }}
+      {% if app_start_result.stderr %}
+      Errors:
+      {{ app_start_result.stderr }}
+      {% endif %}
+
+- name: Wait for application to be ready
+  ansible.builtin.uri:
+    url: "http://localhost:8000/health"
+    method: GET
+    timeout: 15
+  register: health_check
+  until: health_check.status == 200
+  retries: 40
+  delay: 15
+  ignore_errors: true
+
+- name: Display application status
+  ansible.builtin.debug:
+    msg: |
+      VeloSim application deployment completed!
+      Health check: {{ 'PASSED' if health_check.status == 200 else 'FAILED' }}
+      Application directory: {{ app_dir }}
+      Management script: {{ app_dir }}/scripts/velosim-app.sh
+
+      {% if health_check.status != 200 %}
+      If the application is not responding:
+
+      1. Check container status:
+         sudo docker ps -a
+
+      2. Check container logs:
+         sudo docker logs velosim-backend
+         sudo docker logs velosim-frontend
+         sudo docker logs velosim-postgres
+         sudo docker logs velosim-osrm
+
+      3. Check if services are building:
+         sudo docker compose -f {{ app_dir }}/docker-compose.prod.yml build --progress=plain
+
+      4. Restart the application:
+         sudo {{ app_dir }}/scripts/velosim-app.sh restart
+
+      5. Check if ports are blocked:
+         sudo netstat -tlnp | grep -E ':(3000|8000|5432)'
+
+      6. Force rebuild and restart:
+         sudo docker compose -f {{ app_dir }}/docker-compose.prod.yml down
+         sudo docker compose -f {{ app_dir }}/docker-compose.prod.yml build --no-cache
+         sudo docker compose -f {{ app_dir }}/docker-compose.prod.yml up -d
+      {% endif %}

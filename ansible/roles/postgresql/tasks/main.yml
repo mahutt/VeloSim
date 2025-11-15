@@ -1,0 +1,87 @@
+---
+# PostgreSQL Setup for VeloSim Production
+
+- name: Create PostgreSQL data directory
+  ansible.builtin.file:
+    path: "{{ app_dir }}/postgresql-data"
+    state: directory
+    owner: "{{ app_user }}"
+    group: "{{ app_user }}"
+    mode: '0755'
+
+- name: Create PostgreSQL backup directory
+  ansible.builtin.file:
+    path: "{{ app_dir }}/backups/postgresql"
+    state: directory
+    owner: "{{ app_user }}"
+    group: "{{ app_user }}"
+    mode: '0755'
+
+- name: Create scripts directory
+  ansible.builtin.file:
+    path: "{{ app_dir }}/scripts"
+    state: directory
+    owner: "{{ app_user }}"
+    group: "{{ app_user }}"
+    mode: '0755'
+
+- name: Install prerequisites for PostgreSQL repository
+  ansible.builtin.apt:
+    name:
+      - wget
+      - ca-certificates
+      - gnupg
+      - lsb-release
+    state: present
+    update_cache: true
+
+- name: Add PostgreSQL official APT key
+  ansible.builtin.apt_key:
+    url: https://www.postgresql.org/media/keys/ACCC4CF8.asc
+    state: present
+
+- name: Add PostgreSQL official repository
+  ansible.builtin.apt_repository:
+    repo: "deb http://apt.postgresql.org/pub/repos/apt/ {{ ansible_distribution_release }}-pgdg main"
+    state: present
+    update_cache: true
+
+- name: Install PostgreSQL client tools
+  ansible.builtin.apt:
+    name:
+      - postgresql-client-{{ postgres_version }}
+    state: present
+    update_cache: true
+
+- name: Create PostgreSQL init script directory
+  ansible.builtin.file:
+    path: "{{ app_dir }}/postgresql-init"
+    state: directory
+    owner: "{{ app_user }}"
+    group: "{{ app_user }}"
+    mode: '0755'
+
+- name: Copy database initialization script
+  ansible.builtin.copy:
+    src: init-database.sh
+    dest: "{{ app_dir }}/postgresql-init/init-database.sh"
+    owner: "{{ app_user }}"
+    group: "{{ app_user }}"
+    mode: '0755'
+
+- name: Copy PostgreSQL configuration for production
+  ansible.builtin.copy:
+    src: postgresql.conf
+    dest: "{{ app_dir }}/postgresql-init/postgresql.conf"
+    owner: "{{ app_user }}"
+    group: "{{ app_user }}"
+    mode: '0644'
+
+- name: Note about database backup scripts
+  ansible.builtin.debug:
+    msg: |
+      Database backup and restore scripts are provided by the backup_scripts role.
+      Scripts will be available at:
+      - {{ app_dir }}/scripts/database-backup.sh
+      - {{ app_dir }}/scripts/database-restore.sh
+      - {{ app_dir }}/scripts/full-backup.sh

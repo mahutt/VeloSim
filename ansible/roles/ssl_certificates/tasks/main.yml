@@ -1,0 +1,147 @@
+---
+# SSL Certificate Management with Certbot for VeloSim
+
+- name: Install Certbot and Nginx plugin
+  ansible.builtin.apt:
+    name:
+      - certbot
+      - python3-certbot-nginx
+    state: present
+    update_cache: true
+
+- name: Ensure certbot webroot directory exists
+  ansible.builtin.file:
+    path: /var/www/html
+    state: directory
+    owner: www-data
+    group: www-data
+    mode: '0755'
+
+- name: Ensure ACME challenge directory exists
+  ansible.builtin.file:
+    path: /var/www/html/.well-known/acme-challenge
+    state: directory
+    owner: www-data
+    group: www-data
+    mode: '0755'
+
+- name: Test ACME challenge directory is accessible via HTTP
+  ansible.builtin.shell: |
+    echo "test" > /var/www/html/.well-known/acme-challenge/test-file
+    chmod 644 /var/www/html/.well-known/acme-challenge/test-file
+  register: test_file_created
+
+- name: Check if ACME challenge test file is accessible locally] *************************************************************************************
+  ansible.builtin.uri:
+    url: "http://{{ domain_name }}/.well-known/acme-challenge/test-file"
+    method: GET
+    return_content: yes
+  register: acme_test
+  failed_when: false
+
+- name: Display ACME challenge test result
+  ansible.builtin.debug:
+    msg: |
+      ACME challenge test for {{ domain_name }}: {{ 'SUCCESS' if acme_test.status == 200 else 'FAILED' }}
+      {% if acme_test.status != 200 %}
+      Status: {{ acme_test.status | default('connection failed') }}
+      This may cause certificate acquisition to fail!
+      {% endif %}
+
+- name: Fail if ACME challenge is not accessible
+  ansible.builtin.fail:
+    msg: |
+      CRITICAL: {{ domain_name }} ACME challenge path is not accessible!
+      Status: {{ acme_test.status }}
+  when: acme_test.status != 200
+
+- name: Clean up test file
+  ansible.builtin.file:
+    path: /var/www/html/.well-known/acme-challenge/test-file
+    state: absent
+
+- name: Check if SSL certificate exists
+  ansible.builtin.stat:
+    path: "/etc/letsencrypt/live/{{ domain_name }}/fullchain.pem"
+  register: ssl_cert_check
+
+- name: Check for stale Let's Encrypt renewal configurations
+  ansible.builtin.find:
+    paths: /etc/letsencrypt/renewal
+    patterns: "{{ domain_name }}.conf"
+  register: renewal_configs
+  when: not ssl_cert_check.stat.exists
+
+- name: Remove stale Let's Encrypt state if certificate doesn't exist
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: absent
+  loop:
+    - "/etc/letsencrypt/renewal/{{ domain_name }}.conf"
+    - "/etc/letsencrypt/archive/{{ domain_name }}"
+    - "/etc/letsencrypt/live/{{ domain_name }}"
+  when: not ssl_cert_check.stat.exists and renewal_configs.matched > 0
+
+- name: Obtain SSL certificate from Let's Encrypt (webroot method)
+  ansible.builtin.command: >
+    certbot certonly
+    --webroot
+    --webroot-path /var/www/html
+    --email {{ certbot_email }}
+    --agree-tos
+    --no-eff-email
+    --domains {{ domain_name }},www.{{ domain_name }}
+    --non-interactive
+  when: not ssl_cert_check.stat.exists
+  register: certbot_result
+  retries: 2
+  delay: 5
+  until: certbot_result.rc == 0
+  failed_when: certbot_result.rc != 0
+
+- name: Display Certbot result
+  ansible.builtin.debug:
+    var: certbot_result
+  when: certbot_result is defined and certbot_result.changed
+
+- name: Reconfigure Nginx with SSL after obtaining certificates
+  ansible.builtin.include_role:
+    name: nginx
+    tasks_from: reconfigure_ssl
+  when: certbot_result is defined and certbot_result.changed
+
+- name: Copy SSL certificate renewal script
+  ansible.builtin.copy:
+    src: renew-ssl-certs.sh
+    dest: /usr/local/bin/renew-ssl-certs.sh
+    owner: root
+    group: root
+    mode: '0755'
+
+- name: Create Certbot renewal cron job
+  ansible.builtin.cron:
+    name: "Renew SSL certificates"
+    minute: "0"
+    hour: "2"
+    day: "1,15"
+    job: "/usr/local/bin/renew-ssl-certs.sh >> /var/log/certbot-renewal.log 2>&1"
+    user: root
+
+- name: Copy SSL certificate monitoring script
+  ansible.builtin.template:
+    src: check-ssl-certs.sh.j2
+    dest: /usr/local/bin/check-ssl-certs.sh
+    owner: root
+    group: root
+    mode: '0755'
+
+- name: Test SSL certificate status
+  ansible.builtin.command: /usr/local/bin/check-ssl-certs.sh
+  register: ssl_status
+  ignore_errors: true
+  changed_when: false
+
+- name: Display SSL status
+  ansible.builtin.debug:
+    msg: "{{ ssl_status.stdout_lines }}"
+  when: ssl_status.stdout_lines is defined

@@ -1,0 +1,17 @@
+[Unit]
+Description=VeloSim Application Stack
+Requires=docker.service
+After=docker.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+WorkingDirectory={{ app_dir }}
+ExecStart=/usr/bin/docker compose -f docker-compose.prod.yml up -d
+ExecStop=/usr/bin/docker compose -f docker-compose.prod.yml down
+ExecReload=/usr/bin/docker compose -f docker-compose.prod.yml restart
+User={{ app_user }}
+Group={{ app_user }}
+
+[Install]
+WantedBy=multi-user.target

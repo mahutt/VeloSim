@@ -1,0 +1,115 @@
+name: Production Deployment
+
+# Required GitHub Secrets:
+# - DEPLOY_SSH_KEY: SSH private key for accessing the production server (ansible user)
+# - DEPLOY_HOST: Production server hostname/IP
+# - DEPLOY_USER: SSH username for deployment (default: ansible)
+# - ANSIBLE_VAULT_PASSWORD: Password for decrypting Ansible vault files
+# - POSTGRES_PASSWORD: PostgreSQL database password for the VeloSim user
+# - VITE_MAPBOX_ACCESS_TOKEN: Mapbox API access token for map functionality
+# - DOMAIN_NAME: Domain name for the application (e.g., velosim.app)
+#
+# Initial Server Setup:
+# 1. Generate SSH key pair: ssh-keygen -t ed25519 -C "deploy@github-actions" -f ansible_deploy_key
+# 2. Add ansible_deploy_key to GitHub Secrets as DEPLOY_SSH_KEY
+# 3. Add public key to group_vars/all.yml: ansible_deploy_user_pubkey: "ssh-ed25519 AAAAC3..."
+# 4. Run initial deployment with root user to create ansible user
+# 5. Subsequent deployments will use the ansible user
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:  # Allow manual triggering
+    inputs:
+      tags:
+        description: 'Ansible tags to run (comma-separated, e.g., "application,web" or "all")'
+        required: false
+        default: 'application,web'
+        type: string
+
+jobs:
+  deploy:
+    name: Deploy to Production
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install Ansible
+        run: |
+          pip install ansible
+
+      - name: Setup SSH
+        uses: webfactory/ssh-agent@v0.8.0
+        with:
+          ssh-private-key: ${{ secrets.DEPLOY_SSH_KEY }}
+
+      - name: Add server to known hosts
+        run: |
+          ssh-keyscan -H ${{ secrets.DEPLOY_HOST }} >> ~/.ssh/known_hosts
+
+      - name: Create Ansible vault password file
+        run: |
+          echo "${{ secrets.ANSIBLE_VAULT_PASSWORD }}" > /tmp/vault_pass.txt
+          chmod 600 /tmp/vault_pass.txt
+
+      - name: Deploy with Ansible
+        env:
+          POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
+          VITE_MAPBOX_ACCESS_TOKEN: ${{ secrets.VITE_MAPBOX_ACCESS_TOKEN }}
+          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+          ANSIBLE_TAGS: ${{ github.event.inputs.tags || 'application,web' }}
+        run: |
+          cd ansible
+          # For code deployments, only run application and web roles by default
+          # Use workflow_dispatch with custom tags for full deployment or specific roles
+          ansible-playbook \
+            -i inventories/production \
+            -u "${DEPLOY_USER:-ansible}" \
+            deploy.yml \
+            --vault-password-file /tmp/vault_pass.txt \
+            --tags "$ANSIBLE_TAGS" \
+            -e "postgres_password=$POSTGRES_PASSWORD" \
+            -e "vite_mapbox_access_token=$VITE_MAPBOX_ACCESS_TOKEN" \
+            -v
+
+      - name: Cleanup vault password
+        if: always()
+        run: |
+          rm -f /tmp/vault_pass.txt
+
+      - name: Verify deployment
+        run: |
+          echo "Waiting for services to stabilize..."
+          sleep 30
+
+          # Check if the application is accessible
+          if curl -f "https://${{ secrets.DOMAIN_NAME }}/api/health" > /dev/null 2>&1; then
+            echo "✅ Backend health check passed"
+          else
+            echo "❌ Backend health check failed"
+            exit 1
+          fi
+
+          if curl -f "https://${{ secrets.DOMAIN_NAME }}/" > /dev/null 2>&1; then
+            echo "✅ Frontend health check passed"
+          else
+            echo "❌ Frontend health check failed"
+            exit 1
+          fi
+
+      - name: Deployment notification
+        if: always()
+        run: |
+          if [ "${{ job.status }}" == "success" ]; then
+            echo "✅ Deployment completed successfully!"
+          else
+            echo "❌ Deployment failed!"
+          fi
