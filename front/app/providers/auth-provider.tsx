@@ -49,15 +49,18 @@ interface AuthProviderProps {
   children: ReactNode;
 }
 
+const getSecureFlag = () => {
+  return window.location.protocol === 'https:' ? '; Secure' : '';
+};
+
 const setAuthCookie = (token: string) => {
   // Set cookie with appropriate settings
   // SameSite=Lax allows cookie to be sent with WebSocket from same site
-  document.cookie = `access_token=${token}; path=/; SameSite=Lax; Secure=${window.location.protocol === 'https:'}`;
+  document.cookie = `access_token=${token}; path=/; SameSite=Lax${getSecureFlag()}`;
 };
 
 const removeAuthCookie = () => {
-  document.cookie =
-    'access_token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT';
+  document.cookie = `access_token=; path=/; SameSite=Lax${getSecureFlag()}; expires=Thu, 01 Jan 1970 00:00:00 GMT`;
 };
 
 export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
