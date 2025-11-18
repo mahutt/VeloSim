@@ -72,6 +72,7 @@ def patch_active_simulations(
     fake_active_sim = {sim_id: {"simulator": simulator_mock}}
     with (
         patch.object(simulation_service, "active_simulations", fake_active_sim),
+        patch.object(simulation_service, "simulator", simulator_mock),
         patch.object(
             simulation_service, "verify_access", return_value=True
         ) as mock_verify,

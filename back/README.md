@@ -105,15 +105,20 @@ alembic revision --autogenerate -m "message"  # Generate migration
 
 Configure these variables in your `.env` file (see [root README](../README.md) for setup):
 
-| Variable         | Description                  | Default Value                                         | Required |
-| ---------------- | ---------------------------- | ----------------------------------------------------- | -------- |
-| `ENVIRONMENT`    | Application environment      | `development`                                         | No       |
-| `DEBUG`          | Enable debug mode            | `true`                                                | No       |
-| `DATABASE_URL`   | PostgreSQL connection string | `postgresql://velosim:velosim@localhost:5433/velosim` | Yes      |
-| `LOG_LEVEL`      | Minimum log level to record  | `INFO`                                                | No       |
-| `LOG_TO_FILE`    | Enable writing logs to file  | `true`                                                | No       |
-| `LOG_TO_CONSOLE` | Enable console output        | `true`                                                | No       |
-| `LOG_FILE_PATH`  | Path to log file             | `back/grafana_logging/logs.txt`                       | No       |
+| Variable                           | Description                                               | Default Value                                         | Required |
+| ---------------------------------- | --------------------------------------------------------- | ----------------------------------------------------- | -------- |
+| `ENVIRONMENT`                      | Application environment                                   | `development`                                         | No       |
+| `DEBUG`                            | Enable debug mode                                         | `true`                                                | No       |
+| `DATABASE_URL`                     | PostgreSQL connection string                              | `postgresql://velosim:velosim@localhost:5433/velosim` | Yes      |
+| `LOG_LEVEL`                        | Minimum log level to record                               | `INFO`                                                | No       |
+| `LOG_TO_FILE`                      | Enable writing logs to file                               | `true`                                                | No       |
+| `LOG_TO_CONSOLE`                   | Enable console output                                     | `true`                                                | No       |
+| `LOG_FILE_PATH`                    | Path to log file                                          | `back/grafana_logging/logs.txt`                       | No       |
+| `SIMULATION_IDLE_TIMEOUT_SECONDS`  | Timeout (seconds) before shutting down an idle simulation | `15`                                                  | No       |
+| `FEATURE_STATIONS_API_ROUTER`      | Enable Stations API router                                | `false`                                               | No       |
+| `FEATURE_STATION_TASKS_API_ROUTER` | Enable Station Tasks API router                           | `false`                                               | No       |
+| `FEATURE_RESOURCES_API_ROUTER`     | Enable Resources API router                               | `false`                                               | No       |
+
 
 **Environment Options:**
 

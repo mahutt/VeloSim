@@ -422,7 +422,7 @@ async def websocket_simulation_stream(
     sim_data, sim_info = result
 
     # Attach subscriber
-    subscriber = attach_ws_subscriber(sim_data, sim_info, websocket)
+    subscriber = attach_ws_subscriber(sim_id, sim_data, sim_info, websocket)
 
     # Start a simulation (or resume a simulation in the event of reconnection)
     await start_or_resume_simulation(sim_info, sim_id, websocket, requesting_user)
@@ -446,4 +446,4 @@ async def websocket_simulation_stream(
                     },
                 )
     finally:
-        await cleanup_simulation(sim_data, sim_info, subscriber, websocket)
+        await cleanup_simulation(sim_id, sim_data, sim_info, subscriber, websocket)

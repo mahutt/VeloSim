@@ -407,11 +407,13 @@ class TestSimulationService:
         simulation_service.active_simulations["test-sim"] = {
             "db_id": db_sim.id,
             "status": "initialized",
-            "simulator": None,
         }
 
-        with pytest.raises(RuntimeError, match="Simulator for simulation .* not found"):
-            simulation_service.start_simulation(db, "test-sim", test_user.id)
+        with patch.object(simulation_service, "simulator", None):
+            with pytest.raises(
+                RuntimeError, match="Simulator for simulation .* not found"
+            ):
+                simulation_service.start_simulation(db, "test-sim", test_user.id)
 
     def test_start_simulation_sim_not_in_simulator(
         self, db: Session, test_user: User, simulation_service: SimulationService
@@ -422,9 +424,9 @@ class TestSimulationService:
         sim_id = init_resp.sim_id
 
         # Mock the simulator to return None for get_sim_by_id
-        sim_data = simulation_service.active_simulations[sim_id]
-        mock_sim = sim_data["simulator"]
-        with patch.object(mock_sim, "get_sim_by_id", return_value=None):
+        with patch.object(
+            simulation_service.simulator, "get_sim_by_id", return_value=None
+        ):
             with pytest.raises(
                 RuntimeError, match="Simulation .* not found in its Simulator"
             ):
@@ -529,9 +531,9 @@ class TestSimulationService:
         simulation_service.start_simulation(db, sim_id, test_user.id)
 
         # Mock the simulator stop to raise an exception
-        sim_data = simulation_service.active_simulations[sim_id]
-        mock_sim = sim_data["simulator"]
-        with patch.object(mock_sim, "stop", side_effect=Exception("Stop failed")):
+        with patch.object(
+            simulation_service.simulator, "stop", side_effect=Exception("Stop failed")
+        ):
             # Should not raise, but print error
             simulation_service._stop_all_simulations_core(db)
 
@@ -565,14 +567,16 @@ class TestSimulationService:
         simulation_service.active_simulations["test-sim"] = {
             "db_id": db_sim.id,
             "status": "running",
-            "simulator": None,
         }
 
         playback_speed = PlaybackSpeedBase(playback_speed=1.0)
-        with pytest.raises(RuntimeError, match="Simulator for simulation .* not found"):
-            simulation_service.set_playback_speed(
-                db, "test-sim", playback_speed, test_user.id
-            )
+        with patch.object(simulation_service, "simulator", None):
+            with pytest.raises(
+                RuntimeError, match="Simulator for simulation .* not found"
+            ):
+                simulation_service.set_playback_speed(
+                    db, "test-sim", playback_speed, test_user.id
+                )
 
     def test_set_playback_speed_sim_not_in_simulator(
         self, db: Session, test_user: User, simulation_service: SimulationService
@@ -583,9 +587,9 @@ class TestSimulationService:
         sim_id = init_resp.sim_id
         simulation_service.start_simulation(db, sim_id, test_user.id)
 
-        sim_data = simulation_service.active_simulations[sim_id]
-        mock_sim = sim_data["simulator"]
-        with patch.object(mock_sim, "get_sim_by_id", return_value=None):
+        with patch.object(
+            simulation_service.simulator, "get_sim_by_id", return_value=None
+        ):
             playback_speed = PlaybackSpeedBase(playback_speed=2.0)
             with pytest.raises(
                 RuntimeError, match="Simulation .* not found in simulator"
@@ -639,8 +643,10 @@ class TestSimulationService:
         simulation_service.active_simulations["test-sim"] = {
             "db_id": db_sim.id,
             "status": "running",
-            "simulator": None,
         }
 
-        with pytest.raises(RuntimeError, match="Simulator for simulation .* not found"):
-            simulation_service.get_playback_speed(db, "test-sim", test_user.id)
+        with patch.object(simulation_service, "simulator", None):
+            with pytest.raises(
+                RuntimeError, match="Simulator for simulation .* not found"
+            ):
+                simulation_service.get_playback_speed(db, "test-sim", test_user.id)

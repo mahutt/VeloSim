@@ -110,6 +110,14 @@ class Settings(BaseSettings):
     # API
     API_V1_PREFIX: str = "/api/v1"
 
+    # Runtime behaviour settings
+    # Controls how long (in seconds) that a simulation may remain idle without
+    # an active WebSocket connection and subscriber, before being shut down.
+    # Defaults to 15 seconds.
+    SIMULATION_IDLE_TIMEOUT_SECONDS: int = int(
+        os.getenv("SIMULATION_IDLE_TIMEOUT_SECONDS", "15")
+    )
+
     # Feature flags
     FEATURE_STATIONS_API_ROUTER: bool = env_flag("FEATURE_STATIONS_API_ROUTER")
     FEATURE_STATION_TASKS_API_ROUTER: bool = env_flag(
