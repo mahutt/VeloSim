@@ -79,10 +79,13 @@ class JsonParseStrategy(BaseParseStrategy):
 
         # Build tasks
         tasks: Dict[int, BatterySwapTask] = {}
+        task_id_counter = 1
 
         # Initial tasks
         for t in content.get("initial_tasks", []):
-            tid = int(str(t["id"]).strip("t"))
+            tid = task_id_counter
+            task_id_counter += 1
+
             station_ref = stations[int(t["station_id"])]
             task = BatterySwapTask(
                 env=env, task_id=tid, station=station_ref, spawn_delay=0.0
@@ -97,7 +100,9 @@ class JsonParseStrategy(BaseParseStrategy):
 
         # Scheduled tasks
         for t in content.get("scheduled_tasks", []):
-            tid = int(str(t["id"]).strip("t"))
+            tid = task_id_counter
+            task_id_counter += 1
+
             station_ref = stations[int(t["station_id"])]
             raw_time = t.get("time", 0)
             if isinstance(raw_time, str):

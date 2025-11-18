@@ -72,12 +72,12 @@ def simulator_format_scenario() -> Dict[str, Any]:
             },
         ],
         "initial_tasks": [
-            {"id": "t3", "station_id": "8074"},  # No time field
+            {"station_id": "8074"},  # No time field, no ID
         ],
         "scheduled_tasks": [
-            {"id": "t4", "station_id": "2105", "time": 30},  # 30 seconds
-            {"id": "t5", "station_id": "2508", "time": 120},  # 2 minutes
-            {"id": "t6", "station_id": "8074", "time": 1800.5},  # 30.5 minutes
+            {"station_id": "2105", "time": 30},  # 30 seconds
+            {"station_id": "2508", "time": 120},  # 2 minutes
+            {"station_id": "8074", "time": 1800.5},  # 30.5 minutes
         ],
     }
 
@@ -133,12 +133,12 @@ def test_numeric_time_formats_only(validator: ScenarioValidator) -> None:
             }
         ],
         "initial_tasks": [
-            {"id": "t1", "station_id": "1"},  # No time (correct)
-            {"id": "t2", "station_id": "1", "time": 0},  # Zero seconds (correct)
+            {"station_id": "1"},  # No time, no ID (correct)
+            {"station_id": "1", "time": 0},  # Zero seconds (correct)
         ],
         "scheduled_tasks": [
-            {"id": "t4", "station_id": "1", "time": 600},  # Integer seconds
-            {"id": "t5", "station_id": "1", "time": 1800.5},  # Float seconds
+            {"station_id": "1", "time": 600},  # Integer seconds
+            {"station_id": "1", "time": 1800.5},  # Float seconds
         ],
     }
 
@@ -169,7 +169,6 @@ def test_string_time_formats_rejected(validator: ScenarioValidator) -> None:
         ],
         "scheduled_tasks": [
             {
-                "id": "t1",
                 "station_id": "1",
                 "time": "10:30",
             },  # String format - should be rejected
@@ -182,7 +181,7 @@ def test_string_time_formats_rejected(validator: ScenarioValidator) -> None:
 
     # Test RFC 3339 format is rejected
     scenario["scheduled_tasks"] = [
-        {"id": "t1", "station_id": "1", "time": "2025-11-06T14:30:00Z"},
+        {"station_id": "1", "time": "2025-11-06T14:30:00Z"},
     ]
     errors = validator.validate_all(scenario)
     assert len(errors) > 0
@@ -210,10 +209,10 @@ def test_zero_time_is_valid(validator: ScenarioValidator) -> None:
             }
         ],
         "initial_tasks": [
-            {"id": "t1", "station_id": "1", "time": 0},  # Zero means immediate
+            {"station_id": "1", "time": 0},  # Zero means immediate
         ],
         "scheduled_tasks": [
-            {"id": "t2", "station_id": "1", "time": 0},  # Zero means immediate
+            {"station_id": "1", "time": 0},  # Zero means immediate
         ],
     }
 
@@ -242,7 +241,7 @@ def test_large_time_values_are_valid(validator: ScenarioValidator) -> None:
             }
         ],
         "scheduled_tasks": [
-            {"id": "t1", "station_id": "1", "time": 32400},  # 9 hours in seconds
+            {"station_id": "1", "time": 32400},  # 9 hours in seconds
         ],
     }
 

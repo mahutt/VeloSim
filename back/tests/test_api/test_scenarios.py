@@ -496,8 +496,8 @@ class TestScenarioValidation:
                         "resource_position": [45.5, -73.5],
                     }
                 ],
-                "initial_tasks": [{"id": "t1", "station_id": "1"}],
-                "scheduled_tasks": [{"id": "t2", "station_id": "1"}],
+                "initial_tasks": [{"station_id": "1"}],
+                "scheduled_tasks": [{"station_id": "1"}],
             }
         }
 
@@ -705,7 +705,7 @@ class TestValidateScenario:
                         "task_count": 2,
                     }
                 ],
-                "initial_tasks": [{"id": "t1", "station_id": "1"}],
+                "initial_tasks": [{"station_id": "1"}],
                 "scheduled_tasks": [],
             }
         }
@@ -795,7 +795,7 @@ class TestValidateScenario:
                         "task_count": 1,
                     }
                 ],
-                "initial_tasks": [{"id": "t1", "station_id": "1"}],
+                "initial_tasks": [{"station_id": "1"}],
                 "scheduled_tasks": [],
             }
         }

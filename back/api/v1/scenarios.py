@@ -24,7 +24,7 @@ SOFTWARE.
 
 import math
 from typing import Dict, Any, List
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from sqlalchemy.orm import Session
 from pydantic import BaseModel
 
@@ -55,14 +55,24 @@ class ValidationResponse(BaseModel):
     """Response schema for validation endpoint."""
 
     valid: bool
-    errors: List[Dict[str, str]] = []
+    errors: List[Dict[str, Any]] = []
 
 
 @router.post("/validate", response_model=ValidationResponse)
-def validate_scenario_content(request: ValidationRequest) -> ValidationResponse:
-    """Validate scenario content without creating a scenario."""
-    validator = ScenarioValidator()
-    validation_errors = validator.validate_all(request.content)
+async def validate_scenario_content(
+    request: Request, validation_request: ValidationRequest
+) -> ValidationResponse:
+    """Validate scenario content without creating a scenario.
+
+    Extracts line numbers from the original JSON for better error reporting.
+    """
+    # Get the raw body for line number extraction
+    raw_body = await request.body()
+    json_string = raw_body.decode("utf-8")
+
+    # Initialize validator with JSON string for line tracking
+    validator = ScenarioValidator(json_string=json_string)
+    validation_errors = validator.validate_all(validation_request.content)
 
     return ValidationResponse(
         valid=len(validation_errors) == 0, errors=validation_errors
@@ -85,8 +95,8 @@ def get_scenario_template(
     return {
         "content": {
             "scenario_title": "Example Scenario",
-            "start_time": "2025-11-06T08:00:00Z",
-            "end_time": "2025-11-06T17:00:00Z",
+            "start_time": "08:00",
+            "end_time": "17:00",
             "stations": [
                 {
                     "station_id": 1,
@@ -102,18 +112,15 @@ def get_scenario_template(
             ],
             "initial_tasks": [
                 {
-                    "id": "t1",
                     "station_id": 1,
                 }
             ],
             "scheduled_tasks": [
                 {
-                    "id": "t2",
                     "station_id": 1,
                     "time": 1800,
                 },
                 {
-                    "id": "t3",
                     "station_id": 1,
                     "time": 3600,
                 },
@@ -122,20 +129,21 @@ def get_scenario_template(
         "description": (
             "Template for scenario creation. Format requirements:\n\n"
             "- scenario_title: Name of the scenario\n"
-            "- start_time: RFC 3339 datetime (e.g., '2025-11-06T08:00:00Z') "
-            "or simple time (e.g., '08:00')\n"
-            "- end_time: RFC 3339 datetime or simple time (can span multiple days)\n"
+            "- start_time: Simple time format (e.g., '08:00', '17:00') "
+            "or RFC 3339 datetime (e.g., '2025-11-06T08:00:00Z')\n"
+            "- end_time: Simple time format or RFC 3339 datetime "
+            "(can span multiple days with RFC 3339 format)\n"
             "- stations: List of station objects with id, name, "
             "and position [lon, lat]\n"
             "- resources: List of resource objects with id "
             "and position [lon, lat]\n"
             "- initial_tasks: Tasks to spawn immediately at simulation start.\n"
-            "  * id: Unique task identifier (string format: 't1', 't2', etc.)\n"
-            "  * station_id: Target station ID (integer)\n"
+            "  * id: OPTIONAL - Auto-generated if omitted\n"
+            "  * station_id: Target station ID (integer, required)\n"
             "  * time: NOT REQUIRED (tasks spawn immediately)\n"
             "- scheduled_tasks: Tasks to spawn after a delay.\n"
-            "  * id: Unique task identifier (string format: 't1', 't2', etc.)\n"
-            "  * station_id: Target station ID (integer)\n"
+            "  * id: OPTIONAL - Auto-generated if omitted\n"
+            "  * station_id: Target station ID (integer, required)\n"
             "  * time: REQUIRED - delay in seconds (numeric, "
             "e.g., 1800 for 30 min, 3600 for 1 hour)\n\n"
         ),

@@ -67,10 +67,10 @@ def test_json_parse_strategy_valid_input() -> None:
                 {"resource_id": 1, "resource_position": [-64.0060, 75.7128]},
                 {"resource_id": 2, "resource_position": [-123.2437, 64.0522]},
             ],
-            "initial_tasks": [{"id": "t3", "station_id": 8074}],
+            "initial_tasks": [{"station_id": 8074}],
             "scheduled_tasks": [
-                {"id": "t4", "station_id": 2105, "time": 30},
-                {"id": "t5", "station_id": 2508, "time": 120},
+                {"station_id": 2105, "time": 30},
+                {"station_id": 2508, "time": 120},
             ],
         },
     }
@@ -87,10 +87,10 @@ def test_json_parse_strategy_valid_input() -> None:
     stations = params.station_entities
     resources = params.resource_entities
 
-    # IDs stripped of "t" prefix
-    assert tasks[3].station == stations[8074]
-    assert tasks[4].station == stations[2105]
-    assert tasks[5].station == stations[2508]
+    # IDs are auto-generated starting from 1, 2, 3...
+    assert tasks[1].station == stations[8074]  # First task (initial)
+    assert tasks[2].station == stations[2105]  # Second task (scheduled)
+    assert tasks[3].station == stations[2508]  # Third task (scheduled)
 
     for res in resources.values():
         assert isinstance(res, Resource)

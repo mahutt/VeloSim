@@ -22,9 +22,10 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 """
 
-from typing import Any, Dict, List, Set
+from typing import Any, Dict, List, Set, Optional
 from pydantic import BaseModel, ValidationError, model_validator, field_validator
 from datetime import datetime
+import re
 
 
 class PositionValidator(BaseModel):
@@ -62,7 +63,7 @@ class StationValidator(BaseModel):
 
 
 class TaskValidator(BaseModel):
-    id: str
+    id: str | None = None
     station_id: int
     time: int | float | None = None
 
@@ -144,23 +145,85 @@ class ScenarioTimes(BaseModel):
 class ScenarioValidator:
     """Validator for scenario content."""
 
+    def __init__(self, json_string: Optional[str] = None) -> None:
+        """Initialize validator with optional JSON string for line number tracking."""
+        self.line_map: Dict[str, int] = {}
+        if json_string:
+            self._build_line_map(json_string)
+
+    def _build_line_map(self, json_string: str) -> None:
+        """Build a map of JSON paths to line numbers."""
+        lines = json_string.split("\n")
+        path_stack: List[str] = []
+
+        for line_num, line in enumerate(lines, start=1):
+            # Track keys in objects
+            key_match = re.search(r'"([^"]+)"\s*:', line)
+            if key_match:
+                key = key_match.group(1)
+                # Build the current path
+                current_path = ".".join(path_stack + [key]) if path_stack else key
+                self.line_map[current_path] = line_num
+                self.line_map[key] = line_num
+
+                # Track if we're entering an array or object
+                if "[" in line:
+                    path_stack.append(key)
+                elif "{" in line and "}" not in line:
+                    path_stack.append(key)
+
+            # Track array indices
+            if re.match(r"^\s*\{\s*$", line) and path_stack:
+                # Entering an array element
+                pass
+
+            # Pop from stack when closing
+            if "}" in line or "]" in line:
+                if path_stack:
+                    path_stack.pop()
+
+    def _get_line_number(self, field_path: str) -> Optional[int]:
+        """Get line number for a field path, trying multiple variations."""
+        # Try exact match first
+        if field_path in self.line_map:
+            return self.line_map[field_path]
+
+        # Try extracting just the field name from paths like "stations[0].station_id"
+        parts = field_path.split(".")
+        if parts:
+            last_part = parts[-1]
+            if last_part in self.line_map:
+                return self.line_map[last_part]
+
+            # Try the parent field for array elements
+            if "[" in field_path:
+                parent = re.sub(r"\[\d+\].*", "", field_path)
+                if parent in self.line_map:
+                    return self.line_map[parent]
+
+        return None
+
     @staticmethod
     def check_required_fields(
         item: Dict[str, Any], required_fields: List[str]
-    ) -> List[Dict[str, str]]:
+    ) -> List[Dict[str, Any]]:
         return [
             {"field": f, "message": f"Missing required field '{f}'"}
             for f in required_fields
             if f not in item
         ]
 
-    def validate_syntax(self, content: Dict[str, Any]) -> List[Dict[str, str]]:
+    def validate_syntax(self, content: Dict[str, Any]) -> List[Dict[str, Any]]:
         """Validate the syntax of scenario content only."""
-        errors: List[Dict[str, str]] = []
+        errors: List[Dict[str, Any]] = []
 
         # Validate start_time and end_time exist and are properly formatted
         required_fields = ["start_time", "end_time"]
-        errors.extend(self.check_required_fields(content, required_fields))
+        for error in self.check_required_fields(content, required_fields):
+            line_num = self._get_line_number(error["field"])
+            if line_num:
+                error["line"] = line_num
+            errors.append(error)
 
         # Validate time format and constraints
         try:
@@ -168,34 +231,49 @@ class ScenarioValidator:
         except ValidationError as e:
             for err in e.errors():
                 field_path = ".".join(map(str, err["loc"]))
-                errors.append({"field": field_path, "message": err["msg"]})
+                error_dict: Dict[str, Any] = {
+                    "field": field_path,
+                    "message": err["msg"],
+                }
+                line_num = self._get_line_number(field_path)
+                if line_num:
+                    error_dict["line"] = line_num
+                errors.append(error_dict)
 
         return errors
 
-    def validate_stations(self, stations: List[Dict[str, Any]]) -> List[Dict[str, str]]:
-        errors: List[Dict[str, str]] = []
+    def validate_stations(self, stations: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        errors: List[Dict[str, Any]] = []
         seen_ids: Set[int] = set()
 
         for idx, s in enumerate(stations):
-            errors.extend(
-                self.check_required_fields(
-                    s,
-                    [
-                        "station_id",
-                        "station_name",
-                        "station_position",
-                    ],
-                )
-            )
+            for error in self.check_required_fields(
+                s,
+                [
+                    "station_id",
+                    "station_name",
+                    "station_position",
+                ],
+            ):
+                field_path = f"stations[{idx}].{error['field']}"
+                line_num = self._get_line_number(field_path)
+                if line_num:
+                    error["line"] = line_num
+                error["field"] = field_path
+                errors.append(error)
+
             station_id_raw: Any = s.get("station_id")
             if isinstance(station_id_raw, int):
                 if station_id_raw in seen_ids:
-                    errors.append(
-                        {
-                            "field": f"stations[{idx}].station_id",
-                            "message": "Duplicate station ID",
-                        }
-                    )
+                    field_path = f"stations[{idx}].station_id"
+                    dup_error: Dict[str, Any] = {
+                        "field": field_path,
+                        "message": "Duplicate station ID",
+                    }
+                    line_num = self._get_line_number(field_path)
+                    if line_num:
+                        dup_error["line"] = line_num
+                    errors.append(dup_error)
                 seen_ids.add(station_id_raw)
 
             try:
@@ -203,78 +281,125 @@ class ScenarioValidator:
             except ValidationError as e:
                 for err in e.errors():
                     field_name = f"stations[{idx}].{'.'.join(map(str, err['loc']))}"
-                    errors.append({"field": field_name, "message": err["msg"]})
+                    val_error: Dict[str, Any] = {
+                        "field": field_name,
+                        "message": err["msg"],
+                    }
+                    line_num = self._get_line_number(field_name)
+                    if line_num:
+                        val_error["line"] = line_num
+                    errors.append(val_error)
 
         return errors
 
     def validate_resources(
         self, resources: List[Dict[str, Any]]
-    ) -> List[Dict[str, str]]:
-        errors: List[Dict[str, str]] = []
+    ) -> List[Dict[str, Any]]:
+        errors: List[Dict[str, Any]] = []
         seen_ids: Set[int] = set()
 
         for idx, r in enumerate(resources):
-            errors.extend(
-                self.check_required_fields(r, ["resource_id", "resource_position"])
-            )
+            for error in self.check_required_fields(
+                r, ["resource_id", "resource_position"]
+            ):
+                field_path = f"resources[{idx}].{error['field']}"
+                line_num = self._get_line_number(field_path)
+                if line_num:
+                    error["line"] = line_num
+                error["field"] = field_path
+                errors.append(error)
+
             try:
                 validated: ResourceValidator = ResourceValidator(**r)
                 if validated.resource_id in seen_ids:
-                    errors.append(
-                        {
-                            "field": f"resources[{idx}].resource_id",
-                            "message": "Duplicate resource ID",
-                        }
-                    )
+                    field_path = f"resources[{idx}].resource_id"
+                    dup_error: Dict[str, Any] = {
+                        "field": field_path,
+                        "message": "Duplicate resource ID",
+                    }
+                    line_num = self._get_line_number(field_path)
+                    if line_num:
+                        dup_error["line"] = line_num
+                    errors.append(dup_error)
                 seen_ids.add(validated.resource_id)
             except ValidationError as e:
                 for err in e.errors():
                     field_name = f"resources[{idx}].{'.'.join(map(str, err['loc']))}"
-                    errors.append({"field": field_name, "message": err["msg"]})
+                    val_error: Dict[str, Any] = {
+                        "field": field_name,
+                        "message": err["msg"],
+                    }
+                    line_num = self._get_line_number(field_name)
+                    if line_num:
+                        val_error["line"] = line_num
+                    errors.append(val_error)
 
         return errors
 
     def validate_tasks(
         self, tasks: List[Dict[str, Any]], valid_station_ids: Set[int]
-    ) -> List[Dict[str, str]]:
-        errors: List[Dict[str, str]] = []
-        seen_task_ids: Set[str] = set()
+    ) -> List[Dict[str, Any]]:
+        errors: List[Dict[str, Any]] = []
 
         for idx, task in enumerate(tasks):
-            errors.extend(self.check_required_fields(task, ["id", "station_id"]))
+            for error in self.check_required_fields(task, ["station_id"]):
+                field_path = f"tasks[{idx}].{error['field']}"
+                line_num = self._get_line_number(field_path)
+                if line_num:
+                    error["line"] = line_num
+                error["field"] = field_path
+                errors.append(error)
+
+            if "id" in task:
+                field_path = f"tasks[{idx}].id"
+                warning: Dict[str, Any] = {
+                    "field": field_path,
+                    "message": (
+                        "Task IDs are auto-generated and cannot be "
+                        "specified. This field will be ignored."
+                    ),
+                }
+                line_num = self._get_line_number(field_path)
+                if line_num:
+                    warning["line"] = line_num
+                errors.append(warning)
+
             try:
                 validated: TaskValidator = TaskValidator(**task)
-                if validated.id in seen_task_ids:
-                    errors.append(
-                        {"field": f"tasks[{idx}].id", "message": "Duplicate task ID"}
-                    )
-                seen_task_ids.add(validated.id)
 
                 if validated.station_id not in valid_station_ids:
-                    errors.append(
-                        {
-                            "field": f"tasks[{idx}].station_id",
-                            "message": (
-                                f"Station ID {validated.station_id} does not exist"
-                            ),
-                        }
-                    )
+                    field_path = f"tasks[{idx}].station_id"
+                    station_error: Dict[str, Any] = {
+                        "field": field_path,
+                        "message": f"Station ID {validated.station_id} does not exist",
+                    }
+                    line_num = self._get_line_number(field_path)
+                    if line_num:
+                        station_error["line"] = line_num
+                    errors.append(station_error)
             except ValidationError as e:
                 for err in e.errors():
                     field_name = f"tasks[{idx}].{'.'.join(map(str, err['loc']))}"
-                    errors.append({"field": field_name, "message": err["msg"]})
+                    val_error: Dict[str, Any] = {
+                        "field": field_name,
+                        "message": err["msg"],
+                    }
+                    line_num = self._get_line_number(field_name)
+                    if line_num:
+                        val_error["line"] = line_num
+                    errors.append(val_error)
 
         return errors
 
     def validate_simulation_params(
         self, params: Dict[str, Any]
-    ) -> List[Dict[str, str]]:
+    ) -> List[Dict[str, Any]]:
         """Validate simulation time parameters.
 
         Ensures start_time and end_time are valid and that end_time is after start_time.
         Simulations cannot span more than 24 hours.
         """
-        errors: List[Dict[str, str]] = []
+        errors: List[Dict[str, Any]] = []
         start_val: Any = params.get("start_time")
         end_val: Any = params.get("end_time")
 
@@ -285,37 +410,43 @@ class ScenarioValidator:
 
                 # Validate that end_time is after start_time
                 if scenario_times.end_time <= scenario_times.start_time:
-                    errors.append(
-                        {
-                            "field": "end_time",
-                            "message": "end_time must be after start_time",
-                        }
-                    )
+                    time_error: Dict[str, Any] = {
+                        "field": "end_time",
+                        "message": "end_time must be after start_time",
+                    }
+                    line_num = self._get_line_number("end_time")
+                    if line_num:
+                        time_error["line"] = line_num
+                    errors.append(time_error)
 
                 # Validate that simulation doesn't span more than 24 hours
                 duration = scenario_times.end_time - scenario_times.start_time
                 if duration.total_seconds() > 86400:  # 24 hours in seconds
-                    errors.append(
-                        {
-                            "field": "end_time",
-                            "message": "Simulation duration cannot exceed 24 hours",
-                        }
-                    )
+                    duration_error: Dict[str, Any] = {
+                        "field": "end_time",
+                        "message": "Simulation duration cannot exceed 24 hours",
+                    }
+                    line_num = self._get_line_number("end_time")
+                    if line_num:
+                        duration_error["line"] = line_num
+                    errors.append(duration_error)
             except ValidationError as e:
                 for err in e.errors():
                     field_path = ".".join(map(str, err["loc"]))
-                    errors.append(
-                        {
-                            "field": field_path,
-                            "message": err["msg"],
-                        }
-                    )
+                    val_error: Dict[str, Any] = {
+                        "field": field_path,
+                        "message": err["msg"],
+                    }
+                    line_num = self._get_line_number(field_path)
+                    if line_num:
+                        val_error["line"] = line_num
+                    errors.append(val_error)
 
         return errors
 
-    def validate_all(self, scenario_content: Dict[str, Any]) -> List[Dict[str, str]]:
+    def validate_all(self, scenario_content: Dict[str, Any]) -> List[Dict[str, Any]]:
         """Validate all aspects of scenario content."""
-        errors: List[Dict[str, str]] = self.validate_syntax(scenario_content)
+        errors: List[Dict[str, Any]] = self.validate_syntax(scenario_content)
 
         stations: List[Dict[str, Any]] = scenario_content.get("stations", [])
         resources: List[Dict[str, Any]] = scenario_content.get("resources", [])
