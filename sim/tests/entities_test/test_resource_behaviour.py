@@ -35,8 +35,8 @@ from sim.behaviour.sim_behaviour import SimBehaviour
 class FakeTask(Task):
     """Fake task for testing"""
 
-    def __init__(self, env, task_id, station=None):  # type: ignore[no-untyped-def]
-        super().__init__(env, task_id, station)
+    def __init__(self, task_id, station=None):  # type: ignore[no-untyped-def]
+        super().__init__(task_id, station)
         self._state = State.OPEN
 
     def get_state(self) -> State:
@@ -71,7 +71,8 @@ def test_travel_to_returns_immediately_when_already_at_position() -> None:
     """Test that travel_to returns early if already at destination"""
     env = simpy.Environment()
     start_pos = Position([0.0, 0.0])
-    resource = Resource(env, resource_id=1, position=start_pos)
+    resource = Resource(resource_id=1, position=start_pos)
+    resource.env = env
 
     # Mock map map (shouldn't be called)
     mock_map = Mock()
@@ -92,7 +93,8 @@ def test_travel_to_handles_tuple_return_from_route_next() -> None:
     env = simpy.Environment()
     start_pos = Position([0.0, 0.0])
     dest_pos = Position([1.0, 1.0])
-    resource = Resource(env, resource_id=1, position=start_pos)
+    resource = Resource(resource_id=1, position=start_pos)
+    resource.env = env
 
     # Mock route that returns tuple on first call, then positions
     mock_route = Mock()
@@ -130,7 +132,8 @@ def test_travel_to_handles_single_position_return_from_route_next() -> None:
     env = simpy.Environment()
     start_pos = Position([0.0, 0.0])
     dest_pos = Position([1.0, 1.0])
-    resource = Resource(env, resource_id=1, position=start_pos)
+    resource = Resource(resource_id=1, position=start_pos)
+    resource.env = env
 
     # Mock route that returns single position (not tuple)
     mock_route = Mock()
@@ -161,7 +164,8 @@ def test_travel_to_can_be_interrupted() -> None:
     env = simpy.Environment()
     start_pos = Position([0.0, 0.0])
     dest_pos = Position([5.0, 5.0])
-    resource = Resource(env, resource_id=1, position=start_pos)
+    resource = Resource(resource_id=1, position=start_pos)
+    resource.env = env
 
     # Mock route with many positions
     mock_route = Mock()
@@ -192,10 +196,11 @@ def test_travel_to_can_be_interrupted() -> None:
 def test_resource_run_waits_for_initialization() -> None:
     """Test that resource run() yields at start to allow initialization"""
     env = simpy.Environment()
-    resource = Resource(env, resource_id=1, position=Position([0.0, 0.0]))
+    resource = Resource(resource_id=1, position=Position([0.0, 0.0]))
+    resource.env = env
 
     # Add a task so select_next_task will be called
-    task = FakeTask(env, task_id=1)
+    task = FakeTask(task_id=1)
     resource.assign_task(task)
 
     # Set up behaviour and map map after creation
@@ -219,12 +224,14 @@ def test_resource_run_selects_and_dispatches_task() -> None:
     """Test that resource run() selects and dispatches tasks correctly"""
     env = simpy.Environment()
     start_pos = Position([0.0, 0.0])
-    resource = Resource(env, resource_id=1, position=start_pos)
+    resource = Resource(resource_id=1, position=start_pos)
+    resource.env = env
 
     # Create a task at a station
     station_pos = Position([1.0, 1.0])
-    station = Station(env, station_id=1, name="Station1", position=station_pos)
-    task = FakeTask(env, task_id=1, station=station)
+    station = Station(station_id=1, name="Station1", position=station_pos)
+    station.env = env
+    task = FakeTask(task_id=1, station=station)
     resource.assign_task(task)
 
     # Set up behaviour
@@ -259,11 +266,13 @@ def test_resource_run_services_task_when_at_station() -> None:
     station_pos = Position([1.0, 1.0])
 
     # Create station first, THEN resource (so resource.run() starts)
-    station = Station(env, station_id=1, name="Station1", position=station_pos)
-    resource = Resource(env, resource_id=1, position=station_pos)
+    station = Station(station_id=1, name="Station1", position=station_pos)
+    station.env = env
+    resource = Resource(resource_id=1, position=station_pos)
+    resource.env = env
 
     # Create a task and manually set it to in-progress
-    task = FakeTask(env, task_id=1, station=station)
+    task = FakeTask(task_id=1, station=station)
     task.set_state(State.IN_PROGRESS)
     task.set_assigned_resource(resource)
     resource.task_list.append(task)
@@ -292,11 +301,11 @@ def test_resource_run_does_not_service_task_when_not_at_station() -> None:
     station_pos = Position([1.0, 1.0])
 
     # Create station first
-    station = Station(env, station_id=1, name="Station1", position=station_pos)
-    resource = Resource(env, resource_id=1, position=resource_pos)
+    station = Station(station_id=1, name="Station1", position=station_pos)
+    resource = Resource(resource_id=1, position=resource_pos)
 
     # Create a task at a different station and manually set to in-progress
-    task = FakeTask(env, task_id=1, station=station)
+    task = FakeTask(task_id=1, station=station)
     task.set_state(State.IN_PROGRESS)
     task.set_assigned_resource(resource)
     resource.task_list.append(task)
@@ -319,7 +328,7 @@ def test_resource_run_does_not_service_task_when_not_at_station() -> None:
 def test_resource_run_handles_no_tasks() -> None:
     """Test that resource run() handles case when there are no tasks"""
     env = simpy.Environment()
-    resource = Resource(env, resource_id=1, position=Position([0.0, 0.0]))
+    resource = Resource(resource_id=1, position=Position([0.0, 0.0]))
 
     # Set up behaviour
     mock_behaviour = Mock(spec=SimBehaviour)
@@ -340,10 +349,10 @@ def test_resource_run_handles_no_tasks() -> None:
 def test_resource_run_handles_none_station_on_task() -> None:
     """Test that resource run() handles tasks with None station"""
     env = simpy.Environment()
-    resource = Resource(env, resource_id=1, position=Position([0.0, 0.0]))
+    resource = Resource(resource_id=1, position=Position([0.0, 0.0]))
 
     # Create a task with no station
-    task = FakeTask(env, task_id=1, station=None)
+    task = FakeTask(task_id=1, station=None)
     resource.assign_task(task)
 
     # Set up behaviour to select the task

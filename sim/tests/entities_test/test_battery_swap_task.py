@@ -39,7 +39,7 @@ class TestBatterySwapTask:
 
     @pytest.fixture
     def default_station(self, simpy_env: simpy.Environment) -> Station:
-        return Station(simpy_env, 1, "Test Station", Position([-73.5673, 45.5017]))
+        return Station(1, "Test Station", Position([-73.5673, 45.5017]))
 
     def test_battery_swap_task_creation(
         self, simpy_env: simpy.Environment, default_station: Station
@@ -48,7 +48,7 @@ class TestBatterySwapTask:
         task_id = 1
 
         # Act
-        task = BatterySwapTask(simpy_env, task_id, default_station)
+        task = BatterySwapTask(task_id, default_station)
 
         # Assert
         assert task.get_task_id() == 1
@@ -63,7 +63,7 @@ class TestBatterySwapTask:
         task_id = 1
 
         # Act
-        task = BatterySwapTask(simpy_env, task_id)
+        task = BatterySwapTask(task_id)
 
         # Assert
         assert task.get_task_id() == 1
@@ -72,7 +72,7 @@ class TestBatterySwapTask:
         assert task.get_assigned_resource() is None
 
     def test_get_and_set_state(self, simpy_env: simpy.Environment) -> None:
-        task = BatterySwapTask(simpy_env, 1)
+        task = BatterySwapTask(1)
 
         state = task.get_state()
         assert state == State.OPEN
@@ -95,7 +95,7 @@ class TestBatterySwapTask:
 
     def test_get_task_id(self, simpy_env: simpy.Environment) -> None:
         # Arrange
-        task = BatterySwapTask(simpy_env, 1)
+        task = BatterySwapTask(1)
 
         # Act
         id = task.get_task_id()
@@ -107,7 +107,7 @@ class TestBatterySwapTask:
     def test_get_and_set_station(
         self, simpy_env: simpy.Environment, default_station: Station
     ) -> None:
-        task = BatterySwapTask(simpy_env, 1)
+        task = BatterySwapTask(1)
 
         # default no station
         station = task.get_station()
@@ -121,13 +121,13 @@ class TestBatterySwapTask:
     def test_get_and_set_assigned_resource(
         self, simpy_env: simpy.Environment, default_station: Station
     ) -> None:
-        task = BatterySwapTask(simpy_env, 1, default_station)
+        task = BatterySwapTask(1, default_station)
 
         # default no resource
         assigned_resource = task.get_assigned_resource()
         assert assigned_resource is None
 
-        resource = Resource(simpy_env, 1, Position([-73.5673, 45.5017]))
+        resource = Resource(1, Position([-73.5673, 45.5017]))
         task.set_assigned_resource(resource)
         assigned_resource = task.get_assigned_resource()
         assert assigned_resource is not None
@@ -137,8 +137,8 @@ class TestBatterySwapTask:
         self, simpy_env: simpy.Environment, default_station: Station
     ) -> None:
         # Arrange
-        task = BatterySwapTask(simpy_env, 1, default_station)
-        resource = Resource(simpy_env, 1, Position([-73.5673, 45.5017]))
+        task = BatterySwapTask(1, default_station)
+        resource = Resource(1, Position([-73.5673, 45.5017]))
         task.set_assigned_resource(resource)
         assert task.get_assigned_resource() == resource
         assert task.get_state() == State.ASSIGNED
@@ -154,8 +154,8 @@ class TestBatterySwapTask:
         self, simpy_env: simpy.Environment, default_station: Station
     ) -> None:
         # Arrange
-        task = BatterySwapTask(simpy_env, 1, default_station)
-        resource = Resource(simpy_env, 1, Position([-73.5673, 45.5017]))
+        task = BatterySwapTask(1, default_station)
+        resource = Resource(1, Position([-73.5673, 45.5017]))
         task.set_assigned_resource(resource)
 
         # Act
@@ -169,7 +169,7 @@ class TestBatterySwapTask:
         self, simpy_env: simpy.Environment, default_station: Station
     ) -> None:
         # Arrange
-        task = BatterySwapTask(simpy_env, 1, default_station)
+        task = BatterySwapTask(1, default_station)
 
         # Act
         assigned = task.is_assigned()
@@ -182,7 +182,7 @@ class TestBatterySwapTask:
         self, simpy_env: simpy.Environment, default_station: Station
     ) -> None:
         # Arrange
-        task = BatterySwapTask(simpy_env, 1, default_station)
+        task = BatterySwapTask(1, default_station)
 
         # Act
         task_dict = task.to_dict()

@@ -44,23 +44,23 @@ def input_params(env: simpy.Environment) -> InputParameter:
 
     # Add test stations
     station1 = Station(
-        env=env, station_id=1, name="Test Station 1", position=Position([10.0, 20.0])
+        station_id=1, name="Test Station 1", position=Position([10.0, 20.0])
     )
     station2 = Station(
-        env=env, station_id=2, name="Test Station 2", position=Position([30.0, 40.0])
+        station_id=2, name="Test Station 2", position=Position([30.0, 40.0])
     )
     params.add_station(station1)
     params.add_station(station2)
 
     # Add test resources
-    resource1 = Resource(env=env, resource_id=1, position=Position([15.0, 25.0]))
-    resource2 = Resource(env=env, resource_id=2, position=Position([35.0, 45.0]))
+    resource1 = Resource(resource_id=1, position=Position([15.0, 25.0]))
+    resource2 = Resource(resource_id=2, position=Position([35.0, 45.0]))
     params.add_resource(resource1)
     params.add_resource(resource2)
 
     # Add test tasks using concrete BatterySwapTask
-    task1 = BatterySwapTask(env=env, task_id=1, station=station1)
-    task2 = BatterySwapTask(env=env, task_id=2, station=station2)
+    task1 = BatterySwapTask(task_id=1, station=station1)
+    task2 = BatterySwapTask(task_id=2, station=station2)
     params.add_task(task1)
     params.add_task(task2)
 
@@ -95,7 +95,7 @@ def test_set_station_entities(
 
     # Act
     station = Station(
-        env=env, station_id=45, name="Some New Station", position=Position([10.0, 20.0])
+        station_id=45, name="Some New Station", position=Position([10.0, 20.0])
     )
     input_params.set_station_entities({45: station})
 
@@ -113,7 +113,7 @@ def test_set_resource_entities(
     assert input_params.get_resource_count() == 2
 
     # Act
-    resource = Resource(env=env, resource_id=45, position=Position([15.0, 25.0]))
+    resource = Resource(resource_id=45, position=Position([15.0, 25.0]))
     input_params.set_resource_entities({45: resource})
 
     # Assert
@@ -130,7 +130,7 @@ def test_set_task_entities(
     assert input_params.get_task_count() == 2
 
     # Act
-    task = BatterySwapTask(env=env, task_id=45)
+    task = BatterySwapTask(task_id=45)
     input_params.set_task_entities({45: task})
 
     # Assert
@@ -172,7 +172,7 @@ def test_add_station(input_params: InputParameter, env: simpy.Environment) -> No
 
     # Act
     station = Station(
-        env=env, station_id=12, name="Some New Station", position=Position([10.0, 20.0])
+        station_id=12, name="Some New Station", position=Position([10.0, 20.0])
     )
     input_params.add_station(station)
 
@@ -187,7 +187,7 @@ def test_add_resource(input_params: InputParameter, env: simpy.Environment) -> N
     assert 12 not in original_resources.keys()
 
     # Act
-    resource = Resource(env=env, resource_id=12, position=Position([15.0, 25.0]))
+    resource = Resource(resource_id=12, position=Position([15.0, 25.0]))
     input_params.add_resource(resource)
 
     # Assert
@@ -201,7 +201,7 @@ def test_add_task(input_params: InputParameter, env: simpy.Environment) -> None:
     assert 12 not in original_tasks.keys()
 
     # Act
-    task = BatterySwapTask(env=env, task_id=12)
+    task = BatterySwapTask(task_id=12)
     input_params.add_task(task)
 
     # Assert
@@ -214,7 +214,7 @@ def test_remove_station_success(
     input_params: InputParameter, env: simpy.Environment
 ) -> None:
     station = Station(
-        env=env, station_id=12, name="Some New Station", position=Position([10.0, 20.0])
+        station_id=12, name="Some New Station", position=Position([10.0, 20.0])
     )
     input_params.add_station(station)
     added_stations = input_params.get_station_entities()
@@ -241,7 +241,6 @@ def test_remove_station_fail(
 
     # Act
     station = Station(
-        env=env,
         station_id=13,
         name="Some Random Station",
         position=Position([10.0, 20.0]),
@@ -257,7 +256,7 @@ def test_remove_station_fail(
 def test_remove_resource_success(
     input_params: InputParameter, env: simpy.Environment
 ) -> None:
-    resource = Resource(env=env, resource_id=12, position=Position([15.0, 25.0]))
+    resource = Resource(resource_id=12, position=Position([15.0, 25.0]))
     input_params.add_resource(resource)
     addded_resources = input_params.get_resource_entities()
     assert 12 in addded_resources.keys()
@@ -282,7 +281,7 @@ def test_remove_resource_fail(
     assert input_params.get_resource_count() == 2
 
     # Act
-    resource = Resource(env=env, resource_id=13, position=Position([15.0, 25.0]))
+    resource = Resource(resource_id=13, position=Position([15.0, 25.0]))
     input_params.remove_resource(resource)
 
     # Assert
@@ -294,7 +293,7 @@ def test_remove_resource_fail(
 def test_remove_task_success(
     input_params: InputParameter, env: simpy.Environment
 ) -> None:
-    task = BatterySwapTask(env=env, task_id=12)
+    task = BatterySwapTask(task_id=12)
     input_params.add_task(task)
     added_tasks = input_params.get_task_entities()
     assert 12 in added_tasks.keys()
@@ -319,7 +318,7 @@ def test_remove_task_fail(
     assert input_params.get_task_count() == 2
 
     # Act
-    task = BatterySwapTask(env=env, task_id=13)
+    task = BatterySwapTask(task_id=13)
     input_params.remove_task(task)
 
     # Assert

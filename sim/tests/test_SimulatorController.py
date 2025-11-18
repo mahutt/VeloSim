@@ -121,23 +121,23 @@ def input_params(env: simpy.Environment) -> InputParameter:
 
     # Add test stations
     station1 = Station(
-        env=env, station_id=1, name="Test Station 1", position=Position([10.0, 20.0])
+        station_id=1, name="Test Station 1", position=Position([10.0, 20.0])
     )
     station2 = Station(
-        env=env, station_id=2, name="Test Station 2", position=Position([30.0, 40.0])
+        station_id=2, name="Test Station 2", position=Position([30.0, 40.0])
     )
     params.add_station(station1)
     params.add_station(station2)
 
     # Add test resources
-    resource1 = Resource(env=env, resource_id=1, position=Position([15.0, 25.0]))
-    resource2 = Resource(env=env, resource_id=2, position=Position([35.0, 45.0]))
+    resource1 = Resource(resource_id=1, position=Position([15.0, 25.0]))
+    resource2 = Resource(resource_id=2, position=Position([35.0, 45.0]))
     params.add_resource(resource1)
     params.add_resource(resource2)
 
     # Add test tasks using concrete BatterySwapTask
-    task1 = BatterySwapTask(env=env, task_id=1, station=station1)
-    task2 = BatterySwapTask(env=env, task_id=2, station=station2)
+    task1 = BatterySwapTask(task_id=1, station=station1)
+    task2 = BatterySwapTask(task_id=2, station=station2)
     params.add_task(task1)
     params.add_task(task2)
 
@@ -388,7 +388,7 @@ def test_key_frame_includes_new_tasks_and_clears_popups(
     station1 = simulator_controller.get_station_by_id(1)
     assert station1 is not None
     # create a popup task and attach to station
-    new_task = BatterySwapTask(env=env, task_id=99, station=station1)
+    new_task = BatterySwapTask(task_id=99, station=station1)
     station1.pop_up_tasks.append(new_task)
 
     frame = simulator_controller.create_key_frame()
@@ -441,7 +441,7 @@ def test_add_task_success(
     # Arrange
     task_id = 3
     station1 = simulator_controller.get_station_by_id(1)
-    new_task = BatterySwapTask(env, task_id, station1)
+    new_task = BatterySwapTask(task_id, station1)
 
     # Act
     simulator_controller.add_task(new_task)
@@ -458,7 +458,7 @@ def test_add_task_fail(
     # Arrange
     task_id = 2
     station1 = simulator_controller.get_station_by_id(1)
-    new_task = BatterySwapTask(env, task_id, station1)
+    new_task = BatterySwapTask(task_id, station1)
 
     # Act and Assert
     with pytest.raises(Exception, match=f"Task with id {task_id} already exists"):
