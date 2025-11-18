@@ -37,3 +37,6 @@ Related PR: #[PR nb]
 **Screenshots / Code Snippets / Stack Traces**
 
 **Environment**
+
+-----------------------------------------------------------
+**Estimated Ideal Time:** [Estimated time to complete the task]
