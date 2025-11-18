@@ -37,8 +37,12 @@ class JsonParseStrategy(BaseParseStrategy):
 
     def _time_to_seconds(self, time_str: str) -> int:
         try:
-            t = datetime.strptime(time_str, "%H:%M")
-            return t.hour * 3600 + t.minute * 60
+            daytime_split = time_str.split(":", 1)
+            day = daytime_split[0]
+            time = daytime_split[1]
+            t = datetime.strptime(time, "%H:%M")
+            day_int = int(day[-1]) - 1
+            return (day_int * 24) * 3600 + t.hour * 3600 + t.minute * 60
         except Exception:
             print(f"Invalid time format '{time_str}', defaulting to 0s.")
             return 0
@@ -49,12 +53,10 @@ class JsonParseStrategy(BaseParseStrategy):
         """
         env = simpy.Environment()
         content = scenario_json.get("content", {})
-        start_time = self._time_to_seconds(str(content.get("start_time", "00:00")))
-        end_time = self._time_to_seconds(str(content.get("end_time", "00:00")))
+        start_time = self._time_to_seconds(str(content.get("start_time", "Day1:00:00")))
+        end_time = self._time_to_seconds(str(content.get("end_time", "Day1:00:00")))
 
         sim_time = end_time - start_time
-        if sim_time < 0:
-            sim_time += 24 * 3600
 
         # Build stations
         stations: Dict[int, Station] = {}

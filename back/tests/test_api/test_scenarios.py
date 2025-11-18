@@ -479,8 +479,8 @@ class TestScenarioValidation:
         """Test validating valid scenario content."""
         valid_content = {
             "content": {
-                "start_time": "08:00",
-                "end_time": "12:00",
+                "start_time": "day1:08:00",
+                "end_time": "day1:12:00",
                 "stations": [
                     {
                         "station_id": 1,
@@ -498,38 +498,6 @@ class TestScenarioValidation:
                 ],
                 "initial_tasks": [{"station_id": "1"}],
                 "scheduled_tasks": [{"station_id": "1"}],
-            }
-        }
-
-        response = client.post("/api/v1/scenarios/validate", json=valid_content)
-        assert response.status_code == 200
-        data = response.json()
-        assert data["valid"] is True
-        assert data["errors"] == []
-
-    def test_validate_content_with_rfc3339_times(self, client: TestClient) -> None:
-        """Test validating content with RFC 3339 datetime format."""
-        valid_content = {
-            "content": {
-                "start_time": "2025-11-06T08:00:00Z",
-                "end_time": "2025-11-06T17:00:00Z",
-                "stations": [
-                    {
-                        "station_id": 1,
-                        "station_name": "Station 1",
-                        "task_count": 1,
-                        "station_position": [45.5, -73.5],
-                    }
-                ],
-                "resources": [
-                    {
-                        "resource_id": 1,
-                        "task_count": 1,
-                        "resource_position": [45.5, -73.5],
-                    }
-                ],
-                "initial_tasks": [],
-                "scheduled_tasks": [],
             }
         }
 
@@ -582,8 +550,8 @@ class TestScenarioValidation:
         """Test validation fails when end_time is before start_time."""
         invalid_content = {
             "content": {
-                "start_time": "12:00",
-                "end_time": "08:00",
+                "start_time": "day1:12:00",
+                "end_time": "day1:08:00",
                 "stations": [],
                 "resources": [],
                 "initial_tasks": [],
@@ -604,8 +572,8 @@ class TestScenarioValidation:
         """Test validation fails with duplicate station IDs."""
         invalid_content = {
             "content": {
-                "start_time": "08:00",
-                "end_time": "12:00",
+                "start_time": "day1:08:00",
+                "end_time": "day1:12:00",
                 "stations": [
                     {
                         "station_id": 1,
@@ -636,8 +604,8 @@ class TestScenarioValidation:
         """Test validation fails when task references non-existent station."""
         invalid_content = {
             "content": {
-                "start_time": "08:00",
-                "end_time": "12:00",
+                "start_time": "day1:08:00",
+                "end_time": "day1:12:00",
                 "stations": [
                     {
                         "station_id": 1,
@@ -664,8 +632,8 @@ class TestScenarioValidation:
         """Test validation endpoint does not require authentication."""
         valid_content = {
             "content": {
-                "start_time": "08:00",
-                "end_time": "12:00",
+                "start_time": "day1:08:00",
+                "end_time": "day1:12:00",
                 "stations": [],
                 "resources": [],
                 "initial_tasks": [],
@@ -688,8 +656,8 @@ class TestValidateScenario:
         """Test validating valid scenario content returns success."""
         valid_content = {
             "content": {
-                "start_time": "08:00",
-                "end_time": "17:00",
+                "start_time": "day1:08:00",
+                "end_time": "day1:17:00",
                 "stations": [
                     {
                         "station_id": 1,
@@ -759,8 +727,8 @@ class TestValidateScenario:
         """Test validating scenario where end_time is before start_time."""
         invalid_content = {
             "content": {
-                "start_time": "17:00",
-                "end_time": "08:00",  # Before start_time
+                "start_time": "day1:17:00",
+                "end_time": "day1:08:00",  # Before start_time
                 "stations": [],
                 "resources": [],
                 "initial_tasks": [],
@@ -774,44 +742,12 @@ class TestValidateScenario:
         assert data["valid"] is False
         assert any("after" in err["message"].lower() for err in data["errors"])
 
-    def test_validate_rfc3339_datetime_format(self, client: TestClient) -> None:
-        """Test validating scenario with RFC 3339 datetime format."""
-        valid_content = {
-            "content": {
-                "start_time": "2025-11-06T08:00:00Z",
-                "end_time": "2025-11-06T17:00:00Z",
-                "stations": [
-                    {
-                        "station_id": 1,
-                        "station_name": "Station A",
-                        "station_position": [45.5, -73.5],
-                        "task_count": 1,
-                    }
-                ],
-                "resources": [
-                    {
-                        "resource_id": 1,
-                        "resource_position": [45.5, -73.5],
-                        "task_count": 1,
-                    }
-                ],
-                "initial_tasks": [{"station_id": "1"}],
-                "scheduled_tasks": [],
-            }
-        }
-
-        response = client.post("/api/v1/scenarios/validate", json=valid_content)
-        assert response.status_code == 200
-        data = response.json()
-        assert data["valid"] is True
-        assert data["errors"] == []
-
     def test_validate_no_authentication_required(self, client: TestClient) -> None:
         """Test that validation endpoint does not require authentication."""
         valid_content = {
             "content": {
-                "start_time": "08:00",
-                "end_time": "17:00",
+                "start_time": "day1:08:00",
+                "end_time": "day1:17:00",
                 "stations": [],
                 "resources": [],
                 "initial_tasks": [],

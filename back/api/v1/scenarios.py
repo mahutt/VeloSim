@@ -95,8 +95,8 @@ def get_scenario_template(
     return {
         "content": {
             "scenario_title": "Example Scenario",
-            "start_time": "08:00",
-            "end_time": "17:00",
+            "start_time": "day1:08:00",
+            "end_time": "day1:17:00",
             "stations": [
                 {
                     "station_id": 1,
@@ -118,34 +118,32 @@ def get_scenario_template(
             "scheduled_tasks": [
                 {
                     "station_id": 1,
-                    "time": 1800,
+                    "time": "day1:08:30",
                 },
                 {
                     "station_id": 1,
-                    "time": 3600,
+                    "time": "day1:09:00",
                 },
             ],
         },
         "description": (
             "Template for scenario creation. Format requirements:\n\n"
             "- scenario_title: Name of the scenario\n"
-            "- start_time: Simple time format (e.g., '08:00', '17:00') "
-            "or RFC 3339 datetime (e.g., '2025-11-06T08:00:00Z')\n"
-            "- end_time: Simple time format or RFC 3339 datetime "
-            "(can span multiple days with RFC 3339 format)\n"
+            "- start_time: Simple time format and day1 "
+            "(e.g., 'day1:08:00', 'day1:17:00')\n"
+            "- end_time: Simple time format with relative day "
+            "(can span multiple days e.g. 'day2:11:00')\n"
             "- stations: List of station objects with id, name, "
             "and position [lon, lat]\n"
             "- resources: List of resource objects with id "
             "and position [lon, lat]\n"
             "- initial_tasks: Tasks to spawn immediately at simulation start.\n"
-            "  * id: OPTIONAL - Auto-generated if omitted\n"
             "  * station_id: Target station ID (integer, required)\n"
             "  * time: NOT REQUIRED (tasks spawn immediately)\n"
             "- scheduled_tasks: Tasks to spawn after a delay.\n"
-            "  * id: OPTIONAL - Auto-generated if omitted\n"
             "  * station_id: Target station ID (integer, required)\n"
-            "  * time: REQUIRED - delay in seconds (numeric, "
-            "e.g., 1800 for 30 min, 3600 for 1 hour)\n\n"
+            "  * time: REQUIRED - Simple time format with relative day "
+            "(e.g., 'day1:09:00', 'day2:10:00' if sim spans multiple days)\n\n"
         ),
     }
 

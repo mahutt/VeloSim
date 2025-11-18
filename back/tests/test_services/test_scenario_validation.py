@@ -29,8 +29,8 @@ from typing import Any, Dict, List
 from back.services.scenario_validation_service import ScenarioValidator
 
 VALID_SCENARIO_CONTENT: Dict[str, Any] = {
-    "start_time": "08:00",
-    "end_time": "12:00",
+    "start_time": "day1:08:00",
+    "end_time": "day1:12:00",
     "stations": [
         {
             "station_id": 1,
@@ -74,8 +74,8 @@ def test_invalid_time_format(validator: ScenarioValidator) -> None:
 
 def test_end_time_before_start_time(validator: ScenarioValidator) -> None:
     scenario_content: Dict[str, Any] = copy.deepcopy(VALID_SCENARIO_CONTENT)
-    scenario_content["start_time"] = "12:00"
-    scenario_content["end_time"] = "08:00"
+    scenario_content["start_time"] = "day1:12:00"
+    scenario_content["end_time"] = "day1:08:00"
     errors: List[Dict[str, str]] = validator.validate_all(scenario_content)
     assert any(e["field"] == "end_time" and "after" in e["message"] for e in errors)
 
@@ -130,31 +130,12 @@ def test_empty_lists(validator: ScenarioValidator) -> None:
     assert isinstance(errors, list)
 
 
-def test_rfc3339_datetime_format(validator: ScenarioValidator) -> None:
-    """Test that RFC 3339 / ISO 8601 datetime strings are accepted."""
-    scenario_content: Dict[str, Any] = copy.deepcopy(VALID_SCENARIO_CONTENT)
-    # Use RFC 3339 format with timezone
-    scenario_content["start_time"] = "2025-11-06T08:00:00Z"
-    scenario_content["end_time"] = "2025-11-06T17:00:00Z"
-    errors: List[Dict[str, str]] = validator.validate_all(scenario_content)
-    assert len(errors) == 0
-
-
 def test_multi_day_scenario(validator: ScenarioValidator) -> None:
     """Test that scenarios spanning multiple days are supported."""
     scenario_content: Dict[str, Any] = copy.deepcopy(VALID_SCENARIO_CONTENT)
     # Start on one day, end on the next
-    scenario_content["start_time"] = "2025-11-06T08:00:00Z"
-    scenario_content["end_time"] = "2025-11-07T08:00:00Z"  # 24 hours later
-    errors: List[Dict[str, str]] = validator.validate_all(scenario_content)
-    assert len(errors) == 0
-
-
-def test_datetime_with_seconds(validator: ScenarioValidator) -> None:
-    """Test that datetime strings with seconds precision are accepted."""
-    scenario_content: Dict[str, Any] = copy.deepcopy(VALID_SCENARIO_CONTENT)
-    scenario_content["start_time"] = "2025-11-06T08:00:00Z"
-    scenario_content["end_time"] = "2025-11-06T17:30:45Z"
+    scenario_content["start_time"] = "day1:08:00"
+    scenario_content["end_time"] = "day2:08:00"  # 24 hours later
     errors: List[Dict[str, str]] = validator.validate_all(scenario_content)
     assert len(errors) == 0
 
@@ -162,19 +143,16 @@ def test_datetime_with_seconds(validator: ScenarioValidator) -> None:
 def test_simple_time_format_still_works(validator: ScenarioValidator) -> None:
     """Test backward compatibility with simple HH:MM format."""
     scenario_content: Dict[str, Any] = copy.deepcopy(VALID_SCENARIO_CONTENT)
-    scenario_content["start_time"] = "08:00"
-    scenario_content["end_time"] = "17:00"
+    scenario_content["start_time"] = "day1:08:00"
+    scenario_content["end_time"] = "day1:17:00"
     errors: List[Dict[str, str]] = validator.validate_all(scenario_content)
     assert len(errors) == 0
 
 
-def test_task_time_with_string_format_rejected(
+def test_task_time_with_string_format_accepted(
     validator: ScenarioValidator,
 ) -> None:
-    """Test that task times reject string formats.
-
-    Simulator expects numeric seconds only.
-    """
+    """Test that task times accept string formats."""
     scenario_content: Dict[str, Any] = copy.deepcopy(VALID_SCENARIO_CONTENT)
     # Ensure we have at least one station with id="1"
     if (
@@ -189,72 +167,18 @@ def test_task_time_with_string_format_rejected(
             }
         ]
 
+    # Test that dayx:HH:MM time format is accepted
+    scenario_content["scheduled_tasks"] = [{"station_id": "1", "time": "day1:08:30"}]
+    errors = validator.validate_all(scenario_content)
+    assert len(errors) == 0
+
     # Test that RFC 3339 time format is rejected
     scenario_content["initial_tasks"] = [
-        {"id": "t1", "station_id": "1", "time": "2025-11-06T10:30:00Z"}
-    ]
-    errors: List[Dict[str, str]] = validator.validate_all(scenario_content)
-    assert len(errors) > 0
-    assert any("numeric seconds" in err["message"] for err in errors)
-
-    # Test that HH:MM time format is rejected
-    scenario_content["scheduled_tasks"] = [
-        {"id": "t2", "station_id": "1", "time": "08:30"}
+        {"station_id": "1", "time": "2025-11-06T10:30:00Z"}
     ]
     errors = validator.validate_all(scenario_content)
     assert len(errors) > 0
-    assert any("numeric seconds" in err["message"] for err in errors)
-
-
-def test_validate_tasks_with_integer_seconds(
-    validator: ScenarioValidator,
-) -> None:
-    """Test that tasks with time in integer seconds format are valid.
-
-    This is the simulator's expected format.
-    """
-    scenario_content: Dict[str, Any] = copy.deepcopy(VALID_SCENARIO_CONTENT)
-
-    # Test initial_tasks with integer seconds (IDs auto-generated)
-    scenario_content["initial_tasks"] = [
-        {"station_id": "1", "time": 600}  # 600 seconds = 10 minutes
-    ]
-    errors: List[Dict[str, str]] = validator.validate_all(scenario_content)
-    assert len(errors) == 0
-
-    # Test scheduled_tasks with integer seconds (IDs auto-generated)
-    scenario_content["scheduled_tasks"] = [
-        {"station_id": "1", "time": 1800},  # 1800 seconds = 30 minutes
-        {"station_id": "1", "time": 3600},  # 3600 seconds = 1 hour
-    ]
-    errors = validator.validate_all(scenario_content)
-    assert len(errors) == 0
-
-
-def test_validate_tasks_with_float_seconds(validator: ScenarioValidator) -> None:
-    """Test that tasks with time in float seconds format are valid."""
-    scenario_content: Dict[str, Any] = copy.deepcopy(VALID_SCENARIO_CONTENT)
-
-    # Test scheduled_tasks with float seconds (IDs auto-generated)
-    scenario_content["scheduled_tasks"] = [
-        {"station_id": "1", "time": 1800.5},  # 1800.5 seconds
-        {"station_id": "1", "time": 3600.75},  # 3600.75 seconds
-    ]
-    errors: List[Dict[str, str]] = validator.validate_all(scenario_content)
-    assert len(errors) == 0
-
-
-def test_validate_tasks_with_negative_seconds(validator: ScenarioValidator) -> None:
-    """Test that tasks with negative time in seconds are invalid."""
-    scenario_content: Dict[str, Any] = copy.deepcopy(VALID_SCENARIO_CONTENT)
-
-    # Test scheduled_tasks with negative seconds (ID auto-generated)
-    scenario_content["scheduled_tasks"] = [
-        {"station_id": "1", "time": -600},  # negative seconds
-    ]
-    errors: List[Dict[str, str]] = validator.validate_all(scenario_content)
-    assert len(errors) > 0
-    assert any("cannot be negative" in err["message"].lower() for err in errors)
+    assert any("Invalid time format" in err["message"] for err in errors)
 
 
 def test_validate_initial_tasks_time_optional(validator: ScenarioValidator) -> None:
@@ -270,8 +194,8 @@ def test_validate_initial_tasks_time_optional(validator: ScenarioValidator) -> N
     assert len(errors) == 0
 
 
-def test_validate_tasks_id_optional(validator: ScenarioValidator) -> None:
-    """Test that id field is optional for tasks (auto-generated by simulator)."""
+def test_validate_scenario_with_no_task_id(validator: ScenarioValidator) -> None:
+    """Test that id field works without it for tasks (auto-generated by simulator)."""
     scenario_content: Dict[str, Any] = copy.deepcopy(VALID_SCENARIO_CONTENT)
 
     # Test initial_tasks without id field
@@ -279,26 +203,29 @@ def test_validate_tasks_id_optional(validator: ScenarioValidator) -> None:
         {"station_id": "1"},  # No id field - will be auto-generated
     ]
     scenario_content["scheduled_tasks"] = [
-        {"station_id": "1", "time": 1800},  # No id field - will be auto-generated
+        {
+            "station_id": "1",
+            "time": "day1:08:30",
+        },  # No id field - will be auto-generated
     ]
     errors: List[Dict[str, str]] = validator.validate_all(scenario_content)
     assert len(errors) == 0
 
 
 def test_validate_tasks_with_explicit_ids(validator: ScenarioValidator) -> None:
-    """Test that specifying task IDs produces warnings (IDs are auto-generated)."""
+    """Test that specifying task IDs produces errors (IDs are auto-generated)."""
     scenario_content: Dict[str, Any] = copy.deepcopy(VALID_SCENARIO_CONTENT)
 
-    # Test with explicit IDs - should produce warnings
+    # Test with explicit IDs - should produce errors
     scenario_content["initial_tasks"] = [
         {"id": "t1", "station_id": "1"},
     ]
     scenario_content["scheduled_tasks"] = [
-        {"id": "t2", "station_id": "1", "time": 1800},
+        {"id": "t2", "station_id": "1", "time": "day1:08:30"},
     ]
     errors: List[Dict[str, str]] = validator.validate_all(scenario_content)
 
-    # Should have 2 warnings (one for each task with ID)
+    # Should have 2 errors (one for each task with ID)
     assert len(errors) == 2
     for error in errors:
         assert "auto-generated" in error["message"].lower()
@@ -309,8 +236,8 @@ def test_validation_with_line_numbers() -> None:
     """Test line numbers in validation errors with JSON string."""
     json_string = """{
   "content": {
-    "start_time": "08:00",
-    "end_time": "12:00",
+    "start_time": "day1:08:00",
+    "end_time": "day1:12:00",
     "stations": [
       {
         "station_id": 1,

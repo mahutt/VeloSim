@@ -65,81 +65,94 @@ class StationValidator(BaseModel):
 class TaskValidator(BaseModel):
     id: str | None = None
     station_id: int
-    time: int | float | None = None
+    time: str | None = None
 
     @field_validator("time", mode="before")
     @classmethod
-    def parse_time(cls, v: Any) -> int | float | None:
-        """Parse time in simulator format.
+    def parse_time(cls, v: Any) -> str | None:
+        """Parse time to validate valid fomat.
+
+        Supports: Simple time strings with relative day value (e.g., "day1:08:00")
 
         Simulator expects:
         - None or omitted for initial_tasks (spawns immediately)
-        - Integer/float seconds for scheduled_tasks (e.g., 600, 1800.5)
-
-        This validator enforces the simulator's expected format as the source of truth.
+        - Simple time strings with relative day value for scheduled_tasks
+        (e.g., "day1:08:00")
         """
-        if v is None:
-            return v
-
-        # Accept only numeric seconds (simulator format)
-        if isinstance(v, (int, float)):
-            if v < 0:
-                raise ValueError("Time in seconds cannot be negative")
-            return v
-
-        # Reject string formats - simulator doesn't accept them
         if isinstance(v, str):
-            raise ValueError(
-                f"Time must be numeric seconds (e.g., 600, 1800), not string '{v}'. "
-                "The simulator expects numeric seconds only."
-            )
+            try:
+                daytime_str = v.split(":", 1)
+                if daytime_str[0] == v:
+                    raise Exception(f"Invalid time format: {v}.")
+                day_str = daytime_str[0]
+                time_str = daytime_str[1]
 
-        raise ValueError(
-            f"Time must be numeric seconds or None, got {type(v).__name__}"
-        )
+                # validate day_str
+                pattern = r"^day\d+$"
+                if re.match(pattern, day_str, re.IGNORECASE) is None:
+                    raise Exception(
+                        f"Invalid time format due provided day {day_str} in {v}."
+                    )
+
+                # validate time_str
+                try:
+                    datetime.strptime(time_str, "%H:%M").time()
+                except Exception:
+                    raise Exception(
+                        f"Invalid time format due provided time {time_str} in {v}."
+                    )
+            except Exception as e:
+                raise ValueError(
+                    f"""{e} Retry by using a relative day number
+                    and simple time format (e.g. 'day1:08:00')"""
+                )
+            return v
+        else:
+            raise ValueError(f"Time must be a string or None, got {type(v)}")
 
 
 class ScenarioTimes(BaseModel):
-    start_time: datetime
-    end_time: datetime
+    start_time: str
+    end_time: str
 
     @field_validator("start_time", "end_time", mode="before")
     @classmethod
-    def parse_time(cls, v: Any) -> datetime:
-        """Parse time from various formats to datetime object.
+    def parse_time(cls, v: Any) -> str:
+        """Parse time to validate valid fomat.
 
-        Supports:
-        - RFC 3339 / ISO 8601 datetime strings
-          (e.g., "2025-11-06T08:00:00Z")
-        - Simple time strings (e.g., "08:00") - converted to today's date
-        - datetime objects (passed through)
+        Supports: Simple time strings with relative day value (e.g., "day1:08:00")
         """
-        if isinstance(v, datetime):
-            return v
 
         if isinstance(v, str):
-            # Try RFC 3339 / ISO 8601 format first
             try:
-                return datetime.fromisoformat(v.replace("Z", "+00:00"))
-            except ValueError:
-                pass
+                daytime_str = v.split(":", 1)
+                if daytime_str[0] == v:
+                    raise Exception(f"Invalid time format: {v}.")
+                day_str = daytime_str[0]
+                time_str = daytime_str[1]
 
-            # Try simple time format (HH:MM or HH:MM:SS)
-            for fmt in ["%H:%M:%S", "%H:%M"]:
+                # validate day_str
+                pattern = r"^day\d+$"
+                if re.match(pattern, day_str, re.IGNORECASE) is None:
+                    raise Exception(
+                        f"Invalid time format due provided day {day_str} in {v}."
+                    )
+
+                # validate time_str
                 try:
-                    parsed_time = datetime.strptime(v, fmt).time()
-                    # Combine with today's date
-                    return datetime.combine(datetime.today().date(), parsed_time)
-                except ValueError:
-                    continue
-
-            raise ValueError(
-                f"Invalid time format: {v}. Use RFC 3339 format "
-                "(e.g., '2025-11-06T08:00:00Z') or simple time "
-                "(e.g., '08:00')"
-            )
-
-        raise ValueError(f"Time must be a string or datetime, got {type(v)}")
+                    datetime.strptime(time_str, "%H:%M").time()
+                except Exception:
+                    raise Exception(
+                        f"Invalid time format due provided time {time_str} in {v}."
+                    )
+                return v
+            except Exception as e:
+                raise ValueError(
+                    f"""{e} Retry by using a relative day number
+                    and simple time format (e.g. 'day1:08:00')"""
+                )
+        else:
+            raise ValueError(f"Time must be a string, got {type(v)}")
 
 
 class ScenarioValidator:
@@ -394,11 +407,12 @@ class ScenarioValidator:
     def validate_simulation_params(
         self, params: Dict[str, Any]
     ) -> List[Dict[str, Any]]:
-        """Validate simulation time parameters.
+        """
+        Validate simulation time parameters.
 
         Ensures start_time and end_time are valid and that end_time is after start_time.
-        Simulations cannot span more than 24 hours.
         """
+
         errors: List[Dict[str, Any]] = []
         start_val: Any = params.get("start_time")
         end_val: Any = params.get("end_time")
@@ -409,7 +423,25 @@ class ScenarioValidator:
                 scenario_times = ScenarioTimes(start_time=start_val, end_time=end_val)
 
                 # Validate that end_time is after start_time
-                if scenario_times.end_time <= scenario_times.start_time:
+                start_daytime = scenario_times.start_time.split(":", 1)
+                start_day = start_daytime[0]
+                start_time = start_daytime[1]
+                end_daytime = scenario_times.end_time.split(":", 1)
+                end_day = end_daytime[0]
+                end_time = end_daytime[1]
+                error = False
+
+                if start_day == end_day:  # if start and end are on the same day
+                    st = datetime.strptime(start_time, "%H:%M").time()
+                    et = datetime.strptime(end_time, "%H:%M").time()
+                    if et <= st:
+                        error = True
+                else:  # if start and end not on the same day
+                    sd = start_day[-1]
+                    ed = end_day[-1]
+                    if ed < sd:
+                        error = True
+                if error:
                     time_error: Dict[str, Any] = {
                         "field": "end_time",
                         "message": "end_time must be after start_time",
@@ -418,18 +450,6 @@ class ScenarioValidator:
                     if line_num:
                         time_error["line"] = line_num
                     errors.append(time_error)
-
-                # Validate that simulation doesn't span more than 24 hours
-                duration = scenario_times.end_time - scenario_times.start_time
-                if duration.total_seconds() > 86400:  # 24 hours in seconds
-                    duration_error: Dict[str, Any] = {
-                        "field": "end_time",
-                        "message": "Simulation duration cannot exceed 24 hours",
-                    }
-                    line_num = self._get_line_number("end_time")
-                    if line_num:
-                        duration_error["line"] = line_num
-                    errors.append(duration_error)
             except ValidationError as e:
                 for err in e.errors():
                     field_path = ".".join(map(str, err["loc"]))
