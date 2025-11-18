@@ -785,3 +785,132 @@ def test_stop_all_stops_everything_and_is_idempotent(
 
     # Idempotency: calling again should not raise
     sim.stop_all(join_timeout_per_thread=0.2)
+
+
+def test_reorder_resource_tasks_success(
+    sim: Simulator,
+    input_params: InputParameter,
+    monkeypatch: Any,
+) -> None:
+    """Test successful task reordering via Simulator."""
+    # Set OSRM URL
+    monkeypatch.setenv("OSRM_URL", "http://localhost:5000")
+
+    with (
+        patch(
+            "sim.osm.OSRMConnection.OSRMConnection._verify_osrm_connection",
+            return_value=True,
+        ),
+    ):
+        sim_id = sim.initialize(input_params, [], FakeSimBehaviour())
+
+    # Get the controller and resource
+    sim_info = sim.get_sim_by_id(sim_id)
+    assert sim_info is not None
+    controller = sim_info["simController"]
+    resource = controller.get_resource_by_id(1)
+    assert resource is not None
+
+    # Set up tasks
+    resource.task_list.clear()
+    task1 = controller.get_task_by_id(1)
+    task2 = controller.get_task_by_id(2)
+    assert task1 is not None
+    assert task2 is not None
+    resource.task_list = [task1, task2]
+
+    # Reorder tasks via Simulator
+    new_order = sim.reorder_resource_tasks(
+        sim_id=sim_id, resource_id=1, task_ids_to_reorder=[2, 1], apply_from_top=True
+    )
+
+    assert new_order == [2, 1]
+    assert resource.task_list == [task2, task1]
+
+
+def test_reorder_resource_tasks_simulation_not_found(
+    sim: Simulator,
+) -> None:
+    """Test reordering with invalid sim_id raises exception."""
+    with pytest.raises(Exception, match="Simulation invalid-sim-id does not exist"):
+        sim.reorder_resource_tasks(
+            sim_id="invalid-sim-id",
+            resource_id=1,
+            task_ids_to_reorder=[1, 2],
+            apply_from_top=True,
+        )
+
+
+def test_reorder_resource_tasks_resource_not_found(
+    sim: Simulator,
+    input_params: InputParameter,
+    monkeypatch: Any,
+) -> None:
+    """Test reordering with invalid resource_id raises exception."""
+    monkeypatch.setenv("OSRM_URL", "http://localhost:5000")
+
+    with (
+        patch(
+            "sim.osm.OSRMConnection.OSRMConnection._verify_osrm_connection",
+            return_value=True,
+        ),
+    ):
+        sim_id = sim.initialize(input_params, [], FakeSimBehaviour())
+
+    with pytest.raises(Exception, match="Could not find resource in sim with id: 999"):
+        sim.reorder_resource_tasks(
+            sim_id=sim_id,
+            resource_id=999,
+            task_ids_to_reorder=[1, 2],
+            apply_from_top=True,
+        )
+
+
+def test_reorder_resource_tasks_with_thread_lock(
+    sim: Simulator,
+    input_params: InputParameter,
+    monkeypatch: Any,
+) -> None:
+    """Test that reorder acquires thread pool lock."""
+    monkeypatch.setenv("OSRM_URL", "http://localhost:5000")
+
+    with (
+        patch(
+            "sim.osm.OSRMConnection.OSRMConnection._verify_osrm_connection",
+            return_value=True,
+        ),
+    ):
+        sim_id = sim.initialize(input_params, [], FakeSimBehaviour())
+
+    # Get the controller and resource
+    sim_info = sim.get_sim_by_id(sim_id)
+    assert sim_info is not None
+    controller = sim_info["simController"]
+    resource = controller.get_resource_by_id(1)
+    assert resource is not None
+
+    # Set up tasks
+    resource.task_list.clear()
+    task1 = controller.get_task_by_id(1)
+    task2 = controller.get_task_by_id(2)
+    assert task1 is not None
+    assert task2 is not None
+    resource.task_list = [task1, task2]
+
+    # Mock the lock to verify it's being used
+    original_lock = sim.thread_pool_lock
+    mock_lock = MagicMock(wraps=original_lock)
+    sim.thread_pool_lock = mock_lock
+
+    # Reorder tasks
+    new_order = sim.reorder_resource_tasks(
+        sim_id=sim_id, resource_id=1, task_ids_to_reorder=[2], apply_from_top=True
+    )
+
+    # Verify lock was acquired
+    mock_lock.__enter__.assert_called_once()
+    mock_lock.__exit__.assert_called_once()
+    assert new_order == [2, 1]
+
+    # Restore original lock
+    sim.thread_pool_lock = original_lock

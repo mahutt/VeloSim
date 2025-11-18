@@ -1101,6 +1101,129 @@ class TestSimulationAPI:
         assert response.status_code == 404
 
 
+class TestReorderTasks:
+    """Tests for the reorder tasks endpoint."""
+
+    @pytest.fixture
+    def mock_reorder(self) -> Generator[MagicMock, None, None]:
+        """Mock the resource_service.reorder_tasks method."""
+        with patch(
+            "back.api.v1.simulation.resource_service.reorder_tasks"
+        ) as mock_reorder:
+            yield mock_reorder
+
+    def test_reorder_tasks_success(
+        self,
+        mock_reorder: MagicMock,
+        authenticated_client: TestClient,
+        active_sim_id: str,
+    ) -> None:
+        """Test successful task reordering."""
+        from back.schemas import ResourceTaskReorderResponse
+
+        mock_reorder.return_value = ResourceTaskReorderResponse(
+            resource_id=5, task_order=[3, 1, 2, 4]
+        )
+        payload = {"resource_id": 5, "task_ids": [3, 1], "apply_from_top": True}
+        response = authenticated_client.post(
+            f"/api/v1/simulation/{active_sim_id}/resources/reorder-tasks", json=payload
+        )
+        assert response.status_code == 200
+        data = response.json()
+        assert data["resource_id"] == 5
+        assert data["task_order"] == [3, 1, 2, 4]
+        mock_reorder.assert_called_once()
+
+    def test_reorder_tasks_bottom_mode(
+        self,
+        mock_reorder: MagicMock,
+        authenticated_client: TestClient,
+        active_sim_id: str,
+    ) -> None:
+        """Test task reordering with bottom mode."""
+        from back.schemas import ResourceTaskReorderResponse
+
+        mock_reorder.return_value = ResourceTaskReorderResponse(
+            resource_id=5, task_order=[2, 4, 1, 3]
+        )
+        payload = {"resource_id": 5, "task_ids": [3, 1], "apply_from_top": False}
+        response = authenticated_client.post(
+            f"/api/v1/simulation/{active_sim_id}/resources/reorder-tasks", json=payload
+        )
+        assert response.status_code == 200
+        data = response.json()
+        assert data["task_order"] == [2, 4, 1, 3]
+
+    def test_reorder_tasks_permission_error(
+        self,
+        mock_reorder: MagicMock,
+        authenticated_client: TestClient,
+        active_sim_id: str,
+    ) -> None:
+        """Test reorder with permission denied."""
+        mock_reorder.side_effect = VelosimPermissionError(
+            "Unauthorized to access this simulation"
+        )
+        payload = {"resource_id": 5, "task_ids": [1, 2], "apply_from_top": True}
+        response = authenticated_client.post(
+            f"/api/v1/simulation/{active_sim_id}/resources/reorder-tasks", json=payload
+        )
+        assert response.status_code == 403
+
+    def test_reorder_tasks_resource_not_found(
+        self,
+        mock_reorder: MagicMock,
+        authenticated_client: TestClient,
+        active_sim_id: str,
+    ) -> None:
+        """Test reorder with resource not found."""
+        mock_reorder.side_effect = ItemNotFoundError("Resource not found")
+        payload = {"resource_id": 999, "task_ids": [1, 2], "apply_from_top": True}
+        response = authenticated_client.post(
+            f"/api/v1/simulation/{active_sim_id}/resources/reorder-tasks", json=payload
+        )
+        assert response.status_code == 404
+
+    def test_reorder_tasks_runtime_error(
+        self,
+        mock_reorder: MagicMock,
+        authenticated_client: TestClient,
+        active_sim_id: str,
+    ) -> None:
+        """Test reorder with runtime error."""
+        mock_reorder.side_effect = RuntimeError("Invalid reorder request")
+        payload = {"resource_id": 5, "task_ids": [1, 2], "apply_from_top": True}
+        response = authenticated_client.post(
+            f"/api/v1/simulation/{active_sim_id}/resources/reorder-tasks", json=payload
+        )
+        assert response.status_code == 500
+
+    def test_reorder_tasks_empty_list_validation(
+        self,
+        authenticated_client: TestClient,
+        active_sim_id: str,
+    ) -> None:
+        """Test that empty task_ids list is rejected at schema level."""
+        payload = {"resource_id": 5, "task_ids": [], "apply_from_top": True}
+        response = authenticated_client.post(
+            f"/api/v1/simulation/{active_sim_id}/resources/reorder-tasks", json=payload
+        )
+        # Should fail validation (422 Unprocessable Entity)
+        assert response.status_code == 422
+
+    def test_reorder_tasks_missing_required_fields(
+        self,
+        authenticated_client: TestClient,
+        active_sim_id: str,
+    ) -> None:
+        """Test that missing required fields are rejected."""
+        payload = {"resource_id": 5}  # Missing task_ids and apply_from_top
+        response = authenticated_client.post(
+            f"/api/v1/simulation/{active_sim_id}/resources/reorder-tasks", json=payload
+        )
+        assert response.status_code == 422
+
+
 class TestSimulationListIntegration:
     """Integration tests for simulation listing with full flow."""
 

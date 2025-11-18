@@ -45,9 +45,11 @@ from back.schemas import (
     ResourceTaskAssignRequest,
     ResourceTaskUnassignRequest,
     ResourceTaskReassignRequest,
+    ResourceTaskReorderRequest,
     ResourceTaskAssignResponse,
     ResourceTaskUnassignResponse,
     ResourceTaskReassignResponse,
+    ResourceTaskReorderResponse,
 )
 from sqlalchemy.orm import Session
 
@@ -341,6 +343,33 @@ def reassign_task_between_resources(
             sim_id=sim_id,
             requesting_user=requesting_user,
             task_reassign_data=task_reassign_data,
+        )
+    except ItemNotFoundError as err:
+        raise HTTPException(status_code=404, detail=str(err))
+    except VelosimPermissionError as err:
+        raise HTTPException(status_code=403, detail=str(err))
+    except RuntimeError as err:
+        raise HTTPException(status_code=500, detail=str(err))
+
+
+@router.post(
+    "/{sim_id}/resources/reorder-tasks",
+    status_code=200,
+    response_model=ResourceTaskReorderResponse,
+)
+def reorder_resource_tasks(
+    sim_id: str,
+    reorder_data: ResourceTaskReorderRequest,
+    requesting_user: int = Depends(get_user_id),
+    db: Session = Depends(get_db),
+) -> ResourceTaskReorderResponse:
+    """Reorder tasks in a resource's task list within a running simulation."""
+    try:
+        return resource_service.reorder_tasks(
+            db=db,
+            sim_id=sim_id,
+            requesting_user=requesting_user,
+            reorder_data=reorder_data,
         )
     except ItemNotFoundError as err:
         raise HTTPException(status_code=404, detail=str(err))

@@ -24,6 +24,7 @@ SOFTWARE.
 
 import pytest
 import simpy
+from typing import Any
 from sim.entities.resource import Resource
 from sim.entities.position import Position
 from sim.entities.BatterySwapTask import BatterySwapTask
@@ -326,3 +327,200 @@ class TestResource:
 
         resource.clear_update()
         assert resource.has_updated == False
+
+    # Tests for reorder_tasks
+
+    def test_reorder_tasks_empty_list_raises_error(
+        self, simpy_env: simpy.Environment, default_position: Position
+    ) -> None:
+        """Test that empty task_ids list raises ValueError."""
+        task1 = BatterySwapTask(simpy_env, 1)
+        task2 = BatterySwapTask(simpy_env, 2)
+        resource = Resource(simpy_env, 1, default_position, [task1, task2])
+
+        with pytest.raises(ValueError, match="task_ids_to_reorder cannot be empty"):
+            resource.reorder_tasks([], apply_from_top=True)
+
+    def test_reorder_tasks_duplicate_ids_raises_error(
+        self, simpy_env: simpy.Environment, default_position: Position
+    ) -> None:
+        """Test that duplicate task IDs raise ValueError."""
+        task1 = BatterySwapTask(simpy_env, 1)
+        task2 = BatterySwapTask(simpy_env, 2)
+        task3 = BatterySwapTask(simpy_env, 3)
+        resource = Resource(simpy_env, 1, default_position, [task1, task2, task3])
+
+        with pytest.raises(ValueError, match="contains duplicate task IDs"):
+            resource.reorder_tasks([1, 2, 1], apply_from_top=True)
+
+    def test_reorder_tasks_top_mode_basic(
+        self, simpy_env: simpy.Environment, default_position: Position
+    ) -> None:
+        """Test basic top mode reordering without in-progress tasks."""
+        task1 = BatterySwapTask(simpy_env, 1)
+        task2 = BatterySwapTask(simpy_env, 2)
+        task3 = BatterySwapTask(simpy_env, 3)
+        task4 = BatterySwapTask(simpy_env, 4)
+        resource = Resource(
+            simpy_env, 1, default_position, [task1, task2, task3, task4]
+        )
+
+        # Reorder: want [3, 1] at top, then [2, 4] unspecified
+        new_order = resource.reorder_tasks([3, 1], apply_from_top=True)
+
+        assert new_order == [3, 1, 2, 4]
+        assert resource.task_list == [task3, task1, task2, task4]
+        assert resource.has_updated == True
+
+    def test_reorder_tasks_bottom_mode_basic(
+        self, simpy_env: simpy.Environment, default_position: Position
+    ) -> None:
+        """Test basic bottom mode reordering (reversed at end)."""
+        task1 = BatterySwapTask(simpy_env, 1)
+        task2 = BatterySwapTask(simpy_env, 2)
+        task3 = BatterySwapTask(simpy_env, 3)
+        task4 = BatterySwapTask(simpy_env, 4)
+        resource = Resource(
+            simpy_env, 1, default_position, [task1, task2, task3, task4]
+        )
+
+        # Reorder: unspecified [2, 4], then reversed([3, 1]) = [1, 3]
+        new_order = resource.reorder_tasks([3, 1], apply_from_top=False)
+
+        assert new_order == [2, 4, 1, 3]
+        assert resource.task_list == [task2, task4, task1, task3]
+        assert resource.has_updated == True
+
+    def test_reorder_tasks_with_in_progress_pinned_to_top(
+        self, simpy_env: simpy.Environment, default_position: Position
+    ) -> None:
+        """Test that IN_PROGRESS tasks are always pinned to top."""
+        task1 = BatterySwapTask(simpy_env, 1)
+        task2 = BatterySwapTask(simpy_env, 2)
+        task3 = BatterySwapTask(simpy_env, 3)
+        task4 = BatterySwapTask(simpy_env, 4)
+        task5 = BatterySwapTask(simpy_env, 5)
+
+        resource = Resource(
+            simpy_env, 1, default_position, [task1, task2, task3, task4, task5]
+        )
+
+        # Set task2 and task4 as IN_PROGRESS (after Resource creation)
+        task2.set_state(State.IN_PROGRESS)
+        task4.set_state(State.IN_PROGRESS)
+
+        # Reorder with top mode: [5, 3, 1]
+        # Original: [1, 2*, 3, 4*, 5] (* = in-progress)
+        # Expected: [2*, 4*] (in-progress, original order),
+        #           [5, 3, 1] (specified), [] (unspecified)
+        new_order = resource.reorder_tasks([5, 3, 1], apply_from_top=True)
+
+        assert new_order == [2, 4, 5, 3, 1]
+        assert resource.task_list == [task2, task4, task5, task3, task1]
+
+    def test_reorder_tasks_with_in_progress_in_specified_list(
+        self, simpy_env: simpy.Environment, default_position: Position
+    ) -> None:
+        """Test that if a specified task is IN_PROGRESS, it stays at top."""
+        task1 = BatterySwapTask(simpy_env, 1)
+        task2 = BatterySwapTask(simpy_env, 2)
+        task3 = BatterySwapTask(simpy_env, 3)
+        task4 = BatterySwapTask(simpy_env, 4)
+
+        resource = Resource(
+            simpy_env, 1, default_position, [task1, task2, task3, task4]
+        )
+
+        # Set task2 as IN_PROGRESS (after Resource creation)
+        task2.set_state(State.IN_PROGRESS)
+
+        # Try to reorder including task2 (which is in-progress)
+        # Original: [1, 2*, 3, 4] (* = in-progress)
+        # Specified: [4, 2, 1], but 2 is in-progress so excluded from specified
+        # Expected: [2*] (in-progress), [4, 1] (specified), [3] (unspecified)
+        new_order = resource.reorder_tasks([4, 2, 1], apply_from_top=True)
+
+        assert new_order == [2, 4, 1, 3]
+        assert resource.task_list == [task2, task4, task1, task3]
+
+    def test_reorder_tasks_bottom_mode_with_in_progress(
+        self, simpy_env: simpy.Environment, default_position: Position
+    ) -> None:
+        """Test bottom mode with in-progress tasks pinned."""
+        task1 = BatterySwapTask(simpy_env, 1)
+        task2 = BatterySwapTask(simpy_env, 2)
+        task3 = BatterySwapTask(simpy_env, 3)
+        task4 = BatterySwapTask(simpy_env, 4)
+        task5 = BatterySwapTask(simpy_env, 5)
+
+        resource = Resource(
+            simpy_env, 1, default_position, [task1, task2, task3, task4, task5]
+        )
+
+        # Set task2 as IN_PROGRESS (after Resource creation)
+        task2.set_state(State.IN_PROGRESS)
+
+        # Bottom mode: [5, 3]
+        # Original: [1, 2*, 3, 4, 5] (* = in-progress)
+        # Expected: [2*] (in-progress), [1, 4] (unspecified, original order),
+        #           reversed([5, 3]) = [3, 5]
+        new_order = resource.reorder_tasks([5, 3], apply_from_top=False)
+
+        assert new_order == [2, 1, 4, 3, 5]
+        assert resource.task_list == [task2, task1, task4, task3, task5]
+
+    def test_reorder_tasks_invalid_task_ids_ignored_with_warning(
+        self, simpy_env: simpy.Environment, default_position: Position, caplog: Any
+    ) -> None:
+        """Test that invalid task IDs are ignored and warning logged."""
+        task1 = BatterySwapTask(simpy_env, 1)
+        task2 = BatterySwapTask(simpy_env, 2)
+        task3 = BatterySwapTask(simpy_env, 3)
+
+        resource = Resource(simpy_env, 1, default_position, [task1, task2, task3])
+
+        # Include invalid task ID 99
+        new_order = resource.reorder_tasks([3, 99, 1], apply_from_top=True)
+
+        # Task 99 should be ignored
+        assert new_order == [3, 1, 2]
+        assert resource.task_list == [task3, task1, task2]
+
+        # Check warning was logged
+        assert "Task 99 not in resource 1 task list" in caplog.text
+
+    def test_reorder_tasks_all_tasks_specified(
+        self, simpy_env: simpy.Environment, default_position: Position
+    ) -> None:
+        """Test reordering when all tasks are specified."""
+        task1 = BatterySwapTask(simpy_env, 1)
+        task2 = BatterySwapTask(simpy_env, 2)
+        task3 = BatterySwapTask(simpy_env, 3)
+
+        resource = Resource(simpy_env, 1, default_position, [task1, task2, task3])
+
+        # Specify all tasks in reverse order
+        new_order = resource.reorder_tasks([3, 2, 1], apply_from_top=True)
+
+        assert new_order == [3, 2, 1]
+        assert resource.task_list == [task3, task2, task1]
+
+    def test_reorder_tasks_partial_list_resilience(
+        self, simpy_env: simpy.Environment, default_position: Position
+    ) -> None:
+        """Test that partial list handles tasks gracefully."""
+        task1 = BatterySwapTask(simpy_env, 1)
+        task2 = BatterySwapTask(simpy_env, 2)
+        task3 = BatterySwapTask(simpy_env, 3)
+        task4 = BatterySwapTask(simpy_env, 4)
+
+        resource = Resource(
+            simpy_env, 1, default_position, [task1, task2, task3, task4]
+        )
+
+        # Only reorder 2 tasks, others should maintain order
+        new_order = resource.reorder_tasks([4, 2], apply_from_top=True)
+
+        # Expected: [4, 2] (specified), [1, 3] (unspecified in original order)
+        assert new_order == [4, 2, 1, 3]
+        assert resource.task_list == [task4, task2, task1, task3]

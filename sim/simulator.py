@@ -206,6 +206,38 @@ class Simulator:
         except Exception as e:
             print(f"Error occurred: {e}")
 
+    def reorder_resource_tasks(
+        self,
+        sim_id: str,
+        resource_id: int,
+        task_ids_to_reorder: list[int],
+        apply_from_top: bool,
+    ) -> list[int]:
+        """
+        Reorder tasks in a resource's task list.
+
+        Args:
+            sim_id: Simulation ID
+            resource_id: ID of the resource whose tasks should be reordered
+            task_ids_to_reorder: Partial list of task IDs to reorder
+            apply_from_top: If True, specified tasks inserted after in-progress.
+                           If False, specified tasks appended to end (reversed).
+
+        Returns:
+            List of task IDs in the new order
+
+        Raises:
+            Exception: If simulation, resource not found, or reordering fails
+        """
+        with self.thread_pool_lock:
+            sim_info = self.get_sim_by_id(sim_id)
+            if sim_info is not None:
+                return sim_info["simController"].reorder_resource_tasks(
+                    resource_id, task_ids_to_reorder, apply_from_top
+                )
+            else:
+                raise Exception(f"Simulation {sim_id} not found")
+
     # For later use, we will be implementing a stream
     # type for continuous communication between BE and SIM (i.e. Frames)
     def get_stream(

@@ -204,6 +204,31 @@ class SimulatorController:
             else:
                 raise Exception(f"Reassigning task failed due to error {e}")
 
+    def reorder_resource_tasks(
+        self, resource_id: int, task_ids_to_reorder: list[int], apply_from_top: bool
+    ) -> list[int]:
+        """
+        Reorder tasks in a resource's task list.
+
+        Args:
+            resource_id: ID of the resource whose tasks should be reordered
+            task_ids_to_reorder: Partial list of task IDs to reorder
+            apply_from_top: If True, specified tasks inserted after in-progress.
+                           If False, specified tasks appended to end (reversed).
+
+        Returns:
+            List of task IDs in the new order
+
+        Raises:
+            Exception: If resource not found or reordering fails
+        """
+        found_resource = self.get_resource_by_id(resource_id)
+
+        if found_resource:
+            return found_resource.reorder_tasks(task_ids_to_reorder, apply_from_top)
+        else:
+            raise Exception(f"Could not find resource in sim with id: {resource_id}")
+
     # First frame sent from back to front end with station data, etc
     def emit_initial_frame(self) -> None:
         frame = self.create_key_frame()

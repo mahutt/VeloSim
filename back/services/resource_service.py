@@ -35,6 +35,8 @@ from back.schemas import (
     ResourceTaskReassignResponse,
     ResourceTaskUnassignRequest,
     ResourceTaskUnassignResponse,
+    ResourceTaskReorderRequest,
+    ResourceTaskReorderResponse,
 )
 from sqlalchemy.orm import Session
 
@@ -264,6 +266,75 @@ class ResourceService:
             task_id=task_reassign_data.task_id,
             old_resource_id=task_reassign_data.old_resource_id,
             new_resource_id=task_reassign_data.new_resource_id,
+        )
+
+    def reorder_tasks(
+        self,
+        db: Session,
+        sim_id: str,
+        requesting_user: int,
+        reorder_data: ResourceTaskReorderRequest,
+    ) -> ResourceTaskReorderResponse:
+        """
+        Reorder tasks in a resource's task list within a running simulation instance.
+
+        Note:
+            This method operates on runtime simulation objects (in-memory IDs).
+            The `requesting_user` parameter refers to a database user ID.
+
+        Args:
+            db: Database session
+            sim_id: UUID of the active in-memory simulation
+            requesting_user: Database ID of the user performing the action
+            reorder_data: Data containing resource ID, task IDs, and reorder mode
+
+        Returns:
+            ResourceTaskReorderResponse: Confirmation with complete new task order.
+
+        Raises:
+            VelosimPermissionError: If the user cannot access this simulation.
+            ItemNotFoundError: If the resource does not exist in the simulation.
+            RuntimeError: If reordering fails for any other reason.
+        """
+
+        # Verify that the requesting user has permission to access the sim
+        if not simulation_service.verify_access(db, sim_id, requesting_user):
+            raise VelosimPermissionError("Unauthorized to access this simulation")
+
+        # Get the simulator manager that tracks all active simulations
+        sim_data = simulation_service.active_simulations.get(sim_id)
+        if not sim_data:
+            raise ItemNotFoundError(sim_id, "Simulation not found")
+
+        simulator = sim_data.get("simulator")
+        if simulator is None:
+            raise RuntimeError(f"Simulator for simulation {sim_id} not found")
+
+        try:
+            new_task_order = simulator.reorder_resource_tasks(
+                sim_id=sim_id,
+                resource_id=reorder_data.resource_id,
+                task_ids_to_reorder=reorder_data.task_ids,
+                apply_from_top=reorder_data.apply_from_top,
+            )
+        except ValueError as err:
+            # Validation errors (empty list, duplicates)
+            raise RuntimeError(f"Invalid reorder request: {err}") from err
+        except Exception as err:
+            # Inspect the error message to return a specific Error
+            msg = str(err)
+            if "Could not find resource" in msg:
+                raise ItemNotFoundError(
+                    f"Resource {reorder_data.resource_id} not found"
+                ) from err
+            else:
+                # The error is internal
+                raise RuntimeError(f"Failed operation: {err}") from err
+
+        # Return a confirmation message with the new task order
+        return ResourceTaskReorderResponse(
+            resource_id=reorder_data.resource_id,
+            task_order=new_task_order,
         )
 
 

@@ -35,6 +35,8 @@ from back.schemas import (
     ResourceTaskUnassignResponse,
     ResourceTaskReassignRequest,
     ResourceTaskReassignResponse,
+    ResourceTaskReorderRequest,
+    ResourceTaskReorderResponse,
 )
 from back.exceptions import VelosimPermissionError, ItemNotFoundError
 from sim.simulator import Simulator
@@ -261,3 +263,149 @@ class TestResourceService:
                 resource_service.reassign_task(
                     db_session, sim_id, requesting_user, payload
                 )
+
+    def test_reorder_tasks_success(
+        self,
+        db_session: Session,
+        sim_id: str,
+        requesting_user: int,
+        patch_active_simulations: Dict[str, Any],
+    ) -> None:
+        """Test successful task reordering."""
+        patch_active_simulations["simulator"].reorder_resource_tasks.return_value = [
+            3,
+            1,
+            2,
+        ]
+        payload = ResourceTaskReorderRequest(
+            resource_id=1, task_ids=[3, 1], apply_from_top=True
+        )
+        response = resource_service.reorder_tasks(
+            db_session, sim_id, requesting_user, payload
+        )
+        patch_active_simulations[
+            "simulator"
+        ].reorder_resource_tasks.assert_called_once_with(
+            sim_id=sim_id,
+            resource_id=1,
+            task_ids_to_reorder=[3, 1],
+            apply_from_top=True,
+        )
+        assert isinstance(response, ResourceTaskReorderResponse)
+        assert response.resource_id == 1
+        assert response.task_order == [3, 1, 2]
+
+    def test_reorder_tasks_permission_denied(
+        self,
+        db_session: Session,
+        sim_id: str,
+        requesting_user: int,
+    ) -> None:
+        """Test reorder with permission denied."""
+        payload = ResourceTaskReorderRequest(
+            resource_id=1, task_ids=[3, 1], apply_from_top=True
+        )
+        with patch.object(simulation_service, "verify_access", return_value=False):
+            with pytest.raises(VelosimPermissionError):
+                resource_service.reorder_tasks(
+                    db_session, sim_id, requesting_user, payload
+                )
+
+    def test_reorder_tasks_resource_not_found(
+        self,
+        db_session: Session,
+        sim_id: str,
+        requesting_user: int,
+        patch_active_simulations: Dict[str, Any],
+    ) -> None:
+        """Test reorder with resource not found."""
+        patch_active_simulations["simulator"].reorder_resource_tasks.side_effect = (
+            Exception("Could not find resource")
+        )
+        payload = ResourceTaskReorderRequest(
+            resource_id=999, task_ids=[1, 2], apply_from_top=True
+        )
+        with pytest.raises(ItemNotFoundError, match="Resource 999 not found"):
+            resource_service.reorder_tasks(db_session, sim_id, requesting_user, payload)
+
+    def test_reorder_tasks_empty_list_error(
+        self,
+        db_session: Session,
+        sim_id: str,
+        requesting_user: int,
+        patch_active_simulations: Dict[str, Any],
+    ) -> None:
+        """Test reorder with empty task list raises ValueError."""
+        patch_active_simulations["simulator"].reorder_resource_tasks.side_effect = (
+            ValueError("task_ids_to_reorder cannot be empty")
+        )
+        payload = ResourceTaskReorderRequest(
+            resource_id=1, task_ids=[1], apply_from_top=True
+        )
+        with pytest.raises(
+            RuntimeError,
+            match="Invalid reorder request: task_ids_to_reorder cannot be empty",
+        ):
+            resource_service.reorder_tasks(db_session, sim_id, requesting_user, payload)
+
+    def test_reorder_tasks_duplicate_ids_error(
+        self,
+        db_session: Session,
+        sim_id: str,
+        requesting_user: int,
+        patch_active_simulations: Dict[str, Any],
+    ) -> None:
+        """Test reorder with duplicate task IDs raises ValueError."""
+        patch_active_simulations["simulator"].reorder_resource_tasks.side_effect = (
+            ValueError("contains duplicate task IDs")
+        )
+        payload = ResourceTaskReorderRequest(
+            resource_id=1, task_ids=[1, 2], apply_from_top=True
+        )
+        with pytest.raises(
+            RuntimeError, match="Invalid reorder request: contains duplicate task IDs"
+        ):
+            resource_service.reorder_tasks(db_session, sim_id, requesting_user, payload)
+
+    def test_reorder_tasks_runtime_error(
+        self,
+        db_session: Session,
+        sim_id: str,
+        requesting_user: int,
+        patch_active_simulations: Dict[str, Any],
+    ) -> None:
+        """Test reorder with unexpected runtime error."""
+        patch_active_simulations["simulator"].reorder_resource_tasks.side_effect = (
+            Exception("Unexpected failure")
+        )
+        payload = ResourceTaskReorderRequest(
+            resource_id=1, task_ids=[1, 2], apply_from_top=True
+        )
+        with pytest.raises(RuntimeError, match="Failed operation: Unexpected failure"):
+            resource_service.reorder_tasks(db_session, sim_id, requesting_user, payload)
+
+    def test_reorder_tasks_bottom_mode(
+        self,
+        db_session: Session,
+        sim_id: str,
+        requesting_user: int,
+        patch_active_simulations: Dict[str, Any],
+    ) -> None:
+        """Test task reordering with bottom mode."""
+        patch_active_simulations["simulator"].reorder_resource_tasks.return_value = [
+            2,
+            3,
+            1,
+        ]
+        payload = ResourceTaskReorderRequest(
+            resource_id=1, task_ids=[1], apply_from_top=False
+        )
+        response = resource_service.reorder_tasks(
+            db_session, sim_id, requesting_user, payload
+        )
+        patch_active_simulations[
+            "simulator"
+        ].reorder_resource_tasks.assert_called_once_with(
+            sim_id=sim_id, resource_id=1, task_ids_to_reorder=[1], apply_from_top=False
+        )
+        assert response.task_order == [2, 3, 1]

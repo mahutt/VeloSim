@@ -35,6 +35,7 @@ from sim.entities.station import Station
 from sim.entities.resource import Resource
 from sim.entities.BatterySwapTask import BatterySwapTask
 from sim.entities.position import Position
+from sim.entities.task_state import State
 from sim.utils.subscriber import Subscriber
 from sim.behaviour.sim_behaviour import SimBehaviour
 import sim.core.RealTimeDriver as rtd
@@ -751,3 +752,101 @@ def test_strict_mode_initialization(
 
     # The strict parameter should be passed to RealTimeDriver
     assert controller.realTimeDriver.strict is True
+
+
+def test_reorder_resource_tasks_success(
+    simulator_controller: SimulatorController, input_params: InputParameter
+) -> None:
+    """Test successful task reordering on a resource."""
+    # Get a resource and add some tasks
+    resource = simulator_controller.get_resource_by_id(1)
+    assert resource is not None
+
+    # Clear existing tasks and add new ones
+    resource.task_list.clear()
+    task1 = simulator_controller.get_task_by_id(1)
+    task2 = simulator_controller.get_task_by_id(2)
+    assert task1 is not None
+    assert task2 is not None
+
+    resource.task_list = [task1, task2]
+
+    # Reorder tasks
+    new_order = simulator_controller.reorder_resource_tasks(
+        resource_id=1, task_ids_to_reorder=[2, 1], apply_from_top=True
+    )
+
+    assert new_order == [2, 1]
+    assert resource.task_list == [task2, task1]
+
+
+def test_reorder_resource_tasks_resource_not_found(
+    simulator_controller: SimulatorController,
+) -> None:
+    """Test that reordering non-existent resource raises exception."""
+    with pytest.raises(Exception, match="Could not find resource in sim with id: 999"):
+        simulator_controller.reorder_resource_tasks(
+            resource_id=999, task_ids_to_reorder=[1, 2], apply_from_top=True
+        )
+
+
+def test_reorder_resource_tasks_empty_list_raises_error(
+    simulator_controller: SimulatorController,
+) -> None:
+    """Test that empty task list raises ValueError from resource layer."""
+    with pytest.raises(ValueError, match="task_ids_to_reorder cannot be empty"):
+        simulator_controller.reorder_resource_tasks(
+            resource_id=1, task_ids_to_reorder=[], apply_from_top=True
+        )
+
+
+def test_reorder_resource_tasks_with_in_progress_tasks(
+    simulator_controller: SimulatorController, input_params: InputParameter
+) -> None:
+    """Test reordering with in-progress tasks pinned to top."""
+    resource = simulator_controller.get_resource_by_id(1)
+    assert resource is not None
+
+    # Add tasks and set one as in-progress
+    resource.task_list.clear()
+    task1 = simulator_controller.get_task_by_id(1)
+    task2 = simulator_controller.get_task_by_id(2)
+    assert task1 is not None
+    assert task2 is not None
+
+    task1.set_state(State.IN_PROGRESS)
+    resource.task_list = [task1, task2]
+
+    # Try to reorder - task1 should stay at top
+    new_order = simulator_controller.reorder_resource_tasks(
+        resource_id=1, task_ids_to_reorder=[2], apply_from_top=True
+    )
+
+    assert new_order == [1, 2]  # task1 pinned, task2 specified
+    assert resource.task_list[0] == task1  # in-progress task first
+
+
+def test_reorder_resource_tasks_bottom_mode(
+    simulator_controller: SimulatorController, input_params: InputParameter
+) -> None:
+    """Test bottom mode task reordering."""
+    resource = simulator_controller.get_resource_by_id(1)
+    assert resource is not None
+
+    # Set up tasks
+    resource.task_list.clear()
+    task1 = simulator_controller.get_task_by_id(1)
+    task2 = simulator_controller.get_task_by_id(2)
+    assert task1 is not None
+    assert task2 is not None
+
+    resource.task_list = [task1, task2]
+
+    # Reorder with bottom mode
+    new_order = simulator_controller.reorder_resource_tasks(
+        resource_id=1, task_ids_to_reorder=[1], apply_from_top=False
+    )
+
+    # Expected: [2] (unspecified), [1] (specified, at bottom)
+    assert new_order == [2, 1]
+    assert resource.task_list == [task2, task1]

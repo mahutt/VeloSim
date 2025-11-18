@@ -23,6 +23,7 @@ SOFTWARE.
 """
 
 import simpy
+import logging
 
 from sim.map.MapController import MapController
 from typing import Optional, TYPE_CHECKING
@@ -30,6 +31,8 @@ from .task_state import State
 from sim.entities.route import Route
 from typing import Generator, Any
 from .position import Position
+
+logger = logging.getLogger(__name__)
 
 # to avoid circular imports
 if TYPE_CHECKING:  # pragma: no cover
@@ -149,6 +152,112 @@ class Resource:
 
     def clear_update(self) -> None:
         self.has_updated = False
+
+    def reorder_tasks(
+        self, task_ids_to_reorder: list[int], apply_from_top: bool
+    ) -> list[int]:
+        """
+        Reorder tasks in the resource's task list.
+
+        In-progress tasks are always pinned to the top in their original order.
+        Specified task IDs are reordered according to the provided list.
+        Unspecified tasks maintain their original order.
+
+        Args:
+            task_ids_to_reorder: Partial list of task IDs to reorder
+            apply_from_top: If True, specified tasks inserted after in-progress tasks.
+                           If False, specified tasks appended to end (reversed).
+
+        Returns:
+            List of task IDs in the new order
+
+        Raises:
+            ValueError: If task_ids_to_reorder is empty or contains duplicates
+        """
+        # Validation: empty list
+        if not task_ids_to_reorder:
+            raise ValueError("task_ids_to_reorder cannot be empty")
+
+        # Validation: duplicates
+        if len(task_ids_to_reorder) != len(set(task_ids_to_reorder)):
+            raise ValueError("task_ids_to_reorder contains duplicate task IDs")
+
+        # Build a map of task_id -> task for quick lookup
+        current_task_map = {task.id: task for task in self.task_list}
+
+        # Separate tasks into categories
+        in_progress_tasks: list["Task"] = []
+        specified_tasks: list["Task"] = []
+        unspecified_tasks: list["Task"] = []
+
+        # Track which IDs we've seen to maintain original order
+        specified_ids_set = set(task_ids_to_reorder)
+
+        # First pass: collect in-progress tasks in original order
+        for task in self.task_list:
+            if task.get_state() == State.IN_PROGRESS:
+                in_progress_tasks.append(task)
+
+        # Second pass: collect specified tasks (excl. in-progress)
+        for task_id in task_ids_to_reorder:
+            found_task = current_task_map.get(task_id)
+            if found_task is None:
+                # Check if task exists in global registry but not in this resource
+                # Access controller via sim_behaviour if available
+                if hasattr(self, "sim_behaviour") and hasattr(
+                    self.sim_behaviour, "controller"
+                ):
+                    global_task = self.sim_behaviour.controller.get_task_by_id(task_id)
+                    if global_task is not None:
+                        if global_task.get_state() == State.CLOSED:
+                            logger.warning(
+                                f"Task {task_id} not in resource "
+                                f"{self.id} task list - task has "
+                                f"been completed (state: CLOSED)"
+                            )
+                        else:
+                            logger.warning(
+                                f"Task {task_id} not in resource "
+                                f"{self.id} task list - task "
+                                f"exists elsewhere or unassigned"
+                            )
+                    else:
+                        logger.warning(
+                            f"Task {task_id} not found in simulation - "
+                            f"may not exist or invalid ID"
+                        )
+                else:
+                    logger.warning(
+                        f"Task {task_id} not in resource {self.id} task list"
+                    )
+            elif found_task.get_state() != State.IN_PROGRESS:
+                # Only add if not already in in_progress_tasks
+                specified_tasks.append(found_task)
+
+        # Third pass: collect unspecified tasks (excl. in-progress)
+        for task in self.task_list:
+            if (
+                task.id not in specified_ids_set
+                and task.get_state() != State.IN_PROGRESS
+            ):
+                unspecified_tasks.append(task)
+
+        # Build the new task list based on mode
+        if apply_from_top:
+            # [in_progress, specified, unspecified]
+            new_task_list = in_progress_tasks + specified_tasks + unspecified_tasks
+        else:
+            # [in_progress, unspecified, reversed(specified)]
+            new_task_list = (
+                in_progress_tasks + unspecified_tasks + list(reversed(specified_tasks))
+            )
+
+        # Update the task list and mark as updated
+        self.task_list = new_task_list
+        self.has_updated = True
+
+        # Return the new task ID order
+        return [task.id for task in new_task_list]
 
     def travel_to(self, position: "Position") -> Generator[Any, None, None]:
 

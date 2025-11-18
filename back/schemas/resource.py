@@ -203,3 +203,33 @@ class ResourceTaskReassignResponse(BaseModel):
     task_id: int
     old_resource_id: int
     new_resource_id: int
+
+
+class ResourceTaskReorderRequest(BaseModel):
+    """Request schema for reordering tasks in a resource's task list."""
+
+    resource_id: int = Field(
+        ..., description="ID of the resource whose tasks to reorder"
+    )
+    task_ids: list[int] = Field(
+        ...,
+        min_length=1,
+        description="Partial list of task IDs to reorder (must be non-empty)",
+    )
+    apply_from_top: bool = Field(
+        ...,
+        description=(
+            "If true, insert tasks after in-progress tasks; " "if false, append to end"
+        ),
+    )
+
+
+class ResourceTaskReorderResponse(BaseModel):
+    """Response schema for successfully reordering tasks in a resource's task list."""
+
+    resource_id: int = Field(
+        ..., description="ID of the resource whose tasks were reordered"
+    )
+    task_order: list[int] = Field(
+        ..., description="Complete list of task IDs in new order"
+    )
