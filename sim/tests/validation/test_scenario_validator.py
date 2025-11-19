@@ -26,7 +26,7 @@ import pytest
 import copy
 import json
 from typing import Any, Dict, List
-from back.services.scenario_validation_service import ScenarioValidator
+from sim.validation import ScenarioValidator
 
 VALID_SCENARIO_CONTENT: Dict[str, Any] = {
     "start_time": "day1:08:00",

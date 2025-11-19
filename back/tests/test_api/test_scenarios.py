@@ -758,3 +758,56 @@ class TestValidateScenario:
         # Should work without authentication
         response = client.post("/api/v1/scenarios/validate", json=valid_content)
         assert response.status_code == 200
+
+    def test_validate_invalid_utf8_encoding(self, client: TestClient) -> None:
+        """Test that validation endpoint handles invalid UTF-8 encoding gracefully."""
+        # Send raw bytes with invalid UTF-8 sequence
+        invalid_utf8_bytes = b'{"content": {"start_time": "\xff\xfe"}}'
+
+        response = client.post(
+            "/api/v1/scenarios/validate",
+            content=invalid_utf8_bytes,
+            headers={"Content-Type": "application/json"},
+        )
+
+        # FastAPI/Starlette handles this before our endpoint
+        assert response.status_code == 400
+        data = response.json()
+        assert "detail" in data
+
+    def test_validate_unicode_decode_error_handling(self, client: TestClient) -> None:
+        """Test that the endpoint handles UnicodeDecodeError in request body parsing."""
+        from unittest.mock import AsyncMock
+        from back.api.v1.scenarios import (
+            validate_scenario_content,
+            ValidationRequest,
+        )
+        import asyncio
+
+        valid_content = {
+            "content": {
+                "start_time": "day1:08:00",
+                "end_time": "day1:17:00",
+                "stations": [],
+                "resources": [],
+            }
+        }
+
+        # Create a mock bytes object that raises UnicodeDecodeError on decode()
+        class BadBytes:
+            def decode(self, encoding: str = "utf-8", errors: str = "strict") -> str:
+                raise UnicodeDecodeError("utf-8", b"", 0, 1, "invalid start byte")
+
+        # Mock request with body() returning our BadBytes
+        mock_request = AsyncMock()
+        mock_request.body = AsyncMock(return_value=BadBytes())
+
+        # Call the endpoint directly
+        result = asyncio.run(
+            validate_scenario_content(mock_request, ValidationRequest(**valid_content))
+        )
+
+        assert result.valid is False
+        assert len(result.errors) == 1
+        assert result.errors[0]["field"] == "content"
+        assert "UTF-8 encoding" in result.errors[0]["message"]

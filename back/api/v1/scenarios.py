@@ -40,7 +40,7 @@ from back.schemas.scenario import (
     ScenarioUpdate,
     ScenarioUpdateRequest,
 )
-from back.services.scenario_validation_service import ScenarioValidator
+from sim.validation import ScenarioValidator
 
 router = APIRouter(prefix="/scenarios", tags=["scenarios"])
 
@@ -68,7 +68,19 @@ async def validate_scenario_content(
     """
     # Get the raw body for line number extraction
     raw_body = await request.body()
-    json_string = raw_body.decode("utf-8")
+    try:
+        json_string = raw_body.decode("utf-8")
+    except UnicodeDecodeError:
+        # If decoding fails, return validation error
+        return ValidationResponse(
+            valid=False,
+            errors=[
+                {
+                    "field": "content",
+                    "message": "Invalid UTF-8 encoding in request body",
+                }
+            ],
+        )
 
     # Initialize validator with JSON string for line tracking
     validator = ScenarioValidator(json_string=json_string)
