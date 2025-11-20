@@ -36,7 +36,7 @@ docker-compose up -d osrm postgres
 Run the routing test script to verify OSRM connectivity:
 
 ```bash
-python sim/routingStuff.py
+npm run routingTest
 ```
 
 This will calculate a test route and generate detailed output in `route_output.txt`.

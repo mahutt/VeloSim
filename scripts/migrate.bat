@@ -47,7 +47,16 @@ if "%COMMAND%"=="generate" (
         exit /b 1
     )
     echo INFO  [velosim.migrate] Generating new migration: %2
-    alembic revision --autogenerate -m "%2"
+
+    REM Check if we're in a virtual environment or if .venv exists
+    if defined VIRTUAL_ENV (
+        "%VIRTUAL_ENV%\Scripts\alembic.exe" revision --autogenerate -m "%2"
+    ) else if exist "%~dp0..\.venv\Scripts\alembic.exe" (
+        "%~dp0..\.venv\Scripts\alembic.exe" revision --autogenerate -m "%2"
+    ) else (
+        alembic revision --autogenerate -m "%2"
+    )
+
     if errorlevel 1 (
         echo ERROR [velosim.migrate] Migration generation failed
         exit /b 1
@@ -58,7 +67,16 @@ if "%COMMAND%"=="generate" (
 
 if "%COMMAND%"=="upgrade" (
     echo INFO  [velosim.migrate] Running migrations...
-    alembic upgrade head
+
+    REM Check if we're in a virtual environment or if .venv exists
+    if defined VIRTUAL_ENV (
+        "%VIRTUAL_ENV%\Scripts\alembic.exe" upgrade head
+    ) else if exist "%~dp0..\.venv\Scripts\alembic.exe" (
+        "%~dp0..\.venv\Scripts\alembic.exe" upgrade head
+    ) else (
+        alembic upgrade head
+    )
+
     if errorlevel 1 (
         echo ERROR [velosim.migrate] Migration upgrade failed
         exit /b 1
@@ -69,19 +87,46 @@ if "%COMMAND%"=="upgrade" (
 
 if "%COMMAND%"=="current" (
     echo INFO  [velosim.migrate] Checking current migration status...
-    alembic current
+
+    REM Check if we're in a virtual environment or if .venv exists
+    if defined VIRTUAL_ENV (
+        "%VIRTUAL_ENV%\Scripts\alembic.exe" current
+    ) else if exist "%~dp0..\.venv\Scripts\alembic.exe" (
+        "%~dp0..\.venv\Scripts\alembic.exe" current
+    ) else (
+        alembic current
+    )
+
     exit /b 0
 )
 
 if "%COMMAND%"=="status" (
     echo INFO  [velosim.migrate] Checking current migration status...
-    alembic current
+
+    REM Check if we're in a virtual environment or if .venv exists
+    if defined VIRTUAL_ENV (
+        "%VIRTUAL_ENV%\Scripts\alembic.exe" current
+    ) else if exist "%~dp0..\.venv\Scripts\alembic.exe" (
+        "%~dp0..\.venv\Scripts\alembic.exe" current
+    ) else (
+        alembic current
+    )
+
     exit /b 0
 )
 
 if "%COMMAND%"=="downgrade" (
     echo INFO  [velosim.migrate] Rolling back last migration...
-    alembic downgrade -1
+
+    REM Check if we're in a virtual environment or if .venv exists
+    if defined VIRTUAL_ENV (
+        "%VIRTUAL_ENV%\Scripts\alembic.exe" downgrade -1
+    ) else if exist "%~dp0..\.venv\Scripts\alembic.exe" (
+        "%~dp0..\.venv\Scripts\alembic.exe" downgrade -1
+    ) else (
+        alembic downgrade -1
+    )
+
     if errorlevel 1 (
         echo ERROR [velosim.migrate] Migration downgrade failed
         exit /b 1
@@ -92,13 +137,31 @@ if "%COMMAND%"=="downgrade" (
 
 if "%COMMAND%"=="history" (
     echo INFO  [velosim.migrate] Showing migration history...
-    alembic history
+
+    REM Check if we're in a virtual environment or if .venv exists
+    if defined VIRTUAL_ENV (
+        "%VIRTUAL_ENV%\Scripts\alembic.exe" history
+    ) else if exist "%~dp0..\.venv\Scripts\alembic.exe" (
+        "%~dp0..\.venv\Scripts\alembic.exe" history
+    ) else (
+        alembic history
+    )
+
     exit /b 0
 )
 
 if "%COMMAND%"=="init" (
     echo INFO  [velosim.migrate] Initializing Alembic...
-    alembic init alembic
+
+    REM Check if we're in a virtual environment or if .venv exists
+    if defined VIRTUAL_ENV (
+        "%VIRTUAL_ENV%\Scripts\alembic.exe" init alembic
+    ) else if exist "%~dp0..\.venv\Scripts\alembic.exe" (
+        "%~dp0..\.venv\Scripts\alembic.exe" init alembic
+    ) else (
+        alembic init alembic
+    )
+
     if errorlevel 1 (
         echo ERROR [velosim.migrate] Alembic initialization failed
         exit /b 1
@@ -110,10 +173,13 @@ if "%COMMAND%"=="init" (
 if "%COMMAND%"=="seed" (
     echo INFO  [velosim.migrate] Seeding database with initial data...
 
-    REM Check if we're in a virtual environment
+    REM Check if we're in a virtual environment or if .venv exists
     if defined VIRTUAL_ENV (
         echo INFO  [velosim.migrate] Using virtual environment: %VIRTUAL_ENV%
         "%VIRTUAL_ENV%\Scripts\python.exe" "..\scripts\db_manager.py" seed
+    ) else if exist "%~dp0..\.venv\Scripts\python.exe" (
+        echo INFO  [velosim.migrate] Using .venv from project root
+        "%~dp0..\.venv\Scripts\python.exe" "..\scripts\db_manager.py" seed
     ) else (
         echo INFO  [velosim.migrate] No virtual environment detected, using system python
         python "..\scripts\db_manager.py" seed
@@ -130,10 +196,13 @@ if "%COMMAND%"=="seed" (
 if "%COMMAND%"=="dropseed" (
     echo INFO  [velosim.migrate] Dropping database, running migrations, and seeding...
 
-    REM Check if we're in a virtual environment
+    REM Check if we're in a virtual environment or if .venv exists
     if defined VIRTUAL_ENV (
         echo INFO  [velosim.migrate] Using virtual environment: %VIRTUAL_ENV%
         "%VIRTUAL_ENV%\Scripts\python.exe" "..\scripts\db_manager.py" dropseed
+    ) else if exist "%~dp0..\.venv\Scripts\python.exe" (
+        echo INFO  [velosim.migrate] Using .venv from project root
+        "%~dp0..\.venv\Scripts\python.exe" "..\scripts\db_manager.py" dropseed
     ) else (
         echo INFO  [velosim.migrate] No virtual environment detected, using system python
         python "..\scripts\db_manager.py" dropseed

@@ -26,7 +26,19 @@
 
 /**
  * VeloSim Setup Script
- * Ensures proper installation of dependencies in virtual environment
+ *
+ * This script installs Python dependencies in your LOCAL environment for:
+ * - IDE autocomplete and IntelliSense
+ * - Running linters and formatters (black, flake8, mypy)
+ * - Running tests locally without Docker
+ *
+ * Note: If you're using the containerized development workflow (docker-compose),
+ * dependencies are automatically installed inside containers. This local setup
+ * is optional but recommended for better IDE support.
+ *
+ * For containerized development:
+ * - Use: npm run dev (runs backend/frontend in containers)
+ * - Dependencies are managed in Dockerfile and installed during build
  */
 
 const { spawn } = require('child_process');
@@ -67,7 +79,7 @@ function runCommandWithOutput(cmd, args = [], options = {}) {
 
     const child = spawn(cmd, args, {
       stdio: 'pipe',
-      shell: true,
+      shell: false,  // Don't use shell for simple commands to avoid security warnings
       cwd: options.cwd || process.cwd(),
       ...options
     });
@@ -98,56 +110,115 @@ async function main() {
   console.log('Setting up VeloSim development environment...\n');
 
   try {
-    // Step 0: Detect which Python interpreter run-python.js will use
+    // Step 0: Detect or select Python environment
     console.log('[CHECK] Detecting Python environment...');
-    let detectedPython = null;
+    let pythonExe = null;
     let actualPythonPath = null;
+    let isVirtualEnv = false;
 
-    try {
-      const versionResult = await runCommandWithOutput('node', ['scripts/run-python.js', '--version']);
-      console.log(`[INFO] ${versionResult.stdout}`);
+    // Priority 1: Respect active virtual environment (VIRTUAL_ENV)
+    if (process.env.VIRTUAL_ENV) {
+      const venvPython = isWindows
+        ? `"${path.join(process.env.VIRTUAL_ENV, 'Scripts', 'python.exe')}"`
+        : path.join(process.env.VIRTUAL_ENV, 'bin', 'python');
 
-      try {
-        const pathResult = await runCommandWithOutput('node', ['scripts/run-python.js', '-c', 'import sys; print(sys.executable)']);
-        detectedPython = pathResult.stdout.trim();
-        actualPythonPath = detectedPython;
-        console.log(`[INFO] Python executable: ${detectedPython}`);
-      } catch (pathError) {
-        console.log('[INFO] Could not determine exact Python path via run-python.js, using fallback detection...');
-        detectedPython = 'python';
-
-        // Try to get the actual Python path that 'python' command resolves to
-        try {
-          const fallbackResult = await runCommandWithOutput('python', ['-c', 'import sys; print(sys.executable)']);
-          actualPythonPath = fallbackResult.stdout.trim();
-          console.log(`[INFO] Fallback Python executable: ${actualPythonPath}`);
-        } catch (fallbackError) {
-          console.log('[INFO] Could not determine Python executable path');
-          actualPythonPath = 'python (path unknown)';
-        }
+      if (fs.existsSync(venvPython)) {
+        pythonExe = venvPython;
+        actualPythonPath = venvPython;
+        isVirtualEnv = true;
+        console.log(`[INFO] Using active virtual environment: ${process.env.VIRTUAL_ENV}`);
+        console.log(`[INFO] Python executable: ${pythonExe}`);
       }
-    } catch (error) {
-      console.log('[WARNING] Could not detect Python environment details, falling back to system python...');
-      detectedPython = 'python';
-      actualPythonPath = 'python (unknown)';
     }
 
-    // Use the detected Python for all subsequent operations
-    const pythonExe = detectedPython;
-    console.log(`[SUCCESS] Using Python command: ${pythonExe}`);
-    if (actualPythonPath && actualPythonPath !== detectedPython) {
-      console.log(`[INFO] Actual Python executable: ${actualPythonPath}`);
+    // Priority 2: Check for local .venv directory
+    if (!pythonExe) {
+      const venvPath = path.join(process.cwd(), '.venv');
+      const venvPython = isWindows
+        ? `"${path.join(venvPath, 'Scripts', 'python.exe')}"`
+        : path.join(venvPath, 'bin', 'python');
+
+      if (fs.existsSync(venvPython)) {
+        pythonExe = venvPython;
+        actualPythonPath = venvPython;
+        isVirtualEnv = true;
+        console.log(`[INFO] Using local .venv: ${venvPath}`);
+        console.log(`[INFO] Python executable: ${pythonExe}`);
+      }
+    }
+
+    // Priority 3: Fall back to system Python
+    if (!pythonExe) {
+      // Try different Python commands based on platform
+      // Windows: python, py -3, python3
+      // macOS/Linux: python3, python
+      const pythonCommands = isWindows
+        ? ['python', 'py', 'python3']
+        : ['python3', 'python'];
+
+      let foundPython = false;
+
+      for (const cmd of pythonCommands) {
+        try {
+          const result = await runCommandWithOutput(cmd, ['-c', 'import sys; print(sys.executable)']);
+          pythonExe = cmd;
+          actualPythonPath = result.stdout.trim();
+          foundPython = true;
+          console.log(`[INFO] No virtual environment detected, using system Python: ${cmd}`);
+          console.log(`[INFO] Python executable: ${actualPythonPath}`);
+          break;
+        } catch (error) {
+          // Try next command
+          continue;
+        }
+      }
+
+      if (!foundPython) {
+        const installMsg = isWindows
+          ? 'Please install Python 3.11+ from https://www.python.org/downloads/ or Microsoft Store'
+          : 'Please install Python 3.11+ using your package manager (brew install python3, apt install python3, etc.)';
+        throw new Error(`Python not found. ${installMsg}`);
+      }
+    }
+
+    // Display Python version
+    try {
+      const versionResult = await runCommandWithOutput(pythonExe, ['--version']);
+      console.log(`[INFO] ${versionResult.stdout}`);
+    } catch (error) {
+      console.log('[WARNING] Could not determine Python version');
     }
 
     const venvPath = path.join(process.cwd(), '.venv');
 
-    // Step 1: Create .venv if it doesn't exist (but don't force its use)
-    if (!fs.existsSync(venvPath)) {
-      console.log('\n[SETUP] Creating .venv virtual environment for future use...');
+    // Step 1: Create .venv if no virtual environment is active
+    if (!isVirtualEnv && !fs.existsSync(venvPath)) {
+      console.log('\n[SETUP] No virtual environment detected. Creating .venv...');
+      console.log('[INFO] You can also use your own virtual environment (pyenv, venv, etc.) and activate it before running setup');
+
+      // Use the detected pythonExe (python3 or python) to create venv
       await runCommand(pythonExe, ['-m', 'venv', '.venv']);
-      console.log('[INFO] .venv created but current Python environment will be used for setup');
+
+      // Update pythonExe to use the newly created .venv
+      pythonExe = isWindows
+        ? `"${path.join(venvPath, 'Scripts', 'python.exe')}"`
+        : path.join(venvPath, 'bin', 'python');
+
+      actualPythonPath = pythonExe;
+      isVirtualEnv = true;
+      console.log(`[SUCCESS] Created .venv and will use it for installation`);
+      console.log(`[INFO] Python executable: ${pythonExe}`);
+    } else if (!isVirtualEnv && fs.existsSync(venvPath)) {
+      console.log('\n[INFO] .venv exists. Using it for installation...');
+      // Update pythonExe to use the existing .venv
+      pythonExe = isWindows
+        ? `"${path.join(venvPath, 'Scripts', 'python.exe')}"`
+        : path.join(venvPath, 'bin', 'python');
+      actualPythonPath = pythonExe;
+      isVirtualEnv = true;
+      console.log(`[INFO] Python executable: ${pythonExe}`);
     } else {
-      console.log('\n[INFO] .venv already exists');
+      console.log('\n[INFO] Using active virtual environment for installation');
     }
 
     // Step 2: Check if pip works with the detected Python
@@ -167,9 +238,25 @@ async function main() {
     console.log('\n[SETUP] Installing pre-commit hooks...');
     await runCommand(pythonExe, ['-m', 'pre_commit', 'install']);
 
-    // Step 5: Install frontend dependencies
+    // Step 5: Install root npm dependencies (concurrently, rimraf, etc.)
+    console.log('\n[INSTALL] Installing root npm dependencies...');
+    await runCommand('npm', ['install']);
+
+    // Step 6: Install frontend dependencies
     console.log('\n[INSTALL] Installing frontend dependencies...');
     await runCommand('npm', ['install'], { cwd: path.join(process.cwd(), 'front') });
+
+    // Step 7: Prepare OSRM data
+    console.log('\n[SETUP] Preparing OSRM routing data...');
+    console.log('[INFO] This will download Montreal map data (~50-100MB)');
+    console.log('[INFO] This is a one-time setup and may take 3-5 minutes');
+    try {
+      await runCommand('node', ['scripts/prepare-osrm.js']);
+    } catch (error) {
+      console.log('[WARNING] OSRM data preparation failed');
+      console.log('[INFO] You can run this manually later: npm run osrm:prepare');
+      console.log('[INFO] Error:', error.message);
+    }
 
     console.log('\n[SUCCESS] Setup completed successfully!');
 

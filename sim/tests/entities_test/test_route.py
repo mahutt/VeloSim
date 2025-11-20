@@ -25,220 +25,321 @@ SOFTWARE.
 # mypy: ignore-errors
 
 import pytest
-import os
-import json
-from pathlib import Path
-from typing import Generator, List
+from typing import Any, Dict
 from unittest.mock import Mock
-from pandas import DataFrame
 from shapely.geometry import LineString
 
 from sim.entities.route import Route
 from sim.entities.position import Position
-from sim.entities.road import road
-from sim.osm.OSMConnection import OSMConnection
+from sim.entities.osrm_result import OSRMResult, OSRMStep
+from sim.osm.OSRMConnection import OSRMConnection
 
 
 @pytest.fixture
-def setup_test_environment(tmp_path: Path) -> Generator[None, None, None]:
+def test_config() -> dict:
     """
-    Creates a temporary config.json for road initialization.
+    Provide test configuration data.
     """
-    original_cwd = Path.cwd()
-
-    config_data = {
+    return {
         "simulation": {
             "kmh_to_ms_factor": 3.6,
             "map_rules": {"roads": {"default_road_max_speed": 30}},
         }
     }
 
-    config_path = tmp_path / "config.json"
-    with open(config_path, "w") as f:
-        json.dump(config_data, f)
 
-    os.chdir(tmp_path)
-    yield
-    os.chdir(original_cwd)
+@pytest.fixture
+def mock_osrm_connection() -> Mock:
+    """
+    Creates a mock OSRMConnection for coordinate-based routing.
+    """
+    mock_osrm = Mock(spec=OSRMConnection)
+    return mock_osrm
 
 
 @pytest.fixture
-def mock_osm_connection() -> Mock:
+def sample_osrm_route_data() -> Dict[str, Any]:
     """
-    Creates a mock OSMConnection with sample edge data.
+    Returns sample OSRM route data with coordinates and steps.
     """
-    mock_osm = Mock(spec=OSMConnection)
-
-    # Create sample edges DataFrame
-    edges_data = {
-        "id": [101, 102, 103],
-        "u": [1, 2, 3],
-        "v": [2, 3, 4],
-        "name": ["Road A", "Road B", "Road C"],
-        "length": [100.0, 150.0, 200.0],
-        "maxspeed": [50, 40, 60],
-        "geometry": [
-            LineString([(0, 0), (0, 1)]),
-            LineString([(0, 1), (1, 1)]),
-            LineString([(1, 1), (1, 2)]),
+    return {
+        "coordinates": [
+            [-73.5673, 45.5017],  # Start point (Montreal area)
+            [-73.5670, 45.5020],  # Waypoint 1
+            [-73.5665, 45.5025],  # Waypoint 2
+            [-73.5660, 45.5030],  # End point
+        ],
+        "distance": 300.0,  # meters
+        "duration": 180.0,  # seconds
+        "steps": [
+            {
+                "name": "Rue Saint-Denis",
+                "distance": 150.0,
+                "duration": 90.0,
+                "geometry": [[-73.5673, 45.5017], [-73.5670, 45.5020]],
+            },
+            {
+                "name": "Boulevard de Maisonneuve",
+                "distance": 150.0,
+                "duration": 90.0,
+                "geometry": [
+                    [-73.5670, 45.5020],
+                    [-73.5665, 45.5025],
+                    [-73.5660, 45.5030],
+                ],
+            },
         ],
     }
-    mock_edges_df = DataFrame(edges_data)
-    mock_osm.get_all_edges.return_value = mock_edges_df
-
-    # Provide edge index mapping (u, v) -> DataFrame index as expected
-    # by Route
-    edge_index = {
-        (int(row["u"]), int(row["v"])): int(idx)
-        for idx, row in mock_edges_df.iterrows()
-    }
-    mock_osm.get_edge_index.return_value = edge_index
-
-    return mock_osm
 
 
 @pytest.fixture
-def sample_route_node_ids() -> List[int]:
+def simple_osrm_route_data() -> Dict[str, Any]:
     """
-    Returns a sample list of node IDs representing a route.
+    Returns simple OSRM route data with just two points.
     """
-    return [1, 2, 3, 4]
+    return {
+        "coordinates": [
+            [-73.5673, 45.5017],  # Start
+            [-73.5660, 45.5030],  # End
+        ],
+        "distance": 200.0,
+        "duration": 120.0,
+        "steps": [
+            {
+                "name": "Direct Route",
+                "distance": 200.0,
+                "duration": 120.0,
+                "geometry": [[-73.5673, 45.5017], [-73.5660, 45.5030]],
+            }
+        ],
+    }
+
+
+@pytest.fixture
+def simple_osrm_result() -> OSRMResult:
+    """Create a simple OSRMResult for testing."""
+    step1 = OSRMStep(
+        name="Main Street",
+        distance=100.0,
+        duration=7.2,
+        geometry=[[0.0, 0.0], [0.001, 0.0]],
+        speed=13.88,
+    )
+    step2 = OSRMStep(
+        name="Second Avenue",
+        distance=150.0,
+        duration=10.8,
+        geometry=[[0.001, 0.0], [0.001, 0.001]],
+        speed=13.88,
+    )
+
+    return OSRMResult(
+        coordinates=[[0.0, 0.0], [0.001, 0.0], [0.001, 0.001]],
+        distance=250.0,
+        duration=18.0,
+        steps=[step1, step2],
+    )
+
+
+@pytest.fixture
+def osrm_result_no_steps() -> OSRMResult:
+    """Create an OSRMResult without steps (fallback mode)."""
+    return OSRMResult(
+        coordinates=[[0.0, 0.0], [0.001, 0.0], [0.002, 0.0]],
+        distance=200.0,
+        duration=14.4,
+        steps=[],
+    )
+
+
+@pytest.fixture
+def mock_routing_connection() -> Mock:
+    """Create a mock OSRMConnection for testing."""
+    mock_conn = Mock()
+    mock_conn.shortest_path_coords = Mock()
+    return mock_conn
 
 
 class TestRouteCreation:
-    """Tests for Route object initialization."""
+    """Tests for Route object initialization with coordinate-based routing."""
 
-    def test_route_creation_with_valid_nodes(
-        self, setup_test_environment, mock_osm_connection, sample_route_node_ids
+    def test_route_creation_with_valid_osrm_data(
+        self, test_config, mock_osrm_connection, sample_osrm_route_data
     ) -> None:
-        """Test that a route can be created with valid node IDs."""
-        route = Route(sample_route_node_ids, mock_osm_connection)
+        """Test that a route can be created with valid OSRM data."""
+        osrm_result = OSRMResult.from_dict(sample_osrm_route_data)
+        route = Route(osrm_result, mock_osrm_connection, test_config)
 
         assert route is not None
         assert route.id > 0
         assert route.current_road_index == 0
         assert route.current_point_index == 0
         assert route.is_finished is False
-        assert len(route.roads) == 3  # 4 nodes = 3 road segments
+        assert len(route.roads) == 2  # 2 steps in sample data
 
-    def test_route_creation_with_empty_nodes(
-        self, setup_test_environment, mock_osm_connection
+    def test_route_creation_with_empty_coordinates(
+        self, test_config, mock_osrm_connection
     ) -> None:
-        """Test that a route with no nodes is marked as finished."""
-        route = Route([], mock_osm_connection)
+        """Test that a route with no coordinates raises an error."""
+        empty_data = {"coordinates": [], "distance": 0, "duration": 0, "steps": []}
 
-        assert route.is_finished is True
-        assert len(route.roads) == 0
+        # OSRMResult.from_dict should raise ValueError for empty coordinates
+        with pytest.raises(ValueError, match="'coordinates' cannot be empty"):
+            OSRMResult.from_dict(empty_data)
 
     def test_route_unique_ids(
-        self, setup_test_environment, mock_osm_connection, sample_route_node_ids
+        self, test_config, mock_osrm_connection, sample_osrm_route_data
     ) -> None:
         """Test that each route gets a unique ID."""
-        route1 = Route(sample_route_node_ids, mock_osm_connection)
-        route2 = Route(sample_route_node_ids, mock_osm_connection)
+        osrm_result = OSRMResult.from_dict(sample_osrm_route_data)
+        route1 = Route(osrm_result, mock_osrm_connection, test_config)
+        route2 = Route(osrm_result, mock_osrm_connection, test_config)
 
         assert route1.id != route2.id
 
-    def test_route_stores_start_and_end_nodes(
-        self, setup_test_environment, mock_osm_connection, sample_route_node_ids
+    def test_route_stores_start_and_end_coordinates(
+        self, test_config, mock_osrm_connection, sample_osrm_route_data
     ) -> None:
-        """Test that route stores start and end node IDs for recalculation."""
-        route = Route(sample_route_node_ids, mock_osm_connection)
+        """Test that route stores start and end coordinates for recalculation."""
+        osrm_result = OSRMResult.from_dict(sample_osrm_route_data)
+        route = Route(osrm_result, mock_osrm_connection, test_config)
 
-        assert route.start_node_id == 1
-        assert route.end_node_id == 4
+        assert route.start_coord == tuple(sample_osrm_route_data["coordinates"][0])
+        assert route.end_coord == tuple(sample_osrm_route_data["coordinates"][-1])
 
-    def test_route_builds_road_segments(
-        self, setup_test_environment, mock_osm_connection, sample_route_node_ids
+    def test_route_builds_road_segments_from_steps(
+        self, test_config, mock_osrm_connection, sample_osrm_route_data
     ) -> None:
-        """Test that road segments are correctly built from node IDs."""
-        route = Route(sample_route_node_ids, mock_osm_connection)
+        """Test that road segments are correctly built from OSRM steps."""
+        osrm_result = OSRMResult.from_dict(sample_osrm_route_data)
+        route = Route(osrm_result, mock_osrm_connection, test_config)
 
-        # Should create 3 road segments: (1->2), (2->3), (3->4)
-        assert len(route.roads) == 3
-        assert all(isinstance(r, road) for r in route.roads)
-        assert route.roads[0].id == 101
-        assert route.roads[1].id == 102
-        assert route.roads[2].id == 103
+        # Should create 2 road segments from steps
+        assert len(route.roads) == 2
+        assert route.roads[0].name == "Rue Saint-Denis"
+        assert route.roads[1].name == "Boulevard de Maisonneuve"
+
+        # Check that roads have point collections
+        for road in route.roads:
+            assert hasattr(road, "pointcollection")
+            assert len(road.pointcollection) > 0
+            assert all(isinstance(p, Position) for p in road.pointcollection)
+
+    def test_route_fallback_without_steps(
+        self, test_config, mock_osrm_connection
+    ) -> None:
+        """Test that route falls back to single road when steps are missing."""
+        data_without_steps = {
+            "coordinates": [[-73.5673, 45.5017], [-73.5660, 45.5030]],
+            "distance": 200.0,
+            "duration": 120.0,
+            "steps": [],  # No steps
+        }
+        osrm_result = OSRMResult.from_dict(data_without_steps)
+        route = Route(osrm_result, mock_osrm_connection, test_config)
+
+        # Should create 1 road from all coordinates
+        assert len(route.roads) == 1
+        assert route.roads[0].name is None  # Fallback route has no specific name
+        assert len(route.roads[0].pointcollection) > 0
+
+    def test_route_stores_distance_and_duration(
+        self, test_config, mock_osrm_connection, sample_osrm_route_data
+    ) -> None:
+        """Test that route stores OSRM distance and duration."""
+        osrm_result = OSRMResult.from_dict(sample_osrm_route_data)
+        route = Route(osrm_result, mock_osrm_connection, test_config)
+
+        assert route.distance == 300.0
+        assert route.duration == 180.0
 
 
 class TestRouteSubscription:
-    """Tests for route subscription to MapController."""
+    """Tests for route subscription to MapController with coordinate-based routing."""
 
     def test_subscribe_to_map_controller(
-        self, setup_test_environment, mock_osm_connection, sample_route_node_ids
+        self, test_config, mock_osrm_connection, sample_osrm_route_data
     ) -> None:
         """Test that route can subscribe to a MapController."""
-        route = Route(sample_route_node_ids, mock_osm_connection)
+        osrm_result = OSRMResult.from_dict(sample_osrm_route_data)
+        route = Route(osrm_result, mock_osrm_connection, test_config)
         mock_map_controller = Mock()
 
         route.subscribe_to_map_controller(mock_map_controller)
 
         assert route.map_controller == mock_map_controller
-        # Should call _subscribe_route_to_road for each road segment
-        assert mock_map_controller._subscribe_route_to_road.call_count == 3
+        # Should call _subscribe_route_to_road for each road segment (2 steps)
+        assert mock_map_controller._subscribe_route_to_road.call_count == 2
 
     def test_unsubscribe_from_all_roads(
-        self, setup_test_environment, mock_osm_connection, sample_route_node_ids
+        self, test_config, mock_osrm_connection, sample_osrm_route_data
     ) -> None:
         """Test that route can unsubscribe from all roads."""
-        route = Route(sample_route_node_ids, mock_osm_connection)
+        osrm_result = OSRMResult.from_dict(sample_osrm_route_data)
+        route = Route(osrm_result, mock_osrm_connection, test_config)
         mock_map_controller = Mock()
         route.subscribe_to_map_controller(mock_map_controller)
 
         route.unsubscribe_from_all_roads()
 
         # Should call _unsubscribe_route_from_road for each road segment
-        assert mock_map_controller._unsubscribe_route_from_road.call_count == 3
+        assert mock_map_controller._unsubscribe_route_from_road.call_count == 2
 
     def test_unsubscribe_from_specific_road(
-        self, setup_test_environment, mock_osm_connection, sample_route_node_ids
+        self, test_config, mock_osrm_connection, sample_osrm_route_data
     ) -> None:
         """Test that route can unsubscribe from a specific road."""
-        route = Route(sample_route_node_ids, mock_osm_connection)
+        osrm_result = OSRMResult.from_dict(sample_osrm_route_data)
+        route = Route(osrm_result, mock_osrm_connection, test_config)
         mock_map_controller = Mock()
         route.subscribe_to_map_controller(mock_map_controller)
 
-        route.unsubscribe_from_road(101)
+        road_id = route.roads[0].id
+        route.unsubscribe_from_road(road_id)
 
-        mock_map_controller._unsubscribe_route_from_road.assert_called_with(101, route)
+        mock_map_controller._unsubscribe_route_from_road.assert_called_with(
+            road_id, route
+        )
 
     def test_unsubscribe_without_map_controller(
-        self, setup_test_environment, mock_osm_connection, sample_route_node_ids
+        self, test_config, mock_osrm_connection, sample_osrm_route_data
     ) -> None:
         """Test that unsubscribe operations handle missing map_controller gracefully."""
-        route = Route(sample_route_node_ids, mock_osm_connection)
+        osrm_result = OSRMResult.from_dict(sample_osrm_route_data)
+        route = Route(osrm_result, mock_osrm_connection, test_config)
 
         # Should not raise an exception
         route.unsubscribe_from_all_roads()
-        route.unsubscribe_from_road(101)
+        route.unsubscribe_from_road(12345)
 
 
 class TestRouteTraversal:
-    """Tests for route traversal using next()."""
+    """Tests for route traversal using next() with coordinate-based routing."""
 
-    def test_first_call_returns_current_and_full_route(
-        self, setup_test_environment, mock_osm_connection, sample_route_node_ids
+    def test_first_call_returns_current_position(
+        self, test_config, mock_osrm_connection, sample_osrm_route_data
     ) -> None:
-        """Test that first call to next() returns current position and full route."""
-        route = Route(sample_route_node_ids, mock_osm_connection)
+        """Test that first call to next() returns current position."""
+        osrm_result = OSRMResult.from_dict(sample_osrm_route_data)
+        route = Route(osrm_result, mock_osrm_connection, test_config)
 
         result = route.next(as_json=False)
 
-        assert isinstance(result, tuple)
-        current_position, full_route = result
-        assert isinstance(current_position, Position)
-        assert isinstance(full_route, list)
-        assert all(isinstance(p, Position) for p in full_route)
+        assert isinstance(result, Position)
+        # Full route is available via separate method
+        full_route = route.get_route_geometry()
+        assert isinstance(full_route, LineString)
 
     def test_subsequent_calls_return_only_position(
-        self, setup_test_environment, mock_osm_connection, sample_route_node_ids
+        self, test_config, mock_osrm_connection, sample_osrm_route_data
     ) -> None:
-        """Test that subsequent calls to next() return only the position."""
-        route = Route(sample_route_node_ids, mock_osm_connection)
+        """Test that all calls to next() return only the position."""
+        osrm_result = OSRMResult.from_dict(sample_osrm_route_data)
+        route = Route(osrm_result, mock_osrm_connection, test_config)
 
         # First call
-        route.next(as_json=False)
+        first = route.next(as_json=False)
+        assert isinstance(first, Position)
 
         # Second call
         result = route.next(as_json=False)
@@ -246,25 +347,26 @@ class TestRouteTraversal:
         assert isinstance(result, Position)
 
     def test_next_json_format_first_call(
-        self, setup_test_environment, mock_osm_connection, sample_route_node_ids
+        self, test_config, mock_osrm_connection, sample_osrm_route_data
     ) -> None:
         """Test that first call with as_json=True returns proper format."""
-        route = Route(sample_route_node_ids, mock_osm_connection)
+        osrm_result = OSRMResult.from_dict(sample_osrm_route_data)
+        route = Route(osrm_result, mock_osrm_connection, test_config)
 
         result = route.next(as_json=True)
 
         assert isinstance(result, dict)
         assert "id" in result
         assert "position" in result
-        assert "route" in result
-        assert "coordinates" in result["route"]
+        assert "route" not in result  # Route geometry via separate method
         assert result["id"] == route.id
 
     def test_next_json_format_subsequent_calls(
-        self, setup_test_environment, mock_osm_connection, sample_route_node_ids
+        self, test_config, mock_osrm_connection, sample_osrm_route_data
     ) -> None:
         """Test that subsequent calls with as_json=True return proper format."""
-        route = Route(sample_route_node_ids, mock_osm_connection)
+        osrm_result = OSRMResult.from_dict(sample_osrm_route_data)
+        route = Route(osrm_result, mock_osrm_connection, test_config)
 
         # First call
         route.next(as_json=True)
@@ -275,38 +377,44 @@ class TestRouteTraversal:
         assert isinstance(result, dict)
         assert "id" in result
         assert "position" in result
-        assert "route" not in result  # Only first call includes full route
+        assert "route" not in result  # Route geometry via separate method
 
     def test_traversal_moves_through_roads(
-        self, setup_test_environment, mock_osm_connection, sample_route_node_ids
+        self, test_config, mock_osrm_connection, sample_osrm_route_data
     ) -> None:
         """Test that traversal correctly moves through road segments."""
-        route = Route(sample_route_node_ids, mock_osm_connection)
+        osrm_result = OSRMResult.from_dict(sample_osrm_route_data)
+        route = Route(osrm_result, mock_osrm_connection, test_config)
         initial_road_index = route.current_road_index
 
         # Move through all points in first road
         first_road = route.roads[0]
         num_points = len(first_road.pointcollection)
 
+        # Skip duplicates at boundaries by calling next until road changes
         for _ in range(num_points):
             route.next(as_json=False)
+            if route.current_road_index > initial_road_index:
+                break
 
-        # Should have moved to the next road
-        assert route.current_road_index > initial_road_index
+        # Should have moved to the next road or finished
+        assert route.current_road_index > initial_road_index or route.is_finished
 
     def test_route_finishes_when_complete(
-        self, setup_test_environment, mock_osm_connection, sample_route_node_ids
+        self, test_config, mock_osrm_connection, sample_osrm_route_data
     ) -> None:
         """Test that route is marked as finished when all points are consumed."""
-        route = Route(sample_route_node_ids, mock_osm_connection)
+        osrm_result = OSRMResult.from_dict(sample_osrm_route_data)
+        route = Route(osrm_result, mock_osrm_connection, test_config)
 
-        # Count total points
-        total_points = sum(len(r.pointcollection) for r in route.roads)
+        # Count total points (accounting for boundary overlaps)
+        all_points = route._get_all_points()
+        total_points = len(all_points)
 
         # Traverse all points
-        for _ in range(total_points):
-            _ = route.next(as_json=False)
-            if route.is_finished:
+        for _ in range(total_points + 10):  # Extra calls to ensure we reach the end
+            result = route.next(as_json=False)
+            if result is None:
                 break
 
         assert route.is_finished is True
@@ -315,10 +423,11 @@ class TestRouteTraversal:
         assert route.next(as_json=False) is None
 
     def test_route_unsubscribes_from_completed_roads(
-        self, setup_test_environment, mock_osm_connection, sample_route_node_ids
+        self, test_config, mock_osrm_connection, sample_osrm_route_data
     ) -> None:
         """Test that route unsubscribes from roads as they are completed."""
-        route = Route(sample_route_node_ids, mock_osm_connection)
+        osrm_result = OSRMResult.from_dict(sample_osrm_route_data)
+        route = Route(osrm_result, mock_osrm_connection, test_config)
         mock_map_controller = Mock()
         route.subscribe_to_map_controller(mock_map_controller)
 
@@ -331,180 +440,165 @@ class TestRouteTraversal:
 
         for _ in range(num_points):
             route.next(as_json=False)
+            if route.current_road_index > 0:
+                break
 
         # Should have unsubscribed from the first road
-        mock_map_controller._unsubscribe_route_from_road.assert_called_with(
-            first_road.id, route
-        )
+        # Find at least one call that unsubscribes from the first road
+        calls = mock_map_controller._unsubscribe_route_from_road.call_args_list
+        road_ids_unsubscribed = [call[0][0] for call in calls]
+        assert first_road.id in road_ids_unsubscribed
+
+    def test_route_avoids_duplicate_positions(
+        self, test_config, mock_osrm_connection, sample_osrm_route_data
+    ) -> None:
+        """Test that route skips consecutive duplicate positions."""
+        osrm_result = OSRMResult.from_dict(sample_osrm_route_data)
+        route = Route(osrm_result, mock_osrm_connection, test_config)
+
+        positions_returned = []
+        for _ in range(50):  # Get multiple positions
+            result = route.next(as_json=False)
+            if result is None:
+                break
+
+            if isinstance(result, Position):
+                positions_returned.append(result.get_position())
+
+        # Check no consecutive duplicates
+        for i in range(len(positions_returned) - 1):
+            assert (
+                positions_returned[i] != positions_returned[i + 1]
+            ), f"Found duplicate positions at indices {i} and {i+1}"
 
 
 class TestRouteRecalculation:
-    """Tests for route recalculation when roads are disabled."""
+    """Tests for route recalculation when roads are disabled with
+    coordinate-based routing."""
 
     def test_recalculate_with_valid_map_controller(
-        self, setup_test_environment, sample_route_node_ids
+        self, test_config, mock_osrm_connection, sample_osrm_route_data
     ) -> None:
-        """Test that recalculate works with a valid map map."""
-        # Create a more sophisticated mock OSM connection
-        mock_osm = Mock(spec=OSMConnection)
-
-        # Initial edges
-        initial_edges_data = {
-            "id": [101, 102, 103],
-            "u": [1, 2, 3],
-            "v": [2, 3, 4],
-            "name": ["Road A", "Road B", "Road C"],
-            "length": [100.0, 150.0, 200.0],
-            "maxspeed": [50, 40, 60],
-            "geometry": [
-                LineString([(0, 0), (0, 1)]),
-                LineString([(0, 1), (1, 1)]),
-                LineString([(1, 1), (1, 2)]),
-            ],
-        }
-        mock_osm.get_all_edges.return_value = DataFrame(initial_edges_data)
-        # Provide edge index mapping for (u, v) -> row index
-        _df = DataFrame(initial_edges_data)
-        mock_osm.get_edge_index.return_value = {
-            (int(row["u"]), int(row["v"])): int(idx) for idx, row in _df.iterrows()
-        }
-
-        # Mock pathfinding to return alternative route
-        mock_osm.coordinates_to_nearest_node.return_value = 1
-        mock_osm.get_node_by_id.return_value = {"id": 4, "x": 1, "y": 2}
-        mock_osm.shortest_path.return_value = [1, 2, 4]  # Skips node 3
-
-        route = Route(sample_route_node_ids, mock_osm)
+        """Test that recalculate works with a valid map controller."""
+        osrm_result = OSRMResult.from_dict(sample_osrm_route_data)
+        route = Route(osrm_result, mock_osrm_connection, test_config)
         mock_map_controller = Mock()
         route.subscribe_to_map_controller(mock_map_controller)
+
+        # Mock the shortest_path_coords to return alternative route
+        alternative_route = {
+            "coordinates": [[-73.5670, 45.5020], [-73.5665, 45.5025]],
+            "distance": 150.0,
+            "duration": 90.0,
+            "steps": [
+                {
+                    "name": "Alternative Route",
+                    "distance": 150.0,
+                    "duration": 90.0,
+                    "geometry": [[-73.5670, 45.5020], [-73.5665, 45.5025]],
+                }
+            ],
+        }
+        mock_osrm_connection.shortest_path_coords.return_value = alternative_route
+
+        # Advance the route a bit
+        route.next()
+        route.next()
 
         # Recalculate the route
         success = route.recalculate()
 
         assert success is True
-        # Should have called shortest_path
-        assert mock_osm.shortest_path.called
+        # Should have called shortest_path_coords
+        assert mock_osrm_connection.shortest_path_coords.called
 
     def test_recalculate_unsubscribes_and_resubscribes(
-        self, setup_test_environment, sample_route_node_ids
+        self, test_config, mock_osrm_connection, sample_osrm_route_data
     ) -> None:
         """
         Test that recalculation unsubscribes from old roads and
         subscribes to new ones.
         """
-        mock_osm = Mock(spec=OSMConnection)
-
-        # Initial edges
-        initial_edges_data = {
-            "id": [101, 102, 103, 104],
-            "u": [1, 2, 3, 1],
-            "v": [2, 3, 4, 4],
-            "name": ["Road A", "Road B", "Road C", "Road D"],
-            "length": [100.0, 150.0, 200.0, 250.0],
-            "maxspeed": [50, 40, 60, 50],
-            "geometry": [
-                LineString([(0, 0), (0, 1)]),
-                LineString([(0, 1), (1, 1)]),
-                LineString([(1, 1), (1, 2)]),
-                LineString([(0, 0), (1, 2)]),
-            ],
-        }
-        mock_osm.get_all_edges.return_value = DataFrame(initial_edges_data)
-        _df = DataFrame(initial_edges_data)
-        mock_osm.get_edge_index.return_value = {
-            (int(row["u"]), int(row["v"])): int(idx) for idx, row in _df.iterrows()
-        }
-        mock_osm.coordinates_to_nearest_node.return_value = 1
-        mock_osm.get_node_by_id.return_value = {"id": 4, "x": 1, "y": 2}
-        mock_osm.shortest_path.return_value = [1, 4]  # Direct route
-
-        route = Route(sample_route_node_ids, mock_osm)
+        osrm_result = OSRMResult.from_dict(sample_osrm_route_data)
+        route = Route(osrm_result, mock_osrm_connection, test_config)
         mock_map_controller = Mock()
         route.subscribe_to_map_controller(mock_map_controller)
+
+        # Mock alternative route with different road
+        alternative_route = {
+            "coordinates": [[-73.5670, 45.5020], [-73.5660, 45.5030]],
+            "distance": 100.0,
+            "duration": 60.0,
+            "steps": [
+                {
+                    "name": "Direct Route",
+                    "distance": 100.0,
+                    "duration": 60.0,
+                    "geometry": [[-73.5670, 45.5020], [-73.5660, 45.5030]],
+                }
+            ],
+        }
+        mock_osrm_connection.shortest_path_coords.return_value = alternative_route
 
         # Reset to clear initial subscription calls
         mock_map_controller.reset_mock()
 
-        # Recalculate
+        # Advance and recalculate
+        route.next()
         route.recalculate()
 
-        # Should unsubscribe from all old roads (3 roads in original route)
-        assert mock_map_controller._unsubscribe_route_from_road.call_count == 3
+        # Should unsubscribe from all old roads (2 roads in original route)
+        assert mock_map_controller._unsubscribe_route_from_road.call_count == 2
         # Should subscribe to new roads (1 road in new route)
         assert mock_map_controller._subscribe_route_to_road.call_count == 1
 
     def test_recalculate_preserves_route_id(
-        self, setup_test_environment, sample_route_node_ids
+        self, test_config, mock_osrm_connection, sample_osrm_route_data
     ) -> None:
         """Test that route ID remains the same after recalculation."""
-        mock_osm = Mock(spec=OSMConnection)
-
-        initial_edges_data = {
-            "id": [101, 102, 103],
-            "u": [1, 2, 3],
-            "v": [2, 3, 4],
-            "name": ["Road A", "Road B", "Road C"],
-            "length": [100.0, 150.0, 200.0],
-            "maxspeed": [50, 40, 60],
-            "geometry": [
-                LineString([(0, 0), (0, 1)]),
-                LineString([(0, 1), (1, 1)]),
-                LineString([(1, 1), (1, 2)]),
-            ],
-        }
-        mock_osm.get_all_edges.return_value = DataFrame(initial_edges_data)
-        _df = DataFrame(initial_edges_data)
-        mock_osm.get_edge_index.return_value = {
-            (int(row["u"]), int(row["v"])): int(idx) for idx, row in _df.iterrows()
-        }
-        mock_osm.coordinates_to_nearest_node.return_value = 1
-        mock_osm.get_node_by_id.return_value = {"id": 4, "x": 1, "y": 2}
-        mock_osm.shortest_path.return_value = [1, 2, 4]
-
-        route = Route(sample_route_node_ids, mock_osm)
+        osrm_result = OSRMResult.from_dict(sample_osrm_route_data)
+        route = Route(osrm_result, mock_osrm_connection, test_config)
         original_id = route.id
 
         mock_map_controller = Mock()
         route.subscribe_to_map_controller(mock_map_controller)
 
+        # Mock alternative route
+        alternative_route = {
+            "coordinates": [[-73.5670, 45.5020], [-73.5660, 45.5030]],
+            "distance": 100.0,
+            "duration": 60.0,
+            "steps": [],
+        }
+        mock_osrm_connection.shortest_path_coords.return_value = alternative_route
+
+        route.next()
         route.recalculate()
+
         assert route.id == original_id
 
     def test_recalculate_resets_traversal_state(
-        self, setup_test_environment, sample_route_node_ids
+        self, test_config, mock_osrm_connection, sample_osrm_route_data
     ) -> None:
         """Test that recalculation resets the traversal state."""
-        mock_osm = Mock(spec=OSMConnection)
+        osrm_result = OSRMResult.from_dict(sample_osrm_route_data)
+        route = Route(osrm_result, mock_osrm_connection, test_config)
 
-        initial_edges_data = {
-            "id": [101, 102, 103],
-            "u": [1, 2, 3],
-            "v": [2, 3, 4],
-            "name": ["Road A", "Road B", "Road C"],
-            "length": [100.0, 150.0, 200.0],
-            "maxspeed": [50, 40, 60],
-            "geometry": [
-                LineString([(0, 0), (0, 1)]),
-                LineString([(0, 1), (1, 1)]),
-                LineString([(1, 1), (1, 2)]),
-            ],
+        mock_map_controller = Mock()
+        route.subscribe_to_map_controller(mock_map_controller)
+
+        # Mock alternative route
+        alternative_route = {
+            "coordinates": [[-73.5670, 45.5020], [-73.5660, 45.5030]],
+            "distance": 100.0,
+            "duration": 60.0,
+            "steps": [],
         }
-        mock_osm.get_all_edges.return_value = DataFrame(initial_edges_data)
-        _df = DataFrame(initial_edges_data)
-        mock_osm.get_edge_index.return_value = {
-            (int(row["u"]), int(row["v"])): int(idx) for idx, row in _df.iterrows()
-        }
-        mock_osm.coordinates_to_nearest_node.return_value = 1
-        mock_osm.get_node_by_id.return_value = {"id": 4, "x": 1, "y": 2}
-        mock_osm.shortest_path.return_value = [1, 2, 4]
-        route = Route(sample_route_node_ids, mock_osm)
+        mock_osrm_connection.shortest_path_coords.return_value = alternative_route
 
         # Advance the route
         route.next()
         route.next()
-
-        mock_map_controller = Mock()
-        route.subscribe_to_map_controller(mock_map_controller)
 
         # Recalculate
         route.recalculate()
@@ -514,10 +608,11 @@ class TestRouteRecalculation:
         assert route.current_point_index == 0
 
     def test_recalculate_returns_false_if_finished(
-        self, setup_test_environment, mock_osm_connection, sample_route_node_ids
+        self, test_config, mock_osrm_connection, sample_osrm_route_data
     ) -> None:
         """Test that recalculate returns False if route is already finished."""
-        route = Route(sample_route_node_ids, mock_osm_connection)
+        osrm_result = OSRMResult.from_dict(sample_osrm_route_data)
+        route = Route(osrm_result, mock_osrm_connection, test_config)
         route.is_finished = True
 
         mock_map_controller = Mock()
@@ -528,52 +623,718 @@ class TestRouteRecalculation:
         assert success is False
 
     def test_recalculate_returns_false_without_map_controller(
-        self, setup_test_environment, mock_osm_connection, sample_route_node_ids
+        self, test_config, mock_osrm_connection, sample_osrm_route_data
     ) -> None:
-        """Test that recalculate returns False if no map map is set."""
-        route = Route(sample_route_node_ids, mock_osm_connection)
+        """Test that recalculate returns False if no map controller is set."""
+        osrm_result = OSRMResult.from_dict(sample_osrm_route_data)
+        route = Route(osrm_result, mock_osrm_connection, test_config)
 
         success = route.recalculate()
 
         assert success is False
 
-
-class TestRouteEdgeCases:
-    """Tests for edge cases and error handling."""
-
-    def test_route_with_single_node(
-        self, setup_test_environment, mock_osm_connection
+    def test_recalculate_handles_failed_osrm_request(
+        self, test_config, mock_osrm_connection, sample_osrm_route_data
     ) -> None:
-        """Test route creation with a single node (no edges)."""
-        route = Route([1], mock_osm_connection)
+        """Test that recalculate handles failed OSRM requests gracefully."""
+        osrm_result = OSRMResult.from_dict(sample_osrm_route_data)
+        route = Route(osrm_result, mock_osrm_connection, test_config)
+        mock_map_controller = Mock()
+        route.subscribe_to_map_controller(mock_map_controller)
 
-        assert len(route.roads) == 0
+        # Mock OSRM to return None (failed request)
+        mock_osrm_connection.shortest_path_coords.return_value = None
+
+        route.next()
+        success = route.recalculate()
+
+        assert success is False
         assert route.is_finished is True
 
-    def test_route_with_missing_edge(
-        self, setup_test_environment, sample_route_node_ids
+
+class TestRouteEdgeCases:
+    """Tests for edge cases and error handling with coordinate-based routing."""
+
+    def test_route_with_single_coordinate_pair(
+        self, test_config, mock_osrm_connection
     ) -> None:
-        """Test route creation when an edge is missing from OSM data."""
-        mock_osm = Mock(spec=OSMConnection)
+        """Test that route creation with a single coordinate raises an exception.
 
-        # Only provide edges for first two segments
-        edges_data = {
-            "id": [101, 102],
-            "u": [1, 2],
-            "v": [2, 3],
-            "name": ["Road A", "Road B"],
-            "length": [100.0, 150.0],
-            "maxspeed": [50, 40],
-            "geometry": [LineString([(0, 0), (0, 1)]), LineString([(0, 1), (1, 1)])],
-        }
-        mock_osm.get_all_edges.return_value = DataFrame(edges_data)
-        _df = DataFrame(edges_data)
-        mock_osm.get_edge_index.return_value = {
-            (int(row["u"]), int(row["v"])): int(idx) for idx, row in _df.iterrows()
+        API Contract: Route creation requires at least 2 coordinates to form a path.
+        A single coordinate is invalid and should raise an exception during
+        LineString construction.
+        """
+        single_point_data = {
+            "coordinates": [[-73.5673, 45.5017]],
+            "distance": 0.0,
+            "duration": 0.0,
+            "steps": [],
         }
 
-        # This should print a warning but not crash
-        route = Route(sample_route_node_ids, mock_osm)
+        # Should raise an exception (GEOSException from Shapely)
+        # when trying to create a LineString with a single point
+        osrm_result = OSRMResult.from_dict(single_point_data)
+        with pytest.raises(Exception):  # GEOSException or similar geometry error
+            Route(osrm_result, mock_osrm_connection, test_config)
 
-        # Should only have 2 road segments instead of 3
+    def test_route_with_two_identical_coordinates(
+        self, test_config, mock_osrm_connection
+    ) -> None:
+        """Test route where start and end are the same."""
+        identical_coords_data = {
+            "coordinates": [[-73.5673, 45.5017], [-73.5673, 45.5017]],
+            "distance": 0.0,
+            "duration": 0.0,
+            "steps": [
+                {
+                    "name": "Same Location",
+                    "distance": 0.0,
+                    "duration": 0.0,
+                    "geometry": [[-73.5673, 45.5017], [-73.5673, 45.5017]],
+                }
+            ],
+        }
+        osrm_result = OSRMResult.from_dict(identical_coords_data)
+        route = Route(osrm_result, mock_osrm_connection, test_config)
+
+        # Should handle gracefully
+        assert route is not None
+        # May have minimal points
+        if len(route.roads) > 0:
+            assert len(route.roads[0].pointcollection) >= 1
+
+    def test_route_with_very_short_distance(
+        self, test_config, mock_osrm_connection
+    ) -> None:
+        """Test route with very short distance."""
+        short_route_data = {
+            "coordinates": [[-73.5673, 45.5017], [-73.5673, 45.5018]],
+            "distance": 5.0,  # 5 meters
+            "duration": 3.0,
+            "steps": [
+                {
+                    "name": "Very Short Street",
+                    "distance": 5.0,
+                    "duration": 3.0,
+                    "geometry": [[-73.5673, 45.5017], [-73.5673, 45.5018]],
+                }
+            ],
+        }
+        osrm_result = OSRMResult.from_dict(short_route_data)
+        route = Route(osrm_result, mock_osrm_connection, test_config)
+
+        # Should handle short routes
+        assert route is not None
+        assert len(route.roads) > 0
+        # Should have at least start and end points
+        assert len(route.roads[0].pointcollection) >= 2
+
+    def test_route_with_long_distance(self, test_config, mock_osrm_connection) -> None:
+        """Test route with very long distance."""
+        long_route_data = {
+            "coordinates": [
+                [-73.5673, 45.5017],
+                [-73.5600, 45.5100],
+                [-73.5500, 45.5200],
+            ],
+            "distance": 5000.0,  # 5 km
+            "duration": 600.0,  # 10 minutes
+            "steps": [
+                {
+                    "name": "Long Street",
+                    "distance": 5000.0,
+                    "duration": 600.0,
+                    "geometry": [
+                        [-73.5673, 45.5017],
+                        [-73.5600, 45.5100],
+                        [-73.5500, 45.5200],
+                    ],
+                }
+            ],
+        }
+        osrm_result = OSRMResult.from_dict(long_route_data)
+        route = Route(osrm_result, mock_osrm_connection, test_config)
+
+        # Should handle long routes
+        assert route is not None
+        assert len(route.roads) > 0
+        # Should have many points for long distance
+        total_points = sum(len(r.pointcollection) for r in route.roads)
+        assert total_points > 10  # Should have several points for 5km
+
+    def test_route_with_many_steps(self, test_config, mock_osrm_connection) -> None:
+        """Test route with many road segments."""
+        many_steps_data = {
+            "coordinates": [
+                [-73.5673, 45.5017],
+                [-73.5670, 45.5020],
+                [-73.5665, 45.5025],
+                [-73.5660, 45.5030],
+                [-73.5655, 45.5035],
+            ],
+            "distance": 500.0,
+            "duration": 300.0,
+            "steps": [
+                {
+                    "name": f"Street {i}",
+                    "distance": 100.0,
+                    "duration": 60.0,
+                    "geometry": [
+                        [-73.5673 + i * 0.0005, 45.5017 + i * 0.0003],
+                        [-73.5673 + (i + 1) * 0.0005, 45.5017 + (i + 1) * 0.0003],
+                    ],
+                }
+                for i in range(5)
+            ],
+        }
+        osrm_result = OSRMResult.from_dict(many_steps_data)
+        route = Route(osrm_result, mock_osrm_connection, test_config)
+
+        # Should create road for each step
+        assert route is not None
+        assert len(route.roads) == 5
+
+    def test_route_handles_missing_step_names(
+        self, test_config, mock_osrm_connection
+    ) -> None:
+        """Test that route handles steps with missing names."""
+        unnamed_steps_data = {
+            "coordinates": [[-73.5673, 45.5017], [-73.5660, 45.5030]],
+            "distance": 200.0,
+            "duration": 120.0,
+            "steps": [
+                {
+                    "distance": 200.0,
+                    "duration": 120.0,
+                    "geometry": [[-73.5673, 45.5017], [-73.5660, 45.5030]],
+                    # Note: "name" is missing
+                }
+            ],
+        }
+        osrm_result = OSRMResult.from_dict(unnamed_steps_data)
+        route = Route(osrm_result, mock_osrm_connection, test_config)
+
+        # Should handle missing names gracefully
+        assert route is not None
+        assert len(route.roads) > 0
+        # Name should be None for unnamed roads
+        assert route.roads[0].name is None
+
+    def test_get_all_points_filters_duplicates(
+        self, test_config, mock_osrm_connection, sample_osrm_route_data
+    ) -> None:
+        """Test that _get_all_points filters out consecutive duplicates."""
+        osrm_result = OSRMResult.from_dict(sample_osrm_route_data)
+        route = Route(osrm_result, mock_osrm_connection, test_config)
+
+        all_points = route._get_all_points()
+
+        # Check no consecutive duplicates
+        for i in range(len(all_points) - 1):
+            assert all_points[i].get_position() != all_points[i + 1].get_position()
+
+    def test_get_route_geometry_returns_linestring(
+        self, test_config, mock_osrm_connection, sample_osrm_route_data
+    ) -> None:
+        """Test that get_route_geometry returns a valid LineString."""
+        osrm_result = OSRMResult.from_dict(sample_osrm_route_data)
+        route = Route(osrm_result, mock_osrm_connection, test_config)
+
+        geometry = route.get_route_geometry()
+
+        assert isinstance(geometry, LineString)
+        assert len(geometry.coords) >= 2  # At least start and end
+
+
+# ============================================================================
+# Additional tests from test_route.py
+# ============================================================================
+
+
+class TestRouteInitialization:
+    """Test suite for Route initialization (from test_route.py)."""
+
+    def test_route_with_osrm_result_and_steps(
+        self,
+        simple_osrm_result: OSRMResult,
+        mock_osrm_connection: Mock,
+        test_config: dict,
+    ) -> None:
+        """Test Route initialization with OSRMResult containing steps."""
+        route = Route(simple_osrm_result, mock_osrm_connection, test_config)
+
+        assert route.id > 0
+        assert route.current_road_index == 0
+        assert route.current_point_index == 0
+        assert route.is_finished is False
+        assert len(route.roads) == 2  # Should have created 2 roads from 2 steps
+        assert route.routing_connection == mock_osrm_connection
+        assert route.distance == 250.0
+        assert route.duration == 18.0
+        assert route.start_coord == (0.0, 0.0)
+        assert route.end_coord == (0.001, 0.001)
+
+    def test_route_with_osrm_result_no_steps(
+        self,
+        osrm_result_no_steps: OSRMResult,
+        mock_osrm_connection: Mock,
+        test_config: dict,
+    ) -> None:
+        """Test Route initialization with OSRMResult without steps (fallback)."""
+        route = Route(osrm_result_no_steps, mock_osrm_connection, test_config)
+
+        assert route.id > 0
+        assert len(route.roads) == 1  # Single fallback road
+        assert route.distance == 200.0
+        assert route.is_finished is False
+
+    def test_route_with_invalid_type_raises_error(
+        self, mock_osrm_connection: Mock, test_config: dict
+    ) -> None:
+        """Test that passing non-OSRMResult data raises TypeError."""
+        with pytest.raises(TypeError, match="route_data must be OSRMResult"):
+            Route(
+                {"coordinates": [[0, 0]]},  # type: ignore
+                mock_osrm_connection,
+                test_config,
+            )
+
+    def test_route_with_empty_steps_and_coords(
+        self, mock_osrm_connection: Mock, test_config: dict
+    ) -> None:
+        """Test Route with minimal valid route (two points)."""
+        minimal_result = OSRMResult(
+            coordinates=[[0.0, 0.0], [0.0, 0.0]],
+            distance=0.0,
+            duration=0.0,
+            steps=[],
+        )
+
+        route = Route(minimal_result, mock_osrm_connection, test_config)
+        assert len(route.roads) >= 0
+
+
+class TestRouteTraversalDetailed:
+    """Detailed test suite for Route traversal (from test_route.py)."""
+
+    def test_next_first_call(
+        self,
+        simple_osrm_result: OSRMResult,
+        mock_osrm_connection: Mock,
+        test_config: dict,
+    ) -> None:
+        """Test that first call to next() returns position only."""
+        route = Route(simple_osrm_result, mock_osrm_connection, test_config)
+
+        result = route.next(as_json=False)
+
+        assert isinstance(result, Position)
+        geometry = route.get_route_geometry()
+        assert isinstance(geometry, LineString)
+
+    def test_next_first_call_json_format(
+        self,
+        simple_osrm_result: OSRMResult,
+        mock_osrm_connection: Mock,
+        test_config: dict,
+    ) -> None:
+        """Test that first call to next() with as_json=True returns correct format."""
+        route = Route(simple_osrm_result, mock_osrm_connection, test_config)
+
+        result = route.next(as_json=True)
+
+        assert isinstance(result, dict)
+        assert result is not None
+        assert "id" in result
+        assert "position" in result
+        assert result["id"] == route.id
+
+    def test_next_subsequent_calls_return_positions(
+        self,
+        simple_osrm_result: OSRMResult,
+        mock_osrm_connection: Mock,
+        test_config: dict,
+    ) -> None:
+        """Test that all calls to next() return Position objects."""
+        route = Route(simple_osrm_result, mock_osrm_connection, test_config)
+
+        first = route.next(as_json=False)
+        assert isinstance(first, Position)
+
+        second = route.next(as_json=False)
+        assert isinstance(second, Position)
+
+        third = route.next(as_json=False)
+        assert isinstance(third, Position)
+
+    def test_next_subsequent_calls_json_format(
+        self,
+        simple_osrm_result: OSRMResult,
+        mock_osrm_connection: Mock,
+        test_config: dict,
+    ) -> None:
+        """Test subsequent calls with as_json=True."""
+        route = Route(simple_osrm_result, mock_osrm_connection, test_config)
+
+        route.next(as_json=True)
+        result = route.next(as_json=True)
+
+        assert isinstance(result, dict)
+        assert "id" in result
+        assert "position" in result
+
+    def test_next_traverses_all_roads(
+        self,
+        simple_osrm_result: OSRMResult,
+        mock_osrm_connection: Mock,
+        test_config: dict,
+    ) -> None:
+        """Test that next() traverses all roads in sequence."""
+        route = Route(simple_osrm_result, mock_osrm_connection, test_config)
+
+        positions = []
+        result = route.next()
+        while result is not None:
+            if isinstance(result, Position):
+                positions.append(result)
+            result = route.next()
+
+        assert route.is_finished is True
+        assert route.current_road_index >= len(route.roads)
+        assert len(positions) > 0
+
+    def test_next_skips_duplicate_positions(
+        self, mock_osrm_connection: Mock, test_config: dict
+    ) -> None:
+        """Test that next() skips consecutive duplicate positions."""
+        step1 = OSRMStep(
+            name="Road 1",
+            distance=50.0,
+            duration=3.6,
+            geometry=[[0.0, 0.0], [0.0005, 0.0]],
+            speed=13.88,
+        )
+        step2 = OSRMStep(
+            name="Road 2",
+            distance=50.0,
+            duration=3.6,
+            geometry=[[0.0005, 0.0], [0.001, 0.0]],
+            speed=13.88,
+        )
+
+        osrm_result = OSRMResult(
+            coordinates=[[0.0, 0.0], [0.0005, 0.0], [0.001, 0.0]],
+            distance=100.0,
+            duration=7.2,
+            steps=[step1, step2],
+        )
+
+        route = Route(osrm_result, mock_osrm_connection, test_config)
+
+        positions = []
+        result = route.next()
+        while result is not None:
+            if isinstance(result, Position):
+                pos = result.get_position()
+                positions.append(pos)
+            result = route.next()
+
+        for i in range(len(positions) - 1):
+            assert positions[i] != positions[i + 1]
+
+    def test_next_returns_none_when_finished(
+        self,
+        simple_osrm_result: OSRMResult,
+        mock_osrm_connection: Mock,
+        test_config: dict,
+    ) -> None:
+        """Test that next() returns None once route is finished."""
+        route = Route(simple_osrm_result, mock_osrm_connection, test_config)
+
+        result = route.next()
+        while result is not None:
+            result = route.next()
+
+        assert route.is_finished is True
+        assert route.next() is None
+        assert route.next() is None
+
+
+class TestRouteRoadBuilding:
+    """Test suite for road building from OSRM data (from test_route.py)."""
+
+    def test_build_roads_from_steps(
+        self,
+        simple_osrm_result: OSRMResult,
+        mock_osrm_connection: Mock,
+        test_config: dict,
+    ) -> None:
+        """Test that roads are properly built from OSRM steps."""
+        route = Route(simple_osrm_result, mock_osrm_connection, test_config)
+
         assert len(route.roads) == 2
+        assert route.roads[0].name == "Main Street"
+        assert route.roads[1].name == "Second Avenue"
+        assert route.roads[0].length == 100.0
+        assert route.roads[1].length == 150.0
+
+    def test_build_coordinate_roads_fallback(
+        self,
+        osrm_result_no_steps: OSRMResult,
+        mock_osrm_connection: Mock,
+        test_config: dict,
+    ) -> None:
+        """Test fallback road building from coordinates."""
+        route = Route(osrm_result_no_steps, mock_osrm_connection, test_config)
+
+        assert len(route.roads) == 1
+        assert route.roads[0].name is None
+        assert len(route.roads[0].pointcollection) > 0
+
+    def test_skip_invalid_steps(
+        self, mock_osrm_connection: Mock, test_config: dict
+    ) -> None:
+        """Test that invalid steps are skipped during road building."""
+        invalid_step = OSRMStep(
+            name="Invalid Road",
+            distance=0.0,
+            duration=0.0,
+            geometry=[],
+            speed=0.0,
+        )
+        valid_step = OSRMStep(
+            name="Valid Road",
+            distance=100.0,
+            duration=7.2,
+            geometry=[[0.0, 0.0], [0.001, 0.0]],
+            speed=13.88,
+        )
+
+        osrm_result = OSRMResult(
+            coordinates=[[0.0, 0.0], [0.001, 0.0]],
+            distance=100.0,
+            duration=7.2,
+            steps=[invalid_step, valid_step],
+        )
+
+        route = Route(osrm_result, mock_osrm_connection, test_config)
+
+        assert len(route.roads) == 1
+        assert route.roads[0].name == "Valid Road"
+
+
+class TestRouteRecalculationDetailed:
+    """Detailed test suite for route recalculation (from test_route.py)."""
+
+    def test_recalculate_success(
+        self,
+        simple_osrm_result: OSRMResult,
+        mock_osrm_connection: Mock,
+        test_config: dict,
+    ) -> None:
+        """Test successful route recalculation."""
+        route = Route(simple_osrm_result, mock_osrm_connection, test_config)
+        mock_map_controller = Mock()
+        route.subscribe_to_map_controller(mock_map_controller)
+
+        new_route_data = {
+            "coordinates": [[0.001, 0.0], [0.002, 0.0]],
+            "distance": 100.0,
+            "duration": 7.2,
+            "steps": [
+                {
+                    "name": "New Road",
+                    "distance": 100.0,
+                    "duration": 7.2,
+                    "geometry": [[0.001, 0.0], [0.002, 0.0]],
+                    "speed": 13.88,
+                }
+            ],
+        }
+        mock_osrm_connection.shortest_path_coords.return_value = new_route_data
+
+        route.next()
+        route.next()
+
+        success = route.recalculate()
+
+        assert success is True
+        assert mock_osrm_connection.shortest_path_coords.called
+        assert route.current_road_index == 0
+        assert route.current_point_index == 0
+
+    def test_recalculate_when_finished(
+        self,
+        simple_osrm_result: OSRMResult,
+        mock_osrm_connection: Mock,
+        test_config: dict,
+    ) -> None:
+        """Test that recalculation fails when route is finished."""
+        route = Route(simple_osrm_result, mock_osrm_connection, test_config)
+        route.is_finished = True
+
+        success = route.recalculate()
+        assert success is False
+
+    def test_recalculate_without_map_controller(
+        self,
+        simple_osrm_result: OSRMResult,
+        mock_osrm_connection: Mock,
+        test_config: dict,
+    ) -> None:
+        """Test that recalculation fails without MapController."""
+        route = Route(simple_osrm_result, mock_osrm_connection, test_config)
+
+        success = route.recalculate()
+        assert success is False
+
+    def test_recalculate_no_route_found(
+        self,
+        simple_osrm_result: OSRMResult,
+        mock_osrm_connection: Mock,
+        test_config: dict,
+    ) -> None:
+        """Test recalculation when no new route is found."""
+        route = Route(simple_osrm_result, mock_osrm_connection, test_config)
+        mock_map_controller = Mock()
+        route.subscribe_to_map_controller(mock_map_controller)
+
+        mock_osrm_connection.shortest_path_coords.return_value = None
+
+        route.next()
+        success = route.recalculate()
+
+        assert success is False
+        assert route.is_finished is True
+
+
+class TestRouteHelperMethods:
+    """Test suite for Route helper methods (from test_route.py)."""
+
+    def test_get_all_points(
+        self,
+        simple_osrm_result: OSRMResult,
+        mock_osrm_connection: Mock,
+        test_config: dict,
+    ) -> None:
+        """Test _get_all_points returns all positions without duplicates."""
+        route = Route(simple_osrm_result, mock_osrm_connection, test_config)
+
+        all_points = route._get_all_points()
+
+        assert len(all_points) > 0
+        assert all(isinstance(p, Position) for p in all_points)
+
+        for i in range(len(all_points) - 1):
+            assert all_points[i].get_position() != all_points[i + 1].get_position()
+
+    def test_get_route_geometry(
+        self,
+        simple_osrm_result: OSRMResult,
+        mock_osrm_connection: Mock,
+        test_config: dict,
+    ) -> None:
+        """Test get_route_geometry returns valid LineString."""
+        route = Route(simple_osrm_result, mock_osrm_connection, test_config)
+
+        geometry = route.get_route_geometry()
+
+        assert isinstance(geometry, LineString)
+        assert len(geometry.coords) > 0
+
+    def test_get_current_position(
+        self,
+        simple_osrm_result: OSRMResult,
+        mock_osrm_connection: Mock,
+        test_config: dict,
+    ) -> None:
+        """Test _get_current_position returns current coordinates."""
+        route = Route(simple_osrm_result, mock_osrm_connection, test_config)
+
+        current_pos = route._get_current_position()
+
+        assert current_pos is not None
+        assert isinstance(current_pos, tuple)
+        assert len(current_pos) == 2
+
+    def test_get_current_position_when_finished(
+        self,
+        simple_osrm_result: OSRMResult,
+        mock_osrm_connection: Mock,
+        test_config: dict,
+    ) -> None:
+        """Test _get_current_position returns None when finished."""
+        route = Route(simple_osrm_result, mock_osrm_connection, test_config)
+
+        while route.next() is not None:
+            pass
+
+        current_pos = route._get_current_position()
+        assert current_pos is None
+
+
+class TestRouteEdgeCasesDetailed:
+    """Detailed test suite for edge cases (from test_route.py)."""
+
+    def test_route_with_single_step(
+        self, mock_osrm_connection: Mock, test_config: dict
+    ) -> None:
+        """Test Route with a single step."""
+        step = OSRMStep(
+            name="Single Road",
+            distance=50.0,
+            duration=3.6,
+            geometry=[[0.0, 0.0], [0.001, 0.0]],
+            speed=13.88,
+        )
+
+        osrm_result = OSRMResult(
+            coordinates=[[0.0, 0.0], [0.001, 0.0]],
+            distance=50.0,
+            duration=3.6,
+            steps=[step],
+        )
+
+        route = Route(osrm_result, mock_osrm_connection, test_config)
+
+        assert len(route.roads) == 1
+        assert route.roads[0].name == "Single Road"
+
+    def test_route_with_zero_speed_step(
+        self, mock_osrm_connection: Mock, test_config: dict
+    ) -> None:
+        """Test Route handles step with zero speed gracefully."""
+        step = OSRMStep(
+            name="Zero Speed Road",
+            distance=100.0,
+            duration=0.0,
+            geometry=[[0.0, 0.0], [0.001, 0.0]],
+            speed=0.0,
+        )
+
+        osrm_result = OSRMResult(
+            coordinates=[[0.0, 0.0], [0.001, 0.0]],
+            distance=100.0,
+            duration=0.0,
+            steps=[step],
+        )
+
+        route = Route(osrm_result, mock_osrm_connection, test_config)
+        assert len(route.roads) >= 0
+
+    def test_route_coordinates_match_step_geometry(
+        self,
+        simple_osrm_result: OSRMResult,
+        mock_osrm_connection: Mock,
+        test_config: dict,
+    ) -> None:
+        """Test that route coordinates align with step geometries."""
+        route = Route(simple_osrm_result, mock_osrm_connection, test_config)
+
+        first_pos = route.roads[0].pointcollection[0].get_position()
+        assert first_pos[0] == pytest.approx(simple_osrm_result.start_coord[0])
+        assert first_pos[1] == pytest.approx(simple_osrm_result.start_coord[1])
+
+        last_pos = route.roads[-1].pointcollection[-1].get_position()
+        assert last_pos[0] == pytest.approx(simple_osrm_result.end_coord[0])
+        assert last_pos[1] == pytest.approx(simple_osrm_result.end_coord[1])

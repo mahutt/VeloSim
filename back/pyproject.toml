@@ -1,3 +1,43 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "velosim-back"
+version = "1.0.0"
+description = "VeloSim Backend API"
+requires-python = ">=3.11"
+dependencies = [
+    "fastapi>=0.104.0",
+    "uvicorn[standard]>=0.24.0",
+    "sqlalchemy>=2.0.0",
+    "psycopg2-binary>=2.9.0",
+    "python-dotenv>=1.0.0",
+    "pydantic>=2.5.0",
+    "pydantic-settings>=2.1.0",
+    "alembic>=1.13.0",
+    "argon2-cffi>=25.1.0",
+    "python-multipart>=0.0.20",
+    "PyJWT>=2.10.1",
+    "requests>=2.31.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.4.0",
+    "pytest-asyncio>=0.21.0",
+    "pytest-cov>=4.1.0",
+    "httpx>=0.25.0",
+    "coverage>=7.0.0",
+    "black>=25.9.0",
+    "flake8>=7.3.0",
+    "mypy>=1.18.2",
+]
+
+[tool.setuptools.packages.find]
+# Explicitly include all backend packages
+include = ["api*", "auth*", "core*", "crud*", "models*", "schemas*", "database*", "services*", "exceptions*", "grafana_logging*", "alembic*"]
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 python_files = ["test_*.py", "*_test.py"]

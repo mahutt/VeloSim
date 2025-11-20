@@ -156,7 +156,17 @@ class Resource:
         if self.position == position:
             return
 
-        route = self.map_controller.getRoute(self.position, position)
+        try:
+            route = self.map_controller.getRoute(self.position, position)
+        except ValueError as e:
+            # Route could not be found (no path exists, network error, etc.)
+            # Log the error and stay at current position
+            print(
+                f"Resource {self.id}: Cannot find route to "
+                f"{position.get_position()}: {e}"
+            )
+            return
+
         self.current_route = route
         next_position = route.next()
         try:

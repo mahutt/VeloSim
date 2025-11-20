@@ -85,6 +85,42 @@ def run_command(cmd: list, check: bool = True, capture: bool = False) -> subproc
         raise
 
 
+def check_psql_available() -> bool:
+    """Check if psql command is available."""
+    try:
+        subprocess.run(['psql', '--version'], capture_output=True, check=True, timeout=2)
+        return True
+    except (subprocess.CalledProcessError, FileNotFoundError, subprocess.TimeoutExpired):
+        return False
+
+
+def check_docker_available() -> bool:
+    """Check if docker command is available."""
+    try:
+        subprocess.run(['docker', '--version'], capture_output=True, check=True, timeout=2)
+        return True
+    except (subprocess.CalledProcessError, FileNotFoundError, subprocess.TimeoutExpired):
+        return False
+
+
+def get_postgres_container_name() -> str:
+    """Get the name of the running PostgreSQL container."""
+    try:
+        result = subprocess.run(
+            ['docker', 'ps', '--filter', 'ancestor=postgres:15-alpine', '--format', '{{.Names}}'],
+            capture_output=True,
+            text=True,
+            check=True,
+            timeout=5
+        )
+        containers = result.stdout.strip().split('\n')
+        if containers and containers[0]:
+            return containers[0]
+    except (subprocess.CalledProcessError, FileNotFoundError, subprocess.TimeoutExpired):
+        pass
+    return 'velosim-postgres'  # Default container name
+
+
 def run_psql_command(sql: str, db_name: str = None) -> bool:
     """Run a PostgreSQL command using the configured database."""
     db_config = parse_database_url(DATABASE_URL)
@@ -141,20 +177,47 @@ def seed_database():
     # Verify database connection before attempting to seed
     print(f"INFO  [velosim.db_manager] Connecting to database: {db_config['database']} at {db_config['host']}:{db_config['port']}")
 
+    # Determine whether to use psql directly or via Docker
+    use_docker = False
+    container_name = None
+
+    psql_available = check_psql_available()
+    if not psql_available:
+        print("INFO  [velosim.db_manager] psql command not found, checking for Docker...")
+        if check_docker_available():
+            container_name = get_postgres_container_name()
+            print(f"INFO  [velosim.db_manager] Using Docker container: {container_name}")
+            use_docker = True
+        else:
+            print("ERROR [velosim.db_manager] Neither psql nor Docker is available")
+            print("ERROR [velosim.db_manager] Please install PostgreSQL client tools or Docker")
+            return False
+    else:
+        print("INFO  [velosim.db_manager] Using local psql command")
+
     # Set password environment variable if provided
     env = os.environ.copy()
     if db_config['password']:
         env['PGPASSWORD'] = db_config['password']
 
     # Test database connection first
-    test_cmd = [
-        'psql',
-        '-h', db_config['host'],
-        '-p', str(db_config['port']),
-        '-U', db_config['username'],
-        '-d', db_config['database'],
-        '-c', 'SELECT 1;'
-    ]
+    if use_docker:
+        test_cmd = [
+            'docker', 'exec', '-i', container_name,
+            'psql',
+            '-U', db_config['username'],
+            '-d', db_config['database'],
+            '-c', 'SELECT 1;'
+        ]
+    else:
+        test_cmd = [
+            'psql',
+            '-h', db_config['host'],
+            '-p', str(db_config['port']),
+            '-U', db_config['username'],
+            '-d', db_config['database'],
+            '-c', 'SELECT 1;'
+        ]
 
     try:
         subprocess.run(test_cmd, env=env, check=True, capture_output=True, text=True, timeout=5)
@@ -176,54 +239,89 @@ def seed_database():
     for seed_file in seed_files:
         print(f"INFO  [velosim.db_manager] Processing seed file: {seed_file.name}")
 
-        cmd = [
-            'psql',
-            '-h', db_config['host'],
-            '-p', str(db_config['port']),
-            '-U', db_config['username'],
-            '-d', db_config['database'],
-            '-v', 'ON_ERROR_STOP=1',  # Stop on first error
-            '-f', str(seed_file)
-        ]
+        if use_docker:
+            # For Docker on Windows, copy file to container and execute there to avoid encoding issues
+            try:
+                # Copy the seed file to the container
+                copy_cmd = [
+                    'docker', 'cp',
+                    str(seed_file),
+                    f'{container_name}:/tmp/seed.sql'
+                ]
+                subprocess.run(copy_cmd, check=True, capture_output=True, text=True)
 
-        try:
-            result = subprocess.run(cmd, env=env, check=True, capture_output=True, text=True)
+                # Execute the SQL file inside the container
+                cmd = [
+                    'docker', 'exec', '-i', container_name,
+                    'psql',
+                    '-U', db_config['username'],
+                    '-d', db_config['database'],
+                    '-v', 'ON_ERROR_STOP=1',
+                    '-f', '/tmp/seed.sql'
+                ]
 
-            # Show output if there are any notices/warnings
-            if result.stdout and result.stdout.strip():
-                print(f"INFO  [velosim.db_manager] Output from {seed_file.name}:")
-                for line in result.stdout.strip().split('\n'):
-                    if line.strip():
-                        print(f"      {line}")
+                result = subprocess.run(
+                    cmd,
+                    env=env,
+                    check=True,
+                    capture_output=True,
+                    text=True
+                )
 
-            if result.stderr and result.stderr.strip():
-                # Some messages go to stderr even on success (like NOTICE)
-                for line in result.stderr.strip().split('\n'):
-                    if 'ERROR' in line.upper():
-                        print(f"ERROR [velosim.db_manager] {line}")
-                    elif 'WARNING' in line.upper():
-                        print(f"WARN  [velosim.db_manager] {line}")
-                    else:
-                        print(f"INFO  [velosim.db_manager] {line}")
+                # Clean up
+                cleanup_cmd = ['docker', 'exec', container_name, 'rm', '/tmp/seed.sql']
+                subprocess.run(cleanup_cmd, capture_output=True)
+            except subprocess.CalledProcessError as e:
+                print(f"ERROR [velosim.db_manager] Failed to process {seed_file.name}")
+                print(f"ERROR [velosim.db_manager] Exit code: {e.returncode}")
+                if e.stdout:
+                    print(f"ERROR [velosim.db_manager] Output: {e.stdout}")
+                if e.stderr:
+                    print(f"ERROR [velosim.db_manager] Error: {e.stderr}")
+                failed_files.append(seed_file.name)
+                continue
+            except Exception as e:
+                print(f"ERROR [velosim.db_manager] Failed to process {seed_file.name}: {e}")
+                failed_files.append(seed_file.name)
+                continue
+        else:
+            cmd = [
+                'psql',
+                '-h', db_config['host'],
+                '-p', str(db_config['port']),
+                '-U', db_config['username'],
+                '-d', db_config['database'],
+                '-v', 'ON_ERROR_STOP=1',  # Stop on first error
+                '-f', str(seed_file)
+            ]
 
-            print(f"INFO  [velosim.db_manager] ✅ Successfully processed: {seed_file.name}")
+            try:
+                result = subprocess.run(cmd, env=env, check=True, capture_output=True, text=True)
+            except subprocess.CalledProcessError as e:
+                print(f"ERROR [velosim.db_manager] Failed to process {seed_file.name}")
+                if e.stderr:
+                    print(f"ERROR [velosim.db_manager] Error details: {e.stderr.strip()}")
+                failed_files.append(seed_file.name)
+                continue
 
-        except subprocess.CalledProcessError as e:
-            print(f"ERROR [velosim.db_manager] ❌ Failed to process {seed_file.name}")
-            print(f"ERROR [velosim.db_manager] Exit code: {e.returncode}")
-
-            if e.stdout and e.stdout.strip():
-                print(f"ERROR [velosim.db_manager] Output:")
-                for line in e.stdout.strip().split('\n'):
+        # Show output if there are any notices/warnings
+        if result.stdout and result.stdout.strip():
+            print(f"INFO  [velosim.db_manager] Output from {seed_file.name}:")
+            for line in result.stdout.strip().split('\n'):
+                if line.strip():
                     print(f"      {line}")
 
-            if e.stderr and e.stderr.strip():
-                print(f"ERROR [velosim.db_manager] Error details:")
-                for line in e.stderr.strip().split('\n'):
-                    print(f"      {line}")
+        if result.stderr and result.stderr.strip():
+            # Some messages go to stderr even on success (like NOTICE)
+            for line in result.stderr.strip().split('\n'):
+                if 'ERROR' in line.upper():
+                    print(f"ERROR [velosim.db_manager] {line}")
+                elif 'WARNING' in line.upper():
+                    print(f"WARN  [velosim.db_manager] {line}")
+                else:
+                    print(f"INFO  [velosim.db_manager] {line}")
 
-            failed_files.append(seed_file.name)
-            # Continue to show all errors, but track failures
+        print(f"INFO  [velosim.db_manager] ✅ Successfully processed: {seed_file.name}")
 
     # Report results
     if failed_files:

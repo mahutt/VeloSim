@@ -173,7 +173,7 @@ def test_start_creates_thread_and_emits_output(
     assert sim_info is not None
     ctrl = sim_info["simController"]
     with (
-        patch.object(ctrl.map_controller.osm, "build_ch_network", return_value=None),
+        patch.object(ctrl.map_controller.osrm, "build_ch_network", return_value=None),
         patch.object(
             ctrl.map_controller, "getRoute", return_value=SimpleNamespace(roads=[1])
         ),
@@ -218,7 +218,7 @@ def test_start_with_already_running_sim(
     assert sim_info is not None
     ctrl = sim_info["simController"]
     with (
-        patch.object(ctrl.map_controller.osm, "build_ch_network", return_value=None),
+        patch.object(ctrl.map_controller.osrm, "build_ch_network", return_value=None),
         patch.object(
             ctrl.map_controller, "getRoute", return_value=SimpleNamespace(roads=[1])
         ),
@@ -243,7 +243,7 @@ def test_stop_removes_thread_from_pool(
     assert sim_info is not None
     ctrl = sim_info["simController"]
     with (
-        patch.object(ctrl.map_controller.osm, "build_ch_network", return_value=None),
+        patch.object(ctrl.map_controller.osrm, "build_ch_network", return_value=None),
         patch.object(
             ctrl.map_controller,
             "getRoute",
@@ -284,13 +284,13 @@ def test_multiple_parallel_sims(
     a_ctrl = a_info["simController"]
     b_ctrl = b_info["simController"]
     with (
-        patch.object(a_ctrl.map_controller.osm, "build_ch_network", return_value=None),
+        patch.object(a_ctrl.map_controller.osrm, "build_ch_network", return_value=None),
         patch.object(
             a_ctrl.map_controller,
             "getRoute",
             return_value=SimpleNamespace(roads=[1]),
         ),
-        patch.object(b_ctrl.map_controller.osm, "build_ch_network", return_value=None),
+        patch.object(b_ctrl.map_controller.osrm, "build_ch_network", return_value=None),
         patch.object(
             b_ctrl.map_controller,
             "getRoute",
@@ -430,7 +430,7 @@ def test_get_sim_by_id_success(
     assert a_info is not None
     ctrl = a_info["simController"]
     with (
-        patch.object(ctrl.map_controller.osm, "build_ch_network", return_value=None),
+        patch.object(ctrl.map_controller.osrm, "build_ch_network", return_value=None),
         patch.object(
             ctrl.map_controller,
             "getRoute",
@@ -460,7 +460,7 @@ def test_get_sim_by_id_fail(
     assert a_info is not None
     ctrl = a_info["simController"]
     with (
-        patch.object(ctrl.map_controller.osm, "build_ch_network", return_value=None),
+        patch.object(ctrl.map_controller.osrm, "build_ch_network", return_value=None),
         patch.object(
             ctrl.map_controller,
             "getRoute",
@@ -490,7 +490,7 @@ def test_add_task_to_sim_success(
     assert a_info is not None
     ctrl = a_info["simController"]
     with (
-        patch.object(ctrl.map_controller.osm, "build_ch_network", return_value=None),
+        patch.object(ctrl.map_controller.osrm, "build_ch_network", return_value=None),
         patch.object(
             ctrl.map_controller,
             "getRoute",
@@ -533,7 +533,7 @@ def test_add_task_to_sim_fail(
     assert a_info is not None
     ctrl = a_info["simController"]
     with (
-        patch.object(ctrl.map_controller.osm, "build_ch_network", return_value=None),
+        patch.object(ctrl.map_controller.osrm, "build_ch_network", return_value=None),
         patch.object(
             ctrl.map_controller,
             "getRoute",
@@ -565,7 +565,7 @@ def test_assign_task_to_resource_success(
     assert a_info is not None
     ctrl = a_info["simController"]
     with (
-        patch.object(ctrl.map_controller.osm, "build_ch_network", return_value=None),
+        patch.object(ctrl.map_controller.osrm, "build_ch_network", return_value=None),
         patch.object(
             ctrl.map_controller,
             "getRoute",
@@ -598,7 +598,7 @@ def test_assign_task_to_resource_fail(
     assert a_info is not None
     ctrl = a_info["simController"]
     with (
-        patch.object(ctrl.map_controller.osm, "build_ch_network", return_value=None),
+        patch.object(ctrl.map_controller.osrm, "build_ch_network", return_value=None),
         patch.object(
             ctrl.map_controller,
             "getRoute",
@@ -624,7 +624,7 @@ def test_unassign_task_from_resource_success(
     assert a_info is not None
     ctrl = a_info["simController"]
     with (
-        patch.object(ctrl.map_controller.osm, "build_ch_network", return_value=None),
+        patch.object(ctrl.map_controller.osrm, "build_ch_network", return_value=None),
         patch.object(
             ctrl.map_controller,
             "getRoute",
@@ -656,7 +656,7 @@ def test_unassign_task_from_resource_fail(
     assert a_info is not None
     ctrl = a_info["simController"]
     with (
-        patch.object(ctrl.map_controller.osm, "build_ch_network", return_value=None),
+        patch.object(ctrl.map_controller.osrm, "build_ch_network", return_value=None),
         patch.object(
             ctrl.map_controller,
             "getRoute",
@@ -680,7 +680,7 @@ def test_reassign_task_success(sim: Simulator, input_params: InputParameter) -> 
     assert a_info is not None
     ctrl = a_info["simController"]
     with (
-        patch.object(ctrl.map_controller.osm, "build_ch_network", return_value=None),
+        patch.object(ctrl.map_controller.osrm, "build_ch_network", return_value=None),
         patch.object(
             ctrl.map_controller,
             "getRoute",
@@ -720,7 +720,7 @@ def test_reassign_task_fail(
     assert a_info is not None
     ctrl = a_info["simController"]
     with (
-        patch.object(ctrl.map_controller.osm, "build_ch_network", return_value=None),
+        patch.object(ctrl.map_controller.osrm, "build_ch_network", return_value=None),
         patch.object(
             ctrl.map_controller,
             "getRoute",
@@ -761,7 +761,7 @@ def test_stop_all_stops_everything_and_is_idempotent(
         ctrl = sim_info["simController"]
         with (
             patch.object(
-                ctrl.map_controller.osm,
+                ctrl.map_controller.osrm,
                 "build_ch_network",
                 return_value=None,
             ),

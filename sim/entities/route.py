@@ -28,9 +28,7 @@ from sim.entities.road import Road
 from sim.entities.osrm_result import OSRMResult, OSRMStep
 from shapely.geometry import LineString
 import numpy as np
-import json
 import logging
-from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
@@ -54,6 +52,7 @@ class Route:
         self,
         route_data: Union[OSRMResult, List[int]],
         routing_connection: "OSRMConnection",
+        config: Dict,
     ) -> None:
         """
         Initialize a Route from OSRM result.
@@ -61,6 +60,7 @@ class Route:
         Args:
             route_data: OSRMResult instance with route geometry and metadata
             routing_connection: OSRMConnection instance for recalculation
+            config: Configuration dictionary with simulation settings
         """
         # Make this object unique.
         Route._route_counter += 1
@@ -76,6 +76,9 @@ class Route:
 
         # Store routing connection for recalculation
         self.routing_connection = routing_connection
+
+        # Store config for speed calculations
+        self.config = config
 
         # Handle OSRMResult route data
         if isinstance(route_data, OSRMResult):
@@ -130,12 +133,9 @@ class Route:
         if not steps:
             return []
 
-        # Load config for default speeds
-        config_path = Path(__file__).parent.parent / "config.json"
-        with open(config_path, "r") as f:
-            config = json.load(f)
-        conversion_factor = config["simulation"]["kmh_to_ms_factor"]
-        default_speed_kmh = config["simulation"]["map_rules"]["roads"][
+        # Get default speeds from config
+        conversion_factor = self.config["simulation"]["kmh_to_ms_factor"]
+        default_speed_kmh = self.config["simulation"]["map_rules"]["roads"][
             "default_road_max_speed"
         ]
         default_speed_ms = default_speed_kmh / conversion_factor
@@ -200,12 +200,9 @@ class Route:
         if not coordinates:
             return []
 
-        # Load config for speed calculations
-        config_path = Path(__file__).parent.parent / "config.json"
-        with open(config_path, "r") as f:
-            config = json.load(f)
-        conversion_factor = config["simulation"]["kmh_to_ms_factor"]
-        default_speed_kmh = config["simulation"]["map_rules"]["roads"][
+        # Get speed calculations from config
+        conversion_factor = self.config["simulation"]["kmh_to_ms_factor"]
+        default_speed_kmh = self.config["simulation"]["map_rules"]["roads"][
             "default_road_max_speed"
         ]
         max_speed_ms = default_speed_kmh / conversion_factor  # m/s
@@ -223,7 +220,8 @@ class Route:
         # Average approximation: 1° ≈ 95,000 meters
         length_meters = length_degrees * 95000.0
 
-        # If we have duration from OSRM, use it to calculate actual distance
+        # If we have distance from OSRM, use it directly
+        # (more accurate than approximation)
         if hasattr(self, "distance") and self.distance > 0:
             length_meters = self.distance
 

@@ -27,6 +27,8 @@ from sim.entities.route import Route
 from sim.entities.osrm_result import OSRMResult
 from sim.osm.OSRMConnection import OSRMConnection
 from typing import Dict, List, Set, Any, Optional
+import json
+from pathlib import Path
 
 
 class MapController:
@@ -51,6 +53,11 @@ class MapController:
             # Using set for O(1) add/remove operations
             self.road_subscriptions: Dict[int, Set[Route]] = {}
 
+            # Load config once for all routes
+            config_path = Path(__file__).parent.parent / "config.json"
+            with open(config_path, "r") as f:
+                self.config = json.load(f)
+
             self._initialized = True
 
     def getRoute(self, a: Position, b: Position) -> Route:
@@ -66,33 +73,49 @@ class MapController:
 
         Returns:
             Route: A new Route object subscribed to the MapController
+
+        Raises:
+            ValueError: If no route can be found between the two
+                positions
         """
         # 1. Get coordinates from positions
         start_lon, start_lat = a.get_position()
         end_lon, end_lat = b.get_position()
 
-        # 2. Get route from OSRM using coordinates
-        osrm_result_dict = self.osrm.shortest_path_coords(
-            start_lon, start_lat, end_lon, end_lat
-        )
-
-        if not osrm_result_dict:
-            raise ValueError(
-                f"No route found from ({start_lon}, {start_lat}) "
-                f"to ({end_lon}, {end_lat})"
+        try:
+            # 2. Get route from OSRM using coordinates
+            osrm_result_dict = self.osrm.shortest_path_coords(
+                start_lon, start_lat, end_lon, end_lat
             )
 
-        # 3. Convert OSRM dict to typed OSRMResult
-        osrm_result = OSRMResult.from_dict(osrm_result_dict)
+            if not osrm_result_dict:
+                raise ValueError(
+                    f"No route found from ({start_lon}, {start_lat}) "
+                    f"to ({end_lon}, {end_lat})"
+                )
 
-        # 4. Create a new route object with the typed result
-        traversable_route = Route(osrm_result, self.osrm)
+            # 3. Convert OSRM dict to typed OSRMResult
+            osrm_result = OSRMResult.from_dict(osrm_result_dict)
 
-        # 5. Subscribe all the roads to this route in the road_subscriptions dictionary
-        traversable_route.subscribe_to_map_controller(self)
+            # 4. Create a new route object with the typed result and injected config
+            traversable_route = Route(osrm_result, self.osrm, self.config)
 
-        # 6. return the route
-        return traversable_route
+            # 5. Subscribe all the roads to this route in the
+            # road_subscriptions dictionary
+            traversable_route.subscribe_to_map_controller(self)
+
+            # 6. return the route
+            return traversable_route
+
+        except ValueError:
+            # Re-raise ValueError as-is (route not found)
+            raise
+        except Exception as e:
+            # Catch any other errors (network issues, parsing errors, etc.)
+            raise ValueError(
+                f"Failed to create route from ({start_lon}, {start_lat}) "
+                f"to ({end_lon}, {end_lat}): {str(e)}"
+            ) from e
 
     def disableRoads(self, road_id_list: List[int]) -> None:
         """

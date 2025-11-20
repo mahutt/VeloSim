@@ -64,6 +64,7 @@ MIT_COMPATIBLE_LICENSES = {
     'BSD License',
     'BSD-2-Clause',
     'BSD-3-Clause',
+    'BSD 3-Clause',
     'Apache-2.0',
     'Apache 2.0',
     'Apache License 2.0',
@@ -150,6 +151,7 @@ KNOWN_PYTHON_PACKAGE_LICENSES = {
     'types-networkx': 'Apache-2.0',
     'types-shapely': 'Apache-2.0',
     'types-geopandas': 'Apache-2.0',
+    'pytest-asyncio': 'Apache-2.0',
 }
 
 def run_command(command: List[str], cwd: str = None) -> Tuple[int, str, str]:
@@ -318,6 +320,11 @@ def check_python_licenses() -> Tuple[bool, List[str], List[str], List[str]]:
                     elif 'License :: OSI Approved :: Mozilla Public License 2.0 (MPL 2.0)' in line:
                         if license_info == "UNKNOWN":
                             license_info = "Mozilla Public License 2.0 (MPL 2.0)"
+
+            # Use known license overrides for packages with UNKNOWN license
+            if license_info == "UNKNOWN" and dep_name in KNOWN_PYTHON_PACKAGE_LICENSES:
+                license_info = KNOWN_PYTHON_PACKAGE_LICENSES[dep_name]
+                print(f"   Using known license for {dep_name}: {license_info}")
 
         pkg_info = f"{dep_name} v{version_info}: {license_info}"
 

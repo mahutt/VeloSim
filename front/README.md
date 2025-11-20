@@ -1,13 +1,22 @@
 # VeloSim Front-End
 
-## Environment variables
+## Environment Variables
 
-Below is a list of secrets that should be defined in a `.env.local` file at the root of the `/front` directory. For each variable, instructions are provided on how to obtain / set a valid value.
+Environment variables are configured in the **root `.env` file** (located in the project root, one directory up from `/front`).
 
-- `VITE_MAPBOX_ACCESS_TOKEN`
-  - Visit the [Mapbox console](https://console.mapbox.com/) - you may need to sign in or create an account. In the top right corner of the home page, you'll find a "Default public token" section. Use the token provided there.
-- `VITE_BACKEND_URL`
-  - Set this environment variable to `http://localhost:8000` for development.
+**Required Configuration:**
+
+Add these variables to the root `.env` file:
+
+- **`MAPBOX_ACCESS_TOKEN`** (required)
+  - Mapbox access token for map rendering
+  - Get your token from [Mapbox Console](https://account.mapbox.com/)
+
+- **`BACKEND_URL`** (optional, defaults to `http://localhost:8000`)
+  - Backend API URL
+  - Use `http://localhost:8000` for local development
+
+The frontend automatically reads these variables from the root `.env` file via `vite.config.ts`.
 
 ## Testing
 

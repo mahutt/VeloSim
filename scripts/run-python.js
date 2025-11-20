@@ -27,9 +27,9 @@
 /**
  * Cross-platform Python runner for VeloSim
  * Flexibly detects and uses the appropriate Python interpreter based on developer preference:
- * 1. Active virtual environment Python
- * 2. System Python
- * 3. Project .venv Python
+ * 1. Active virtual environment Python (VIRTUAL_ENV env var)
+ * 2. Local .venv directories
+ * 3. System Python
  */
 
 const { spawn } = require('child_process');
@@ -40,7 +40,7 @@ const fs = require('fs');
 const isWindows = process.platform === 'win32';
 
 function findPythonExecutable() {
-  // Priority 1: Check if we're in an active virtual environment
+  // Priority 1: Respect active virtual environment (VIRTUAL_ENV)
   if (process.env.VIRTUAL_ENV) {
     const venvPython = isWindows
       ? path.join(process.env.VIRTUAL_ENV, 'Scripts', 'python.exe')
@@ -51,12 +51,7 @@ function findPythonExecutable() {
     }
   }
 
-  // Priority 2: If no virtual environment is active, use system Python
-  if (!process.env.VIRTUAL_ENV) {
-    return 'python';
-  }
-
-  // Priority 3: Fallback - check for .venv directories if VIRTUAL_ENV is set but corrupted
+  // Priority 2: Check for .venv directories
   const possibleVenvPaths = [
     path.join(process.cwd(), '.venv'),                    // Current directory
     path.join(process.cwd(), '..', '.venv'),              // Parent directory (from back/)
@@ -75,8 +70,8 @@ function findPythonExecutable() {
     }
   }
 
-  // Final fallback: Use system Python
-  return 'python';
+  // Final fallback: Use system Python (python3 on Unix, python on Windows)
+  return isWindows ? 'python' : 'python3';
 }
 
 function runPython(args) {
@@ -84,7 +79,7 @@ function runPython(args) {
 
   const child = spawn(pythonExecutable, args, {
     stdio: 'inherit',
-    shell: true,
+    shell: false,  // Don't use shell to avoid security warnings and escaping issues
     cwd: process.cwd()
   });
 

@@ -85,12 +85,12 @@ class FakeSubscriber(Subscriber):
 
 @pytest.fixture(autouse=True)
 def reset_singleton() -> Generator[None, None, None]:
-    """Reset OSMConnection singleton before each test"""
-    from sim.osm.OSMConnection import OSMConnection
+    """Reset OSRMConnection singleton before each test"""
+    from sim.osm.OSRMConnection import OSRMConnection
 
-    OSMConnection.reset_instance()
+    OSRMConnection._instance = None
     yield
-    OSMConnection.reset_instance()
+    OSRMConnection._instance = None
 
 
 @pytest.fixture()
@@ -150,14 +150,17 @@ def simulator_controller(
     frame_emitter: FrameEmitter,
     input_params: InputParameter,
     fake_time: MockClock,
+    monkeypatch: Any,
 ) -> SimulatorController:
-    # Mock OSMConnection initialization to avoid file I/O
+    # Set OSRM URL environment variable to avoid ValueError
+    monkeypatch.setenv("OSRM_URL", "http://localhost:5000")
+
+    # Mock OSRMConnection initialization to avoid file I/O
     with (
-        patch("sim.osm.OSMConnection.OSMConnection._initialize_osm_data_file"),
-        patch("sim.osm.OSMConnection.OSMConnection._get_drivable_network"),
-        patch("sim.osm.OSMConnection.OSMConnection.create_networkx_graph"),
-        patch("sim.osm.OSMConnection.OSMConnection._set_projected_nodes"),
-        patch("sim.osm.OSMConnection.OSMConnection._build_edge_index"),
+        patch(
+            "sim.osm.OSRMConnection.OSRMConnection._verify_osrm_connection",
+            return_value=True,
+        ),
     ):
         controller = SimulatorController(
             simEnv=env,
@@ -671,18 +674,11 @@ def test_start_simulation(
         mock_thread = Mock()
         mock_thread_class.return_value = mock_thread
 
-        # Patch heavy map building and routing
-        with (
-            patch.object(
-                simulator_controller.map_controller.osm,
-                "build_ch_network",
-                return_value=None,
-            ),
-            patch.object(
-                simulator_controller.map_controller,
-                "getRoute",
-                return_value=SimpleNamespace(roads=[1, 2]),
-            ),
+        # Patch heavy routing (OSRM doesn't have build_ch_network)
+        with patch.object(
+            simulator_controller.map_controller,
+            "getRoute",
+            return_value=SimpleNamespace(roads=[1, 2]),
         ):
             simulator_controller.start(3600)
 
@@ -703,19 +699,29 @@ def test_start_simulation(
 
 
 def test_custom_keyframe_frequency(
-    env: simpy.Environment, frame_emitter: FrameEmitter, fake_time: MockClock
+    env: simpy.Environment,
+    frame_emitter: FrameEmitter,
+    fake_time: MockClock,
+    monkeypatch: Any,
 ) -> None:
     """Test that custom keyframe frequency is properly set."""
+    # Set OSRM URL environment variable
+    monkeypatch.setenv("OSRM_URL", "http://localhost:5000")
+
     params = InputParameter()
     params.set_key_frame_freq(30)  # Custom frequency
 
-    controller = SimulatorController(
-        simEnv=env,
-        frameEmitter=frame_emitter,
-        inputParameters=params,
-        sim_behaviour=FakeSimBehaviour(),
-        strict=False,
-    )
+    with patch(
+        "sim.osm.OSRMConnection.OSRMConnection._verify_osrm_connection",
+        return_value=True,
+    ):
+        controller = SimulatorController(
+            simEnv=env,
+            frameEmitter=frame_emitter,
+            inputParameters=params,
+            sim_behaviour=FakeSimBehaviour(),
+            strict=False,
+        )
 
     assert controller.keyframeFreq == 30
 
@@ -725,15 +731,23 @@ def test_strict_mode_initialization(
     frame_emitter: FrameEmitter,
     input_params: InputParameter,
     fake_time: MockClock,
+    monkeypatch: Any,
 ) -> None:
     """Test that strict mode is properly passed to RealTimeDriver."""
-    controller = SimulatorController(
-        simEnv=env,
-        frameEmitter=frame_emitter,
-        inputParameters=input_params,
-        sim_behaviour=FakeSimBehaviour(),
-        strict=True,
-    )
+    # Set OSRM URL environment variable
+    monkeypatch.setenv("OSRM_URL", "http://localhost:5000")
+
+    with patch(
+        "sim.osm.OSRMConnection.OSRMConnection._verify_osrm_connection",
+        return_value=True,
+    ):
+        controller = SimulatorController(
+            simEnv=env,
+            frameEmitter=frame_emitter,
+            inputParameters=input_params,
+            sim_behaviour=FakeSimBehaviour(),
+            strict=True,
+        )
 
     # The strict parameter should be passed to RealTimeDriver
     assert controller.realTimeDriver.strict is True
