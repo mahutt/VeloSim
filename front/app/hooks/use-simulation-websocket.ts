@@ -63,12 +63,6 @@ export const useSimulationWebSocket = ({
   const [connectionAttempts, setConnectionAttempts] = useState(0);
 
   const wsRef = useRef<WebSocket | null>(null);
-  const simulationStatusRef = useRef<SimulationStatus>('idle');
-
-  // Keep ref in sync with state
-  useEffect(() => {
-    simulationStatusRef.current = simulationStatus;
-  }, [simulationStatus]);
 
   // Store callbacks in refs to avoid recreating WebSocket on callback changes
   const onInitialFrameRef = useRef(onInitialFrame);
@@ -174,10 +168,9 @@ export const useSimulationWebSocket = ({
           console.log('[WS] 🎞️  Frame', message.seq);
           try {
             onFrameUpdateRef.current(payload);
-            // Use ref to get current status, not stale closure value
-            if (simulationStatusRef.current !== 'running') {
-              setSimulationStatus('running');
-            }
+            setSimulationStatus((prev) =>
+              prev !== 'running' ? 'running' : prev
+            );
           } catch (error) {
             logSimulationError(error, 'Failed to process frame update', {
               errorType: 'FRAME_UPDATE_ERROR',
@@ -258,10 +251,7 @@ export const useSimulationWebSocket = ({
         return;
       }
 
-      // Use ref to check current status, not stale closure value
-      if (simulationStatusRef.current !== 'error') {
-        setSimulationStatus('idle');
-      }
+      setSimulationStatus((prev) => (prev !== 'error' ? 'idle' : prev));
 
       // Retry logic for network errors
       if (connectionAttempts < MAX_RETRIES && event.code === 1006) {
