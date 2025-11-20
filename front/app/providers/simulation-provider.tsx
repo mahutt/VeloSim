@@ -28,6 +28,7 @@ import {
   useEffect,
   useRef,
   useState,
+  useCallback,
   type ReactNode,
 } from 'react';
 
@@ -43,6 +44,7 @@ import {
   type BackendResource,
   type BackendTask,
   type StationTask,
+  type SimulationStatus,
 } from '~/types';
 import {
   adaptStationsToGeoJSON,
@@ -54,27 +56,12 @@ import {
 } from '~/lib/map-interactions';
 import useError from '~/hooks/use-error';
 import useAuth from '~/hooks/use-auth';
-import {
-  logMissingEntityError,
-  logFrameProcessingError,
-  logSimulationError,
-} from '~/utils/simulation-error-utils';
+import { logMissingEntityError } from '~/utils/simulation-error-utils';
 import api from '~/api';
+import { useSimulationWebSocket } from '~/hooks/use-simulation-websocket';
 
 // Expect to receive frames every 1 second
 const BASE_FRAME_INTERVAL_MS = 1000;
-
-// WebSocket reconnection settings
-const MAX_RETRIES = 5;
-const INITIAL_DELAY = 1000; // 1 second
-
-type SimulationStatus =
-  | 'idle' // Not connected
-  | 'connecting' // WebSocket connecting
-  | 'loading' // Connected, waiting for initial frame
-  | 'ready' // Initial frame received, can interact
-  | 'running' // Frames streaming
-  | 'error'; // Error state
 
 export const SPEED_OPTIONS = [0, 0.5, 1, 2, 4, 8] as const;
 export type Speed = (typeof SPEED_OPTIONS)[number];
@@ -120,17 +107,6 @@ export const SimulationProvider = ({
   const speedRef = useRef<Speed>(1);
 
   const [simId] = useState<string | null>(initialSimId || null);
-  const [isConnected, setIsConnected] = useState(false);
-  const [simulationStatus, setSimulationStatus] =
-    useState<SimulationStatus>('idle');
-  const [connectionAttempts, setConnectionAttempts] = useState(0);
-
-  // Derived loading state for convenience
-  const isLoading =
-    simulationStatus === 'connecting' || simulationStatus === 'loading';
-
-  // WebSocket reference
-  const wsRef = useRef<WebSocket | null>(null);
 
   // Flag to trigger map render on next animation frame
   const renderOnNextFrameRef = useRef<boolean>(false);
@@ -303,6 +279,8 @@ export const SimulationProvider = ({
   ) => {
     console.log(isInitialFrame);
 
+    // Always update tasks (including closed ones)
+    // Backend sends all tasks with their current status
     if (payload.tasks && payload.tasks.length > 0) {
       payload.tasks.forEach((task) =>
         tasksRef.current.set(task.id, {
@@ -502,108 +480,73 @@ export const SimulationProvider = ({
   };
 
   // Handle initial frame from WebSocket
-  const handleInitialFrame = (payload: BackendPayload) => {
+  const handleInitialFrame = useCallback((payload: BackendPayload) => {
     console.log('[WS] Handling initial frame:', payload);
 
-    try {
-      // Store initial data (pass true to indicate this is initial frame)
-      const updatedResources = adaptSimulationData(payload, true);
-      setResources(updatedResources);
+    // Store initial data (pass true to indicate this is initial frame)
+    const updatedResources = adaptSimulationData(payload, true);
+    setResources(updatedResources);
 
-      // Initialize positions for all resources
-      if (payload.resources) {
-        payload.resources.forEach((resource: BackendResource) => {
-          // Backend sends [lon, lat] which is what GeoJSON expects
-          const position: [number, number] = resource.resource_position;
-          frameStartPositionsRef.current.set(resource.resource_id, position);
-          currentPositionsRef.current.set(resource.resource_id, position);
-          targetPositionsRef.current.set(resource.resource_id, position);
-        });
-      }
-
-      // Update initial frame time
-      lastFrameTimeRef.current = performance.now();
-
-      // Start animation loop
-      ensureAnimationRunning();
-
-      // Update map with initial data
-      updateMapSources(
-        selectedStationIdRef.current,
-        selectedResourceIdRef.current
-      );
-
-      // Transition from loading to ready
-      setSimulationStatus('ready');
-    } catch (error) {
-      logSimulationError(error, 'Failed to process initial frame', {
-        errorType: 'INITIAL_FRAME_ERROR',
-        payloadKeys: Object.keys(payload),
+    // Initialize positions for all resources
+    if (payload.resources) {
+      payload.resources.forEach((resource: BackendResource) => {
+        // Backend sends [lon, lat] which is what GeoJSON expects
+        const position: [number, number] = resource.resource_position;
+        frameStartPositionsRef.current.set(resource.resource_id, position);
+        currentPositionsRef.current.set(resource.resource_id, position);
+        targetPositionsRef.current.set(resource.resource_id, position);
       });
-      displayError(
-        'Initialization Error',
-        'Failed to initialize simulation. Please refresh and try again.'
-      );
-      setSimulationStatus('error');
     }
-  };
+
+    // Update initial frame time
+    lastFrameTimeRef.current = performance.now();
+
+    // Start animation loop
+    ensureAnimationRunning();
+
+    // Update map with initial data
+    updateMapSources(
+      selectedStationIdRef.current,
+      selectedResourceIdRef.current
+    );
+  }, []);
 
   // Handle frame updates from WebSocket
-  const handleFrameUpdate = (payload: BackendPayload) => {
+  const handleFrameUpdate = useCallback((payload: BackendPayload) => {
     console.log('[WS] Handling frame update:', payload);
 
-    try {
-      // Update data (pass false to preserve existing tasks if not in payload)
-      const updatedResources = adaptSimulationData(payload, false);
-      setResources(updatedResources);
+    // Update data (pass false to preserve existing tasks if not in payload)
+    const updatedResources = adaptSimulationData(payload, false);
+    setResources(updatedResources);
 
-      // Update frame start time and positions for new frame
-      const now = performance.now();
-      lastFrameTimeRef.current = now;
+    // Update frame start time and positions for new frame
+    const now = performance.now();
+    lastFrameTimeRef.current = now;
 
-      // For each resource, update the frame start position and target
-      if (payload.resources) {
-        payload.resources.forEach((resource: BackendResource) => {
-          // Backend sends [lon, lat] which is what GeoJSON expects
-          const newPosition: [number, number] = resource.resource_position;
+    // For each resource, update the frame start position and target
+    if (payload.resources) {
+      payload.resources.forEach((resource: BackendResource) => {
+        // Backend sends [lon, lat] which is what GeoJSON expects
+        const newPosition: [number, number] = resource.resource_position;
 
-          // Set frame start to current animated position
-          const currentPos = currentPositionsRef.current.get(
-            resource.resource_id
-          );
-          if (currentPos) {
-            frameStartPositionsRef.current.set(
-              resource.resource_id,
-              currentPos
-            );
-          } else {
-            frameStartPositionsRef.current.set(
-              resource.resource_id,
-              newPosition
-            );
-          }
+        // Set frame start to current animated position
+        const currentPos = currentPositionsRef.current.get(
+          resource.resource_id
+        );
+        if (currentPos) {
+          frameStartPositionsRef.current.set(resource.resource_id, currentPos);
+        } else {
+          frameStartPositionsRef.current.set(resource.resource_id, newPosition);
+        }
 
-          // Set new target
-          targetPositionsRef.current.set(resource.resource_id, newPosition);
-        });
-      }
-
-      // Ensure we're in running state
-      if (simulationStatus !== 'running') {
-        setSimulationStatus('running');
-      }
-
-      // Ensure animation loop is running (in case it stopped)
-      ensureAnimationRunning();
-    } catch (error) {
-      logSimulationError(error, 'Failed to process frame update', {
-        errorType: 'FRAME_UPDATE_ERROR',
-        payloadKeys: Object.keys(payload),
+        // Set new target
+        targetPositionsRef.current.set(resource.resource_id, newPosition);
       });
-      // Don't show error dialog for individual frame failures - just log it
-      // The simulation will continue with the last good state
     }
-  };
+
+    // Ensure animation loop is running (in case it stopped)
+    ensureAnimationRunning();
+  }, []);
 
   // Track if animation loop is running
   const isAnimatingRef = useRef<boolean>(false);
@@ -673,223 +616,69 @@ export const SimulationProvider = ({
   };
 
   // ============================================================================
-  // WEBSOCKET CONNECTION EFFECT
-  // TODO: Extract WebSocket logic into useWebSocket hook for better maintainability
-  // This effect is large and could be split into:
-  // - useWebSocket (connection, message handling, reconnection)
-  // - useSimulationAnimation (RAF loop, position interpolation)
-  // - useSimulationData (data adapters, state management)
-  // See: [Link to ticket/issue if you create one]
+  // WEBSOCKET CONNECTION
+  // WebSocket connection is managed by useSimulationWebSocket hook
+  // ============================================================================
+
+  const { isConnected, simulationStatus } = useSimulationWebSocket({
+    simId,
+    enabled: mapLoaded && !!user,
+    onInitialFrame: handleInitialFrame,
+    onFrameUpdate: handleFrameUpdate,
+    onError: displayError,
+  });
+
+  // Derived loading state for convenience
+  const isLoading =
+    simulationStatus === 'connecting' || simulationStatus === 'loading';
+
+  // ============================================================================
+  // MAP INTERACTIONS SETUP
   // ============================================================================
 
   useEffect(() => {
-    if (!mapLoaded || !simId || !user) {
-      console.log('[WS] ⏳ Waiting for prerequisites...', {
-        mapLoaded,
-        simId: !!simId,
-        hasUser: !!user,
-      });
-      return;
-    }
-
-    console.log('[WS] 🚀 Connecting to WebSocket...');
-
-    // Build WebSocket URL
-    const apiBaseUrl = import.meta.env.VITE_BACKEND_URL;
-    const url = apiBaseUrl ? new URL(apiBaseUrl) : null;
-    const wsProtocol =
-      url?.protocol === 'https:' || window.location.protocol === 'https:'
-        ? 'wss:'
-        : 'ws:';
-    const wsHost = url?.host || window.location.host;
-    const wsUrl = `${wsProtocol}//${wsHost}/api/v1/simulation/stream/${simId}`;
-
-    console.log('[WS] URL:', wsUrl);
-    console.log('[WS] Cookie will be sent automatically by browser');
-
-    setSimulationStatus('connecting');
-
-    const ws = new WebSocket(wsUrl);
-    wsRef.current = ws;
-
-    ws.onopen = () => {
-      console.log('[WS] ✅ Connection opened');
-      setIsConnected(true);
-      setConnectionAttempts(0);
-      // Set to loading state - waiting for initial frame
-      setSimulationStatus('loading');
-    };
-
-    ws.onmessage = (event) => {
-      try {
-        const message = JSON.parse(event.data);
-
-        // Handle status messages
-        if (message.type === 'status') {
-          console.log('[WS] 📊 Status:', message.message, message);
-          // Status messages are informational, don't change state
-          return;
-        }
-
-        // Handle error messages
-        if (message.type === 'error') {
-          console.error('[WS] ❌ Server Error:', message.message);
-          displayError(
-            'Simulation Error',
-            message.message || 'An error occurred'
-          );
-          setSimulationStatus('error');
-          return;
-        }
-
-        // Parse payload if it's a string
-        let payload = message.payload;
-        if (typeof payload === 'string') {
-          payload = JSON.parse(payload);
-        }
-
-        // Handle initial frame (seq === 0)
-        if (message.seq === 0) {
-          console.log('[WS] 🎬 Initial frame received');
-          handleInitialFrame(payload);
-          return;
-        }
-
-        // Handle regular frames (seq > 0)
-        if (message.seq > 0) {
-          console.log('[WS] 🎞️  Frame', message.seq);
-          handleFrameUpdate(payload);
-          return;
-        }
-
-        console.warn('[WS] ⚠️  Unknown message:', message);
-      } catch (error) {
-        console.error('[WS] ❌ Parse error:', error);
-        console.error('[WS] Raw data:', event.data);
-        logFrameProcessingError(error, event.data?.seq || -1);
-        displayError(
-          'Simulation Frame Error',
-          'An error occurred while processing simulation data. The simulation may not display correctly.'
-        );
-      }
-    };
-
-    ws.onerror = (error) => {
-      console.error('[WS] ❌ WebSocket error:', error);
-
-      // Log to backend - WebSocket errors are client-side only
-      logSimulationError(error, 'WebSocket connection error', {
-        errorType: 'WEBSOCKET_ERROR',
-        simId,
-        wsUrl,
-      });
-
-      displayError(
-        'Connection Error',
-        'Failed to connect to simulation. Check authentication and try again.'
-      );
-      setSimulationStatus('error');
-    };
-
-    ws.onclose = (event) => {
-      console.log('[WS] 🔌 Connection closed:', {
-        code: event.code,
-        reason: event.reason,
-        wasClean: event.wasClean,
-      });
-
-      setIsConnected(false);
-
-      // Pause the simulation by setting playback speed to 0
-      api
-        .post(`/simulation/${simId!}/playbackSpeed`, { playback_speed: 0 })
-        .then(() => {
-          console.log('[WS] ⏸️  Playback paused on disconnect');
-        })
-        .catch((error) => {
-          console.error('[WS] Failed to pause playback:', error);
-        });
-
-      // Code 1008 = Policy Violation (auth failure)
-      if (event.code === 1008) {
-        console.error('[WS] ❌ Authentication failed (code 1008)');
-
-        // Log to backend - WebSocket close events are client-side only
-        logSimulationError(
-          new Error('WebSocket authentication failed'),
-          'WebSocket closed due to authentication failure',
-          {
-            errorType: 'WEBSOCKET_AUTH_FAILURE',
-            simId,
-            closeCode: event.code,
-            closeReason: event.reason,
-          }
-        );
-
-        displayError(
-          'Authentication Failed',
-          'WebSocket authentication failed. Please try logging in again.'
-        );
-        setSimulationStatus('error');
-        return;
-      }
-
-      if (simulationStatus !== 'error') {
-        setSimulationStatus('idle');
-      }
-
-      // Retry logic for network errors
-      if (connectionAttempts < MAX_RETRIES && event.code === 1006) {
-        const delay = INITIAL_DELAY * Math.pow(2, connectionAttempts);
-        console.log(
-          `[WS] 🔄 Retry ${connectionAttempts + 1}/${MAX_RETRIES} in ${delay}ms`
-        );
-
-        setTimeout(() => {
-          setConnectionAttempts((prev) => prev + 1);
-        }, delay);
-      }
-    };
+    if (!mapLoaded) return;
 
     // Set up map interactions
-    if (mapRef.current) {
-      setupMapClickHandlers(mapRef.current, (item) => {
-        if (!item) {
-          clearSelection();
-          return;
-        }
-        const { type, id } = item;
-        selectItem(type, id);
-      });
+    setupMapClickHandlers(mapRef.current!, (item) => {
+      if (!item) {
+        clearSelection();
+        return;
+      }
+      const { type, id } = item;
+      selectItem(type, id);
+    });
 
-      setupMapHoverHandlers(mapRef.current, (item) => {
-        if (!item) {
-          updateHoverState(null, null);
-          return;
-        }
-        const { type, id } = item;
-        if (type === SelectedItemType.Station) {
-          updateHoverState(id, null);
-        } else if (type === SelectedItemType.Resource) {
-          updateHoverState(null, id);
-        }
-      });
-    }
+    setupMapHoverHandlers(mapRef.current!, (item) => {
+      if (!item) {
+        updateHoverState(null, null);
+        return;
+      }
+      const { type, id } = item;
+      if (type === SelectedItemType.Station) {
+        updateHoverState(id, null);
+      } else if (type === SelectedItemType.Resource) {
+        updateHoverState(null, id);
+      }
+    });
+  }, [mapLoaded]);
 
-    // Cleanup on unmount - defined here to avoid stale closures
+  // ============================================================================
+  // ANIMATION CLEANUP
+  // ============================================================================
+
+  useEffect(() => {
+    // Cleanup animation loop on unmount
     return () => {
       if (animationFrameRef.current) {
         cancelAnimationFrame(animationFrameRef.current);
         isAnimatingRef.current = false;
       }
-      if (wsRef.current) {
-        wsRef.current.close();
-      }
       if (hoverDebounceTimeoutRef.current) {
         clearTimeout(hoverDebounceTimeoutRef.current);
       }
     };
-  }, [mapLoaded, simId, user, connectionAttempts]);
+  }, []);
 
   // Render existing data when map loads
   useEffect(() => {
