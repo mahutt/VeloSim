@@ -175,6 +175,14 @@ front/.env.production.local
 # Simulator
 sim/osm/OSMData
 
+# OSRM preprocessed data files (large binary files, regenerate locally)
+osrm-data/
+route_output.txt
+
+# Legacy patterns (keep for backward compatibility)
+osrm-data/*.osrm*
+osrm-data/*.pbf
+
 # npm
 npm-debug.log*
 yarn-debug.log*
