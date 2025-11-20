@@ -111,6 +111,10 @@ export const SimulationProvider = ({
   // Flag to trigger map render on next animation frame
   const renderOnNextFrameRef = useRef<boolean>(false);
 
+  // RAF queue system for batched map updates
+  const mapUpdatePendingRef = useRef<boolean>(false);
+  const mapUpdateRafIdRef = useRef<number | null>(null);
+
   // (TOTAL) NON-REACTIVE SIMULATION ENTITY STATE
   const stationsRef = useRef<Map<number, Station>>(new Map());
   const resourcesRef = useRef<Map<number, Resource>>(new Map());
@@ -342,10 +346,6 @@ export const SimulationProvider = ({
   };
 
   // Helper function to update both map sources
-  // TODO: Queue updates and batch them to next animation frame for better performance
-  // Currently each call triggers immediate map re-render. Could maintain consistent RPS
-  // by queueing updates and applying them only during the animation loop.
-  // This would prevent extra renders when user rapidly selects/deselects entities.
   const updateMapSources = (
     selectedStationId?: number,
     selectedResourceId?: number
@@ -388,6 +388,27 @@ export const SimulationProvider = ({
     }
   };
 
+  // Flush batched map updates using current selection state
+  const flushMapUpdates = () => {
+    mapUpdatePendingRef.current = false;
+    mapUpdateRafIdRef.current = null;
+    updateMapSources(
+      selectedStationIdRef.current,
+      selectedResourceIdRef.current
+    );
+  };
+
+  // Queue a map update to be applied on next animation frame
+  // This batches multiple updates together for consistent 60 RPS
+  const queueMapUpdate = () => {
+    mapUpdatePendingRef.current = true;
+
+    // Only schedule RAF if not already scheduled
+    if (mapUpdateRafIdRef.current === null) {
+      mapUpdateRafIdRef.current = requestAnimationFrame(flushMapUpdates);
+    }
+  };
+
   const updateSelectedItem = (
     resourceId: number,
     updatedResource: Resource
@@ -401,10 +422,7 @@ export const SimulationProvider = ({
         value: updatedResource,
       });
       selectedResourceIdRef.current = resourceId;
-      updateMapSources(
-        selectedStationIdRef.current,
-        selectedResourceIdRef.current
-      );
+      queueMapUpdate();
     }
   };
 
@@ -416,7 +434,7 @@ export const SimulationProvider = ({
     selectedStationIdRef.current = undefined;
     selectedResourceIdRef.current = undefined;
 
-    updateMapSources(undefined, undefined);
+    queueMapUpdate();
   };
 
   // Selection function
@@ -453,10 +471,7 @@ export const SimulationProvider = ({
       selectedStationIdRef.current = undefined;
     }
 
-    updateMapSources(
-      type === SelectedItemType.Station ? id : undefined,
-      type === SelectedItemType.Resource ? id : undefined
-    );
+    queueMapUpdate();
   };
 
   // Update hover state with immediate visual feedback
@@ -472,10 +487,7 @@ export const SimulationProvider = ({
     }
 
     hoverDebounceTimeoutRef.current = setTimeout(() => {
-      updateMapSources(
-        selectedStationIdRef.current,
-        selectedResourceIdRef.current
-      );
+      queueMapUpdate();
     }, 16); // ~60fps
   };
 
@@ -505,10 +517,7 @@ export const SimulationProvider = ({
     ensureAnimationRunning();
 
     // Update map with initial data
-    updateMapSources(
-      selectedStationIdRef.current,
-      selectedResourceIdRef.current
-    );
+    queueMapUpdate();
   }, []);
 
   // Handle frame updates from WebSocket
@@ -604,6 +613,7 @@ export const SimulationProvider = ({
 
     // Only update map if positions or station tasks changed
     if (renderOnNextFrameRef.current) {
+      // Call updateMapSources directly since we're already in a RAF callback
       updateMapSources(
         selectedStationIdRef.current,
         selectedResourceIdRef.current
@@ -674,6 +684,10 @@ export const SimulationProvider = ({
         cancelAnimationFrame(animationFrameRef.current);
         isAnimatingRef.current = false;
       }
+      if (mapUpdateRafIdRef.current !== null) {
+        cancelAnimationFrame(mapUpdateRafIdRef.current);
+        mapUpdateRafIdRef.current = null;
+      }
       if (hoverDebounceTimeoutRef.current) {
         clearTimeout(hoverDebounceTimeoutRef.current);
       }
@@ -686,10 +700,7 @@ export const SimulationProvider = ({
 
     if (stationsRef.current.size > 0 || resourcesRef.current.size > 0) {
       console.log('[Map] Map loaded, rendering existing data');
-      updateMapSources(
-        selectedStationIdRef.current,
-        selectedResourceIdRef.current
-      );
+      queueMapUpdate();
     }
   }, [mapLoaded]);
 

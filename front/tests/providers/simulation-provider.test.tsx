@@ -605,3 +605,327 @@ test('reassignTask posts to API and moves task between resources', async () => {
     expect(getByTestId('new-count')).toHaveTextContent('1');
   });
 });
+
+test('RAF queue batches multiple rapid selections into single render', async () => {
+  const setMapSourceMock = await import('~/lib/map-helpers').then(
+    (m) => m.setMapSource
+  );
+  (setMapSourceMock as Mock).mockClear();
+
+  const TestRapidSelectComponent = () => {
+    const { selectItem, stationsRef } = useSimulation();
+
+    useEffect(() => {
+      // Add multiple stations
+      for (let i = 1; i <= 5; i++) {
+        stationsRef.current.set(i, {
+          id: i,
+          name: `Station ${i}`,
+          position: [0, 0],
+          tasks: [],
+          task_count: 0,
+        });
+      }
+    }, []);
+
+    return (
+      <button
+        data-testid="rapid-select-btn"
+        onClick={() => {
+          // Rapidly select multiple stations
+          selectItem(SelectedItemType.Station, 1);
+          selectItem(SelectedItemType.Station, 2);
+          selectItem(SelectedItemType.Station, 3);
+          selectItem(SelectedItemType.Station, 4);
+          selectItem(SelectedItemType.Station, 5);
+        }}
+      >
+        Rapid Select
+      </button>
+    );
+  };
+
+  const { getByTestId } = render(
+    <MapProvider>
+      <SimulationProvider>
+        <TaskAssignmentProvider>
+          <MapContainer />
+          <TestRapidSelectComponent />
+        </TaskAssignmentProvider>
+      </SimulationProvider>
+    </MapProvider>
+  );
+
+  await waitFor(() => {
+    expect(MockMap.instance).toBeDefined();
+  });
+
+  await act(async () => {
+    MockMap.instance?.callBacks['load']();
+  });
+
+  (setMapSourceMock as Mock).mockClear();
+  const rapidSelectBtn = getByTestId('rapid-select-btn');
+
+  await act(async () => {
+    rapidSelectBtn.click();
+    // Wait for RAF to flush
+    await new Promise((r) => setTimeout(r, 50));
+  });
+
+  // Should batch 5 rapid selections into 1-2 renders (not 5)
+  // Exact count depends on RAF timing, but should be significantly less than 5
+  const callCount = (setMapSourceMock as Mock).mock.calls.length;
+  expect(callCount).toBeLessThan(5);
+  expect(callCount).toBeGreaterThan(0);
+});
+
+test('RAF queue batches rapid clearSelection calls', async () => {
+  const setMapSourceMock = await import('~/lib/map-helpers').then(
+    (m) => m.setMapSource
+  );
+  (setMapSourceMock as Mock).mockClear();
+
+  const TestRapidClearComponent = () => {
+    const { clearSelection, stationsRef, selectItem } = useSimulation();
+
+    useEffect(() => {
+      stationsRef.current.set(1, {
+        id: 1,
+        name: 'Station 1',
+        position: [0, 0],
+        tasks: [],
+        task_count: 0,
+      });
+    }, []);
+
+    return (
+      <div>
+        <button
+          data-testid="select-first"
+          onClick={() => selectItem(SelectedItemType.Station, 1)}
+        >
+          Select
+        </button>
+        <button
+          data-testid="rapid-clear-btn"
+          onClick={() => {
+            // Rapidly clear multiple times
+            clearSelection();
+            clearSelection();
+            clearSelection();
+            clearSelection();
+            clearSelection();
+          }}
+        >
+          Rapid Clear
+        </button>
+      </div>
+    );
+  };
+
+  const { getByTestId } = render(
+    <MapProvider>
+      <SimulationProvider>
+        <TaskAssignmentProvider>
+          <MapContainer />
+          <TestRapidClearComponent />
+        </TaskAssignmentProvider>
+      </SimulationProvider>
+    </MapProvider>
+  );
+
+  await waitFor(() => {
+    expect(MockMap.instance).toBeDefined();
+  });
+
+  await act(async () => {
+    MockMap.instance?.callBacks['load']();
+  });
+
+  // First select a station
+  const selectBtn = getByTestId('select-first');
+  await act(async () => {
+    selectBtn.click();
+    await new Promise((r) => setTimeout(r, 50));
+  });
+
+  (setMapSourceMock as Mock).mockClear();
+  const rapidClearBtn = getByTestId('rapid-clear-btn');
+
+  await act(async () => {
+    rapidClearBtn.click();
+    // Wait for RAF to flush
+    await new Promise((r) => setTimeout(r, 50));
+  });
+
+  // Should batch 5 rapid clears into 1-2 renders (not 5)
+  const callCount = (setMapSourceMock as Mock).mock.calls.length;
+  expect(callCount).toBeLessThan(5);
+  expect(callCount).toBeGreaterThan(0);
+});
+
+test('RAF queue batches resource selection updates', async () => {
+  const setMapSourceMock = await import('~/lib/map-helpers').then(
+    (m) => m.setMapSource
+  );
+  (setMapSourceMock as Mock).mockClear();
+
+  const TestRapidResourceSelectComponent = () => {
+    const { selectItem, resourcesRef } = useSimulation();
+
+    useEffect(() => {
+      // Add multiple resources
+      for (let i = 1; i <= 5; i++) {
+        resourcesRef.current.set(i, {
+          id: i,
+          position: [0, 0],
+          taskList: [],
+          task_count: 0,
+          in_progress_task_id: null,
+        });
+      }
+    }, []);
+
+    return (
+      <button
+        data-testid="rapid-select-resource-btn"
+        onClick={() => {
+          // Rapidly select multiple resources
+          selectItem(SelectedItemType.Resource, 1);
+          selectItem(SelectedItemType.Resource, 2);
+          selectItem(SelectedItemType.Resource, 3);
+          selectItem(SelectedItemType.Resource, 4);
+          selectItem(SelectedItemType.Resource, 5);
+        }}
+      >
+        Rapid Select Resources
+      </button>
+    );
+  };
+
+  const { getByTestId } = render(
+    <MapProvider>
+      <SimulationProvider>
+        <TaskAssignmentProvider>
+          <MapContainer />
+          <TestRapidResourceSelectComponent />
+        </TaskAssignmentProvider>
+      </SimulationProvider>
+    </MapProvider>
+  );
+
+  await waitFor(() => {
+    expect(MockMap.instance).toBeDefined();
+  });
+
+  await act(async () => {
+    MockMap.instance?.callBacks['load']();
+  });
+
+  (setMapSourceMock as Mock).mockClear();
+  const rapidSelectBtn = getByTestId('rapid-select-resource-btn');
+
+  await act(async () => {
+    rapidSelectBtn.click();
+    // Wait for RAF to flush
+    await new Promise((r) => setTimeout(r, 50));
+  });
+
+  // Should batch 5 rapid resource selections into 1-2 renders (not 5)
+  const callCount = (setMapSourceMock as Mock).mock.calls.length;
+  expect(callCount).toBeLessThan(5);
+  expect(callCount).toBeGreaterThan(0);
+});
+
+test('flushMapUpdates applies updates with current selection state', async () => {
+  const setMapSourceMock = await import('~/lib/map-helpers').then(
+    (m) => m.setMapSource
+  );
+  (setMapSourceMock as Mock).mockClear();
+
+  const TestFlushComponent = () => {
+    const { selectItem, stationsRef } = useSimulation();
+
+    useEffect(() => {
+      stationsRef.current.set(1, {
+        id: 1,
+        name: 'Station 1',
+        position: [0, 0],
+        tasks: [],
+        task_count: 0,
+      });
+      stationsRef.current.set(2, {
+        id: 2,
+        name: 'Station 2',
+        position: [0, 0],
+        tasks: [],
+        task_count: 0,
+      });
+    }, []);
+
+    return (
+      <button
+        data-testid="select-and-update"
+        onClick={() => {
+          selectItem(SelectedItemType.Station, 1);
+          // Immediately select another - should batch and use final state
+          selectItem(SelectedItemType.Station, 2);
+        }}
+      >
+        Select and Update
+      </button>
+    );
+  };
+
+  const { getByTestId } = render(
+    <MapProvider>
+      <SimulationProvider>
+        <TaskAssignmentProvider>
+          <MapContainer />
+          <TestFlushComponent />
+        </TaskAssignmentProvider>
+      </SimulationProvider>
+    </MapProvider>
+  );
+
+  await waitFor(() => {
+    expect(MockMap.instance).toBeDefined();
+  });
+
+  await act(async () => {
+    MockMap.instance?.callBacks['load']();
+  });
+
+  (setMapSourceMock as Mock).mockClear();
+  const selectBtn = getByTestId('select-and-update');
+
+  await act(async () => {
+    selectBtn.click();
+    // Wait for RAF to flush
+    await new Promise((r) => setTimeout(r, 50));
+  });
+
+  // Should have batched the two selections into fewer calls
+  const callCount = (setMapSourceMock as Mock).mock.calls.length;
+  // Without batching, we'd expect 4 calls (2 stations updates + 2 resources updates)
+  // With batching, we expect 2 calls (1 stations update + 1 resources update)
+  expect(callCount).toBeLessThanOrEqual(2);
+  expect(callCount).toBeGreaterThan(0);
+
+  // Verify the final station data has station 2 selected
+  const stationCalls = (setMapSourceMock as Mock).mock.calls.filter(
+    (call) => call[0] === 'stations'
+  );
+  expect(stationCalls.length).toBeGreaterThan(0);
+
+  const lastStationCall = stationCalls[stationCalls.length - 1];
+  const stationGeoJSON = lastStationCall[1];
+
+  // Check that the GeoJSON has the correct selected station
+  const selectedFeature = stationGeoJSON.features.find(
+    (f: { properties: { selected: boolean } }) => f.properties.selected
+  );
+  expect(selectedFeature).toBeDefined();
+  expect(selectedFeature.properties.id).toBe(2);
+});
