@@ -104,12 +104,6 @@ class SimulatorController:
             self.simEnv.process(resource.run())
 
     def start(self, sim_time: int) -> None:
-        # Build CH network for fast routing (with caching and progress bar)
-        print("\n" + "=" * 60)
-        print("Preparing Contraction Hierarchy network for fast routing...")
-        print("=" * 60)
-        self.map_controller.build_ch_netowrk()
-        print("=" * 60 + "\n")
         # Load entities into sim event queue and pass behaviour and/or mapcontroller
         self.prep_entities()
         # start sim clock
