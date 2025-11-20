@@ -25,13 +25,73 @@ SOFTWARE.
 import pytest
 import os
 import json
+import numpy as np
 from pathlib import Path
 from pandas import Series
 from shapely.geometry import LineString
-from typing import Generator
+from typing import Generator, List
 
-from sim.entities.road import road
+from sim.entities.road import Road
 from sim.entities.position import Position
+
+
+def generate_point_collection(
+    linestring: LineString, length: float, maxspeed: float
+) -> List[Position]:
+    """
+    Generate evenly-spaced Position objects along a route.
+    This mimics the logic from route.py for testing purposes.
+    """
+    points: List[Position] = []
+
+    if maxspeed <= 0 or length <= 0:
+        coords = list(linestring.coords)
+        if coords:
+            points.append(Position([float(coords[0][0]), float(coords[0][1])]))
+            if len(coords) > 1:
+                points.append(Position([float(coords[-1][0]), float(coords[-1][1])]))
+        return points
+
+    distance_increment = maxspeed
+
+    coords = list(linestring.coords)
+
+    if len(coords) == 2:
+        start_lon, start_lat = coords[0]
+        end_lon, end_lat = coords[1]
+
+        time_seconds = length / maxspeed
+        num_points = int(np.ceil(time_seconds)) + 1
+
+        for i in range(num_points):
+            distance = min(i * distance_increment, length)
+            t = distance / length
+
+            lon = float(start_lon + t * (end_lon - start_lon))
+            lat = float(start_lat + t * (end_lat - start_lat))
+
+            new_position = Position([lon, lat])
+
+            if not points or points[-1].get_position() != new_position.get_position():
+                points.append(new_position)
+    else:
+        # Multi-vertex linestring
+        total_length_degrees = linestring.length
+
+        for i in range(int(np.ceil(length / distance_increment)) + 1):
+            distance_meters = min(i * distance_increment, length)
+
+            # Convert meters back to degrees for interpolation
+            distance_degrees = (distance_meters / length) * total_length_degrees
+
+            point = linestring.interpolate(distance_degrees)
+            new_position = Position([float(point.x), float(point.y)])
+
+            # Avoid duplicates
+            if not points or points[-1].get_position() != new_position.get_position():
+                points.append(new_position)
+
+    return points
 
 
 @pytest.fixture
@@ -70,8 +130,19 @@ def test_road_initialization_with_valid_maxspeed(setup_test_environment: None) -
         }
     )
 
-    # Initialize the Road object. It will read the real config.json.
-    road_obj = road(edge_data)
+    # Extract data and convert maxspeed
+    road_id = edge_data["id"]
+    name = edge_data["name"]
+    length = edge_data["length"]
+    maxspeed_kmh = float(edge_data["maxspeed"])
+    maxspeed_ms = maxspeed_kmh / 3.6  # Convert to m/s
+    linestring = edge_data["geometry"]
+
+    # Generate point collection
+    pointcollection = generate_point_collection(linestring, length, maxspeed_ms)
+
+    # Initialize the Road object
+    road_obj = Road(road_id, name, pointcollection, length, maxspeed_ms)
 
     # Check attributes and conversions
     assert road_obj.id == 101
@@ -100,7 +171,18 @@ def test_road_initialization_with_missing_maxspeed(
         }
     )
 
-    road_obj = road(edge_data)
+    # Extract data and use default maxspeed
+    road_id = edge_data["id"]
+    name = edge_data["name"]
+    length = edge_data["length"]
+    default_speed_kmh = 50  # From config
+    maxspeed_ms = default_speed_kmh / 3.6
+    linestring = edge_data["geometry"]
+
+    # Generate point collection
+    pointcollection = generate_point_collection(linestring, length, maxspeed_ms)
+
+    road_obj = Road(road_id, name, pointcollection, length, maxspeed_ms)
 
     # Check that the default speed from the real config was used
     assert road_obj.id == 202
@@ -125,7 +207,17 @@ def test_road_with_zero_length(setup_test_environment: None) -> None:
         }
     )
 
-    road_obj = road(edge_data)
+    # Extract data
+    road_id = edge_data["id"]
+    name = edge_data["name"]
+    length = edge_data["length"]
+    maxspeed_ms = float(edge_data["maxspeed"]) / 3.6
+    linestring = edge_data["geometry"]
+
+    # Generate point collection
+    pointcollection = generate_point_collection(linestring, length, maxspeed_ms)
+
+    road_obj = Road(road_id, name, pointcollection, length, maxspeed_ms)
 
     assert road_obj.length == 0.0
     assert len(road_obj.pointcollection) == 2
@@ -145,7 +237,17 @@ def test_road_shorter_than_one_second_travel(setup_test_environment: None) -> No
         }
     )
 
-    road_obj = road(edge_data)
+    # Extract data
+    road_id = edge_data["id"]
+    name = edge_data["name"]
+    length = edge_data["length"]
+    maxspeed_ms = float(edge_data["maxspeed"]) / 3.6
+    linestring = edge_data["geometry"]
+
+    # Generate point collection
+    pointcollection = generate_point_collection(linestring, length, maxspeed_ms)
+
+    road_obj = Road(road_id, name, pointcollection, length, maxspeed_ms)
 
     assert road_obj.maxspeed > road_obj.length
     assert len(road_obj.pointcollection) == 2
@@ -165,7 +267,17 @@ def test_road_with_multi_vertex_linestring(setup_test_environment: None) -> None
         }
     )
 
-    road_obj = road(edge_data)
+    # Extract data
+    road_id = edge_data["id"]
+    name = edge_data["name"]
+    length = edge_data["length"]
+    maxspeed_ms = float(edge_data["maxspeed"]) / 3.6
+    linestring = edge_data["geometry"]
+
+    # Generate point collection
+    pointcollection = generate_point_collection(linestring, length, maxspeed_ms)
+
+    road_obj = Road(road_id, name, pointcollection, length, maxspeed_ms)
 
     # Verify basic attributes
     assert road_obj.id == 505
@@ -199,7 +311,17 @@ def test_road_with_multi_vertex_ensures_last_point(
         }
     )
 
-    road_obj = road(edge_data)
+    # Extract data
+    road_id = edge_data["id"]
+    name = edge_data["name"]
+    length = edge_data["length"]
+    maxspeed_ms = float(edge_data["maxspeed"]) / 3.6
+    linestring = edge_data["geometry"]
+
+    # Generate point collection
+    pointcollection = generate_point_collection(linestring, length, maxspeed_ms)
+
+    road_obj = Road(road_id, name, pointcollection, length, maxspeed_ms)
 
     # The last point should be exactly (100, 100) regardless of interpolation
     last_point = road_obj.pointcollection[-1].get_position()
@@ -221,7 +343,17 @@ def test_road_with_single_coordinate_linestring(setup_test_environment: None) ->
         }
     )
 
-    road_obj = road(edge_data)
+    # Extract data
+    road_id = edge_data["id"]
+    name = edge_data["name"]
+    length = edge_data["length"]
+    maxspeed_ms = float(edge_data["maxspeed"]) / 3.6
+    linestring = edge_data["geometry"]
+
+    # Generate point collection
+    pointcollection = generate_point_collection(linestring, length, maxspeed_ms)
+
+    road_obj = Road(road_id, name, pointcollection, length, maxspeed_ms)
 
     # Should have at least one point
     assert len(road_obj.pointcollection) >= 1
@@ -242,7 +374,17 @@ def test_road_with_complex_multi_vertex_path(setup_test_environment: None) -> No
         }
     )
 
-    road_obj = road(edge_data)
+    # Extract data
+    road_id = edge_data["id"]
+    name = edge_data["name"]
+    length = edge_data["length"]
+    maxspeed_ms = float(edge_data["maxspeed"]) / 3.6
+    linestring = edge_data["geometry"]
+
+    # Generate point collection
+    pointcollection = generate_point_collection(linestring, length, maxspeed_ms)
+
+    road_obj = Road(road_id, name, pointcollection, length, maxspeed_ms)
 
     # Verify attributes
     assert road_obj.id == 808
@@ -280,7 +422,17 @@ def test_road_multi_vertex_no_duplicate_last_point(
         }
     )
 
-    road_obj = road(edge_data)
+    # Extract data
+    road_id = edge_data["id"]
+    name = edge_data["name"]
+    length = edge_data["length"]
+    maxspeed_ms = float(edge_data["maxspeed"]) / 3.6
+    linestring = edge_data["geometry"]
+
+    # Generate point collection
+    pointcollection = generate_point_collection(linestring, length, maxspeed_ms)
+
+    road_obj = Road(road_id, name, pointcollection, length, maxspeed_ms)
 
     # Verify no duplicate positions at the end
     positions = [p.get_position() for p in road_obj.pointcollection]

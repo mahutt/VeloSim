@@ -40,6 +40,11 @@ os.environ["FEATURE_STATIONS_API_ROUTER"] = "true"
 os.environ["FEATURE_STATION_TASKS_API_ROUTER"] = "true"
 os.environ["FEATURE_RESOURCES_API_ROUTER"] = "true"
 
+# Set dummy OSRM URL for tests to prevent connection errors
+# This must be set before any simulation code tries to initialize OSRMConnection
+if "OSRM_URL" not in os.environ:
+    os.environ["OSRM_URL"] = "http://localhost:5000"
+
 # Add the back directory to Python path for relative imports
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
