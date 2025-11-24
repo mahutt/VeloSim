@@ -22,7 +22,6 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 """
 
-# Import validation logic from sim package
-from sim.validation import ScenarioValidator
+from sim.validation.scenario_validator import ScenarioValidator
 
 __all__ = ["ScenarioValidator"]

@@ -199,8 +199,8 @@ VALUES
 (
     'Test Scenario 1',
     '{
-        "start_time": "08:00",
-        "end_time": "12:00",
+        "start_time": "day1:08:00",
+        "end_time": "day1:12:00",
         "resources": [
             { "resource_id": 1, "resource_position": [-73.5610, 45.5070] },
             { "resource_id": 2, "resource_position": [-73.5670, 45.5090] }
@@ -213,8 +213,8 @@ VALUES
             { "id": "t1", "station_id": 1, "assigned_resource_id": 1 }
         ],
         "scheduled_tasks": [
-            { "id": "t3", "station_id": 1, "time": 5400 },
-            { "id": "t4", "station_id": 2, "time": 6300 }
+            { "id": "t3", "station_id": 1, "time": "day1:09:30" },
+            { "id": "t4", "station_id": 2, "time": "day1:09:45" }
         ]
     }',
     'Test description for Scenario 1.',
@@ -225,8 +225,8 @@ VALUES
 (
     'Test Scenario 2',
     '{
-        "start_time": "13:00",
-        "end_time": "17:00",
+        "start_time": "day1:13:00",
+        "end_time": "day1:17:00",
         "resources": [
             { "resource_id": 3, "resource_position": [-73.5740, 45.5030] }
         ],
@@ -238,8 +238,8 @@ VALUES
             { "id": "t5", "station_id": 3, "assigned_resource_id": 3 }
         ],
         "scheduled_tasks": [
-            { "id": "t7", "station_id": 3, "time": 50400 },
-            { "id": "t8", "station_id": 4, "time": 55800 }
+            { "id": "t7", "station_id": 3, "time": "day1:14:00" },
+            { "id": "t8", "station_id": 4, "time": "day1:15:30" }
         ]
     }',
     'Test description for Scenario 2.',

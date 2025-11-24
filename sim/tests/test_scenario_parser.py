@@ -23,7 +23,7 @@ SOFTWARE.
 """
 
 import pytest
-
+from unittest.mock import patch, MagicMock
 from sim.utils.base_parse_strategy import BaseParseStrategy
 from sim.utils.json_parser_strategy import JsonParseStrategy
 from sim.entities.inputParameters import InputParameter
@@ -44,8 +44,8 @@ def test_json_parse_strategy_valid_input() -> None:
         "id": 1,
         "name": "Test Scenario",
         "content": {
-            "start_time": "00:00",
-            "end_time": "01:00",
+            "start_time": "day1:00:00",
+            "end_time": "day2:01:00",
             "stations": [
                 {
                     "station_id": 8074,
@@ -67,10 +67,10 @@ def test_json_parse_strategy_valid_input() -> None:
                 {"resource_id": 1, "resource_position": [-64.0060, 75.7128]},
                 {"resource_id": 2, "resource_position": [-123.2437, 64.0522]},
             ],
-            "initial_tasks": [{"id": "t3", "station_id": 8074}],
+            "initial_tasks": [{"station_id": 8074}],
             "scheduled_tasks": [
-                {"id": "t4", "station_id": 2105, "time": 30},
-                {"id": "t5", "station_id": 2508, "time": 120},
+                {"station_id": 2105, "time": "day1:05:00"},
+                {"station_id": 2508, "time": "day1:08:00"},
             ],
         },
     }
@@ -87,10 +87,10 @@ def test_json_parse_strategy_valid_input() -> None:
     stations = params.station_entities
     resources = params.resource_entities
 
-    # IDs stripped of "t" prefix
-    assert tasks[3].station == stations[8074]
-    assert tasks[4].station == stations[2105]
-    assert tasks[5].station == stations[2508]
+    # IDs are auto-generated starting from 1, 2, 3...
+    assert tasks[1].station == stations[8074]  # First task (initial)
+    assert tasks[2].station == stations[2105]  # Second task (scheduled)
+    assert tasks[3].station == stations[2508]  # Third task (scheduled)
 
     for res in resources.values():
         assert isinstance(res, Resource)
@@ -101,6 +101,52 @@ def test_json_parse_strategy_invalid_json() -> None:
     strategy = JsonParseStrategy()
     with pytest.raises(AttributeError):
         strategy.parse("string_instead_of_dict")  # type: ignore[arg-type]
+
+
+@patch("builtins.print")
+def test_json_parse_strategy_with_invalid_time(mock_print: MagicMock) -> None:
+    scenario_json_with_bad_time_format = {
+        "id": 1,
+        "name": "Test Scenario",
+        "content": {
+            "start_time": "day1:00:00",
+            "end_time": "day2:01",  # invalid time format
+            "stations": [
+                {
+                    "station_id": 8074,
+                    "station_name": "Lionel-Groulx",
+                    "station_position": [-74.0060, 40.7128],
+                },
+                {
+                    "station_id": 2105,
+                    "station_name": "Guy-Concordia",
+                    "station_position": [-118.2437, 34.0522],
+                },
+                {
+                    "station_id": 2508,
+                    "station_name": "Peel",
+                    "station_position": [-87.6298, 41.8781],
+                },
+            ],
+            "resources": [
+                {"resource_id": 1, "resource_position": [-64.0060, 75.7128]},
+                {"resource_id": 2, "resource_position": [-123.2437, 64.0522]},
+            ],
+            "initial_tasks": [{"station_id": 8074}],
+            "scheduled_tasks": [
+                {"station_id": 2105, "time": "day1:05:00"},
+                {"station_id": 2508, "time": "day1:08:00"},
+            ],
+        },
+    }
+
+    strategy = JsonParseStrategy()
+    params: InputParameter = strategy.parse(scenario_json_with_bad_time_format)
+
+    mock_print.assert_called_once_with(
+        "Invalid time format 'day2:01', defaulting to 0s."
+    )
+    assert params.sim_time == 0
 
 
 def test_scenario_parser_delegates_to_strategy() -> None:
