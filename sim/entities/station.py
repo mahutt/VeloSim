@@ -36,16 +36,15 @@ if TYPE_CHECKING:  # pragma: no cover
 
 
 class Station:
+    env: simpy.Environment
 
     def __init__(
         self,
-        env: simpy.Environment,
         station_id: int,
         name: str,
         position: "Position",  # [longitude, latitude]
         tasks: list["Task"] | None = None,
     ) -> None:
-        self.env = env
         self.id = station_id
         self.name = name
         self.position = position
@@ -97,9 +96,9 @@ class Station:
 
             # TEMPORARY ID SOLUTION FOR TESTING
             task_id = uuid.uuid4().int % 1_000_000_000
-            # Ensure BatterySwapTask is instantiated with the current env
-            # and station
-            task = BatterySwapTask(env=self.env, task_id=task_id, station=self)
+            # Create BatterySwapTask and set its env attribute
+            task = BatterySwapTask(task_id=task_id, station=self)
+            task.env = self.env
             self.add_task(task)
             self.add_pop_up_task(task)
 

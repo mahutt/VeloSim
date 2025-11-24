@@ -45,24 +45,23 @@ class TestStation:
         station_id = 1
         name = "Test Station Name"
 
-        station = Station(simpy_env, station_id, name, default_position)
+        station = Station(station_id, name, default_position)
 
         assert station.id == station_id
         assert station.name == name
         assert station.position == default_position
         assert station.tasks == []
-        assert station.env == simpy_env
 
     def test_station_creation_with_tasks(
         self, simpy_env: simpy.Environment, default_position: Position
     ) -> None:
         station_id = 2
         name = "Station with Tasks"
-        task = BatterySwapTask(simpy_env, 1)
-        task2 = BatterySwapTask(simpy_env, 2)
+        task = BatterySwapTask(1)
+        task2 = BatterySwapTask(2)
         initial_tasks: list[Task] = [task, task2]
 
-        station = Station(simpy_env, station_id, name, default_position, initial_tasks)
+        station = Station(station_id, name, default_position, initial_tasks)
 
         assert station.id == station_id
         assert station.name == name
@@ -73,19 +72,19 @@ class TestStation:
     def test_add_task(
         self, simpy_env: simpy.Environment, default_position: Position
     ) -> None:
-        station = Station(simpy_env, 1, "Test Station", default_position)
+        station = Station(1, "Test Station", default_position)
 
         assert len(station.tasks) == 0
 
         # adding a single task
-        task = BatterySwapTask(simpy_env, 1)
+        task = BatterySwapTask(1)
         station.add_task(task)
         assert task in station.tasks
         assert len(station.tasks) == 1
 
         # adding multiple tasks
-        task2 = BatterySwapTask(simpy_env, 2)
-        task3 = BatterySwapTask(simpy_env, 3)
+        task2 = BatterySwapTask(2)
+        task3 = BatterySwapTask(3)
         station.add_task(task2)
         station.add_task(task3)
         assert station.tasks == [task, task2, task3]
@@ -94,14 +93,12 @@ class TestStation:
     def test_remove_task(
         self, simpy_env: simpy.Environment, default_position: Position
     ) -> None:
-        task = BatterySwapTask(simpy_env, 1)
-        task2 = BatterySwapTask(simpy_env, 2)
-        task3 = BatterySwapTask(simpy_env, 3)
-        task4 = BatterySwapTask(simpy_env, 4)
+        task = BatterySwapTask(1)
+        task2 = BatterySwapTask(2)
+        task3 = BatterySwapTask(3)
+        task4 = BatterySwapTask(4)
         initial_tasks: list[Task] = [task, task2, task3, task4]
-        station = Station(
-            simpy_env, 1, "Test Station", default_position, initial_tasks.copy()
-        )
+        station = Station(1, "Test Station", default_position, initial_tasks.copy())
 
         # removing existing task
         station.remove_task(task2)
@@ -117,16 +114,14 @@ class TestStation:
     def test_remove_nonexistent_task(
         self, simpy_env: simpy.Environment, default_position: Position
     ) -> None:
-        task = BatterySwapTask(simpy_env, 1)
-        task2 = BatterySwapTask(simpy_env, 2)
-        task3 = BatterySwapTask(simpy_env, 3)
+        task = BatterySwapTask(1)
+        task2 = BatterySwapTask(2)
+        task3 = BatterySwapTask(3)
         initial_tasks: list[Task] = [task, task2, task3]
-        station = Station(
-            simpy_env, 1, "Test Station", default_position, initial_tasks.copy()
-        )
+        station = Station(1, "Test Station", default_position, initial_tasks.copy())
 
         # attempting to remove non-existent task
-        task4 = BatterySwapTask(simpy_env, 4)
+        task4 = BatterySwapTask(4)
         station.remove_task(task4)
 
         assert station.tasks == [task, task2, task3]
@@ -135,18 +130,16 @@ class TestStation:
     def test_get_count(
         self, simpy_env: simpy.Environment, default_position: Position
     ) -> None:
-        station = Station(simpy_env, 1, "Empty Station", default_position)
+        station = Station(1, "Empty Station", default_position)
         assert station.get_task_count() == 0
 
-        task = BatterySwapTask(simpy_env, 1)
-        task2 = BatterySwapTask(simpy_env, 2)
-        task3 = BatterySwapTask(simpy_env, 3)
-        task4 = BatterySwapTask(simpy_env, 4)
-        task5 = BatterySwapTask(simpy_env, 5)
+        task = BatterySwapTask(1)
+        task2 = BatterySwapTask(2)
+        task3 = BatterySwapTask(3)
+        task4 = BatterySwapTask(4)
+        task5 = BatterySwapTask(5)
         tasks: list[Task] = [task, task2, task3, task4, task5]
-        station_with_tasks = Station(
-            simpy_env, 2, "Busy Station", default_position, tasks
-        )
+        station_with_tasks = Station(2, "Busy Station", default_position, tasks)
         assert station_with_tasks.get_task_count() == 5
 
         station.add_task(task)
@@ -159,7 +152,7 @@ class TestStation:
     def test_get_station_position(
         self, simpy_env: simpy.Environment, default_position: Position
     ) -> None:
-        station = Station(simpy_env, 1, "Test Station", default_position)
+        station = Station(1, "Test Station", default_position)
 
         returned_position = station.get_station_position()
         assert returned_position == default_position

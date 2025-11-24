@@ -22,7 +22,6 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 """
 
-import simpy
 from datetime import datetime
 from typing import Dict
 from sim.entities.inputParameters import InputParameter
@@ -51,7 +50,6 @@ class JsonParseStrategy(BaseParseStrategy):
         """
         Parse a single scenario JSON and return InputParameter
         """
-        env = simpy.Environment()
         content = scenario_json.get("content", {})
         start_time = self._time_to_seconds(str(content.get("start_time", "Day1:00:00")))
         end_time = self._time_to_seconds(str(content.get("end_time", "Day1:00:00")))
@@ -64,7 +62,6 @@ class JsonParseStrategy(BaseParseStrategy):
             station_id = int(s["station_id"])
             pos = Position(s.get("station_position", [0, 0]))
             stations[station_id] = Station(
-                env=env,
                 station_id=station_id,
                 name=s.get("station_name", f"Station {station_id}"),
                 position=pos,
@@ -75,9 +72,7 @@ class JsonParseStrategy(BaseParseStrategy):
         for r in content.get("resources", []):
             rid = int(r["resource_id"])
             pos = Position(r.get("resource_position", [0, 0]))
-            resources[rid] = Resource(
-                env=env, resource_id=rid, position=pos, task_list=[]
-            )
+            resources[rid] = Resource(resource_id=rid, position=pos, task_list=[])
 
         # Build tasks
         tasks: Dict[int, BatterySwapTask] = {}
@@ -89,9 +84,7 @@ class JsonParseStrategy(BaseParseStrategy):
             task_id_counter += 1
 
             station_ref = stations[int(t["station_id"])]
-            task = BatterySwapTask(
-                env=env, task_id=tid, station=station_ref, spawn_delay=0.0
-            )
+            task = BatterySwapTask(task_id=tid, station=station_ref, spawn_delay=0.0)
             tasks[tid] = task
             station_ref.add_task(task)
 
@@ -112,9 +105,7 @@ class JsonParseStrategy(BaseParseStrategy):
             else:
                 delay = int(raw_time)
 
-            task = BatterySwapTask(
-                env=env, task_id=tid, station=station_ref, spawn_delay=delay
-            )
+            task = BatterySwapTask(task_id=tid, station=station_ref, spawn_delay=delay)
             tasks[tid] = task
             station_ref.add_task(task)
 

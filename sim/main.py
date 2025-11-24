@@ -53,11 +53,6 @@ class WebSocketSubscriber(Subscriber):
         print(f"[{self.name}] Received: {frame}\n\n")
 
 
-# Create a temporary environment for entity creation
-temp_env = simpy.Environment()
-
-temp_env2 = simpy.Environment()
-
 # Montreal coordinates - various stations
 ikea = Position([-73.691993, 45.490198])  # IKEA
 concordia = Position([-73.577797, 45.495009])  # Concordia University
@@ -69,35 +64,18 @@ jean_talon_market = Position([-73.613426, 45.534917])  # Jean-Talon Market
 mont_royal = Position([-73.587807, 45.508840])  # Mount Royal
 
 # Create example stations
-station1 = Station(temp_env, station_id=1, name="Ikea", position=ikea)
-station2 = Station(temp_env, station_id=2, name="Concordia", position=concordia)
-station3 = Station(temp_env, station_id=3, name="McGill", position=mcgill)
-station4 = Station(temp_env, station_id=4, name="Downtown", position=downtown)
-station5 = Station(temp_env, station_id=5, name="Old Montreal", position=old_montreal)
-station6 = Station(
-    temp_env, station_id=6, name="Olympic Stadium", position=olympic_stadium
-)
+# station1 = Station(station_id=1, name="Ikea", position=ikea)
+# station2 = Station(station_id=2, name="Concordia", position=concordia)
+# station3 = Station(station_id=3, name="McGill", position=mcgill)
+# station4 = Station(station_id=4, name="Downtown", position=downtown)
+# station5 = Station(station_id=5, name="Old Montreal", position=old_montreal)
+# station6 = Station(station_id=6, name="Olympic Stadium", position=olympic_stadium)
 
 # Create example resources at different starting positions
-resource1 = Resource(temp_env, resource_id=101, position=ikea)
-resource2 = Resource(temp_env, resource_id=102, position=mcgill)
-resource3 = Resource(temp_env, resource_id=103, position=jean_talon_market)
-resource4 = Resource(temp_env, resource_id=104, position=mont_royal)
-
-# Create tasks for different stations
-task1 = BatterySwapTask(temp_env, 1, station2)  # Task at Concordia
-task2 = BatterySwapTask(temp_env, 2, station3)  # Task at McGill
-task3 = BatterySwapTask(temp_env, 3, station5)  # Task at Old Montreal
-task4 = BatterySwapTask(temp_env, 4, station6)  # Task at Olympic Stadium
-
-# Add tasks to their respective stations
-station2.add_task(task1)
-station3.add_task(task2)
-station5.add_task(task3)
-station6.add_task(task4)
-
-# Assign initial task to first resource
-resource1.assign_task(task1)
+resource1 = Resource(resource_id=101, position=ikea)
+resource2 = Resource(resource_id=102, position=mcgill)
+resource3 = Resource(resource_id=103, position=jean_talon_market)
+resource4 = Resource(resource_id=104, position=mont_royal)
 
 # ===== SECOND SIMULATION ENTITIES =====
 # Additional Montreal locations for second simulation
@@ -109,26 +87,24 @@ parc_jarry = Position([-73.628571, 45.534180])  # Parc Jarry
 notre_dame = Position([-73.553810, 45.504722])  # Notre-Dame Basilica
 
 # Create stations for second simulation
-station7 = Station(temp_env2, station_id=7, name="Verdun", position=verdun)
-station8 = Station(temp_env2, station_id=8, name="Plateau", position=plateau)
-station9 = Station(temp_env2, station_id=9, name="Chinatown", position=chinatown)
-station10 = Station(
-    temp_env2, station_id=10, name="Atwater Market", position=atwater_market
-)
-station11 = Station(temp_env2, station_id=11, name="Parc Jarry", position=parc_jarry)
-station12 = Station(temp_env2, station_id=12, name="Notre-Dame", position=notre_dame)
+station7 = Station(station_id=7, name="Verdun", position=verdun)
+station8 = Station(station_id=8, name="Plateau", position=plateau)
+station9 = Station(station_id=9, name="Chinatown", position=chinatown)
+station10 = Station(station_id=10, name="Atwater Market", position=atwater_market)
+station11 = Station(station_id=11, name="Parc Jarry", position=parc_jarry)
+station12 = Station(station_id=12, name="Notre-Dame", position=notre_dame)
 
 # Create resources for second simulation
-resource5 = Resource(temp_env2, resource_id=201, position=verdun)
-resource6 = Resource(temp_env2, resource_id=202, position=plateau)
-resource7 = Resource(temp_env2, resource_id=203, position=atwater_market)
-resource8 = Resource(temp_env2, resource_id=204, position=parc_jarry)
+resource5 = Resource(resource_id=201, position=verdun)
+resource6 = Resource(resource_id=202, position=plateau)
+resource7 = Resource(resource_id=203, position=atwater_market)
+resource8 = Resource(resource_id=204, position=parc_jarry)
 
 # Create tasks for second simulation
-task5 = BatterySwapTask(temp_env2, 5, station8)  # Task at Plateau
-task6 = BatterySwapTask(temp_env2, 6, station9)  # Task at Chinatown
-task7 = BatterySwapTask(temp_env2, 7, station10)  # Task at Atwater Market
-task8 = BatterySwapTask(temp_env2, 8, station12)  # Task at Notre-Dame
+task5 = BatterySwapTask(5, station8)  # Task at Plateau
+task6 = BatterySwapTask(6, station9)  # Task at Chinatown
+task7 = BatterySwapTask(7, station10)  # Task at Atwater Market
+task8 = BatterySwapTask(8, station12)  # Task at Notre-Dame
 
 # Add tasks to their respective stations
 station8.add_task(task5)
@@ -143,18 +119,18 @@ resource5.assign_task(task5)
 env = simpy.Environment()
 
 # Stations
-station_1 = Station(env, 1, "Station A", Position([-73.569000, 45.453140]))
-station_2 = Station(env, 2, "Station B", Position([-73.586273, 45.523064]))
+station_1 = Station(1, "Station A", Position([-73.569000, 45.453140]))
+station_2 = Station(2, "Station B", Position([-73.586273, 45.523064]))
 
 # Resources
-resource_1 = Resource(env, 1, Position([-73.583092, 45.477344]))
-resource_2 = Resource(env, 2, Position([-73.628571, 45.534180]))
+resource_1 = Resource(1, Position([-73.583092, 45.477344]))
+resource_2 = Resource(2, Position([-73.628571, 45.534180]))
 
 # Tasks
-task_1 = BatterySwapTask(env, 1, station_1)  # will be assigned
-task_2 = BatterySwapTask(env, 2, station_1)  # unassigned
-task_3 = BatterySwapTask(env, 3, station_2)  # will be assigned
-task_4 = BatterySwapTask(env, 4, station_2)  # unassigned
+task_1 = BatterySwapTask(1, station_1, 20)  # will be assigned
+task_2 = BatterySwapTask(2, station_1)  # unassigned
+task_3 = BatterySwapTask(3, station_2, 20)  # will be assigned
+task_4 = BatterySwapTask(4, station_2)  # unassigned
 
 # Assign tasks to stations
 station_1.add_task(task_1)
@@ -180,62 +156,35 @@ params = InputParameter(
     resource_entities=resources,
     task_entities=tasks,
     real_time_factor=1.0,
-    key_frame_freq=10,
+    key_frame_freq=1000,
 )
 
 
 # Create InputParameter for second simulation
-params2 = InputParameter(
-    station_entities={
-        7: station7,
-        8: station8,
-        9: station9,
-        10: station10,
-        11: station11,
-        12: station12,
-    },
-    resource_entities={
-        201: resource5,
-        202: resource6,
-        203: resource7,
-        204: resource8,
-    },
-    task_entities={
-        5: task5,
-        6: task6,
-        7: task7,
-        8: task8,
-    },
-    real_time_factor=1,  # Real-time simulation
-    key_frame_freq=3000,  # Key frame every 3000 frames
-)
-
-# Create InputParameter for second simulation
-params2 = InputParameter(
-    station_entities={
-        7: station7,
-        8: station8,
-        9: station9,
-        10: station10,
-        11: station11,
-        12: station12,
-    },
-    resource_entities={
-        201: resource5,
-        202: resource6,
-        203: resource7,
-        204: resource8,
-    },
-    task_entities={
-        5: task5,
-        6: task6,
-        7: task7,
-        8: task8,
-    },
-    real_time_factor=1,  # Real-time simulation
-    key_frame_freq=3000,  # Key frame every 3000 frames
-)
-
+# params2 = InputParameter(
+#     station_entities={
+#         7: station7,
+#         8: station8,
+#         9: station9,
+#         10: station10,
+#         11: station11,
+#         12: station12,
+#     },
+#     resource_entities={
+#         201: resource5,
+#         202: resource6,
+#         203: resource7,
+#         204: resource8,
+#     },
+#     task_entities={
+#         5: task5,
+#         6: task6,
+#         7: task7,
+#         8: task8,
+#     },
+#     real_time_factor=1,  # Real-time simulation
+#     key_frame_freq=3000,  # Key frame every 3000 frames
+# )
 
 sim1_sub = WebSocketSubscriber("SIM-1 WebSock")
 sim_1_db_logger = LoggerSubscriber("Database-1_Logger")
@@ -258,7 +207,7 @@ if __name__ == "__main__":
     # Initialize simulations and send initial frames
     print("Initializing simulations...")
     r1 = sim.initialize(params, sub_list_1, sim_behaviour=sim_behaviour)
-    r2 = sim.initialize(params2, sub_list_1, sim_behaviour=sim_behaviour)
+    # r2 = sim.initialize(params2, sub_list_1, sim_behaviour=sim_behaviour)
 
     print("Initial frames sent. Starting simulation loops...")
 
@@ -267,8 +216,6 @@ if __name__ == "__main__":
     thread = sim.thread_pool[r1]["thread"]
     # if thread is not None:
     #     thread.join()
-
-    time.sleep(5)
 
     # sim.start(r2, 5)
     # # Let first resource run for a bit

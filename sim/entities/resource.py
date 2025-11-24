@@ -42,15 +42,14 @@ class Resource:
     map_controller: MapController
     sim_behaviour: "SimBehaviour"
     current_route: Route | None
+    env: simpy.Environment
 
     def __init__(
         self,
-        env: simpy.Environment,
         resource_id: int,
         position: "Position",  # [longitude, latitude]
         task_list: list["Task"] | None = None,
     ) -> None:
-        self.env = env
         self.id = resource_id
         self.position = position
         self.current_route = None

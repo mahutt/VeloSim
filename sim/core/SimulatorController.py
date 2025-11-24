@@ -84,7 +84,9 @@ class SimulatorController:
             task.set_behaviour(self.sim_behaviour)
             # Rebind to the actual simulation environment
             task.env = self.simEnv
-
+            task.spawn_time = self.simEnv.now + (
+                task.spawn_delay if task.spawn_delay else 0
+            )
             # Handle scheduling
             if task.spawn_delay is not None and task.spawn_delay > 0:
                 # Task starts SCHEDULED, will become OPEN after delay

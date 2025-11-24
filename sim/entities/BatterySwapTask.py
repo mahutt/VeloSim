@@ -34,14 +34,15 @@ if TYPE_CHECKING:  # pragma: no cover
 
 
 class BatterySwapTask(Task):
+    env: simpy.Environment
+
     def __init__(
         self,
-        env: simpy.Environment,
         task_id: int,
         station: Optional["Station"] = None,
         spawn_delay: Optional[float] = None,
     ) -> None:
-        super().__init__(env, task_id, station, spawn_delay)
+        super().__init__(task_id, station, spawn_delay)
 
     def get_state(self) -> State:
         return self.state

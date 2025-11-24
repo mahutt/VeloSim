@@ -97,7 +97,6 @@ def simpy_env() -> simpy.Environment:
 @pytest.fixture
 def default_station(simpy_env: simpy.Environment) -> Station:
     return Station(
-        simpy_env,
         station_id=1,
         name="Test Station",
         position=Position([-73.5673, 45.5017]),
@@ -111,13 +110,11 @@ def input_params(simpy_env: simpy.Environment) -> InputParameter:
 
     # Add test stations
     station1 = Station(
-        env=simpy_env,
         station_id=1,
         name="Test Station 1",
         position=Position([10.0, 20.0]),
     )
     station2 = Station(
-        env=simpy_env,
         station_id=2,
         name="Test Station 2",
         position=Position([30.0, 40.0]),
@@ -126,14 +123,14 @@ def input_params(simpy_env: simpy.Environment) -> InputParameter:
     params.add_station(station2)
 
     # Add test resources
-    resource1 = Resource(env=simpy_env, resource_id=1, position=Position([15.0, 25.0]))
-    resource2 = Resource(env=simpy_env, resource_id=2, position=Position([35.0, 45.0]))
+    resource1 = Resource(resource_id=1, position=Position([15.0, 25.0]))
+    resource2 = Resource(resource_id=2, position=Position([35.0, 45.0]))
     params.add_resource(resource1)
     params.add_resource(resource2)
 
     # Add test tasks using concrete BatterySwapTask
-    task1 = BatterySwapTask(env=simpy_env, task_id=1, station=station1)
-    task2 = BatterySwapTask(env=simpy_env, task_id=2, station=station2)
+    task1 = BatterySwapTask(task_id=1, station=station1)
+    task2 = BatterySwapTask(task_id=2, station=station2)
     params.add_task(task1)
     params.add_task(task2)
 
@@ -499,7 +496,7 @@ def test_add_task_to_sim_success(
     ):
         sim.start(a, 3600)
 
-    new_task = BatterySwapTask(simpy_env, 3, default_station)
+    new_task = BatterySwapTask(3, default_station)
 
     # Act
     sim.add_task_to_sim(a, new_task)
@@ -542,7 +539,7 @@ def test_add_task_to_sim_fail(
     ):
         sim.start(a, 3600)
 
-    new_task = BatterySwapTask(simpy_env, 3, default_station)
+    new_task = BatterySwapTask(3, default_station)
 
     # Act
     sim.add_task_to_sim("random_id", new_task)

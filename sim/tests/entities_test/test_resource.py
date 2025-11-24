@@ -44,23 +44,22 @@ class TestResource:
     def resource(
         self, simpy_env: simpy.Environment, default_position: Position
     ) -> Resource:
-        return Resource(simpy_env, 1, default_position)
+        return Resource(1, default_position)
 
     @pytest.fixture
     def resource_with_tasks(
         self, simpy_env: simpy.Environment, default_position: Position
     ) -> Resource:
-        task = BatterySwapTask(simpy_env, 1)
-        task2 = BatterySwapTask(simpy_env, 2)
-        task3 = BatterySwapTask(simpy_env, 3)
-        return Resource(simpy_env, 2, default_position, [task, task2, task3])
+        task = BatterySwapTask(1)
+        task2 = BatterySwapTask(2)
+        task3 = BatterySwapTask(3)
+        return Resource(2, default_position, [task, task2, task3])
 
     def test_resource_initialization(
         self, simpy_env: simpy.Environment, default_position: Position
     ) -> None:
-        resource = Resource(simpy_env, 1, default_position)
+        resource = Resource(1, default_position)
 
-        assert resource.env == simpy_env
         assert resource.id == 1
         assert resource.position == default_position
         assert resource.task_list == []
@@ -69,13 +68,12 @@ class TestResource:
     def test_resource_initialization_with_task_list(
         self, simpy_env: simpy.Environment, default_position: Position
     ) -> None:
-        task = BatterySwapTask(simpy_env, 1)
-        task2 = BatterySwapTask(simpy_env, 2)
-        task3 = BatterySwapTask(simpy_env, 3)
+        task = BatterySwapTask(1)
+        task2 = BatterySwapTask(2)
+        task3 = BatterySwapTask(3)
         task_list: list[Task] = [task, task2, task3]
-        resource = Resource(simpy_env, 2, default_position, task_list)
+        resource = Resource(2, default_position, task_list)
 
-        assert resource.env == simpy_env
         assert resource.id == 2
         assert resource.position == default_position
         assert resource.task_list == task_list
@@ -99,7 +97,7 @@ class TestResource:
         self, simpy_env: simpy.Environment, resource: Resource
     ) -> None:
         initial_count = resource.get_task_count()
-        task = BatterySwapTask(simpy_env, 1)
+        task = BatterySwapTask(1)
 
         resource.assign_task(task)
 
@@ -109,9 +107,9 @@ class TestResource:
     def test_assign_multiple_tasks(
         self, simpy_env: simpy.Environment, resource: Resource
     ) -> None:
-        task = BatterySwapTask(simpy_env, 1)
-        task2 = BatterySwapTask(simpy_env, 2)
-        task3 = BatterySwapTask(simpy_env, 3)
+        task = BatterySwapTask(1)
+        task2 = BatterySwapTask(2)
+        task3 = BatterySwapTask(3)
         task_list = [task, task2, task3]
         initial_count = resource.get_task_count()
 
@@ -125,10 +123,10 @@ class TestResource:
     def test_unassign_existing_task(
         self, simpy_env: simpy.Environment, default_position: Position
     ) -> None:
-        task = BatterySwapTask(simpy_env, 1)
-        task2 = BatterySwapTask(simpy_env, 2)
-        task3 = BatterySwapTask(simpy_env, 3)
-        resource = Resource(simpy_env, 2, default_position, [task, task2, task3])
+        task = BatterySwapTask(1)
+        task2 = BatterySwapTask(2)
+        task3 = BatterySwapTask(3)
+        resource = Resource(2, default_position, [task, task2, task3])
         initial_count = resource.get_task_count()
         task_to_remove = task2
 
@@ -142,13 +140,13 @@ class TestResource:
     def test_unassign_nonexistent_task(
         self, simpy_env: simpy.Environment, default_position: Position
     ) -> None:
-        task = BatterySwapTask(simpy_env, 1)
-        task2 = BatterySwapTask(simpy_env, 2)
-        task3 = BatterySwapTask(simpy_env, 3)
-        resource = Resource(simpy_env, 2, default_position, [task, task2, task3])
+        task = BatterySwapTask(1)
+        task2 = BatterySwapTask(2)
+        task3 = BatterySwapTask(3)
+        resource = Resource(2, default_position, [task, task2, task3])
         initial_count = resource.get_task_count()
         initial_tasks = resource.get_task_list().copy()
-        nonexistent_task = BatterySwapTask(simpy_env, 4)
+        nonexistent_task = BatterySwapTask(4)
 
         assert nonexistent_task not in resource.get_task_list()
 
@@ -162,10 +160,10 @@ class TestResource:
         self, simpy_env: simpy.Environment, default_position: Position
     ) -> None:
         # Arrange
-        task = BatterySwapTask(simpy_env, 1)
-        task2 = BatterySwapTask(simpy_env, 2)
-        task3 = BatterySwapTask(simpy_env, 3)
-        resource = Resource(simpy_env, 2, default_position, [task, task2, task3])
+        task = BatterySwapTask(1)
+        task2 = BatterySwapTask(2)
+        task3 = BatterySwapTask(3)
+        resource = Resource(2, default_position, [task, task2, task3])
         task2.set_state(State.IN_PROGRESS)
 
         # Act
@@ -179,10 +177,10 @@ class TestResource:
         self, simpy_env: simpy.Environment, default_position: Position
     ) -> None:
         # Arrange
-        task = BatterySwapTask(simpy_env, 1)
-        task2 = BatterySwapTask(simpy_env, 2)
-        task3 = BatterySwapTask(simpy_env, 3)
-        resource = Resource(simpy_env, 2, default_position, [task, task2, task3])
+        task = BatterySwapTask(1)
+        task2 = BatterySwapTask(2)
+        task3 = BatterySwapTask(3)
+        resource = Resource(2, default_position, [task, task2, task3])
 
         # Act
         dispatched_task = resource.get_in_progress_task()
@@ -194,10 +192,10 @@ class TestResource:
         self, simpy_env: simpy.Environment, default_position: Position
     ) -> None:
         # Arrange
-        task = BatterySwapTask(simpy_env, 1)
-        task2 = BatterySwapTask(simpy_env, 2)
-        task3 = BatterySwapTask(simpy_env, 3)
-        resource = Resource(simpy_env, 2, default_position, [task, task2, task3])
+        task = BatterySwapTask(1)
+        task2 = BatterySwapTask(2)
+        task3 = BatterySwapTask(3)
+        resource = Resource(2, default_position, [task, task2, task3])
 
         # Act
         resource.dispatch_task(task2)
@@ -209,11 +207,11 @@ class TestResource:
         self, simpy_env: simpy.Environment, default_position: Position
     ) -> None:
         # Arrange
-        task = BatterySwapTask(simpy_env, 1)
-        task2 = BatterySwapTask(simpy_env, 2)
-        task3 = BatterySwapTask(simpy_env, 3)
-        station = Station(simpy_env, 1, "Test Station", default_position)
-        resource = Resource(simpy_env, 2, default_position, [task, task2, task3])
+        task = BatterySwapTask(1)
+        task2 = BatterySwapTask(2)
+        task3 = BatterySwapTask(3)
+        station = Station(1, "Test Station", default_position)
+        resource = Resource(2, default_position, [task, task2, task3])
         task.set_state(State.IN_PROGRESS)
         task.set_station(station)
         task2.set_station(station)
@@ -228,12 +226,12 @@ class TestResource:
         self, simpy_env: simpy.Environment, default_position: Position
     ) -> None:
         # Arrange
-        task = BatterySwapTask(simpy_env, 1)
-        task2 = BatterySwapTask(simpy_env, 2)
-        task3 = BatterySwapTask(simpy_env, 3)
-        station = Station(simpy_env, 1, "Test Station", default_position)
-        station2 = Station(simpy_env, 2, "Other Station", default_position)
-        resource = Resource(simpy_env, 2, default_position, [task, task2, task3])
+        task = BatterySwapTask(1)
+        task2 = BatterySwapTask(2)
+        task3 = BatterySwapTask(3)
+        station = Station(1, "Test Station", default_position)
+        station2 = Station(2, "Other Station", default_position)
+        resource = Resource(2, default_position, [task, task2, task3])
         task.set_state(State.IN_PROGRESS)
         task.set_station(station)
         task2.set_station(station2)
@@ -245,10 +243,10 @@ class TestResource:
     def test_service_task(
         self, simpy_env: simpy.Environment, default_position: Position
     ) -> None:
-        task = BatterySwapTask(simpy_env, 1)
-        task2 = BatterySwapTask(simpy_env, 2)
-        task3 = BatterySwapTask(simpy_env, 3)
-        resource = Resource(simpy_env, 2, default_position, [task, task2, task3])
+        task = BatterySwapTask(1)
+        task2 = BatterySwapTask(2)
+        task3 = BatterySwapTask(3)
+        resource = Resource(2, default_position, [task, task2, task3])
         initial_count = resource.get_task_count()
         task_to_service = task2
 
@@ -262,13 +260,13 @@ class TestResource:
     def test_service_nonexistent_task(
         self, simpy_env: simpy.Environment, default_position: Position
     ) -> None:
-        task = BatterySwapTask(simpy_env, 1)
-        task2 = BatterySwapTask(simpy_env, 2)
-        task3 = BatterySwapTask(simpy_env, 3)
-        resource = Resource(simpy_env, 2, default_position, [task, task2, task3])
+        task = BatterySwapTask(1)
+        task2 = BatterySwapTask(2)
+        task3 = BatterySwapTask(3)
+        resource = Resource(2, default_position, [task, task2, task3])
         initial_count = resource.get_task_count()
         initial_tasks = resource.get_task_list().copy()
-        nonexistent_task = BatterySwapTask(simpy_env, 4)
+        nonexistent_task = BatterySwapTask(4)
 
         assert nonexistent_task not in resource.get_task_list()
 
@@ -300,9 +298,9 @@ class TestResource:
         assert resource.get_task_count() == 0
 
         # add some tasks
-        task = BatterySwapTask(simpy_env, 1)
-        task2 = BatterySwapTask(simpy_env, 2)
-        task3 = BatterySwapTask(simpy_env, 3)
+        task = BatterySwapTask(1)
+        task2 = BatterySwapTask(2)
+        task3 = BatterySwapTask(3)
         resource.assign_task(task)
         resource.assign_task(task2)
         resource.assign_task(task3)

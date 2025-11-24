@@ -57,7 +57,10 @@ def test_sim_behaviour_setters_assign_strategies() -> None:
 
 def test_station_uses_tpu_strategy_in_run_loop() -> None:
     env = simpy.Environment()
-    station = Station(env, station_id=1, name="S1", position=Position([0.0, 0.0]))
+    station = Station(station_id=1, name="S1", position=Position([0.0, 0.0]))
+
+    # Set the env attribute since it's no longer passed in constructor
+    station.env = env
 
     # Set up behaviour with a TPU strategy that returns True once
     beh = SimBehaviour()

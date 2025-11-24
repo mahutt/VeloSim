@@ -38,20 +38,20 @@ if TYPE_CHECKING:  # pragma: no cover
 
 
 class Task(ABC):
+    env: simpy.Environment
+    spawn_time: float
+
     def __init__(
         self,
-        env: simpy.Environment,
         task_id: int,
         station: Optional[Station] = None,
         spawn_delay: Optional[float] = None,
     ) -> None:
-        self.env = env
         self.id: int = task_id
         self.station: Optional[Station] = station
         self.assigned_resource: Optional[Resource] = None
         self.has_updated = False
 
-        self.spawn_time: float = env.now + (spawn_delay if spawn_delay else 0)
         self.spawn_delay = spawn_delay
         if spawn_delay is not None and spawn_delay > 0:
             self.state = State.SCHEDULED
