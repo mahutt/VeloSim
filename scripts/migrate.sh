@@ -11,7 +11,29 @@ cd "$SCRIPT_DIR/../back"
 
 echo "INFO  [velosim.migrate] Starting Alembic migration process..."
 
-# Run migration commands
+# Find the Python executable using run-python.js
+# 1. find the alembic executable
+TEMP_SCRIPT=$(mktemp)
+cat > "$TEMP_SCRIPT" << 'EOF'
+import sys
+import os
+from pathlib import Path
+
+# Get the directory where the Python executable is located
+python_dir = Path(sys.executable).parent
+alembic_path = python_dir / "alembic"
+
+if alembic_path.exists():
+    print(str(alembic_path))
+else:
+    # Fallback: try to find alembic in PATH
+    print("alembic")
+EOF
+
+ALEMBIC_CMD=$(node "$SCRIPT_DIR/run-python.js" "$TEMP_SCRIPT")
+rm "$TEMP_SCRIPT"
+
+# Run migration commands using the found alembic command
 case "$1" in
     "generate")
         if [ -z "$2" ]; then
@@ -20,31 +42,31 @@ case "$1" in
             exit 1
         fi
         echo "INFO  [velosim.migrate] Generating new migration: $2"
-        alembic revision --autogenerate -m "$2"
+        "$ALEMBIC_CMD" revision --autogenerate -m "$2"
         ;;
     "upgrade")
         echo "INFO  [velosim.migrate] Running migrations..."
-        alembic upgrade head
+        "$ALEMBIC_CMD" upgrade head
         ;;
     "current"|"status")
         echo "INFO  [velosim.migrate] Checking current migration status..."
-        alembic current
+        "$ALEMBIC_CMD" current
         ;;
     "downgrade")
         echo "INFO  [velosim.migrate] Rolling back last migration..."
-        alembic downgrade -1
+        "$ALEMBIC_CMD" downgrade -1
         ;;
     "history")
         echo "INFO  [velosim.migrate] Showing migration history..."
-        alembic history
+        "$ALEMBIC_CMD" history
         ;;
     "init")
         echo "INFO  [velosim.migrate] Initializing Alembic..."
-        alembic init alembic
+        "$ALEMBIC_CMD" init alembic
         ;;
     "seed")
         echo "INFO  [velosim.migrate] Seeding database with initial data..."
-        python "$SCRIPT_DIR/db_manager.py" seed
+        node "$SCRIPT_DIR/run-python.js" "$SCRIPT_DIR/db_manager.py" seed
         if [ $? -eq 0 ]; then
             echo "INFO  [velosim.migrate] Database seeded successfully"
         else
@@ -54,7 +76,7 @@ case "$1" in
         ;;
     "dropseed")
         echo "INFO  [velosim.migrate] Dropping database, running migrations, and seeding..."
-        python "$SCRIPT_DIR/db_manager.py" dropseed
+        node "$SCRIPT_DIR/run-python.js" "$SCRIPT_DIR/db_manager.py" dropseed
         if [ $? -eq 0 ]; then
             echo "INFO  [velosim.migrate] Database reset completed successfully"
         else

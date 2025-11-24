@@ -46,15 +46,13 @@ pytestmark = pytest.mark.usefixtures("mock_heavy_sim_operations")
 def mock_heavy_sim_operations() -> Generator[None, None, None]:
     """
     Mock heavy simulation operations at the session level to prevent
-    OSM data loading and CH network building during tests.
+    OSRM connection checks during tests.
     """
     with (
-        patch("sim.osm.OSMConnection.OSMConnection._initialize_osm_data_file"),
-        patch("sim.osm.OSMConnection.OSMConnection._get_drivable_network"),
-        patch("sim.osm.OSMConnection.OSMConnection._set_projected_nodes"),
-        patch("sim.osm.OSMConnection.OSMConnection._build_edge_index"),
-        patch("sim.osm.OSMConnection.OSMConnection.create_networkx_graph"),
-        patch("sim.osm.OSMConnection.OSMConnection.build_ch_network"),
+        patch(
+            "sim.osm.OSRMConnection.OSRMConnection._verify_osrm_connection",
+            return_value=True,
+        ),
         patch("sim.core.SimulatorController.SimulatorController.start") as mock_start,
     ):
         # Make start() a no-op that doesn't spawn threads or do heavy work

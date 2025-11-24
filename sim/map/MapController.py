@@ -24,11 +24,19 @@ SOFTWARE.
 
 from sim.entities.position import Position
 from sim.entities.route import Route
-from sim.osm.OSMConnection import OSMConnection
-from typing import Dict, List, Set, Any
+from sim.entities.osrm_result import OSRMResult
+from sim.osm.OSRMConnection import OSRMConnection
+from typing import Dict, List, Set, Any, Optional
+import json
+from pathlib import Path
 
 
 class MapController:
+    """Map controller using OSRM for routing.
+
+    This uses OSRM instead of local graph-based routing.
+    """
+
     _instance = None
 
     def __new__(cls, *args: Any, **kwargs: Any) -> "MapController":
@@ -36,21 +44,26 @@ class MapController:
             cls._instance = super().__new__(cls)
         return cls._instance
 
-    def __init__(self) -> None:
+    def __init__(self, osrm_url: Optional[str] = None) -> None:
         if not hasattr(self, "_initialized"):
-            # Initialize the OSMConnection:
-            self.osm = OSMConnection()
+            # Initialize the OSRM connection
+            self.osrm = OSRMConnection(osrm_url=osrm_url)
 
             # Dictionary mapping road_id -> set of routes using that road
             # Using set for O(1) add/remove operations
             self.road_subscriptions: Dict[int, Set[Route]] = {}
+
+            # Load config once for all routes
+            config_path = Path(__file__).parent.parent / "config.json"
+            with open(config_path, "r") as f:
+                self.config = json.load(f)
 
             self._initialized = True
 
     def getRoute(self, a: Position, b: Position) -> Route:
         """
         Given a starting position, a route object will be created
-        containing the shortest path.
+        containing the shortest path using OSRM.
         The route will be automatically subscribed to all roads
         it traverses.
 
@@ -60,39 +73,66 @@ class MapController:
 
         Returns:
             Route: A new Route object subscribed to the MapController
+
+        Raises:
+            ValueError: If no route can be found between the two
+                positions
         """
-        # 1. Find the nearest valid node in OSM:
-        starting_node = self.osm.coordinates_to_nearest_node(
-            a.get_position()[0], a.get_position()[1]
-        )
-        ending_node = self.osm.coordinates_to_nearest_node(
-            b.get_position()[0], b.get_position()[1]
-        )
+        # 1. Get coordinates from positions
+        start_lon, start_lat = a.get_position()
+        end_lon, end_lat = b.get_position()
 
-        # 2. Generate the path:
-        osm_route = self.osm.shortest_path(starting_node, ending_node, use_ch=True)
+        try:
+            # 2. Get route from OSRM using coordinates
+            osrm_result_dict = self.osrm.shortest_path_coords(
+                start_lon, start_lat, end_lon, end_lat
+            )
 
-        # 3. Create a new route object
-        traversable_route = Route(osm_route, self.osm)
+            if not osrm_result_dict:
+                raise ValueError(
+                    f"No route found from ({start_lon}, {start_lat}) "
+                    f"to ({end_lon}, {end_lat})"
+                )
 
-        # 4. Subscribe all the roads to this route in the road_subscriptions dictionary
-        traversable_route.subscribe_to_map_controller(self)
+            # 3. Convert OSRM dict to typed OSRMResult
+            osrm_result = OSRMResult.from_dict(osrm_result_dict)
 
-        # 5. return the route
-        return traversable_route
+            # 4. Create a new route object with the typed result and injected config
+            traversable_route = Route(osrm_result, self.osrm, self.config)
+
+            # 5. Subscribe all the roads to this route in the
+            # road_subscriptions dictionary
+            traversable_route.subscribe_to_map_controller(self)
+
+            # 6. return the route
+            return traversable_route
+
+        except ValueError:
+            # Re-raise ValueError as-is (route not found)
+            raise
+        except Exception as e:
+            # Catch any other errors (network issues, parsing errors, etc.)
+            raise ValueError(
+                f"Failed to create route from ({start_lon}, {start_lat}) "
+                f"to ({end_lon}, {end_lat}): {str(e)}"
+            ) from e
 
     def disableRoads(self, road_id_list: List[int]) -> None:
         """
         Given a list of road segments with their OSM ID, will disable
         the roads on the map.
         For any route containing this road, a new route will be
-        calculated.
+        calculated using OSRM.
+
+        Note: Road disabling with OSRM requires either:
+        1. Running a custom OSRM server with modified data
+        2. Client-side filtering (which this implements)
 
         Args:
             road_id_list: List of road segment OSM IDs to disable
         """
-        # Get all edges from OSM
-        all_edges = self.osm.get_all_edges()
+        # Get all edges from OSRM
+        all_edges = self.osrm.get_all_edges()
 
         for road_id in road_id_list:
             # Find routes subscribed to this road
@@ -107,39 +147,19 @@ class MapController:
                         if not success:
                             msg = (
                                 f"Warning: Route {route.id} could not be "
-                                f"recalculated after road {road_id} was "
-                                f"disabled."
+                                "recalculated after road "
+                                f"{road_id} was disabled."
                             )
                             print(msg)
 
-            # Disable the road in OSM data
-            # Find the edge(s) with this road_id and remove them from the graph
+            # Disable the road in OSM data (for edge lookups)
             try:
                 edge_mask = all_edges["id"] == road_id
                 if edge_mask.any():
-                    # Get the edge details before removing
-                    disabled_edge = all_edges[edge_mask].iloc[0]
-                    u_node = disabled_edge["u"]
-                    v_node = disabled_edge["v"]
-
                     # Remove from edges dataframe
                     all_edges = all_edges[~edge_mask]
-                    self.osm.set_edges(all_edges)
-
-                    # Remove from networkx graph
-                    graph = self.osm.get_graph()
-                    if graph.has_edge(u_node, v_node):
-                        # NetworkX MultiDiGraph can have multiple edges between nodes
-                        # Remove all edges between these nodes with this road_id
-                        edges_to_remove = []
-                        for key, data in graph[u_node][v_node].items():
-                            if data.get("id") == road_id:
-                                edges_to_remove.append(key)
-
-                        for key in edges_to_remove:
-                            graph.remove_edge(u_node, v_node, key)
-
-                    print(f"Road {road_id} has been disabled.")
+                    self.osrm.set_edges(all_edges)
+                    print(f"Road {road_id} has been disabled locally.")
                 else:
                     print(f"Warning: Road {road_id} not found in OSM data.")
             except Exception as e:
@@ -170,6 +190,3 @@ class MapController:
             # Clean up empty sets to save memory
             if not self.road_subscriptions[road_id]:
                 del self.road_subscriptions[road_id]
-
-    def build_ch_netowrk(self) -> None:
-        self.osm.build_ch_network()

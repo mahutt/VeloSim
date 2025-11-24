@@ -97,12 +97,12 @@ def test_travel_to_handles_tuple_return_from_route_next() -> None:
     # Mock route that returns tuple on first call, then positions
     mock_route = Mock()
     intermediate_pos = Position([0.5, 0.5])
-    full_route = [start_pos, intermediate_pos, dest_pos]
+    full_route_geometry = [start_pos, intermediate_pos, dest_pos]
 
-    # First call returns tuple (next_position, full_route)
+    # First call returns tuple (next_position, route_geometry)
     # Subsequent calls return just positions, then None
     mock_route.next.side_effect = [
-        (intermediate_pos, full_route),
+        (intermediate_pos, full_route_geometry),
         dest_pos,
         None,
     ]
@@ -121,8 +121,8 @@ def test_travel_to_handles_tuple_return_from_route_next() -> None:
 
     # Verify resource moved through positions
     assert resource.position == dest_pos
-    # current_route should be set to full_route (from the tuple)
-    assert resource.current_route == full_route  # type: ignore[comparison-overlap]
+    # current_route should be cleared after travel completes
+    assert resource.current_route is None
 
 
 def test_travel_to_handles_single_position_return_from_route_next() -> None:

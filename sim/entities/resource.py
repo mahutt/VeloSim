@@ -29,10 +29,10 @@ from typing import Optional, TYPE_CHECKING
 from .task_state import State
 from sim.entities.route import Route
 from typing import Generator, Any
+from .position import Position
 
 # to avoid circular imports
 if TYPE_CHECKING:  # pragma: no cover
-    from .position import Position
     from .task import Task
     from sim.behaviour.sim_behaviour import SimBehaviour
 
@@ -156,24 +156,37 @@ class Resource:
         if self.position == position:
             return
 
-        route = self.map_controller.getRoute(self.position, position)
+        try:
+            route = self.map_controller.getRoute(self.position, position)
+        except ValueError as e:
+            # Route could not be found (no path exists, network error, etc.)
+            # Log the error and stay at current position
+            print(
+                f"Resource {self.id}: Cannot find route to "
+                f"{position.get_position()}: {e}"
+            )
+            return
+
         self.current_route = route
-        first_result = route.next()
-        if isinstance(first_result, tuple):
-            next_position, full_route = first_result
-            self.current_route = full_route  # type: ignore[assignment]
-        else:
-            next_position = first_result  # type: ignore[assignment]
+        next_position = route.next()
         try:
             while self.position != position and next_position:
-
+                # Handle case where route.next() returns tuple (position, geometry)
+                if isinstance(next_position, tuple):
+                    next_position = next_position[0]
+                assert isinstance(
+                    next_position, Position
+                )  # route.next() returns Position when as_json=False
                 self.set_resource_position(next_position)
                 yield self.env.timeout(1)
-                next_position = route.next()  # type: ignore[assignment]
+                next_position = route.next()
         # Allows a traveling resource to be interrupted by other simpy entities
         except simpy.Interrupt:
             # TODO Implement interrupt logic
             pass
+        finally:
+            # Clear current route when travel completes or is interrupted
+            self.current_route = None
 
     # continous process that runs throughout the simulation
     def run(self):  # type: ignore[no-untyped-def]

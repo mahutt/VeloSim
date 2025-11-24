@@ -59,6 +59,42 @@ VeloSim is an open-source network simulation platform that enables job dispatche
 > - Windows: `.venv\Scripts\activate`
 > - macOS/Linux: `source .venv/bin/activate`
 
+**Quick start with npm:**
+
+```bash
+# Start everything (PostgreSQL, OSRM, Backend, Frontend)
+npm run dev
+
+# Or start individual components:
+npm run dev:services    # Start Docker services (PostgreSQL + OSRM)
+npm run dev:backend     # Start backend API
+npm run dev:frontend    # Start frontend
+```
+
+**Using Docker Compose:**
+
+```bash
+# Start all services in containers
+docker-compose up -d
+
+# Stop all services
+docker-compose down
+```
+
+**Ports:**
+
+| Service | Local Dev (`npm run dev`) | Docker Compose |
+|---------|---------------------------|----------------|
+| Frontend | 5173 | 3000 |
+| Backend API | 8000 | 8000 |
+| PostgreSQL | 5433 | 5432 (internal) |
+| OSRM | 5001 | 5000 (internal) |
+| Grafana | N/A | 3001 |
+
+> **Note:** `npm run setup` installs Python dependencies locally for IDE autocomplete and running linters/tests. When using Docker Compose, dependencies are automatically installed in containers.
+
+**Testing and linting:**
+
 ```bash
 # Run all tests
 npm run test
@@ -86,15 +122,17 @@ npm run format
 3. **Write tests** for new functionality
 4. **Run tests locally**: `npm run test`
 5. **Commit with proper message**: Must include issue number
-   ```
+
+   ```text
    feat: add user authentication #123
    fix: resolve login bug fixes #456
    ```
+
 6. **Push and create PR** - CI will automatically run
 
 ### Project Structure
 
-```
+```plaintext
 VeloSim/
 ├── back/           # Python backend API (FastAPI + SQLAlchemy)
 ├── sim/            # Python simulation engine

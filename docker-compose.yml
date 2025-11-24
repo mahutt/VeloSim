@@ -1,5 +1,3 @@
-version: "3.8"
-
 networks:
   velosim-net:
     driver: bridge
@@ -60,7 +58,7 @@ services:
     image: grafana/grafana:11.0.0
     container_name: velosim-grafana
     ports:
-      - "3000:3000"
+      - "3001:3000"  # Expose on 3001 to avoid conflict with frontend
     environment:
       - GF_SECURITY_ADMIN_USER=admin
       - GF_SECURITY_ADMIN_PASSWORD=admin
@@ -88,5 +86,80 @@ services:
     depends_on:
       loki:
         condition: service_healthy
+    networks:
+      - velosim-net
+
+  # --- OSRM Routing Server ---
+  osrm:
+    # Architecture-specific OSRM v6.0.0 image
+    # Defaults to arm64 if not set (most common for Mac M1/M2)
+    image: ${OSRM_IMAGE:-ghcr.io/project-osrm/osrm-backend:v6.0.0@sha256:733da1be48587358a417750655cc4748bbae9af60e3ace610db68d4febe038d8}
+    container_name: velosim-osrm
+    ports:
+      - "5001:5000"
+    volumes:
+      - ./osrm-data:/data:ro
+    command: osrm-routed --algorithm mld /data/montreal.osrm
+    restart: unless-stopped
+    networks:
+      - velosim-net
+
+  # --- Backend API ---
+  backend:
+    build:
+      context: .
+      dockerfile: back/Dockerfile
+    container_name: velosim-backend
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./back:/app/back
+      - ./sim:/app/sim
+      - ./scripts:/app/scripts
+    environment:
+      # Database connection
+      - DATABASE_URL=postgresql://velosim:velosim@postgres:5432/velosim
+      # OSRM connection - use service name for Docker networking
+      - OSRM_URL=http://osrm:5000
+    env_file:
+      - .env
+    depends_on:
+      postgres:
+        condition: service_healthy
+      osrm:
+        condition: service_started  # Changed from service_healthy since health check is disabled
+    restart: unless-stopped
+    networks:
+      - velosim-net
+
+  # --- Frontend (For full deployment) ---
+  frontend:
+    build:
+      context: .
+      dockerfile: front/Dockerfile
+      args:
+        - VITE_MAPBOX_ACCESS_TOKEN=${MAPBOX_ACCESS_TOKEN:-}
+        - VITE_BACKEND_URL=http://localhost:8000
+    container_name: velosim-frontend
+    ports:
+      - "3000:3000"  # Frontend always uses 3000 (both Docker and production)
+    depends_on:
+      - backend
+    restart: unless-stopped
+    networks:
+      - velosim-net
+
+  # --- Nginx Proxy (For full deployment) ---
+  proxy:
+    build:
+      context: ./docker/nginx-proxy
+      dockerfile: Dockerfile
+    container_name: velosim-proxy
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
+      - frontend
+    restart: unless-stopped
     networks:
       - velosim-net

@@ -6,25 +6,22 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 
 WORKDIR /app
 
-COPY back/requirements.txt /tmp/requirements/back.txt
-COPY sim/ /tmp/sim-src
-
-RUN python -m pip install --upgrade pip setuptools wheel \
- && python -m pip install --no-cache-dir -r /tmp/requirements/back.txt \
- && if [ -f /tmp/sim-src/pyproject.toml ] || [ -f /tmp/sim-src/setup.py ]; then \
-        python -m pip install /tmp/sim-src; \
-    elif [ -f /tmp/sim-src/requirements.txt ]; then \
-        python -m pip install -r /tmp/sim-src/requirements.txt; \
-    else \
-        python -m pip install 'simpy>=4.0.2'; \
-    fi
-
+# Configuring Backend Container
 RUN apt-get update && \
-    apt-get install -y --no-install-recommends postgresql-client && \
+    apt-get install -y --no-install-recommends \
+    postgresql-client && \
     rm -rf /var/lib/apt/lists/*
 
+# Copy pyproject.toml and the source code needed for installation
+COPY pyproject.toml ./
 COPY back/ ./back
-COPY sim/  ./sim
+COPY sim/ ./sim
+
+# Install the package with all dependencies
+RUN python -m pip install --upgrade pip setuptools wheel \
+    && python -m pip install --no-cache-dir -e .[dev]
+
+# Copy remaining files into container.
 COPY scripts/ ./scripts
 
 ENV PYTHONPATH=/app

@@ -29,37 +29,30 @@ dependencies = [
     "pydantic-settings>=2.1.0",
     "alembic>=1.13.0",
     "numpy>=1.24.0,<2.0.0",
-    "geopandas>=1.1.1",
-    "pyrosm>=0.6.2",
-    "networkx",
-    "pandana>=0.6.1",
-    "tables>=3.8.0",
-    "tqdm>=4.66.0",
     "argon2-cffi>=25.1.0",
     "python-multipart>=0.0.20",
     "PyJWT>=2.10.1",
-    "python-dateutil>=2.9.0"
+    "python-dateutil>=2.9.0",
+    "requests>=2.31.0",
+    "pandas>=2.0.0",
+    "shapely>=2.0.0"
 ]
 
 [project.optional-dependencies]
 dev = [
     "pytest>=7.0.0",
+    "pytest-asyncio>=0.21.0",
     "pytest-cov>=4.0.0",
     "coverage>=7.0.0",
     "black>=25.9.0",
     "flake8>=7.3.0",
     "mypy>=1.18.2",
     "pre-commit>=3.0.0",
-    "httpx>=0.24.0",
-    "types-networkx>=3.0.0",
-    "pandas-stubs>=2.0.0",
-    "types-shapely>=2.0.0",
-    "types-geopandas>=1.1.1",
-    "certifi"
+    "httpx>=0.24.0"
 ]
 
-[tool.setuptools.packages.find]
-include = ["back*", "sim*"]
+[tool.setuptools]
+packages = ["back", "sim"]
 
 [tool.pytest.ini_options]
 testpaths = ["back/tests", "sim/tests"]
@@ -164,6 +157,16 @@ module = [
     "simpy.*",
     "argon2.*",
     "jwt.*",
-    "pandana.*"
+    "requests.*",
+    "pandas.*",
+    "shapely.*"
 ]
 ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = "sim.routingStuff"
+disable_error_code = ["assignment", "no-any-return"]
+
+[[tool.mypy.overrides]]
+module = "sim.entities.route"
+disable_error_code = ["no-any-return"]

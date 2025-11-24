@@ -1,0 +1,46 @@
+# Docker Compose configuration for VeloSim with OSRM routing (Backend Only)
+#
+# This adds the OSRM routing server backend to the VeloSim stack.
+# No web frontend - API only.
+#
+# Usage:
+#   1. Prepare OSRM data (one-time, automatic via npm setup):
+#      npm run osrm:prepare
+#      OR: ./scripts/prepare_osrm_data.sh
+#
+#   2. Start OSRM backend:
+#      docker-compose -f docker-compose.osrm.yml up -d
+#      OR: npm run dev  (starts OSRM + Postgres + Backend + Frontend)
+#
+#   3. Test OSRM API:
+#      curl "http://localhost:5001/route/v1/driving/-73.5673,45.5017;-73.5543,45.5089"
+#
+#   4. Stop:
+#      docker-compose -f docker-compose.osrm.yml down
+
+services:
+  # OSRM Routing Server (Backend Only)
+  osrm:
+    # Use architecture-specific image via environment variable
+    # OSRM_IMAGE is automatically set by npm scripts
+    # Must use v6.0.0 - compatible with preprocessed data
+    image: ${OSRM_IMAGE}
+    container_name: velosim-osrm
+    ports:
+      - "5001:5000"
+    volumes:
+      - ./osrm-data:/data:ro
+    command: osrm-routed --algorithm mld /data/montreal.osrm
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:5000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    networks:
+      - velosim-network
+
+networks:
+  velosim-network:
+    driver: bridge
