@@ -30,6 +30,9 @@ from .sim_websocket_helpers import (
     attach_ws_subscriber,
     start_or_resume_simulation,
     cleanup_simulation,
+    accept_websocket_connection,
+    verify_simulation_access,
+    run_message_loop,
 )
 
 __all__ = [
@@ -39,4 +42,7 @@ __all__ = [
     "attach_ws_subscriber",
     "start_or_resume_simulation",
     "cleanup_simulation",
+    "accept_websocket_connection",
+    "verify_simulation_access",
+    "run_message_loop",
 ]

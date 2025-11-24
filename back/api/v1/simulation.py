@@ -35,11 +35,14 @@ from fastapi import (
 from back.api.v1.utils import (
     cleanup_simulation,
     get_simulation_or_error,
-    safe_send_json,
     start_or_resume_simulation,
 )
-from back.api.v1.utils.sim_websocket_helpers import attach_ws_subscriber
-from back.exceptions.websocket_auth_error import WebSocketAuthError
+from back.api.v1.utils.sim_websocket_helpers import (
+    accept_websocket_connection,
+    attach_ws_subscriber,
+    run_message_loop,
+    verify_simulation_access,
+)
 from back.models.scenario import Scenario
 from back.schemas import (
     ResourceTaskAssignRequest,
@@ -393,57 +396,27 @@ async def websocket_simulation_stream(
     The frontend connects to this endpoint to receive frame updates
     from the running simulation via the FrameEmitter.
     """
-    try:
-        await websocket.accept()
-    except WebSocketAuthError as e:
-        await e.websocket.close(code=e.code)
+    # Accept WebSocket connection
+    if not await accept_websocket_connection(websocket):
         return
 
-    try:
-        has_access = simulation_service.verify_access(db, sim_id, requesting_user)
-        if not has_access:
-            await websocket.send_json(
-                {"type": "error", "message": "Unauthorized access to this simulation."}
-            )
-            await websocket.close()
-            return
-    except ItemNotFoundError as e:
-        await websocket.send_json({"type": "error", "message": str(e)})
-        await websocket.close()
-        return
-    except VelosimPermissionError as e:
-        await websocket.send_json({"type": "error", "message": str(e)})
-        await websocket.close()
+    # Verify the client/user has access to this simulation
+    if not await verify_simulation_access(websocket, db, sim_id, requesting_user):
         return
 
+    # Retrieve simulation data and info
     result = await get_simulation_or_error(sim_id, websocket)
     if result is None:
         return
     sim_data, sim_info = result
 
-    # Attach subscriber
+    # Attach subscriber and start/resume simulation
     subscriber = attach_ws_subscriber(sim_id, sim_data, sim_info, websocket)
-
-    # Start a simulation (or resume a simulation in the event of reconnection)
     await start_or_resume_simulation(sim_info, sim_id, websocket, requesting_user)
 
+    # Run message loop until disconnect
     try:
-        while True:
-            try:
-                msg = await websocket.receive_json()
-            except Exception:
-                break
-
-            if msg.get("action") != "ping":
-                # send a warning for any client-side message received that is not
-                # a "ping" (which is used to check the liveness of the connection)
-                await safe_send_json(
-                    websocket,
-                    {
-                        "type": "warning",
-                        "event": "unknown_action",
-                        "message": "Unrecognized action.",
-                    },
-                )
+        await run_message_loop(websocket)
     finally:
+        # Clean up the in-memory simulation's resources
         await cleanup_simulation(sim_id, sim_data, sim_info, subscriber, websocket)

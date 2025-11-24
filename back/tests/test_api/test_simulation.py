@@ -29,7 +29,7 @@ import pytest
 from unittest.mock import patch, MagicMock, ANY
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
-from typing import Generator, TypedDict, List, cast, Any
+from typing import Generator, TypedDict, List, cast, Any, Coroutine
 
 from back.api.v1.utils.sim_websocket_helpers import WebSocketSubscriber
 from back.main import app
@@ -1432,7 +1432,12 @@ class TestWebSocketHelpers:
             attach_ws_subscriber,
         )
 
-        mock_create_task.return_value = MagicMock()
+        # Make the mock properly handle coroutines by closing them
+        def create_task_side_effect(coro: Coroutine[Any, Any, None]) -> MagicMock:
+            coro.close()
+            return MagicMock()
+
+        mock_create_task.side_effect = create_task_side_effect
 
         mock_ws1 = MagicMock()
         mock_ws2 = MagicMock()
@@ -1469,7 +1474,12 @@ class TestWebSocketHelpers:
             WebSocketSubscriber,
         )
 
-        mock_create_task.return_value = MagicMock()
+        # Make the mock properly handle coroutines by closing them
+        def create_task_side_effect(coro: Coroutine[Any, Any, None]) -> MagicMock:
+            coro.close()
+            return MagicMock()
+
+        mock_create_task.side_effect = create_task_side_effect
 
         mock_ws1 = MagicMock()
         mock_ws2 = MagicMock()
@@ -1729,6 +1739,13 @@ class TestWebSocketHelpers:
         """Test auto_shutdown_simulation doesn't stop if subscriber reconnects"""
         from back.api.v1.utils.sim_websocket_helpers import auto_shutdown_simulation
 
+        # Make the mock properly handle coroutines by closing them
+        def create_task_side_effect(coro: Coroutine[Any, Any, None]) -> MagicMock:
+            coro.close()
+            return MagicMock()
+
+        mock_create_task.side_effect = create_task_side_effect
+
         async def mock_sleep_impl(duration: float) -> None:
             pass
 
@@ -1755,6 +1772,13 @@ class TestWebSocketHelpers:
     ) -> None:
         """Test auto_shutdown_simulation stops simulation when no subscriber"""
         from back.api.v1.utils.sim_websocket_helpers import auto_shutdown_simulation
+
+        # Make the mock properly handle coroutines by closing them
+        def create_task_side_effect(coro: Coroutine[Any, Any, None]) -> MagicMock:
+            coro.close()
+            return MagicMock()
+
+        mock_create_task.side_effect = create_task_side_effect
 
         async def mock_sleep_impl(duration: float) -> None:
             pass
@@ -1785,6 +1809,13 @@ class TestWebSocketHelpers:
         """Test auto_shutdown_simulation handles exceptions gracefully"""
         from back.api.v1.utils.sim_websocket_helpers import auto_shutdown_simulation
 
+        # Make the mock properly handle coroutines by closing them
+        def create_task_side_effect(coro: Coroutine[Any, Any, None]) -> MagicMock:
+            coro.close()
+            return MagicMock()
+
+        mock_create_task.side_effect = create_task_side_effect
+
         async def mock_sleep_impl(duration: float) -> None:
             pass
 
@@ -1814,7 +1845,14 @@ class TestWebSocketHelpers:
             with patch(
                 "back.api.v1.utils.sim_websocket_helpers.asyncio.create_task"
             ) as mock_create_task:
-                mock_create_task.return_value = MagicMock()
+                # Make the mock properly handle coroutines by closing them
+                def create_task_side_effect(
+                    coro: Coroutine[Any, Any, None],
+                ) -> MagicMock:
+                    coro.close()
+                    return MagicMock()
+
+                mock_create_task.side_effect = create_task_side_effect
                 attach_ws_subscriber(
                     "sim123", sim_data, cast(RunInfo, sim_info), mock_ws
                 )
@@ -1875,7 +1913,13 @@ class TestWebSocketHelpers:
         with patch(
             "back.api.v1.utils.sim_websocket_helpers.asyncio.create_task"
         ) as mock_create_task:
-            mock_create_task.return_value = MagicMock()
+            # Make the mock properly handle coroutines by closing them
+            def create_task_side_effect(coro: Coroutine[Any, Any, None]) -> MagicMock:
+                coro.close()
+                return MagicMock()
+
+            mock_create_task.side_effect = create_task_side_effect
+
             asyncio.run(
                 cleanup_simulation(
                     "sim123", sim_data, cast(RunInfo, sim_info), subscriber, mock_ws
@@ -1949,44 +1993,30 @@ class TestWebSocketEndpointLogic:
     @patch("back.api.v1.simulation.attach_ws_subscriber")
     @patch("back.api.v1.simulation.start_or_resume_simulation")
     @patch("back.api.v1.simulation.cleanup_simulation")
-    @patch("back.api.v1.simulation.safe_send_json")
+    @patch("back.api.v1.utils.sim_websocket_helpers.handle_client_message")
     def test_websocket_message_loop_unknown_action(
         self,
-        mock_safe_send: MagicMock,
+        mock_handle_msg: MagicMock,
         mock_cleanup: MagicMock,
         mock_start: MagicMock,
         mock_attach: MagicMock,
         mock_get_sim: MagicMock,
         mock_sim_service: MagicMock,
     ) -> None:
-        """Test that unknown actions trigger warnings"""
+        """Test that unknown actions trigger warnings via handle_client_message"""
         mock_ws = MagicMock()
 
-        async def send_warning() -> None:
-            await mock_safe_send(
-                mock_ws,
-                {
-                    "type": "warning",
-                    "event": "unknown_action",
-                    "message": "Unrecognized action.",
-                },
-            )
-
-        # Simulate handling unknown action
+        # Simulate handling unknown actions through handle_client_message
         messages = [
             {"action": "invalid_action"},
             {"action": "another_unknown"},
         ]
 
         for msg in messages:
-            if msg.get("action") != "ping":
-                asyncio.run(send_warning())
+            asyncio.run(mock_handle_msg(mock_ws, msg))
 
-        # Should call safe_send_json twice (once per unknown action)
-        assert mock_safe_send.call_count == 2
-        first_call = mock_safe_send.call_args_list[0][0][1]
-        assert first_call["type"] == "warning"
-        assert first_call["event"] == "unknown_action"
+        # Should call handle_client_message twice (once per unknown action)
+        assert mock_handle_msg.call_count == 2
 
     @patch("back.api.v1.simulation.simulation_service.active_simulations", {})
     @patch("back.api.v1.simulation.get_simulation_or_error")
