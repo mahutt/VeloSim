@@ -48,7 +48,7 @@ export class VeloSimStack extends cdk.Stack {
       this.node.tryGetContext('allowedIps') ||
       ['0.0.0.0/0']; // Default: open to all (change this!)
     if (typeof allowedIps === 'string') {
-      allowedIps = allowedIps.split(',')
+      allowedIps = JSON.parse(allowedIps) as string[];
     }
 
     // ============================================================================
@@ -165,11 +165,29 @@ export class VeloSimStack extends cdk.Stack {
       removalPolicy: cdk.RemovalPolicy.DESTROY,
     });
 
+    // OSRM Routing container with embedded Montreal data
+    const osrmContainer = taskDefinition.addContainer('osrm', {
+      image: ecs.ContainerImage.fromEcrRepository(ecrRepository, 'osrm-latest'),
+      memoryLimitMiB: 768,
+      cpu: 512,
+      logging: ecs.LogDrivers.awsLogs({
+        streamPrefix: 'osrm',
+        logGroup,
+      }),
+      essential: true,
+    });
+
+    osrmContainer.addPortMappings({
+      containerPort: 5000,
+      hostPort: 5000,
+      protocol: ecs.Protocol.TCP,
+    });
+
     // Backend container
     const backendContainer = taskDefinition.addContainer('backend', {
       image: ecs.ContainerImage.fromEcrRepository(ecrRepository, 'latest'),
-      memoryLimitMiB: 1536, // 1.5GB for backend
-      cpu: 1536,
+      memoryLimitMiB: 2048,
+      cpu: 1024,
       logging: ecs.LogDrivers.awsLogs({
         streamPrefix: 'backend',
         logGroup,
@@ -181,6 +199,7 @@ export class VeloSimStack extends cdk.Stack {
         DB_HOST: database.dbInstanceEndpointAddress,
         DB_PORT: database.dbInstanceEndpointPort,
         DB_NAME: 'velosim',
+        OSRM_URL: 'http://127.0.0.1:5000',
       },
       secrets: {
         DB_USERNAME: ecs.Secret.fromSecretsManager(dbCredentials, 'username'),
@@ -194,11 +213,16 @@ export class VeloSimStack extends cdk.Stack {
       protocol: ecs.Protocol.TCP,
     });
 
+    backendContainer.addContainerDependencies({
+      container: osrmContainer,
+      condition: ecs.ContainerDependencyCondition.START,
+    });
+
     // Frontend container (in same task for simplicity)
     const frontendContainer = taskDefinition.addContainer('frontend', {
       image: ecs.ContainerImage.fromEcrRepository(ecrRepository, 'frontend-latest'),
-      memoryLimitMiB: 512, // 512MB for frontend
-      cpu: 512,
+      memoryLimitMiB: 256,
+      cpu: 256,
       logging: ecs.LogDrivers.awsLogs({
         streamPrefix: 'frontend',
         logGroup,
@@ -215,12 +239,8 @@ export class VeloSimStack extends cdk.Stack {
       protocol: ecs.Protocol.TCP,
     });
 
-    const proxyImage = ecs.ContainerImage.fromAsset(
-      path.join(__dirname, '..', '..', 'docker', 'nginx-proxy'),
-    );
-
     const proxyContainer = taskDefinition.addContainer('proxy', {
-      image: proxyImage,
+      image: ecs.ContainerImage.fromEcrRepository(ecrRepository, 'proxy-latest'),
       essential: true,
       memoryReservationMiB: 64,
       logging: ecs.LogDrivers.awsLogs({ streamPrefix: 'proxy' }),
@@ -333,6 +353,30 @@ export class VeloSimStack extends cdk.Stack {
     const migrationTaskDefinition = new ecs.Ec2TaskDefinition(this, 'VeloSimMigrationTaskDef', {
       networkMode: ecs.NetworkMode.BRIDGE,
       family: 'velosim-migration',
+    });
+
+    // Migration container - runs Alembic database migrations
+    migrationTaskDefinition.addContainer('migrations', {
+      image: ecs.ContainerImage.fromEcrRepository(ecrRepository, 'latest'),
+      memoryLimitMiB: 512,
+      logging: ecs.LogDrivers.awsLogs({
+        streamPrefix: 'migrations',
+        logGroup,
+      }),
+      command: ['alembic', 'upgrade', 'head'],
+      workingDirectory: '/app/back',
+      essential: true,
+      environment: {
+        DB_HOST: database.dbInstanceEndpointAddress,
+        DB_PORT: database.dbInstanceEndpointPort,
+        DB_NAME: 'velosim',
+        ENVIRONMENT: 'production',
+        DEBUG: 'false',
+      },
+      secrets: {
+        DB_USERNAME: ecs.Secret.fromSecretsManager(dbCredentials, 'username'),
+        DB_PASSWORD: ecs.Secret.fromSecretsManager(dbCredentials, 'password'),
+      },
     });
 
     // ============================================================================
