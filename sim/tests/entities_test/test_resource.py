@@ -334,9 +334,9 @@ class TestResource:
         self, simpy_env: simpy.Environment, default_position: Position
     ) -> None:
         """Test that empty task_ids list raises ValueError."""
-        task1 = BatterySwapTask(simpy_env, 1)
-        task2 = BatterySwapTask(simpy_env, 2)
-        resource = Resource(simpy_env, 1, default_position, [task1, task2])
+        task1 = BatterySwapTask(1)
+        task2 = BatterySwapTask(2)
+        resource = Resource(1, default_position, [task1, task2])
 
         with pytest.raises(ValueError, match="task_ids_to_reorder cannot be empty"):
             resource.reorder_tasks([], apply_from_top=True)
@@ -345,10 +345,10 @@ class TestResource:
         self, simpy_env: simpy.Environment, default_position: Position
     ) -> None:
         """Test that duplicate task IDs raise ValueError."""
-        task1 = BatterySwapTask(simpy_env, 1)
-        task2 = BatterySwapTask(simpy_env, 2)
-        task3 = BatterySwapTask(simpy_env, 3)
-        resource = Resource(simpy_env, 1, default_position, [task1, task2, task3])
+        task1 = BatterySwapTask(1)
+        task2 = BatterySwapTask(2)
+        task3 = BatterySwapTask(3)
+        resource = Resource(1, default_position, [task1, task2, task3])
 
         with pytest.raises(ValueError, match="contains duplicate task IDs"):
             resource.reorder_tasks([1, 2, 1], apply_from_top=True)
@@ -357,13 +357,11 @@ class TestResource:
         self, simpy_env: simpy.Environment, default_position: Position
     ) -> None:
         """Test basic top mode reordering without in-progress tasks."""
-        task1 = BatterySwapTask(simpy_env, 1)
-        task2 = BatterySwapTask(simpy_env, 2)
-        task3 = BatterySwapTask(simpy_env, 3)
-        task4 = BatterySwapTask(simpy_env, 4)
-        resource = Resource(
-            simpy_env, 1, default_position, [task1, task2, task3, task4]
-        )
+        task1 = BatterySwapTask(1)
+        task2 = BatterySwapTask(2)
+        task3 = BatterySwapTask(3)
+        task4 = BatterySwapTask(4)
+        resource = Resource(1, default_position, [task1, task2, task3, task4])
 
         # Reorder: want [3, 1] at top, then [2, 4] unspecified
         new_order = resource.reorder_tasks([3, 1], apply_from_top=True)
@@ -376,13 +374,11 @@ class TestResource:
         self, simpy_env: simpy.Environment, default_position: Position
     ) -> None:
         """Test basic bottom mode reordering (reversed at end)."""
-        task1 = BatterySwapTask(simpy_env, 1)
-        task2 = BatterySwapTask(simpy_env, 2)
-        task3 = BatterySwapTask(simpy_env, 3)
-        task4 = BatterySwapTask(simpy_env, 4)
-        resource = Resource(
-            simpy_env, 1, default_position, [task1, task2, task3, task4]
-        )
+        task1 = BatterySwapTask(1)
+        task2 = BatterySwapTask(2)
+        task3 = BatterySwapTask(3)
+        task4 = BatterySwapTask(4)
+        resource = Resource(1, default_position, [task1, task2, task3, task4])
 
         # Reorder: unspecified [2, 4], then reversed([3, 1]) = [1, 3]
         new_order = resource.reorder_tasks([3, 1], apply_from_top=False)
@@ -395,15 +391,13 @@ class TestResource:
         self, simpy_env: simpy.Environment, default_position: Position
     ) -> None:
         """Test that IN_PROGRESS tasks are always pinned to top."""
-        task1 = BatterySwapTask(simpy_env, 1)
-        task2 = BatterySwapTask(simpy_env, 2)
-        task3 = BatterySwapTask(simpy_env, 3)
-        task4 = BatterySwapTask(simpy_env, 4)
-        task5 = BatterySwapTask(simpy_env, 5)
+        task1 = BatterySwapTask(1)
+        task2 = BatterySwapTask(2)
+        task3 = BatterySwapTask(3)
+        task4 = BatterySwapTask(4)
+        task5 = BatterySwapTask(5)
 
-        resource = Resource(
-            simpy_env, 1, default_position, [task1, task2, task3, task4, task5]
-        )
+        resource = Resource(1, default_position, [task1, task2, task3, task4, task5])
 
         # Set task2 and task4 as IN_PROGRESS (after Resource creation)
         task2.set_state(State.IN_PROGRESS)
@@ -422,14 +416,12 @@ class TestResource:
         self, simpy_env: simpy.Environment, default_position: Position
     ) -> None:
         """Test that if a specified task is IN_PROGRESS, it stays at top."""
-        task1 = BatterySwapTask(simpy_env, 1)
-        task2 = BatterySwapTask(simpy_env, 2)
-        task3 = BatterySwapTask(simpy_env, 3)
-        task4 = BatterySwapTask(simpy_env, 4)
+        task1 = BatterySwapTask(1)
+        task2 = BatterySwapTask(2)
+        task3 = BatterySwapTask(3)
+        task4 = BatterySwapTask(4)
 
-        resource = Resource(
-            simpy_env, 1, default_position, [task1, task2, task3, task4]
-        )
+        resource = Resource(1, default_position, [task1, task2, task3, task4])
 
         # Set task2 as IN_PROGRESS (after Resource creation)
         task2.set_state(State.IN_PROGRESS)
@@ -447,15 +439,13 @@ class TestResource:
         self, simpy_env: simpy.Environment, default_position: Position
     ) -> None:
         """Test bottom mode with in-progress tasks pinned."""
-        task1 = BatterySwapTask(simpy_env, 1)
-        task2 = BatterySwapTask(simpy_env, 2)
-        task3 = BatterySwapTask(simpy_env, 3)
-        task4 = BatterySwapTask(simpy_env, 4)
-        task5 = BatterySwapTask(simpy_env, 5)
+        task1 = BatterySwapTask(1)
+        task2 = BatterySwapTask(2)
+        task3 = BatterySwapTask(3)
+        task4 = BatterySwapTask(4)
+        task5 = BatterySwapTask(5)
 
-        resource = Resource(
-            simpy_env, 1, default_position, [task1, task2, task3, task4, task5]
-        )
+        resource = Resource(1, default_position, [task1, task2, task3, task4, task5])
 
         # Set task2 as IN_PROGRESS (after Resource creation)
         task2.set_state(State.IN_PROGRESS)
@@ -473,11 +463,11 @@ class TestResource:
         self, simpy_env: simpy.Environment, default_position: Position, caplog: Any
     ) -> None:
         """Test that invalid task IDs are ignored and warning logged."""
-        task1 = BatterySwapTask(simpy_env, 1)
-        task2 = BatterySwapTask(simpy_env, 2)
-        task3 = BatterySwapTask(simpy_env, 3)
+        task1 = BatterySwapTask(1)
+        task2 = BatterySwapTask(2)
+        task3 = BatterySwapTask(3)
 
-        resource = Resource(simpy_env, 1, default_position, [task1, task2, task3])
+        resource = Resource(1, default_position, [task1, task2, task3])
 
         # Include invalid task ID 99
         new_order = resource.reorder_tasks([3, 99, 1], apply_from_top=True)
@@ -493,11 +483,11 @@ class TestResource:
         self, simpy_env: simpy.Environment, default_position: Position
     ) -> None:
         """Test reordering when all tasks are specified."""
-        task1 = BatterySwapTask(simpy_env, 1)
-        task2 = BatterySwapTask(simpy_env, 2)
-        task3 = BatterySwapTask(simpy_env, 3)
+        task1 = BatterySwapTask(1)
+        task2 = BatterySwapTask(2)
+        task3 = BatterySwapTask(3)
 
-        resource = Resource(simpy_env, 1, default_position, [task1, task2, task3])
+        resource = Resource(1, default_position, [task1, task2, task3])
 
         # Specify all tasks in reverse order
         new_order = resource.reorder_tasks([3, 2, 1], apply_from_top=True)
@@ -509,14 +499,12 @@ class TestResource:
         self, simpy_env: simpy.Environment, default_position: Position
     ) -> None:
         """Test that partial list handles tasks gracefully."""
-        task1 = BatterySwapTask(simpy_env, 1)
-        task2 = BatterySwapTask(simpy_env, 2)
-        task3 = BatterySwapTask(simpy_env, 3)
-        task4 = BatterySwapTask(simpy_env, 4)
+        task1 = BatterySwapTask(1)
+        task2 = BatterySwapTask(2)
+        task3 = BatterySwapTask(3)
+        task4 = BatterySwapTask(4)
 
-        resource = Resource(
-            simpy_env, 1, default_position, [task1, task2, task3, task4]
-        )
+        resource = Resource(1, default_position, [task1, task2, task3, task4])
 
         # Only reorder 2 tasks, others should maintain order
         new_order = resource.reorder_tasks([4, 2], apply_from_top=True)
