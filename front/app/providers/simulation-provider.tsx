@@ -66,6 +66,15 @@ const BASE_FRAME_INTERVAL_MS = 1000;
 export const SPEED_OPTIONS = [0, 0.5, 1, 2, 4, 8] as const;
 export type Speed = (typeof SPEED_OPTIONS)[number];
 
+// convert sim time (in seconds) to HH:MM format
+function formatSecondsToHHMM(seconds: number) {
+  if (!Number.isFinite(seconds) || seconds < 0) return '00:00';
+  const hours = Math.floor(seconds / 3600);
+  const minutes = Math.floor((seconds % 3600) / 60);
+  const pad = (n: number) => n.toString().padStart(2, '0');
+  return `${pad(hours)}:${pad(minutes)}`;
+}
+
 type SimulationContextType = {
   speedRef: React.RefObject<Speed>;
   stationsRef: React.RefObject<Map<number, Station>>;
@@ -86,6 +95,7 @@ type SimulationContextType = {
   isConnected: boolean;
   simulationStatus: SimulationStatus;
   isLoading: boolean; // Convenience flag for UI
+  formattedSimTime: string | null;
 };
 
 const SimulationContext = createContext<SimulationContextType | undefined>(
@@ -124,6 +134,8 @@ export const SimulationProvider = ({
   const [resources, setResources] = useState<Resource[]>([]);
   const [selectedItem, setSelectedItem] = useState<SelectedItem | null>(null);
   const [tasks, setTasks] = useState<StationTask[]>([]);
+
+  const [formattedSimTime, setFormattedSimTime] = useState<string | null>(null);
 
   const assignTask = async (resourceId: number, taskId: number) => {
     const resource = resourcesRef.current.get(resourceId);
@@ -495,6 +507,10 @@ export const SimulationProvider = ({
   const handleInitialFrame = useCallback((payload: BackendPayload) => {
     console.log('[WS] Handling initial frame:', payload);
 
+    if (payload.clock) {
+      setFormattedSimTime(formatSecondsToHHMM(payload.clock.simSecondsPassed));
+    }
+
     // Store initial data (pass true to indicate this is initial frame)
     const updatedResources = adaptSimulationData(payload, true);
     setResources(updatedResources);
@@ -524,6 +540,9 @@ export const SimulationProvider = ({
   const handleFrameUpdate = useCallback((payload: BackendPayload) => {
     console.log('[WS] Handling frame update:', payload);
 
+    if (payload.clock) {
+      setFormattedSimTime(formatSecondsToHHMM(payload.clock.simSecondsPassed));
+    }
     // Update data (pass false to preserve existing tasks if not in payload)
     const updatedResources = adaptSimulationData(payload, false);
     setResources(updatedResources);
@@ -726,6 +745,7 @@ export const SimulationProvider = ({
         isConnected,
         simulationStatus,
         isLoading,
+        formattedSimTime,
       }}
     >
       {children}

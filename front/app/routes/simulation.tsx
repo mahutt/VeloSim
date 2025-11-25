@@ -35,6 +35,7 @@ import { TaskAssignmentProvider } from '~/providers/task-assignment-provider';
 import { useParams } from 'react-router';
 import { Loader2 } from 'lucide-react';
 import PlaybackControls from '~/components/map/playback-controls';
+import SimulationClock from '~/components/map/clock';
 
 export function meta() {
   return [{ title: 'Simulation' }];
@@ -76,7 +77,10 @@ function SimulationContent() {
       )}
       {!isLoading && (
         <>
-          <PlaybackControls />
+          <div className="absolute top-4 right-4 flex items-center gap-2">
+            <SimulationClock />
+            <PlaybackControls />
+          </div>
           <ResourceBar />
           <SelectedItemBar />
         </>
