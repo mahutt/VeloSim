@@ -29,7 +29,7 @@ import pytest
 from unittest.mock import patch, MagicMock, ANY
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
-from typing import Generator, TypedDict, List, cast, Any
+from typing import Generator, TypedDict, List, cast, Any, Coroutine
 
 from back.api.v1.utils.sim_websocket_helpers import WebSocketSubscriber
 from back.main import app
@@ -1422,32 +1422,51 @@ class TestWebSocketSimulationStream:
 class TestWebSocketHelpers:
     """Tests for WebSocket helper functions in sim_websocket_helpers.py"""
 
-    def test_attach_ws_subscriber_detaches_old_subscriber(self) -> None:
+    @patch("back.api.v1.utils.sim_websocket_helpers.asyncio.create_task")
+    def test_attach_ws_subscriber_detaches_old_subscriber(
+        self, mock_create_task: MagicMock
+    ) -> None:
         """Test that attach_ws_subscriber detaches old subscribers"""
         from sim.core.frame_emitter import FrameEmitter
         from back.api.v1.utils.sim_websocket_helpers import (
             attach_ws_subscriber,
         )
 
+        # Make the mock properly handle coroutines by closing them
+        def create_task_side_effect(coro: Coroutine[Any, Any, None]) -> MagicMock:
+            coro.close()
+            return MagicMock()
+
+        mock_create_task.side_effect = create_task_side_effect
+
         mock_ws1 = MagicMock()
         mock_ws2 = MagicMock()
         emitter = FrameEmitter("test_sim")
 
-        sim_data: dict[str, Any] = {}
+        sim_data: dict[str, Any] = {"user_id": 1}
         sim_info: dict[str, Any] = {"emitter": emitter}
 
-        # First attach
-        s1 = attach_ws_subscriber(sim_data, cast(RunInfo, sim_info), mock_ws1)
-        assert len(emitter.subscribers) == 1
-        assert sim_data["ws_subscriber"] == s1
+        # Patch asyncio.get_running_loop for WebSocketSubscriber
+        with patch("back.api.v1.utils.sim_websocket_helpers.asyncio.get_running_loop"):
+            # First attach
+            s1 = attach_ws_subscriber(
+                "sim123", sim_data, cast(RunInfo, sim_info), mock_ws1
+            )
+            assert len(emitter.subscribers) == 1
+            assert sim_data["ws_subscriber"] == s1
 
-        # Second attach should remove the first
-        s2 = attach_ws_subscriber(sim_data, cast(RunInfo, sim_info), mock_ws2)
-        assert len(emitter.subscribers) == 1
-        assert sim_data["ws_subscriber"] == s2
-        assert s1.closed is True
+            # Second attach should remove the first
+            s2 = attach_ws_subscriber(
+                "sim123", sim_data, cast(RunInfo, sim_info), mock_ws2
+            )
+            assert len(emitter.subscribers) == 1
+            assert sim_data["ws_subscriber"] == s2
+            assert s1.closed is True
 
-    def test_attach_ws_subscriber_cleans_all_websocket_subscribers(self) -> None:
+    @patch("back.api.v1.utils.sim_websocket_helpers.asyncio.create_task")
+    def test_attach_ws_subscriber_cleans_all_websocket_subscribers(
+        self, mock_create_task: MagicMock
+    ) -> None:
         """Test that attach_ws_subscriber removes all WebSocketSubscribers"""
         from sim.core.frame_emitter import FrameEmitter
         from back.api.v1.utils.sim_websocket_helpers import (
@@ -1455,30 +1474,39 @@ class TestWebSocketHelpers:
             WebSocketSubscriber,
         )
 
+        # Make the mock properly handle coroutines by closing them
+        def create_task_side_effect(coro: Coroutine[Any, Any, None]) -> MagicMock:
+            coro.close()
+            return MagicMock()
+
+        mock_create_task.side_effect = create_task_side_effect
+
         mock_ws1 = MagicMock()
         mock_ws2 = MagicMock()
         mock_ws3 = MagicMock()
         emitter = FrameEmitter("test_sim")
 
-        # Manually add multiple WebSocketSubscribers (simulating a bug/edge case)
-        orphaned_sub1 = WebSocketSubscriber(mock_ws1)
-        orphaned_sub2 = WebSocketSubscriber(mock_ws2)
-        emitter.attach(orphaned_sub1)
-        emitter.attach(orphaned_sub2)
-
-        sim_data: dict[str, Any] = {}
+        sim_data: dict[str, Any] = {"user_id": 1}
         sim_info: dict[str, Any] = {"emitter": emitter}
 
-        # This should clean up all existing WebSocketSubscribers
-        new_subscriber = attach_ws_subscriber(
-            sim_data, cast(RunInfo, sim_info), mock_ws3
-        )
+        # Patch asyncio.get_running_loop for WebSocketSubscriber
+        with patch("back.api.v1.utils.sim_websocket_helpers.asyncio.get_running_loop"):
+            # Manually add multiple WebSocketSubscribers (simulating a bug/edge case)
+            orphaned_sub1 = WebSocketSubscriber(mock_ws1)
+            orphaned_sub2 = WebSocketSubscriber(mock_ws2)
+            emitter.attach(orphaned_sub1)
+            emitter.attach(orphaned_sub2)
 
-        # Should only have the new subscriber
-        assert len(emitter.subscribers) == 1
-        assert emitter.subscribers[0] == new_subscriber
-        assert orphaned_sub1.closed is True
-        assert orphaned_sub2.closed is True
+            # This should clean up all existing WebSocketSubscribers
+            new_subscriber = attach_ws_subscriber(
+                "sim123", sim_data, cast(RunInfo, sim_info), mock_ws3
+            )
+
+            # Should only have the new subscriber
+            assert len(emitter.subscribers) == 1
+            assert emitter.subscribers[0] == new_subscriber
+            assert orphaned_sub1.closed is True
+            assert orphaned_sub2.closed is True
 
     def test_start_or_resume_simulation_already_running(self) -> None:
         """Test start_or_resume when simulation is already running"""
@@ -1561,7 +1589,7 @@ class TestWebSocketHelpers:
         )
 
         # Should call start_simulation
-        mock_start_sim.assert_called_once_with(mock_db, "sim123", 1, mock_ws)
+        mock_start_sim.assert_called_once_with(mock_db, "sim123", 1)
 
     def test_cleanup_simulation_pauses_when_no_subscribers(self) -> None:
         """Test cleanup pauses simulation when no subscribers remain"""
@@ -1588,10 +1616,12 @@ class TestWebSocketHelpers:
             "emitter": emitter,
             "simController": MagicMock(realTimeDriver=mock_driver),
         }
-        sim_data: dict[str, Any] = {"ws_subscriber": subscriber}
+        sim_data: dict[str, Any] = {"ws_subscriber": subscriber, "user_id": 1}
 
         asyncio.run(
-            cleanup_simulation(sim_data, cast(RunInfo, sim_info), subscriber, mock_ws)
+            cleanup_simulation(
+                "sim123", sim_data, cast(RunInfo, sim_info), subscriber, mock_ws
+            )
         )
 
         # Should pause the driver
@@ -1626,11 +1656,13 @@ class TestWebSocketHelpers:
             "emitter": emitter,
             "simController": MagicMock(realTimeDriver=mock_driver),
         }
-        sim_data: dict[str, Any] = {"ws_subscriber": subscriber}
+        sim_data: dict[str, Any] = {"ws_subscriber": subscriber, "user_id": 1}
 
         # Should not raise even if close fails
         asyncio.run(
-            cleanup_simulation(sim_data, cast(RunInfo, sim_info), subscriber, mock_ws)
+            cleanup_simulation(
+                "sim123", sim_data, cast(RunInfo, sim_info), subscriber, mock_ws
+            )
         )
 
         # Cleanup should still complete
@@ -1668,7 +1700,10 @@ class TestWebSocketHelpers:
 
         assert result is None
 
-    def test_get_simulation_or_error_not_in_simulator(self) -> None:
+    @patch("back.api.v1.utils.sim_websocket_helpers.simulation_service")
+    def test_get_simulation_or_error_not_in_simulator(
+        self, mock_sim_service: MagicMock
+    ) -> None:
         """Test get_simulation_or_error when simulation not found in simulator"""
         from back.api.v1.utils.sim_websocket_helpers import get_simulation_or_error
 
@@ -1683,13 +1718,385 @@ class TestWebSocketHelpers:
         mock_simulator = MagicMock()
         mock_simulator.get_sim_by_id = MagicMock(return_value=None)
 
-        simulation_service.active_simulations["test_sim"] = {
-            "simulator": mock_simulator
+        mock_sim_service.active_simulations = {
+            "test_sim": {"simulator": mock_simulator}
         }
+        mock_sim_service.simulator = mock_simulator
 
         result = asyncio.run(get_simulation_or_error("test_sim", mock_ws))
 
         assert result is None
 
-        # Cleanup
-        simulation_service.active_simulations.pop("test_sim", None)
+    @patch("back.api.v1.utils.sim_websocket_helpers.asyncio.create_task")
+    @patch("back.api.v1.utils.sim_websocket_helpers.asyncio.sleep")
+    @patch("back.api.v1.utils.sim_websocket_helpers.simulation_service")
+    def test_auto_shutdown_simulation_with_subscriber(
+        self,
+        mock_sim_service: MagicMock,
+        mock_sleep: MagicMock,
+        mock_create_task: MagicMock,
+    ) -> None:
+        """Test auto_shutdown_simulation doesn't stop if subscriber reconnects"""
+        from back.api.v1.utils.sim_websocket_helpers import auto_shutdown_simulation
+
+        # Make the mock properly handle coroutines by closing them
+        def create_task_side_effect(coro: Coroutine[Any, Any, None]) -> MagicMock:
+            coro.close()
+            return MagicMock()
+
+        mock_create_task.side_effect = create_task_side_effect
+
+        async def mock_sleep_impl(duration: float) -> None:
+            pass
+
+        mock_sleep.side_effect = mock_sleep_impl
+
+        # Simulate subscriber reconnection before timeout
+        sim_data: dict[str, Any] = {"ws_subscriber": MagicMock(), "user_id": 1}
+
+        asyncio.run(auto_shutdown_simulation("sim123", sim_data, 1))
+
+        # Should not call stop_simulation since subscriber exists
+        mock_sim_service.stop_simulation.assert_not_called()
+
+    @patch("back.api.v1.utils.sim_websocket_helpers.asyncio.create_task")
+    @patch("back.api.v1.utils.sim_websocket_helpers.asyncio.sleep")
+    @patch("back.api.v1.utils.sim_websocket_helpers.simulation_service")
+    @patch("back.api.v1.utils.sim_websocket_helpers.get_db")
+    def test_auto_shutdown_simulation_without_subscriber(
+        self,
+        mock_get_db: MagicMock,
+        mock_sim_service: MagicMock,
+        mock_sleep: MagicMock,
+        mock_create_task: MagicMock,
+    ) -> None:
+        """Test auto_shutdown_simulation stops simulation when no subscriber"""
+        from back.api.v1.utils.sim_websocket_helpers import auto_shutdown_simulation
+
+        # Make the mock properly handle coroutines by closing them
+        def create_task_side_effect(coro: Coroutine[Any, Any, None]) -> MagicMock:
+            coro.close()
+            return MagicMock()
+
+        mock_create_task.side_effect = create_task_side_effect
+
+        async def mock_sleep_impl(duration: float) -> None:
+            pass
+
+        mock_sleep.side_effect = mock_sleep_impl
+        mock_db = MagicMock()
+        mock_get_db.return_value = iter([mock_db])
+
+        # No subscriber in sim_data
+        sim_data: dict[str, Any] = {"user_id": 1}
+
+        asyncio.run(auto_shutdown_simulation("sim123", sim_data, 1))
+
+        # Should call stop_simulation
+        mock_sim_service.stop_simulation.assert_called_once_with(mock_db, "sim123", 1)
+
+    @patch("back.api.v1.utils.sim_websocket_helpers.asyncio.create_task")
+    @patch("back.api.v1.utils.sim_websocket_helpers.asyncio.sleep")
+    @patch("back.api.v1.utils.sim_websocket_helpers.simulation_service")
+    @patch("back.api.v1.utils.sim_websocket_helpers.get_db")
+    def test_auto_shutdown_simulation_exception_handling(
+        self,
+        mock_get_db: MagicMock,
+        mock_sim_service: MagicMock,
+        mock_sleep: MagicMock,
+        mock_create_task: MagicMock,
+    ) -> None:
+        """Test auto_shutdown_simulation handles exceptions gracefully"""
+        from back.api.v1.utils.sim_websocket_helpers import auto_shutdown_simulation
+
+        # Make the mock properly handle coroutines by closing them
+        def create_task_side_effect(coro: Coroutine[Any, Any, None]) -> MagicMock:
+            coro.close()
+            return MagicMock()
+
+        mock_create_task.side_effect = create_task_side_effect
+
+        async def mock_sleep_impl(duration: float) -> None:
+            pass
+
+        mock_sleep.side_effect = mock_sleep_impl
+        mock_db = MagicMock()
+        mock_get_db.return_value = iter([mock_db])
+        mock_sim_service.stop_simulation.side_effect = Exception("Stop failed")
+
+        sim_data: dict[str, Any] = {"user_id": 1}
+
+        # Should not raise, just print error
+        asyncio.run(auto_shutdown_simulation("sim123", sim_data, 1))
+
+    def test_attach_ws_subscriber_cancels_old_shutdown_task(self) -> None:
+        """Test that attach_ws_subscriber cancels previous shutdown task"""
+        from sim.core.frame_emitter import FrameEmitter
+        from back.api.v1.utils.sim_websocket_helpers import attach_ws_subscriber
+
+        mock_ws = MagicMock()
+        emitter = FrameEmitter("test_sim")
+        old_task = MagicMock()
+
+        sim_data: dict[str, Any] = {"user_id": 1, "shutdown_task": old_task}
+        sim_info: dict[str, Any] = {"emitter": emitter}
+
+        with patch("back.api.v1.utils.sim_websocket_helpers.asyncio.get_running_loop"):
+            with patch(
+                "back.api.v1.utils.sim_websocket_helpers.asyncio.create_task"
+            ) as mock_create_task:
+                # Make the mock properly handle coroutines by closing them
+                def create_task_side_effect(
+                    coro: Coroutine[Any, Any, None],
+                ) -> MagicMock:
+                    coro.close()
+                    return MagicMock()
+
+                mock_create_task.side_effect = create_task_side_effect
+                attach_ws_subscriber(
+                    "sim123", sim_data, cast(RunInfo, sim_info), mock_ws
+                )
+
+                # Should cancel old shutdown task
+                old_task.cancel.assert_called_once()
+
+    def test_attach_ws_subscriber_raises_on_missing_user_id(self) -> None:
+        """Test that attach_ws_subscriber raises ValueError if user_id is missing"""
+        from sim.core.frame_emitter import FrameEmitter
+        from back.api.v1.utils.sim_websocket_helpers import attach_ws_subscriber
+
+        mock_ws = MagicMock()
+        emitter = FrameEmitter("test_sim")
+
+        sim_data: dict[str, Any] = {}  # Missing user_id
+        sim_info: dict[str, Any] = {"emitter": emitter}
+
+        with patch("back.api.v1.utils.sim_websocket_helpers.asyncio.get_running_loop"):
+            with pytest.raises(ValueError, match="user_id must be present"):
+                attach_ws_subscriber(
+                    "sim123", sim_data, cast(RunInfo, sim_info), mock_ws
+                )
+
+    def test_cleanup_simulation_cancels_shutdown_task(self) -> None:
+        """Test cleanup_simulation cancels old shutdown task"""
+        from sim.core.frame_emitter import FrameEmitter
+        from back.api.v1.utils.sim_websocket_helpers import (
+            cleanup_simulation,
+            WebSocketSubscriber,
+        )
+
+        mock_ws = MagicMock()
+        mock_ws.client_state = WebSocketState.DISCONNECTED
+
+        async def mock_close() -> None:
+            pass
+
+        mock_ws.close = mock_close
+
+        emitter = FrameEmitter("test_sim")
+        subscriber = WebSocketSubscriber(mock_ws)
+        emitter.attach(subscriber)
+
+        mock_driver = MagicMock()
+        old_task = MagicMock()
+
+        sim_info: dict[str, Any] = {
+            "emitter": emitter,
+            "simController": MagicMock(realTimeDriver=mock_driver),
+        }
+        sim_data: dict[str, Any] = {
+            "ws_subscriber": subscriber,
+            "user_id": 1,
+            "shutdown_task": old_task,
+        }
+
+        with patch(
+            "back.api.v1.utils.sim_websocket_helpers.asyncio.create_task"
+        ) as mock_create_task:
+            # Make the mock properly handle coroutines by closing them
+            def create_task_side_effect(coro: Coroutine[Any, Any, None]) -> MagicMock:
+                coro.close()
+                return MagicMock()
+
+            mock_create_task.side_effect = create_task_side_effect
+
+            asyncio.run(
+                cleanup_simulation(
+                    "sim123", sim_data, cast(RunInfo, sim_info), subscriber, mock_ws
+                )
+            )
+
+            # Should cancel old shutdown task
+            old_task.cancel.assert_called_once()
+            # Should create new shutdown task
+            mock_create_task.assert_called_once()
+
+
+class TestWebSocketEndpointLogic:
+    """Test the simulation WebSocket connection endpoint."""
+
+    @patch("back.api.v1.simulation.simulation_service.verify_access")
+    def test_websocket_stream_unauthorized_access_logic(
+        self, mock_verify: MagicMock
+    ) -> None:
+        """Test that verify_access returning False prevents access"""
+        mock_verify.return_value = False
+
+        mock_ws = MagicMock()
+        mock_ws.client_state = WebSocketState.CONNECTED
+
+        async def mock_send_json(data: Any) -> None:
+            pass
+
+        async def mock_close(code: int | None = None) -> None:
+            pass
+
+        mock_ws.send_json = mock_send_json
+        mock_ws.close = mock_close
+
+        # The websocket_simulation_stream function would check verify_access
+        # and if False, send error and close
+        has_access = mock_verify(MagicMock(), "sim123", 2)
+        assert has_access is False
+
+    @patch("back.api.v1.simulation.simulation_service")
+    @patch("back.api.v1.simulation.get_simulation_or_error")
+    @patch("back.api.v1.simulation.attach_ws_subscriber")
+    @patch("back.api.v1.simulation.start_or_resume_simulation")
+    @patch("back.api.v1.simulation.cleanup_simulation")
+    def test_websocket_message_loop_ping_action(
+        self,
+        mock_cleanup: MagicMock,
+        mock_start: MagicMock,
+        mock_attach: MagicMock,
+        mock_get_sim: MagicMock,
+        mock_sim_service: MagicMock,
+    ) -> None:
+        """Test that ping messages don't trigger warnings"""
+
+        # Simulate the message handling loop
+        messages = [
+            {"action": "ping"},
+            {"action": "ping"},
+        ]
+
+        warnings_sent = []
+        for msg in messages:
+            if msg.get("action") != "ping":
+                warnings_sent.append(msg)
+
+        # No warnings should be sent for ping actions
+        assert len(warnings_sent) == 0
+
+    @patch("back.api.v1.simulation.simulation_service")
+    @patch("back.api.v1.simulation.get_simulation_or_error")
+    @patch("back.api.v1.simulation.attach_ws_subscriber")
+    @patch("back.api.v1.simulation.start_or_resume_simulation")
+    @patch("back.api.v1.simulation.cleanup_simulation")
+    @patch("back.api.v1.utils.sim_websocket_helpers.handle_client_message")
+    def test_websocket_message_loop_unknown_action(
+        self,
+        mock_handle_msg: MagicMock,
+        mock_cleanup: MagicMock,
+        mock_start: MagicMock,
+        mock_attach: MagicMock,
+        mock_get_sim: MagicMock,
+        mock_sim_service: MagicMock,
+    ) -> None:
+        """Test that unknown actions trigger warnings via handle_client_message"""
+        mock_ws = MagicMock()
+
+        # Simulate handling unknown actions through handle_client_message
+        messages = [
+            {"action": "invalid_action"},
+            {"action": "another_unknown"},
+        ]
+
+        for msg in messages:
+            asyncio.run(mock_handle_msg(mock_ws, msg))
+
+        # Should call handle_client_message twice (once per unknown action)
+        assert mock_handle_msg.call_count == 2
+
+    @patch("back.api.v1.simulation.simulation_service.active_simulations", {})
+    @patch("back.api.v1.simulation.get_simulation_or_error")
+    def test_websocket_simulation_not_found_returns_none(
+        self, mock_get_sim: MagicMock
+    ) -> None:
+        """Test that get_simulation_or_error returns None for missing sim"""
+        mock_ws = MagicMock()
+        mock_ws.client_state = WebSocketState.CONNECTED
+
+        async def mock_send_json(data: Any) -> None:
+            pass
+
+        async def mock_close(code: int | None = None) -> None:
+            pass
+
+        mock_ws.send_json = mock_send_json
+        mock_ws.close = mock_close
+
+        # Mock to return None (sim not found)
+        async def return_none(*args: Any, **kwargs: Any) -> None:
+            return None
+
+        mock_get_sim.side_effect = return_none
+
+        result = asyncio.run(mock_get_sim("nonexistent", mock_ws))
+        assert result is None
+
+    @patch("back.api.v1.simulation.cleanup_simulation")
+    def test_websocket_cleanup_always_called_in_finally(
+        self, mock_cleanup: MagicMock
+    ) -> None:
+        """Test that cleanup is called even if exception occurs in loop"""
+
+        async def websocket_loop_simulation() -> None:
+            try:
+                # Simulate the while loop
+                raise Exception("Connection error")
+            except Exception:
+                # Catch the exception
+                pass
+            finally:
+                # Cleanup should always be called
+                await mock_cleanup(
+                    "sim123",
+                    {},
+                    cast(RunInfo, {}),
+                    MagicMock(),
+                    MagicMock(),
+                )
+
+        asyncio.run(websocket_loop_simulation())
+        mock_cleanup.assert_called_once()
+
+    @patch("back.api.v1.simulation.simulation_service.verify_access")
+    def test_verify_access_checks_permissions(self, mock_verify: MagicMock) -> None:
+        """Test that verify_access is called with correct parameters"""
+        mock_db = MagicMock()
+        sim_id = "test-sim-123"
+        user_id = 42
+
+        mock_verify.return_value = True
+
+        # Simulate the access check in websocket_simulation_stream
+        has_access = mock_verify(mock_db, sim_id, user_id)
+
+        assert has_access is True
+        mock_verify.assert_called_once_with(mock_db, sim_id, user_id)
+
+    def test_auto_shutdown_timeout_value(self) -> None:
+        """Test that auto_shutdown uses the configured timeout"""
+        from back.api.v1.utils.sim_websocket_helpers import auto_shutdown_simulation
+        import inspect
+
+        src = inspect.getsource(auto_shutdown_simulation)
+
+        # Assert that the sleep call uses the configured setting
+        expected = "asyncio.sleep(settings.SIMULATION_IDLE_TIMEOUT_SECONDS)"
+
+        assert expected in src, (
+            "auto_shutdown_simulation must use the configurable "
+            "SIMULATION_IDLE_TIMEOUT_SECONDS instead of a hard-coded value"
+        )

@@ -22,10 +22,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 """
 
-import asyncio
-import threading
 from typing import Any, Dict, List
-from fastapi import WebSocket
 from sqlalchemy.orm import Session
 from back.models import User
 from back.models.sim_instance import SimInstance
@@ -34,7 +31,6 @@ from back.schemas import (
     PlaybackSpeedResponse,
     SimulationPlaybackStatus,
 )
-from sim.entities.frame import Frame
 from sim.simulator import Simulator
 from sim.entities.inputParameters import InputParameter
 from back.crud import sim_instance_crud, user_crud
@@ -43,31 +39,6 @@ from back.schemas.sim_instance import (
     SimulationResponse,
 )
 from back.exceptions import VelosimPermissionError, ItemNotFoundError
-from sim.utils.subscriber import Subscriber
-
-
-class WebSocketSubscriber(Subscriber):
-    def __init__(self, websocket: WebSocket) -> None:
-        self.websocket = websocket
-        # get the current running loop of the WebSocket (main uvicorn loop)
-        self.loop = asyncio.get_running_loop()
-
-    def on_frame(self, frame: Frame) -> None:
-        # schedule the coroutine in the main event loop
-        asyncio.run_coroutine_threadsafe(self._send_frame(frame), self.loop)
-
-    async def _send_frame(self, frame: Frame) -> None:
-        try:
-            await self.websocket.send_json(
-                {
-                    "seq": frame.seq_number,
-                    "timestamp": frame.timestamp_ms,
-                    "is_key": frame.is_key,
-                    "payload": frame.payload_dict,
-                }
-            )
-        except Exception as e:
-            print(f"WebSocket send error: {e}")
 
 
 class SimulationService:
@@ -77,6 +48,7 @@ class SimulationService:
         # Maps sim_id (UUID from simulator) -> (db_id, status, sim_time, simulator)
         # sim_time comes from InputParameter.sim_time
         self.active_simulations: Dict[str, Dict[str, Any]] = {}
+        self.simulator = Simulator()
         # Example of an entry to represent an in-memory simulation instance:
         # sim_id: {
         #     "db_id": 123,
@@ -138,7 +110,7 @@ class SimulationService:
         db.commit()
 
         # Create a fresh Simulator for this simulation
-        sim = Simulator()
+        sim = self.simulator
 
         # Initialize simulation with InputParameter
         sim_id = sim.initialize(params, subscribers=[])
@@ -148,7 +120,7 @@ class SimulationService:
             "db_id": db_sim_instance.id,
             "status": "initialized",
             "sim_time": params.sim_time,
-            "simulator": sim,
+            "user_id": user.id,
         }
 
         return SimulationResponse(
@@ -162,7 +134,6 @@ class SimulationService:
         db: Session,
         sim_id: str,
         requesting_user: int,
-        websocket: WebSocket | None = None,
     ) -> SimulationResponse:
         """
         Start an initialized simulation and return a confirmation response.
@@ -181,7 +152,7 @@ class SimulationService:
             raise ItemNotFoundError(db_id, "Simulation instance record not found")
 
         # Use the Simulator instance tied to this sim
-        sim = sim_data.get("simulator")
+        sim = self.simulator
         if sim is None:
             raise RuntimeError(f"Simulator for simulation {sim_id} not found")
 
@@ -196,12 +167,7 @@ class SimulationService:
                 f"Simulation {sim_id} does not have a valid sim_time defined."
             )
 
-        # Start the simulation in a background thread
-        def run_sim() -> None:
-            sim.start(sim_id, sim_time_value)
-
-        thread = threading.Thread(target=run_sim, daemon=True)
-        thread.start()
+        sim.start(sim_id, sim_time_value)
 
         # Update state
         sim_data["status"] = "running"
@@ -249,7 +215,7 @@ class SimulationService:
             raise VelosimPermissionError("Unauthorized to stop this simulation.")
 
         # Stop simulator and delete DB record
-        sim = sim_data.get("simulator")
+        sim = self.simulator
         if sim is None:
             raise RuntimeError(f"Simulator for simulation {sim_id} not found")
         sim.stop(sim_id)
@@ -367,13 +333,13 @@ class SimulationService:
         """
         try:
             # Stop all simulators
-            for sim_id, sim_data in self.active_simulations.items():
-                sim = sim_data.get("simulator")
-                if sim is not None:
-                    try:
-                        sim.stop(sim_id)
-                    except Exception as exc:
-                        print(f"Failed to stop simulation {sim_id}: {exc}")
+            sim = self.simulator
+
+            for sim_id in list(self.active_simulations.keys()):
+                try:
+                    sim.stop(sim_id)
+                except Exception as exc:
+                    print(f"Failed to stop simulation {sim_id}: {exc}")
 
             # Clean up database records in a single batch operation
             if self.active_simulations:
@@ -436,7 +402,7 @@ class SimulationService:
         if db_sim_instance.user_id != user.id and not user.is_admin:
             raise VelosimPermissionError("Unauthorized to modify this simulation.")
 
-        sim = sim_data.get("simulator")
+        sim = self.simulator
         if sim is None:
             raise RuntimeError(f"Simulator for simulation {sim_id} not found")
         sim_info = sim.get_sim_by_id(sim_id)
@@ -488,12 +454,12 @@ class SimulationService:
             raise VelosimPermissionError("Unauthorized to access this simulation.")
 
         # Get simulator runtime information from the sim package
-        sim = sim_data.get("simulator")
+        sim = self.simulator
         if sim is None:
             raise RuntimeError(f"Simulator for simulation {sim_id} not found")
         sim_info = sim.get_sim_by_id(sim_id)
         # Retrieve the corresponding realTimeDriver
-        driver = sim_info["simController"].realTimeDriver
+        driver = sim_info["simController"].realTimeDriver  # type: ignore
 
         # Determine status based on the boolean value of 'running' attribute
         # from realTimeDriver
