@@ -306,7 +306,7 @@ class ResourceService:
         if not sim_data:
             raise ItemNotFoundError(sim_id, "Simulation not found")
 
-        simulator = sim_data.get("simulator")
+        simulator = simulation_service.simulator
         if simulator is None:
             raise RuntimeError(f"Simulator for simulation {sim_id} not found")
 
