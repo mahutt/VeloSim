@@ -55,6 +55,7 @@ describe('SelectedItemBar', () => {
       simulationStatus: 'idle',
       isLoading: false,
       formattedSimTime: null,
+      currentDay: 1,
     });
 
     const { container } = render(
@@ -95,6 +96,7 @@ describe('SelectedItemBar', () => {
       startSimulation: vi.fn(),
       simulationStatus: 'idle',
       formattedSimTime: null,
+      currentDay: 1,
     });
 
     render(
@@ -145,6 +147,7 @@ describe('SelectedItemBar', () => {
       startSimulation: vi.fn(),
       simulationStatus: 'idle',
       formattedSimTime: null,
+      currentDay: 1,
     });
 
     render(
@@ -193,6 +196,7 @@ describe('SelectedItemBar', () => {
       startSimulation: vi.fn(),
       simulationStatus: 'idle',
       formattedSimTime: null,
+      currentDay: 1,
     });
 
     render(
@@ -239,6 +243,7 @@ describe('SelectedItemBar', () => {
       startSimulation: vi.fn(),
       simulationStatus: 'idle',
       formattedSimTime: null,
+      currentDay: 1,
     });
 
     render(
