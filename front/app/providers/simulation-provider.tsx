@@ -63,6 +63,8 @@ import { useSimulationWebSocket } from '~/hooks/use-simulation-websocket';
 // Expect to receive frames every 1 second
 const BASE_FRAME_INTERVAL_MS = 1000;
 
+const SECONDS_PER_DAY = 86400;
+
 export const SPEED_OPTIONS = [0, 0.5, 1, 2, 4, 8] as const;
 export type Speed = (typeof SPEED_OPTIONS)[number];
 
@@ -72,7 +74,13 @@ function formatSecondsToHHMM(seconds: number) {
   const hours = Math.floor(seconds / 3600);
   const minutes = Math.floor((seconds % 3600) / 60);
   const pad = (n: number) => n.toString().padStart(2, '0');
-  return `${pad(hours)}:${pad(minutes)}`;
+  const hoursDisplayed = hours % 24;
+  return `${pad(hoursDisplayed)}:${pad(minutes)}`;
+}
+
+function calculateDayFromSeconds(seconds: number): number {
+  if (!Number.isFinite(seconds) || seconds < 0) return 1;
+  return Math.floor(seconds / SECONDS_PER_DAY) + 1;
 }
 
 type SimulationContextType = {
@@ -96,6 +104,7 @@ type SimulationContextType = {
   simulationStatus: SimulationStatus;
   isLoading: boolean; // Convenience flag for UI
   formattedSimTime: string | null;
+  currentDay: number;
 };
 
 const SimulationContext = createContext<SimulationContextType | undefined>(
@@ -136,6 +145,7 @@ export const SimulationProvider = ({
   const [tasks, setTasks] = useState<StationTask[]>([]);
 
   const [formattedSimTime, setFormattedSimTime] = useState<string | null>(null);
+  const [currentDay, setCurrentDay] = useState<number>(1);
 
   const assignTask = async (resourceId: number, taskId: number) => {
     const resource = resourcesRef.current.get(resourceId);
@@ -509,6 +519,7 @@ export const SimulationProvider = ({
 
     if (payload.clock) {
       setFormattedSimTime(formatSecondsToHHMM(payload.clock.simSecondsPassed));
+      setCurrentDay(calculateDayFromSeconds(payload.clock.simSecondsPassed));
     }
 
     // Store initial data (pass true to indicate this is initial frame)
@@ -542,6 +553,7 @@ export const SimulationProvider = ({
 
     if (payload.clock) {
       setFormattedSimTime(formatSecondsToHHMM(payload.clock.simSecondsPassed));
+      setCurrentDay(calculateDayFromSeconds(payload.clock.simSecondsPassed));
     }
     // Update data (pass false to preserve existing tasks if not in payload)
     const updatedResources = adaptSimulationData(payload, false);
@@ -746,6 +758,7 @@ export const SimulationProvider = ({
         simulationStatus,
         isLoading,
         formattedSimTime,
+        currentDay,
       }}
     >
       {children}

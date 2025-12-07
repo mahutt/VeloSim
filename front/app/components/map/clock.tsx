@@ -22,18 +22,26 @@
  * SOFTWARE.
  */
 
+import { Clock as ClockIcon } from 'lucide-react';
 import { useSimulation } from '~/providers/simulation-provider';
 
 export default function Clock() {
-  const { formattedSimTime } = useSimulation();
+  const { formattedSimTime, currentDay } = useSimulation();
 
   // HH:MM time format
   const time = formattedSimTime ?? '--:--';
 
   return (
     <div className="bg-gray-50 border shadow rounded-md">
-      <div className="px-3 py-1 font-mono">
-        <div>{time}</div>
+      <div className="px-2 py-1 flex items-center gap-2 font-mono">
+        <ClockIcon className="h-4 w-4 text-gray-600" />
+        <div className="flex items-center gap-1">
+          <span className="text-sm font-medium text-gray-700">
+            Day {currentDay}
+          </span>
+          <span className="text-gray-400">—</span>
+          <span className="text-sm font-medium text-gray-900">{time}</span>
+        </div>
       </div>
     </div>
   );
