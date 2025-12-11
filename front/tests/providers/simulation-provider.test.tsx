@@ -71,7 +71,11 @@ import { MapProvider } from '~/providers/map-provider';
 import { TaskAssignmentProvider } from '~/providers/task-assignment-provider';
 import { MockMap } from 'tests/mocks';
 import MapContainer from '~/components/map/map-container';
-import { SelectedItemType } from '~/types';
+import {
+  SelectedItemType,
+  type BackendPayload,
+  type UseSimulationWebSocketOptions,
+} from '~/types';
 import {
   logSimulationError,
   logMissingEntityError,
@@ -108,6 +112,18 @@ vi.mock('~/lib/map-interactions.ts', () => {
   };
 });
 
+let wsOptions: UseSimulationWebSocketOptions | null = null;
+vi.mock('~/hooks/use-simulation-websocket', () => ({
+  useSimulationWebSocket: (opts: UseSimulationWebSocketOptions) => {
+    wsOptions = opts;
+    return {
+      isConnected: true,
+      simulationStatus: 'ready',
+      wsRef: { current: null },
+    };
+  },
+}));
+
 // Mock the fetch API
 const mockFetch = vi.fn();
 global.fetch = mockFetch;
@@ -132,6 +148,16 @@ const TestComponent = () => {
 const mockLogSimulationError = vi.fn();
 const mockLogMissingEntityError = vi.fn();
 
+const ClockProbe = () => {
+  const { formattedSimTime, currentDay } = useSimulation();
+  return (
+    <div>
+      <div data-testid="time">{formattedSimTime ?? 'null'}</div>
+      <div data-testid="day">{currentDay}</div>
+    </div>
+  );
+};
+
 // Mock requestAnimationFrame - prevent infinite recursion by limiting calls
 let rafCallCount = 0;
 global.requestAnimationFrame = vi.fn((cb) => {
@@ -148,6 +174,7 @@ global.cancelAnimationFrame = vi.fn();
 beforeEach(() => {
   vi.clearAllMocks();
   rafCallCount = 0; // Reset RAF call count
+  wsOptions = null;
 
   // Re-apply the simulation error utils mocks
   (logSimulationError as Mock).mockImplementation(mockLogSimulationError);
@@ -603,6 +630,188 @@ test('reassignTask posts to API and moves task between resources', async () => {
   await waitFor(() => {
     expect(getByTestId('prev-count')).toHaveTextContent('0');
     expect(getByTestId('new-count')).toHaveTextContent('1');
+  });
+});
+
+test('sets clock time and day from initial frame payload', async () => {
+  const { getByTestId } = render(
+    <MapProvider>
+      <SimulationProvider>
+        <TaskAssignmentProvider>
+          <MapContainer />
+          <ClockProbe />
+        </TaskAssignmentProvider>
+      </SimulationProvider>
+    </MapProvider>
+  );
+
+  await waitFor(() => {
+    expect(MockMap.instance).toBeDefined();
+  });
+
+  await act(async () => {
+    MockMap.instance?.callBacks['load']();
+  });
+
+  await act(async () => {
+    wsOptions?.onInitialFrame?.({
+      clock: {
+        simSecondsPassed: 3661,
+        simMinutesPassed: 61,
+        realSecondsPassed: 3661,
+        realMinutesPassed: 61,
+      },
+      resources: [],
+      stations: [],
+      tasks: [],
+    } as BackendPayload);
+  });
+
+  await waitFor(() => {
+    expect(getByTestId('time')).toHaveTextContent('01:01');
+    expect(getByTestId('day')).toHaveTextContent('1');
+  });
+});
+
+test('advances to next day when sim time crosses 24h', async () => {
+  const { getByTestId } = render(
+    <MapProvider>
+      <SimulationProvider>
+        <TaskAssignmentProvider>
+          <MapContainer />
+          <ClockProbe />
+        </TaskAssignmentProvider>
+      </SimulationProvider>
+    </MapProvider>
+  );
+
+  await waitFor(() => {
+    expect(MockMap.instance).toBeDefined();
+  });
+
+  await act(async () => {
+    MockMap.instance?.callBacks['load']();
+  });
+
+  await act(async () => {
+    wsOptions?.onInitialFrame?.({
+      clock: {
+        simSecondsPassed: 86399,
+        simMinutesPassed: 1439,
+        realSecondsPassed: 86399,
+        realMinutesPassed: 1439,
+      },
+      resources: [],
+      stations: [],
+      tasks: [],
+    } as BackendPayload);
+  });
+
+  await act(async () => {
+    wsOptions?.onFrameUpdate?.({
+      clock: {
+        simSecondsPassed: 90061,
+        simMinutesPassed: 1501,
+        realSecondsPassed: 90061,
+        realMinutesPassed: 1501,
+      },
+      resources: [],
+      stations: [],
+      tasks: [],
+    } as BackendPayload);
+  });
+
+  await waitFor(() => {
+    expect(getByTestId('time')).toHaveTextContent('01:01');
+    expect(getByTestId('day')).toHaveTextContent('2');
+  });
+});
+
+test('keeps prior clock when update payload omits clock', async () => {
+  const { getByTestId } = render(
+    <MapProvider>
+      <SimulationProvider>
+        <TaskAssignmentProvider>
+          <MapContainer />
+          <ClockProbe />
+        </TaskAssignmentProvider>
+      </SimulationProvider>
+    </MapProvider>
+  );
+
+  await waitFor(() => {
+    expect(MockMap.instance).toBeDefined();
+  });
+
+  await act(async () => {
+    MockMap.instance?.callBacks['load']();
+  });
+
+  await act(async () => {
+    wsOptions?.onInitialFrame?.({
+      clock: {
+        simSecondsPassed: 18000,
+        simMinutesPassed: 300,
+        realSecondsPassed: 18000,
+        realMinutesPassed: 300,
+      },
+      resources: [],
+      stations: [],
+      tasks: [],
+    } as BackendPayload);
+  });
+
+  await act(async () => {
+    wsOptions?.onFrameUpdate?.({
+      resources: [],
+      stations: [],
+      tasks: [],
+    } as BackendPayload);
+  });
+
+  await waitFor(() => {
+    expect(getByTestId('time')).toHaveTextContent('05:00');
+    expect(getByTestId('day')).toHaveTextContent('1');
+  });
+});
+
+test('defaults to 00:00 day 1 for negative sim time', async () => {
+  const { getByTestId } = render(
+    <MapProvider>
+      <SimulationProvider>
+        <TaskAssignmentProvider>
+          <MapContainer />
+          <ClockProbe />
+        </TaskAssignmentProvider>
+      </SimulationProvider>
+    </MapProvider>
+  );
+
+  await waitFor(() => {
+    expect(MockMap.instance).toBeDefined();
+  });
+
+  await act(async () => {
+    MockMap.instance?.callBacks['load']();
+  });
+
+  await act(async () => {
+    wsOptions?.onInitialFrame?.({
+      clock: {
+        simSecondsPassed: -5,
+        simMinutesPassed: -1,
+        realSecondsPassed: -5,
+        realMinutesPassed: -1,
+      },
+      resources: [],
+      stations: [],
+      tasks: [],
+    } as BackendPayload);
+  });
+
+  await waitFor(() => {
+    expect(getByTestId('time')).toHaveTextContent('00:00');
+    expect(getByTestId('day')).toHaveTextContent('1');
   });
 });
 
