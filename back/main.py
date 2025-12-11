@@ -35,6 +35,9 @@ from back.api.v1 import api_router
 from back.services.simulation_service import simulation_service
 from back.auth import Token, authenticate_user
 from back.database.session import get_db
+from back.grafana_logging.logger import get_logger
+
+logger = get_logger(__name__)
 
 
 @asynccontextmanager
@@ -52,7 +55,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     except Exception as e:
         # In test environments or if database is unavailable,
         # gracefully skip cleanup
-        print(f"Warning: Could not cleanup simulations during shutdown: {e}")
+        logger.warning(f"Could not cleanup simulations during shutdown: {e}")
 
 
 # Create FastAPI application
