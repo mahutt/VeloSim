@@ -44,7 +44,7 @@ def test_json_parse_strategy_valid_input() -> None:
         "id": 1,
         "name": "Test Scenario",
         "content": {
-            "start_time": "day1:00:00",
+            "start_time": "day1:01:00",
             "end_time": "day2:01:00",
             "stations": [
                 {
@@ -91,6 +91,11 @@ def test_json_parse_strategy_valid_input() -> None:
     assert tasks[1].station == stations[8074]  # First task (initial)
     assert tasks[2].station == stations[2105]  # Second task (scheduled)
     assert tasks[3].station == stations[2508]  # Third task (scheduled)
+
+    # Check spawn delays
+    assert tasks[1].spawn_delay == 0  # Initial task
+    assert tasks[2].spawn_delay == 4 * 3600  # 4 hours after start
+    assert tasks[3].spawn_delay == 7 * 3600  # 7 hours after start
 
     for res in resources.values():
         assert isinstance(res, Resource)

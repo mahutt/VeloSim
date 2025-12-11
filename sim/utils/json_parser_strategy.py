@@ -101,7 +101,7 @@ class JsonParseStrategy(BaseParseStrategy):
             station_ref = stations[int(t["station_id"])]
             raw_time = t.get("time", 0)
             if isinstance(raw_time, str):
-                delay = self._time_to_seconds(raw_time)
+                delay = self._time_to_seconds(raw_time) - start_time
             else:
                 delay = int(raw_time)
 
