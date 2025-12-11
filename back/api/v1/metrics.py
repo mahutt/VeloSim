@@ -22,31 +22,16 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 """
 
-from fastapi import APIRouter
-from .stations import router as stations_router
-from .station_tasks import router as station_tasks_router
-from .simulation import router as simulation_router
-from .resources import router as resources_router
-from .users import router as users_router
-from .logs import router as logs_router
-from .scenarios import router as scenarios_router
-from back.core.config import settings
-from .metrics import router as metrics_router
+from fastapi import APIRouter, Response
+from prometheus_client import generate_latest, CONTENT_TYPE_LATEST
 
-# Create the main v1 API router
-api_router = APIRouter()
+router = APIRouter(prefix="/metric", tags=["metrics"])
 
-# Include all endpoint routers
-api_router.include_router(simulation_router)
-api_router.include_router(users_router)
-api_router.include_router(logs_router)
-api_router.include_router(scenarios_router)
-api_router.include_router(metrics_router)
-if settings.FEATURE_STATIONS_API_ROUTER:
-    api_router.include_router(stations_router)
-if settings.FEATURE_STATION_TASKS_API_ROUTER:
-    api_router.include_router(station_tasks_router)
-if settings.FEATURE_RESOURCES_API_ROUTER:
-    api_router.include_router(resources_router)
 
-__all__ = ["api_router"]
+@router.get("/metrics")
+def metrics() -> Response:
+    """
+    Return Prometheus metrics - OpenTelemetry automatically populates these
+    """
+    data = generate_latest()
+    return Response(content=data, media_type=CONTENT_TYPE_LATEST)
