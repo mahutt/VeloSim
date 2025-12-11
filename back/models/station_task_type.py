@@ -26,4 +26,6 @@ from enum import Enum
 
 
 class StationTaskType(Enum):
+    """Enumeration of station task types."""
+
     BATTERY_SWAP = "battery_swap"

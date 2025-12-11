@@ -34,6 +34,14 @@ oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
 
 
 async def get_user_id(token: Annotated[str, Depends(oauth2_scheme)]) -> int:
+    """Extract and validate user ID from OAuth2 bearer token.
+
+    Args:
+        token: The OAuth2 bearer token from the request.
+
+    Returns:
+        int: The authenticated user's ID.
+    """
     user_id = validate_access_token(token)
     if user_id is None:
         raise HTTPException(
@@ -52,6 +60,13 @@ async def get_user_id_over_websocket(
     WebSocket-compatible authentication.
     Raises a WebSocketAuthError with the appropriate WebSocket error code if
     authentication fails.
+
+    Args:
+        websocket: The WebSocket connection containing authentication headers.
+        access_token: Optional access token from cookie.
+
+    Returns:
+        int: The authenticated user's ID.
     """
     token_to_use: Optional[str] = None
 

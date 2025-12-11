@@ -34,7 +34,15 @@ class ScenarioCRUD:
     """CRUD operations for Scenario model with user ownership and validation."""
 
     def create(self, db: Session, scenario_data: ScenarioCreate) -> Scenario:
-        """Create a new scenario. Raises 400 if invalid data."""
+        """Create a new scenario. Raises 400 if invalid data.
+
+        Args:
+            db: Database session.
+            scenario_data: The data for creating a new scenario.
+
+        Returns:
+            Scenario: The newly created scenario.
+        """
         if not scenario_data.name:
             raise BadRequestError("Scenario must have a name")
 
@@ -53,7 +61,16 @@ class ScenarioCRUD:
         return db_scenario
 
     def get(self, db: Session, scenario_id: int, user_id: int) -> Scenario:
-        """Get a scenario by ID only if it belongs to the user."""
+        """Get a scenario by ID only if it belongs to the user.
+
+        Args:
+            db: Database session.
+            scenario_id: The ID of the scenario to retrieve.
+            user_id: The ID of the user who owns the scenario.
+
+        Returns:
+            Scenario: The requested scenario.
+        """
         scenario = (
             db.query(Scenario)
             .filter(Scenario.id == scenario_id, Scenario.user_id == user_id)
@@ -72,6 +89,14 @@ class ScenarioCRUD:
 
         Returns None if no scenario with that name exists for the user.
         Used for duplicate name checking.
+
+        Args:
+            db: Database session.
+            name: The name of the scenario to find.
+            user_id: The ID of the user who owns the scenario.
+
+        Returns:
+            Scenario | None: The scenario if found, None otherwise.
         """
         return (
             db.query(Scenario)
@@ -82,7 +107,17 @@ class ScenarioCRUD:
     def get_by_user(
         self, db: Session, user_id: int, skip: int = 0, limit: int = 100
     ) -> Tuple[List[Scenario], int]:
-        """Get all scenarios for a user with pagination."""
+        """Get all scenarios for a user with pagination.
+
+        Args:
+            db: Database session.
+            user_id: The ID of the user who owns the scenarios.
+            skip: Number of records to skip (default: 0).
+            limit: Maximum number of records to return (default: 100).
+
+        Returns:
+            Tuple[List[Scenario], int]: Tuple of (scenarios list, total count).
+        """
         total = (
             db.query(func.count(Scenario.id))
             .filter(Scenario.user_id == user_id)
@@ -103,7 +138,17 @@ class ScenarioCRUD:
     def update(
         self, db: Session, scenario_id: int, user_id: int, scenario_data: ScenarioUpdate
     ) -> Scenario:
-        """Update a scenario only if it belongs to the user."""
+        """Update a scenario only if it belongs to the user.
+
+        Args:
+            db: Database session.
+            scenario_id: The ID of the scenario to update.
+            user_id: The ID of the user who owns the scenario.
+            scenario_data: The updated data for the scenario.
+
+        Returns:
+            Scenario: The updated scenario.
+        """
         scenario = self.get(db, scenario_id, user_id)
 
         update_data = scenario_data.model_dump(exclude_unset=True)
@@ -121,7 +166,16 @@ class ScenarioCRUD:
         return scenario
 
     def delete(self, db: Session, scenario_id: int, user_id: int) -> None:
-        """Delete a scenario only if it belongs to the user."""
+        """Delete a scenario only if it belongs to the user.
+
+        Args:
+            db: Database session.
+            scenario_id: The ID of the scenario to delete.
+            user_id: The ID of the user who owns the scenario.
+
+        Returns:
+            None
+        """
         scenario = self.get(db, scenario_id, user_id)
         db.delete(scenario)
         db.commit()

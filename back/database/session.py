@@ -30,6 +30,8 @@ from back.core.config import settings
 
 
 class Base(DeclarativeBase):
+    """Base class for all SQLAlchemy ORM models."""
+
     pass
 
 
@@ -46,7 +48,12 @@ SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 
 def get_db() -> Generator[Session, None, None]:
-    """Get database session with automatic transaction management."""
+    """Get database session with automatic transaction management.
+
+    Returns:
+        Generator[Session, None, None]: Database session that commits on
+            success or rolls back on error.
+    """
     db = SessionLocal()
     try:
         yield db

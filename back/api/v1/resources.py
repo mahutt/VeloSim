@@ -44,7 +44,15 @@ router = APIRouter(prefix="/resources", tags=["resources"])
 def create_resource(
     resource_data: ResourceCreate, db: Session = Depends(get_db)
 ) -> ResourceResponse:
-    """Create a new resource."""
+    """Create a new resource.
+
+    Args:
+        resource_data: Data for creating the new resource
+        db: Database session dependency
+
+    Returns:
+        ResourceResponse containing the created resource data
+    """
     db_resource = resource_crud.create(db, resource_data)
     return ResourceResponse.model_validate(db_resource)
 
@@ -59,7 +67,18 @@ def get_resources(
     limit: int = Query(10, ge=1, le=100),
     db: Session = Depends(get_db),
 ) -> ResourceListResponse:
-    """Get all resources with pagination."""
+    """Get all resources with pagination.
+
+    Args:
+        type: Optional filter by resource type
+        status: Optional filter by current task status
+        skip: Number of records to skip for pagination
+        limit: Maximum number of records to return (1-100)
+        db: Database session dependency
+
+    Returns:
+        ResourceListResponse containing paginated list of resources and metadata
+    """
     resources, total = resource_crud.get_all_filtered(
         db, skip=skip, limit=limit, type=type, status=status
     )
@@ -76,13 +95,25 @@ def get_resources(
 
 @router.get("/types", response_model=List[str])
 def get_resource_types() -> List[str]:
-    """Get all resource types."""
+    """Get all resource types.
+
+    Returns:
+        List of all available resource type values
+    """
     return [r_type.value for r_type in ResourceType]
 
 
 @router.get("/{resource_id}", response_model=ResourceResponse)
 def get_resource(resource_id: int, db: Session = Depends(get_db)) -> ResourceResponse:
-    """Get a specific resource by ID."""
+    """Get a specific resource by ID.
+
+    Args:
+        resource_id: ID of the resource to retrieve
+        db: Database session dependency
+
+    Returns:
+        ResourceResponse containing the requested resource data
+    """
     db_resource = resource_crud.get(db, resource_id)
     if not db_resource:
         raise HTTPException(
@@ -95,7 +126,16 @@ def get_resource(resource_id: int, db: Session = Depends(get_db)) -> ResourceRes
 def update_resource(
     resource_id: int, resource_data: ResourceUpdate, db: Session = Depends(get_db)
 ) -> ResourceResponse:
-    """Update a resource (only current position and start/end of route)."""
+    """Update a resource (only current position and start/end of route).
+
+    Args:
+        resource_id: ID of the resource to update
+        resource_data: Updated resource data
+        db: Database session dependency
+
+    Returns:
+        ResourceResponse containing the updated resource data
+    """
     db_resource = resource_crud.update(db, resource_id, resource_data)
     if not db_resource:
         raise HTTPException(
@@ -106,8 +146,16 @@ def update_resource(
 
 @router.delete("/{resource_id}", status_code=204)
 def delete_resource(resource_id: int, db: Session = Depends(get_db)) -> None:
+    """Delete a resource.
+
+    Args:
+        resource_id: ID of the resource to delete
+        db: Database session dependency
+
+    Returns:
+        None (204 No Content status on success)
+    """
     success = resource_crud.delete(db, resource_id)
-    """Delete a resource."""
     if not success:
         raise HTTPException(
             status_code=404, detail=f"Resource with ID {resource_id} not found"

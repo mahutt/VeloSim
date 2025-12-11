@@ -26,6 +26,8 @@ from enum import Enum
 
 
 class TaskStatus(Enum):
+    """Enumeration of task status values."""
+
     OPEN = "open"
     ASSIGNED = "assigned"
     IN_PROGRESS = "in_progress"
@@ -33,6 +35,11 @@ class TaskStatus(Enum):
 
     @property
     def is_open(self) -> bool:
+        """Check if the task status is open.
+
+        Returns:
+            bool: True if status is open, False otherwise.
+        """
         if self.value == "open":
             return True
         return False

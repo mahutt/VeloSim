@@ -34,7 +34,15 @@ class StationCRUD:
     """CRUD operations for Station model."""
 
     def create(self, db: Session, station_data: StationCreate) -> Station:
-        """Create a new station."""
+        """Create a new station.
+
+        Args:
+            db: Database session.
+            station_data: The data for creating a new station.
+
+        Returns:
+            Station: The newly created station.
+        """
         db_station = Station(
             sim_instance_id=station_data.sim_instance_id,
             name=station_data.name,
@@ -47,17 +55,42 @@ class StationCRUD:
         return db_station
 
     def get(self, db: Session, station_id: int) -> Optional[Station]:
-        """Get a station by ID."""
+        """Get a station by ID.
+
+        Args:
+            db: Database session.
+            station_id: The ID of the station to retrieve.
+
+        Returns:
+            Optional[Station]: The station if found, None otherwise.
+        """
         return db.query(Station).filter(Station.id == station_id).first()
 
     def get_by_name(self, db: Session, name: str) -> Optional[Station]:
-        """Get a station by name."""
+        """Get a station by name.
+
+        Args:
+            db: Database session.
+            name: The name of the station to find.
+
+        Returns:
+            Optional[Station]: The station if found, None otherwise.
+        """
         return db.query(Station).filter(Station.name == name).first()
 
     def get_all(
         self, db: Session, skip: int = 0, limit: int = 100
     ) -> Tuple[List[Station], int]:
-        """Get all stations with pagination."""
+        """Get all stations with pagination.
+
+        Args:
+            db: Database session.
+            skip: Number of records to skip (default: 0).
+            limit: Maximum number of records to return (default: 100).
+
+        Returns:
+            Tuple[List[Station], int]: Tuple of (stations list, total count).
+        """
         total = db.query(func.count(Station.id)).scalar() or 0
         stations = db.query(Station).offset(skip).limit(limit).all()
         return stations, total
@@ -65,7 +98,16 @@ class StationCRUD:
     def update(
         self, db: Session, station_id: int, station_data: StationUpdate
     ) -> Optional[Station]:
-        """Update a station."""
+        """Update a station.
+
+        Args:
+            db: Database session.
+            station_id: The ID of the station to update.
+            station_data: The updated data for the station.
+
+        Returns:
+            Optional[Station]: The updated station if found, None otherwise.
+        """
         db_station = self.get(db, station_id)
         if not db_station:
             return None
@@ -79,7 +121,15 @@ class StationCRUD:
         return db_station
 
     def delete(self, db: Session, station_id: int) -> bool:
-        """Delete a station."""
+        """Delete a station.
+
+        Args:
+            db: Database session.
+            station_id: The ID of the station to delete.
+
+        Returns:
+            bool: True if station was deleted, False if not found.
+        """
         db_station = self.get(db, station_id)
         if not db_station:
             return False

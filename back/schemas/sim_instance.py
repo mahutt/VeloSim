@@ -51,29 +51,45 @@ class SimInstanceResponse(SimInstanceBase):
     @computed_field  # type: ignore[prop-decorator]
     @property
     def resource_count(self) -> int:
-        """Compute the number of resources."""
+        """Compute the number of resources.
+
+        Returns:
+            int: Number of resources in the simulation instance.
+        """
         return len(self.resources) if hasattr(self, "resources") else 0
 
     @computed_field  # type: ignore[prop-decorator]
     @property
     def station_count(self) -> int:
-        """Compute the number of stations."""
+        """Compute the number of stations.
+
+        Returns:
+            int: Number of stations in the simulation instance.
+        """
         return len(self.stations) if hasattr(self, "stations") else 0
 
     @computed_field  # type: ignore[prop-decorator]
     @property
     def task_count(self) -> int:
-        """Compute the number of tasks."""
+        """Compute the number of tasks.
+
+        Returns:
+            int: Number of tasks in the simulation instance.
+        """
         return len(self.tasks) if hasattr(self, "tasks") else 0
 
 
 class SimulationResponse(BaseModel):
+    """Response schema for simulation operations."""
+
     sim_id: str
     db_id: int
     status: str
 
 
 class SimulationListResponse(BaseModel):
+    """Response schema for paginated simulation list."""
+
     simulations: List[SimInstanceResponse]
     total: int
     page: int

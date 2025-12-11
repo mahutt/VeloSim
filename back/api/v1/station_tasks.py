@@ -46,7 +46,15 @@ router = APIRouter(prefix="/stationTasks", tags=["stationTasks"])
 def create_station_task(
     station_task_create_data: StationTaskCreate, db: Session = Depends(get_db)
 ) -> StationTaskResponse:
-    """Create a new station task."""
+    """Create a new station task.
+
+    Args:
+        station_task_create_data: The data for creating a new station task.
+        db: Database session dependency.
+
+    Returns:
+        StationTaskResponse: The created station task.
+    """
     # Check if the station exists. This had to be done explicitly rather than relying on
     # SqlAlchemy's IntegrityError (used below as well to avoid race condition) to work
     # under unit testing.
@@ -79,7 +87,18 @@ def get_station_tasks(
     limit: int = Query(10, ge=1, le=100, description="Number of stations to retrieve"),
     db: Session = Depends(get_db),
 ) -> StationTaskListResponse:
-    """Get all station tasks with pagination."""
+    """Get all station tasks with pagination.
+
+    Args:
+        station_id: Optional filter for tasks belonging to a specific station.
+        task_status: Optional filter for tasks with a specific status.
+        skip: Number of records to skip for pagination (default: 0).
+        limit: Maximum number of records to return (default: 10, max: 100).
+        db: Database session dependency.
+
+    Returns:
+        StationTaskListResponse: Paginated list of station tasks matching the filters.
+    """
     station_tasks, total = station_task_crud.get_all(
         db, station_id, task_status, skip, limit
     )
@@ -103,7 +122,11 @@ def get_station_tasks(
 # 'types'
 @router.get("/types", response_model=List[str])
 def get_task_types() -> List[str]:
-    """Get all station task types."""
+    """Get all station task types.
+
+    Returns:
+        List[str]: List of all available station task type values.
+    """
     return [task_type.value for task_type in StationTaskType]
 
 
@@ -111,7 +134,15 @@ def get_task_types() -> List[str]:
 def get_station_task(
     station_task_id: int, db: Session = Depends(get_db)
 ) -> StationTaskResponse:
-    """Get a specific station task by ID."""
+    """Get a specific station task by ID.
+
+    Args:
+        station_task_id: The ID of the station task to retrieve.
+        db: Database session dependency.
+
+    Returns:
+        StationTaskResponse: The requested station task.
+    """
     db_station_task = station_task_crud.get(db, station_task_id)
     if not db_station_task:
         raise HTTPException(
@@ -126,7 +157,16 @@ def update_station_task(
     station_task_data: StationTaskUpdate,
     db: Session = Depends(get_db),
 ) -> StationTaskResponse:
-    """Update a station task."""
+    """Update a station task.
+
+    Args:
+        station_task_id: The ID of the station task to update.
+        station_task_data: The updated data for the station task.
+        db: Database session dependency.
+
+    Returns:
+        StationTaskResponse: The updated station task.
+    """
     existing_station_task = station_task_crud.get(db, station_task_id)
     if not existing_station_task:
         raise HTTPException(
@@ -139,7 +179,15 @@ def update_station_task(
 
 @router.delete("/{station_task_id}", status_code=204)
 def delete_station_task(station_task_id: int, db: Session = Depends(get_db)) -> None:
-    """Delete a station task."""
+    """Delete a station task.
+
+    Args:
+        station_task_id: The ID of the station task to delete.
+        db: Database session dependency.
+
+    Returns:
+        None: No content on successful deletion.
+    """
     success = station_task_crud.delete(db, station_task_id)
     if not success:
         raise HTTPException(

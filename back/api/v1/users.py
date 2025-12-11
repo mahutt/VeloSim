@@ -53,7 +53,19 @@ def get_users(
     db: Session = Depends(get_db),
     requesting_user: int = Depends(get_user_id),
 ) -> UsersResponse:
-    """Get all users with pagination."""
+    """Get all users with pagination.
+
+    Args:
+        is_enabled: Optional filter for enabled or disabled users.
+        is_admin: Optional filter by admin role.
+        skip: Number of records to skip for pagination (default: 0).
+        limit: Maximum number of records to return (default: 10, max: 100).
+        db: Database session dependency.
+        requesting_user: ID of the user making the request.
+
+    Returns:
+        UsersResponse: Paginated list of users matching the filters.
+    """
     try:
         users, total = user_crud.get_all(
             db,
@@ -83,7 +95,15 @@ def get_me(
     db: Session = Depends(get_db),
     requesting_user: int = Depends(get_user_id),
 ) -> UserResponse:
-    """Get the requesting user"""
+    """Get the requesting user.
+
+    Args:
+        db: Database session dependency.
+        requesting_user: ID of the user making the request.
+
+    Returns:
+        UserResponse: The requesting user's profile.
+    """
     user = user_crud.get_if_permission(db, requesting_user, requesting_user)
 
     return UserResponse.model_validate(user)
@@ -95,7 +115,16 @@ def get_by_id(
     db: Session = Depends(get_db),
     requesting_user: int = Depends(get_user_id),
 ) -> UserResponse:
-    """Get the requested user if it is the user themselves, or the user is an admin."""
+    """Get the requested user if it is the user themselves, or the user is an admin.
+
+    Args:
+        user_id: The ID of the user to retrieve.
+        db: Database session dependency.
+        requesting_user: ID of the user making the request.
+
+    Returns:
+        UserResponse: The requested user's profile.
+    """
     try:
         user = user_crud.get_if_permission(db, user_id, requesting_user)
 
@@ -115,7 +144,16 @@ async def create(
 ) -> UserResponse:
     """Create a new user.
 
-    The requesting user must be an admin."""
+    The requesting user must be an admin.
+
+    Args:
+        user_create_data: The data for creating a new user.
+        db: Database session dependency.
+        requesting_user: ID of the user making the request.
+
+    Returns:
+        UserResponse: The created user profile.
+    """
     try:
         new_user = user_crud.create(db, user_create_data, requesting_user)
         return UserResponse.model_validate(new_user)
@@ -134,7 +172,17 @@ async def password_update(
 ) -> UserResponse:
     """Update a user's password.
 
-    The requesting user must be an admin or the user themselves."""
+    The requesting user must be an admin or the user themselves.
+
+    Args:
+        user_id: The ID of the user whose password to update.
+        password_data: The new password data.
+        db: Database session dependency.
+        requesting_user: ID of the user making the request.
+
+    Returns:
+        UserResponse: The updated user profile.
+    """
     try:
         updated_user = user_crud.update_password(
             db, user_id, password_data, requesting_user
@@ -157,7 +205,17 @@ async def role_update(
 
     The requesting user must be an admin. The requesting user cannot change their own
     role. This prevents an admin from demoting themselves without another admin to
-    restore access to the app."""
+    restore access to the app.
+
+    Args:
+        user_id: The ID of the user whose role to update.
+        role_data: The new role data.
+        db: Database session dependency.
+        requesting_user: ID of the user making the request.
+
+    Returns:
+        UserResponse: The updated user profile.
+    """
     try:
         updated_user = user_crud.update_role(db, user_id, role_data, requesting_user)
         return UserResponse.model_validate(updated_user)

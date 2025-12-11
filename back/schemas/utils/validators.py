@@ -26,14 +26,28 @@ from typing import Any
 
 
 def validate_longitude(v: Any) -> float:
-    """Validate that longitude is between -180 and 180."""
+    """Validate that longitude is between -180 and 180.
+
+    Args:
+        v: The longitude value to validate.
+
+    Returns:
+        float: Validated longitude value.
+    """
     if not -180 <= v <= 180:
         raise ValueError("Longitude must be between -180 and 180")
     return float(v)
 
 
 def validate_latitude(v: Any) -> float:
-    """Validate that latitude is between -90 and 90."""
+    """Validate that latitude is between -90 and 90.
+
+    Args:
+        v: The latitude value to validate.
+
+    Returns:
+        float: Validated latitude value.
+    """
     if not -90 <= v <= 90:
         raise ValueError("Latitude must be between -90 and 90")
     return float(v)

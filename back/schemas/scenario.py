@@ -327,7 +327,11 @@ class ScenarioResponse(BaseModel):
 
     @computed_field
     def content_size(self) -> int:
-        """Return the approximate size of the content (number of keys for dict)."""
+        """Return the approximate size of the content (number of keys for dict).
+
+        Returns:
+            int: Number of keys in content dict, or 0 if not a dict.
+        """
         return len(self.content) if isinstance(self.content, dict) else 0
 
 

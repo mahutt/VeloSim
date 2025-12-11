@@ -26,6 +26,8 @@ from enum import Enum
 
 
 class ResourceType(Enum):
+    """Enumeration of resource types in the simulation."""
+
     VEHICLE_DRIVER = "vehicle_driver"
     # Each resource combines a driver and a vehicle, since they are always
     # paired in this context.
