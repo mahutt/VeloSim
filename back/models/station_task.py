@@ -35,8 +35,9 @@ if TYPE_CHECKING:
 
 
 class StationTask(Base):
-    """Model to represent tasks that must be done to a specific bike (as opposed to
-    tasks to maintain the station itself).
+    """Model to represent tasks that must be done to a specific bike.
+
+    As opposed to tasks to maintain the station itself.
     """
 
     __tablename__ = "station_tasks"

@@ -66,7 +66,7 @@ def check_rate_limit(user_id: int) -> bool:
 
 
 @router.post("/frontend", response_model=FrontendLogResponse, status_code=201)
-async def log_frontend_entry(
+def log_frontend_entry(
     request: Request,
     log_entry: FrontendLogEntry,
     user_id: int = Depends(get_user_id),
@@ -110,7 +110,7 @@ async def log_frontend_entry(
 
 
 @router.post("/frontend/batch", response_model=FrontendLogResponse, status_code=201)
-async def log_frontend_batch(
+def log_frontend_batch(
     request: Request,
     log_entries: List[FrontendLogEntry],
     user_id: int = Depends(get_user_id),

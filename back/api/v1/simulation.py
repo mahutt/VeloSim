@@ -74,7 +74,7 @@ router = APIRouter(prefix="/simulation", tags=["simulation"])
 
 
 @router.post("/initialize", response_model=SimulationResponse)
-async def initialize_simulation(
+def initialize_simulation(
     scenario: dict | None = Body(None),
     scenario_id: int | None = Query(None),
     db: Session = Depends(get_db),
@@ -127,7 +127,7 @@ async def initialize_simulation(
 
 
 @router.post("/stop/{sim_id}", response_model=SimulationResponse)
-async def stop_simulation(
+def stop_simulation(
     sim_id: str,
     db: Session = Depends(get_db),
     requesting_user: int = Depends(get_user_id),
@@ -154,7 +154,7 @@ async def stop_simulation(
 
 
 @router.get("/my", response_model=SimulationListResponse)
-async def list_my_simulations(
+def list_my_simulations(
     skip: int = Query(0, ge=0, description="Number of simulations to skip"),
     limit: int = Query(
         10, ge=1, le=100, description="Number of simulations to retrieve"
@@ -193,7 +193,7 @@ async def list_my_simulations(
 
 
 @router.get("/list", response_model=SimulationListResponse)
-async def list_all_simulations(
+def list_all_simulations(
     skip: int = Query(0, ge=0, description="Number of simulations to skip"),
     limit: int = Query(
         10, ge=1, le=100, description="Number of simulations to retrieve"
@@ -232,7 +232,7 @@ async def list_all_simulations(
 
 
 @router.get("/status/{sim_id}")
-async def get_simulation_status(
+def get_simulation_status(
     sim_id: str,
     db: Session = Depends(get_db),
     requesting_user: int = Depends(get_user_id),
@@ -259,7 +259,7 @@ async def get_simulation_status(
 
 
 @router.post("/stopAll")
-async def stop_all_simulations(
+def stop_all_simulations(
     db: Session = Depends(get_db),
     requesting_user: int = Depends(get_user_id),
 ) -> Dict[str, str]:
@@ -288,7 +288,7 @@ async def stop_all_simulations(
 
 
 @router.get("/{sim_id}/playbackSpeed", response_model=PlaybackSpeedResponse)
-async def get_playback_speed(
+def get_playback_speed(
     sim_id: str,
     db: Session = Depends(get_db),
     requesting_user: int = Depends(get_user_id),
@@ -317,7 +317,7 @@ async def get_playback_speed(
 
 
 @router.post("/{sim_id}/playbackSpeed", response_model=PlaybackSpeedResponse)
-async def set_playback_speed(
+def set_playback_speed(
     sim_id: str,
     playback_speed: PlaybackSpeedBase,
     db: Session = Depends(get_db),

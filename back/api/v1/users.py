@@ -137,7 +137,7 @@ def get_by_id(
 
 
 @router.post("/create", response_model=UserResponse, status_code=201)
-async def create(
+def create(
     user_create_data: UserCreate,
     db: Session = Depends(get_db),
     requesting_user: int = Depends(get_user_id),
@@ -164,7 +164,7 @@ async def create(
 
 
 @router.put("/{user_id}/password", response_model=UserResponse)
-async def password_update(
+def password_update(
     user_id: int,
     password_data: UserPasswordUpdate,
     db: Session = Depends(get_db),
@@ -195,7 +195,7 @@ async def password_update(
 
 
 @router.put("/{user_id}/role", response_model=UserResponse)
-async def role_update(
+def role_update(
     user_id: int,
     role_data: UserRoleUpdate,
     db: Session = Depends(get_db),
