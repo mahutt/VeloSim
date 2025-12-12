@@ -210,12 +210,10 @@ def test_emit_initial_frame(
 
     # Check frame structure
     assert frame.seq_number == 0
-    assert "sim_id" in frame.payload_dict
+    assert "simId" in frame.payload_dict
     assert "tasks" in frame.payload_dict
     assert "stations" in frame.payload_dict
     assert "resources" in frame.payload_dict
-    assert "new_tasks" in frame.payload_dict
-    assert frame.payload_dict["new_tasks"] == []
     assert "clock" in frame.payload_dict
 
     # Check that frame counter was incremented
@@ -223,21 +221,19 @@ def test_emit_initial_frame(
 
 
 def test_create_key_frame(simulator_controller: SimulatorController) -> None:
-    """Test that create_key_frame generates a complete frame with all entities."""
-    frame = simulator_controller.create_key_frame()
+    """Test that create_frame generates a complete frame with all entities."""
+    frame = simulator_controller.create_frame(is_key=True)
 
     # Check frame structure
     assert frame.seq_number == 0
     assert isinstance(frame.payload_dict, dict)
 
     payload = frame.payload_dict
-    assert "sim_id" in payload
+    assert "simId" in payload
     assert "tasks" in payload
     assert "stations" in payload
     assert "resources" in payload
     assert "clock" in payload
-    assert "new_tasks" in payload
-    assert payload["new_tasks"] == []
 
     # Check that all entities are included in key frame
     assert len(payload["tasks"]) == 2
@@ -248,36 +244,32 @@ def test_create_key_frame(simulator_controller: SimulatorController) -> None:
     task = payload["tasks"][0]
     assert "id" in task
     assert "state" in task
-    assert "station_id" in task
-    assert "station_name" in task
-    assert "assigned_resource_id" in task
-    assert "is_assigned" in task
+    assert "stationId" in task
+    assert "assignedResourceId" in task
 
     # Check station structure
     station = payload["stations"][0]
-    assert "station_id" in station
-    assert "station_name" in station
-    assert "station_position" in station
-    assert "station_tasks" in station
-    assert "task_count" in station
+    assert "id" in station
+    assert "name" in station
+    assert "position" in station
+    assert "taskIds" in station
 
     # Check resource structure
     resource = payload["resources"][0]
-    assert "resource_id" in resource
-    assert "resource_position" in resource
-    assert "resource_tasks" in resource
-    assert "task_count" in resource
-    assert "in_progress_task_id" in resource
+    assert "id" in resource
+    assert "position" in resource
+    assert "taskIds" in resource
+    assert "inProgressTaskId" in resource
 
 
 def test_create_diff_frame(simulator_controller: SimulatorController) -> None:
-    """Test that create_diff_frame generates a frame with only updated entities."""
+    """Test that create_frame generates a frame with only updated entities."""
     # Mark one entity as updated (using ID keys instead of indices)
     simulator_controller.station_entities[1].has_updated = True
     simulator_controller.task_entities[1].has_updated = True
     simulator_controller.resource_entities[1].has_updated = True
 
-    frame = simulator_controller.create_diff_frame()
+    frame = simulator_controller.create_frame(is_key=False)
 
     # Check frame structure
     assert frame.seq_number == 0
@@ -289,8 +281,6 @@ def test_create_diff_frame(simulator_controller: SimulatorController) -> None:
     assert len(payload["tasks"]) == 1
     assert len(payload["stations"]) == 1
     assert len(payload["resources"]) == 1
-    assert "new_tasks" in payload
-    assert payload["new_tasks"] == []
 
 
 def test_emit_frame_with_provided_frame(
@@ -332,8 +322,6 @@ def test_emit_frame_without_provided_frame_key_frame(
     assert len(frame.payload_dict["tasks"]) == 2
     assert len(frame.payload_dict["stations"]) == 2
     assert len(frame.payload_dict["resources"]) == 2
-    assert "new_tasks" in frame.payload_dict
-    assert frame.payload_dict["new_tasks"] == []
 
 
 def test_emit_frame_without_provided_frame_diff_frame(
@@ -361,8 +349,6 @@ def test_emit_frame_without_provided_frame_diff_frame(
     assert len(frame.payload_dict["stations"]) == 1
     assert len(frame.payload_dict["tasks"]) == 0  # No tasks marked as updated
     assert len(frame.payload_dict["resources"]) == 0  # No resources marked as updated
-    assert "new_tasks" in frame.payload_dict
-    assert frame.payload_dict["new_tasks"] == []
 
 
 def test_emit_frame_clears_update_flags(
@@ -395,10 +381,10 @@ def test_key_frame_includes_new_tasks_and_clears_popups(
     new_task = BatterySwapTask(task_id=99, station=station1)
     station1.pop_up_tasks.append(new_task)
 
-    frame = simulator_controller.create_key_frame()
+    frame = simulator_controller.create_frame(is_key=True)
     payload = frame.payload_dict
-    assert "new_tasks" in payload
-    assert any(t["id"] == 99 for t in payload["new_tasks"])
+    assert "tasks" in payload
+    assert any(t["id"] == 99 for t in payload["tasks"])
     # ensure task added to map task_entities
     assert simulator_controller.get_task_by_id(99) is not None
     # ensure popups cleared after frame generation

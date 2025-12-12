@@ -22,15 +22,18 @@
  * SOFTWARE.
  */
 
-import { ResourceItem } from './resource-item';
+import { ResourceItem, type ResourceItemElement } from './resource-item';
 import { useSimulation } from '~/providers/simulation-provider';
-import { SelectedItemType } from '~/types';
 import { Card, CardContent, CardHeader } from '~/components/ui/card';
 import { SearchBar } from './search-bar';
 import { useMemo, useState } from 'react';
+import { SelectedItemType } from '../map/selected-item-bar';
+
+// Restricted Resource[] type for ResourceBar component
+export type ResourceBarElement = ResourceItemElement[];
 
 export default function ResourceBar() {
-  const { selectItem, resources, selectedItem } = useSimulation();
+  const { selectItem, resourceBarElement, selectedItem } = useSimulation();
   const [searchQuery, setSearchQuery] = useState('');
 
   const handleSelect = (resourceId: number) => {
@@ -49,17 +52,17 @@ export default function ResourceBar() {
   const filteredResources = useMemo(() => {
     const trimmedQuery = searchQuery.trim();
     if (!trimmedQuery) {
-      return resources;
+      return resourceBarElement;
     }
 
-    return resources.filter((resource) => {
+    return resourceBarElement.filter((resource) => {
       const resourceIdString = resource.id.toString();
       return (
         resourceIdString === trimmedQuery ||
         resourceIdString.startsWith(trimmedQuery)
       );
     });
-  }, [resources, searchQuery]);
+  }, [resourceBarElement, searchQuery]);
 
   return (
     <div className="absolute top-14 right-4 w-60 max-h-[calc(100vh-2rem)]">
@@ -74,7 +77,7 @@ export default function ResourceBar() {
         </CardHeader>
         <CardContent className="pt-0">
           <div className="space-y-2 max-h-[calc(100vh-12rem)] overflow-y-auto pr-3 -mr-3">
-            {resources.length === 0 ? (
+            {resourceBarElement.length === 0 ? (
               <div className="text-center text-muted-foreground py-8 select-none">
                 No resources currently available
               </div>

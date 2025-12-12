@@ -218,6 +218,7 @@ describe('useSimulationWebSocket', () => {
     ws.simulateOpen();
 
     const initialPayload: BackendPayload = {
+      simId: 'test-sim',
       resources: [],
       stations: [],
       tasks: [],
@@ -286,13 +287,15 @@ describe('useSimulationWebSocket', () => {
 
     // Send frame update
     const updatePayload: BackendPayload = {
+      simId: 'test-sim',
+      tasks: [],
+      stations: [],
       resources: [
         {
-          resource_id: 1,
-          resource_position: [0, 0],
-          resource_tasks: [],
-          task_count: 0,
-          in_progress_task_id: null,
+          id: 1,
+          position: [0, 0],
+          taskIds: [],
+          inProgressTaskId: null,
         },
       ],
       clock: {

@@ -26,25 +26,22 @@ import { Item, ItemContent, ItemTitle } from '~/components/ui/item';
 import { useFeature } from '~/hooks/use-feature';
 import { Button } from '~/components/ui/button';
 import { X } from 'lucide-react';
-import { useSimulation } from '~/providers/simulation-provider';
+import type { StationTask } from '~/types';
 
 export function TaskItem({
-  taskId,
+  task,
   onUnassign,
 }: {
-  taskId: number;
+  task: StationTask;
   onUnassign?: () => void;
 }) {
-  const { tasks } = useSimulation();
-
-  const taskIsInProgress =
-    tasks.find((t) => t.id === taskId)?.state === 'inprogress';
+  const taskIsInProgress = task.state === 'inprogress';
 
   const dragEnabled = useFeature('taskDragAndDrop') && !taskIsInProgress;
 
   const handleDragStart = (e: React.DragEvent<HTMLDivElement>) => {
     e.dataTransfer.effectAllowed = 'move';
-    e.dataTransfer.setData('taskId', taskId.toString());
+    e.dataTransfer.setData('taskId', task.id.toString());
   };
 
   return (
@@ -59,7 +56,7 @@ export function TaskItem({
         }`}
     >
       <ItemContent>
-        <ItemTitle>Task #{taskId}</ItemTitle>
+        <ItemTitle>Task #{task.id}</ItemTitle>
       </ItemContent>
       {!taskIsInProgress && onUnassign ? (
         <Button

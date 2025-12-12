@@ -72,7 +72,6 @@ import { TaskAssignmentProvider } from '~/providers/task-assignment-provider';
 import { MockMap } from 'tests/mocks';
 import MapContainer from '~/components/map/map-container';
 import {
-  SelectedItemType,
   type BackendPayload,
   type UseSimulationWebSocketOptions,
 } from '~/types';
@@ -81,6 +80,7 @@ import {
   logMissingEntityError,
 } from '~/utils/simulation-error-utils';
 import api from '~/api';
+import { SelectedItemType } from '~/components/map/selected-item-bar';
 
 // Mock the API module
 vi.mock('~/api', () => {
@@ -273,8 +273,7 @@ test('selectItem selects a station when it exists', async () => {
         id: 1,
         name: 'Test Station',
         position: [0, 0],
-        tasks: [],
-        task_count: 0,
+        taskIds: [],
       });
     }, []);
 
@@ -381,9 +380,8 @@ test('selectItem selects a resource when it exists', async () => {
       resourcesRef.current.set(1, {
         id: 1,
         position: [0, 0],
-        taskList: [],
-        task_count: 0,
-        in_progress_task_id: null,
+        taskIds: [],
+        inProgressTaskId: null,
       });
     }, []);
 
@@ -434,21 +432,21 @@ test('selectItem selects a resource when it exists', async () => {
   });
 });
 
-test('assignTask posts to API and updates resource taskList', async () => {
+test('assignTask posts to API and updates resource taskIds', async () => {
   const TestAssignComponent = () => {
-    const { assignTask, resourcesRef, resources } = useSimulation();
+    const { assignTask, resourcesRef, resourceBarElement } = useSimulation();
 
     useEffect(() => {
       resourcesRef.current.set(1, {
         id: 1,
         position: [0, 0],
-        taskList: [],
-        task_count: 0,
-        in_progress_task_id: null,
+        taskIds: [],
+        inProgressTaskId: null,
       });
     }, []);
 
-    const taskCount = resources.find((r) => r.id === 1)?.taskList?.length || 0;
+    const taskCount =
+      resourceBarElement.find((r) => r.id === 1)?.taskCount || 0;
 
     return (
       <div>
@@ -498,19 +496,19 @@ test('assignTask posts to API and updates resource taskList', async () => {
 
 test('unassignTask posts to API and removes task from resource', async () => {
   const TestUnassignComponent = () => {
-    const { unassignTask, resourcesRef, resources } = useSimulation();
+    const { unassignTask, resourcesRef, resourceBarElement } = useSimulation();
 
     useEffect(() => {
       resourcesRef.current.set(1, {
         id: 1,
         position: [0, 0],
-        taskList: [99],
-        task_count: 1,
-        in_progress_task_id: null,
+        taskIds: [99],
+        inProgressTaskId: null,
       });
     }, []);
 
-    const taskCount = resources.find((r) => r.id === 1)?.taskList?.length || 0;
+    const taskCount =
+      resourceBarElement.find((r) => r.id === 1)?.taskCount || 0;
 
     return (
       <div>
@@ -560,27 +558,25 @@ test('unassignTask posts to API and removes task from resource', async () => {
 
 test('reassignTask posts to API and moves task between resources', async () => {
   const TestReassignComponent = () => {
-    const { reassignTask, resourcesRef, resources } = useSimulation();
+    const { reassignTask, resourcesRef, resourceBarElement } = useSimulation();
 
     useEffect(() => {
       resourcesRef.current.set(1, {
         id: 1,
         position: [0, 0],
-        taskList: [123],
-        task_count: 1,
-        in_progress_task_id: null,
+        taskIds: [123],
+        inProgressTaskId: null,
       });
       resourcesRef.current.set(2, {
         id: 2,
         position: [0, 0],
-        taskList: [],
-        task_count: 0,
-        in_progress_task_id: null,
+        taskIds: [],
+        inProgressTaskId: null,
       });
     }, []);
 
-    const prevCount = resources.find((r) => r.id === 1)?.taskList?.length || 0;
-    const newCount = resources.find((r) => r.id === 2)?.taskList?.length || 0;
+    const prevCount = resourceBarElement.find((r) => r.id === 1)?.taskCount;
+    const newCount = resourceBarElement.find((r) => r.id === 2)?.taskCount;
 
     return (
       <div>
@@ -655,6 +651,7 @@ test('sets clock time and day from initial frame payload', async () => {
 
   await act(async () => {
     wsOptions?.onInitialFrame?.({
+      simId: 'test-sim-123',
       clock: {
         simSecondsPassed: 3661,
         simMinutesPassed: 61,
@@ -696,6 +693,7 @@ test('advances to next day when sim time crosses 24h', async () => {
 
   await act(async () => {
     wsOptions?.onInitialFrame?.({
+      simId: 'test-sim-123',
       clock: {
         simSecondsPassed: 86399,
         simMinutesPassed: 1439,
@@ -711,6 +709,7 @@ test('advances to next day when sim time crosses 24h', async () => {
 
   await act(async () => {
     wsOptions?.onFrameUpdate?.({
+      simId: 'test-sim-123',
       clock: {
         simSecondsPassed: 90061,
         simMinutesPassed: 1501,
@@ -752,6 +751,7 @@ test('defaults to 00:00 day 1 for negative sim time', async () => {
 
   await act(async () => {
     wsOptions?.onInitialFrame?.({
+      simId: 'test-sim-123',
       clock: {
         simSecondsPassed: -5,
         simMinutesPassed: -1,
@@ -793,6 +793,7 @@ test('displays time correctly with scenario start_time (08:00)', async () => {
 
   await act(async () => {
     wsOptions?.onInitialFrame?.({
+      simId: 'test-sim-123',
       clock: {
         simSecondsPassed: 0,
         simMinutesPassed: 0,
@@ -834,6 +835,7 @@ test('advances time correctly with start_time', async () => {
 
   await act(async () => {
     wsOptions?.onInitialFrame?.({
+      simId: 'test-sim-123',
       clock: {
         simSecondsPassed: 7200,
         simMinutesPassed: 120,
@@ -869,8 +871,7 @@ test('RAF queue batches multiple rapid selections into single render', async () 
           id: i,
           name: `Station ${i}`,
           position: [0, 0],
-          tasks: [],
-          task_count: 0,
+          taskIds: [],
         });
       }
     }, []);
@@ -941,8 +942,7 @@ test('RAF queue batches rapid clearSelection calls', async () => {
         id: 1,
         name: 'Station 1',
         position: [0, 0],
-        tasks: [],
-        task_count: 0,
+        taskIds: [],
       });
     }, []);
 
@@ -1027,9 +1027,8 @@ test('RAF queue batches resource selection updates', async () => {
         resourcesRef.current.set(i, {
           id: i,
           position: [0, 0],
-          taskList: [],
-          task_count: 0,
-          in_progress_task_id: null,
+          taskIds: [],
+          inProgressTaskId: null,
         });
       }
     }, []);
@@ -1099,15 +1098,13 @@ test('flushMapUpdates applies updates with current selection state', async () =>
         id: 1,
         name: 'Station 1',
         position: [0, 0],
-        tasks: [],
-        task_count: 0,
+        taskIds: [],
       });
       stationsRef.current.set(2, {
         id: 2,
         name: 'Station 2',
         position: [0, 0],
-        tasks: [],
-        task_count: 0,
+        taskIds: [],
       });
     }, []);
 

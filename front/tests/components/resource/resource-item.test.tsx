@@ -24,7 +24,10 @@
 
 import { expect, test, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
-import { ResourceItem } from '~/components/resource/resource-item';
+import {
+  ResourceItem,
+  type ResourceItemElement,
+} from '~/components/resource/resource-item';
 import { MapProvider } from '~/providers/map-provider';
 import { SimulationProvider } from '~/providers/simulation-provider';
 import { TaskAssignmentProvider } from '~/providers/task-assignment-provider';
@@ -43,13 +46,9 @@ vi.mock('~/hooks/use-auth', () => ({
 }));
 
 test('resource item renders with resource data', () => {
-  const mockResource = {
+  const mockResource: ResourceItemElement = {
     id: 1,
-    position: [-73.57776, 45.48944] as [number, number],
-    taskList: [1, 2, 3],
-    route: {
-      coordinates: [[-73.57776, 45.48944]] as [number, number][],
-    },
+    taskCount: 3,
   };
 
   const mockOnSelect = vi.fn();
@@ -69,13 +68,9 @@ test('resource item renders with resource data', () => {
 });
 
 test('resource item renders with selection state', () => {
-  const mockResource = {
+  const mockResource: ResourceItemElement = {
     id: 1,
-    position: [-73.57776, 45.48944] as [number, number],
-    taskList: [1, 2],
-    route: {
-      coordinates: [[-73.57776, 45.48944]] as [number, number][],
-    },
+    taskCount: 5,
   };
 
   const mockOnSelect = vi.fn();
@@ -128,13 +123,9 @@ test('resource item renders with selection state', () => {
 });
 
 test('resource item calls onSelect when clicked', () => {
-  const mockResource = {
+  const mockResource: ResourceItemElement = {
     id: 2,
-    position: [-73.57776, 45.48944] as [number, number],
-    taskList: [1, 2, 3, 4, 5],
-    route: {
-      coordinates: [[-73.57776, 45.48944]] as [number, number][],
-    },
+    taskCount: 5,
   };
 
   const mockOnSelect = vi.fn();
@@ -160,11 +151,7 @@ test('resource item calls onSelect when clicked', () => {
 test('resource item displays correct task count', () => {
   const mockResource = {
     id: 5,
-    position: [-73.57776, 45.48944] as [number, number],
-    taskList: [1, 2, 3, 4, 5, 6, 7, 8],
-    route: {
-      coordinates: [[-73.57776, 45.48944]] as [number, number][],
-    },
+    taskCount: 8,
   };
 
   const mockOnSelect = vi.fn();
@@ -180,36 +167,4 @@ test('resource item displays correct task count', () => {
   );
 
   expect(screen.getByText('8 tasks')).toBeDefined();
-});
-
-test('resource item renders correctly when resource is undefined', () => {
-  const mockOnSelect = vi.fn();
-
-  const { container } = render(
-    <MapProvider>
-      <SimulationProvider>
-        <TaskAssignmentProvider>
-          <ResourceItem resource={undefined} onSelect={mockOnSelect} />
-        </TaskAssignmentProvider>
-      </SimulationProvider>
-    </MapProvider>
-  );
-
-  expect(container.firstChild).toBeNull();
-});
-
-test('resource item calls onSelect even when resource is undefined', () => {
-  const mockOnSelect = vi.fn();
-
-  render(
-    <MapProvider>
-      <SimulationProvider>
-        <TaskAssignmentProvider>
-          <ResourceItem resource={undefined} onSelect={mockOnSelect} />
-        </TaskAssignmentProvider>
-      </SimulationProvider>
-    </MapProvider>
-  );
-
-  expect(mockOnSelect).toHaveBeenCalledTimes(0);
 });
