@@ -115,11 +115,13 @@ class OSRMConnection:
         logger.info(f"OSRMConnection initialized with server: {self.osrm_base_url}")
 
     def _verify_osrm_connection(self) -> bool:
-        """
-        Verify that the OSRM server is accessible.
+        """Verify that the OSRM server is accessible.
+
+        Performs a simple test query between two Montreal coordinates to check
+        if the OSRM server is responding correctly.
 
         Returns:
-            bool: True if server responds, False otherwise
+            True if server responds with status 200, False otherwise.
         """
         try:
             # Simple test query between two points in Montreal
@@ -320,6 +322,9 @@ class OSRMConnection:
             lon: Longitude of center point
             lat: Latitude of center point
             radius: Radius in degrees (approximately 100m at 0.001)
+
+        Returns:
+            None
         """
         self.blocked_roads[(lon, lat)] = radius
         logger.debug(f"Blocked road area at ({lon}, {lat}) with radius {radius}")
@@ -331,30 +336,38 @@ class OSRMConnection:
         Args:
             lon: Longitude of blocked point
             lat: Latitude of blocked point
+
+        Returns:
+            None
         """
         self.blocked_roads.pop((lon, lat), None)
         logger.debug(f"Unblocked road area at ({lon}, {lat})")
 
     def clear_blocked_roads(self) -> None:
-        """Clear all blocked roads."""
+        """Clear all blocked roads.
+
+        Returns:
+            None
+        """
         self.blocked_roads.clear()
         logger.info("Cleared all blocked roads")
 
     def _route_intersects_blocked(
         self, coordinates: List[List[float]], tolerance: float = 0.001
     ) -> bool:
-        """
-        Check if a route passes through any blocked areas.
+        """Check if a route passes through any blocked areas.
 
-        This checks if any line segment of the route comes within the blocked
-        radius of any blocked point, not just if waypoints fall within blocked areas.
+        Analyzes each line segment of the route to determine if it comes within
+        the blocked radius of any blocked point. This is more accurate than just
+        checking waypoints.
 
         Args:
-            coordinates: List of [lon, lat] waypoints
-            tolerance: Additional tolerance in degrees (added to each blocked radius)
+            coordinates: List of [lon, lat] waypoints defining the route.
+            tolerance: Additional tolerance in degrees added to each blocked
+                radius. Defaults to 0.001 degrees (~100m).
 
         Returns:
-            True if route intersects any blocked area
+            True if any segment of the route intersects a blocked area, False otherwise.
         """
         if not self.blocked_roads:
             return False
@@ -414,18 +427,18 @@ class OSRMConnection:
 
     @staticmethod
     def _coord_to_virtual_node(lon: float, lat: float) -> int:
-        """
-        Convert a coordinate to a virtual node ID for backward compatibility.
+        """Convert a coordinate to a virtual node ID for backward compatibility.
 
-        This creates a stable hash of the coordinates that can be used as a
-        node ID by legacy code expecting integer node references.
+        Creates a stable MD5 hash of the coordinates to generate a consistent
+        integer node ID. This allows legacy code expecting node-based interfaces
+        to work with coordinate-based routing.
 
         Args:
-            lon: Longitude
-            lat: Latitude
+            lon: Longitude coordinate.
+            lat: Latitude coordinate.
 
         Returns:
-            Virtual node ID (integer hash)
+            Virtual node ID as an integer hash (first 8 hex digits of MD5).
         """
         # Create a stable hash from coordinates
         coord_str = f"{lon:.6f},{lat:.6f}"
@@ -435,18 +448,18 @@ class OSRMConnection:
     def _virtual_node_to_coord(
         node_id: int, coord_lookup: Dict[int, Tuple[float, float]]
     ) -> Tuple[float, float]:
-        """
-        Convert a virtual node ID back to coordinates.
+        """Convert a virtual node ID back to coordinates.
 
-        Requires a lookup dictionary that maps node IDs to coordinates.
-        This should be maintained by calling code if needed.
+        Looks up the coordinates for a given virtual node ID. Since node IDs
+        are hashed, this requires an external lookup dictionary maintained by
+        the calling code.
 
         Args:
-            node_id: Virtual node ID
-            coord_lookup: Dictionary mapping node IDs to (lon, lat)
+            node_id: Virtual node ID to look up.
+            coord_lookup: Dictionary mapping node IDs to (lon, lat) tuples.
 
         Returns:
-            Tuple of (lon, lat)
+            Tuple of (lon, lat), or (0.0, 0.0) if node_id not found.
         """
         return coord_lookup.get(node_id, (0.0, 0.0))
 
@@ -584,7 +597,11 @@ class OSRMConnection:
             return None
 
     def close(self) -> None:
-        """Close the HTTP session."""
+        """Close the HTTP session.
+
+        Returns:
+            None
+        """
         if hasattr(self, "_session"):
             self._session.close()
             logger.info("OSRMConnection closed")
@@ -595,18 +612,31 @@ class OSRMConnection:
 
     # Compatibility methods for edge-based operations
     def get_all_edges(self) -> Any:
-        """
-        Compatibility method for edge-based operations.
-        Returns empty DataFrame since OSRM doesn't use local edges.
+        """Get all edges in the road network.
+
+        Compatibility method for legacy code expecting edge-based operations.
+        Returns an empty DataFrame since OSRM delegates all routing to the
+        server and doesn't maintain local edge data.
+
+        Returns:
+            Empty pandas DataFrame.
         """
         import pandas as pd
 
         return pd.DataFrame()
 
     def set_edges(self, edges: Any) -> None:
-        """
-        Compatibility method for edge-based operations.
-        No-op for OSRM since we don't maintain local edge data.
+        """Set edges in the road network.
+
+        Compatibility method for legacy code expecting edge-based operations.
+        This is a no-op for OSRM since all routing is delegated to the server
+        and no local edge data is maintained.
+
+        Args:
+            edges: Edge data (ignored).
+
+        Returns:
+            None
         """
         pass
 

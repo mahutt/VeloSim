@@ -31,7 +31,16 @@ if TYPE_CHECKING:
 
 
 class TaskPopupStrategy(ABC):
+    """Abstract base class for task popup strategies at stations."""
 
     @abstractmethod
     def check_for_new_task(self, station: "Station") -> bool:
+        """Check if a new task should popup at the station.
+
+        Args:
+            station: The station to check for new task popup.
+
+        Returns:
+            True if new task should popup, False otherwise.
+        """
         raise NotImplementedError()

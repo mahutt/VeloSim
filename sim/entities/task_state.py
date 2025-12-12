@@ -27,6 +27,8 @@ from enum import Enum
 
 # enum of task states
 class State(Enum):
+    """Enumeration of task lifecycle states."""
+
     SCHEDULED = 0
     OPEN = 1
     ASSIGNED = 2

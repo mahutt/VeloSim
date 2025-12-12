@@ -41,6 +41,7 @@ if TYPE_CHECKING:  # pragma: no cover
 
 
 class Resource:
+    """Simulation resource entity that can be assigned tasks."""
 
     map_controller: MapController
     sim_behaviour: "SimBehaviour"
@@ -65,20 +66,66 @@ class Resource:
         self.has_updated = False  # flag to track if a resource was updated
 
     def get_resource_position(self) -> "Position":
+        """Get the current position of the resource.
+
+        Returns:
+            Position: The current geographical position of the resource.
+        """
         return self.position
 
     def set_behaviour(self, sim_behaviour: "SimBehaviour") -> None:
+        """Set the simulation behavior controller for this resource.
+
+        Args:
+            sim_behaviour: The SimBehaviour instance that defines task selection,
+                resource allocation, and other behavioral strategies.
+
+        Returns:
+            None
+        """
         self.sim_behaviour = sim_behaviour
 
     def set_resource_position(self, position: "Position") -> None:
+        """Set the resource's position and mark it as updated.
+
+        Args:
+            position: The new geographical position for the resource.
+
+        Returns:
+            None
+        """
         self.position = position
         self.has_updated = True
 
     def set_map_controller(self, map_controller: MapController) -> None:
+        """Set the map controller for route calculation and navigation.
+
+        Args:
+            map_controller: The MapController instance used for calculating routes
+                and managing map-related operations.
+
+        Returns:
+            None
+        """
         self.map_controller = map_controller
 
     def assign_task(self, task: "Task", dispatch_delay: Optional[float] = None) -> None:
+        """Assign a task to this resource and optionally schedule dispatch.
 
+        Adds the task to the resource's task list and updates the task's assigned
+        resource reference. The task must be in OPEN state to be assigned.
+        If a dispatch delay is provided, the task will be automatically dispatched
+        after the specified delay; otherwise, it remains in ASSIGNED state until
+        manually dispatched.
+
+        Args:
+            task: The task to assign to this resource. Must be in OPEN state.
+            dispatch_delay: Optional delay in simulation time units before automatic
+                dispatch. If None or 0, task remains ASSIGNED until manually dispatched.
+
+        Returns:
+            None
+        """
         if task.get_state() == State.OPEN:
             self.task_list.append(task)
             task.set_assigned_resource(self)
@@ -94,6 +141,18 @@ class Resource:
     def _dispatch_after_delay(
         self, task: "Task", delay: float
     ) -> Generator[simpy.Event, None, None]:
+        """Internal generator that dispatches a task after a specified delay.
+
+        This is a SimPy process that waits for the specified delay and then
+        dispatches the task if it's still assigned to this resource.
+
+        Args:
+            task: The task to dispatch after the delay.
+            delay: The simulation time delay before dispatching the task.
+
+        Yields:
+            simpy.Event: SimPy timeout event for the delay period.
+        """
         # Yield when time delta has been reached.
         yield self.env.timeout(delay)
         # Check task is still assigned to us
@@ -101,20 +160,57 @@ class Resource:
             self.dispatch_task(task)
 
     def unassign_task(self, task: "Task") -> None:
+        """Remove a task from this resource's task list.
+
+        Removes the task from the resource's task list and clears the task's
+        assigned resource reference. Only removes the task if it's currently
+        in the task list and in ASSIGNED state.
+
+        Args:
+            task: The task to unassign from this resource.
+
+        Returns:
+            None
+        """
         if task in self.task_list and task.is_assigned():
             self.task_list.remove(task)
             task.unassign_resource()
             self.has_updated = True
 
     def get_in_progress_task(self) -> Optional["Task"]:
+        """Get the task currently being worked on by this resource.
+
+        Searches through the resource's task list for a task in IN_PROGRESS state.
+        Only one task should be in progress at a time.
+
+        Returns:
+            Optional[Task]: The task currently in progress, or None if no task
+                is currently being worked on.
+        """
         for task in self.task_list:
             if task.get_state() == State.IN_PROGRESS:
                 return task
         return None
 
-    # dispatch a task in the list of tasks only if it is at the same station
-    # as other in-progress tasks or if no other tasks are in-progress
     def dispatch_task(self, task: "Task") -> None:
+        """Dispatch a task to IN_PROGRESS state with station validation.
+
+        Changes the task state from ASSIGNED to IN_PROGRESS. The task can only be
+        dispatched if no other task is in progress, or if it's at the same station
+        as the currently in-progress task. This ensures resources can only work on
+        tasks at one station at a time.
+
+        Args:
+            task: The task to dispatch. Must be in this resource's task list and
+                in ASSIGNED state.
+
+        Returns:
+            None
+
+        Raises:
+            Exception: If attempting to dispatch a task at a different station
+                while another task is in progress.
+        """
         if task in self.task_list and task.is_assigned():
             task_in_progress = self.get_in_progress_task()
             if (
@@ -126,21 +222,50 @@ class Resource:
             else:
                 raise Exception("Cannot dispatch task at this station")
 
-    # when a task has been completed, we want to remove it from the list of
-    # tasks the resource needs to complete
     def service_task(self, task: "Task") -> None:
+        """Complete a task and remove it from the resource's task list.
+
+        Marks the task as CLOSED and removes it from the resource's task list.
+        This should be called when a resource has finished servicing a task
+        at its station.
+
+        Args:
+            task: The task to complete. Must be in this resource's task list.
+
+        Returns:
+            None
+        """
         if task in self.task_list:
             self.task_list.remove(task)
             task.set_state(State.CLOSED)
             self.has_updated = True
 
     def get_task_count(self) -> int:
+        """Get the total number of tasks assigned to this resource.
+
+        Returns:
+            int: The total count of tasks in the resource's task list,
+                including all states (SCHEDULED, ASSIGNED, IN_PROGRESS, etc.).
+        """
         return len(self.task_list)
 
     def get_task_list(self) -> list["Task"]:
+        """Get the complete list of tasks assigned to this resource.
+
+        Returns:
+            list[Task]: The full task list including tasks in all states.
+        """
         return self.task_list
 
     def get_visible_task_list(self) -> list["Task"]:
+        """Get the list of tasks visible in the current simulation state.
+
+        Filters out tasks that are SCHEDULED (not yet spawned) or CLOSED (completed).
+        Visible tasks are those in OPEN, ASSIGNED, or IN_PROGRESS states.
+
+        Returns:
+            list[Task]: List of tasks that are currently visible and actionable.
+        """
         return [
             task
             for task in self.task_list
@@ -148,9 +273,23 @@ class Resource:
         ]
 
     def get_visible_task_count(self) -> int:
+        """Get the count of visible tasks assigned to this resource.
+
+        Returns:
+            int: The number of tasks that are currently visible (excludes
+                SCHEDULED and CLOSED tasks).
+        """
         return len(self.get_visible_task_list())
 
     def clear_update(self) -> None:
+        """Clear the update flag for this resource.
+
+        Resets the has_updated flag to False, indicating that changes to this
+        resource have been processed or acknowledged.
+
+        Returns:
+            None
+        """
         self.has_updated = False
 
     def reorder_tasks(
@@ -260,7 +399,27 @@ class Resource:
         return [task.id for task in new_task_list]
 
     def travel_to(self, position: "Position") -> Generator[Any, None, None]:
+        """SimPy process that moves the resource to a target position.
 
+        Calculates a route using the MapController and traverses it
+        step-by-step, updating the resource's position at each simulation tick.
+        The process yields control back to the simulation environment at each
+        step and can be interrupted.
+
+        If the resource is already at the target position, the method returns
+        immediately. If no route can be found, logs an error and stays at the
+        current position.
+
+        Args:
+            position: The target Position to travel to.
+
+        Yields:
+            simpy.Event: Timeout events for each step of travel
+                (1 time unit per step).
+
+        Returns:
+            Generator that yields timeout events during travel.
+        """
         if self.position == position:
             return
 
@@ -296,8 +455,21 @@ class Resource:
             # Clear current route when travel completes or is interrupted
             self.current_route = None
 
-    # continous process that runs throughout the simulation
     def run(self):  # type: ignore[no-untyped-def]
+        """Main SimPy process that runs continuously throughout the simulation.
+
+        This is the resource's main execution loop that handles task selection,
+        dispatch, travel, and servicing. The process:
+        1. Waits for initialization (sim_behaviour and map_controller setup)
+        2. Checks for in-progress tasks and either travels to or services them
+        3. If no task is in progress, selects and dispatches the next task
+        4. Yields control back to the simulation at each tick
+
+        The process runs indefinitely until the simulation ends.
+
+        Yields:
+            simpy.Event: Timeout events and travel process events.
+        """
         # Yield once at the start to ensure sim_behaviour and
         # map_controller are set
         yield self.env.timeout(1)

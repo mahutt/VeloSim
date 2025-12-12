@@ -40,6 +40,8 @@ from typing import Optional, Callable, Any, cast
 
 
 class RealTimeDriver:
+    """Drives simulation in real-time with configurable time scaling."""
+
     # Keeps track of the actual time a simulation was started at for pacing
     wall_start_time: float
     # Keeps track of the simulation start for pacing
@@ -93,10 +95,23 @@ class RealTimeDriver:
         self.sleep_interval = self.config.get("default_sleep_interval", 0.002)
 
     def reset_pacing_refs(self) -> None:
+        """Reset pacing reference times to current wall and sim times.
+
+        Returns:
+            None
+        """
         self.wall_start_time = time.perf_counter()
         self.sim_start_time = self.simEnv.now
 
     def set_real_time_factor(self, factor: float) -> None:
+        """Set the real time factor for simulation pacing.
+
+        Args:
+            factor: Real seconds per simulated second.
+
+        Returns:
+            None
+        """
         self.reset_pacing_refs()
         self.real_time_factor = factor
 
@@ -105,6 +120,15 @@ class RealTimeDriver:
         until: Optional[float] = None,
         step_callback: Optional[Callable[[], None]] = None,
     ) -> None:
+        """Run the simulation until specified time with real-time pacing.
+
+        Args:
+            until: Simulation time to run until (default from config).
+            step_callback: Optional callback invoked after each sim second.
+
+        Returns:
+            None
+        """
         # Use config default if until is not specified
         if until is None:
             until = self.config.get("default_until_time", 3600.0)
@@ -173,10 +197,20 @@ class RealTimeDriver:
                     # TODO: record/report lag metrics if needed
 
     def pause(self) -> None:
+        """Pause the simulation execution.
+
+        Returns:
+            None
+        """
         print("Pausing")
         self.running = False
 
     def resume(self) -> None:
+        """Resume the paused simulation execution.
+
+        Returns:
+            None
+        """
         print("Resuming")
         self.reset_pacing_refs()
         # Reset pacing since time during
@@ -184,7 +218,20 @@ class RealTimeDriver:
         self.running = True
 
     def stop(self) -> None:
+        """Stop the simulation execution.
+
+        Returns:
+            None
+        """
         self.stop_flag = True
 
     def record_lag(self, lag: float) -> None:
+        """Record simulation lag for monitoring.
+
+        Args:
+            lag: The lag amount in seconds.
+
+        Returns:
+            None
+        """
         pass

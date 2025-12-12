@@ -30,22 +30,48 @@ from sim.utils.subscriber import Subscriber
 
 
 class FrameEmitter(Publisher):
+    """Publisher that emits simulation frames to subscribers."""
+
     def __init__(self, sim_id: str) -> None:
         self.subscribers: List[Subscriber] = []
         self.sim_id = sim_id
         self._lock = threading.Lock()
 
     def attach(self, sub: Subscriber) -> None:
+        """Attach a subscriber to receive frame notifications.
+
+        Args:
+            sub: The subscriber to attach.
+
+        Returns:
+            None
+        """
         with self._lock:
             if sub not in self.subscribers:
                 self.subscribers.append(sub)
 
     def detach(self, sub: Subscriber) -> None:
+        """Detach a subscriber from receiving frame notifications.
+
+        Args:
+            sub: The subscriber to detach.
+
+        Returns:
+            None
+        """
         with self._lock:
             if sub in self.subscribers:
                 self.subscribers.remove(sub)
 
     def notify(self, frame: Frame) -> None:
+        """Notify all subscribers with a new frame.
+
+        Args:
+            frame: The frame to send to subscribers.
+
+        Returns:
+            None
+        """
         with self._lock:
             live_subscribers = list(
                 self.subscribers

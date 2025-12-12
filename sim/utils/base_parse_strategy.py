@@ -32,4 +32,12 @@ class BaseParseStrategy(ABC):
 
     @abstractmethod
     def parse(self, scenario_json: dict) -> InputParameter:
+        """Parse scenario JSON into InputParameter object.
+
+        Args:
+            scenario_json: Dictionary containing scenario configuration data.
+
+        Returns:
+            InputParameter object containing parsed scenario entities and settings.
+        """
         pass

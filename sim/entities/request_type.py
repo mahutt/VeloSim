@@ -26,4 +26,6 @@ SOFTWARE.
 # This class is a placeholder for when we define
 # request params later down in the project.
 class RequestType:
+    """Placeholder for future request parameter definitions."""
+
     temp = 0

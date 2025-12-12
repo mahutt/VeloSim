@@ -33,8 +33,17 @@ if TYPE_CHECKING:
 
 
 class DefaultTPUStrategy(TaskPopupStrategy):
+    """Default strategy for task popup at stations."""
 
     def check_for_new_task(self, station: "Station") -> bool:
+        """Check if a new task should popup at the station.
+
+        Args:
+            station: The station to check for new task popup.
+
+        Returns:
+            True if new task should popup (0.001% chance), False otherwise.
+        """
         # 0.001% chance of a new task popping up per station per second
         hit = random.randrange(100000) == 0
         return hit

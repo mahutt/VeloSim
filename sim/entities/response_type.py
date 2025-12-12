@@ -26,4 +26,6 @@ SOFTWARE.
 # This class is a placeholder for when we define
 # response params later down in the project.
 class ResponseType:
+    """Placeholder for future response parameter definitions."""
+
     temp = 0

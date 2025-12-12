@@ -37,13 +37,23 @@ from sim.behaviour.sim_behaviour import SimBehaviour
 
 
 class RunInfo(TypedDict):
+    """Type definition for simulation run metadata."""
+
     thread: Optional[threading.Thread]
     emitter: FrameEmitter
     simController: SimulatorController
 
 
 class Simulator:
+    """Manager for multiple concurrent simulation instances."""
+
     def __init__(self) -> None:
+        """Initialize the Simulator with an empty thread pool.
+
+        Creates a thread-safe pool for managing multiple concurrent simulations.
+        Each simulation is identified by a unique run_id and has its own thread,
+        emitter, and controller.
+        """
         self.thread_pool: Dict[str, RunInfo] = {}
         self.thread_pool_lock = threading.Lock()
 
@@ -53,6 +63,26 @@ class Simulator:
         subscribers: List[Subscriber],
         sim_behaviour: SimBehaviour = SimBehaviour(),
     ) -> str:
+        """Initialize a simulation instance without starting the simulation loop.
+
+        Creates a new simulation environment with the specified parameters and
+        subscribers, generates a unique run ID, and stores the simulation in the
+        thread pool. The simulation loop must be started separately using start().
+
+        Args:
+            input_parameters: Simulation configuration including stations, resources,
+                tasks, and timing parameters.
+            subscribers: List of subscribers to receive frame updates from the
+                simulation.
+            sim_behaviour: Custom simulation behavior for task assignment and
+                resource selection strategies. Defaults to SimBehaviour().
+
+        Returns:
+            Unique simulation run ID (UUID string) for controlling this simulation.
+
+        Raises:
+            RuntimeError: If the generated run_id already exists in the thread pool.
+        """
         # Initialize a simulation and send the initial frame, but don't start
         # the simulation loop.
         run_id = str(uuid.uuid4())  # threadID / SIM ID
@@ -83,6 +113,22 @@ class Simulator:
         return run_id
 
     def start(self, sim_id: str, simTime: int) -> None:
+        """Start the simulation loop for an initialized simulation.
+
+        Creates and starts a daemon thread that runs the simulation for the
+        specified duration. The simulation must have been initialized first
+        using initialize().
+
+        Args:
+            sim_id: Unique simulation ID returned from initialize().
+            simTime: Maximum simulation time in seconds.
+
+        Returns:
+            None
+
+        Raises:
+            RuntimeError: If simulation not found or already running.
+        """
         # Start the simulation loop for an already initialized simulation.
         with self.thread_pool_lock:
             rec = self.thread_pool.get(sim_id)
@@ -108,6 +154,20 @@ class Simulator:
             t.start()
 
     def stop(self, sim_id: str, join_timeout: float | None = 2.0) -> None:
+        """Stop a running simulation and clean up resources.
+
+        Signals the simulation controller to stop, waits for the thread to
+        terminate, and removes the simulation from the thread pool if the
+        thread has stopped.
+
+        Args:
+            sim_id: Unique simulation ID to stop.
+            join_timeout: Maximum time in seconds to wait for thread termination.
+                Defaults to 2.0. Use None for indefinite wait.
+
+        Returns:
+            None
+        """
         with self.thread_pool_lock:
             rec = self.thread_pool.get(sim_id)
 
@@ -129,6 +189,17 @@ class Simulator:
         print(f"{sim_id} ended")
 
     def pause(self, sim_id: str) -> None:
+        """Pause a running simulation.
+
+        Temporarily halts simulation time progression while maintaining all
+        simulation state. The simulation can be resumed using resume().
+
+        Args:
+            sim_id: Unique simulation ID to pause.
+
+        Returns:
+            None
+        """
         try:
             sim_info = self.get_sim_by_id(sim_id)
             if sim_info is not None:
@@ -137,6 +208,16 @@ class Simulator:
             print(f"Could not pause simulation due to: {e}")
 
     def resume(self, sim_id: str) -> None:
+        """Resume a paused simulation.
+
+        Continues simulation time progression from the point where it was paused.
+
+        Args:
+            sim_id: Unique simulation ID to resume.
+
+        Returns:
+            None
+        """
         try:
             sim_info = self.get_sim_by_id(sim_id)
             if sim_info is not None:
@@ -145,6 +226,18 @@ class Simulator:
             print(f"Could not resume simulation due to: {e}")
 
     def set_factor(self, sim_id: str, factor: float) -> None:
+        """Set the real-time speed factor for a simulation.
+
+        Adjusts how fast simulation time progresses relative to real time.
+        A factor of 1.0 means real-time, 2.0 means twice as fast, etc.
+
+        Args:
+            sim_id: Unique simulation ID.
+            factor: Speed multiplier for simulation time progression.
+
+        Returns:
+            None
+        """
         try:
             sim_info = self.get_sim_by_id(sim_id)
             if sim_info is not None:
@@ -153,18 +246,59 @@ class Simulator:
             print(f"Could not set factor due to: {e}")
 
     def status(self) -> None:
+        """Get the status of all simulations.
+
+        Returns:
+            None
+
+        Raises:
+            NotImplementedError: This method is not yet implemented.
+        """
         raise NotImplementedError("status() not implemented yet")
 
     def send_request(self, request_type: RequestType) -> None:
+        """Send a request to a simulation.
+
+        Args:
+            request_type: Type of request to send to the simulation.
+
+        Returns:
+            None
+
+        Raises:
+            NotImplementedError: This method is not yet implemented.
+        """
         raise NotImplementedError("send_request() not implemented yet")
 
     def get_sim_by_id(self, sim_id: str) -> Optional[RunInfo]:
+        """Retrieve simulation information by ID.
+
+        Args:
+            sim_id: Unique simulation ID to retrieve.
+
+        Returns:
+            RunInfo containing thread, emitter, and controller for the simulation.
+
+        Raises:
+            Exception: If the simulation ID is not found in the thread pool.
+        """
         if sim_id in self.thread_pool:
             return self.thread_pool.get(sim_id)
         else:
             raise Exception(f"Simulation {sim_id} does not exist in the thread pool")
 
     def add_task_to_sim(self, sim_id: str, task: Task) -> None:
+        """Add a new task to a running simulation.
+
+        Dynamically adds a task to the simulation's task queue during execution.
+
+        Args:
+            sim_id: Unique simulation ID.
+            task: Task object to add to the simulation.
+
+        Returns:
+            None
+        """
         try:
             sim_info = self.get_sim_by_id(sim_id)
             if sim_info is not None:
@@ -175,6 +309,16 @@ class Simulator:
     def assign_task_to_resource(
         self, sim_id: str, task_id: int, resource_id: int
     ) -> None:
+        """Assign a task to a specific resource in the simulation.
+
+        Args:
+            sim_id: Unique simulation ID.
+            task_id: ID of the task to assign.
+            resource_id: ID of the resource to assign the task to.
+
+        Returns:
+            None
+        """
         try:
             sim_info = self.get_sim_by_id(sim_id)
             if sim_info is not None:
@@ -185,6 +329,16 @@ class Simulator:
     def unassign_task_from_resource(
         self, sim_id: str, task_id: int, resource_id: int
     ) -> None:
+        """Remove a task assignment from a resource in the simulation.
+
+        Args:
+            sim_id: Unique simulation ID.
+            task_id: ID of the task to unassign.
+            resource_id: ID of the resource to unassign the task from.
+
+        Returns:
+            None
+        """
         try:
             sim_info = self.get_sim_by_id(sim_id)
             if sim_info is not None:
@@ -197,6 +351,17 @@ class Simulator:
     def reassign_task(
         self, sim_id: str, task_id: int, old_resource_id: int, new_resource_id: int
     ) -> None:
+        """Reassign a task from one resource to another in the simulation.
+
+        Args:
+            sim_id: Unique simulation ID.
+            task_id: ID of the task to reassign.
+            old_resource_id: ID of the current resource holding the task.
+            new_resource_id: ID of the resource to reassign the task to.
+
+        Returns:
+            None
+        """
         try:
             sim_info = self.get_sim_by_id(sim_id)
             if sim_info is not None:
@@ -243,9 +408,33 @@ class Simulator:
     def get_stream(
         self,
     ) -> None:
+        """Get a stream for continuous communication with the simulation.
+
+        This will provide a stream interface for real-time frame updates between
+        the backend and simulation.
+
+        Returns:
+            None
+
+        Raises:
+            NotImplementedError: This method is not yet implemented.
+        """
         raise NotImplementedError("get_stream() not implemented yet")
 
     def stop_all(self, *, join_timeout_per_thread: float | None = 2.0) -> None:
+        """Stop all running simulations and clean up resources.
+
+        Iterates through all simulations in the thread pool and attempts to stop
+        each one. Continues stopping remaining simulations even if individual
+        stops fail.
+
+        Args:
+            join_timeout_per_thread: Maximum time in seconds to wait for each
+                thread to terminate. Defaults to 2.0. Use None for indefinite wait.
+
+        Returns:
+            None
+        """
         with self.thread_pool_lock:
             ids = list(self.thread_pool.keys())
         for sim_id in ids:

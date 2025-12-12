@@ -45,6 +45,14 @@ class Clock:
         self.env = env
 
     def clock(self) -> Generator[Any, Any, None]:
+        """Clock generator that tracks sim and real time progression.
+
+        Yields:
+            Timeout events for each simulated second.
+
+        Returns:
+            Generator that yields timeout events indefinitely.
+        """
         real_time_accum = 0.0
         while True:
             start = time.perf_counter()
@@ -60,4 +68,9 @@ class Clock:
             self.sim_time_minutes = sim_seconds / 60
 
     def run(self) -> None:
+        """Start the clock process in the simulation environment.
+
+        Returns:
+            None
+        """
         self.env.process(self.clock())

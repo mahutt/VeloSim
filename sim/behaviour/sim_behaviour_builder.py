@@ -34,23 +34,51 @@ from typing import Self
 
 
 class SimBehaviourBuilder:
+    """Builder for constructing simulation behavior configurations."""
+
     sim_behaviour: SimBehaviour
 
     def __init__(self) -> None:
         self.reset()
 
     def set_RCNT_strategy(self, strategy: ResourceChooseNextTaskStrategy) -> Self:
+        """Set the resource choose next task strategy.
+
+        Args:
+            strategy: The strategy to use for resource task selection.
+
+        Returns:
+            Self for method chaining.
+        """
         self.sim_behaviour.set_RCNT_strategy(strategy)
         return self
 
     def set_TPU_strategy(self, strategy: TaskPopupStrategy) -> Self:
+        """Set the task popup strategy.
+
+        Args:
+            strategy: The strategy to use for task popup behavior.
+
+        Returns:
+            Self for method chaining.
+        """
         self.sim_behaviour.set_TPU_strategy(strategy)
         return self
 
     def reset(self) -> None:
+        """Reset the builder to a new default SimBehaviour instance.
+
+        Returns:
+            None
+        """
         self.sim_behaviour = SimBehaviour()
 
     def get_sim_behaviour(self) -> SimBehaviour:
+        """Get the built SimBehaviour and reset the builder.
+
+        Returns:
+            The configured SimBehaviour instance.
+        """
         ret_sim_behaviour = self.sim_behaviour
         self.reset()
         return ret_sim_behaviour

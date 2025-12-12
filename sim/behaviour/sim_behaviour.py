@@ -36,6 +36,7 @@ from sim.behaviour.default.default_RCNT_strategy import DefaultRCNTStrategy
 
 
 class SimBehaviour:
+    """Configuration for simulation behavior strategies."""
 
     RCNT_strategy: ResourceChooseNextTaskStrategy
 
@@ -46,7 +47,23 @@ class SimBehaviour:
         self.TPU_strategy = DefaultTPUStrategy()
 
     def set_RCNT_strategy(self, strategy: ResourceChooseNextTaskStrategy) -> None:
+        """Set the resource choose next task strategy.
+
+        Args:
+            strategy: The strategy to use for resource task selection.
+
+        Returns:
+            None
+        """
         self.RCNT_strategy = strategy
 
     def set_TPU_strategy(self, strategy: TaskPopupStrategy) -> None:
+        """Set the task popup strategy.
+
+        Args:
+            strategy: The strategy to use for task popup behavior.
+
+        Returns:
+            None
+        """
         self.TPU_strategy = strategy

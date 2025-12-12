@@ -33,8 +33,19 @@ from sim.utils.base_parse_strategy import BaseParseStrategy
 
 
 class JsonParseStrategy(BaseParseStrategy):
+    """JSON-based scenario parsing strategy implementation."""
 
     def _time_to_seconds(self, time_str: str) -> int:
+        """Convert day-time string to total seconds.
+
+        Converts time format 'dayX:HH:MM' to total seconds from start.
+
+        Args:
+            time_str: Time string in format 'dayX:HH:MM' (e.g., 'day1:08:30').
+
+        Returns:
+            Total seconds from simulation start. Returns 0 if format is invalid.
+        """
         try:
             daytime_split = time_str.split(":", 1)
             day = daytime_split[0]
@@ -47,8 +58,16 @@ class JsonParseStrategy(BaseParseStrategy):
             return 0
 
     def parse(self, scenario_json: dict) -> InputParameter:
-        """
-        Parse a single scenario JSON and return InputParameter
+        """Parse a single scenario JSON and return InputParameter.
+
+        Converts scenario JSON format into an InputParameter object containing
+        all simulation configuration including stations, resources, and tasks.
+
+        Args:
+            scenario_json: Dictionary containing scenario configuration data.
+
+        Returns:
+            InputParameter object with parsed simulation configuration.
         """
         content = scenario_json.get("content", {})
         start_time = self._time_to_seconds(str(content.get("start_time", "Day1:00:00")))

@@ -31,6 +31,7 @@ from sim.entities.task import Task
 
 
 class InputParameter:
+    """Container for simulation input parameters and entities."""
 
     def __init__(
         self,
@@ -56,73 +57,209 @@ class InputParameter:
 
     # Getter methods
     def get_station_entities(self) -> Dict[int, Station]:
+        """Get the station entities dictionary.
+
+        Returns:
+            Dictionary mapping station IDs to Station objects.
+        """
         return self.station_entities
 
     def get_resource_entities(self) -> Dict[int, Resource]:
+        """Get the resource entities dictionary.
+
+        Returns:
+            Dictionary mapping resource IDs to Resource objects.
+        """
         return self.resource_entities
 
     def get_task_entities(self) -> Dict[int, Task]:
+        """Get the task entities dictionary.
+
+        Returns:
+            Dictionary mapping task IDs to Task objects.
+        """
         return self.task_entities
 
     def get_real_time_factor(self) -> Optional[float]:
+        """Get the real-time pacing factor.
+
+        Returns:
+            Real seconds per simulated second, or None.
+        """
         return self.realTimeFactor
 
     def get_key_frame_freq(self) -> Optional[int]:
+        """Get the key frame frequency.
+
+        Returns:
+            Number of frames between key frames, or None.
+        """
         return self.keyFrameFreq
 
     def set_sim_time(self, sim_time: int) -> None:
+        """Set the simulation time.
+
+        Args:
+            sim_time: Duration to run simulation in sim seconds.
+
+        Returns:
+            None
+        """
         self.sim_time = sim_time
 
     # Setter methods
     def set_station_entities(self, station_entities: Dict[int, Station]) -> None:
+        """Set the station entities dictionary.
+
+        Args:
+            station_entities: Dictionary mapping station IDs to stations.
+
+        Returns:
+            None
+        """
         self.station_entities = station_entities
 
     def set_resource_entities(self, resource_entities: Dict[int, Resource]) -> None:
+        """Set the resource entities dictionary.
+
+        Args:
+            resource_entities: Dictionary mapping resource IDs to resources.
+
+        Returns:
+            None
+        """
         self.resource_entities = resource_entities
 
     def set_task_entities(self, task_entities: Dict[int, Task]) -> None:
+        """Set the task entities dictionary.
+
+        Args:
+            task_entities: Dictionary mapping task IDs to tasks.
+
+        Returns:
+            None
+        """
         self.task_entities = task_entities
 
     def set_real_time_factor(self, real_time_factor: Optional[float]) -> None:
+        """Set the real-time pacing factor.
+
+        Args:
+            real_time_factor: Real seconds per simulated second.
+
+        Returns:
+            None
+        """
         self.realTimeFactor = real_time_factor
 
     def set_key_frame_freq(self, key_frame_freq: Optional[int]) -> None:
+        """Set the key frame frequency.
+
+        Args:
+            key_frame_freq: Number of frames between key frames.
+
+        Returns:
+            None
+        """
         self.keyFrameFreq = key_frame_freq
 
     # Utility methods to add individual entities
     def add_station(self, station: Station) -> None:
+        """Add a station to the entities.
+
+        Args:
+            station: The station to add.
+
+        Returns:
+            None
+        """
         self.station_entities[station.id] = station
 
     def add_resource(self, resource: Resource) -> None:
+        """Add a resource to the entities.
+
+        Args:
+            resource: The resource to add.
+
+        Returns:
+            None
+        """
         self.resource_entities[resource.id] = resource
 
     def add_task(self, task: Task) -> None:
+        """Add a task to the entities.
+
+        Args:
+            task: The task to add.
+
+        Returns:
+            None
+        """
         self.task_entities[task.id] = task
 
     # Utility methods to remove individual entities
     def remove_station(self, station: Station) -> None:
+        """Remove a station from the entities.
+
+        Args:
+            station: The station to remove.
+
+        Returns:
+            None
+        """
         deleted_station = self.station_entities.pop(station.id, False)
         if not deleted_station:
             print(f"remove_station(): Station: {station.id} not found")
 
     def remove_resource(self, resource: Resource) -> None:
+        """Remove a resource from the entities.
+
+        Args:
+            resource: The resource to remove.
+
+        Returns:
+            None
+        """
         deleted_resource = self.resource_entities.pop(resource.id, False)
         if not deleted_resource:
             print(f"remove_resource(): Resource: {resource.id} not found")
 
     def remove_task(self, task: Task) -> None:
+        """Remove a task from the entities.
+
+        Args:
+            task: The task to remove.
+
+        Returns:
+            None
+        """
         deleted_task = self.task_entities.pop(task.id, False)
         if not deleted_task:
             print(f"remove_task(): Task: {task.id} not found")
 
     # Get counts
     def get_station_count(self) -> int:
+        """Get the number of stations.
+
+        Returns:
+            The count of station entities.
+        """
         return len(self.station_entities)
 
     def get_resource_count(self) -> int:
+        """Get the number of resources.
+
+        Returns:
+            The count of resource entities.
+        """
         return len(self.resource_entities)
 
     def get_task_count(self) -> int:
+        """Get the number of tasks.
+
+        Returns:
+            The count of task entities.
+        """
         return len(self.task_entities)
 
     def __str__(self) -> str:

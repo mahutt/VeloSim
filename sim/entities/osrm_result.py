@@ -153,7 +153,15 @@ class OSRMResult:
 
     @property
     def start_coord(self) -> tuple[float, float]:
-        """Get the starting coordinate as a tuple (lon, lat)."""
+        """Get the starting coordinate as a tuple (lon, lat).
+
+        Extracts the first coordinate from the route's coordinate list and returns
+        it as a tuple. Returns (0.0, 0.0) if coordinates list is empty.
+
+        Returns:
+            tuple[float, float]: Starting coordinate as (longitude, latitude).
+                Returns (0.0, 0.0) if no coordinates available.
+        """
         if not self.coordinates:
             return (0.0, 0.0)
         coord = self.coordinates[0]
@@ -161,7 +169,15 @@ class OSRMResult:
 
     @property
     def end_coord(self) -> tuple[float, float]:
-        """Get the ending coordinate as a tuple (lon, lat)."""
+        """Get the ending coordinate as a tuple (lon, lat).
+
+        Extracts the last coordinate from the route's coordinate list and returns
+        it as a tuple. Returns (0.0, 0.0) if coordinates list is empty.
+
+        Returns:
+            tuple[float, float]: Ending coordinate as (longitude, latitude).
+                Returns (0.0, 0.0) if no coordinates available.
+        """
         if not self.coordinates:
             return (0.0, 0.0)
         coord = self.coordinates[-1]
