@@ -44,6 +44,9 @@ class FrontendLogService:
         Args:
             log_entry: The frontend log entry to process
             user_id: Optional user ID from authentication
+
+        Returns:
+            None
         """
         # Build structured log message matching frontend's format
         log_data = {
@@ -98,6 +101,9 @@ class FrontendLogService:
         Args:
             log_entries: List of frontend log entries to process
             user_id: Optional user ID from authentication
+
+        Returns:
+            None
         """
         for entry in log_entries:
             self.log_entry(entry, user_id)

@@ -35,17 +35,29 @@ class PlaybackSpeedBase(BaseModel):
 
     @field_validator("playback_speed")
     def validate_speed(cls, v: float) -> float:
+        """Validate playback speed is one of the allowed values.
+
+        Args:
+            v: The playback speed value to validate.
+
+        Returns:
+            float: Validated playback speed value.
+        """
         if v not in ALLOWED_SPEEDS:
             raise ValueError(f"Playback speed must be one of {sorted(ALLOWED_SPEEDS)}")
         return v
 
 
 class SimulationPlaybackStatus(str, Enum):
+    """Enumeration of simulation playback status values."""
+
     INITIALIZED = "initialized"
     RUNNING = "running"
     PAUSED = "paused"
 
 
 class PlaybackSpeedResponse(PlaybackSpeedBase):
+    """Response schema for playback speed operations."""
+
     simulation_id: str
     status: SimulationPlaybackStatus

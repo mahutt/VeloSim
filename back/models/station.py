@@ -60,12 +60,23 @@ class Station(Base):
 
     @property
     def position(self) -> list[float]:
-        """Get position as [longitude, latitude] to match sim model."""
+        """Get position as [longitude, latitude] to match sim model.
+
+        Returns:
+            list[float]: Position as [longitude, latitude].
+        """
         return [self.longitude, self.latitude]
 
     @position.setter
     def position(self, pos: list[float]) -> None:
-        """Set position from [longitude, latitude] list."""
+        """Set position from [longitude, latitude] list.
+
+        Args:
+            pos: Position as [longitude, latitude].
+
+        Returns:
+            None
+        """
         if len(pos) != 2:
             raise ValueError("Position must be [longitude, latitude]")
         self.longitude = pos[0]

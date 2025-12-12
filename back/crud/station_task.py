@@ -32,7 +32,15 @@ class StationTaskCRUD:
     """CRUD operations for StationTask model."""
 
     def create(self, db: Session, station_task_data: StationTaskCreate) -> StationTask:
-        """Create a new station task."""
+        """Create a new station task.
+
+        Args:
+            db: Database session.
+            station_task_data: The data for creating a new station task.
+
+        Returns:
+            StationTask: The newly created station task.
+        """
         with db.begin(nested=True):
             db_task = StationTask(
                 sim_instance_id=station_task_data.sim_instance_id,
@@ -45,7 +53,15 @@ class StationTaskCRUD:
             return db_task
 
     def get(self, db: Session, task_id: int) -> Optional[StationTask]:
-        """Get a station task by ID."""
+        """Get a station task by ID.
+
+        Args:
+            db: Database session.
+            task_id: The ID of the station task to retrieve.
+
+        Returns:
+            Optional[StationTask]: The station task if found, None otherwise.
+        """
         return db.query(StationTask).filter(StationTask.id == task_id).first()
 
     def get_all(
@@ -56,7 +72,18 @@ class StationTaskCRUD:
         skip: int = 0,
         limit: int = 10,
     ) -> Tuple[List[StationTask], int]:
-        """Get all station tasks with optional filters and pagination."""
+        """Get all station tasks with optional filters and pagination.
+
+        Args:
+            db: Database session.
+            station_id: Optional filter by station ID.
+            task_status: Optional filter by task status.
+            skip: Number of records to skip (default: 0).
+            limit: Maximum number of records to return (default: 10).
+
+        Returns:
+            Tuple[List[StationTask], int]: Tuple of (station tasks list, total count).
+        """
 
         # Build the base query
         query = db.query(StationTask)
@@ -78,7 +105,16 @@ class StationTaskCRUD:
     def update(
         self, db: Session, task_id: int, station_task_data: StationTaskUpdate
     ) -> Optional[StationTask]:
-        """Update a station task (status only)."""
+        """Update a station task (status only).
+
+        Args:
+            db: Database session.
+            task_id: The ID of the station task to update.
+            station_task_data: The updated data for the station task.
+
+        Returns:
+            Optional[StationTask]: The updated station task if found, None otherwise.
+        """
         with db.begin(nested=True):
             db_task = self.get(db, task_id)
             if not db_task:
@@ -93,7 +129,15 @@ class StationTaskCRUD:
             return db_task
 
     def delete(self, db: Session, task_id: int) -> bool:
-        """Delete a station task."""
+        """Delete a station task.
+
+        Args:
+            db: Database session.
+            task_id: The ID of the station task to delete.
+
+        Returns:
+            bool: True if task was deleted, False if not found.
+        """
         with db.begin(nested=True):
             db_task = self.get(db, task_id)
             if not db_task:

@@ -34,7 +34,15 @@ class ResourceCRUD:
     """CRUD operations for Resource model."""
 
     def create(self, db: Session, resource_data: ResourceCreate) -> Resource:
-        """Create a new resource."""
+        """Create a new resource.
+
+        Args:
+            db: Database session.
+            resource_data: The data for creating a new resource.
+
+        Returns:
+            Resource: The newly created resource.
+        """
         with db.begin(nested=True):
             db_resource = Resource(
                 sim_instance_id=resource_data.sim_instance_id,
@@ -52,19 +60,44 @@ class ResourceCRUD:
         return db_resource
 
     def get(self, db: Session, resource_id: int) -> Optional[Resource]:
-        """Get a resource by ID."""
+        """Get a resource by ID.
+
+        Args:
+            db: Database session.
+            resource_id: The ID of the resource to retrieve.
+
+        Returns:
+            Optional[Resource]: The resource if found, None otherwise.
+        """
         return db.query(Resource).filter(Resource.id == resource_id).first()
 
     def get_all(
         self, db: Session, skip: int = 0, limit: int = 100
     ) -> Tuple[List[Resource], int]:
-        """Get all resources with pagination."""
+        """Get all resources with pagination.
+
+        Args:
+            db: Database session.
+            skip: Number of records to skip (default: 0).
+            limit: Maximum number of records to return (default: 100).
+
+        Returns:
+            Tuple[List[Resource], int]: Tuple of (resources list, total count).
+        """
         total = db.query(func.count(Resource.id)).scalar() or 0
         resources = db.query(Resource).offset(skip).limit(limit).all()
         return resources, total
 
     def get_type(self, db: Session, resource_id: int) -> Optional[ResourceType]:
-        """Get a resource's type by id."""
+        """Get a resource's type by id.
+
+        Args:
+            db: Database session.
+            resource_id: The ID of the resource.
+
+        Returns:
+            Optional[ResourceType]: The resource type if found, None otherwise.
+        """
         resource = self.get(db, resource_id)
         return resource.type if resource else None
 
@@ -79,6 +112,16 @@ class ResourceCRUD:
         """
         Get all resources with optional filters by type or task status.
         Returns: (resources_list, total_count)
+
+        Args:
+            db: Database session.
+            skip: Number of records to skip (default: 0).
+            limit: Maximum number of records to return (default: 100).
+            type: Optional filter by resource type.
+            status: Optional filter by task status.
+
+        Returns:
+            Tuple[List[Resource], int]: Tuple of (filtered resources list, total count).
         """
         query = db.query(Resource)
 
@@ -102,7 +145,16 @@ class ResourceCRUD:
     def update(
         self, db: Session, resource_id: int, resource_data: ResourceUpdate
     ) -> Optional[Resource]:
-        """Update a resource (only current position and start/end of route)."""
+        """Update a resource (only current position and start/end of route).
+
+        Args:
+            db: Database session.
+            resource_id: The ID of the resource to update.
+            resource_data: The updated data for the resource.
+
+        Returns:
+            Optional[Resource]: The updated resource if found, None otherwise.
+        """
         resource = self.get(db, resource_id)
         if not resource:
             return None
@@ -114,7 +166,15 @@ class ResourceCRUD:
         return resource
 
     def delete(self, db: Session, resource_id: int) -> bool:
-        """Delete a resource."""
+        """Delete a resource.
+
+        Args:
+            db: Database session.
+            resource_id: The ID of the resource to delete.
+
+        Returns:
+            bool: True if resource was deleted, False if not found.
+        """
         resource = self.get(db, resource_id)
         if not resource:
             return False
@@ -129,7 +189,16 @@ class ResourceCRUD:
         return True
 
     def assign_task(self, db: Session, resource_id: int, task_id: int) -> bool:
-        """Assign a task to a resource using task_id."""
+        """Assign a task to a resource using task_id.
+
+        Args:
+            db: Database session.
+            resource_id: The ID of the resource to assign the task to.
+            task_id: The ID of the task to assign.
+
+        Returns:
+            bool: True if assignment successful, False if resource or task not found.
+        """
         resource = self.get(db, resource_id)
         task = db.get(StationTask, task_id)
         if not resource or not task:
@@ -141,7 +210,16 @@ class ResourceCRUD:
         return True
 
     def unassign_task(self, db: Session, resource_id: int, task_id: int) -> bool:
-        """Unassign a task from a resource using task_id."""
+        """Unassign a task from a resource using task_id.
+
+        Args:
+            db: Database session.
+            resource_id: The ID of the resource to unassign the task from.
+            task_id: The ID of the task to unassign.
+
+        Returns:
+            bool: True if unassignment successful, False if resource or task not found.
+        """
         resource = self.get(db, resource_id)
         task = db.get(StationTask, task_id)
         if not resource or not task:
@@ -153,7 +231,17 @@ class ResourceCRUD:
         return True
 
     def service_task(self, db: Session, resource_id: int, task_id: int) -> bool:
-        """Mark a task as closed and remove it from the resource's assignments."""
+        """Mark a task as closed and remove it from the resource's assignments.
+
+        Args:
+            db: Database session.
+            resource_id: The ID of the resource servicing the task.
+            task_id: The ID of the task to mark as serviced.
+
+        Returns:
+            bool: True if task serviced successfully, False if resource or
+                task not found.
+        """
         resource = self.get(db, resource_id)
         task = db.get(StationTask, task_id)
         if not resource or not task:

@@ -51,6 +51,13 @@ JWT_ALGORITHM = "HS256"
 def authenticate_user(username: str | None, password: str | None) -> str | None:
     """Attempts to authenticate the user and issue an access token. Returns None if the
     user cannot be authenticated with these credentials.
+
+    Args:
+        username: The username to authenticate.
+        password: The password to verify.
+
+    Returns:
+        str | None: Access token if authentication successful, None otherwise.
     """
     if username is None or password is None:
         return None
@@ -70,6 +77,12 @@ def authenticate_user(username: str | None, password: str | None) -> str | None:
 def generate_access_token(user_id: int) -> str:
     """Returns a JSON Web Token (JWT) for a given user ID which can be validated in the
     future.
+
+    Args:
+        user_id: The ID of the user to generate a token for.
+
+    Returns:
+        str: The encoded JWT access token.
     """
     now = datetime.now(timezone.utc)
     token_data: dict[str, str | int] = {
@@ -84,6 +97,12 @@ def generate_access_token(user_id: int) -> str:
 def validate_access_token(access_token: str) -> int | None:
     """Attempts to validate the access token and returns the user ID contained within
     the signed token if still valid, or None if it cannot be validated.
+
+    Args:
+        access_token: The JWT access token to validate.
+
+    Returns:
+        int | None: User ID if token is valid, None otherwise.
     """
     try:
         now = floor(datetime.now(timezone.utc).timestamp())

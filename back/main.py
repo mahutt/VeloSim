@@ -39,7 +39,14 @@ from back.database.session import get_db
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
-    """Application lifespan management"""
+    """Application lifespan management.
+
+    Args:
+        app: The FastAPI application instance.
+
+    Returns:
+        AsyncIterator[None]: Async context manager for startup and shutdown.
+    """
     # Startup
     yield
     # Shutdown - cleanup simulations
@@ -79,6 +86,13 @@ async def login_for_access_token(
     We only use usernames/passwords for authentication, however, we support passing
     these in either the username or client id field, and password or client secret field
     again for maximum compatibility with differenc scenarios.
+
+    Args:
+        form_data: OAuth2 password request form containing
+            username/password or client_id/client_secret.
+
+    Returns:
+        Token: Access token and token type for authenticated user.
     """
     access_token = authenticate_user(
         form_data.username or form_data.client_id,
@@ -107,13 +121,21 @@ app.include_router(api_router, prefix="/api/v1")
 
 @app.get("/")
 async def root() -> Dict[str, str]:
-    """Root endpoint."""
+    """Root endpoint.
+
+    Returns:
+        Dict[str, str]: API information including name and version.
+    """
     return {"message": "VeloSim Backend API", "version": "1.0.0"}
 
 
 @app.get("/health")
 async def health_check() -> Dict[str, str]:
-    """Basic health check endpoint."""
+    """Basic health check endpoint.
+
+    Returns:
+        Dict[str, str]: Health status of the service.
+    """
     return {"status": "healthy", "service": "VeloSim Backend API"}
 
 

@@ -82,12 +82,23 @@ class Resource(Base):
 
     @property
     def position(self) -> list[float]:
-        """Get current position as [longitude, latitude] to match sim model."""
+        """Get current position as [longitude, latitude] to match sim model.
+
+        Returns:
+            list[float]: Current position as [longitude, latitude].
+        """
         return [self.longitude, self.latitude]
 
     @position.setter
     def position(self, pos: list[float]) -> None:
-        """Set current position from [longitude, latitude] list."""
+        """Set current position from [longitude, latitude] list.
+
+        Args:
+            pos: Position as [longitude, latitude].
+
+        Returns:
+            None
+        """
         if len(pos) != 2:
             raise ValueError("Position must be in the form [longitude, latitude]")
         self.longitude = pos[0]
@@ -95,7 +106,11 @@ class Resource(Base):
 
     @property
     def route(self) -> List[List[float]]:
-        """Get current route as [[start_long, start_lat], [end_long, end_lat]]."""
+        """Get current route as [[start_long, start_lat], [end_long, end_lat]].
+
+        Returns:
+            List[List[float]]: Route as [[start_long, start_lat], [end_long, end_lat]].
+        """
         return [
             [self.route_start_longitude, self.route_start_latitude],
             [self.route_end_longitude, self.route_end_latitude],
@@ -103,7 +118,14 @@ class Resource(Base):
 
     @route.setter
     def route(self, route_pos: List[List[float]]) -> None:
-        """Set route from [[start_long, start_lat], [end_long, end_lat]] list."""
+        """Set route from [[start_long, start_lat], [end_long, end_lat]] list.
+
+        Args:
+            route_pos: Route as [[start_long, start_lat], [end_long, end_lat]].
+
+        Returns:
+            None
+        """
         if len(route_pos) != 2 or any(len(p) != 2 for p in route_pos):
             raise ValueError(
                 "Route must be [[start_long, start_lat], [end_long, end_lat]]"
@@ -114,7 +136,14 @@ class Resource(Base):
         ) = route_pos
 
     def assign_task(self, task: "StationTask") -> None:
-        """Assign a task to this resource (on the precondition that it is open)."""
+        """Assign a task to this resource (on the precondition that it is open).
+
+        Args:
+            task: The station task to assign.
+
+        Returns:
+            None
+        """
         if task is None:
             raise ValueError("Cannot assign a null task.")
         if task in self.tasks:
@@ -132,7 +161,14 @@ class Resource(Base):
         task.status = TaskStatus.ASSIGNED
 
     def unassign_task(self, task: "StationTask") -> None:
-        """Unassign a task from this resource."""
+        """Unassign a task from this resource.
+
+        Args:
+            task: The station task to unassign.
+
+        Returns:
+            None
+        """
         if task is None:
             raise ValueError("Cannot unassign a null task.")
         if task not in self.tasks:
@@ -142,7 +178,14 @@ class Resource(Base):
         task.status = TaskStatus.OPEN
 
     def service_task(self, task: "StationTask") -> None:
-        """Mark a task as closed and remove it from this resource."""
+        """Mark a task as closed and remove it from this resource.
+
+        Args:
+            task: The station task to service.
+
+        Returns:
+            None
+        """
         if task is None:
             raise ValueError("Cannot service a null task.")
         if task not in self.tasks:
@@ -155,9 +198,17 @@ class Resource(Base):
         task.status = TaskStatus.CLOSED
 
     def get_task_count(self) -> int:
-        """Return the number of tasks currently assigned to the resource."""
+        """Return the number of tasks currently assigned to the resource.
+
+        Returns:
+            int: Number of tasks assigned.
+        """
         return len(self.tasks)
 
     def get_task_list(self) -> List["StationTask"]:
-        """Return a list of all tasks currently assigned."""
+        """Return a list of all tasks currently assigned.
+
+        Returns:
+            List[StationTask]: List of assigned tasks.
+        """
         return list(self.tasks)

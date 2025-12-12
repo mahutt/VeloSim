@@ -44,11 +44,27 @@ class ResourceBase(BaseModel):
     @field_validator("latitude", "route_start_latitude", "route_end_latitude")
     @classmethod
     def check_latitude(cls: Type["ResourceBase"], v: float) -> float:
+        """Validate latitude is within valid range.
+
+        Args:
+            v: The latitude value to validate.
+
+        Returns:
+            float: Validated latitude value.
+        """
         return validate_latitude(v)
 
     @field_validator("longitude", "route_start_longitude", "route_end_longitude")
     @classmethod
     def check_longitude(cls: Type["ResourceBase"], v: float) -> float:
+        """Validate longitude is within valid range.
+
+        Args:
+            v: The longitude value to validate.
+
+        Returns:
+            float: Validated longitude value.
+        """
         return validate_longitude(v)
 
 
@@ -81,6 +97,14 @@ class ResourceUpdate(BaseModel):
     def check_optional_latitude(
         cls: Type["ResourceUpdate"], v: Optional[float]
     ) -> Optional[float]:
+        """Validate optional latitude is within valid range.
+
+        Args:
+            v: The optional latitude value to validate.
+
+        Returns:
+            Optional[float]: Validated latitude value or None.
+        """
         if v is not None:
             return validate_latitude(v)
         return None
@@ -90,6 +114,14 @@ class ResourceUpdate(BaseModel):
     def check_optional_longitude(
         cls: Type["ResourceUpdate"], v: Optional[float]
     ) -> Optional[float]:
+        """Validate optional longitude is within valid range.
+
+        Args:
+            v: The optional longitude value to validate.
+
+        Returns:
+            Optional[float]: Validated longitude value or None.
+        """
         if v is not None:
             return validate_longitude(v)
         return None
@@ -129,13 +161,21 @@ class ResourceResponse(BaseModel):
 
     @computed_field
     def position(self) -> List[float]:
-        """Get current position as [longitude, latitude] to match sim model."""
+        """Get current position as [longitude, latitude] to match sim model.
+
+        Returns:
+            List[float]: Position as [longitude, latitude].
+        """
         return [self.longitude, self.latitude]
 
     @computed_field
     def route(self) -> List[List[float]]:
         """Get current route as [[start_long, start_lat], [end_long, end_lat]]
-        to match provisional sim model."""
+        to match provisional sim model.
+
+        Returns:
+            List[List[float]]: Route as [[start_long, start_lat], [end_long, end_lat]].
+        """
         return [
             [self.route_start_longitude, self.route_start_latitude],
             [self.route_end_longitude, self.route_end_latitude],
@@ -143,7 +183,11 @@ class ResourceResponse(BaseModel):
 
     @computed_field
     def task_count(self) -> int:
-        """Return number of tasks assigned to this resource to match sim model."""
+        """Return number of tasks assigned to this resource to match sim model.
+
+        Returns:
+            int: Number of assigned tasks.
+        """
         return len(self.tasks)
 
 

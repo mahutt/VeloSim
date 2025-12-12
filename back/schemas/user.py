@@ -44,10 +44,14 @@ class UserCreate(UserBase):
 
 
 class UserPasswordUpdate(UserBase):
+    """Schema for updating user password."""
+
     password: str = Field(..., description="Password to set for the user")
 
 
 class UserRoleUpdate(UserBase):
+    """Schema for updating user role and status."""
+
     is_admin: Optional[bool] = Field(
         None, description="Whether the user is an administrator"
     )

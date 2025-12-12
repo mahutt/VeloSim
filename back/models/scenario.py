@@ -39,6 +39,14 @@ class JSONBCompatible(TypeDecorator[Any]):
     impl = Text  # fallback for SQLite
 
     def load_dialect_impl(self, dialect: Dialect) -> TypeEngine[Any]:
+        """Load the dialect-specific type implementation.
+
+        Args:
+            dialect: The database dialect.
+
+        Returns:
+            TypeEngine[Any]: The dialect-specific type descriptor.
+        """
         if dialect.name == "postgresql":
             return dialect.type_descriptor(JSONB())
         return dialect.type_descriptor(Text())
@@ -46,6 +54,15 @@ class JSONBCompatible(TypeDecorator[Any]):
     def process_bind_param(
         self, value: Optional[Any], dialect: Dialect
     ) -> Optional[Any]:
+        """Process values being sent to the database.
+
+        Args:
+            value: The value to process.
+            dialect: The database dialect.
+
+        Returns:
+            Optional[Any]: Processed value for the database.
+        """
         if value is None:
             return None
         if dialect.name == "sqlite":
@@ -57,6 +74,15 @@ class JSONBCompatible(TypeDecorator[Any]):
     def process_result_value(
         self, value: Optional[Any], dialect: Dialect
     ) -> Optional[Any]:
+        """Process values coming from the database.
+
+        Args:
+            value: The value from the database.
+            dialect: The database dialect.
+
+        Returns:
+            Optional[Any]: Processed value from the database.
+        """
         if value is None:
             return None
         if dialect.name == "sqlite":

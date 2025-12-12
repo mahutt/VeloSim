@@ -32,7 +32,11 @@ from back.grafana_logging.logger import (
 
 
 def example_basic_logging() -> None:
-    """Example: Basic logging in any Python module."""
+    """Example: Basic logging in any Python module.
+
+    Returns:
+        None
+    """
     logger = get_logger(__name__)
 
     logger.debug("This is a debug message")
@@ -43,7 +47,11 @@ def example_basic_logging() -> None:
 
 
 def example_backend_api_logging() -> List[str]:
-    """Example: Logging in a FastAPI endpoint."""
+    """Example: Logging in a FastAPI endpoint.
+
+    Returns:
+        List[str]: List of station names.
+    """
     logger = get_logger("api.stations")
 
     # Log when endpoint is called
@@ -60,7 +68,11 @@ def example_backend_api_logging() -> List[str]:
 
 
 def example_http_request_logging() -> None:
-    """Example: Logging HTTP requests."""
+    """Example: Logging HTTP requests.
+
+    Returns:
+        None
+    """
     import time
 
     start_time = time.time()
@@ -76,7 +88,11 @@ def example_http_request_logging() -> None:
 
 
 def example_simulator_logging() -> None:
-    """Example: Logging in the simulator."""
+    """Example: Logging in the simulator.
+
+    Returns:
+        None
+    """
     logger = get_logger("simulator")
 
     # Log simulation start
@@ -103,7 +119,11 @@ def example_simulator_logging() -> None:
 
 
 def example_error_logging_with_context() -> None:
-    """Example: Logging errors with full context."""
+    """Example: Logging errors with full context.
+
+    Returns:
+        None
+    """
     logger = get_logger("database")
 
     try:
@@ -119,7 +139,11 @@ def example_error_logging_with_context() -> None:
 
 
 def example_conditional_logging() -> None:
-    """Example: Conditional logging based on environment."""
+    """Example: Conditional logging based on environment.
+
+    Returns:
+        None
+    """
     import os
 
     logger = get_logger(__name__)
@@ -133,7 +157,11 @@ def example_conditional_logging() -> None:
 
 
 def example_structured_logging() -> None:
-    """Example: Structured logging with consistent format."""
+    """Example: Structured logging with consistent format.
+
+    Returns:
+        None
+    """
     logger = get_logger("user_service")
 
     user_id = 12345
@@ -150,6 +178,9 @@ def example_frontend_api_logging() -> None:
     Example: FastAPI endpoint for receiving frontend logs.
 
     Add this to your FastAPI router:
+
+    Returns:
+        None
     """
     from fastapi import APIRouter, Body
 
@@ -160,7 +191,16 @@ def example_frontend_api_logging() -> None:
     async def log_from_frontend(
         level: str = Body(...), message: str = Body(...), context: dict = Body(None)
     ) -> Dict[str, str]:
-        """Receive and log messages from the frontend."""
+        """Receive and log messages from the frontend.
+
+        Args:
+            level: Log level (debug, info, warning, error).
+            message: Log message from frontend.
+            context: Optional context dictionary.
+
+        Returns:
+            Dict[str, str]: Success response.
+        """
         # Map string level to logger method
         log_func = getattr(frontend_logger, level.lower(), frontend_logger.info)
 

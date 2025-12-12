@@ -34,13 +34,28 @@ load_dotenv()
 
 
 def env_flag(name: str) -> bool:
-    """Convert an environment variable to a boolean flag (default is False)."""
+    """Convert an environment variable to a boolean flag (default is False).
+
+    Args:
+        name: The name of the environment variable.
+
+    Returns:
+        bool: True if the environment variable equals 'true'
+            (case-insensitive), False otherwise.
+    """
     return os.getenv(name, "false").strip().lower() == "true"
 
 
 def compose_database_url_from_env(default: str) -> str:
     """Compose the database URL from its individual components. This is neccesary when
-    some parts of the URLs are kept as secrets in cloud environments."""
+    some parts of the URLs are kept as secrets in cloud environments.
+
+    Args:
+        default: The default database URL to use if environment variables are not set.
+
+    Returns:
+        str: The composed database URL or the default if components are missing.
+    """
     host = os.getenv("DB_HOST")
     port = os.getenv("DB_PORT")
     name = os.getenv("DB_NAME")
@@ -86,6 +101,12 @@ class Settings(BaseSettings):
         - Comma-separated string: "https://a.com, https://b.com"
         - Single string: "https://a.com"
         - List[str]
+
+        Args:
+            v: The value to parse (can be str, list, or None).
+
+        Returns:
+            Any: Parsed list of allowed origins or the original value.
         """
         if v is None:
             return v

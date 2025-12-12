@@ -65,6 +65,13 @@ async def validate_scenario_content(
     """Validate scenario content without creating a scenario.
 
     Extracts line numbers from the original JSON for better error reporting.
+
+    Args:
+        request: FastAPI request object for accessing raw body
+        validation_request: Scenario content to validate
+
+    Returns:
+        ValidationResponse with validation status and any errors found
     """
     # Get the raw body for line number extraction
     raw_body = await request.body()
@@ -100,6 +107,9 @@ def get_scenario_template(
 
     This endpoint provides an example scenario structure with comments
     explaining each field to help users understand the expected format.
+
+    Args:
+        requesting_user: ID of the authenticated user making the request
 
     Returns:
         dict: A template scenario with example data and documentation.
@@ -167,7 +177,17 @@ def get_scenarios(
     requesting_user: int = Depends(get_user_id),
     db: Session = Depends(get_db),
 ) -> ScenarioListResponse:
-    """Get all scenarios with pagination."""
+    """Get all scenarios with pagination.
+
+    Args:
+        skip: Number of scenarios to skip for pagination
+        limit: Number of scenarios to retrieve (1-100)
+        requesting_user: ID of the authenticated user
+        db: Database session dependency
+
+    Returns:
+        ScenarioListResponse containing paginated list of scenarios and metadata
+    """
     try:
         scenarios, total = scenario_crud.get_by_user(db, requesting_user, skip, limit)
     except BadRequestError as err:
@@ -195,7 +215,16 @@ def get_scenario(
     requesting_user: int = Depends(get_user_id),
     db: Session = Depends(get_db),
 ) -> ScenarioResponse:
-    """Get a specific scenario by ID."""
+    """Get a specific scenario by ID.
+
+    Args:
+        scenario_id: ID of the scenario to retrieve
+        requesting_user: ID of the authenticated user
+        db: Database session dependency
+
+    Returns:
+        ScenarioResponse containing the requested scenario data
+    """
     try:
         db_scenario = scenario_crud.get(db, scenario_id, requesting_user)
         return ScenarioResponse.model_validate(db_scenario)
@@ -215,6 +244,14 @@ def create_scenario(
 ) -> ScenarioResponse:
     """
     Create a new scenario.
+
+    Args:
+        request: Scenario creation request with name, content, and options
+        requesting_user: ID of the authenticated user
+        db: Database session dependency
+
+    Returns:
+        ScenarioResponse containing the created scenario data
     """
     try:
         # Check for duplicate name if not allowed
@@ -269,6 +306,15 @@ def update_scenario(
 ) -> ScenarioResponse:
     """
     Update an existing scenario.
+
+    Args:
+        scenario_id: ID of the scenario to update
+        request: Scenario update request with optional name, content, and description
+        requesting_user: ID of the authenticated user
+        db: Database session dependency
+
+    Returns:
+        ScenarioResponse containing the updated scenario data
     """
     try:
         # Validate scenario content if it's being updated
@@ -312,6 +358,14 @@ def delete_scenario(
 ) -> None:
     """
     Delete a scenario.
+
+    Args:
+        scenario_id: ID of the scenario to delete
+        requesting_user: ID of the authenticated user
+        db: Database session dependency
+
+    Returns:
+        None (204 No Content status on success)
     """
     try:
         scenario_crud.delete(db, scenario_id, requesting_user)

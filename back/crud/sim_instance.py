@@ -33,7 +33,15 @@ class SimInstanceCRUD:
     """CRUD operations for SimInstance model."""
 
     def create(self, db: Session, sim_instance_data: SimInstanceCreate) -> SimInstance:
-        """Create a new simulation instance."""
+        """Create a new simulation instance.
+
+        Args:
+            db: Database session.
+            sim_instance_data: The data for creating a new simulation instance.
+
+        Returns:
+            SimInstance: The newly created simulation instance.
+        """
         db_sim_instance = SimInstance(
             user_id=sim_instance_data.user_id,
         )
@@ -43,7 +51,15 @@ class SimInstanceCRUD:
         return db_sim_instance
 
     def get(self, db: Session, sim_instance_id: int) -> Optional[SimInstance]:
-        """Get a simulation instance by ID."""
+        """Get a simulation instance by ID.
+
+        Args:
+            db: Database session.
+            sim_instance_id: The ID of the simulation instance to retrieve.
+
+        Returns:
+            Optional[SimInstance]: The simulation instance if found, None otherwise.
+        """
         return db.query(SimInstance).filter(SimInstance.id == sim_instance_id).first()
 
     def get_by_user(
@@ -58,6 +74,16 @@ class SimInstanceCRUD:
         Get all simulation instances for a specific user if permitted.
 
         Normal users can only see their own simulations. Admins can access any.
+
+        Args:
+            db: Database session.
+            target_user_id: The ID of the user whose simulations to retrieve.
+            requesting_user_id: The ID of the user making the request.
+            skip: Number of records to skip (default: 0).
+            limit: Maximum number of records to return (default: 100).
+
+        Returns:
+            List[SimInstance]: List of simulation instances for the user.
         """
         # Lazy import to avoid circular dependency
         from back.crud import user_crud
@@ -81,11 +107,28 @@ class SimInstanceCRUD:
     def get_all(
         self, db: Session, skip: int = 0, limit: int = 100
     ) -> List[SimInstance]:
-        """Get all simulation instances (admin function)."""
+        """Get all simulation instances (admin function).
+
+        Args:
+            db: Database session.
+            skip: Number of records to skip (default: 0).
+            limit: Maximum number of records to return (default: 100).
+
+        Returns:
+            List[SimInstance]: List of all simulation instances.
+        """
         return db.query(SimInstance).offset(skip).limit(limit).all()
 
     def delete(self, db: Session, sim_instance_id: int) -> bool:
-        """Delete a simulation instance by ID."""
+        """Delete a simulation instance by ID.
+
+        Args:
+            db: Database session.
+            sim_instance_id: The ID of the simulation instance to delete.
+
+        Returns:
+            bool: True if instance was deleted, False if not found.
+        """
         sim_instance = self.get(db, sim_instance_id)
         if not sim_instance:
             return False

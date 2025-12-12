@@ -42,7 +42,15 @@ router = APIRouter(prefix="/stations", tags=["stations"])
 def create_station(
     station_data: StationCreate, db: Session = Depends(get_db)
 ) -> StationResponse:
-    """Create a new bike station."""
+    """Create a new bike station.
+
+    Args:
+        station_data: Station creation data including name and position
+        db: Database session dependency
+
+    Returns:
+        StationResponse containing the created station data
+    """
     # Check if station with same name already exists
     existing_station = station_crud.get_by_name(db, station_data.name)
     if existing_station:
@@ -61,7 +69,16 @@ def get_stations(
     limit: int = Query(10, ge=1, le=100, description="Number of stations to retrieve"),
     db: Session = Depends(get_db),
 ) -> StationListResponse:
-    """Get all stations with pagination."""
+    """Get all stations with pagination.
+
+    Args:
+        skip: Number of stations to skip for pagination
+        limit: Number of stations to retrieve (1-100)
+        db: Database session dependency
+
+    Returns:
+        StationListResponse containing paginated list of stations and metadata
+    """
     stations, total = station_crud.get_all(db, skip, limit)
 
     total_pages = math.ceil(total / limit) if total > 0 else 0
@@ -78,7 +95,15 @@ def get_stations(
 
 @router.get("/{station_id}", response_model=StationResponse)
 def get_station(station_id: int, db: Session = Depends(get_db)) -> StationResponse:
-    """Get a specific station by ID."""
+    """Get a specific station by ID.
+
+    Args:
+        station_id: ID of the station to retrieve
+        db: Database session dependency
+
+    Returns:
+        StationResponse containing the requested station data
+    """
     db_station = station_crud.get(db, station_id)
     if not db_station:
         raise HTTPException(
@@ -91,7 +116,16 @@ def get_station(station_id: int, db: Session = Depends(get_db)) -> StationRespon
 def update_station(
     station_id: int, station_data: StationUpdate, db: Session = Depends(get_db)
 ) -> StationResponse:
-    """Update a station."""
+    """Update a station.
+
+    Args:
+        station_id: ID of the station to update
+        station_data: Updated station data
+        db: Database session dependency
+
+    Returns:
+        StationResponse containing the updated station data
+    """
     # Check if station exists
     existing_station = station_crud.get(db, station_id)
     if not existing_station:
@@ -114,7 +148,15 @@ def update_station(
 
 @router.delete("/{station_id}", status_code=204)
 def delete_station(station_id: int, db: Session = Depends(get_db)) -> None:
-    """Delete a station."""
+    """Delete a station.
+
+    Args:
+        station_id: ID of the station to delete
+        db: Database session dependency
+
+    Returns:
+        None (204 No Content status on success)
+    """
     success = station_crud.delete(db, station_id)
     if not success:
         raise HTTPException(

@@ -40,17 +40,42 @@ class UserCRUD:
     """CRUD operations for User model."""
 
     def get(self, db: Session, user_id: int) -> Optional[User]:
-        """Get a user by ID."""
+        """Get a user by ID.
+
+        Args:
+            db: Database session.
+            user_id: The ID of the user to retrieve.
+
+        Returns:
+            Optional[User]: The user if found, None otherwise.
+        """
         return db.query(User).filter(User.id == user_id).first()
 
     def get_by_username(self, db: Session, username: str) -> Optional[User]:
-        """Get a user by username."""
+        """Get a user by username.
+
+        Args:
+            db: Database session.
+            username: The username to search for.
+
+        Returns:
+            Optional[User]: The user if found, None otherwise.
+        """
         return db.query(User).filter(User.username == username).first()
 
     def get_if_permission(
         self, db: Session, user_id: int, requesting_user_id: int
     ) -> Optional[User]:
-        """Get a user by ID if the requester is the user themselves or an admin."""
+        """Get a user by ID if the requester is the user themselves or an admin.
+
+        Args:
+            db: Database session.
+            user_id: The ID of the user to retrieve.
+            requesting_user_id: The ID of the user making the request.
+
+        Returns:
+            Optional[User]: The user if found and permission granted.
+        """
         requesting_user = self.get(db, requesting_user_id)
         if not requesting_user or not requesting_user.is_enabled:
             raise VelosimPermissionError("Requesting user cannot access this user.")
@@ -69,7 +94,19 @@ class UserCRUD:
         limit: int = 10,
     ) -> Tuple[List[User], int]:
         """Get all users with optional filters and pagination, if the requester is an
-        admin."""
+        admin.
+
+        Args:
+            db: Database session.
+            is_enabled: Optional filter for enabled users.
+            is_admin: Optional filter for admin users.
+            requesting_user_id: The ID of the user making the request.
+            skip: Number of records to skip (default: 0).
+            limit: Maximum number of records to return (default: 10).
+
+        Returns:
+            Tuple[List[User], int]: Tuple of (users list, total count).
+        """
         requesting_user = self.get(db, requesting_user_id)
         if (
             not requesting_user
@@ -98,7 +135,16 @@ class UserCRUD:
     def create(
         self, db: Session, user_data: UserCreate, requesting_user_id: int
     ) -> User:
-        """Checks whether the requester is an admin, and if so, creates a new user."""
+        """Checks whether the requester is an admin, and if so, creates a new user.
+
+        Args:
+            db: Database session.
+            user_data: The data for creating a new user.
+            requesting_user_id: The ID of the user making the request.
+
+        Returns:
+            User: The newly created user.
+        """
         requesting_user = self.get(db, requesting_user_id)
         if (
             not requesting_user
@@ -133,7 +179,17 @@ class UserCRUD:
         password_data: UserPasswordUpdate,
         requesting_user_id: int,
     ) -> User:
-        """Updates a password if the requester is the user themselves or an admin."""
+        """Updates a password if the requester is the user themselves or an admin.
+
+        Args:
+            db: Database session.
+            user_id: The ID of the user whose password to update.
+            password_data: The new password data.
+            requesting_user_id: The ID of the user making the request.
+
+        Returns:
+            User: The user with updated password.
+        """
         requesting_user = self.get(db, requesting_user_id)
         if not requesting_user or not requesting_user.is_enabled:
             raise VelosimPermissionError("Requesting user cannot update this password.")
@@ -158,7 +214,17 @@ class UserCRUD:
         requesting_user_id: int,
     ) -> User:
         """Updates a user's role if the requester is an admin and not the user
-        themselves."""
+        themselves.
+
+        Args:
+            db: Database session.
+            user_id: The ID of the user whose role to update.
+            role_data: The new role data.
+            requesting_user_id: The ID of the user making the request.
+
+        Returns:
+            User: The user with updated role.
+        """
         requesting_user = self.get(db, requesting_user_id)
         if not requesting_user or not requesting_user.is_enabled:
             raise VelosimPermissionError("Requesting user cannot update this role.")
@@ -182,7 +248,14 @@ class UserCRUD:
     def hash_password(self, password: str) -> str:
         """Hashes the password in a manner that will be understood by
         auth.authenticate_user later. This had to be taken out of the auth module to
-        avoid a circular import."""
+        avoid a circular import.
+
+        Args:
+            password: The plaintext password to hash.
+
+        Returns:
+            str: The hashed password.
+        """
         return str(ph.hash(password))
 
 

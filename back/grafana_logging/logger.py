@@ -158,6 +158,9 @@ class VeloSimLogger:
             duration_ms: Request duration in milliseconds
             logger_name: Name of the logger to use
 
+        Returns:
+            None
+
         Example:
             >>> VeloSimLogger.log_request("GET", "/api/v1/stations", 200, 45.2)
         """
@@ -187,6 +190,9 @@ class VeloSimLogger:
             message: Event message
             data: Optional dictionary of event data
             logger_name: Name of the logger to use
+
+        Returns:
+            None
 
         Example:
             >>> VeloSimLogger.log_simulation_event(
@@ -230,14 +236,33 @@ def get_logger(name: str, level: Optional[str] = None) -> logging.Logger:
 
 # Convenience functions for common logging patterns
 def log_request(method: str, path: str, status_code: int, duration_ms: float) -> None:
-    """Log an HTTP request. See VeloSimLogger.log_request for details."""
+    """Log an HTTP request. See VeloSimLogger.log_request for details.
+
+    Args:
+        method: HTTP method.
+        path: Request path.
+        status_code: HTTP status code.
+        duration_ms: Request duration in milliseconds.
+
+    Returns:
+        None
+    """
     VeloSimLogger.log_request(method, path, status_code, duration_ms)
 
 
 def log_simulation_event(
     event_type: str, message: str, data: Optional[dict] = None
 ) -> None:
-    """Log a simulation event. See VeloSimLogger.log_simulation_event for details."""
+    """Log a simulation event. See VeloSimLogger.log_simulation_event for details.
+
+    Args:
+        event_type: Type of event.
+        message: Event message.
+        data: Optional dictionary of event data.
+
+    Returns:
+        None
+    """
     VeloSimLogger.log_simulation_event(event_type, message, data)
 
 

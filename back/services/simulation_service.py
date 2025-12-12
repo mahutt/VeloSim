@@ -82,6 +82,14 @@ class SimulationService:
         Admins always have permission, otherwise the requesting user must be the
         owner of that simulation instance.
 
+        Args:
+            db: Database session.
+            sim_id: The UUID of the simulation to verify access for.
+            requesting_user: The ID of the user requesting access.
+
+        Returns:
+            bool: True if user has access, False otherwise.
+
         Raises:
             ItemNotFoundError: if the simulation is not found, either in-memory
                 or from its database record.
@@ -102,6 +110,16 @@ class SimulationService:
     def initialize_simulation(
         self, db: Session, requesting_user: int, params: InputParameter
     ) -> SimulationResponse:
+        """Initialize a new simulation with the given parameters.
+
+        Args:
+            db: Database session.
+            requesting_user: The ID of the user initializing the simulation.
+            params: Input parameters for the simulation.
+
+        Returns:
+            SimulationResponse: Response containing sim_id, db_id, and status.
+        """
         user = self._get_requesting_user(db, requesting_user)
 
         # Create DB record
@@ -137,6 +155,14 @@ class SimulationService:
     ) -> SimulationResponse:
         """
         Start an initialized simulation and return a confirmation response.
+
+        Args:
+            db: Database session.
+            sim_id: The UUID of the simulation to start.
+            requesting_user: The ID of the user starting the simulation.
+
+        Returns:
+            SimulationResponse: Response containing sim_id, db_id, and running status.
         """
         if not self.verify_access(db, sim_id, requesting_user):
             raise VelosimPermissionError("Unauthorized to start this simulation.")
@@ -366,6 +392,9 @@ class SimulationService:
         Args:
             db: Database session
             requesting_user: Requesting user's ID
+
+        Returns:
+            None
         """
         user = self._get_requesting_user(db, requesting_user)
         if not user.is_admin:
@@ -378,6 +407,12 @@ class SimulationService:
         Stop all running simulations from system context (ex. during shutdown).
 
         No user check. Use carefully.
+
+        Args:
+            db: Database session.
+
+        Returns:
+            None
         """
         self._stop_all_simulations_core(db)
 
@@ -388,6 +423,17 @@ class SimulationService:
         playback_speed: PlaybackSpeedBase,
         requesting_user: int,
     ) -> PlaybackSpeedResponse:
+        """Set the playback speed for a simulation.
+
+        Args:
+            db: Database session.
+            sim_id: The UUID of the simulation.
+            playback_speed: The new playback speed settings.
+            requesting_user: The ID of the user making the request.
+
+        Returns:
+            PlaybackSpeedResponse: Response containing the updated playback speed.
+        """
         user = self._get_requesting_user(db, requesting_user)
 
         if sim_id not in self.active_simulations:
@@ -438,6 +484,15 @@ class SimulationService:
     ) -> PlaybackSpeedResponse:
         """
         Return the current playback speed and runtime status for a simulation.
+
+        Args:
+            db: Database session.
+            sim_id: The UUID of the simulation.
+            requesting_user: The ID of the user making the request.
+
+        Returns:
+            PlaybackSpeedResponse: Response containing the current playback
+                speed and status.
         """
         user = self._get_requesting_user(db, requesting_user)
 

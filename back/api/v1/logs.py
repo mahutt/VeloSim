@@ -71,7 +71,16 @@ def log_frontend_entry(
     log_entry: FrontendLogEntry,
     user_id: int = Depends(get_user_id),
 ) -> FrontendLogResponse:
-    """Receive and persist a log entry from the frontend."""
+    """Receive and persist a log entry from the frontend.
+
+    Args:
+        request: FastAPI request object containing headers and metadata
+        log_entry: Frontend log entry data to be recorded
+        user_id: ID of the authenticated user making the request
+
+    Returns:
+        FrontendLogResponse indicating success or failure of the operation
+    """
     # Check rate limit
     if not check_rate_limit(user_id):
         raise HTTPException(
@@ -106,7 +115,16 @@ def log_frontend_batch(
     log_entries: List[FrontendLogEntry],
     user_id: int = Depends(get_user_id),
 ) -> FrontendLogResponse:
-    """Receive and persist multiple log entries from the frontend in a batch."""
+    """Receive and persist multiple log entries from the frontend in a batch.
+
+    Args:
+        request: FastAPI request object containing headers and metadata
+        log_entries: List of frontend log entries to be recorded (max 50)
+        user_id: ID of the authenticated user making the request
+
+    Returns:
+        FrontendLogResponse indicating success and number of entries processed
+    """
     # Validate batch size
     if len(log_entries) > 50:
         raise HTTPException(

@@ -37,11 +37,27 @@ class PositionSchema(BaseModel):
     @field_validator("longitude")
     @classmethod
     def check_longitude(cls, v: Any) -> float:
+        """Validate longitude is within valid range.
+
+        Args:
+            v: The longitude value to validate.
+
+        Returns:
+            float: Validated longitude value.
+        """
         return validate_longitude(v)
 
     @field_validator("latitude")
     @classmethod
     def check_latitude(cls, v: Any) -> float:
+        """Validate latitude is within valid range.
+
+        Args:
+            v: The latitude value to validate.
+
+        Returns:
+            float: Validated latitude value.
+        """
         return validate_latitude(v)
 
 
@@ -55,11 +71,27 @@ class StationBase(BaseModel):
     @field_validator("longitude")
     @classmethod
     def check_longitude(cls, v: Any) -> float:
+        """Validate longitude is within valid range.
+
+        Args:
+            v: The longitude value to validate.
+
+        Returns:
+            float: Validated longitude value.
+        """
         return validate_longitude(v)
 
     @field_validator("latitude")
     @classmethod
     def check_latitude(cls, v: Any) -> float:
+        """Validate latitude is within valid range.
+
+        Args:
+            v: The latitude value to validate.
+
+        Returns:
+            float: Validated latitude value.
+        """
         return validate_latitude(v)
 
 
@@ -81,6 +113,14 @@ class StationUpdate(BaseModel):
     @field_validator("longitude")
     @classmethod
     def check_optional_longitude(cls, v: Any) -> Optional[float]:
+        """Validate optional longitude is within valid range.
+
+        Args:
+            v: The optional longitude value to validate.
+
+        Returns:
+            Optional[float]: Validated longitude value or None.
+        """
         if v is not None:
             return validate_longitude(v)
         return None
@@ -88,6 +128,14 @@ class StationUpdate(BaseModel):
     @field_validator("latitude")
     @classmethod
     def check_optional_latitude(cls, v: Any) -> Optional[float]:
+        """Validate optional latitude is within valid range.
+
+        Args:
+            v: The optional latitude value to validate.
+
+        Returns:
+            Optional[float]: Validated latitude value or None.
+        """
         if v is not None:
             return validate_latitude(v)
         return None
@@ -106,7 +154,11 @@ class StationResponse(BaseModel):
 
     @computed_field
     def position(self) -> list[float]:
-        """Get position as [longitude, latitude] to match simulation model."""
+        """Get position as [longitude, latitude] to match simulation model.
+
+        Returns:
+            list[float]: Position as [longitude, latitude].
+        """
         return [self.longitude, self.latitude]
 
 

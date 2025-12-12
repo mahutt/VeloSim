@@ -92,7 +92,14 @@ class FrontendLogEntry(BaseModel):
     @field_validator("message")
     @classmethod
     def validate_message_not_empty(cls, v: str) -> str:
-        """Ensure message is not just whitespace."""
+        """Ensure message is not just whitespace.
+
+        Args:
+            v: The message string to validate.
+
+        Returns:
+            str: Validated non-empty message.
+        """
         if not v or not v.strip():
             raise ValueError("Message cannot be empty")
         return v

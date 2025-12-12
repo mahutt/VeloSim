@@ -39,6 +39,8 @@ from sqlalchemy.orm import Session
 
 
 class WebSocketSubscriber(Subscriber):
+    """WebSocket subscriber for simulation frame updates."""
+
     def __init__(self, websocket: WebSocket):
         self.websocket = websocket
         """WebSocket connection for he current running loop."""
@@ -52,14 +54,33 @@ class WebSocketSubscriber(Subscriber):
         """Internal flag indicating whether the WebSocket connection has been closed."""
 
     def set_event_loop(self, loop: asyncio.AbstractEventLoop) -> None:
-        """Set the event loop manually (primarily for testing)."""
+        """Set the event loop manually (primarily for testing).
+
+        Args:
+            loop: The asyncio event loop to use for running tasks.
+
+        Returns:
+            None
+        """
         self.loop = loop
 
     def close(self) -> None:
-        """Mark the subscriber as closed to prevent further frame sends."""
+        """Mark the subscriber as closed to prevent further frame sends.
+
+        Returns:
+            None
+        """
         self.closed = True
 
     def on_frame(self, frame: Frame) -> None:
+        """Handle incoming simulation frame and schedule it for sending via WebSocket.
+
+        Args:
+            frame: The simulation frame to send to the client.
+
+        Returns:
+            None
+        """
         # Check if closed or websocket disconnected before scheduling
         if self.closed:
             return
@@ -102,7 +123,15 @@ class WebSocketSubscriber(Subscriber):
 
 
 async def safe_send_json(websocket: WebSocket, payload: dict) -> None:
-    """Send JSON through websocket and ignore if connection closed."""
+    """Send JSON through websocket and ignore if connection closed.
+
+    Args:
+        websocket: The WebSocket connection to send through.
+        payload: The JSON payload to send.
+
+    Returns:
+        None
+    """
     if websocket.client_state != WebSocketState.CONNECTED:
         # Socket already closed therefore do not attempt to send JSON
         return
@@ -113,6 +142,12 @@ async def accept_websocket_connection(websocket: WebSocket) -> bool:
     """
     Attempts to accept an incoming WebSocket connection.
     Returns True if connection accepted successfully and False otherwise.
+
+    Args:
+        websocket: The WebSocket connection to accept.
+
+    Returns:
+        bool: True if connection accepted successfully, False otherwise.
     """
     try:
         await websocket.accept()
@@ -125,6 +160,13 @@ async def accept_websocket_connection(websocket: WebSocket) -> bool:
 async def send_error_and_close(websocket: WebSocket, error_message: str) -> None:
     """
     Send error message to client and close the connection.
+
+    Args:
+        websocket: The WebSocket connection to send through and close.
+        error_message: The error message to send to the client.
+
+    Returns:
+        None
     """
     await websocket.send_json({"type": "error", "message": error_message})
     await websocket.close()
@@ -136,6 +178,15 @@ async def verify_simulation_access(
     """
     Verify user has access to the simulation.
     Returns True if access granted, False if access denied (error sent to client).
+
+    Args:
+        websocket: The WebSocket connection for error messaging.
+        db: Database session for checking simulation ownership.
+        sim_id: The ID of the simulation to verify access for.
+        requesting_user: The ID of the user requesting access.
+
+    Returns:
+        bool: True if access granted, False if access denied.
     """
     try:
         has_access = simulation_service.verify_access(db, sim_id, requesting_user)
@@ -156,6 +207,13 @@ async def verify_simulation_access(
 async def handle_client_message(websocket: WebSocket, msg: dict) -> None:
     """
     Process incoming client message.
+
+    Args:
+        websocket: The WebSocket connection for sending responses.
+        msg: The message received from the client.
+
+    Returns:
+        None
     """
     if msg.get("action") != "ping":
         # Send warning for unrecognized actions (ping is for liveness checks)
@@ -173,6 +231,12 @@ async def run_message_loop(websocket: WebSocket) -> None:
     """
     Run the main WebSocket message receiving loop. The loop continues until
     the WebSocket connection breaks or when an invalid message is received.
+
+    Args:
+        websocket: The WebSocket connection to receive messages from.
+
+    Returns:
+        None
     """
     while True:
         try:
@@ -186,7 +250,16 @@ async def run_message_loop(websocket: WebSocket) -> None:
 async def get_simulation_or_error(
     sim_id: str, websocket: WebSocket
 ) -> Optional[Tuple[dict, RunInfo]]:
-    """Fetch simulation info or send an error and close websocket."""
+    """Fetch simulation info or send an error and close websocket.
+
+    Args:
+        sim_id: The ID of the simulation to retrieve.
+        websocket: The WebSocket connection for error messaging.
+
+    Returns:
+        Optional[Tuple[dict, RunInfo]]: Tuple of sim_data and sim_info if
+            found, None otherwise.
+    """
     sim_data = simulation_service.active_simulations.get(sim_id)
     if not sim_data:
         await safe_send_json(
@@ -350,6 +423,15 @@ def attach_ws_subscriber(
     """
     Attach a new WebSocketSubscriber to the simulation emitter.
     Returns the newly attached WebSocketSubscriber.
+
+    Args:
+        sim_id: The ID of the simulation to attach to.
+        sim_data: Dictionary containing simulation data including user_id.
+        sim_info: The simulation run information.
+        websocket: The WebSocket connection to stream frames to.
+
+    Returns:
+        WebSocketSubscriber: The newly attached subscriber instance.
     """
     # Verify the user_id before proceeding
     user_id = sim_data.get("user_id")
@@ -452,6 +534,15 @@ async def start_or_resume_simulation(
 ) -> None:
     """
     Start or resume simulation based on current state and notify the client.
+
+    Args:
+        sim_info: The simulation run information.
+        sim_id: The ID of the simulation to start or resume.
+        websocket: The WebSocket connection for status notifications.
+        requesting_user: The ID of the user requesting the start/resume.
+
+    Returns:
+        None
     """
     if _is_simulation_not_started(sim_info):
         _start_simulation(sim_id, requesting_user)
@@ -492,6 +583,16 @@ async def cleanup_simulation(
 ) -> None:
     """
     Clean up simulation resources following WebSocket disconnection.
+
+    Args:
+        sim_id: The ID of the simulation to clean up.
+        sim_data: Dictionary containing simulation data.
+        sim_info: The simulation run information.
+        subscriber: The WebSocket subscriber to detach and close.
+        websocket: The WebSocket connection to close.
+
+    Returns:
+        None
     """
     # Clean up subscriber
     _close_subscriber(subscriber)
@@ -515,6 +616,14 @@ async def auto_shutdown_simulation(
     """
     Initiates a complete service shutdown (database cleanup and simulator stop)
     once the service has been idle for longer than the configured timeout.
+
+    Args:
+        sim_id: The ID of the simulation to shutdown.
+        sim_data: Dictionary containing simulation data.
+        requesting_user: The ID of the user who initiated the simulation.
+
+    Returns:
+        None
     """
     await asyncio.sleep(settings.SIMULATION_IDLE_TIMEOUT_SECONDS)
 
