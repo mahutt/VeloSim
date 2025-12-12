@@ -23,6 +23,7 @@ SOFTWARE.
 """
 
 from typing import TYPE_CHECKING, Dict, List, NotRequired, TypedDict
+import asyncio
 from sqlalchemy.orm import Session
 from back.models import User
 from back.models.sim_instance import SimInstance
@@ -44,8 +45,39 @@ from back.grafana_logging.logger import get_logger
 logger = get_logger(__name__)
 
 if TYPE_CHECKING:
-    import asyncio
     from back.api.v1.utils.sim_websocket_helpers import WebSocketSubscriber
+
+
+class SimulationLockManager:
+    """Manages per-simulation locks for thread-safe operations."""
+
+    _locks: Dict[str, asyncio.Lock] = {}
+
+    @classmethod
+    def get_lock(cls, sim_id: str) -> asyncio.Lock:
+        """Get or create lock for simulation.
+
+        Args:
+            sim_id: The UUID of the simulation to get the lock for
+
+        Returns:
+            asyncio.Lock instance for the specified simulation
+        """
+        if sim_id not in cls._locks:
+            cls._locks[sim_id] = asyncio.Lock()
+        return cls._locks[sim_id]
+
+    @classmethod
+    def remove_lock(cls, sim_id: str) -> None:
+        """Remove lock when simulation is cleaned up.
+
+        Args:
+            sim_id: The UUID of the simulation to remove the lock for
+
+        Returns:
+            None
+        """
+        cls._locks.pop(sim_id, None)
 
 
 class ActiveSimulationData(TypedDict):
@@ -261,6 +293,8 @@ class SimulationService:
         db.commit()
 
         del self.active_simulations[sim_id]
+        # Clean up the lock for this simulation
+        SimulationLockManager.remove_lock(sim_id)
         return True
 
     def get_active_user_simulations(
@@ -390,6 +424,10 @@ class SimulationService:
 
             db.commit()
             self.active_simulations.clear()
+
+            # Clean up all locks after simulations are stopped
+            for sim_id in list(SimulationLockManager._locks.keys()):
+                SimulationLockManager.remove_lock(sim_id)
 
         except Exception as exc:
             db.rollback()
