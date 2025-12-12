@@ -31,6 +31,7 @@ from back.database.session import get_db
 from back.exceptions import ItemNotFoundError, VelosimPermissionError
 from back.exceptions.websocket_auth_error import WebSocketAuthError
 from back.services import simulation_service
+from back.services.simulation_service import ActiveSimulationData
 from sim.entities.frame import Frame
 from sim.simulator import RunInfo
 from sim.utils.subscriber import Subscriber
@@ -309,14 +310,14 @@ def _detach_subscriber_from_emitter(
     sim_info["emitter"].detach(subscriber)
 
 
-def _remove_subscriber_from_sim_data(sim_data: dict) -> None:
+def _remove_subscriber_from_sim_data(sim_data: ActiveSimulationData) -> None:
     """
     Remove the subscriber reference from simulation data.
     """
     sim_data.pop("ws_subscriber", None)
 
 
-def _cleanup_old_subscribers(sim_data: dict, sim_info: RunInfo) -> None:
+def _cleanup_old_subscribers(sim_data: ActiveSimulationData, sim_info: RunInfo) -> None:
     """
     Clean up all existing WebSocket subscribers.
 
@@ -326,7 +327,7 @@ def _cleanup_old_subscribers(sim_data: dict, sim_info: RunInfo) -> None:
     3. Remove references from sim_data
     """
     # Clean up primary subscriber if it exists
-    old_sub: Optional[WebSocketSubscriber] = sim_data.get("ws_subscriber")
+    old_sub = sim_data.get("ws_subscriber")
     if old_sub:
         _close_subscriber(old_sub)
         _detach_subscriber_from_emitter(old_sub, sim_info)
@@ -356,7 +357,7 @@ def _attach_subscriber_to_emitter(
 
 
 def _store_subscriber_in_sim_data(
-    subscriber: WebSocketSubscriber, sim_data: dict
+    subscriber: WebSocketSubscriber, sim_data: ActiveSimulationData
 ) -> None:
     """
     Store the subscriber reference in simulation data.
@@ -365,7 +366,7 @@ def _store_subscriber_in_sim_data(
 
 
 def _setup_new_subscriber(
-    sim_data: dict, sim_info: RunInfo, websocket: WebSocket
+    sim_data: ActiveSimulationData, sim_info: RunInfo, websocket: WebSocket
 ) -> WebSocketSubscriber:
     """
     Set up a new WebSocket subscriber for the simulation.
@@ -380,7 +381,7 @@ def _setup_new_subscriber(
     return subscriber
 
 
-def _cancel_shutdown_task(sim_data: dict) -> None:
+def _cancel_shutdown_task(sim_data: ActiveSimulationData) -> None:
     """
     Cancel the existing shutdown task if present.
     """
@@ -389,21 +390,27 @@ def _cancel_shutdown_task(sim_data: dict) -> None:
         old_task.cancel()
 
 
-def _create_shutdown_task(sim_id: str, sim_data: dict, user_id: int) -> asyncio.Task:
+def _create_shutdown_task(
+    sim_id: str, sim_data: ActiveSimulationData, user_id: int
+) -> asyncio.Task:
     """
     Create a new auto-shutdown task.
     """
     return asyncio.create_task(auto_shutdown_simulation(sim_id, sim_data, user_id))
 
 
-def _store_shutdown_task(shutdown_task: asyncio.Task, sim_data: dict) -> None:
+def _store_shutdown_task(
+    shutdown_task: asyncio.Task, sim_data: ActiveSimulationData
+) -> None:
     """
     Store the shutdown task reference in simulation data.
     """
     sim_data["shutdown_task"] = shutdown_task
 
 
-def _schedule_auto_shutdown(sim_id: str, sim_data: dict, user_id: int) -> asyncio.Task:
+def _schedule_auto_shutdown(
+    sim_id: str, sim_data: ActiveSimulationData, user_id: int
+) -> asyncio.Task:
     """
     Schedule an auto-shutdown task for the simulation.
     Returns the shutdown Task.
@@ -419,7 +426,7 @@ def _schedule_auto_shutdown(sim_id: str, sim_data: dict, user_id: int) -> asynci
 
 def attach_ws_subscriber(
     sim_id: str,
-    sim_data: dict,
+    sim_data: ActiveSimulationData,
     sim_info: RunInfo,
     websocket: WebSocket,
 ) -> WebSocketSubscriber:
@@ -579,7 +586,7 @@ async def _close_websocket_connection(websocket: WebSocket) -> None:
 
 async def cleanup_simulation(
     sim_id: str,
-    sim_data: dict,
+    sim_data: ActiveSimulationData,
     sim_info: RunInfo,
     subscriber: WebSocketSubscriber,
     websocket: WebSocket,
@@ -614,7 +621,7 @@ async def cleanup_simulation(
 
 
 async def auto_shutdown_simulation(
-    sim_id: str, sim_data: dict, requesting_user: int
+    sim_id: str, sim_data: ActiveSimulationData, requesting_user: int
 ) -> None:
     """
     Initiates a complete service shutdown (database cleanup and simulator stop)

@@ -33,6 +33,7 @@ from typing import Generator, TypedDict, List, cast, Any, Coroutine
 
 from back.api.v1.utils.sim_websocket_helpers import WebSocketSubscriber
 from back.main import app
+from back.services.simulation_service import ActiveSimulationData
 from sim.simulator import RunInfo
 from back.auth.dependency import get_user_id
 from back.exceptions import VelosimPermissionError, ItemNotFoundError
@@ -165,7 +166,12 @@ def ws_client_authenticated(client: TestClient) -> Generator[TestClient, None, N
 def active_sim_id() -> Generator[str, None, None]:
     """Provides a dummy in-memory active simulation for tests."""
     sim_id = "sim-test-123"
-    simulation_service.active_simulations[sim_id] = {"db_id": 999, "status": "running"}
+    simulation_service.active_simulations[sim_id] = {
+        "db_id": 999,
+        "status": "running",
+        "sim_time": 3600,
+        "user_id": 1,
+    }
     yield sim_id
     del simulation_service.active_simulations[sim_id]
 
@@ -1353,14 +1359,20 @@ class TestWebSocketSimulationStream:
         }
 
         sim_data = {
-            "simulator": MagicMock(),
             "db_id": 1,
             "status": "initialized",
+            "sim_time": 3600,
+            "user_id": 1,
         }
-        mock_simulator: MagicMock = sim_data["simulator"]  # type: ignore[assignment]
+        mock_simulator = MagicMock()
         mock_simulator.get_sim_by_id = MagicMock(return_value=sim_info)
 
-        simulation_service.active_simulations["test_sim_123"] = sim_data
+        simulation_service.active_simulations["test_sim_123"] = {
+            "db_id": 1,
+            "status": "initialized",
+            "sim_time": 3600,
+            "user_id": 1,
+        }
 
         yield {"sim_data": sim_data, "sim_info": sim_info}
 
@@ -1450,14 +1462,20 @@ class TestWebSocketHelpers:
         with patch("back.api.v1.utils.sim_websocket_helpers.asyncio.get_running_loop"):
             # First attach
             s1 = attach_ws_subscriber(
-                "sim123", sim_data, cast(RunInfo, sim_info), mock_ws1
+                "sim123",
+                cast(ActiveSimulationData, sim_data),
+                cast(RunInfo, sim_info),
+                mock_ws1,
             )
             assert len(emitter.subscribers) == 1
             assert sim_data["ws_subscriber"] == s1
 
             # Second attach should remove the first
             s2 = attach_ws_subscriber(
-                "sim123", sim_data, cast(RunInfo, sim_info), mock_ws2
+                "sim123",
+                cast(ActiveSimulationData, sim_data),
+                cast(RunInfo, sim_info),
+                mock_ws2,
             )
             assert len(emitter.subscribers) == 1
             assert sim_data["ws_subscriber"] == s2
@@ -1499,7 +1517,10 @@ class TestWebSocketHelpers:
 
             # This should clean up all existing WebSocketSubscribers
             new_subscriber = attach_ws_subscriber(
-                "sim123", sim_data, cast(RunInfo, sim_info), mock_ws3
+                "sim123",
+                cast(ActiveSimulationData, sim_data),
+                cast(RunInfo, sim_info),
+                mock_ws3,
             )
 
             # Should only have the new subscriber
@@ -1620,7 +1641,11 @@ class TestWebSocketHelpers:
 
         asyncio.run(
             cleanup_simulation(
-                "sim123", sim_data, cast(RunInfo, sim_info), subscriber, mock_ws
+                "sim123",
+                cast(ActiveSimulationData, sim_data),
+                cast(RunInfo, sim_info),
+                subscriber,
+                mock_ws,
             )
         )
 
@@ -1661,7 +1686,11 @@ class TestWebSocketHelpers:
         # Should not raise even if close fails
         asyncio.run(
             cleanup_simulation(
-                "sim123", sim_data, cast(RunInfo, sim_info), subscriber, mock_ws
+                "sim123",
+                cast(ActiveSimulationData, sim_data),
+                cast(RunInfo, sim_info),
+                subscriber,
+                mock_ws,
             )
         )
 
@@ -1754,7 +1783,9 @@ class TestWebSocketHelpers:
         # Simulate subscriber reconnection before timeout
         sim_data: dict[str, Any] = {"ws_subscriber": MagicMock(), "user_id": 1}
 
-        asyncio.run(auto_shutdown_simulation("sim123", sim_data, 1))
+        asyncio.run(
+            auto_shutdown_simulation("sim123", cast(ActiveSimulationData, sim_data), 1)
+        )
 
         # Should not call stop_simulation since subscriber exists
         mock_sim_service.stop_simulation.assert_not_called()
@@ -1790,7 +1821,9 @@ class TestWebSocketHelpers:
         # No subscriber in sim_data
         sim_data: dict[str, Any] = {"user_id": 1}
 
-        asyncio.run(auto_shutdown_simulation("sim123", sim_data, 1))
+        asyncio.run(
+            auto_shutdown_simulation("sim123", cast(ActiveSimulationData, sim_data), 1)
+        )
 
         # Should call stop_simulation
         mock_sim_service.stop_simulation.assert_called_once_with(mock_db, "sim123", 1)
@@ -1827,7 +1860,9 @@ class TestWebSocketHelpers:
         sim_data: dict[str, Any] = {"user_id": 1}
 
         # Should not raise, just print error
-        asyncio.run(auto_shutdown_simulation("sim123", sim_data, 1))
+        asyncio.run(
+            auto_shutdown_simulation("sim123", cast(ActiveSimulationData, sim_data), 1)
+        )
 
     def test_attach_ws_subscriber_cancels_old_shutdown_task(self) -> None:
         """Test that attach_ws_subscriber cancels previous shutdown task"""
@@ -1854,7 +1889,10 @@ class TestWebSocketHelpers:
 
                 mock_create_task.side_effect = create_task_side_effect
                 attach_ws_subscriber(
-                    "sim123", sim_data, cast(RunInfo, sim_info), mock_ws
+                    "sim123",
+                    cast(ActiveSimulationData, sim_data),
+                    cast(RunInfo, sim_info),
+                    mock_ws,
                 )
 
                 # Should cancel old shutdown task
@@ -1874,7 +1912,10 @@ class TestWebSocketHelpers:
         with patch("back.api.v1.utils.sim_websocket_helpers.asyncio.get_running_loop"):
             with pytest.raises(ValueError, match="user_id must be present"):
                 attach_ws_subscriber(
-                    "sim123", sim_data, cast(RunInfo, sim_info), mock_ws
+                    "sim123",
+                    cast(ActiveSimulationData, sim_data),
+                    cast(RunInfo, sim_info),
+                    mock_ws,
                 )
 
     def test_cleanup_simulation_cancels_shutdown_task(self) -> None:
@@ -1922,7 +1963,11 @@ class TestWebSocketHelpers:
 
             asyncio.run(
                 cleanup_simulation(
-                    "sim123", sim_data, cast(RunInfo, sim_info), subscriber, mock_ws
+                    "sim123",
+                    cast(ActiveSimulationData, sim_data),
+                    cast(RunInfo, sim_info),
+                    subscriber,
+                    mock_ws,
                 )
             )
 
