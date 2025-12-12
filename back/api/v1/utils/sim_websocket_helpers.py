@@ -256,7 +256,7 @@ async def run_message_loop(websocket: WebSocket) -> None:
 
 async def get_simulation_or_error(
     sim_id: str, websocket: WebSocket
-) -> Optional[Tuple[dict, RunInfo]]:
+) -> Optional[Tuple[ActiveSimulationData, RunInfo]]:
     """Fetch simulation info or send an error and close websocket.
 
     Args:
@@ -665,7 +665,7 @@ async def auto_shutdown_simulation(
 
         # Check if simulation still exists (may have been stopped by admin)
         if sim_id not in simulation_service.active_simulations:
-            print(f"Simulation {sim_id} already stopped, skipping auto-shutdown.")
+            logger.info(f"Simulation {sim_id} already stopped, skipping auto-shutdown.")
             return
 
         # A shutdown is performed if no WebSocket subscriber is associated with
