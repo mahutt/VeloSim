@@ -83,13 +83,13 @@ docker-compose down
 
 **Ports:**
 
-| Service | Local Dev (`npm run dev`) | Docker Compose |
-|---------|---------------------------|----------------|
-| Frontend | 5173 | 3000 |
-| Backend API | 8000 | 8000 |
-| PostgreSQL | 5433 | 5432 (internal) |
-| OSRM | 5001 | 5000 (internal) |
-| Grafana | N/A | 3001 |
+| Service     | Local Dev (`npm run dev`) | Docker Compose  |
+| ----------- | ------------------------- | --------------- |
+| Frontend    | 5173                      | 3000            |
+| Backend API | 8000                      | 8000            |
+| PostgreSQL  | 5433                      | 5432 (internal) |
+| OSRM        | 5001                      | 5000 (internal) |
+| Grafana     | N/A                       | 3001            |
 
 > **Note:** `npm run setup` installs Python dependencies locally for IDE autocomplete and running linters/tests. When using Docker Compose, dependencies are automatically installed in containers.
 
@@ -107,6 +107,15 @@ npm run lint
 
 # Format all code
 npm run format
+```
+
+**Documentation:**
+
+```bash
+# Generate HTML documentation from docstrings
+python scripts/build_docs.py
+
+# Documentation will be available at docs/_build/html/index.html
 ```
 
 ### Development Workflow
