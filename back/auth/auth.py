@@ -34,15 +34,18 @@ import jwt
 
 from back.crud.user import user_crud
 from back.database.session import get_db
+from back.grafana_logging.logger import get_logger
+
+logger = get_logger(__name__)
 
 ph = PasswordHasher.from_parameters(RFC_9106_LOW_MEMORY)
 
 jwt_secret: str = os.getenv("VELOSIM_JWT_SECRET")  # type: ignore
 if not jwt_secret:
     jwt_secret = secrets.token_hex(32)
-    print("WARNING: JWT secret environment variable not set. Generated a random key.")
-    print("WARNING: This means JWT tokens will be invalid after server restart.")
-    print("WARNING: Set VELOSIM_JWT_SECRET environment variable for production use.")
+    logger.warning("JWT secret environment variable not set. Generated a random key.")
+    logger.warning("This means JWT tokens will be invalid after server restart.")
+    logger.warning("Set VELOSIM_JWT_SECRET environment variable for production use.")
 
 ACCESS_TOKEN_LIFE = timedelta(minutes=30)
 JWT_ALGORITHM = "HS256"

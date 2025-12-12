@@ -39,6 +39,9 @@ from back.schemas.sim_instance import (
     SimulationResponse,
 )
 from back.exceptions import VelosimPermissionError, ItemNotFoundError
+from back.grafana_logging.logger import get_logger
+
+logger = get_logger(__name__)
 
 
 class SimulationService:
@@ -365,7 +368,7 @@ class SimulationService:
                 try:
                     sim.stop(sim_id)
                 except Exception as exc:
-                    print(f"Failed to stop simulation {sim_id}: {exc}")
+                    logger.error(f"Failed to stop simulation {sim_id}: {exc}")
 
             # Clean up database records in a single batch operation
             if self.active_simulations:

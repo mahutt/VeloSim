@@ -36,6 +36,9 @@ from sim.simulator import RunInfo
 from sim.utils.subscriber import Subscriber
 from back.core.config import settings
 from sqlalchemy.orm import Session
+from back.grafana_logging.logger import get_logger
+
+logger = get_logger(__name__)
 
 
 class WebSocketSubscriber(Subscriber):
@@ -637,6 +640,6 @@ async def auto_shutdown_simulation(
     try:
         db = next(get_db())
         simulation_service.stop_simulation(db, sim_id, requesting_user)
-        print(f"Simulation {sim_id} stopped due to disconnect timeout.")
+        logger.info(f"Simulation {sim_id} stopped due to disconnect timeout.")
     except Exception as e:
-        print(f"Failed to stop {sim_id}: {e}")
+        logger.error(f"Failed to stop {sim_id}: {e}")
