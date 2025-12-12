@@ -35,8 +35,9 @@ if TYPE_CHECKING:
 
 
 class SimInstance(Base):
-    """Model to represent sim instances. This model will be more fleshed out once we
-    know more about how sims will run.
+    """Model to represent sim instances.
+
+    This model will be more fleshed out once we know more about how sims will run.
     """
 
     __tablename__ = "sim_instances"

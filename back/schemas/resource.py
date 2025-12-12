@@ -76,8 +76,10 @@ class ResourceCreate(ResourceBase):
 
 
 class ResourceUpdate(BaseModel):
-    """Schema for updating a resource, namely the current position and start/end
-    of route."""
+    """Schema for updating a resource.
+
+    Namely the current position and start/end of route.
+    """
 
     latitude: Optional[float] = Field(None, description="Current latitude position")
     longitude: Optional[float] = Field(None, description="Current longitude position")

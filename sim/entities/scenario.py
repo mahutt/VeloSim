@@ -32,6 +32,8 @@ from sim.entities.task import Task
 
 @dataclass
 class Scenario:
+    """Complete scenario definition with resources, stations, and tasks."""
+
     scenario_title: Optional[str]
     start_time: str
     end_time: str

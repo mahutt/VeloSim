@@ -33,7 +33,7 @@ class UserBase(BaseModel):
 
 
 class UserCreate(UserBase):
-    """Schema for creating a new user"""
+    """Schema for creating a new user."""
 
     username: str = Field(..., description="Username to create")
     password: str = Field(..., description="Password to set for the user")

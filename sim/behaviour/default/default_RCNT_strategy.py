@@ -33,8 +33,16 @@ if TYPE_CHECKING:
 
 
 class DefaultRCNTStrategy(ResourceChooseNextTaskStrategy):
+    """Default strategy for resource choosing next task."""
 
     def select_next_task(self, resource: "Resource") -> "Task":
+        """Select the next task for a resource to execute.
 
+        Args:
+            resource: The resource selecting a task.
+
+        Returns:
+            Task: The first task in the resource's task list.
+        """
         tasks = resource.get_task_list()
         return tasks[0]

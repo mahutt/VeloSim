@@ -33,7 +33,7 @@ if TYPE_CHECKING:
 
 
 class User(Base):
-    """User model of the VeloSim app"""
+    """User model of the VeloSim app."""
 
     __tablename__ = "users"
 

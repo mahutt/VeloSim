@@ -38,6 +38,8 @@ if TYPE_CHECKING:  # pragma: no cover
 
 
 class Task(ABC):
+    """Abstract base class for simulation tasks."""
+
     env: simpy.Environment
     spawn_time: float
 
@@ -59,6 +61,18 @@ class Task(ABC):
             self.state = State.OPEN
 
     def _spawn_after_delay(self, delay: float) -> Generator[simpy.Event, None, None]:
+        """Internal generator that spawns a task after a specified delay.
+
+        This is a SimPy process that waits for the spawn delay and then transitions
+        the task from SCHEDULED to OPEN state. Updates the task, station, and resource
+        flags to trigger state change notifications.
+
+        Args:
+            delay: The simulation time delay before spawning the task.
+
+        Yields:
+            simpy.Event: SimPy timeout event for the delay period.
+        """
         # Yield until scheduled time has been reached.
         yield self.env.timeout(delay)
         self.set_state(State.OPEN)
@@ -70,47 +84,129 @@ class Task(ABC):
 
     @abstractmethod
     def get_state(self) -> State:
+        """Get the current state of the task.
+
+        Returns:
+            State: The current state (SCHEDULED, OPEN, ASSIGNED, IN_PROGRESS,
+                or CLOSED).
+        """
         pass
 
     @abstractmethod
     def set_state(self, state: State) -> None:
+        """Set the state of the task.
+
+        Args:
+            state: The new state to set for the task.
+
+        Returns:
+            None
+        """
         pass
 
     @abstractmethod
     def get_task_id(self) -> int:
+        """Get the unique identifier for this task.
+
+        Returns:
+            int: The task's unique ID.
+        """
         pass
 
     @abstractmethod
     def get_station(self) -> Optional["Station"]:
+        """Get the station where this task is located.
+
+        Returns:
+            Optional[Station]: The station assigned to this task, or None if
+                no station is assigned.
+        """
         pass
 
     @abstractmethod
     def set_station(self, station: "Station") -> None:
+        """Set the station where this task is located.
+
+        Args:
+            station: The station to assign to this task.
+
+        Returns:
+            None
+        """
         pass
 
     @abstractmethod
     def get_assigned_resource(self) -> Optional["Resource"]:
+        """Get the resource assigned to work on this task.
+
+        Returns:
+            Optional[Resource]: The resource assigned to this task, or None if
+                no resource is assigned.
+        """
         pass
 
     @abstractmethod
     def set_assigned_resource(self, resource: "Resource") -> None:
+        """Assign a resource to work on this task.
+
+        Args:
+            resource: The resource to assign to this task.
+
+        Returns:
+            None
+        """
         pass
 
     @abstractmethod
     def unassign_resource(self) -> None:
+        """Remove the resource assignment from this task.
+
+        Clears the assigned_resource reference and typically transitions the task
+        back to OPEN state.
+
+        Returns:
+            None
+        """
         pass
 
     @abstractmethod
     def is_assigned(self) -> bool:
+        """Check if the task is assigned to a resource.
+
+        Returns:
+            bool: True if the task is in ASSIGNED state, False otherwise.
+        """
         pass
 
     def set_behaviour(self, behaviour: "SimBehaviour") -> None:
+        """Set the simulation behavior controller for this task.
+
+        Args:
+            behaviour: The SimBehaviour instance that defines task-related
+                behavioral strategies.
+
+        Returns:
+            None
+        """
         self.behaviour = behaviour
 
     def clear_update(self) -> None:
+        """Clear the update flag for this task.
+
+        Resets the has_updated flag to False, indicating that changes to this
+        task have been processed or acknowledged.
+
+        Returns:
+            None
+        """
         self.has_updated = False
 
     def to_dict(self) -> dict[str, Any]:
+        """Convert task to dictionary representation.
+
+        Returns:
+            Dictionary containing task ID, state, station ID, and resource ID.
+        """
         return {
             "id": self.id,
             "state": str(self.state),

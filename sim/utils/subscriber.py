@@ -28,7 +28,16 @@ from sim.entities.frame import Frame
 
 
 class Subscriber(ABC):
-    # Update Method
+    """Abstract base class for subscriber in observer pattern."""
+
     @abstractmethod
     def on_frame(self, frame: Frame) -> None:
+        """Handle incoming frame notification from publisher.
+
+        Args:
+            frame: Frame data received from publisher.
+
+        Returns:
+            None
+        """
         raise NotImplementedError()

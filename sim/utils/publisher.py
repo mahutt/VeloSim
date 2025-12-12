@@ -28,14 +28,40 @@ from sim.utils.subscriber import Subscriber
 
 
 class Publisher(ABC):
+    """Abstract base class for publisher in observer pattern."""
+
     @abstractmethod
     def attach(self, sub: Subscriber) -> None:
+        """Attach a subscriber to receive frame notifications.
+
+        Args:
+            sub: Subscriber instance to attach.
+
+        Returns:
+            None
+        """
         raise NotImplementedError()
 
     @abstractmethod
     def detach(self, sub: Subscriber) -> None:
+        """Detach a subscriber from receiving frame notifications.
+
+        Args:
+            sub: Subscriber instance to detach.
+
+        Returns:
+            None
+        """
         raise NotImplementedError()
 
     @abstractmethod
     def notify(self, frame: Frame) -> None:
+        """Notify all attached subscribers with a new frame.
+
+        Args:
+            frame: Frame data to send to subscribers.
+
+        Returns:
+            None
+        """
         raise NotImplementedError()

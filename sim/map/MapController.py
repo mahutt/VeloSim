@@ -40,11 +40,32 @@ class MapController:
     _instance = None
 
     def __new__(cls, *args: Any, **kwargs: Any) -> "MapController":
+        """Implement singleton pattern for MapController.
+
+        Ensures only one instance of MapController exists across the application.
+
+        Args:
+            *args: Variable length argument list.
+            **kwargs: Arbitrary keyword arguments.
+
+        Returns:
+            The singleton MapController instance.
+        """
         if cls._instance is None:
             cls._instance = super().__new__(cls)
         return cls._instance
 
     def __init__(self, osrm_url: Optional[str] = None) -> None:
+        """Initialize the MapController with OSRM routing.
+
+        Sets up the OSRM connection for routing operations and initializes
+        the road subscription tracking system. This is only executed once
+        due to the singleton pattern.
+
+        Args:
+            osrm_url: Optional URL for the OSRM server. If not provided,
+                will use environment variables to determine the server.
+        """
         if not hasattr(self, "_initialized"):
             # Initialize the OSRM connection
             self.osrm = OSRMConnection(osrm_url=osrm_url)
@@ -130,6 +151,9 @@ class MapController:
 
         Args:
             road_id_list: List of road segment OSM IDs to disable
+
+        Returns:
+            None
         """
         # Get all edges from OSRM
         all_edges = self.osrm.get_all_edges()

@@ -38,18 +38,53 @@ from sim.behaviour.sim_behaviour import SimBehaviour
 
 
 class LoggerSubscriber(Subscriber):
+    """Subscriber that logs simulation frames for debugging."""
+
     def __init__(self, name: str) -> None:
+        """Initialize a logger subscriber.
+
+        Args:
+            name: Identifier for this logger subscriber instance.
+        """
         self.name = name
 
     def on_frame(self, frame: Frame) -> None:
+        """Handle incoming frame from the simulation.
+
+        Prints the received frame to console with the subscriber's name prefix.
+
+        Args:
+            frame: Simulation frame containing state updates.
+
+        Returns:
+            None
+        """
         print(f"[{self.name}] Received: {frame}\n\n")
 
 
 class WebSocketSubscriber(Subscriber):
+    """Subscriber that broadcasts simulation frames via WebSocket."""
+
     def __init__(self, name: str) -> None:
+        """Initialize a WebSocket subscriber.
+
+        Args:
+            name: Identifier for this WebSocket subscriber instance.
+        """
         self.name = name
 
     def on_frame(self, frame: Frame) -> None:
+        """Handle incoming frame from the simulation.
+
+        Prints the received frame to console with the subscriber's name prefix.
+        In a real implementation, this would send frames over WebSocket.
+
+        Args:
+            frame: Simulation frame containing state updates.
+
+        Returns:
+            None
+        """
         print(f"[{self.name}] Received: {frame}\n\n")
 
 

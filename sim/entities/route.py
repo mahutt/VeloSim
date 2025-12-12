@@ -340,26 +340,51 @@ class Route:
         return points
 
     def subscribe_to_map_controller(self, map_controller: "MapController") -> None:
-        """
-        Subscribes this route to all roads it traverses via the MapController.
+        """Subscribes this route to all roads it traverses via the MapController.
+
+        Registers this route with the MapController for each road segment it uses.
+        This enables the MapController to track which routes are using which roads,
+        facilitating traffic management and route updates.
+
+        Args:
+            map_controller: The MapController instance that manages road subscriptions
+                and traffic routing in the simulation.
+
+        Returns:
+            None
         """
         self.map_controller = map_controller
         for road_segment in self.roads:
             map_controller._subscribe_route_to_road(road_segment.id, self)
 
     def unsubscribe_from_all_roads(self) -> None:
-        """
-        Unsubscribes this route from all roads in the MapController.
-        Should be called when route is being recalculated or finished.
+        """Unsubscribes this route from all roads in the MapController.
+
+        Removes this route from all road subscriptions in the MapController.
+        This should be called when the route is being recalculated or has finished
+        to ensure proper cleanup and prevent memory leaks.
+
+        The method safely handles the case where no MapController is set.
+
+        Returns:
+            None
         """
         if self.map_controller:
             for road_segment in self.roads:
                 self.map_controller._unsubscribe_route_from_road(road_segment.id, self)
 
     def unsubscribe_from_road(self, road_id: int) -> None:
-        """
-        Unsubscribes this route from a specific road.
-        Called when the route has passed a road segment.
+        """Unsubscribes this route from a specific road segment.
+
+        Called when the route has passed a road segment and no longer needs
+        to be tracked for that road. Removes this route from the MapController's
+        subscription list for the specified road.
+
+        Args:
+            road_id: The ID of the road segment to unsubscribe from.
+
+        Returns:
+            None
         """
         if self.map_controller:
             self.map_controller._unsubscribe_route_from_road(road_id, self)
@@ -504,11 +529,18 @@ class Route:
         return all_points_objects
 
     def get_route_geometry(self) -> LineString:
-        """
-        Returns the complete route geometry as a LineString.
+        """Returns the complete route geometry as a LineString.
+
+        Collects all position points from all road segments in the route,
+        filters out consecutive duplicates at road boundaries, and constructs
+        a Shapely LineString representing the complete route path.
+
+        This is useful for route visualization, spatial analysis, and calculating
+        route properties such as length or intersection with other geometries.
 
         Returns:
-            LineString: Shapely LineString representing the entire route path
+            LineString: Shapely LineString object representing the entire route path,
+                with coordinates in (longitude, latitude) format.
         """
         all_points = self._get_all_points()
         coordinates = [p.get_position() for p in all_points]

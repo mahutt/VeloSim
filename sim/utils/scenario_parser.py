@@ -27,12 +27,34 @@ from sim.utils.base_parse_strategy import BaseParseStrategy
 
 
 class ScenarioParser:
+    """Parser for scenario JSON using strategy pattern."""
 
     def __init__(self, strategy: BaseParseStrategy) -> None:
+        """Initialize parser with a parsing strategy.
+
+        Args:
+            strategy: Parsing strategy to use for scenario interpretation.
+        """
         self._strategy = strategy
 
     def setStrategy(self, strategy: BaseParseStrategy) -> None:
+        """Set a new parsing strategy.
+
+        Args:
+            strategy: New parsing strategy to use.
+
+        Returns:
+            None
+        """
         self._strategy = strategy
 
     def parse(self, scenario_json: dict) -> InputParameter:
+        """Parse scenario JSON using the configured strategy.
+
+        Args:
+            scenario_json: Dictionary containing scenario configuration.
+
+        Returns:
+            InputParameter object with parsed scenario data.
+        """
         return self._strategy.parse(scenario_json=scenario_json)

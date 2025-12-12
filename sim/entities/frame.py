@@ -28,6 +28,8 @@ from typing import Any, Dict, Optional
 
 
 class Frame:
+    """Simulation frame containing timestamped payload data."""
+
     def __init__(
         self,
         seq_numb: int,

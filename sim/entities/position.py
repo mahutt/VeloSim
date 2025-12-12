@@ -24,13 +24,28 @@ SOFTWARE.
 
 
 class Position:
+    """Geographical position with longitude and latitude coordinates."""
+
     def __init__(self, position: list[float]) -> None:  # [longitude, latitude]
         self.position = position
 
     def get_position(self) -> list[float]:
+        """Get the position coordinates.
+
+        Returns:
+            List of [longitude, latitude].
+        """
         return self.position
 
     def set_position(self, position: list[float]) -> None:
+        """Set the position coordinates.
+
+        Args:
+            position: List of [longitude, latitude].
+
+        Returns:
+            None
+        """
         self.position = position
 
     def __eq__(self, other: object) -> bool:
@@ -42,7 +57,14 @@ class Position:
         )
 
     def close_enough(self, other: object) -> bool:
-        """Check if this position is within a certain distance of another position."""
+        """Check if this position is within a certain distance of another position.
+
+        Args:
+            other: Another position object to compare with.
+
+        Returns:
+            True if positions are within 0.001 units, False otherwise.
+        """
         if not isinstance(other, Position):
             return False
         return (

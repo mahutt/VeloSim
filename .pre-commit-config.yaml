@@ -99,6 +99,13 @@ repos:
         always_run: true
         pass_filenames: false
 
+      - id: validate-docstrings
+        name: Python Docstring Validation
+        entry: bash -c 'if [ -f .venv/bin/python ]; then .venv/bin/python scripts/validate_docstrings.py; elif [ -f .venv/Scripts/python.exe ]; then .venv/Scripts/python.exe scripts/validate_docstrings.py; else python scripts/validate_docstrings.py; fi'
+        language: system
+        files: ^(back|sim)/.*\.py$
+        pass_filenames: false
+
       - id: validate-commit-message
         name: Validate Commit Message (Conventional + Issue Number)
         entry: bash -c 'if [ -f .venv/bin/python ]; then .venv/bin/python scripts/validate_commit_wrapper.py "$@"; elif [ -f .venv/Scripts/python.exe ]; then .venv/Scripts/python.exe scripts/validate_commit_wrapper.py "$@"; else python scripts/validate_commit_wrapper.py "$@"; fi' --

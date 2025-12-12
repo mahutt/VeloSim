@@ -180,6 +180,19 @@ def main() -> int:
     back_dir = project_root / "back"
     sim_dir = project_root / "sim"
 
+    # Determine which directories to check based on command-line argument
+    target = sys.argv[1] if len(sys.argv) > 1 else "both"
+
+    if target == "back":
+        directories = [back_dir]
+        print(f"Validating docstrings in backend (back/) directory only...")
+    elif target == "sim":
+        directories = [sim_dir]
+        print(f"Validating docstrings in simulation (sim/) directory only...")
+    else:
+        directories = [back_dir, sim_dir]
+        print(f"Validating docstrings in both back/ and sim/ directories...")
+
     # Patterns to exclude
     exclude_patterns = [
         "**/alembic/**",
@@ -198,7 +211,7 @@ def main() -> int:
 
     # Find all Python files
     python_files: List[Path] = []
-    for directory in [back_dir, sim_dir]:
+    for directory in directories:
         if directory.exists():
             for py_file in directory.rglob("*.py"):
                 # Check if file should be excluded using pathlib pattern matching

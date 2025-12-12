@@ -29,11 +29,27 @@ import re
 
 
 class PositionValidator(BaseModel):
+    """Validator for geographical position coordinates."""
+
     lat: float
     lon: float
 
     @model_validator(mode="before")
     def check_lat_lon(cls, values: Any) -> Dict[str, float]:
+        """Validate and normalize position coordinates.
+
+        Accepts position data as either a dict with lat/lon keys or a list/tuple
+        of [lon, lat] and validates that coordinates are within valid ranges.
+
+        Args:
+            values: Position data as dict, list, or tuple.
+
+        Returns:
+            Dictionary with validated 'lat' and 'lon' keys.
+
+        Raises:
+            ValueError: If position format is invalid or coordinates are out of range.
+        """
         if isinstance(values, (list, tuple)):
             if len(values) != 2:
                 raise ValueError(
@@ -52,17 +68,23 @@ class PositionValidator(BaseModel):
 
 
 class ResourceValidator(BaseModel):
+    """Validator for resource entity data."""
+
     resource_id: int
     resource_position: PositionValidator
 
 
 class StationValidator(BaseModel):
+    """Validator for station entity data."""
+
     station_id: int
     station_name: str
     station_position: PositionValidator
 
 
 class TaskValidator(BaseModel):
+    """Validator for task entity data."""
+
     id: str | None = None
     station_id: int
     time: str | None = None
@@ -78,6 +100,15 @@ class TaskValidator(BaseModel):
         - None or omitted for initial_tasks (spawns immediately)
         - Simple time strings with relative day value for scheduled_tasks
         (e.g., "day1:08:00")
+
+        Args:
+            v: Time value to validate, either string or None.
+
+        Returns:
+            Validated time string or None.
+
+        Raises:
+            ValueError: If time format is invalid.
         """
         if isinstance(v, str):
             try:
@@ -112,6 +143,8 @@ class TaskValidator(BaseModel):
 
 
 class ScenarioTimes(BaseModel):
+    """Validator for scenario start and end times."""
+
     start_time: str
     end_time: str
 
@@ -121,6 +154,15 @@ class ScenarioTimes(BaseModel):
         """Parse time to validate valid fomat.
 
         Supports: Simple time strings with relative day value (e.g., "day1:08:00")
+
+        Args:
+            v: Time value to validate as a string.
+
+        Returns:
+            Validated time string.
+
+        Raises:
+            ValueError: If time format is invalid.
         """
 
         if isinstance(v, str):
@@ -159,13 +201,22 @@ class ScenarioValidator:
     """Validator for scenario content."""
 
     def __init__(self, json_string: Optional[str] = None) -> None:
-        """Initialize validator with optional JSON string for line number tracking."""
+        """Initialize validator with optional JSON string for line number tracking.
+
+        Args:
+            json_string: Optional JSON string to build line number mapping
+                for error reporting.
+        """
         self.line_map: Dict[str, int] = {}
         if json_string:
             self._build_line_map(json_string)
 
     def _build_line_map(self, json_string: str) -> None:
-        """Build a map of JSON paths to line numbers."""
+        """Build a map of JSON paths to line numbers.
+
+        Args:
+            json_string: JSON string to parse for line number mapping.
+        """
         lines = json_string.split("\n")
         path_stack: List[str] = []
 
@@ -196,7 +247,14 @@ class ScenarioValidator:
                     path_stack.pop()
 
     def _get_line_number(self, field_path: str) -> Optional[int]:
-        """Get line number for a field path, trying multiple variations."""
+        """Get line number for a field path, trying multiple variations.
+
+        Args:
+            field_path: JSON field path (e.g., 'stations[0].station_id').
+
+        Returns:
+            Line number if found, None otherwise.
+        """
         # Try exact match first
         if field_path in self.line_map:
             return self.line_map[field_path]
@@ -220,6 +278,15 @@ class ScenarioValidator:
     def check_required_fields(
         item: Dict[str, Any], required_fields: List[str]
     ) -> List[Dict[str, Any]]:
+        """Check if all required fields are present in an item.
+
+        Args:
+            item: Dictionary to check for required fields.
+            required_fields: List of field names that must be present.
+
+        Returns:
+            List of error dictionaries for missing fields.
+        """
         return [
             {"field": f, "message": f"Missing required field '{f}'"}
             for f in required_fields
@@ -227,7 +294,14 @@ class ScenarioValidator:
         ]
 
     def validate_syntax(self, content: Dict[str, Any]) -> List[Dict[str, Any]]:
-        """Validate the syntax of scenario content only."""
+        """Validate the syntax of scenario content only.
+
+        Args:
+            content: Scenario content dictionary to validate.
+
+        Returns:
+            List of error dictionaries with field, message, and optional line number.
+        """
         errors: List[Dict[str, Any]] = []
 
         # Validate start_time and end_time exist and are properly formatted
@@ -256,6 +330,14 @@ class ScenarioValidator:
         return errors
 
     def validate_stations(self, stations: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """Validate station definitions including IDs, names, and positions.
+
+        Args:
+            stations: List of station dictionaries to validate.
+
+        Returns:
+            List of error dictionaries for invalid or duplicate stations.
+        """
         errors: List[Dict[str, Any]] = []
         seen_ids: Set[int] = set()
 
@@ -308,6 +390,14 @@ class ScenarioValidator:
     def validate_resources(
         self, resources: List[Dict[str, Any]]
     ) -> List[Dict[str, Any]]:
+        """Validate resource definitions including IDs and positions.
+
+        Args:
+            resources: List of resource dictionaries to validate.
+
+        Returns:
+            List of error dictionaries for invalid or duplicate resources.
+        """
         errors: List[Dict[str, Any]] = []
         seen_ids: Set[int] = set()
 
@@ -352,6 +442,15 @@ class ScenarioValidator:
     def validate_tasks(
         self, tasks: List[Dict[str, Any]], valid_station_ids: Set[int]
     ) -> List[Dict[str, Any]]:
+        """Validate task definitions and station ID references.
+
+        Args:
+            tasks: List of task dictionaries to validate.
+            valid_station_ids: Set of valid station IDs for reference checking.
+
+        Returns:
+            List of error dictionaries for invalid tasks or station references.
+        """
         errors: List[Dict[str, Any]] = []
 
         for idx, task in enumerate(tasks):
@@ -407,10 +506,16 @@ class ScenarioValidator:
     def validate_simulation_params(
         self, params: Dict[str, Any]
     ) -> List[Dict[str, Any]]:
-        """
-        Validate simulation time parameters.
+        """Validate simulation time parameters.
 
         Ensures start_time and end_time are valid and that end_time is after start_time.
+
+        Args:
+            params: Dictionary containing simulation parameters with
+                start_time and end_time.
+
+        Returns:
+            List of validation error dictionaries, empty if no errors.
         """
 
         errors: List[Dict[str, Any]] = []
@@ -465,7 +570,14 @@ class ScenarioValidator:
         return errors
 
     def validate_all(self, scenario_content: Dict[str, Any]) -> List[Dict[str, Any]]:
-        """Validate all aspects of scenario content."""
+        """Validate all aspects of scenario content.
+
+        Args:
+            scenario_content: Complete scenario dictionary to validate.
+
+        Returns:
+            List of all validation errors found across all validation checks.
+        """
         errors: List[Dict[str, Any]] = self.validate_syntax(scenario_content)
 
         stations: List[Dict[str, Any]] = scenario_content.get("stations", [])

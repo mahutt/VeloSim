@@ -31,7 +31,16 @@ if TYPE_CHECKING:
 
 
 class ResourceChooseNextTaskStrategy(ABC):
+    """Abstract base class for resource task selection strategies."""
 
     @abstractmethod
     def select_next_task(self, resource: "Resource") -> "Task":
+        """Select the next task for a resource to execute.
+
+        Args:
+            resource: The resource selecting its next task.
+
+        Returns:
+            The selected task for the resource to execute.
+        """
         raise NotImplementedError()

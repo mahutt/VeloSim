@@ -39,6 +39,7 @@ from sim.map.MapController import MapController
 
 
 class SimulatorController:
+    """Main controller for simulation execution and entity management."""
 
     def __init__(
         self,
@@ -73,6 +74,11 @@ class SimulatorController:
         self.task_entities = inputParameters.get_task_entities()
 
     def prep_entities(self) -> None:
+        """Prepare all entities for simulation by setting behaviors and env.
+
+        Returns:
+            None
+        """
 
         for _, station in self.station_entities.items():
             station.set_behaviour(self.sim_behaviour)
@@ -106,6 +112,14 @@ class SimulatorController:
             self.simEnv.process(resource.run())
 
     def start(self, sim_time: int) -> None:
+        """Start the simulation for specified time.
+
+        Args:
+            sim_time: Duration to run the simulation in sim seconds.
+
+        Returns:
+            None
+        """
         # Load entities into sim event queue and pass behaviour and/or mapcontroller
         self.prep_entities()
         # start sim clock
@@ -117,6 +131,11 @@ class SimulatorController:
         self.sim_thread.start()
 
     def stop(self) -> None:
+        """Stop the running simulation.
+
+        Returns:
+            None
+        """
         self.realTimeDriver.stop()
         if hasattr(self, "sim_thread") and self.sim_thread.is_alive():
             self.sim_thread.join()
@@ -125,24 +144,77 @@ class SimulatorController:
         self.emit_frame(final_frame)
 
     def pause(self) -> None:
+        """Pause the running simulation.
+
+        Returns:
+            None
+        """
         self.realTimeDriver.pause()
 
     def resume(self) -> None:
+        """Resume the paused simulation.
+
+        Returns:
+            None
+        """
         self.realTimeDriver.resume()
 
     def set_factor(self, factor: float) -> None:
+        """Set the real-time factor for simulation pacing.
+
+        Args:
+            factor: Real seconds per simulated second.
+
+        Returns:
+            None
+        """
         self.realTimeDriver.set_real_time_factor(factor)
 
     def get_task_by_id(self, task_id: int) -> Optional[Task]:
+        """Get a task by its ID.
+
+        Args:
+            task_id: The task ID to look up.
+
+        Returns:
+            The task if found, None otherwise.
+        """
         return self.task_entities.get(task_id)
 
     def get_resource_by_id(self, resource_id: int) -> Optional[Resource]:
+        """Get a resource by its ID.
+
+        Args:
+            resource_id: The resource ID to look up.
+
+        Returns:
+            The resource if found, None otherwise.
+        """
         return self.resource_entities.get(resource_id)
 
     def get_station_by_id(self, station_id: int) -> Optional[Station]:
+        """Get a station by its ID.
+
+        Args:
+            station_id: The station ID to look up.
+
+        Returns:
+            The station if found, None otherwise.
+        """
         return self.station_entities.get(station_id)
 
     def add_task(self, task: Task) -> None:
+        """Add a new task to the simulation.
+
+        Args:
+            task: The task to add.
+
+        Returns:
+            None
+
+        Raises:
+            Exception: If a task with the same ID already exists.
+        """
         task_id = task.get_task_id()
         found_task = self.get_task_by_id(task_id)
 
@@ -154,6 +226,19 @@ class SimulatorController:
     def assign_task_to_resource(
         self, task_id: int, resource_id: int, dispatch_delay: Optional[float] = None
     ) -> None:
+        """Assign a task to a resource.
+
+        Args:
+            task_id: The task ID to assign.
+            resource_id: The resource ID to assign to.
+            dispatch_delay: Optional delay before task dispatch.
+
+        Returns:
+            None
+
+        Raises:
+            Exception: If task or resource not found.
+        """
         found_task = self.get_task_by_id(task_id)
         found_resource = self.get_resource_by_id(resource_id)
 
@@ -165,6 +250,18 @@ class SimulatorController:
             raise Exception(f"Could not find resource in sim with id: {resource_id}")
 
     def unassign_task_from_resource(self, task_id: int, resource_id: int) -> None:
+        """Unassign a task from a resource.
+
+        Args:
+            task_id: The task ID to unassign.
+            resource_id: The resource ID to unassign from.
+
+        Returns:
+            None
+
+        Raises:
+            Exception: If task or resource not found.
+        """
         found_task = self.get_task_by_id(task_id)
         found_resource = self.get_resource_by_id(resource_id)
 
@@ -182,6 +279,20 @@ class SimulatorController:
         new_resource_id: int,
         dispatch_delay: Optional[float] = None,
     ) -> None:
+        """Reassign a task from one resource to another.
+
+        Args:
+            task_id: The task ID to reassign.
+            old_resource_id: The current resource ID.
+            new_resource_id: The new resource ID to assign to.
+            dispatch_delay: Optional delay before task dispatch.
+
+        Returns:
+            None
+
+        Raises:
+            Exception: If task or resources not found.
+        """
         try:
             self.unassign_task_from_resource(task_id, old_resource_id)
             self.assign_task_to_resource(task_id, new_resource_id, dispatch_delay)
@@ -231,11 +342,24 @@ class SimulatorController:
 
     # First frame sent from back to front end with station data, etc
     def emit_initial_frame(self) -> None:
+        """Emit the initial key frame with all entity data.
+
+        Returns:
+            None
+        """
         frame = self.create_key_frame()
         self.emit_frame(frame)
 
     # Should call frame emitter
     def emit_frame(self, frame: Optional[Frame] = None) -> None:
+        """Emit a frame to all subscribers.
+
+        Args:
+            frame: Optional frame to emit; if None, creates key or diff frame.
+
+        Returns:
+            None
+        """
         # generate key frame if the current frame is a multiple of the n
         # specified for key frames
         if not frame:
@@ -253,6 +377,11 @@ class SimulatorController:
         self.frameCounter += 1
 
     def clear_entity_updates(self) -> None:
+        """Clear update flags on all entities after emitting frame.
+
+        Returns:
+            None
+        """
         # Tasks
         for task in self.task_entities.values():
             task.clear_update()
@@ -264,6 +393,11 @@ class SimulatorController:
             resource.clear_update()
 
     def create_diff_frame(self) -> Frame:
+        """Create a differential frame with only updated entities.
+
+        Returns:
+            A frame containing only entities that have been updated.
+        """
         tasks = []
         for task in self.task_entities.values():
             if task.has_updated:
@@ -358,6 +492,11 @@ class SimulatorController:
         return frame
 
     def create_key_frame(self) -> Frame:
+        """Create a complete key frame with all entity states.
+
+        Returns:
+            A key frame containing all entity data.
+        """
         tasks = []
         for task in self.task_entities.values():
             station = task.get_station()
