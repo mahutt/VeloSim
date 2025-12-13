@@ -238,6 +238,8 @@ class TestSimulationService:
         simulation_service.active_simulations["sim-uuid-1"] = {
             "db_id": 99999,
             "status": "running",
+            "sim_time": 3600,
+            "user_id": test_user.id,
         }
         with pytest.raises(
             ItemNotFoundError, match="Simulation instance record 99999 not found"
@@ -254,6 +256,8 @@ class TestSimulationService:
         simulation_service.active_simulations["sim-uuid-2"] = {
             "db_id": db_sim.id,
             "status": "running",
+            "sim_time": 3600,
+            "user_id": 999,
         }
         assert simulation_service.verify_access(db, "sim-uuid-2", admin_user.id) is True
 
@@ -267,6 +271,8 @@ class TestSimulationService:
         simulation_service.active_simulations["sim-uuid-3"] = {
             "db_id": db_sim.id,
             "status": "running",
+            "sim_time": 3600,
+            "user_id": test_user.id,
         }
         assert simulation_service.verify_access(db, "sim-uuid-3", test_user.id) is True
 
@@ -284,6 +290,8 @@ class TestSimulationService:
         simulation_service.active_simulations["sim-uuid-4"] = {
             "db_id": db_sim.id,
             "status": "running",
+            "sim_time": 3600,
+            "user_id": test_user.id,
         }
         assert (
             simulation_service.verify_access(db, "sim-uuid-4", test_user2.id) is False
@@ -392,6 +400,8 @@ class TestSimulationService:
         simulation_service.active_simulations["test-sim"] = {
             "db_id": 99999,
             "status": "initialized",
+            "sim_time": 3600,
+            "user_id": test_user.id,
         }
         with pytest.raises(ItemNotFoundError, match="Simulation instance record"):
             simulation_service.start_simulation(db, "test-sim", test_user.id)
@@ -407,6 +417,8 @@ class TestSimulationService:
         simulation_service.active_simulations["test-sim"] = {
             "db_id": db_sim.id,
             "status": "initialized",
+            "sim_time": 3600,
+            "user_id": test_user.id,
         }
 
         with patch.object(simulation_service, "simulator", None):
@@ -567,6 +579,8 @@ class TestSimulationService:
         simulation_service.active_simulations["test-sim"] = {
             "db_id": db_sim.id,
             "status": "running",
+            "sim_time": 3600,
+            "user_id": test_user.id,
         }
 
         playback_speed = PlaybackSpeedBase(playback_speed=1.0)
@@ -643,6 +657,8 @@ class TestSimulationService:
         simulation_service.active_simulations["test-sim"] = {
             "db_id": db_sim.id,
             "status": "running",
+            "sim_time": 3600,
+            "user_id": test_user.id,
         }
 
         with patch.object(simulation_service, "simulator", None):

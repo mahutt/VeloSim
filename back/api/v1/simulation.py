@@ -537,7 +537,7 @@ async def websocket_simulation_stream(
     sim_data, sim_info = result
 
     # Attach subscriber and start/resume simulation
-    subscriber = attach_ws_subscriber(sim_id, sim_data, sim_info, websocket)
+    subscriber = await attach_ws_subscriber(sim_id, sim_data, sim_info, websocket)
     await start_or_resume_simulation(sim_info, sim_id, websocket, requesting_user)
 
     # Run message loop until disconnect

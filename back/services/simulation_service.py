@@ -22,7 +22,8 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 """
 
-from typing import Any, Dict, List
+from typing import TYPE_CHECKING, Dict, List, NotRequired, TypedDict
+import asyncio
 from sqlalchemy.orm import Session
 from back.models import User
 from back.models.sim_instance import SimInstance
@@ -43,22 +44,62 @@ from back.grafana_logging.logger import get_logger
 
 logger = get_logger(__name__)
 
+if TYPE_CHECKING:
+    from back.api.v1.utils.sim_websocket_helpers import WebSocketSubscriber
+
+
+class SimulationLockManager:
+    """Manages per-simulation locks for thread-safe operations."""
+
+    _locks: Dict[str, asyncio.Lock] = {}
+
+    @classmethod
+    def get_lock(cls, sim_id: str) -> asyncio.Lock:
+        """Get or create lock for simulation.
+
+        Args:
+            sim_id: The UUID of the simulation to get the lock for
+
+        Returns:
+            asyncio.Lock instance for the specified simulation
+        """
+        if sim_id not in cls._locks:
+            cls._locks[sim_id] = asyncio.Lock()
+        return cls._locks[sim_id]
+
+    @classmethod
+    def remove_lock(cls, sim_id: str) -> None:
+        """Remove lock when simulation is cleaned up.
+
+        Args:
+            sim_id: The UUID of the simulation to remove the lock for
+
+        Returns:
+            None
+        """
+        cls._locks.pop(sim_id, None)
+
+
+class ActiveSimulationData(TypedDict):
+    """Type definition for active simulation data stored in memory."""
+
+    # Required attributes
+    db_id: int  # links to database record
+    status: str  # tracks simulation state
+    sim_time: int | None  # duration (assigned None if undefined)
+    user_id: int  # identifies simulation owner
+    # Optional attributes
+    ws_subscriber: NotRequired["WebSocketSubscriber"]  # WebSocket connected
+    shutdown_task: NotRequired["asyncio.Task"]  # Auto-shutdown scheduled
+
 
 class SimulationService:
     """Service layer for managing the lifecycle and access control of simulations."""
 
     def __init__(self) -> None:
-        # Maps sim_id (UUID from simulator) -> (db_id, status, sim_time, simulator)
-        # sim_time comes from InputParameter.sim_time
-        self.active_simulations: Dict[str, Dict[str, Any]] = {}
+        # Maps sim_id (UUID from simulator) -> ActiveSimulationData
+        self.active_simulations: Dict[str, ActiveSimulationData] = {}
         self.simulator = Simulator()
-        # Example of an entry to represent an in-memory simulation instance:
-        # sim_id: {
-        #     "db_id": 123,
-        #     "status": "running",
-        #     "sim_time": 3600,
-        #     "simulator": <Simulator instance from sim package>,
-        # }
 
     # Internal helper
     def _get_requesting_user(self, db: Session, requesting_user: int) -> User:
@@ -136,13 +177,13 @@ class SimulationService:
         # Initialize simulation with InputParameter
         sim_id = sim.initialize(params, subscribers=[])
 
-        # Store the Simulator instance per sim_id
-        self.active_simulations[sim_id] = {
-            "db_id": db_sim_instance.id,
-            "status": "initialized",
-            "sim_time": params.sim_time,
-            "user_id": user.id,
-        }
+        # Store the simulation data per sim_id
+        self.active_simulations[sim_id] = ActiveSimulationData(
+            db_id=db_sim_instance.id,
+            status="initialized",
+            sim_time=params.sim_time,
+            user_id=user.id,
+        )
 
         return SimulationResponse(
             sim_id=sim_id,
@@ -252,6 +293,8 @@ class SimulationService:
         db.commit()
 
         del self.active_simulations[sim_id]
+        # Clean up the lock for this simulation
+        SimulationLockManager.remove_lock(sim_id)
         return True
 
     def get_active_user_simulations(
@@ -381,6 +424,10 @@ class SimulationService:
 
             db.commit()
             self.active_simulations.clear()
+
+            # Clean up all locks after simulations are stopped
+            for sim_id in list(SimulationLockManager._locks.keys()):
+                SimulationLockManager.remove_lock(sim_id)
 
         except Exception as exc:
             db.rollback()

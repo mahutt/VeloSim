@@ -31,6 +31,10 @@ from back.database.session import get_db
 from back.exceptions import ItemNotFoundError, VelosimPermissionError
 from back.exceptions.websocket_auth_error import WebSocketAuthError
 from back.services import simulation_service
+from back.services.simulation_service import (
+    ActiveSimulationData,
+    SimulationLockManager,
+)
 from sim.entities.frame import Frame
 from sim.simulator import RunInfo
 from sim.utils.subscriber import Subscriber
@@ -252,7 +256,7 @@ async def run_message_loop(websocket: WebSocket) -> None:
 
 async def get_simulation_or_error(
     sim_id: str, websocket: WebSocket
-) -> Optional[Tuple[dict, RunInfo]]:
+) -> Optional[Tuple[ActiveSimulationData, RunInfo]]:
     """Fetch simulation info or send an error and close websocket.
 
     Args:
@@ -309,14 +313,14 @@ def _detach_subscriber_from_emitter(
     sim_info["emitter"].detach(subscriber)
 
 
-def _remove_subscriber_from_sim_data(sim_data: dict) -> None:
+def _remove_subscriber_from_sim_data(sim_data: ActiveSimulationData) -> None:
     """
     Remove the subscriber reference from simulation data.
     """
     sim_data.pop("ws_subscriber", None)
 
 
-def _cleanup_old_subscribers(sim_data: dict, sim_info: RunInfo) -> None:
+def _cleanup_old_subscribers(sim_data: ActiveSimulationData, sim_info: RunInfo) -> None:
     """
     Clean up all existing WebSocket subscribers.
 
@@ -326,7 +330,7 @@ def _cleanup_old_subscribers(sim_data: dict, sim_info: RunInfo) -> None:
     3. Remove references from sim_data
     """
     # Clean up primary subscriber if it exists
-    old_sub: Optional[WebSocketSubscriber] = sim_data.get("ws_subscriber")
+    old_sub = sim_data.get("ws_subscriber")
     if old_sub:
         _close_subscriber(old_sub)
         _detach_subscriber_from_emitter(old_sub, sim_info)
@@ -356,7 +360,7 @@ def _attach_subscriber_to_emitter(
 
 
 def _store_subscriber_in_sim_data(
-    subscriber: WebSocketSubscriber, sim_data: dict
+    subscriber: WebSocketSubscriber, sim_data: ActiveSimulationData
 ) -> None:
     """
     Store the subscriber reference in simulation data.
@@ -365,7 +369,7 @@ def _store_subscriber_in_sim_data(
 
 
 def _setup_new_subscriber(
-    sim_data: dict, sim_info: RunInfo, websocket: WebSocket
+    sim_data: ActiveSimulationData, sim_info: RunInfo, websocket: WebSocket
 ) -> WebSocketSubscriber:
     """
     Set up a new WebSocket subscriber for the simulation.
@@ -380,7 +384,7 @@ def _setup_new_subscriber(
     return subscriber
 
 
-def _cancel_shutdown_task(sim_data: dict) -> None:
+def _cancel_shutdown_task(sim_data: ActiveSimulationData) -> None:
     """
     Cancel the existing shutdown task if present.
     """
@@ -389,21 +393,27 @@ def _cancel_shutdown_task(sim_data: dict) -> None:
         old_task.cancel()
 
 
-def _create_shutdown_task(sim_id: str, sim_data: dict, user_id: int) -> asyncio.Task:
+def _create_shutdown_task(
+    sim_id: str, sim_data: ActiveSimulationData, user_id: int
+) -> asyncio.Task:
     """
     Create a new auto-shutdown task.
     """
     return asyncio.create_task(auto_shutdown_simulation(sim_id, sim_data, user_id))
 
 
-def _store_shutdown_task(shutdown_task: asyncio.Task, sim_data: dict) -> None:
+def _store_shutdown_task(
+    shutdown_task: asyncio.Task, sim_data: ActiveSimulationData
+) -> None:
     """
     Store the shutdown task reference in simulation data.
     """
     sim_data["shutdown_task"] = shutdown_task
 
 
-def _schedule_auto_shutdown(sim_id: str, sim_data: dict, user_id: int) -> asyncio.Task:
+def _schedule_auto_shutdown(
+    sim_id: str, sim_data: ActiveSimulationData, user_id: int
+) -> asyncio.Task:
     """
     Schedule an auto-shutdown task for the simulation.
     Returns the shutdown Task.
@@ -417,9 +427,9 @@ def _schedule_auto_shutdown(sim_id: str, sim_data: dict, user_id: int) -> asynci
     return shutdown_task
 
 
-def attach_ws_subscriber(
+async def attach_ws_subscriber(
     sim_id: str,
-    sim_data: dict,
+    sim_data: ActiveSimulationData,
     sim_info: RunInfo,
     websocket: WebSocket,
 ) -> WebSocketSubscriber:
@@ -441,16 +451,20 @@ def attach_ws_subscriber(
     if user_id is None:
         raise ValueError("user_id must be present in sim_data")
 
-    # Detach and close any previous subscriber(s)
-    _cleanup_old_subscribers(sim_data, sim_info)
+    # Get lock for this simulation
+    lock = SimulationLockManager.get_lock(sim_id)
 
-    # Set up a new subscriber
-    subscriber = _setup_new_subscriber(sim_data, sim_info, websocket)
+    async with lock:
+        # Detach and close any previous subscriber(s)
+        _cleanup_old_subscribers(sim_data, sim_info)
 
-    # Schedule an auto-shutdown task for when the connection is idle
-    _schedule_auto_shutdown(sim_id, sim_data, user_id)
+        # Set up a new subscriber
+        subscriber = _setup_new_subscriber(sim_data, sim_info, websocket)
 
-    return subscriber
+        # Schedule an auto-shutdown task for when the connection is idle
+        _schedule_auto_shutdown(sim_id, sim_data, user_id)
+
+        return subscriber
 
 
 def _is_simulation_not_started(sim_info: RunInfo) -> bool:
@@ -472,8 +486,15 @@ def _start_simulation(sim_id: str, requesting_user: int) -> None:
     """
     Start a new simulation thread.
     """
-    db = next(get_db())
-    simulation_service.start_simulation(db, sim_id, requesting_user)
+    db_gen = get_db()
+    db = next(db_gen)
+    try:
+        simulation_service.start_simulation(db, sim_id, requesting_user)
+    finally:
+        try:
+            next(db_gen)
+        except StopIteration:
+            pass
 
 
 def _resume_simulation(sim_info: RunInfo) -> None:
@@ -579,7 +600,7 @@ async def _close_websocket_connection(websocket: WebSocket) -> None:
 
 async def cleanup_simulation(
     sim_id: str,
-    sim_data: dict,
+    sim_data: ActiveSimulationData,
     sim_info: RunInfo,
     subscriber: WebSocketSubscriber,
     websocket: WebSocket,
@@ -597,24 +618,28 @@ async def cleanup_simulation(
     Returns:
         None
     """
-    # Clean up subscriber
-    _close_subscriber(subscriber)
-    _detach_subscriber_from_emitter(subscriber, sim_info)
-    _remove_subscriber_from_sim_data(sim_data)
+    # Get lock for this simulation
+    lock = SimulationLockManager.get_lock(sim_id)
 
-    # Pause simulation execution
-    _pause_simulation(sim_info)
+    async with lock:
+        # Clean up subscriber
+        _close_subscriber(subscriber)
+        _detach_subscriber_from_emitter(subscriber, sim_info)
+        _remove_subscriber_from_sim_data(sim_data)
 
-    # Schedule shutdown after idle timeout
-    user_id = sim_data["user_id"]
-    _schedule_auto_shutdown(sim_id, sim_data, user_id)
+        # Pause simulation execution
+        _pause_simulation(sim_info)
+
+        # Schedule shutdown after idle timeout
+        user_id = sim_data["user_id"]
+        _schedule_auto_shutdown(sim_id, sim_data, user_id)
 
     # Close WebSocket connection
     await _close_websocket_connection(websocket)
 
 
 async def auto_shutdown_simulation(
-    sim_id: str, sim_data: dict, requesting_user: int
+    sim_id: str, sim_data: ActiveSimulationData, requesting_user: int
 ) -> None:
     """
     Initiates a complete service shutdown (database cleanup and simulator stop)
@@ -630,16 +655,34 @@ async def auto_shutdown_simulation(
     """
     await asyncio.sleep(settings.SIMULATION_IDLE_TIMEOUT_SECONDS)
 
-    # If a subscriber exists, the user has reconnected and there is no need
-    # to shut down
-    if "ws_subscriber" in sim_data:
-        return
+    # Get lock for this simulation
+    lock = SimulationLockManager.get_lock(sim_id)
 
-    # A shutdown is performed if no WebSocket subscriber is associated with
-    # the running, in-memory simulation instance
-    try:
-        db = next(get_db())
-        simulation_service.stop_simulation(db, sim_id, requesting_user)
-        logger.info(f"Simulation {sim_id} stopped due to disconnect timeout.")
-    except Exception as e:
-        logger.error(f"Failed to stop {sim_id}: {e}")
+    async with lock:
+        # Check if a subscriber exists - user may have reconnected during sleep
+        if "ws_subscriber" in sim_data:
+            return
+
+        # Check if simulation still exists (may have been stopped by admin)
+        if sim_id not in simulation_service.active_simulations:
+            logger.info(f"Simulation {sim_id} already stopped, skipping auto-shutdown.")
+            return
+
+        # A shutdown is performed if no WebSocket subscriber is associated with
+        # the running, in-memory simulation instance
+        try:
+            db_gen = get_db()
+            db = next(db_gen)
+            try:
+                simulation_service.stop_simulation(db, sim_id, requesting_user)
+                logger.info(f"Simulation {sim_id} stopped due to disconnect timeout.")
+            finally:
+                try:
+                    next(db_gen)
+                except StopIteration:
+                    pass
+        except ItemNotFoundError:
+            # Simulation was already stopped (e.g., by admin) - this is expected
+            logger.info(f"Simulation {sim_id} already stopped, skipping auto-shutdown.")
+        except Exception as e:
+            logger.error(f"Failed to stop {sim_id}: {e}")
