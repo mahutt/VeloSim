@@ -22,24 +22,14 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 """
 
-from fastapi import APIRouter, Response
-from prometheus_client import generate_latest, CONTENT_TYPE_LATEST
+from opentelemetry import metrics
 
-router = APIRouter(prefix="/metric", tags=["metrics"])
+# Get the global meter (same pattern as your other metrics)
+meter = metrics.get_meter("velosim.simulation")
 
-
-@router.get("/metrics")
-def metrics() -> Response:
-    """
-    Expose Prometheus metrics for scraping.
-
-    This endpoint returns metrics collected by the Prometheus client.
-    Metrics are automatically populated via OpenTelemetry instrumentation
-    and are scraped by Prometheus.
-
-    Returns:
-        Response: A plaintext HTTP response containing Prometheus metrics
-        in the standard exposition format.
-    """
-    data = generate_latest()
-    return Response(content=data, media_type=CONTENT_TYPE_LATEST)
+# Histogram for simulation startup time (seconds)
+simulation_startup_histogram = meter.create_histogram(
+    name="simulation.startup.time",
+    unit="s",
+    description="Total time from HTTP initialize request to first frame emitted",
+)

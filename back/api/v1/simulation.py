@@ -22,6 +22,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 """
 
+import time
 import math
 from typing import Dict
 from fastapi import (
@@ -93,6 +94,8 @@ def initialize_simulation(
     Returns:
         SimulationResponse containing the initialized simulation details
     """
+    """Initialize a new simulation and return a confirmation response."""
+    start_time = time.perf_counter()  # Start timer for total startup metric
     if (scenario is None and scenario_id is None) or (
         scenario is not None and scenario_id is not None
     ):
@@ -112,9 +115,16 @@ def initialize_simulation(
         scenario_params = json_parser.parse(scenario)
 
         # Initialize simulation
-        return simulation_service.initialize_simulation(
+        result = simulation_service.initialize_simulation(
             db, requesting_user, scenario_params
         )
+        # Store the start time for the total startup metric
+        sim_id = result.sim_id
+        if sim_id in simulation_service.active_simulations:
+            simulation_service.active_simulations[sim_id][
+                "initialization_start_time"
+            ] = start_time
+        return result
 
     except VelosimPermissionError as err:
         raise HTTPException(status_code=403, detail=str(err))

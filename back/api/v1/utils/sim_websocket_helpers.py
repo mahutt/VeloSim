@@ -26,6 +26,7 @@ from typing import Optional, Tuple
 from fastapi import WebSocket
 from fastapi.websockets import WebSocketState
 import asyncio
+import time
 
 from back.database.session import get_db
 from back.exceptions import ItemNotFoundError, VelosimPermissionError
@@ -35,6 +36,7 @@ from back.services.simulation_service import (
     ActiveSimulationData,
     SimulationLockManager,
 )
+from back.core.simulation_startup_monitor import simulation_startup_histogram
 from sim.entities.frame import Frame
 from sim.simulator import RunInfo
 from sim.utils.subscriber import Subscriber
@@ -52,13 +54,19 @@ class WebSocketSubscriber(Subscriber):
         self.websocket = websocket
         """WebSocket connection for he current running loop."""
         try:
+            # Extract sim_id from the WebSocket's path, which is part of the ASGI scope
+            self.sim_id = websocket.scope["path"].split("/")[-1]
+        except (KeyError, IndexError):
+            # Provide a fallback for tests or unexpected scope structures
+            self.sim_id = "unknown"
+        try:
             self.loop = asyncio.get_running_loop()
         except RuntimeError:
             # No running loop - will be set manually (e.g., in tests)
             self.loop = None  # type: ignore
-        """Event loop used to run asynchronous tasks from synchronous callbacks."""
         self.closed = False
-        """Internal flag indicating whether the WebSocket connection has been closed."""
+        self._first_frame_emitted = False
+        """Flag to ensure startup time is only recorded once."""
 
     def set_event_loop(self, loop: asyncio.AbstractEventLoop) -> None:
         """Set the event loop manually (primarily for testing).
@@ -93,6 +101,21 @@ class WebSocketSubscriber(Subscriber):
             return
         if self.websocket.client_state != WebSocketState.CONNECTED:
             return
+            # On the first frame, check if we can record the total startup time.
+        if not self._first_frame_emitted:
+            self._first_frame_emitted = True
+            sim_data = simulation_service.active_simulations.get(self.sim_id)
+            # This metric is only recorded if the simulation was just initialized.
+            if sim_data and (
+                initialization_start_time := sim_data.pop(
+                    "initialization_start_time", None
+                )
+            ):
+                end_time = time.perf_counter()
+                total_startup_time = end_time - initialization_start_time
+                simulation_startup_histogram.record(
+                    total_startup_time, {"simulation.id": self.sim_id}
+                )
         if self.loop is not None and not self.loop.is_closed():
             # schedule the coroutine in the main event loop
             asyncio.run_coroutine_threadsafe(self._send_frame(frame), self.loop)
