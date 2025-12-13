@@ -24,6 +24,7 @@ SOFTWARE.
 
 from typing import Annotated, AsyncIterator, Dict
 from fastapi.middleware.cors import CORSMiddleware
+from uvicorn.middleware.proxy_headers import ProxyHeadersMiddleware
 from contextlib import asynccontextmanager
 from fastapi import Depends, FastAPI, HTTPException
 from fastapi.security import OAuth2PasswordRequestForm
@@ -105,6 +106,9 @@ async def login_for_access_token(
         raise HTTPException(status_code=400, detail="Invalid credentials")
     return Token(access_token=access_token, token_type="bearer")
 
+
+# Add ProxyHeaders middleware to trust X-Forwarded-* headers from nginx
+app.add_middleware(ProxyHeadersMiddleware, trusted_hosts=["127.0.0.1", "localhost"])
 
 # Add CORS middleware
 app.add_middleware(

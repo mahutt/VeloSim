@@ -1,0 +1,24 @@
+# VeloSim Deployment - Files to exclude from sync
+.git/
+.gitignore
+*.pyc
+__pycache__/
+node_modules/
+.env*
+.vscode/
+.idea/
+*.log
+logs/
+.DS_Store
+ansible/.vagrant/
+ansible/facts_cache/
+*.egg-info/
+.pytest_cache/
+coverage.html
+.coverage
+dist/
+build/
+*.tmp
+*.swp
+*.bak
+osrm-data/

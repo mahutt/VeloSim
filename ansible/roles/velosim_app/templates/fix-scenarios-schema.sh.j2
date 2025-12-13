@@ -1,0 +1,54 @@
+#!/bin/bash
+# Quick fix script to add missing content column to scenarios table
+# {{ ansible_managed }}
+
+set -euo pipefail
+
+APP_DIR="{{ app_dir }}"
+COMPOSE_FILE="{{ app_dir }}/docker-compose.prod.yml"
+
+cd "$APP_DIR"
+
+echo "=== Fixing scenarios table schema ==="
+
+# Check if scenarios table exists and if content column is missing
+echo "Checking scenarios table structure..."
+docker compose -f "$COMPOSE_FILE" exec -T postgres psql -U {{ postgres_user }} -d {{ postgres_db }} -c "\d scenarios" || echo "Table doesn't exist yet"
+
+# Add content column if it doesn't exist
+echo "Adding missing content column to scenarios table..."
+docker compose -f "$COMPOSE_FILE" exec -T postgres psql -U {{ postgres_user }} -d {{ postgres_db }} -c "
+DO \$\$
+BEGIN
+    -- Check if content column exists
+    IF NOT EXISTS (
+        SELECT 1 FROM information_schema.columns 
+        WHERE table_name = 'scenarios' AND column_name = 'content'
+    ) THEN
+        -- Add content column
+        ALTER TABLE scenarios ADD COLUMN content JSONB NOT NULL DEFAULT '{}';
+        RAISE NOTICE 'Added content column to scenarios table';
+    ELSE
+        RAISE NOTICE 'Content column already exists in scenarios table';
+    END IF;
+    
+    -- Check if we have the wrong column name (geojson_data) and need to rename/migrate
+    IF EXISTS (
+        SELECT 1 FROM information_schema.columns 
+        WHERE table_name = 'scenarios' AND column_name = 'geojson_data'
+    ) THEN
+        -- Copy data from geojson_data to content if content is empty
+        UPDATE scenarios SET content = geojson_data WHERE content = '{}' AND geojson_data IS NOT NULL;
+        -- Drop the old column
+        ALTER TABLE scenarios DROP COLUMN geojson_data;
+        RAISE NOTICE 'Migrated geojson_data to content column';
+    END IF;
+END
+\$\$;
+"
+
+echo "✓ Scenarios table schema fix completed"
+
+# Verify the fix
+echo "Verifying scenarios table structure:"
+docker compose -f "$COMPOSE_FILE" exec -T postgres psql -U {{ postgres_user }} -d {{ postgres_db }} -c "\d scenarios"

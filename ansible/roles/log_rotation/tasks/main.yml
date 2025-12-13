@@ -1,0 +1,19 @@
+---
+# Log rotation configuration for VeloSim
+
+- name: Configure logrotate for VeloSim application logs
+  ansible.builtin.template:
+    src: velosim-logrotate.conf
+    dest: /etc/logrotate.d/{{ app_name }}
+    owner: root
+    group: root
+    mode: '0644'
+
+- name: Test logrotate configuration
+  ansible.builtin.command: logrotate -d /etc/logrotate.d/{{ app_name }}
+  register: logrotate_test
+  changed_when: false
+
+- name: Display logrotate test results
+  ansible.builtin.debug:
+    msg: "{{ logrotate_test.stdout_lines }}"

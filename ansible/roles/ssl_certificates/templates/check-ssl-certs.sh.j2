@@ -1,0 +1,33 @@
+#!/bin/bash
+# SSL Certificate Monitoring Script for VeloSim
+# Checks certificate expiration and warns if renewal is needed
+# Used for monitoring and alerting
+
+DOMAIN="{{ domain_name }}"
+CERT_FILE="/etc/letsencrypt/live/$DOMAIN/fullchain.pem"
+WARN_DAYS=30
+
+if [ ! -f "$CERT_FILE" ]; then
+    echo "ERROR: SSL certificate file not found: $CERT_FILE"
+    exit 1
+fi
+
+# Extract expiration date from certificate
+EXPIRY_DATE=$(openssl x509 -in "$CERT_FILE" -noout -enddate | cut -d= -f2)
+EXPIRY_EPOCH=$(date -d "$EXPIRY_DATE" +%s)
+CURRENT_EPOCH=$(date +%s)
+DAYS_UNTIL_EXPIRY=$(( (EXPIRY_EPOCH - CURRENT_EPOCH) / 86400 ))
+
+echo "SSL Certificate Status for $DOMAIN:"
+echo "  Expires: $EXPIRY_DATE"
+echo "  Days until expiry: $DAYS_UNTIL_EXPIRY"
+
+if [ $DAYS_UNTIL_EXPIRY -le $WARN_DAYS ]; then
+    echo "  WARNING: Certificate expires in $DAYS_UNTIL_EXPIRY days!"
+    echo "  Consider running: certbot renew"
+    # Log warning for monitoring systems
+    logger "VeloSim SSL certificate expires in $DAYS_UNTIL_EXPIRY days"
+    exit 2
+else
+    echo "  Status: OK"
+fi

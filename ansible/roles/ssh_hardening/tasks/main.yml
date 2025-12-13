@@ -1,0 +1,46 @@
+---
+# SSH Hardening for VeloSim production servers
+
+- name: Ensure SSH group exists
+  ansible.builtin.group:
+    name: ssh-users
+    state: present
+
+- name: Generate ed25519 SSH host key if needed
+  ansible.builtin.command:
+    cmd: ssh-keygen -q -N "" -t ed25519 -f /etc/ssh/ssh_host_ed25519_key
+    creates: /etc/ssh/ssh_host_ed25519_key
+
+- name: Set proper permissions on SSH host keys
+  ansible.builtin.file:
+    path: "{{ item }}"
+    owner: root
+    group: root
+    mode: '0600'
+  with_items:
+    - /etc/ssh/ssh_host_ed25519_key
+
+- name: Set proper permissions on SSH public host keys
+  ansible.builtin.file:
+    path: "{{ item }}"
+    owner: root
+    group: root
+    mode: '0644'
+  with_items:
+    - /etc/ssh/ssh_host_ed25519_key.pub
+
+- name: Deploy hardened SSH configuration
+  ansible.builtin.copy:
+    src: sshd_config
+    dest: /etc/ssh/sshd_config.d/00-velosim-hardening.conf
+    owner: root
+    group: root
+    mode: '0644'
+    backup: true
+  notify: restart ssh
+
+- name: Ensure SSH is started and enabled
+  ansible.builtin.systemd:
+    name: ssh
+    state: started
+    enabled: true

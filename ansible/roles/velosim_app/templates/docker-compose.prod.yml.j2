@@ -1,0 +1,142 @@
+# VeloSim Production Docker Compose Configuration
+# This file is managed by Ansible - do not edit manually
+
+networks:
+  velosim-net:
+    driver: bridge
+
+volumes:
+  postgres_data:
+    driver: local
+  osrm_data:
+    driver: local
+
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:{{ postgres_version }}-alpine
+    container_name: velosim-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: {{ postgres_user }}
+      POSTGRES_PASSWORD: {{ postgres_password }}
+      POSTGRES_DB: {{ postgres_db }}
+    ports:
+      - "127.0.0.1:5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - {{ app_dir }}/source/back/database/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+      - {{ app_dir }}/source/back/alembic/seeds/seed.sql:/docker-entrypoint-initdb.d/seed.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U {{ postgres_user }}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - velosim-net
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # OSRM Routing Server
+  osrm:
+    image: ghcr.io/project-osrm/osrm-backend:v6.0.0
+    container_name: velosim-osrm
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:5001:5000"
+    volumes:
+      - {{ app_dir }}/osrm-data:/data:ro
+    command: osrm-routed --algorithm mld /data/montreal.osrm
+    networks:
+      - velosim-net
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # Backend API
+  backend:
+    build:
+      context: {{ app_dir }}/source
+      dockerfile: back/Dockerfile
+    container_name: velosim-backend
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8000:8000"
+    volumes:
+      - {{ app_dir }}/logs:/app/logs
+      - {{ app_dir }}/.env.prod:/app/.env:ro
+    environment:
+      - DATABASE_URL=postgresql://{{ postgres_user }}:{{ postgres_password }}@postgres:5432/{{ postgres_db }}
+      - OSRM_URL=http://osrm:5000
+    env_file:
+      - {{ app_dir }}/.env.prod
+    depends_on:
+      postgres:
+        condition: service_healthy
+      osrm:
+        condition: service_started
+    networks:
+      - velosim-net
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # Frontend
+  frontend:
+    build:
+      context: {{ app_dir }}/source
+      dockerfile: front/Dockerfile
+      args:
+        - "VITE_BACKEND_URL=https://{{ domain_name }}"
+        - "VITE_MAPBOX_ACCESS_TOKEN={{ vite_mapbox_token | default('') }}"
+    container_name: velosim-frontend
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:3000:3000"
+    environment:
+      - VITE_MAPBOX_ACCESS_TOKEN={{ vite_mapbox_token | default('') }}
+    depends_on:
+      backend:
+        condition: service_healthy
+    networks:
+      - velosim-net
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # Grafana for monitoring (optional)
+  grafana:
+    image: grafana/grafana:11.0.0
+    container_name: velosim-grafana
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:3001:3000"
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD={{ vault_grafana_password | default('admin') }}
+      - GF_SERVER_DOMAIN={{ domain_name }}
+      - GF_SERVER_ROOT_URL=https://{{ domain_name }}/grafana/
+    volumes:
+      - {{ app_dir }}/source/back/grafana_logging/grafana/provisioning:/etc/grafana/provisioning:ro
+    networks:
+      - velosim-net
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"

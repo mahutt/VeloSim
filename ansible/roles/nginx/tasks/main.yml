@@ -1,0 +1,188 @@
+---
+# Nginx Setup for VeloSim Production
+
+- name: Install Nginx
+  ansible.builtin.apt:
+    name: nginx
+    state: present
+    update_cache: true
+
+- name: Remove default Nginx site
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: absent
+  loop:
+    - /etc/nginx/sites-enabled/default
+    - /etc/nginx/sites-available/default
+  notify: reload nginx
+
+- name: Remove default Nginx configuration
+  ansible.builtin.file:
+    path: /var/www/html/index.nginx-debian.html
+    state: absent
+
+- name: Check if SSL certificates exist
+  ansible.builtin.stat:
+    path: "/etc/letsencrypt/live/{{ domain_name }}/fullchain.pem"
+  register: ssl_cert_exists
+  when: ssl_enabled | default(false)
+
+- name: Set SSL configuration fact
+  ansible.builtin.set_fact:
+    configure_ssl: "{{ ssl_enabled | default(false) and ssl_cert_exists.stat.exists | default(false) }}"
+
+- name: Display SSL configuration status
+  ansible.builtin.debug:
+    msg: |
+      SSL Configuration Status:
+      - ssl_enabled: {{ ssl_enabled | default(false) }}
+      - Certificates exist: {{ ssl_cert_exists.stat.exists | default(false) }}
+      - Will configure SSL: {{ configure_ssl }}
+
+- name: Create Nginx configuration for VeloSim
+  ansible.builtin.template:
+    src: velosim.conf.j2
+    dest: "/etc/nginx/sites-available/{{ domain_name }}"
+    owner: root
+    group: root
+    mode: '0644'
+  notify: reload nginx
+
+- name: Enable VeloSim site
+  ansible.builtin.file:
+    src: "/etc/nginx/sites-available/{{ domain_name }}"
+    dest: "/etc/nginx/sites-enabled/{{ domain_name }}"
+    state: link
+  notify: reload nginx
+
+- name: Configure Nginx main settings
+  ansible.builtin.template:
+    src: nginx.conf.j2
+    dest: /etc/nginx/nginx.conf
+    owner: root
+    group: root
+    mode: '0644'
+    backup: true
+  notify: reload nginx
+
+- name: Create Nginx log directory for VeloSim
+  ansible.builtin.file:
+    path: "/var/log/nginx/{{ domain_name }}"
+    state: directory
+    owner: www-data
+    group: www-data
+    mode: '0755'
+
+- name: Create IP-based access log directory
+  ansible.builtin.file:
+    path: "/var/log/nginx"
+    state: directory
+    owner: www-data
+    group: www-data
+    mode: '0755'
+
+- name: Create maintenance page for when application is starting
+  ansible.builtin.copy:
+    src: maintenance.html
+    dest: /var/www/html/maintenance.html
+    owner: www-data
+    group: www-data
+    mode: '0644'
+
+- name: Create 50x error page
+  ansible.builtin.copy:
+    src: 50x.html
+    dest: /var/www/html/50x.html
+    owner: www-data
+    group: www-data
+    mode: '0644'
+
+- name: Configure Nginx security headers
+  ansible.builtin.copy:
+    src: security-headers.conf
+    dest: /etc/nginx/conf.d/security-headers.conf
+    owner: root
+    group: root
+    mode: '0644'
+  notify: reload nginx
+
+- name: Test Nginx configuration
+  ansible.builtin.command: nginx -t
+  register: nginx_test
+  changed_when: false
+
+- name: Check if VeloSim backend is responding
+  ansible.builtin.uri:
+    url: "http://127.0.0.1:8000/health"
+    method: GET
+    timeout: 5
+  register: backend_health
+  failed_when: false
+
+- name: Display backend status
+  ansible.builtin.debug:
+    msg: |
+      Backend health check: {{ 'OK' if backend_health.status == 200 else 'FAILED' }}
+      {% if backend_health.status != 200 %}
+      WARNING: VeloSim backend is not responding on port 8000
+      Nginx will show errors until the application containers are running
+      {% endif %}
+
+- name: Start and enable Nginx
+  ansible.builtin.systemd:
+    name: nginx
+    state: started
+    enabled: true
+
+- name: Display troubleshooting information
+  ansible.builtin.debug:
+    msg: |
+      === VeloSim Nginx Configuration Complete ===
+
+      If you see 403 Forbidden errors:
+      1. This is normal if VeloSim containers aren't running yet
+      2. You should see a "Starting Up" maintenance page instead
+
+      If you see 403 errors or Nginx welcome page:
+
+      1. Check if containers are running:
+         sudo docker ps
+
+      2. Start VeloSim if not running:
+         sudo {{ app_dir }}/scripts/velosim-app.sh start
+
+      3. Check container logs:
+         sudo docker logs velosim-backend
+         sudo docker logs velosim-frontend
+
+      4. Test backend directly:
+         curl http://localhost:8000/health
+
+      5. Check if ports are listening:
+         sudo netstat -tlnp | grep -E ':(3000|8000|80)'
+
+      6. Check Nginx configuration:
+         sudo nginx -t
+         sudo systemctl reload nginx
+
+      7. Check Nginx logs:
+         sudo tail -f /var/log/nginx/error.log
+         sudo tail -f /var/log/nginx/ip-error.log
+
+      The application should be accessible via:
+      - Domain: http://{{ domain_name }}
+      - IP: http://[your-vm-ip]
+
+      Current SSL mode: {{ 'HTTPS enabled' if ssl_enabled | default(false) else 'HTTP only (SSL disabled)' }}
+
+- name: Configure logrotate for Nginx
+  ansible.builtin.template:
+    src: nginx-logrotate.conf
+    dest: /etc/logrotate.d/nginx-{{ app_name }}
+    owner: root
+    group: root
+    mode: '0644'
+
+- name: Force flush handlers to reload nginx
+  ansible.builtin.meta: flush_handlers
+  tags: [web, ssl]

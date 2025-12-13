@@ -1,0 +1,54 @@
+---
+# Backup scripts for VeloSim production
+
+- name: Create backup directories
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: "{{ app_user }}"
+    group: "{{ app_user }}"
+    mode: '0755'
+  loop:
+    - "{{ app_dir }}/backups"
+    - "{{ app_dir }}/backups/application"
+    - "{{ app_dir }}/backups/logs"
+
+- name: Copy database backup script
+  ansible.builtin.template:
+    src: database-backup.sh.j2
+    dest: "{{ app_dir }}/scripts/backup-database.sh"
+    owner: "{{ app_user }}"
+    group: "{{ app_user }}"
+    mode: '0755'
+
+- name: Copy database restore script
+  ansible.builtin.template:
+    src: database-restore.sh.j2
+    dest: "{{ app_dir }}/scripts/restore-database.sh"
+    owner: "{{ app_user }}"
+    group: "{{ app_user }}"
+    mode: '0755'
+
+- name: Copy comprehensive backup script
+  ansible.builtin.template:
+    src: full-backup.sh.j2
+    dest: "{{ app_dir }}/scripts/full-backup.sh"
+    owner: "{{ app_user }}"
+    group: "{{ app_user }}"
+    mode: '0755'
+
+- name: Schedule automated backups via cron
+  ansible.builtin.cron:
+    name: "VeloSim automated backup"
+    minute: "{{ backup_schedule_minute }}"
+    hour: "{{ backup_schedule_hour }}"
+    job: "{{ app_dir }}/scripts/full-backup.sh"
+    user: "{{ app_user }}"
+
+- name: Create backup monitoring script
+  ansible.builtin.template:
+    src: backup-status.sh.j2
+    dest: "{{ app_dir }}/scripts/backup-status.sh"
+    owner: "{{ app_user }}"
+    group: "{{ app_user }}"
+    mode: '0755'

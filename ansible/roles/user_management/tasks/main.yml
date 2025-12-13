@@ -1,0 +1,169 @@
+---
+# User Management with GitHub SSH Keys for VeloSim
+
+- name: Create VeloSim application user
+  ansible.builtin.user:
+    name: "{{ app_user }}"
+    comment: "VeloSim Application User"
+    shell: /bin/bash
+    home: "/home/{{ app_user }}"
+    create_home: true
+    system: true
+    groups: docker
+    append: true
+
+- name: Create users from GitHub
+  ansible.builtin.user:
+    name: "{{ item.username }}"
+    comment: "VeloSim Team Member - {{ item.username }}"
+    shell: /bin/bash
+    home: "/home/{{ item.username }}"
+    create_home: true
+    groups: "{{ 'sudo,ssh-users' if item.sudo else 'ssh-users' }}"
+    append: true
+  loop: "{{ velosim_users }}"
+  register: created_users
+
+- name: Create .ssh directories for users
+  ansible.builtin.file:
+    path: "/home/{{ item.username }}/.ssh"
+    state: directory
+    owner: "{{ item.username }}"
+    group: "{{ item.username }}"
+    mode: '0700'
+  loop: "{{ velosim_users }}"
+
+- name: Download SSH keys from GitHub for each user (on target server)
+  ansible.builtin.get_url:
+    url: "https://github.com/{{ item.github_username }}.keys"
+    dest: "/tmp/{{ item.username }}_github_keys.txt"
+    mode: '0600'
+    timeout: 30
+  loop: "{{ velosim_users }}"
+  ignore_errors: true
+
+- name: Read SSH keys files
+  ansible.builtin.slurp:
+    src: "/tmp/{{ item.username }}_github_keys.txt"
+  loop: "{{ velosim_users }}"
+  register: github_ssh_keys_content
+  ignore_errors: true
+
+- name: Configure authorized_keys for users
+  ansible.builtin.copy:
+    content: "{{ item.content | b64decode }}"
+    dest: "/home/{{ velosim_users[item_index].username }}/.ssh/authorized_keys"
+    owner: "{{ velosim_users[item_index].username }}"
+    group: "{{ velosim_users[item_index].username }}"
+    mode: '0600'
+  loop: "{{ github_ssh_keys_content.results }}"
+  loop_control:
+    index_var: item_index
+  when:
+    - not item.failed | default(false)
+    - item.content is defined
+    - (item.content | b64decode | trim) != ""
+
+- name: Clean up temporary key files
+  ansible.builtin.file:
+    path: "/tmp/{{ item.username }}_github_keys.txt"
+    state: absent
+  loop: "{{ velosim_users }}"
+
+- name: Display warning for users with failed SSH key downloads
+  ansible.builtin.debug:
+    msg: |
+      WARNING: Failed to download SSH keys for user {{ velosim_users[item_index].username }}
+      from GitHub user {{ velosim_users[item_index].github_username }}.
+      You will need to manually add SSH keys for this user.
+  loop: "{{ github_ssh_keys_content.results }}"
+  loop_control:
+    index_var: item_index
+  when: item.failed | default(false)
+
+- name: Display warning for users with no SSH keys
+  ansible.builtin.debug:
+    msg: |
+      WARNING: No SSH keys found for user {{ velosim_users[item_index].username }}
+      (GitHub user {{ velosim_users[item_index].github_username }}).
+      You will need to manually add SSH keys for this user.
+  loop: "{{ github_ssh_keys_content.results }}"
+  loop_control:
+    index_var: item_index
+  when:
+    - not item.failed | default(false)
+    - item.content is defined
+    - (item.content | b64decode | trim) == ""
+
+- name: Configure passwordless sudo for sudo users
+  ansible.builtin.lineinfile:
+    path: /etc/sudoers.d/99-velosim-users
+    line: "{{ item.username }} ALL=(ALL) NOPASSWD:ALL"
+    create: true
+    mode: '0440'
+    validate: 'visudo -cf %s'
+  loop: "{{ velosim_users }}"
+  when: item.sudo | default(false)
+
+- name: Add users to ssh-users group
+  ansible.builtin.user:
+    name: "{{ item.username }}"
+    groups: ssh-users
+    append: true
+  loop: "{{ velosim_users }}"
+
+- name: Create .ssh directory for application user
+  ansible.builtin.file:
+    path: "/home/{{ app_user }}/.ssh"
+    state: directory
+    owner: "{{ app_user }}"
+    group: "{{ app_user }}"
+    mode: '0700'
+
+- name: Setup log directories with proper permissions
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: "{{ app_user }}"
+    group: "{{ app_user }}"
+    mode: '0755'
+  loop:
+    - "/var/log/{{ app_name }}"
+    - "/home/{{ app_user }}/logs"
+
+# Ansible Deployment User Setup
+- name: Create ansible deployment user
+  ansible.builtin.user:
+    name: "{{ ansible_deploy_user | default('ansible') }}"
+    comment: "Ansible Deployment User"
+    shell: /bin/bash
+    home: "/home/{{ ansible_deploy_user | default('ansible') }}"
+    create_home: true
+    groups: sudo,docker
+    append: true
+  when: ansible_deploy_user_pubkey is defined
+
+- name: Create .ssh directory for ansible user
+  ansible.builtin.file:
+    path: "/home/{{ ansible_deploy_user | default('ansible') }}/.ssh"
+    state: directory
+    owner: "{{ ansible_deploy_user | default('ansible') }}"
+    group: "{{ ansible_deploy_user | default('ansible') }}"
+    mode: '0700'
+  when: ansible_deploy_user_pubkey is defined
+
+- name: Add SSH public key for ansible user
+  ansible.posix.authorized_key:
+    user: "{{ ansible_deploy_user | default('ansible') }}"
+    key: "{{ ansible_deploy_user_pubkey }}"
+    state: present
+  when: ansible_deploy_user_pubkey is defined
+
+- name: Configure passwordless sudo for ansible user
+  ansible.builtin.lineinfile:
+    path: /etc/sudoers.d/99-ansible-deploy
+    line: "{{ ansible_deploy_user | default('ansible') }} ALL=(ALL) NOPASSWD:ALL"
+    create: true
+    mode: '0440'
+    validate: 'visudo -cf %s'
+  when: ansible_deploy_user_pubkey is defined

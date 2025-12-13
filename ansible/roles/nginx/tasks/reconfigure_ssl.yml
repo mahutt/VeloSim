@@ -1,0 +1,30 @@
+---
+# Reconfigure Nginx with SSL after certificates are obtained
+
+- name: Set SSL configuration fact for reconfiguration
+  ansible.builtin.set_fact:
+    configure_ssl: true
+
+- name: Redeploy Nginx configuration with SSL
+  ansible.builtin.template:
+    src: velosim.conf.j2
+    dest: "/etc/nginx/sites-available/{{ domain_name }}"
+    owner: root
+    group: root
+    mode: '0644'
+
+- name: Test Nginx configuration after SSL reconfiguration
+  ansible.builtin.command: nginx -t
+  register: nginx_ssl_test
+  changed_when: false
+
+- name: Display Nginx SSL test result
+  ansible.builtin.debug:
+    msg: "Nginx configuration test passed with SSL enabled"
+  when: nginx_ssl_test.rc == 0
+
+- name: Reload Nginx with SSL configuration
+  ansible.builtin.service:
+    name: nginx
+    state: reloaded
+  when: nginx_ssl_test.rc == 0

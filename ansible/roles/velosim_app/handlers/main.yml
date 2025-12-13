@@ -1,0 +1,25 @@
+---
+# VeloSim application handlers
+
+- name: restart velosim
+  ansible.builtin.command: "{{ app_dir }}/scripts/velosim-app.sh restart"
+  become_user: "{{ app_user }}"
+
+- name: reload systemd
+  ansible.builtin.systemd:
+    daemon_reload: true
+  become: true
+
+- name: enable velosim service
+  ansible.builtin.systemd:
+    name: velosim
+    enabled: true
+  become: true
+- name: reload systemd
+  ansible.builtin.systemd:
+    daemon_reload: true
+
+- name: enable velosim service
+  ansible.builtin.systemd:
+    name: velosim
+    enabled: true

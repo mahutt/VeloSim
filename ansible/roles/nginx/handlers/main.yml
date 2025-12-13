@@ -1,0 +1,36 @@
+---
+# Nginx Handlers for VeloSim
+
+- name: reload nginx
+  ansible.builtin.service:
+    name: nginx
+    state: reloaded
+
+- name: restart nginx
+  ansible.builtin.service:
+    name: nginx
+    state: restarted
+
+- name: reconfigure nginx with ssl
+  block:
+    - name: Set SSL configuration fact for reconfiguration
+      ansible.builtin.set_fact:
+        configure_ssl: true
+    
+    - name: Redeploy Nginx configuration with SSL
+      ansible.builtin.template:
+        src: velosim.conf.j2
+        dest: "/etc/nginx/sites-available/{{ domain_name }}"
+        owner: root
+        group: root
+        mode: '0644'
+    
+    - name: Test Nginx configuration after SSL reconfiguration
+      ansible.builtin.command: nginx -t
+      register: nginx_ssl_test
+      changed_when: false
+    
+    - name: Reload Nginx with SSL configuration
+      ansible.builtin.service:
+        name: nginx
+        state: reloaded
