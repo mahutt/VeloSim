@@ -23,141 +23,188 @@ SOFTWARE.
 """
 
 import pytest
-from sqlalchemy.orm import Session
+from unittest.mock import Mock
 from back.crud.station import station_crud
 from back.crud.user import user_crud
-from back.crud.sim_instance import sim_instance_crud
-from back.schemas import StationCreate, StationUpdate, SimInstanceCreate
+from back.schemas import StationCreate, StationUpdate
 from back.models import User, SimInstance
 
 
 @pytest.fixture
-def test_user(db: Session) -> User:
+def test_user() -> User:
     """Create a non-admin user for testing."""
-    test_user = User(
+    return User(
+        id=1,
         username="test_user",
         password_hash=user_crud.hash_password("test_password"),
         is_admin=False,
         is_enabled=True,
     )
-    db.add(test_user)
-    db.flush()
-    db.refresh(test_user)
-    return test_user
 
 
 @pytest.fixture
-def sim_instance(db: Session, test_user: User) -> SimInstance:
+def sim_instance(test_user: User) -> SimInstance:
     """Create a test simulation instance for the normal user."""
-    sim_instance_data = SimInstanceCreate(user_id=test_user.id)
-    sim = sim_instance_crud.create(db, sim_instance_data)
-    db.commit()
-    return sim
+    return SimInstance(id=1, user_id=test_user.id)
 
 
 class TestStationCRUD:
     """Test the station CRUD operations."""
 
-    def test_create_station(self, db: Session, sim_instance: SimInstance) -> None:
+    def test_create_station(self, mock_db: Mock, sim_instance: SimInstance) -> None:
         """Test creating a station."""
+        from back.tests.mock_utils import setup_mock_db_add_with_id
+
+        setup_mock_db_add_with_id(mock_db, 1)
+
         station_data = StationCreate(
             name="Test Station",
             longitude=-73.5,
             latitude=45.5,
             sim_instance_id=sim_instance.id,
         )
-        station = station_crud.create(db, station_data)
+        station = station_crud.create(mock_db, station_data)
 
         assert station.id is not None
         assert station.name == "Test Station"
         assert station.longitude == -73.5
         assert station.latitude == 45.5
 
-    def test_get_station_by_id(self, db: Session, sim_instance: SimInstance) -> None:
+    def test_get_station_by_id(self, mock_db: Mock, sim_instance: SimInstance) -> None:
         """Test getting a station by ID."""
-        # Create a station first
-        station_data = StationCreate(
+        from back.models import Station
+
+        created_station = Station(
+            id=1,
             name="Get Test Station",
             longitude=-73.6,
             latitude=45.6,
             sim_instance_id=sim_instance.id,
         )
-        created_station = station_crud.create(db, station_data)
+
+        mock_query = Mock()
+        mock_query.filter.return_value.first.return_value = created_station
+        mock_db.query.return_value = mock_query
 
         # Get the station by ID
-        retrieved_station = station_crud.get(db, created_station.id)
+        retrieved_station = station_crud.get(mock_db, created_station.id)
         assert retrieved_station is not None
         assert retrieved_station.id == created_station.id
         assert retrieved_station.name == "Get Test Station"
 
-    def test_get_station_by_id_not_found(self, db: Session) -> None:
+    def test_get_station_by_id_not_found(self, mock_db: Mock) -> None:
         """Test getting a station by ID that doesn't exist."""
-        station = station_crud.get(db, 999)
+        mock_query = Mock()
+        mock_query.filter.return_value.first.return_value = None
+        mock_db.query.return_value = mock_query
+
+        station = station_crud.get(mock_db, 999)
         assert station is None
 
-    def test_get_station_by_name(self, db: Session, sim_instance: SimInstance) -> None:
+    def test_get_station_by_name(
+        self, mock_db: Mock, sim_instance: SimInstance
+    ) -> None:
         """Test getting a station by name."""
-        # Create a station first
-        station_data = StationCreate(
+        from back.models import Station
+
+        created_station = Station(
+            id=1,
             name="Named Station",
             longitude=-73.7,
             latitude=45.7,
             sim_instance_id=sim_instance.id,
         )
-        created_station = station_crud.create(db, station_data)
+
+        mock_query = Mock()
+        mock_query.filter.return_value.first.return_value = created_station
+        mock_db.query.return_value = mock_query
 
         # Get the station by name
-        retrieved_station = station_crud.get_by_name(db, "Named Station")
+        retrieved_station = station_crud.get_by_name(mock_db, "Named Station")
         assert retrieved_station is not None
         assert retrieved_station.id == created_station.id
         assert retrieved_station.name == "Named Station"
 
-    def test_get_station_by_name_not_found(self, db: Session) -> None:
+    def test_get_station_by_name_not_found(self, mock_db: Mock) -> None:
         """Test getting a station by name that doesn't exist."""
-        station = station_crud.get_by_name(db, "Nonexistent Station")
+        mock_query = Mock()
+        mock_query.filter.return_value.first.return_value = None
+        mock_db.query.return_value = mock_query
+
+        station = station_crud.get_by_name(mock_db, "Nonexistent Station")
         assert station is None
 
-    def test_get_all_stations_empty(self, db: Session) -> None:
+    def test_get_all_stations_empty(self, mock_db: Mock) -> None:
         """Test getting all stations when database is empty."""
-        stations, total = station_crud.get_all(db)
+        mock_count_query = Mock()
+        mock_count_query.scalar.return_value = 0
+        mock_data_query = Mock()
+        mock_data_query.offset.return_value.limit.return_value.all.return_value = []
+        mock_db.query.side_effect = [mock_count_query, mock_data_query]
+
+        stations, total = station_crud.get_all(mock_db)
         assert stations == []
         assert total == 0
 
     def test_get_all_stations_with_data(
-        self, db: Session, sim_instance: SimInstance
+        self, mock_db: Mock, sim_instance: SimInstance
     ) -> None:
         """Test getting all stations with data."""
-        # Create multiple stations
-        for i in range(5):
-            station_data = StationCreate(
+        from back.models import Station
+
+        # Create test stations
+        stations = [
+            Station(
+                id=i + 1,
                 name=f"Station {i}",
                 longitude=-73.5 + i * 0.01,
                 latitude=45.5 + i * 0.01,
                 sim_instance_id=sim_instance.id,
             )
-            station_crud.create(db, station_data)
+            for i in range(5)
+        ]
+
+        mock_count_query = Mock()
+        mock_count_query.scalar.return_value = 5
+        mock_data_query = Mock()
+        mock_data_query.offset.return_value.limit.return_value.all.return_value = (
+            stations
+        )
+        mock_db.query.side_effect = [mock_count_query, mock_data_query]
 
         # Get all stations
-        stations, total = station_crud.get_all(db)
-        assert len(stations) == 5
+        result_stations, total = station_crud.get_all(mock_db)
+        assert len(result_stations) == 5
         assert total == 5
 
     def test_get_all_stations_with_pagination(
-        self, db: Session, sim_instance: SimInstance
+        self, mock_db: Mock, sim_instance: SimInstance
     ) -> None:
         """Test getting all stations with pagination."""
-        # Create multiple stations
-        for i in range(10):
-            station_data = StationCreate(
+        from back.models import Station
+
+        # Create test stations for pagination
+        paginated_stations = [
+            Station(
+                id=i + 1,
                 name=f"Pagination Station {i}",
                 longitude=-73.5 + i * 0.01,
                 latitude=45.5 + i * 0.01,
                 sim_instance_id=sim_instance.id,
             )
-            station_crud.create(db, station_data)
+            for i in range(3, 7)
+        ]
+
+        mock_count_query = Mock()
+        mock_count_query.scalar.return_value = 10
+        mock_data_query = Mock()
+        mock_data_query.offset.return_value.limit.return_value.all.return_value = (
+            paginated_stations
+        )
+        mock_db.query.side_effect = [mock_count_query, mock_data_query]
 
         # Test pagination
-        stations, total = station_crud.get_all(db, skip=3, limit=4)
+        stations, total = station_crud.get_all(mock_db, skip=3, limit=4)
         assert len(stations) == 4
         assert total == 10
 
@@ -166,22 +213,27 @@ class TestStationCRUD:
         expected_names = [f"Pagination Station {i}" for i in range(3, 7)]
         assert station_names == expected_names
 
-    def test_update_station(self, db: Session, sim_instance: SimInstance) -> None:
+    def test_update_station(self, mock_db: Mock, sim_instance: SimInstance) -> None:
         """Test updating a station."""
-        # Create a station first
-        station_data = StationCreate(
+        from back.models import Station
+
+        created_station = Station(
+            id=1,
             name="Original Station",
             longitude=-73.5,
             latitude=45.5,
             sim_instance_id=sim_instance.id,
         )
-        created_station = station_crud.create(db, station_data)
+
+        mock_query = Mock()
+        mock_query.filter.return_value.first.return_value = created_station
+        mock_db.query.return_value = mock_query
 
         # Update the station
         update_data = StationUpdate(
             name="Updated Station", longitude=-73.6, latitude=45.6
         )
-        updated_station = station_crud.update(db, created_station.id, update_data)
+        updated_station = station_crud.update(mock_db, created_station.id, update_data)
 
         assert updated_station is not None
         assert updated_station.id == created_station.id
@@ -190,61 +242,81 @@ class TestStationCRUD:
         assert updated_station.latitude == 45.6
 
     def test_update_station_partial(
-        self, db: Session, sim_instance: SimInstance
+        self, mock_db: Mock, sim_instance: SimInstance
     ) -> None:
         """Test updating a station with partial data."""
-        # Create a station first
-        station_data = StationCreate(
+        from back.models import Station
+
+        created_station = Station(
+            id=1,
             name="Partial Update Station",
             longitude=-73.5,
             latitude=45.5,
             sim_instance_id=sim_instance.id,
         )
-        created_station = station_crud.create(db, station_data)
+
+        mock_query = Mock()
+        mock_query.filter.return_value.first.return_value = created_station
+        mock_db.query.return_value = mock_query
 
         # Update only the name
         update_data = StationUpdate(name="New Name Only")  # type: ignore[call-arg]
-        updated_station = station_crud.update(db, created_station.id, update_data)
+        updated_station = station_crud.update(mock_db, created_station.id, update_data)
 
         assert updated_station is not None
         assert updated_station.name == "New Name Only"
         assert updated_station.longitude == -73.5  # Should remain unchanged
         assert updated_station.latitude == 45.5  # Should remain unchanged
 
-    def test_update_station_not_found(self, db: Session) -> None:
+    def test_update_station_not_found(self, mock_db: Mock) -> None:
         """Test updating a station that doesn't exist."""
+        mock_query = Mock()
+        mock_query.filter.return_value.first.return_value = None
+        mock_db.query.return_value = mock_query
+
         update_data = StationUpdate(name="Updated Name")  # type: ignore[call-arg]
-        updated_station = station_crud.update(db, 999, update_data)
+        updated_station = station_crud.update(mock_db, 999, update_data)
         assert updated_station is None
 
-    def test_delete_station(self, db: Session, sim_instance: SimInstance) -> None:
+    def test_delete_station(self, mock_db: Mock, sim_instance: SimInstance) -> None:
         """Test deleting a station."""
-        # Create a station first
-        station_data = StationCreate(
+        from back.models import Station
+
+        created_station = Station(
+            id=1,
             name="Station to Delete",
             longitude=-73.5,
             latitude=45.5,
             sim_instance_id=sim_instance.id,
         )
-        created_station = station_crud.create(db, station_data)
+
+        mock_query = Mock()
+        mock_query.filter.return_value.first.side_effect = [created_station, None]
+        mock_db.query.return_value = mock_query
 
         # Delete the station
-        success = station_crud.delete(db, created_station.id)
+        success = station_crud.delete(mock_db, created_station.id)
         assert success is True
 
         # Verify it's deleted
-        retrieved_station = station_crud.get(db, created_station.id)
+        retrieved_station = station_crud.get(mock_db, created_station.id)
         assert retrieved_station is None
 
-    def test_delete_station_not_found(self, db: Session) -> None:
+    def test_delete_station_not_found(self, mock_db: Mock) -> None:
         """Test deleting a station that doesn't exist."""
-        success = station_crud.delete(db, 999)
+        mock_query = Mock()
+        mock_query.filter.return_value.first.return_value = None
+        mock_db.query.return_value = mock_query
+
+        success = station_crud.delete(mock_db, 999)
         assert success is False
 
     def test_create_multiple_stations_with_different_names(
-        self, db: Session, sim_instance: SimInstance
+        self, mock_db: Mock, sim_instance: SimInstance
     ) -> None:
         """Test creating multiple stations with different names."""
+        from back.tests.mock_utils import setup_mock_db_add_with_id
+
         stations_data = [
             StationCreate(
                 name="Station A",
@@ -267,19 +339,33 @@ class TestStationCRUD:
         ]
 
         created_stations = []
-        for station_data in stations_data:
-            station = station_crud.create(db, station_data)
+        for i, station_data in enumerate(stations_data):
+            setup_mock_db_add_with_id(mock_db, i + 1)
+            station = station_crud.create(mock_db, station_data)
             created_stations.append(station)
             assert station.id is not None
             assert station.name == station_data.name
 
         # Verify all stations are in the database
-        all_stations, total = station_crud.get_all(db)
+        mock_count_query = Mock()
+        mock_count_query.scalar.return_value = 3
+        mock_data_query = Mock()
+        mock_data_query.offset.return_value.limit.return_value.all.return_value = (
+            created_stations
+        )
+        mock_db.query.side_effect = [mock_count_query, mock_data_query]
+
+        all_stations, total = station_crud.get_all(mock_db)
         assert total == 3
         assert len(all_stations) == 3
 
         # Verify we can get each by name
-        for original_data in stations_data:
-            retrieved = station_crud.get_by_name(db, original_data.name)
+        # - reset mock_db.query after side_effect exhaustion
+        for original_data, created_station in zip(stations_data, created_stations):
+            mock_query = Mock()
+            mock_query.filter.return_value.first.return_value = created_station
+            mock_db.query = Mock(return_value=mock_query)
+
+            retrieved = station_crud.get_by_name(mock_db, original_data.name)
             assert retrieved is not None
             assert retrieved.name == original_data.name
