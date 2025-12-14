@@ -41,6 +41,7 @@ class InputParameter:
         real_time_factor: Optional[float] = None,
         key_frame_freq: Optional[int] = None,
         sim_time: Optional[int] = 0,
+        start_time: Optional[int] = 0,
     ) -> None:
         self.station_entities: Dict[int, Station] = (
             station_entities if station_entities is not None else {}
@@ -54,6 +55,7 @@ class InputParameter:
         self.realTimeFactor: Optional[float] = real_time_factor
         self.keyFrameFreq: Optional[int] = key_frame_freq
         self.sim_time: int = sim_time if sim_time is not None else 0
+        self.start_time: int = start_time if start_time is not None else 0
 
     # Getter methods
     def get_station_entities(self) -> Dict[int, Station]:
@@ -95,6 +97,14 @@ class InputParameter:
             Number of frames between key frames, or None.
         """
         return self.keyFrameFreq
+
+    def get_start_time(self) -> int:
+        """Get the simulation start time.
+
+        Returns:
+            The simulation start time.
+        """
+        return self.start_time
 
     def set_sim_time(self, sim_time: int) -> None:
         """Set the simulation time.

@@ -59,6 +59,10 @@ import useAuth from '~/hooks/use-auth';
 import { logMissingEntityError } from '~/utils/simulation-error-utils';
 import api from '~/api';
 import { useSimulationWebSocket } from '~/hooks/use-simulation-websocket';
+import {
+  formatSecondsToHHMM,
+  calculateDayFromSeconds,
+} from '~/utils/clock-utils';
 
 // Expect to receive frames every 1 second
 const BASE_FRAME_INTERVAL_MS = 1000;
@@ -86,6 +90,8 @@ type SimulationContextType = {
   isConnected: boolean;
   simulationStatus: SimulationStatus;
   isLoading: boolean; // Convenience flag for UI
+  formattedSimTime: string | null;
+  currentDay: number;
 };
 
 const SimulationContext = createContext<SimulationContextType | undefined>(
@@ -124,6 +130,9 @@ export const SimulationProvider = ({
   const [resources, setResources] = useState<Resource[]>([]);
   const [selectedItem, setSelectedItem] = useState<SelectedItem | null>(null);
   const [tasks, setTasks] = useState<StationTask[]>([]);
+
+  const [formattedSimTime, setFormattedSimTime] = useState<string | null>(null);
+  const [currentDay, setCurrentDay] = useState<number>(1);
 
   const assignTask = async (resourceId: number, taskId: number) => {
     const resource = resourcesRef.current.get(resourceId);
@@ -495,6 +504,19 @@ export const SimulationProvider = ({
   const handleInitialFrame = useCallback((payload: BackendPayload) => {
     console.log('[WS] Handling initial frame:', payload);
 
+    setFormattedSimTime(
+      formatSecondsToHHMM(
+        payload.clock.simSecondsPassed,
+        payload.clock.startTime
+      )
+    );
+    setCurrentDay(
+      calculateDayFromSeconds(
+        payload.clock.simSecondsPassed,
+        payload.clock.startTime
+      )
+    );
+
     // Store initial data (pass true to indicate this is initial frame)
     const updatedResources = adaptSimulationData(payload, true);
     setResources(updatedResources);
@@ -523,6 +545,19 @@ export const SimulationProvider = ({
   // Handle frame updates from WebSocket
   const handleFrameUpdate = useCallback((payload: BackendPayload) => {
     console.log('[WS] Handling frame update:', payload);
+
+    setFormattedSimTime(
+      formatSecondsToHHMM(
+        payload.clock.simSecondsPassed,
+        payload.clock.startTime
+      )
+    );
+    setCurrentDay(
+      calculateDayFromSeconds(
+        payload.clock.simSecondsPassed,
+        payload.clock.startTime
+      )
+    );
 
     // Update data (pass false to preserve existing tasks if not in payload)
     const updatedResources = adaptSimulationData(payload, false);
@@ -726,6 +761,8 @@ export const SimulationProvider = ({
         isConnected,
         simulationStatus,
         isLoading,
+        formattedSimTime,
+        currentDay,
       }}
     >
       {children}

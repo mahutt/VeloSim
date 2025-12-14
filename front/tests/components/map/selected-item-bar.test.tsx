@@ -54,6 +54,8 @@ describe('SelectedItemBar', () => {
       isConnected: false,
       simulationStatus: 'idle',
       isLoading: false,
+      formattedSimTime: null,
+      currentDay: 1,
     });
 
     const { container } = render(
@@ -93,6 +95,8 @@ describe('SelectedItemBar', () => {
       isConnected: false,
       startSimulation: vi.fn(),
       simulationStatus: 'idle',
+      formattedSimTime: null,
+      currentDay: 1,
     });
 
     render(
@@ -142,6 +146,8 @@ describe('SelectedItemBar', () => {
       isConnected: false,
       startSimulation: vi.fn(),
       simulationStatus: 'idle',
+      formattedSimTime: null,
+      currentDay: 1,
     });
 
     render(
@@ -189,6 +195,8 @@ describe('SelectedItemBar', () => {
       isConnected: false,
       startSimulation: vi.fn(),
       simulationStatus: 'idle',
+      formattedSimTime: null,
+      currentDay: 1,
     });
 
     render(
@@ -234,6 +242,8 @@ describe('SelectedItemBar', () => {
       isConnected: false,
       startSimulation: vi.fn(),
       simulationStatus: 'idle',
+      formattedSimTime: null,
+      currentDay: 1,
     });
 
     render(

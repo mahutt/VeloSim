@@ -221,6 +221,13 @@ describe('useSimulationWebSocket', () => {
       resources: [],
       stations: [],
       tasks: [],
+      clock: {
+        simSecondsPassed: 0,
+        simMinutesPassed: 0,
+        realSecondsPassed: 0,
+        realMinutesPassed: 0,
+        startTime: 0,
+      },
     };
 
     ws.simulateMessage({
@@ -259,7 +266,18 @@ describe('useSimulationWebSocket', () => {
     // Send initial frame first
     ws.simulateMessage({
       seq: 0,
-      payload: { resources: [], stations: [], tasks: [] },
+      payload: {
+        resources: [],
+        stations: [],
+        tasks: [],
+        clock: {
+          simSecondsPassed: 0,
+          simMinutesPassed: 0,
+          realSecondsPassed: 0,
+          realMinutesPassed: 0,
+          startTime: 0,
+        },
+      },
     });
 
     await waitFor(() => {
@@ -277,6 +295,13 @@ describe('useSimulationWebSocket', () => {
           in_progress_task_id: null,
         },
       ],
+      clock: {
+        simSecondsPassed: 1,
+        simMinutesPassed: 0,
+        realSecondsPassed: 1,
+        realMinutesPassed: 0,
+        startTime: 0,
+      },
     };
 
     ws.simulateMessage({
