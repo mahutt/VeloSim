@@ -161,9 +161,11 @@ class OSRMConnection:
 
         Returns:
             Dict with keys:
+
                 - 'coordinates': List of [lon, lat] waypoints
                 - 'distance': Total distance in meters
                 - 'duration': Total duration in seconds
+
             Returns None if no valid route found
         """
         # Build OSRM route query
