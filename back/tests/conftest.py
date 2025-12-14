@@ -31,9 +31,11 @@ import sys
 import os
 from typing import Generator
 import pytest
+from unittest.mock import Mock
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, Session
+from back.tests.mock_utils import create_mock_db_session
 
 # Enable any feature flags for testing **before** importing 'app'
 os.environ["FEATURE_STATIONS_API_ROUTER"] = "true"
@@ -85,6 +87,12 @@ def db() -> Generator[Session, None, None]:
     finally:
         db.close()
         Base.metadata.drop_all(bind=engine)
+
+
+@pytest.fixture
+def mock_db() -> Mock:
+    """Create a mock database session for unit testing without real DB."""
+    return create_mock_db_session()
 
 
 @pytest.fixture
