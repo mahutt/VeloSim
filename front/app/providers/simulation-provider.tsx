@@ -504,20 +504,18 @@ export const SimulationProvider = ({
   const handleInitialFrame = useCallback((payload: BackendPayload) => {
     console.log('[WS] Handling initial frame:', payload);
 
-    if (payload.clock) {
-      setFormattedSimTime(
-        formatSecondsToHHMM(
-          payload.clock.simSecondsPassed,
-          payload.clock.startTime
-        )
-      );
-      setCurrentDay(
-        calculateDayFromSeconds(
-          payload.clock.simSecondsPassed,
-          payload.clock.startTime
-        )
-      );
-    }
+    setFormattedSimTime(
+      formatSecondsToHHMM(
+        payload.clock.simSecondsPassed,
+        payload.clock.startTime
+      )
+    );
+    setCurrentDay(
+      calculateDayFromSeconds(
+        payload.clock.simSecondsPassed,
+        payload.clock.startTime
+      )
+    );
 
     // Store initial data (pass true to indicate this is initial frame)
     const updatedResources = adaptSimulationData(payload, true);
@@ -548,20 +546,19 @@ export const SimulationProvider = ({
   const handleFrameUpdate = useCallback((payload: BackendPayload) => {
     console.log('[WS] Handling frame update:', payload);
 
-    if (payload.clock) {
-      setFormattedSimTime(
-        formatSecondsToHHMM(
-          payload.clock.simSecondsPassed,
-          payload.clock.startTime
-        )
-      );
-      setCurrentDay(
-        calculateDayFromSeconds(
-          payload.clock.simSecondsPassed,
-          payload.clock.startTime
-        )
-      );
-    }
+    setFormattedSimTime(
+      formatSecondsToHHMM(
+        payload.clock.simSecondsPassed,
+        payload.clock.startTime
+      )
+    );
+    setCurrentDay(
+      calculateDayFromSeconds(
+        payload.clock.simSecondsPassed,
+        payload.clock.startTime
+      )
+    );
+
     // Update data (pass false to preserve existing tasks if not in payload)
     const updatedResources = adaptSimulationData(payload, false);
     setResources(updatedResources);

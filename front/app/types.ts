@@ -96,42 +96,6 @@ export interface Resource {
   in_progress_task_id?: number | null;
 }
 
-// Clock type for simulation timing
-export interface Clock {
-  realSecondsPassed: number;
-  realMinutesPassed: number;
-  simSecondsPassed: number;
-  simMinutesPassed: number;
-  startTime: number;
-}
-
-// WebSocket simulation frame types
-export interface FramePayload {
-  sim_id: string;
-  tasks: StationTask[];
-  stations: Station[];
-  resources: Resource[];
-  clock: Clock;
-}
-
-export interface SimulationFrame {
-  seq_numb: number;
-  timestamp: number;
-  is_key: boolean;
-  payload: FramePayload;
-}
-
-export interface WebSocketSimulationMessage {
-  sim_id: string;
-  db_id: number;
-  status: 'started' | 'running' | 'paused' | 'completed' | 'error';
-  initial_frame: SimulationFrame;
-}
-
-export interface WebSocketFrameMessage {
-  frame: SimulationFrame;
-}
-
 // WebSocket connection types
 export type SimulationStatus =
   | 'idle' // Not connected
@@ -220,7 +184,7 @@ export interface BackendPayload {
   stations?: BackendStation[];
   resources?: BackendResource[];
   new_tasks?: BackendTask[];
-  clock?: {
+  clock: {
     simSecondsPassed: number;
     simMinutesPassed: number;
     realSecondsPassed: number;

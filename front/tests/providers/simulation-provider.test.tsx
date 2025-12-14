@@ -730,55 +730,6 @@ test('advances to next day when sim time crosses 24h', async () => {
   });
 });
 
-test('keeps prior clock when update payload omits clock', async () => {
-  const { getByTestId } = render(
-    <MapProvider>
-      <SimulationProvider>
-        <TaskAssignmentProvider>
-          <MapContainer />
-          <ClockProbe />
-        </TaskAssignmentProvider>
-      </SimulationProvider>
-    </MapProvider>
-  );
-
-  await waitFor(() => {
-    expect(MockMap.instance).toBeDefined();
-  });
-
-  await act(async () => {
-    MockMap.instance?.callBacks['load']();
-  });
-
-  await act(async () => {
-    wsOptions?.onInitialFrame?.({
-      clock: {
-        simSecondsPassed: 18000,
-        simMinutesPassed: 300,
-        realSecondsPassed: 18000,
-        realMinutesPassed: 300,
-        startTime: 0,
-      },
-      resources: [],
-      stations: [],
-      tasks: [],
-    } as BackendPayload);
-  });
-
-  await act(async () => {
-    wsOptions?.onFrameUpdate?.({
-      resources: [],
-      stations: [],
-      tasks: [],
-    } as BackendPayload);
-  });
-
-  await waitFor(() => {
-    expect(getByTestId('time')).toHaveTextContent('05:00');
-    expect(getByTestId('day')).toHaveTextContent('1');
-  });
-});
-
 test('defaults to 00:00 day 1 for negative sim time', async () => {
   const { getByTestId } = render(
     <MapProvider>

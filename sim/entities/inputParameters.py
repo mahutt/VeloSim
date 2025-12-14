@@ -99,6 +99,11 @@ class InputParameter:
         return self.keyFrameFreq
 
     def get_start_time(self) -> int:
+        """Get the simulation start time.
+
+        Returns:
+            The simulation start time.
+        """
         return self.start_time
 
     def set_sim_time(self, sim_time: int) -> None:
