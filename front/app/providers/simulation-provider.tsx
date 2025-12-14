@@ -59,29 +59,16 @@ import useAuth from '~/hooks/use-auth';
 import { logMissingEntityError } from '~/utils/simulation-error-utils';
 import api from '~/api';
 import { useSimulationWebSocket } from '~/hooks/use-simulation-websocket';
+import {
+  formatSecondsToHHMM,
+  calculateDayFromSeconds,
+} from '~/utils/clock-utils';
 
 // Expect to receive frames every 1 second
 const BASE_FRAME_INTERVAL_MS = 1000;
 
-const SECONDS_PER_DAY = 86400;
-
 export const SPEED_OPTIONS = [0, 0.5, 1, 2, 4, 8] as const;
 export type Speed = (typeof SPEED_OPTIONS)[number];
-
-// convert sim time (in seconds) to HH:MM format
-function formatSecondsToHHMM(seconds: number) {
-  if (!Number.isFinite(seconds) || seconds < 0) return '00:00';
-  const hours = Math.floor(seconds / 3600);
-  const minutes = Math.floor((seconds % 3600) / 60);
-  const pad = (n: number) => n.toString().padStart(2, '0');
-  const hoursDisplayed = hours % 24;
-  return `${pad(hoursDisplayed)}:${pad(minutes)}`;
-}
-
-function calculateDayFromSeconds(seconds: number): number {
-  if (!Number.isFinite(seconds) || seconds < 0) return 1;
-  return Math.floor(seconds / SECONDS_PER_DAY) + 1;
-}
 
 type SimulationContextType = {
   speedRef: React.RefObject<Speed>;
@@ -518,8 +505,18 @@ export const SimulationProvider = ({
     console.log('[WS] Handling initial frame:', payload);
 
     if (payload.clock) {
-      setFormattedSimTime(formatSecondsToHHMM(payload.clock.simSecondsPassed));
-      setCurrentDay(calculateDayFromSeconds(payload.clock.simSecondsPassed));
+      setFormattedSimTime(
+        formatSecondsToHHMM(
+          payload.clock.simSecondsPassed,
+          payload.clock.startTime
+        )
+      );
+      setCurrentDay(
+        calculateDayFromSeconds(
+          payload.clock.simSecondsPassed,
+          payload.clock.startTime
+        )
+      );
     }
 
     // Store initial data (pass true to indicate this is initial frame)
@@ -552,8 +549,18 @@ export const SimulationProvider = ({
     console.log('[WS] Handling frame update:', payload);
 
     if (payload.clock) {
-      setFormattedSimTime(formatSecondsToHHMM(payload.clock.simSecondsPassed));
-      setCurrentDay(calculateDayFromSeconds(payload.clock.simSecondsPassed));
+      setFormattedSimTime(
+        formatSecondsToHHMM(
+          payload.clock.simSecondsPassed,
+          payload.clock.startTime
+        )
+      );
+      setCurrentDay(
+        calculateDayFromSeconds(
+          payload.clock.simSecondsPassed,
+          payload.clock.startTime
+        )
+      );
     }
     // Update data (pass false to preserve existing tasks if not in payload)
     const updatedResources = adaptSimulationData(payload, false);

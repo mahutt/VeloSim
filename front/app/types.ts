@@ -102,6 +102,7 @@ export interface Clock {
   realMinutesPassed: number;
   simSecondsPassed: number;
   simMinutesPassed: number;
+  startTime: number;
 }
 
 // WebSocket simulation frame types
@@ -224,6 +225,7 @@ export interface BackendPayload {
     simMinutesPassed: number;
     realSecondsPassed: number;
     realMinutesPassed: number;
+    startTime: number;
   };
 }
 

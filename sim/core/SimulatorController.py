@@ -63,6 +63,7 @@ class SimulatorController:
         self.clock = Clock(simEnv)
         self.sim_behaviour = sim_behaviour
         self.frameCounter: int = 0
+        self.start_time: int = inputParameters.get_start_time()
 
         # Unpack InputParameter object to populate entity lists
         self.station_entities: Dict[int, Station] = (
@@ -486,6 +487,7 @@ class SimulatorController:
                 "realMinutesPassed": self.clock.real_minutes_passed,
                 "simSecondsPassed": self.clock.sim_time_seconds,
                 "simMinutesPassed": self.clock.sim_time_minutes,
+                "startTime": self.start_time,
             },
         }
         frame = Frame(seq_numb=self.frameCounter, payload=payload)
@@ -580,6 +582,7 @@ class SimulatorController:
                 "realMinutesPassed": self.clock.real_minutes_passed,
                 "simSecondsPassed": self.clock.sim_time_seconds,
                 "simMinutesPassed": self.clock.sim_time_minutes,
+                "startTime": self.start_time,
             },
         }
         frame = Frame(seq_numb=self.frameCounter, payload=payload, is_key=True)

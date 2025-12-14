@@ -660,6 +660,7 @@ test('sets clock time and day from initial frame payload', async () => {
         simMinutesPassed: 61,
         realSecondsPassed: 3661,
         realMinutesPassed: 61,
+        startTime: 0,
       },
       resources: [],
       stations: [],
@@ -700,6 +701,7 @@ test('advances to next day when sim time crosses 24h', async () => {
         simMinutesPassed: 1439,
         realSecondsPassed: 86399,
         realMinutesPassed: 1439,
+        startTime: 0,
       },
       resources: [],
       stations: [],
@@ -714,6 +716,7 @@ test('advances to next day when sim time crosses 24h', async () => {
         simMinutesPassed: 1501,
         realSecondsPassed: 90061,
         realMinutesPassed: 1501,
+        startTime: 0,
       },
       resources: [],
       stations: [],
@@ -754,6 +757,7 @@ test('keeps prior clock when update payload omits clock', async () => {
         simMinutesPassed: 300,
         realSecondsPassed: 18000,
         realMinutesPassed: 300,
+        startTime: 0,
       },
       resources: [],
       stations: [],
@@ -802,6 +806,7 @@ test('defaults to 00:00 day 1 for negative sim time', async () => {
         simMinutesPassed: -1,
         realSecondsPassed: -5,
         realMinutesPassed: -1,
+        startTime: 0,
       },
       resources: [],
       stations: [],
@@ -811,6 +816,88 @@ test('defaults to 00:00 day 1 for negative sim time', async () => {
 
   await waitFor(() => {
     expect(getByTestId('time')).toHaveTextContent('00:00');
+    expect(getByTestId('day')).toHaveTextContent('1');
+  });
+});
+
+test('displays time correctly with scenario start_time (08:00)', async () => {
+  const { getByTestId } = render(
+    <MapProvider>
+      <SimulationProvider>
+        <TaskAssignmentProvider>
+          <MapContainer />
+          <ClockProbe />
+        </TaskAssignmentProvider>
+      </SimulationProvider>
+    </MapProvider>
+  );
+
+  await waitFor(() => {
+    expect(MockMap.instance).toBeDefined();
+  });
+
+  await act(async () => {
+    MockMap.instance?.callBacks['load']();
+  });
+
+  await act(async () => {
+    wsOptions?.onInitialFrame?.({
+      clock: {
+        simSecondsPassed: 0,
+        simMinutesPassed: 0,
+        realSecondsPassed: 0,
+        realMinutesPassed: 0,
+        startTime: 28800,
+      },
+      resources: [],
+      stations: [],
+      tasks: [],
+    } as BackendPayload);
+  });
+
+  await waitFor(() => {
+    expect(getByTestId('time')).toHaveTextContent('08:00');
+    expect(getByTestId('day')).toHaveTextContent('1');
+  });
+});
+
+test('advances time correctly with start_time', async () => {
+  const { getByTestId } = render(
+    <MapProvider>
+      <SimulationProvider>
+        <TaskAssignmentProvider>
+          <MapContainer />
+          <ClockProbe />
+        </TaskAssignmentProvider>
+      </SimulationProvider>
+    </MapProvider>
+  );
+
+  await waitFor(() => {
+    expect(MockMap.instance).toBeDefined();
+  });
+
+  await act(async () => {
+    MockMap.instance?.callBacks['load']();
+  });
+
+  await act(async () => {
+    wsOptions?.onInitialFrame?.({
+      clock: {
+        simSecondsPassed: 7200,
+        simMinutesPassed: 120,
+        realSecondsPassed: 7200,
+        realMinutesPassed: 120,
+        startTime: 28800,
+      },
+      resources: [],
+      stations: [],
+      tasks: [],
+    } as BackendPayload);
+  });
+
+  await waitFor(() => {
+    expect(getByTestId('time')).toHaveTextContent('10:00');
     expect(getByTestId('day')).toHaveTextContent('1');
   });
 });
