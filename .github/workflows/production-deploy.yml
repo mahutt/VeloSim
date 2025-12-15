@@ -3,6 +3,7 @@ name: Production Deployment
 # Required GitHub Secrets:
 # - DEPLOY_SSH_KEY: SSH private key for accessing the production server (ansible user)
 # - DEPLOY_HOST: Production server hostname/IP
+# - DEPLOY_HOST_KEY: Server's SSH host key (e.g., "ssh-ed25519 AAAAC3Nza...")
 # - DEPLOY_USER: SSH username for deployment (default: ansible)
 # - ANSIBLE_VAULT_PASSWORD: Password for decrypting Ansible vault files
 # - POSTGRES_PASSWORD: PostgreSQL database password for the VeloSim user
@@ -11,10 +12,12 @@ name: Production Deployment
 #
 # Initial Server Setup:
 # 1. Generate SSH key pair: ssh-keygen -t ed25519 -C "deploy@github-actions" -f ansible_deploy_key
-# 2. Add ansible_deploy_key to GitHub Secrets as DEPLOY_SSH_KEY
-# 3. Add public key to group_vars/all.yml: ansible_deploy_user_pubkey: "ssh-ed25519 AAAAC3..."
-# 4. Run initial deployment with root user to create ansible user
-# 5. Subsequent deployments will use the ansible user
+# 2. Get server's SSH host key: ssh-keyscan -t ed25519 YOUR_SERVER_IP
+# 3. Add ansible_deploy_key to GitHub Secrets as DEPLOY_SSH_KEY
+# 4. Add server's host key to GitHub Secrets as DEPLOY_HOST_KEY
+# 5. Add public key to group_vars/all.yml: ansible_deploy_user_pubkey: "ssh-ed25519 AAAAC3..."
+# 6. Run initial deployment with root user to create ansible user
+# 7. Subsequent deployments will use the ansible user
 
 on:
   push:
@@ -53,7 +56,9 @@ jobs:
 
       - name: Add server to known hosts
         run: |
-          ssh-keyscan -H ${{ secrets.DEPLOY_HOST }} >> ~/.ssh/known_hosts
+          mkdir -p ~/.ssh
+          echo "${{ secrets.DEPLOY_HOST }} ${{ secrets.DEPLOY_HOST_KEY }}" >> ~/.ssh/known_hosts
+          chmod 644 ~/.ssh/known_hosts
 
       - name: Create Ansible vault password file
         run: |
