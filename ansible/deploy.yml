@@ -14,7 +14,8 @@
 
   vars:
     # Environment variables override, pass via -e flag or export before running
-    _postgres_password: "{{ lookup('env', 'POSTGRES_PASSWORD') | default(vault_postgres_password, true) }}"
+    # These will fail if not provided, which is intentional for security
+    _postgres_password: "{{ lookup('env', 'POSTGRES_PASSWORD') }}"
     _vite_mapbox_token: "{{ lookup('env', 'VITE_MAPBOX_ACCESS_TOKEN') | default('', true) }}"
 
   pre_tasks:
