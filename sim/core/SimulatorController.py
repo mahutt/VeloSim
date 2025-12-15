@@ -141,7 +141,7 @@ class SimulatorController:
         if hasattr(self, "sim_thread") and self.sim_thread.is_alive():
             self.sim_thread.join()
 
-        final_frame = self.create_key_frame()
+        final_frame = self.create_frame(is_key=True)
         self.emit_frame(final_frame)
 
     def pause(self) -> None:
@@ -348,7 +348,7 @@ class SimulatorController:
         Returns:
             None
         """
-        frame = self.create_key_frame()
+        frame = self.create_frame(is_key=True)
         self.emit_frame(frame)
 
     # Should call frame emitter
@@ -364,13 +364,12 @@ class SimulatorController:
         # generate key frame if the current frame is a multiple of the n
         # specified for key frames
         if not frame:
-            frame = (
-                self.create_key_frame()
-                if self.frameCounter % self.keyframeFreq == 0
+            is_key = (
+                self.frameCounter % self.keyframeFreq == 0
                 or self.frameCounter == self.sim_time
                 or self.frameCounter == 0
-                else self.create_diff_frame()
             )
+            frame = self.create_frame(is_key=is_key)
         self.frameEmitter.notify(frame=frame)
         # After emitting the frame, clear update flags so only fresh
         # changes appear next time
@@ -393,46 +392,17 @@ class SimulatorController:
         for resource in self.resource_entities.values():
             resource.clear_update()
 
-    def create_diff_frame(self) -> Frame:
-        """Create a differential frame with only updated entities.
+    def create_frame(self, is_key: bool = False) -> Frame:
+        """Create a frame containing entity data.
+
+        Args:
+            is_key: Whether to create a key frame (True) or diff frame (False).
 
         Returns:
-            A frame containing only entities that have been updated.
+            A Frame object with the current entity states.
         """
-        tasks = []
-        for task in self.task_entities.values():
-            if task.has_updated:
-                station = task.get_station()
-                assigned_resource = task.get_assigned_resource()
-                tasks.append(
-                    {
-                        "id": task.get_task_id(),
-                        "state": str(task.get_state()),
-                        "station_id": station.id if station is not None else None,
-                        "station_name": station.name if station is not None else None,
-                        "assigned_resource_id": (
-                            assigned_resource.id
-                            if assigned_resource is not None
-                            else None
-                        ),
-                        "is_assigned": task.is_assigned(),
-                    }
-                )
 
-        stations = [
-            {
-                "station_id": station.id,
-                "station_name": station.name,
-                "station_position": (station.get_station_position().get_position()),
-                "station_tasks": [
-                    task.to_dict() for task in station.get_visible_tasks()
-                ],
-                "task_count": station.get_visible_task_count(),
-            }
-            for station in self.station_entities.values()
-            if station.has_updated
-        ]
-
+        # Collect newly created pop-up tasks for inclusion in frame
         # Aggregate newly created pop-up tasks from stations (if any)
         new_task_objects = [
             task
@@ -443,10 +413,9 @@ class SimulatorController:
         # Ensure pop-up tasks are added to global task_entities
         for task in new_task_objects:
             tid = task.get_task_id()
+            task.has_updated = True  # Mark new tasks as updated for diff frame
             if tid not in self.task_entities:
                 self.task_entities[tid] = task
-
-        new_tasks = [t.to_dict() for t in new_task_objects]
 
         # Clear pop-up tasks after including them in the frame to avoid duplicates
         if new_task_objects:
@@ -454,21 +423,48 @@ class SimulatorController:
                 if getattr(station, "pop_up_tasks", None):
                     station.pop_up_tasks.clear()
 
+        tasks = []
+        for task in self.task_entities.values():
+            task_station = task.get_station()
+            if (
+                not is_key and not task.has_updated
+            ) or task_station is None:  # stationId should not be null
+                continue
+            assigned_resource = task.get_assigned_resource()
+            tasks.append(
+                {
+                    "id": task.get_task_id(),
+                    "state": str(task.get_state()),
+                    "stationId": task_station.id,
+                    "assignedResourceId": (
+                        assigned_resource.id if assigned_resource is not None else None
+                    ),
+                }
+            )
+
+        stations = [
+            {
+                "id": station.id,
+                "name": station.name,
+                "position": (station.get_station_position().get_position()),
+                "taskIds": [task.id for task in station.get_visible_tasks()],
+            }
+            for station in self.station_entities.values()
+            if (is_key or station.has_updated)
+        ]
+
         resources = []
         for resource in self.resource_entities.values():
-            if resource.has_updated:
+            if is_key or resource.has_updated:
                 in_progress_task = resource.get_in_progress_task()
                 resources.append(
                     {
-                        "resource_id": resource.id,
-                        "resource_position": (
-                            resource.get_resource_position().get_position()
-                        ),
-                        "resource_tasks": [
-                            task.to_dict() for task in resource.get_visible_task_list()
+                        "id": resource.id,
+                        "position": (resource.get_resource_position().get_position()),
+                        "taskIds": [
+                            task.id for task in resource.get_visible_task_list()
                         ],
-                        "task_count": resource.get_visible_task_count(),
-                        "in_progress_task_id": (
+                        "inProgressTaskId": (
                             in_progress_task.get_task_id()
                             if in_progress_task is not None
                             else None
@@ -477,9 +473,8 @@ class SimulatorController:
                 )
 
         payload = {
-            "sim_id": self.frameEmitter.sim_id,
+            "simId": self.frameEmitter.sim_id,
             "tasks": tasks,
-            "new_tasks": new_tasks,
             "stations": stations,
             "resources": resources,
             "clock": {
@@ -490,100 +485,5 @@ class SimulatorController:
                 "startTime": self.start_time,
             },
         }
-        frame = Frame(seq_numb=self.frameCounter, payload=payload)
-        return frame
-
-    def create_key_frame(self) -> Frame:
-        """Create a complete key frame with all entity states.
-
-        Returns:
-            A key frame containing all entity data.
-        """
-        tasks = []
-        for task in self.task_entities.values():
-            station = task.get_station()
-            assigned_resource = task.get_assigned_resource()
-            tasks.append(
-                {
-                    "id": task.get_task_id(),
-                    "state": str(task.get_state()),
-                    "station_id": station.id if station is not None else None,
-                    "station_name": station.name if station is not None else None,
-                    "assigned_resource_id": (
-                        assigned_resource.id if assigned_resource is not None else None
-                    ),
-                    "is_assigned": task.is_assigned(),
-                }
-            )
-
-        stations = [
-            {
-                "station_id": station.id,
-                "station_name": station.name,
-                "station_position": (station.get_station_position().get_position()),
-                "station_tasks": [
-                    task.to_dict() for task in station.get_visible_tasks()
-                ],
-                "task_count": station.get_visible_task_count(),
-            }
-            for station in self.station_entities.values()
-        ]
-
-        # Aggregate newly created pop-up tasks from stations (if any)
-        new_task_objects = [
-            task
-            for station in self.station_entities.values()
-            for task in getattr(station, "pop_up_tasks", [])
-        ]
-
-        # Ensure pop-up tasks are added to global task_entities
-        for task in new_task_objects:
-            tid = task.get_task_id()
-            if tid not in self.task_entities:
-                self.task_entities[tid] = task
-
-        new_tasks = [t.to_dict() for t in new_task_objects]
-
-        # Clear pop-up tasks after including them in the frame to avoid duplicates
-        if new_task_objects:
-            for station in self.station_entities.values():
-                if getattr(station, "pop_up_tasks", None):
-                    station.pop_up_tasks.clear()
-
-        resources = []
-        for resource in self.resource_entities.values():
-            in_progress_task = resource.get_in_progress_task()
-            resources.append(
-                {
-                    "resource_id": resource.id,
-                    "resource_position": (
-                        resource.get_resource_position().get_position()
-                    ),
-                    "resource_tasks": [
-                        task.to_dict() for task in resource.get_visible_task_list()
-                    ],
-                    "task_count": resource.get_visible_task_count(),
-                    "in_progress_task_id": (
-                        in_progress_task.get_task_id()
-                        if in_progress_task is not None
-                        else None
-                    ),
-                }
-            )
-
-        payload = {
-            "sim_id": self.frameEmitter.sim_id,
-            "tasks": tasks,
-            "new_tasks": new_tasks,
-            "stations": stations,
-            "resources": resources,
-            "clock": {
-                "realSecondsPassed": self.clock.real_seconds_passed,
-                "realMinutesPassed": self.clock.real_minutes_passed,
-                "simSecondsPassed": self.clock.sim_time_seconds,
-                "simMinutesPassed": self.clock.sim_time_minutes,
-                "startTime": self.start_time,
-            },
-        }
-        frame = Frame(seq_numb=self.frameCounter, payload=payload, is_key=True)
+        frame = Frame(seq_numb=self.frameCounter, payload=payload, is_key=is_key)
         return frame

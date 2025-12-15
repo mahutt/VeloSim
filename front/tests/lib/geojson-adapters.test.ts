@@ -33,13 +33,13 @@ describe('adaptStationsToGeoJSON', () => {
         id: 1,
         name: 'Central Station',
         position: [-74.006, 40.7128],
-        tasks: [],
+        taskIds: [],
       },
       {
         id: 2,
         name: 'Park Station',
         position: [-73.9857, 40.7484],
-        tasks: [],
+        taskIds: [],
       },
     ];
 

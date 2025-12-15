@@ -27,12 +27,17 @@ import type { Resource } from '~/types';
 import { Item, ItemContent, ItemTitle } from '~/components/ui/item';
 import { useTaskAssignment } from '~/providers/task-assignment-provider';
 
+// Restricted Resource type for ResourceItem component
+export interface ResourceItemElement extends Pick<Resource, 'id'> {
+  taskCount: number;
+}
+
 export function ResourceItem({
   resource,
   onSelect,
   isSelected = false,
 }: {
-  resource?: Resource;
+  resource: ResourceItemElement;
   onSelect: () => void;
   isSelected?: boolean;
 }) {
@@ -40,14 +45,11 @@ export function ResourceItem({
   const { requestAssignment } = useTaskAssignment();
 
   const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
-    if (!resource) return;
-
     e.preventDefault();
     e.dataTransfer.dropEffect = 'move';
   };
 
   const handleDropOnResource = (e: React.DragEvent<HTMLDivElement>) => {
-    if (!resource) return;
     e.preventDefault();
     setIsDragOver(false);
 
@@ -68,10 +70,6 @@ export function ResourceItem({
     }
     setIsDragOver(false);
   };
-
-  if (!resource) {
-    return null;
-  }
 
   return (
     <Item
@@ -103,8 +101,7 @@ export function ResourceItem({
       <span
         className={`text-xs ${isSelected ? 'text-red-600' : 'text-gray-400'}`}
       >
-        {resource.taskList.length}{' '}
-        {resource.taskList.length === 1 ? 'task' : 'tasks'}
+        {resource.taskCount} {resource.taskCount === 1 ? 'task' : 'tasks'}
       </span>
     </Item>
   );

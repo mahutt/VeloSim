@@ -89,7 +89,7 @@ export function TaskAssignmentProvider({ children }: { children: ReactNode }) {
   const requestAssignment = useCallback(
     (resourceId: number, taskId: number) => {
       const assignedResource = Array.from(resourcesRef.current.values()).find(
-        (r) => r.taskList && r.taskList.includes(taskId)
+        (r) => r.taskIds && r.taskIds.includes(taskId)
       );
 
       if (assignedResource) {

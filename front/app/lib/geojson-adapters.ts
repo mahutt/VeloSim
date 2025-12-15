@@ -36,7 +36,7 @@ export function adaptStationsToGeoJSON(
       properties: {
         id: station.id,
         name: station.name,
-        taskCount: station.tasks.length,
+        taskCount: station.taskIds.length,
         selected: station.id === selectedStationId,
         hover: station.id === hoveredStationId,
       },
@@ -60,7 +60,7 @@ export function adaptResourcesToGeoJSON(
       properties: {
         id: resource.id,
         route: resource.route?.coordinates || [],
-        taskList: resource.taskList,
+        taskList: resource.taskIds,
         selected: resource.id === selectedId,
         hover: resource.id === hoveredId,
       },
