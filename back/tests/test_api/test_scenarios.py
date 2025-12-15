@@ -289,7 +289,11 @@ class TestScenariosAPI:
         # Mock the validator to return validation errors
         mock_validator = MagicMock()
         mock_validator.validate_all.return_value = [
-            {"field": "content.stations", "message": "At least one station is required"}
+            {
+                "field": "content.stations",
+                "message": "At least one station is required",
+                "line": 5,
+            }
         ]
         mock_validator_class.return_value = mock_validator
 
@@ -303,7 +307,11 @@ class TestScenariosAPI:
             },
         )
         assert response.status_code == 400
-        assert "Invalid scenario content" in response.json()["detail"]
+        detail = response.json()["detail"]
+        assert detail["message"] == "Invalid scenario content"
+        assert len(detail["errors"]) == 1
+        assert detail["errors"][0]["field"] == "content.stations"
+        assert detail["errors"][0]["line"] == 5
 
     def test_create_scenario_requires_authentication(self, client: TestClient) -> None:
         """Test creating scenario without authentication returns 401."""
@@ -408,7 +416,11 @@ class TestScenariosAPI:
         # Mock the validator to return validation errors
         mock_validator = MagicMock()
         mock_validator.validate_all.return_value = [
-            {"field": "content.resources", "message": "Invalid resource configuration"}
+            {
+                "field": "content.resources",
+                "message": "Invalid resource configuration",
+                "line": 10,
+            }
         ]
         mock_validator_class.return_value = mock_validator
 
@@ -417,7 +429,11 @@ class TestScenariosAPI:
             json={"content": {"invalid": "data"}},
         )
         assert response.status_code == 400
-        assert "Invalid scenario content" in response.json()["detail"]
+        detail = response.json()["detail"]
+        assert detail["message"] == "Invalid scenario content"
+        assert len(detail["errors"]) == 1
+        assert detail["errors"][0]["field"] == "content.resources"
+        assert detail["errors"][0]["line"] == 10
 
     def test_update_scenario_requires_authentication(self, client: TestClient) -> None:
         """Test updating scenario without authentication returns 401."""
