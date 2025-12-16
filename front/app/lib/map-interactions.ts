@@ -25,6 +25,7 @@
 import type { Map as MapboxMap, MapMouseEvent } from 'mapbox-gl';
 import { isMapLayer, MapLayer } from './map-helpers';
 import { SelectedItemType } from '~/components/map/selected-item-bar';
+import type { Position } from '~/types';
 
 // Entities may be represented by more than 1 layer (e.g., stations and their task counts)
 // So we use a function to map layers to entity types
@@ -45,7 +46,7 @@ type ItemSelectCallback = (
   item: {
     type: SelectedItemType;
     id: number;
-    coordinates: [number, number];
+    coordinates: Position;
   } | null
 ) => void;
 

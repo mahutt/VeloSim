@@ -40,6 +40,7 @@ import {
   type StationTask,
   type SimulationStatus,
   type Station,
+  type Position,
 } from '~/types';
 import {
   adaptStationsToGeoJSON,
@@ -259,11 +260,9 @@ export const SimulationProvider = ({
   const selectedResourceIdRef = useRef<number | undefined>(undefined);
 
   // Position tracking for each resource
-  const frameStartPositionsRef = useRef<Map<number, [number, number]>>(
-    new Map()
-  );
-  const currentPositionsRef = useRef<Map<number, [number, number]>>(new Map());
-  const targetPositionsRef = useRef<Map<number, [number, number]>>(new Map());
+  const frameStartPositionsRef = useRef<Map<number, Position>>(new Map());
+  const currentPositionsRef = useRef<Map<number, Position>>(new Map());
+  const targetPositionsRef = useRef<Map<number, Position>>(new Map());
 
   // Global frame timing (shared by all resources)
   const lastFrameTimeRef = useRef<number>(0);
@@ -575,7 +574,7 @@ export const SimulationProvider = ({
       // Linear interpolation between start and target positions
       // TODO: Replace with route-based interpolation once backend sends GeoJSON routes
       // This will allow resources to follow actual roadways instead of straight lines
-      const currentPos: [number, number] = [
+      const currentPos: Position = [
         start[0] + (target[0] - start[0]) * t, // longitude
         start[1] + (target[1] - start[1]) * t, // latitude
       ];
