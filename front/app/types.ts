@@ -30,9 +30,9 @@ export interface User {
   is_enabled: boolean;
 }
 
-// Entity types
+// Simulation types
 
-export type Position = [number, number];
+export type Position = [number, number]; // [longitude, latitude]
 
 export interface Station {
   id: number;
@@ -86,10 +86,10 @@ export interface InitializeSimulationResponse {
 // Resource types
 export interface Resource {
   id: number;
-  position: [number, number];
+  position: Position;
   taskIds: number[];
   route?: {
-    coordinates: [number, number][];
+    coordinates: Position[];
   };
   inProgressTaskId: number | null;
 }

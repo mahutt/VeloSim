@@ -35,6 +35,7 @@ import SelectedItemBar, {
 } from '~/components/map/selected-item-bar';
 import { FeatureToggleProvider } from '~/providers/feature-toggle-provider';
 import { TaskAssignmentProvider } from '~/providers/task-assignment-provider';
+import type { Position } from '~/types';
 
 // Mock the useSimulation hook
 vi.mock('~/providers/simulation-provider', () => ({
@@ -76,7 +77,7 @@ describe('SelectedItemBar', () => {
     const mockStation = {
       id: 1,
       name: 'Test Station',
-      position: [-73.57776, 45.48944] as [number, number],
+      position: [-73.57776, 45.48944] as Position,
       tasks: [],
     };
 
@@ -122,7 +123,7 @@ describe('SelectedItemBar', () => {
   it('should render resource information when resource is selected', () => {
     const mockResource: PopulatedResource = {
       id: 5,
-      position: [-73.58, 45.49] as [number, number],
+      position: [-73.58, 45.49] as Position,
       tasks: [
         { id: 1, stationId: 1, state: 'open', assignedResourceId: null },
         { id: 2, stationId: 2, state: 'open', assignedResourceId: null },
@@ -132,7 +133,7 @@ describe('SelectedItemBar', () => {
         coordinates: [
           [-73.58, 45.49],
           [-73.57, 45.5],
-        ] as [number, number][],
+        ] as Position[],
       },
       inProgressTask: null,
     };
@@ -184,7 +185,7 @@ describe('SelectedItemBar', () => {
     const mockStation = {
       id: 1,
       name: 'Test Station',
-      position: [-73.57776, 45.48944] as [number, number],
+      position: [-73.57776, 45.48944] as Position,
       tasks: [],
     };
 
@@ -227,7 +228,7 @@ describe('SelectedItemBar', () => {
     const mockStation = {
       id: 1,
       name: 'Test Station',
-      position: [-73.57776, 45.48944] as [number, number],
+      position: [-73.57776, 45.48944] as Position,
       tasks: [
         { id: 1, stationId: 1, type: 'battery_swap' as const },
         { id: 2, stationId: 1, type: 'battery_swap' as const },
