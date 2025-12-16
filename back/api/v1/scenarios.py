@@ -304,6 +304,8 @@ async def create_scenario(
         db_scenario = scenario_crud.create(db, scenario_data)
         return ScenarioResponse.model_validate(db_scenario)
 
+    except HTTPException:
+        raise  # Re-raise HTTPException to preserve structured validation errors
     except BadRequestError as err:
         raise HTTPException(status_code=400, detail=str(err))
     except VelosimPermissionError as err:
@@ -374,6 +376,8 @@ async def update_scenario(
         )
         return ScenarioResponse.model_validate(db_scenario)
 
+    except HTTPException:
+        raise  # Re-raise HTTPException to preserve structured validation errors
     except ItemNotFoundError as err:
         raise HTTPException(status_code=404, detail=str(err))
     except BadRequestError as err:
