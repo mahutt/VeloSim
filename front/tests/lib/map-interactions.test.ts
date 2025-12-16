@@ -138,7 +138,7 @@ test('clicking resource calls onItemSelect with wrapped resource data', () => {
   handlers['click']({ point: { x: 100, y: 100 } });
 
   expect(onItemSelect).toHaveBeenCalledWith({
-    type: SelectedItemType.Resource,
+    type: SelectedItemType.Driver,
     id: 1,
     coordinates: [-73.6, 45.6],
   });

@@ -373,15 +373,16 @@ test('selectItem shows error when station does not exist', async () => {
 
 test('selectItem selects a resource when it exists', async () => {
   const TestComponentWithSelect = () => {
-    const { selectItem, selectedItem, resourcesRef } = useSimulation();
+    const { selectItem, selectedItem, driversRef } = useSimulation();
 
     // Manually add a resource to test selection
     useEffect(() => {
-      resourcesRef.current.set(1, {
+      driversRef.current.set(1, {
         id: 1,
         position: [0, 0],
         taskIds: [],
         inProgressTaskId: null,
+        vehicleId: null,
       });
     }, []);
 
@@ -392,7 +393,7 @@ test('selectItem selects a resource when it exists', async () => {
         </div>
         <button
           data-testid="select-btn"
-          onClick={() => selectItem(SelectedItemType.Resource, 1)}
+          onClick={() => selectItem(SelectedItemType.Driver, 1)}
         >
           Select
         </button>
@@ -434,14 +435,15 @@ test('selectItem selects a resource when it exists', async () => {
 
 test('assignTask posts to API and updates resource taskIds', async () => {
   const TestAssignComponent = () => {
-    const { assignTask, resourcesRef, resourceBarElement } = useSimulation();
+    const { assignTask, driversRef, resourceBarElement } = useSimulation();
 
     useEffect(() => {
-      resourcesRef.current.set(1, {
+      driversRef.current.set(1, {
         id: 1,
         position: [0, 0],
         taskIds: [],
         inProgressTaskId: null,
+        vehicleId: null,
       });
     }, []);
 
@@ -496,14 +498,15 @@ test('assignTask posts to API and updates resource taskIds', async () => {
 
 test('unassignTask posts to API and removes task from resource', async () => {
   const TestUnassignComponent = () => {
-    const { unassignTask, resourcesRef, resourceBarElement } = useSimulation();
+    const { unassignTask, driversRef, resourceBarElement } = useSimulation();
 
     useEffect(() => {
-      resourcesRef.current.set(1, {
+      driversRef.current.set(1, {
         id: 1,
         position: [0, 0],
         taskIds: [99],
         inProgressTaskId: null,
+        vehicleId: null,
       });
     }, []);
 
@@ -558,20 +561,22 @@ test('unassignTask posts to API and removes task from resource', async () => {
 
 test('reassignTask posts to API and moves task between resources', async () => {
   const TestReassignComponent = () => {
-    const { reassignTask, resourcesRef, resourceBarElement } = useSimulation();
+    const { reassignTask, driversRef, resourceBarElement } = useSimulation();
 
     useEffect(() => {
-      resourcesRef.current.set(1, {
+      driversRef.current.set(1, {
         id: 1,
         position: [0, 0],
         taskIds: [123],
         inProgressTaskId: null,
+        vehicleId: null,
       });
-      resourcesRef.current.set(2, {
+      driversRef.current.set(2, {
         id: 2,
         position: [0, 0],
         taskIds: [],
         inProgressTaskId: null,
+        vehicleId: null,
       });
     }, []);
 
@@ -659,7 +664,8 @@ test('sets clock time and day from initial frame payload', async () => {
         realMinutesPassed: 61,
         startTime: 0,
       },
-      resources: [],
+      drivers: [],
+      vehicles: [],
       stations: [],
       tasks: [],
     } as BackendPayload);
@@ -701,7 +707,8 @@ test('advances to next day when sim time crosses 24h', async () => {
         realMinutesPassed: 1439,
         startTime: 0,
       },
-      resources: [],
+      drivers: [],
+      vehicles: [],
       stations: [],
       tasks: [],
     } as BackendPayload);
@@ -717,7 +724,8 @@ test('advances to next day when sim time crosses 24h', async () => {
         realMinutesPassed: 1501,
         startTime: 0,
       },
-      resources: [],
+      drivers: [],
+      vehicles: [],
       stations: [],
       tasks: [],
     } as BackendPayload);
@@ -759,7 +767,8 @@ test('defaults to 00:00 day 1 for negative sim time', async () => {
         realMinutesPassed: -1,
         startTime: 0,
       },
-      resources: [],
+      drivers: [],
+      vehicles: [],
       stations: [],
       tasks: [],
     } as BackendPayload);
@@ -801,7 +810,8 @@ test('displays time correctly with scenario start_time (08:00)', async () => {
         realMinutesPassed: 0,
         startTime: 28800,
       },
-      resources: [],
+      drivers: [],
+      vehicles: [],
       stations: [],
       tasks: [],
     } as BackendPayload);
@@ -843,7 +853,8 @@ test('advances time correctly with start_time', async () => {
         realMinutesPassed: 120,
         startTime: 28800,
       },
-      resources: [],
+      drivers: [],
+      vehicles: [],
       stations: [],
       tasks: [],
     } as BackendPayload);
@@ -1019,16 +1030,17 @@ test('RAF queue batches resource selection updates', async () => {
   (setMapSourceMock as Mock).mockClear();
 
   const TestRapidResourceSelectComponent = () => {
-    const { selectItem, resourcesRef } = useSimulation();
+    const { selectItem, driversRef } = useSimulation();
 
     useEffect(() => {
       // Add multiple resources
       for (let i = 1; i <= 5; i++) {
-        resourcesRef.current.set(i, {
+        driversRef.current.set(i, {
           id: i,
           position: [0, 0],
           taskIds: [],
           inProgressTaskId: null,
+          vehicleId: null,
         });
       }
     }, []);
@@ -1038,11 +1050,11 @@ test('RAF queue batches resource selection updates', async () => {
         data-testid="rapid-select-resource-btn"
         onClick={() => {
           // Rapidly select multiple resources
-          selectItem(SelectedItemType.Resource, 1);
-          selectItem(SelectedItemType.Resource, 2);
-          selectItem(SelectedItemType.Resource, 3);
-          selectItem(SelectedItemType.Resource, 4);
-          selectItem(SelectedItemType.Resource, 5);
+          selectItem(SelectedItemType.Driver, 1);
+          selectItem(SelectedItemType.Driver, 2);
+          selectItem(SelectedItemType.Driver, 3);
+          selectItem(SelectedItemType.Driver, 4);
+          selectItem(SelectedItemType.Driver, 5);
         }}
       >
         Rapid Select Resources

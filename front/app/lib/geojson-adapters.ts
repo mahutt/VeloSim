@@ -22,7 +22,7 @@
  * SOFTWARE.
  */
 
-import type { Resource, Station } from '~/types';
+import type { Driver, Station } from '~/types';
 
 export function adaptStationsToGeoJSON(
   stations: Station[],
@@ -49,7 +49,7 @@ export function adaptStationsToGeoJSON(
 }
 
 export function adaptResourcesToGeoJSON(
-  resources: Resource[],
+  resources: Driver[],
   selectedId?: number,
   hoveredId?: number
 ): GeoJSON.FeatureCollection {

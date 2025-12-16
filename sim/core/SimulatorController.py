@@ -476,7 +476,8 @@ class SimulatorController:
             "simId": self.frameEmitter.sim_id,
             "tasks": tasks,
             "stations": stations,
-            "resources": resources,
+            "drivers": resources,
+            "vehicles": [],  # Placeholder for future vehicle entities
             "clock": {
                 "realSecondsPassed": self.clock.real_seconds_passed,
                 "realMinutesPassed": self.clock.real_minutes_passed,

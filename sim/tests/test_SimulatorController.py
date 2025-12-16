@@ -213,7 +213,8 @@ def test_emit_initial_frame(
     assert "simId" in frame.payload_dict
     assert "tasks" in frame.payload_dict
     assert "stations" in frame.payload_dict
-    assert "resources" in frame.payload_dict
+    assert "drivers" in frame.payload_dict
+    assert "vehicles" in frame.payload_dict
     assert "clock" in frame.payload_dict
 
     # Check that frame counter was incremented
@@ -232,13 +233,14 @@ def test_create_key_frame(simulator_controller: SimulatorController) -> None:
     assert "simId" in payload
     assert "tasks" in payload
     assert "stations" in payload
-    assert "resources" in payload
+    assert "drivers" in payload
+    assert "vehicles" in payload
     assert "clock" in payload
 
     # Check that all entities are included in key frame
     assert len(payload["tasks"]) == 2
     assert len(payload["stations"]) == 2
-    assert len(payload["resources"]) == 2
+    assert len(payload["drivers"]) == 2
 
     # Check task structure
     task = payload["tasks"][0]
@@ -255,7 +257,7 @@ def test_create_key_frame(simulator_controller: SimulatorController) -> None:
     assert "taskIds" in station
 
     # Check resource structure
-    resource = payload["resources"][0]
+    resource = payload["drivers"][0]
     assert "id" in resource
     assert "position" in resource
     assert "taskIds" in resource
@@ -280,7 +282,7 @@ def test_create_diff_frame(simulator_controller: SimulatorController) -> None:
     # Check that only updated entities are included
     assert len(payload["tasks"]) == 1
     assert len(payload["stations"]) == 1
-    assert len(payload["resources"]) == 1
+    assert len(payload["drivers"]) == 1
 
 
 def test_emit_frame_with_provided_frame(
@@ -321,7 +323,7 @@ def test_emit_frame_without_provided_frame_key_frame(
     # Should be a key frame (includes all entities)
     assert len(frame.payload_dict["tasks"]) == 2
     assert len(frame.payload_dict["stations"]) == 2
-    assert len(frame.payload_dict["resources"]) == 2
+    assert len(frame.payload_dict["drivers"]) == 2
 
 
 def test_emit_frame_without_provided_frame_diff_frame(
@@ -348,7 +350,7 @@ def test_emit_frame_without_provided_frame_diff_frame(
     # Should be a diff frame (only updated entities)
     assert len(frame.payload_dict["stations"]) == 1
     assert len(frame.payload_dict["tasks"]) == 0  # No tasks marked as updated
-    assert len(frame.payload_dict["resources"]) == 0  # No resources marked as updated
+    assert len(frame.payload_dict["drivers"]) == 0  # No resources marked as updated
 
 
 def test_emit_frame_clears_update_flags(

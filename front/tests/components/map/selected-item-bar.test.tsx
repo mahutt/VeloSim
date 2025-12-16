@@ -47,7 +47,7 @@ describe('SelectedItemBar', () => {
     vi.mocked(useSimulation).mockReturnValue({
       speedRef: { current: 1 },
       stationsRef: { current: new Map() },
-      resourcesRef: { current: new Map() },
+      driversRef: { current: new Map() },
       resourceBarElement: [],
       selectedItem: null,
       selectItem: vi.fn(),
@@ -91,7 +91,7 @@ describe('SelectedItemBar', () => {
       clearSelection: clearSelectionMock,
       selectItem: vi.fn(),
       stationsRef: { current: new Map() },
-      resourcesRef: { current: new Map() },
+      driversRef: { current: new Map() },
       resources: [],
       assignTask: vi.fn(),
       unassignTask: vi.fn(),
@@ -140,13 +140,13 @@ describe('SelectedItemBar', () => {
 
     (useSimulation as unknown as ReturnType<typeof vi.fn>).mockReturnValue({
       selectedItem: {
-        type: SelectedItemType.Resource,
+        type: SelectedItemType.Driver,
         value: mockResource,
       },
       clearSelection: vi.fn(),
       selectItem: vi.fn(),
       stationsRef: { current: new Map() },
-      resourcesRef: { current: new Map() },
+      driversRef: { current: new Map() },
       resourceBarElement: [],
       assignTask: vi.fn(),
       unassignTask: vi.fn(),
@@ -169,7 +169,7 @@ describe('SelectedItemBar', () => {
       </FeatureToggleProvider>
     );
 
-    expect(screen.getByText('Resource')).toBeInTheDocument();
+    expect(screen.getByText('Driver')).toBeInTheDocument();
     expect(screen.getByText('#5')).toBeInTheDocument();
     expect(screen.getByText('Position')).toBeInTheDocument();
     expect(screen.getByText('Tasks (3)')).toBeInTheDocument();
@@ -197,7 +197,7 @@ describe('SelectedItemBar', () => {
       clearSelection: clearSelectionMock,
       selectItem: vi.fn(),
       stationsRef: { current: new Map() },
-      resourcesRef: { current: new Map() },
+      driversRef: { current: new Map() },
       resources: [],
       assignTask: vi.fn(),
       unassignTask: vi.fn(),
@@ -243,7 +243,7 @@ describe('SelectedItemBar', () => {
       clearSelection: vi.fn(),
       selectItem: vi.fn(),
       stationsRef: { current: new Map() },
-      resourcesRef: { current: new Map() },
+      driversRef: { current: new Map() },
       resources: [],
       tasks: [],
       assignTask: vi.fn(),

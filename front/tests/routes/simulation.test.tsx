@@ -60,7 +60,7 @@ vi.mock('~/providers/simulation-provider', () => ({
     isLoading: false,
     simulationStatus: 'ready',
     stationsRef: { current: new Map() },
-    resourcesRef: { current: new Map() },
+    driversRef: { current: new Map() },
     resources: [],
     selectedItem: null,
     selectItem: vi.fn(),

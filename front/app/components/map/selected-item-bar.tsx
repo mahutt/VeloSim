@@ -33,7 +33,7 @@ import { useTaskAssignment } from '~/providers/task-assignment-provider';
 
 export enum SelectedItemType {
   Station = 'station',
-  Resource = 'resource',
+  Driver = 'driver',
 }
 
 export interface PopulatedStation {
@@ -55,7 +55,7 @@ export interface PopulatedResource {
 
 export type SelectedItemBarElement =
   | { type: SelectedItemType.Station; value: PopulatedStation }
-  | { type: SelectedItemType.Resource; value: PopulatedResource };
+  | { type: SelectedItemType.Driver; value: PopulatedResource };
 
 export default function SelectedItemBar() {
   const { selectedItem, clearSelection } = useSimulation();
@@ -74,7 +74,7 @@ export default function SelectedItemBar() {
             <span className="text-red-500">
               {selectedItem.type === SelectedItemType.Station
                 ? 'Station'
-                : 'Resource'}
+                : 'Driver'}
             </span>{' '}
             <span className="text-foreground">#{selectedItem.value.id}</span>
           </CardTitle>
@@ -101,7 +101,7 @@ export default function SelectedItemBar() {
 }
 
 function StationInfo({ station }: { station: PopulatedStation }) {
-  const { resourcesRef } = useSimulation();
+  const { driversRef } = useSimulation();
   const { requestUnassignment } = useTaskAssignment();
 
   return (
@@ -124,7 +124,7 @@ function StationInfo({ station }: { station: PopulatedStation }) {
           <div className="space-y-2">
             {station.tasks.map((task) => {
               const assignedResource = Array.from(
-                resourcesRef.current.values()
+                driversRef.current.values()
               ).find((r) => r.taskIds && r.taskIds.includes(task.id));
 
               return (

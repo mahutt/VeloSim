@@ -83,8 +83,7 @@ export interface InitializeSimulationResponse {
   status: string;
 }
 
-// Resource types
-export interface Resource {
+export interface Driver {
   id: number;
   position: Position;
   taskIds: number[];
@@ -92,6 +91,13 @@ export interface Resource {
     coordinates: Position[];
   };
   inProgressTaskId: number | null;
+  vehicleId: number | null; // null implies at HQ, not on route
+}
+
+export interface Vehicle {
+  id: number;
+  driverId: number | null; // null implies at HQ, not on route
+  // inventory: number // will come later
 }
 
 // WebSocket connection types
@@ -144,7 +150,8 @@ export interface BackendPayload {
   simId: string;
   tasks: StationTask[];
   stations: Station[];
-  resources: Resource[];
+  drivers: Driver[];
+  vehicles: Vehicle[];
   clock: {
     simSecondsPassed: number;
     simMinutesPassed: number;

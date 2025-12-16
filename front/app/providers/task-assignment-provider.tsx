@@ -69,7 +69,7 @@ const TaskAssignmentContext = createContext<
 >(undefined);
 
 export function TaskAssignmentProvider({ children }: { children: ReactNode }) {
-  const { assignTask, unassignTask, reassignTask, resourcesRef } =
+  const { assignTask, unassignTask, reassignTask, driversRef } =
     useSimulation();
   const [pendingAssignment, setPendingAssignment] =
     useState<PendingAssignment>(null);
@@ -88,7 +88,7 @@ export function TaskAssignmentProvider({ children }: { children: ReactNode }) {
 
   const requestAssignment = useCallback(
     (resourceId: number, taskId: number) => {
-      const assignedResource = Array.from(resourcesRef.current.values()).find(
+      const assignedResource = Array.from(driversRef.current.values()).find(
         (r) => r.taskIds && r.taskIds.includes(taskId)
       );
 
@@ -103,7 +103,7 @@ export function TaskAssignmentProvider({ children }: { children: ReactNode }) {
 
       setPendingAssignment({ taskId, resourceId, action: 'assign' });
     },
-    [resourcesRef, requestReassignment]
+    [driversRef, requestReassignment]
   );
 
   const requestUnassignment = useCallback(

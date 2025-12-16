@@ -219,7 +219,8 @@ describe('useSimulationWebSocket', () => {
 
     const initialPayload: BackendPayload = {
       simId: 'test-sim',
-      resources: [],
+      drivers: [],
+      vehicles: [],
       stations: [],
       tasks: [],
       clock: {
@@ -268,7 +269,8 @@ describe('useSimulationWebSocket', () => {
     ws.simulateMessage({
       seq: 0,
       payload: {
-        resources: [],
+        drivers: [],
+        vehicles: [],
         stations: [],
         tasks: [],
         clock: {
@@ -290,14 +292,16 @@ describe('useSimulationWebSocket', () => {
       simId: 'test-sim',
       tasks: [],
       stations: [],
-      resources: [
+      drivers: [
         {
           id: 1,
           position: [0, 0],
           taskIds: [],
           inProgressTaskId: null,
+          vehicleId: null,
         },
       ],
+      vehicles: [],
       clock: {
         simSecondsPassed: 1,
         simMinutesPassed: 0,
