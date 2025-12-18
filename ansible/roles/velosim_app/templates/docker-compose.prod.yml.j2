@@ -128,7 +128,7 @@ services:
       - "127.0.0.1:3001:3000"
     environment:
       - GF_SECURITY_ADMIN_USER=admin
-      - GF_SECURITY_ADMIN_PASSWORD={{ vault_grafana_password | default('admin') }}
+      - GF_SECURITY_ADMIN_PASSWORD={{ grafana_password | default('admin') }}
       - GF_SERVER_DOMAIN={{ domain_name }}
       - GF_SERVER_ROOT_URL=https://{{ domain_name }}/grafana/
     volumes:
