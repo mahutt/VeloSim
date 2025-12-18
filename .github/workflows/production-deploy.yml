@@ -87,13 +87,18 @@ jobs:
           sleep 30
 
           # Check if the application is accessible
-          if curl -f "https://${{ secrets.DOMAIN_NAME }}/api/health" > /dev/null 2>&1; then
+          echo "Testing backend health endpoint..."
+          if curl -f "https://${{ secrets.DOMAIN_NAME }}/health" > /dev/null 2>&1; then
             echo "✅ Backend health check passed"
           else
             echo "❌ Backend health check failed"
+            echo "Attempting to fetch health check for debugging..."
+            curl -v "https://${{ secrets.DOMAIN_NAME }}/health" || true
             exit 1
           fi
 
+          # Check frontend via HTTPS
+          echo "Testing frontend availability..."
           if curl -f "https://${{ secrets.DOMAIN_NAME }}/" > /dev/null 2>&1; then
             echo "✅ Frontend health check passed"
           else
