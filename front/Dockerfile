@@ -18,11 +18,12 @@ RUN npm ci
 COPY front/ ./
 RUN npm run build
 
-# Runtime stage
-FROM node:20-alpine
-WORKDIR /app
-COPY front/package.json front/package-lock.json ./
-RUN npm ci --omit=dev
-COPY --from=build /app/build ./build
-EXPOSE 3000
-CMD ["npm","run","start","--","-H","0.0.0.0","-p","3000"]
+# Runtime stage - Use nginx to serve static files
+FROM nginx:alpine
+
+# Remove default nginx config and copy our SPA configuration
+RUN rm /etc/nginx/conf.d/default.conf
+COPY front/nginx.conf /etc/nginx/conf.d/default.conf
+
+# Copy the built SPA from build stage
+COPY --from=build /app/build/client /usr/share/nginx/html
