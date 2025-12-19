@@ -32,6 +32,7 @@ if TYPE_CHECKING:
     from .resource import Resource
     from .station_task import StationTask
     from .station import Station
+    from .sim_keyframe import SimKeyframe
 
 
 class SimInstance(Base):
@@ -62,6 +63,9 @@ class SimInstance(Base):
     )
     stations: Mapped[List["Station"]] = relationship(
         "Station", back_populates="sim_instance", cascade="all, delete-orphan"
+    )
+    keyframes: Mapped[List["SimKeyframe"]] = relationship(
+        "SimKeyframe", back_populates="sim_instance", cascade="all, delete-orphan"
     )
 
     def __repr__(self) -> str:

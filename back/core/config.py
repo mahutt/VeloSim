@@ -139,6 +139,17 @@ class Settings(BaseSettings):
         os.getenv("SIMULATION_IDLE_TIMEOUT_SECONDS", "15")
     )
 
+    # Keyframe persistence settings
+    # Controls the interval for persisting keyframes to the database.
+    # For example, a value of 5 means every 5th keyframe is persisted.
+    # Defaults to 5 (persist every 5th keyframe).
+    KEYFRAME_PERSIST_INTERVAL: int = int(os.getenv("KEYFRAME_PERSIST_INTERVAL", "5"))
+
+    # Maximum size of the keyframe persistence queue.
+    # If the queue fills up, random frames will be dropped with a warning.
+    # Defaults to 1000 frames.
+    KEYFRAME_QUEUE_MAX_SIZE: int = int(os.getenv("KEYFRAME_QUEUE_MAX_SIZE", "1000"))
+
     # Feature flags
     FEATURE_STATIONS_API_ROUTER: bool = env_flag("FEATURE_STATIONS_API_ROUTER")
     FEATURE_STATION_TASKS_API_ROUTER: bool = env_flag(
