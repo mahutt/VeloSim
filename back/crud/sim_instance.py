@@ -62,6 +62,18 @@ class SimInstanceCRUD:
         """
         return db.query(SimInstance).filter(SimInstance.id == sim_instance_id).first()
 
+    def get_by_uuid(self, db: Session, uuid: str) -> Optional[SimInstance]:
+        """Get a simulation instance by UUID.
+
+        Args:
+            db: Database session.
+            uuid: The UUID of the simulation instance to retrieve.
+
+        Returns:
+            Optional[SimInstance]: The simulation instance if found, None otherwise.
+        """
+        return db.query(SimInstance).filter(SimInstance.uuid == uuid).first()
+
     def get_by_user(
         self,
         db: Session,

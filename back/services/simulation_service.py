@@ -185,6 +185,10 @@ class SimulationService:
         # Initialize simulation with InputParameter and persistence subscriber
         sim_id = sim.initialize(params, subscribers=[keyframe_subscriber])
 
+        # Update the database record with the simulator's UUID
+        db_sim_instance.uuid = sim_id
+        db.commit()
+
         # Store the simulation data per sim_id
         self.active_simulations[sim_id] = ActiveSimulationData(
             db_id=db_sim_instance.id,

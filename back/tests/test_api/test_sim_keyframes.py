@@ -111,11 +111,16 @@ class TestSimKeyframesAPI:
         assert data["per_page"] == 20
         assert data["total_pages"] == 1
 
+    @patch("back.api.v1.simulation.sim_instance_crud.get_by_uuid")
     @patch("back.api.v1.simulation.sim_instance_crud.get")
     def test_get_keyframes_simulation_not_found(
-        self, mock_sim_get: MagicMock, authenticated_client: TestClient
+        self,
+        mock_sim_get: MagicMock,
+        mock_sim_get_by_uuid: MagicMock,
+        authenticated_client: TestClient,
     ) -> None:
         """Test getting keyframes for non-existent simulation."""
+        mock_sim_get_by_uuid.return_value = None  # Not found in DB by UUID
         mock_sim_get.return_value = None
 
         response = authenticated_client.get(

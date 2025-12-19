@@ -583,13 +583,18 @@ def get_simulation_keyframes(
     """
     try:
         # Get simulation data to retrieve db_id
-        if sim_id not in simulation_service.active_simulations:
-            raise ItemNotFoundError("Simulation not found")
+        # First try active simulations (fast path)
+        if sim_id in simulation_service.active_simulations:
+            sim_data = simulation_service.active_simulations[sim_id]
+            db_id: int = sim_data["db_id"]
+        else:
+            # Fallback to database for historical simulations
+            sim_instance = sim_instance_crud.get_by_uuid(db, sim_id)
+            if not sim_instance:
+                raise ItemNotFoundError("Simulation not found")
+            db_id = sim_instance.id
 
-        sim_data = simulation_service.active_simulations[sim_id]
-        db_id: int = sim_data["db_id"]
-
-        # Verify simulation exists and get ownership
+        # Verify simulation exists and get ownership (for active sims or re-fetch)
         sim_instance = sim_instance_crud.get(db, db_id)
         if not sim_instance:
             raise ItemNotFoundError("Simulation instance not found")
@@ -666,13 +671,18 @@ def get_simulation_keyframe_at_time(
 
     try:
         # Get simulation data to retrieve db_id
-        if sim_id not in simulation_service.active_simulations:
-            raise ItemNotFoundError("Simulation not found")
+        # First try active simulations (fast path)
+        if sim_id in simulation_service.active_simulations:
+            sim_data = simulation_service.active_simulations[sim_id]
+            db_id: int = sim_data["db_id"]
+        else:
+            # Fallback to database for historical simulations
+            sim_instance = sim_instance_crud.get_by_uuid(db, sim_id)
+            if not sim_instance:
+                raise ItemNotFoundError("Simulation not found")
+            db_id = sim_instance.id
 
-        sim_data = simulation_service.active_simulations[sim_id]
-        db_id: int = sim_data["db_id"]
-
-        # Verify simulation exists and get ownership
+        # Verify simulation exists and get ownership (for active sims or re-fetch)
         sim_instance = sim_instance_crud.get(db, db_id)
         if not sim_instance:
             raise ItemNotFoundError("Simulation instance not found")

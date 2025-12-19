@@ -63,13 +63,16 @@ class SimKeyframe(Base):
         "SimInstance", back_populates="keyframes"
     )
 
-    # Composite index for efficient querying by simulation and time
+    # Indexes for efficient querying
     __table_args__ = (
+        # Composite index for querying by simulation and time
         Index(
             "ix_sim_keyframes_instance_time",
             "sim_instance_id",
             "sim_seconds_elapsed",
         ),
+        # Index for querying by creation time
+        Index("ix_sim_keyframes_created_at", "created_at"),
     )
 
     def __repr__(self) -> str:

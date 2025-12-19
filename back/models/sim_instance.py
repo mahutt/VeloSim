@@ -22,8 +22,8 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 """
 
-from typing import TYPE_CHECKING, List
-from sqlalchemy import DateTime, ForeignKey, func
+from typing import TYPE_CHECKING, List, Optional
+from sqlalchemy import DateTime, ForeignKey, String, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from back.database.session import Base
 
@@ -44,6 +44,11 @@ class SimInstance(Base):
     __tablename__ = "sim_instances"
 
     id: Mapped[int] = mapped_column(primary_key=True, index=True)
+
+    # UUID for external identification (matches simulator UUID)
+    uuid: Mapped[Optional[str]] = mapped_column(
+        String(36), nullable=True, unique=True, index=True
+    )
 
     date_created: Mapped[DateTime] = mapped_column(
         DateTime, nullable=False, server_default=func.now()
