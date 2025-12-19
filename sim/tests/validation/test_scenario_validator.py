@@ -336,3 +336,52 @@ def test_task_time_with_invalid_type(validator: ScenarioValidator) -> None:
 
     assert len(errors) > 0
     assert any("time must be" in error.get("message", "").lower() for error in errors)
+
+
+def test_array_elements_have_distinct_line_numbers() -> None:
+    """Test that different array elements report different line numbers."""
+    json_string = """{
+  "content": {
+    "start_time": "day1:08:00",
+    "end_time": "day1:12:00",
+    "stations": [
+      {
+        "station_id": 1,
+        "station_name": "Station 1",
+        "station_position": [-73.5, 45.5]
+      }
+    ],
+    "resources": [
+      {
+        "resource_id": 1,
+        "resource_position": [-73.5, 45.5]
+      },
+      {
+        "resource_id": 1,
+        "resource_position": [-73.6, 45.6]
+      },
+      {
+        "resource_id": 1,
+        "resource_position": [-73.7, 45.7]
+      }
+    ],
+    "initial_tasks": [],
+    "scheduled_tasks": []
+  }
+}"""
+
+    data = json.loads(json_string)
+    validator = ScenarioValidator(json_string=json_string)
+    errors = validator.validate_all(data["content"])
+
+    # Should have errors for duplicate resource IDs
+    dup_errors = [e for e in errors if "Duplicate resource ID" in e.get("message", "")]
+    assert len(dup_errors) >= 2  # At least 2 duplicates of resource_id 1
+
+    # Check that errors have line numbers and they are different
+    line_numbers = [e.get("line") for e in dup_errors if e.get("line") is not None]
+    assert len(line_numbers) >= 2
+    # Line numbers should be different for different array elements
+    assert (
+        len(set(line_numbers)) >= 2
+    ), f"Expected distinct line numbers, got: {line_numbers}"

@@ -200,14 +200,19 @@ class ScenarioTimes(BaseModel):
 class ScenarioValidator:
     """Validator for scenario content."""
 
-    def __init__(self, json_string: Optional[str] = None) -> None:
+    def __init__(
+        self, json_string: Optional[str] = None, content_root: str = "content"
+    ) -> None:
         """Initialize validator with optional JSON string for line number tracking.
 
         Args:
             json_string: Optional JSON string to build line number mapping
                 for error reporting.
+            content_root: The root key in the JSON that contains the scenario content.
+                Set to "" if the JSON string is already the content itself.
         """
         self.line_map: Dict[str, int] = {}
+        self.content_root = content_root
         if json_string:
             self._build_line_map(json_string)
 
@@ -219,8 +224,21 @@ class ScenarioValidator:
         """
         lines = json_string.split("\n")
         path_stack: List[str] = []
+        array_counters: Dict[str, int] = {}
+        in_array: Dict[str, bool] = {}
 
         for line_num, line in enumerate(lines, start=1):
+            key_array_match = re.search(r'"([^"]+)"\s*:\s*\[', line)
+            if key_array_match:
+                key = key_array_match.group(1)
+                current_path = ".".join(path_stack + [key]) if path_stack else key
+                self.line_map[current_path] = line_num
+                array_counters[current_path] = 0
+                in_array[current_path] = True
+                if "[" in line and "]" not in line:
+                    path_stack.append(key)
+                continue
+
             # Track keys in objects
             key_match = re.search(r'"([^"]+)"\s*:', line)
             if key_match:
@@ -228,49 +246,84 @@ class ScenarioValidator:
                 # Build the current path
                 current_path = ".".join(path_stack + [key]) if path_stack else key
                 self.line_map[current_path] = line_num
-                self.line_map[key] = line_num
 
-                # Track if we're entering an array or object
-                if "[" in line:
-                    path_stack.append(key)
-                elif "{" in line and "}" not in line:
-                    path_stack.append(key)
-
-            # Track array indices
-            if re.match(r"^\s*\{\s*$", line) and path_stack:
-                # Entering an array element
-                pass
-
-            # Pop from stack when closing
-            if "}" in line or "]" in line:
+                # For fields inside arrays, also map with array index
                 if path_stack:
+                    parent_path = ".".join(path_stack)
+                    if parent_path in in_array and in_array[parent_path]:
+                        array_idx = array_counters.get(parent_path, 0)
+                        indexed_path = f"{parent_path}[{array_idx}].{key}"
+                        self.line_map[indexed_path] = line_num
+
+                # Track if we're entering an object (not an array)
+                if "{" in line and "[" not in line and "}" not in line:
+                    path_stack.append(key)
+
+            # Detect array element start (opening brace after array start)
+            if re.match(r"^\s*\{\s*$", line) and path_stack:
+                parent_path = ".".join(path_stack)
+                if parent_path in in_array and in_array[parent_path]:
+                    # This is a new array element
+                    array_idx = array_counters[parent_path]
+                    element_path = f"{parent_path}[{array_idx}]"
+                    self.line_map[element_path] = line_num
+
+            # Pop from stack when closing objects/arrays
+            if "}" in line and path_stack:
+                parent_path = ".".join(path_stack)
+                if parent_path in in_array and in_array[parent_path]:
+                    # Increment array counter when closing an array element
+                    array_counters[parent_path] = array_counters.get(parent_path, 0) + 1
+                else:
                     path_stack.pop()
+            elif "]" in line and path_stack:
+                parent_path = ".".join(path_stack)
+                if parent_path in in_array:
+                    in_array[parent_path] = False
+                path_stack.pop()
 
     def _get_line_number(self, field_path: str) -> Optional[int]:
         """Get line number for a field path, trying multiple variations.
 
         Args:
-            field_path: JSON field path (e.g., 'stations[0].station_id').
+            field_path: JSON field path (e.g., 'resources[1].resource_id').
 
         Returns:
             Line number if found, None otherwise.
         """
-        # Try exact match first
+        # Try with content_root prefix first
+        if self.content_root:
+            prefixed_path = f"{self.content_root}.{field_path}"
+            if prefixed_path in self.line_map:
+                return self.line_map[prefixed_path]
+
+            # Try the array element itself with prefix (e.g., 'content.resources[1]')
+            if "[" in field_path:
+                array_element = re.match(r"^([^\[]+\[\d+\])", field_path)
+                if array_element:
+                    element_path = f"{self.content_root}.{array_element.group(1)}"
+                    if element_path in self.line_map:
+                        return self.line_map[element_path]
+
+        # Try exact match without prefix
         if field_path in self.line_map:
             return self.line_map[field_path]
 
-        # Try extracting just the field name from paths like "stations[0].station_id"
+        # Try the array element itself (e.g., 'resources[1]')
+        if "[" in field_path:
+            array_element = re.match(r"^([^\[]+\[\d+\])", field_path)
+            if array_element:
+                element_path = array_element.group(1)
+                if element_path in self.line_map:
+                    return self.line_map[element_path]
+
+        # Try extracting just the field name as last resort
         parts = field_path.split(".")
         if parts:
             last_part = parts[-1]
-            if last_part in self.line_map:
+            # Only use this fallback if there's no array index in the path
+            if "[" not in field_path and last_part in self.line_map:
                 return self.line_map[last_part]
-
-            # Try the parent field for array elements
-            if "[" in field_path:
-                parent = re.sub(r"\[\d+\].*", "", field_path)
-                if parent in self.line_map:
-                    return self.line_map[parent]
 
         return None
 

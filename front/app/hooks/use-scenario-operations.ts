@@ -34,6 +34,54 @@ export function useScenarioOperations() {
   const { displayError } = useError();
 
   /**
+   * Formats backend error responses into user-friendly messages
+   */
+  const formatBackendError = (error: unknown): string => {
+    let message = 'Unknown error';
+    if (error && typeof error === 'object') {
+      const errorObj = error as {
+        response?: { data?: unknown };
+        message?: string;
+      };
+
+      const responseData = errorObj.response?.data as
+        | { detail?: unknown; errors?: unknown }
+        | undefined;
+
+      // Handle new structured error format: { message: "...", errors: [...] }
+      // Check both detail.errors and direct errors at top level
+      const detail = responseData?.detail;
+      const errors =
+        detail && typeof detail === 'object' && 'errors' in detail
+          ? detail.errors
+          : responseData?.errors;
+
+      if (errors && Array.isArray(errors)) {
+        const formattedErrors = errors.map(
+          (
+            err: { field?: string; message: string; line?: number } | string
+          ) => {
+            if (typeof err === 'string') return `• ${err}`;
+            const fieldInfo = err.field ? `[${err.field}]: ` : '';
+            const lineInfo = err.line ? ` (line ${err.line})` : '';
+            return `• ${fieldInfo}${err.message}${lineInfo}`;
+          }
+        );
+        return formattedErrors.join('\n');
+      }
+
+      // Handle string errors
+      if (typeof detail === 'string') {
+        return detail;
+      }
+
+      // Fallback to error message
+      message = errorObj.message || message;
+    }
+    return message;
+  };
+
+  /**
    * Validates scenario content and returns parsed JSON
    * @returns Parsed content if valid, null if invalid
    */
@@ -59,21 +107,39 @@ export function useScenarioOperations() {
     }
 
     try {
-      const response = await api.post('/scenarios/validate', {
-        content: parsedContent,
+      // Send raw JSON string with formatting to preserve line numbers
+      // Use 2-space indentation to match user's editor formatting
+      const requestBody = JSON.stringify(
+        {
+          content: parsedContent,
+        },
+        null,
+        2
+      );
+
+      const response = await api.post('/scenarios/validate', requestBody, {
+        headers: {
+          'Content-Type': 'application/json',
+        },
       });
       const result = response.data;
 
       // Check if validation failed
       if (!result.valid) {
-        // Backend now returns errors as an array of strings
+        // Backend returns errors as an array of objects with field, message, and optional line
         const errors = Array.isArray(result.errors)
           ? result.errors
           : [result.errors].filter(Boolean);
 
         displayError(
           'Scenario validation failed',
-          errors.map((e: string) => `• ${e}`).join('\n')
+          errors
+            .map((e: { field?: string; message: string; line?: number }) => {
+              const fieldInfo = e.field ? `[${e.field}]: ` : '';
+              const lineInfo = e.line ? ` (line ${e.line})` : '';
+              return `• ${fieldInfo}${e.message}${lineInfo}`;
+            })
+            .join('\n')
         );
         return null;
       }
@@ -186,16 +252,7 @@ export function useScenarioOperations() {
       toast.success('Scenario saved successfully!');
       return response.data?.id ?? null;
     } catch (error: unknown) {
-      let message = 'Unknown error';
-      if (error && typeof error === 'object') {
-        const errorObj = error as {
-          response?: { data?: { detail?: string } };
-          message?: string;
-        };
-        message =
-          errorObj.response?.data?.detail || errorObj.message || message;
-      }
-      displayError('Failed to save scenario', message);
+      displayError('Failed to save scenario', formatBackendError(error));
       return null;
     }
   };
@@ -233,16 +290,7 @@ export function useScenarioOperations() {
       toast.success('Scenario overwritten successfully!');
       return response.data?.id ?? scenarioId;
     } catch (error: unknown) {
-      let message = 'Unknown error';
-      if (error && typeof error === 'object') {
-        const errorObj = error as {
-          response?: { data?: { detail?: string } };
-          message?: string;
-        };
-        message =
-          errorObj.response?.data?.detail || errorObj.message || message;
-      }
-      displayError('Failed to overwrite scenario', message);
+      displayError('Failed to overwrite scenario', formatBackendError(error));
       return null;
     }
   };
@@ -258,16 +306,7 @@ export function useScenarioOperations() {
       });
       return true;
     } catch (error: unknown) {
-      let message = 'Unknown error';
-      if (error && typeof error === 'object') {
-        const errorObj = error as {
-          response?: { data?: { detail?: string } };
-          message?: string;
-        };
-        message =
-          errorObj.response?.data?.detail || errorObj.message || message;
-      }
-      displayError('Failed to delete scenario', message);
+      displayError('Failed to delete scenario', formatBackendError(error));
       return false;
     }
   };
