@@ -26,6 +26,7 @@ import asyncio
 import concurrent.futures
 import random
 import threading
+import time
 from typing import Optional
 from sim.entities.frame import Frame
 from sim.utils.subscriber import Subscriber
@@ -299,6 +300,22 @@ class KeyframePersistenceSubscriber(Subscriber):
             "Shutting down KeyframePersistenceSubscriber for "
             f"sim_instance_id={self.sim_instance_id}"
         )
+
+        # Wait for queue to drain before sending shutdown signal
+        drain_timeout = settings.KEYFRAME_DRAIN_TIMEOUT
+        drain_start = time.time()
+
+        while not self.frame_queue.empty():
+            elapsed = time.time() - drain_start
+            if elapsed >= drain_timeout:
+                queue_size = self.frame_queue.qsize()
+                logger.warning(
+                    f"Keyframe queue drain timeout ({drain_timeout}s) "
+                    f"for sim_instance_id={self.sim_instance_id}. "
+                    f"Remaining queue size: {queue_size}"
+                )
+                break
+            await asyncio.sleep(0.1)  # Brief sleep to allow queue processing
 
         # Send shutdown signal to worker
         try:
