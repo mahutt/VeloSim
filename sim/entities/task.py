@@ -33,7 +33,7 @@ from .task_state import State
 # to avoid circular imports
 if TYPE_CHECKING:  # pragma: no cover
     from .station import Station
-    from .resource import Resource
+    from .driver import Driver
     from sim.behaviour.sim_behaviour import SimBehaviour
 
 
@@ -51,7 +51,7 @@ class Task(ABC):
     ) -> None:
         self.id: int = task_id
         self.station: Optional[Station] = station
-        self.assigned_resource: Optional[Resource] = None
+        self.assigned_driver: Optional[Driver] = None
         self.has_updated = False
 
         self.spawn_delay = spawn_delay
@@ -64,7 +64,7 @@ class Task(ABC):
         """Internal generator that spawns a task after a specified delay.
 
         This is a SimPy process that waits for the spawn delay and then transitions
-        the task from SCHEDULED to OPEN state. Updates the task, station, and resource
+        the task from SCHEDULED to OPEN state. Updates the task, station, and driver
         flags to trigger state change notifications.
 
         Args:
@@ -79,8 +79,8 @@ class Task(ABC):
         self.has_updated = True
         if self.station is not None:
             self.station.has_updated = True
-        if self.assigned_resource is not None:
-            self.assigned_resource.has_updated = True
+        if self.assigned_driver is not None:
+            self.assigned_driver.has_updated = True
 
     @abstractmethod
     def get_state(self) -> State:
@@ -136,21 +136,21 @@ class Task(ABC):
         pass
 
     @abstractmethod
-    def get_assigned_resource(self) -> Optional["Resource"]:
-        """Get the resource assigned to work on this task.
+    def get_assigned_driver(self) -> Optional["Driver"]:
+        """Get the driver assigned to work on this task.
 
         Returns:
-            Optional[Resource]: The resource assigned to this task, or None if
-                no resource is assigned.
+            Optional[Driver]: The driver assigned to this task, or None if
+                no driver is assigned.
         """
         pass
 
     @abstractmethod
-    def set_assigned_resource(self, resource: "Resource") -> None:
-        """Assign a resource to work on this task.
+    def set_assigned_driver(self, driver: "Driver") -> None:
+        """Assign a driver to work on this task.
 
         Args:
-            resource: The resource to assign to this task.
+            driver: The driver to assign to this task.
 
         Returns:
             None
@@ -158,10 +158,10 @@ class Task(ABC):
         pass
 
     @abstractmethod
-    def unassign_resource(self) -> None:
-        """Remove the resource assignment from this task.
+    def unassign_driver(self) -> None:
+        """Remove the driver assignment from this task.
 
-        Clears the assigned_resource reference and typically transitions the task
+        Clears the assigned_driver reference and typically transitions the task
         back to OPEN state.
 
         Returns:
@@ -171,7 +171,7 @@ class Task(ABC):
 
     @abstractmethod
     def is_assigned(self) -> bool:
-        """Check if the task is assigned to a resource.
+        """Check if the task is assigned to a driver.
 
         Returns:
             bool: True if the task is in ASSIGNED state, False otherwise.
@@ -205,16 +205,14 @@ class Task(ABC):
         """Convert task to dictionary representation.
 
         Returns:
-            Dictionary containing task ID, state, station ID, and resource ID.
+            Dictionary containing task ID, state, station ID, and driver ID.
         """
         return {
             "id": self.id,
             "state": str(self.state),
             "station_id": (self.station.id if self.station is not None else None),
-            "assigned_resource_id": (
-                self.assigned_resource.id
-                if self.assigned_resource is not None
-                else None
+            "assigned_driver_id": (
+                self.assigned_driver.id if self.assigned_driver is not None else None
             ),
         }
 

@@ -28,7 +28,7 @@ from sim.behaviour.default.default_RCNT_strategy import DefaultRCNTStrategy
 from typing import Any
 
 
-class _FakeResource:
+class _FakeDriver:
     def __init__(self, tasks: list[Any]) -> None:
         self._tasks = tasks
 
@@ -38,16 +38,16 @@ class _FakeResource:
 
 def test_default_rcnt_strategy_picks_first_task() -> None:
     t1, t2 = object(), object()
-    resource = _FakeResource([t1, t2])
+    driver = _FakeDriver([t1, t2])
     strat = DefaultRCNTStrategy()
 
-    chosen = strat.select_next_task(resource)  # type: ignore[arg-type]
+    chosen = strat.select_next_task(driver)  # type: ignore[arg-type]
     assert chosen is t1
 
 
 def test_default_rcnt_strategy_raises_on_empty_list() -> None:
-    resource = _FakeResource([])
+    driver = _FakeDriver([])
     strat = DefaultRCNTStrategy()
 
     with pytest.raises(IndexError):
-        _ = strat.select_next_task(resource)  # type: ignore[arg-type]
+        _ = strat.select_next_task(driver)  # type: ignore[arg-type]

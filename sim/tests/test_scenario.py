@@ -47,6 +47,8 @@ class MockTask(Task):
         self._state: State = State.IN_PROGRESS
         self._station: Optional[Station] = None
         self._assigned_resource: Optional[Resource] = None
+        # Driver-based API compatibility
+        self._assigned_driver = None
 
     def get_task_id(self) -> int:
         return hash(self._name)
@@ -74,6 +76,20 @@ class MockTask(Task):
 
     def is_assigned(self) -> bool:
         return self._assigned_resource is not None
+
+    # Implement required driver-based abstract methods for Task
+    def get_assigned_driver(self):  # type: ignore[no-untyped-def]
+        return self._assigned_driver
+
+    def set_assigned_driver(self, driver):  # type: ignore[no-untyped-def]
+        self._assigned_driver = driver
+        if self._state != State.IN_PROGRESS:
+            self._state = State.ASSIGNED
+
+    def unassign_driver(self) -> None:
+        self._assigned_driver = None
+        if self._state != State.IN_PROGRESS:
+            self._state = State.OPEN
 
 
 def test_default_initialization() -> None:

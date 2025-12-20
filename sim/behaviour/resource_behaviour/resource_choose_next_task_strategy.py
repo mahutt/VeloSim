@@ -27,20 +27,20 @@ from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from sim.entities.task import Task
-    from sim.entities.resource import Resource
+    from sim.entities.driver import Driver
 
 
-class ResourceChooseNextTaskStrategy(ABC):
-    """Abstract base class for resource task selection strategies."""
+class DriverChooseNextTaskStrategy(ABC):
+    """Abstract base class for driver task selection strategies."""
 
     @abstractmethod
-    def select_next_task(self, resource: "Resource") -> "Task":
-        """Select the next task for a resource to execute.
+    def select_next_task(self, driver: "Driver") -> "Task":
+        """Select the next task for a driver to execute.
 
         Args:
-            resource: The resource selecting its next task.
+            driver: The driver selecting its next task.
 
         Returns:
-            The selected task for the resource to execute.
+            The selected task for the driver to execute.
         """
         raise NotImplementedError()

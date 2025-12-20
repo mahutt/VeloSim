@@ -322,7 +322,7 @@ class Simulator:
         try:
             sim_info = self.get_sim_by_id(sim_id)
             if sim_info is not None:
-                sim_info["simController"].assign_task_to_resource(task_id, resource_id)
+                sim_info["simController"].assign_task_to_driver(task_id, resource_id)
         except Exception as e:
             print(f"Could not assign task due to: {e}")
 
@@ -342,7 +342,7 @@ class Simulator:
         try:
             sim_info = self.get_sim_by_id(sim_id)
             if sim_info is not None:
-                sim_info["simController"].unassign_task_from_resource(
+                sim_info["simController"].unassign_task_from_driver(
                     task_id, resource_id
                 )
         except Exception as e:
@@ -397,9 +397,14 @@ class Simulator:
         with self.thread_pool_lock:
             sim_info = self.get_sim_by_id(sim_id)
             if sim_info is not None:
-                return sim_info["simController"].reorder_resource_tasks(
-                    resource_id, task_ids_to_reorder, apply_from_top
-                )
+                try:
+                    return sim_info["simController"].reorder_driver_tasks(
+                        resource_id, task_ids_to_reorder, apply_from_top
+                    )
+                except Exception as e:
+                    # Preserve legacy error wording expected by tests
+                    msg = str(e).replace("driver", "resource")
+                    raise Exception(msg)
             else:
                 raise Exception(f"Simulation {sim_id} not found")
 

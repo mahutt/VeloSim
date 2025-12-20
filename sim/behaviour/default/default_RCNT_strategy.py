@@ -23,26 +23,26 @@ SOFTWARE.
 """
 
 from sim.behaviour.resource_behaviour.resource_choose_next_task_strategy import (
-    ResourceChooseNextTaskStrategy,
+    DriverChooseNextTaskStrategy,
 )
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from sim.entities.task import Task
-    from sim.entities.resource import Resource
+    from sim.entities.driver import Driver
 
 
-class DefaultRCNTStrategy(ResourceChooseNextTaskStrategy):
-    """Default strategy for resource choosing next task."""
+class DefaultRCNTStrategy(DriverChooseNextTaskStrategy):
+    """Default strategy for driver choosing next task."""
 
-    def select_next_task(self, resource: "Resource") -> "Task":
-        """Select the next task for a resource to execute.
+    def select_next_task(self, driver: "Driver") -> "Task":
+        """Select the next task for a driver to execute.
 
         Args:
-            resource: The resource selecting a task.
+            driver: The driver selecting a task.
 
         Returns:
-            Task: The first task in the resource's task list.
+            Task: The first task in the driver's task list.
         """
-        tasks = resource.get_task_list()
+        tasks = driver.get_task_list()
         return tasks[0]

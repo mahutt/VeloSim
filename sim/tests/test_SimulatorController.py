@@ -32,7 +32,7 @@ from sim.core.frame_emitter import FrameEmitter
 from sim.entities.inputParameters import InputParameter
 from sim.entities.frame import Frame
 from sim.entities.station import Station
-from sim.entities.resource import Resource
+from sim.entities.driver import Driver
 from sim.entities.BatterySwapTask import BatterySwapTask
 from sim.entities.position import Position
 from sim.entities.task_state import State
@@ -49,7 +49,7 @@ class FakeTPUStrategy:
 
 
 class FakeRCNTStrategy:
-    def select_next_task(self, resource: Resource) -> None:
+    def select_next_task(self, driver: Driver) -> None:
         return None
 
 
@@ -130,11 +130,11 @@ def input_params(env: simpy.Environment) -> InputParameter:
     params.add_station(station1)
     params.add_station(station2)
 
-    # Add test resources
-    resource1 = Resource(resource_id=1, position=Position([15.0, 25.0]))
-    resource2 = Resource(resource_id=2, position=Position([35.0, 45.0]))
-    params.add_resource(resource1)
-    params.add_resource(resource2)
+    # Add test drivers
+    driver1 = Driver(driver_id=1, position=Position([15.0, 25.0]))
+    driver2 = Driver(driver_id=2, position=Position([35.0, 45.0]))
+    params.add_driver(driver1)
+    params.add_driver(driver2)
 
     # Add test tasks using concrete BatterySwapTask
     task1 = BatterySwapTask(task_id=1, station=station1)
@@ -185,7 +185,7 @@ def test_simulator_controller_initialization(
 
     # Check that entities are properly loaded from InputParameter
     assert len(simulator_controller.station_entities) == 2
-    assert len(simulator_controller.resource_entities) == 2
+    assert len(simulator_controller.driver_entities) == 2
     assert len(simulator_controller.task_entities) == 2
 
     # Check keyframe frequency
@@ -256,12 +256,12 @@ def test_create_key_frame(simulator_controller: SimulatorController) -> None:
     assert "position" in station
     assert "taskIds" in station
 
-    # Check resource structure
-    resource = payload["drivers"][0]
-    assert "id" in resource
-    assert "position" in resource
-    assert "taskIds" in resource
-    assert "inProgressTaskId" in resource
+    # Check driver structure
+    driver = payload["drivers"][0]
+    assert "id" in driver
+    assert "position" in driver
+    assert "taskIds" in driver
+    assert "inProgressTaskId" in driver
 
 
 def test_create_diff_frame(simulator_controller: SimulatorController) -> None:
@@ -269,7 +269,7 @@ def test_create_diff_frame(simulator_controller: SimulatorController) -> None:
     # Mark one entity as updated (using ID keys instead of indices)
     simulator_controller.station_entities[1].has_updated = True
     simulator_controller.task_entities[1].has_updated = True
-    simulator_controller.resource_entities[1].has_updated = True
+    simulator_controller.driver_entities[1].has_updated = True
 
     frame = simulator_controller.create_frame(is_key=False)
 
@@ -362,7 +362,7 @@ def test_emit_frame_clears_update_flags(
     # Mark entities as updated
     simulator_controller.station_entities[1].has_updated = True
     simulator_controller.task_entities[1].has_updated = True
-    simulator_controller.resource_entities[1].has_updated = True
+    simulator_controller.driver_entities[1].has_updated = True
 
     # Emit a provided frame to avoid depending on internal selection
     custom_frame = Frame(seq_numb=0, payload={})
@@ -370,7 +370,7 @@ def test_emit_frame_clears_update_flags(
 
     assert simulator_controller.station_entities[1].has_updated is False
     assert simulator_controller.task_entities[1].has_updated is False
-    assert simulator_controller.resource_entities[1].has_updated is False
+    assert simulator_controller.driver_entities[1].has_updated is False
 
 
 def test_key_frame_includes_new_tasks_and_clears_popups(
@@ -464,104 +464,104 @@ def test_add_task_fail(
     assert set(simulator_controller.task_entities.keys()) == {1, 2}
 
 
-def test_assign_task_to_resource_success(
+def test_assign_task_to_driver_success(
     simulator_controller: SimulatorController,
 ) -> None:
-    """Test assign_task_to_resource functionality."""
+    """Test assign_task_to_driver functionality."""
     # Arrange
     task_id = 1
-    resource_id = 1
+    driver_id = 1
 
     # Act
-    simulator_controller.assign_task_to_resource(task_id, resource_id)
+    simulator_controller.assign_task_to_driver(task_id, driver_id)
 
     # Assert
     task = simulator_controller.get_task_by_id(task_id)
-    resource = simulator_controller.get_resource_by_id(resource_id)
+    driver = simulator_controller.get_driver_by_id(driver_id)
     assert task is not None
-    assert resource is not None
-    assert task.get_assigned_resource() == resource
-    assert resource.get_task_list()[0] == task
+    assert driver is not None
+    assert task.get_assigned_driver() == driver
+    assert driver.get_task_list()[0] == task
 
 
-def test_assign_task_to_resource_with_bad_task_id(
+def test_assign_task_to_driver_with_bad_task_id(
     simulator_controller: SimulatorController,
 ) -> None:
-    """Test assign_task_to_resource functionality with an invalid task_id."""
+    """Test assign_task_to_driver functionality with an invalid task_id."""
     # Arrange
     task_id = 6  # Non-existant id
-    resource_id = 1
+    driver_id = 1
 
     # Act and Assert
     with pytest.raises(
         Exception, match=f"Could not find task in sim with id: {task_id}"
     ):
-        simulator_controller.assign_task_to_resource(task_id, resource_id)
+        simulator_controller.assign_task_to_driver(task_id, driver_id)
 
 
-def test_assign_task_to_resource_with_bad_resource_id(
+def test_assign_task_to_driver_with_bad_driver_id(
     simulator_controller: SimulatorController,
 ) -> None:
-    """Test assign_task_to_resource functionality with an invalid resouruce_id."""
+    """Test assign_task_to_driver functionality with an invalid driver_id."""
     # Arrange
     task_id = 1
-    resource_id = 6  # Non-existant id
+    driver_id = 6  # Non-existant id
 
     # Act and Assert
     with pytest.raises(
-        Exception, match=f"Could not find resource in sim with id: {resource_id}"
+        Exception, match=f"Could not find driver in sim with id: {driver_id}"
     ):
-        simulator_controller.assign_task_to_resource(task_id, resource_id)
+        simulator_controller.assign_task_to_driver(task_id, driver_id)
 
 
-def test_unassign_task_from_resource_success(
+def test_unassign_task_from_driver_success(
     simulator_controller: SimulatorController,
 ) -> None:
-    """Test unassign_task_from_resource functionality."""
+    """Test unassign_task_from_driver functionality."""
     # Arrange
     task_id = 1
-    resource_id = 1
+    driver_id = 1
 
     # Act
-    simulator_controller.unassign_task_from_resource(task_id, resource_id)
+    simulator_controller.unassign_task_from_driver(task_id, driver_id)
 
     # Assert
     task = simulator_controller.get_task_by_id(task_id)
-    resource = simulator_controller.get_resource_by_id(resource_id)
+    driver = simulator_controller.get_driver_by_id(driver_id)
     assert task is not None
-    assert resource is not None
-    assert task.get_assigned_resource() is None
-    assert resource.get_task_count() == 0
+    assert driver is not None
+    assert task.get_assigned_driver() is None
+    assert driver.get_task_count() == 0
 
 
-def test_unassign_task_from_resource_with_bad_task_id(
+def test_unassign_task_from_driver_with_bad_task_id(
     simulator_controller: SimulatorController,
 ) -> None:
-    """Test unassign_task_from_resource functionality with an invalid task_id."""
+    """Test unassign_task_from_driver functionality with an invalid task_id."""
     # Arrange
     task_id = 6  # Non-existant id
-    resource_id = 1
+    driver_id = 1
 
     # Act and Assert
     with pytest.raises(
         Exception, match=f"Could not find task in sim with id: {task_id}"
     ):
-        simulator_controller.unassign_task_from_resource(task_id, resource_id)
+        simulator_controller.unassign_task_from_driver(task_id, driver_id)
 
 
-def test_unassign_task_from_resource_with_bad_resource_id(
+def test_unassign_task_from_driver_with_bad_driver_id(
     simulator_controller: SimulatorController,
 ) -> None:
-    """Test unassign_task_from_resource functionality with an invalid resource_id."""
+    """Test unassign_task_from_driver functionality with an invalid driver_id."""
     # Arrange
     task_id = 1
-    resource_id = 6  # Non-existant id
+    driver_id = 6  # Non-existant id
 
     # Act and Assert
     with pytest.raises(
-        Exception, match=f"Could not find resource in sim with id: {resource_id}"
+        Exception, match=f"Could not find driver in sim with id: {driver_id}"
     ):
-        simulator_controller.unassign_task_from_resource(task_id, resource_id)
+        simulator_controller.unassign_task_from_driver(task_id, driver_id)
 
 
 def test_reassign_task_success(
@@ -570,24 +570,24 @@ def test_reassign_task_success(
     """Test reassign_task functionality"""
     # Arrange
     task_id = 1
-    old_resource_id = 1
-    new_resource_id = 2
+    old_driver_id = 1
+    new_driver_id = 2
 
-    simulator_controller.assign_task_to_resource(task_id, old_resource_id)
+    simulator_controller.assign_task_to_driver(task_id, old_driver_id)
 
     # Act
-    simulator_controller.reassign_task(task_id, old_resource_id, new_resource_id)
+    simulator_controller.reassign_task(task_id, old_driver_id, new_driver_id)
 
     # Assert
     task = simulator_controller.get_task_by_id(task_id)
     assert task is not None
-    old_resource = simulator_controller.get_resource_by_id(old_resource_id)
-    assert old_resource is not None
-    new_resource = simulator_controller.get_resource_by_id(new_resource_id)
-    assert new_resource is not None
-    assert task.get_assigned_resource() == new_resource
-    assert task in new_resource.get_task_list()
-    assert task not in old_resource.get_task_list()
+    old_driver = simulator_controller.get_driver_by_id(old_driver_id)
+    assert old_driver is not None
+    new_driver = simulator_controller.get_driver_by_id(new_driver_id)
+    assert new_driver is not None
+    assert task.get_assigned_driver() == new_driver
+    assert task in new_driver.get_task_list()
+    assert task not in old_driver.get_task_list()
 
 
 def test_reassign_task_fail_with_bad_task_id(
@@ -596,57 +596,57 @@ def test_reassign_task_fail_with_bad_task_id(
     """Test reassign_task functionality with bad task_id"""
     # Arrange
     task_id = 6  # Non-existent task
-    old_resource_id = 1
-    new_resource_id = 2
+    old_driver_id = 1
+    new_driver_id = 2
 
     # Act and Assert
     with pytest.raises(
         Exception, match=f"Reassigning task failed as could not find task {task_id}"
     ):
-        simulator_controller.reassign_task(task_id, old_resource_id, new_resource_id)
+        simulator_controller.reassign_task(task_id, old_driver_id, new_driver_id)
 
 
-def test_reassign_task_fail_with_bad_old_resource_id(
+def test_reassign_task_fail_with_bad_old_driver_id(
     simulator_controller: SimulatorController,
 ) -> None:
-    """Test reassign_task functionality with bad old_resource_id"""
+    """Test reassign_task functionality with bad old_driver_id"""
     # Arrange
     task_id = 1
-    old_resource_id = 6  # Non-existent resource
-    new_resource_id = 2
+    old_driver_id = 6  # Non-existent driver
+    new_driver_id = 2
 
     # Act and Assert
     with pytest.raises(
         Exception,
-        match=f"Reassigning failed as could not find resource {old_resource_id}",
+        match=f"Reassigning failed as could not find driver {old_driver_id}",
     ):
-        simulator_controller.reassign_task(task_id, old_resource_id, new_resource_id)
+        simulator_controller.reassign_task(task_id, old_driver_id, new_driver_id)
 
 
-def test_reassign_task_fail_with_bad_new_resource_id(
+def test_reassign_task_fail_with_bad_new_driver_id(
     simulator_controller: SimulatorController,
 ) -> None:
-    """Test reassign_task functionality with bad new_resource_id"""
+    """Test reassign_task functionality with bad new_driver_id"""
     # Arrange
     task_id = 1
-    old_resource_id = 1
-    new_resource_id = 6  # Non-existent resource
+    old_driver_id = 1
+    new_driver_id = 6  # Non-existent driver
 
-    simulator_controller.assign_task_to_resource(task_id, old_resource_id)
+    simulator_controller.assign_task_to_driver(task_id, old_driver_id)
 
     # Act and Assert
     with pytest.raises(
         Exception,
-        match=f"Reassigning failed as could not find resource {new_resource_id}",
+        match=f"Reassigning failed as could not find driver {new_driver_id}",
     ):
-        simulator_controller.reassign_task(task_id, old_resource_id, new_resource_id)
+        simulator_controller.reassign_task(task_id, old_driver_id, new_driver_id)
 
     task = simulator_controller.get_task_by_id(task_id)
     assert task is not None
-    old_resource = simulator_controller.get_resource_by_id(old_resource_id)
-    assert old_resource is not None
-    assert task.get_assigned_resource() == old_resource
-    assert task in old_resource.get_task_list()
+    old_driver = simulator_controller.get_driver_by_id(old_driver_id)
+    assert old_driver is not None
+    assert task.get_assigned_driver() == old_driver
+    assert task in old_driver.get_task_list()
 
 
 def test_start_simulation(
@@ -742,99 +742,99 @@ def test_strict_mode_initialization(
     assert controller.realTimeDriver.strict is True
 
 
-def test_reorder_resource_tasks_success(
+def test_reorder_driver_tasks_success(
     simulator_controller: SimulatorController, input_params: InputParameter
 ) -> None:
-    """Test successful task reordering on a resource."""
-    # Get a resource and add some tasks
-    resource = simulator_controller.get_resource_by_id(1)
-    assert resource is not None
+    """Test successful task reordering on a driver."""
+    # Get a driver and add some tasks
+    driver = simulator_controller.get_driver_by_id(1)
+    assert driver is not None
 
     # Clear existing tasks and add new ones
-    resource.task_list.clear()
+    driver.task_list.clear()
     task1 = simulator_controller.get_task_by_id(1)
     task2 = simulator_controller.get_task_by_id(2)
     assert task1 is not None
     assert task2 is not None
 
-    resource.task_list = [task1, task2]
+    driver.task_list = [task1, task2]
 
     # Reorder tasks
-    new_order = simulator_controller.reorder_resource_tasks(
-        resource_id=1, task_ids_to_reorder=[2, 1], apply_from_top=True
+    new_order = simulator_controller.reorder_driver_tasks(
+        driver_id=1, task_ids_to_reorder=[2, 1], apply_from_top=True
     )
 
     assert new_order == [2, 1]
-    assert resource.task_list == [task2, task1]
+    assert driver.task_list == [task2, task1]
 
 
-def test_reorder_resource_tasks_resource_not_found(
+def test_reorder_driver_tasks_driver_not_found(
     simulator_controller: SimulatorController,
 ) -> None:
-    """Test that reordering non-existent resource raises exception."""
-    with pytest.raises(Exception, match="Could not find resource in sim with id: 999"):
-        simulator_controller.reorder_resource_tasks(
-            resource_id=999, task_ids_to_reorder=[1, 2], apply_from_top=True
+    """Test that reordering non-existent driver raises exception."""
+    with pytest.raises(Exception, match="Could not find driver in sim with id: 999"):
+        simulator_controller.reorder_driver_tasks(
+            driver_id=999, task_ids_to_reorder=[1, 2], apply_from_top=True
         )
 
 
-def test_reorder_resource_tasks_empty_list_raises_error(
+def test_reorder_driver_tasks_empty_list_raises_error(
     simulator_controller: SimulatorController,
 ) -> None:
-    """Test that empty task list raises ValueError from resource layer."""
+    """Test that empty task list raises ValueError from driver layer."""
     with pytest.raises(ValueError, match="task_ids_to_reorder cannot be empty"):
-        simulator_controller.reorder_resource_tasks(
-            resource_id=1, task_ids_to_reorder=[], apply_from_top=True
+        simulator_controller.reorder_driver_tasks(
+            driver_id=1, task_ids_to_reorder=[], apply_from_top=True
         )
 
 
-def test_reorder_resource_tasks_with_in_progress_tasks(
+def test_reorder_driver_tasks_with_in_progress_tasks(
     simulator_controller: SimulatorController, input_params: InputParameter
 ) -> None:
     """Test reordering with in-progress tasks pinned to top."""
-    resource = simulator_controller.get_resource_by_id(1)
-    assert resource is not None
+    driver = simulator_controller.get_driver_by_id(1)
+    assert driver is not None
 
     # Add tasks and set one as in-progress
-    resource.task_list.clear()
+    driver.task_list.clear()
     task1 = simulator_controller.get_task_by_id(1)
     task2 = simulator_controller.get_task_by_id(2)
     assert task1 is not None
     assert task2 is not None
 
     task1.set_state(State.IN_PROGRESS)
-    resource.task_list = [task1, task2]
+    driver.task_list = [task1, task2]
 
     # Try to reorder - task1 should stay at top
-    new_order = simulator_controller.reorder_resource_tasks(
-        resource_id=1, task_ids_to_reorder=[2], apply_from_top=True
+    new_order = simulator_controller.reorder_driver_tasks(
+        driver_id=1, task_ids_to_reorder=[2], apply_from_top=True
     )
 
     assert new_order == [1, 2]  # task1 pinned, task2 specified
-    assert resource.task_list[0] == task1  # in-progress task first
+    assert driver.task_list[0] == task1  # in-progress task first
 
 
-def test_reorder_resource_tasks_bottom_mode(
+def test_reorder_driver_tasks_bottom_mode(
     simulator_controller: SimulatorController, input_params: InputParameter
 ) -> None:
     """Test bottom mode task reordering."""
-    resource = simulator_controller.get_resource_by_id(1)
-    assert resource is not None
+    driver = simulator_controller.get_driver_by_id(1)
+    assert driver is not None
 
     # Set up tasks
-    resource.task_list.clear()
+    driver.task_list.clear()
     task1 = simulator_controller.get_task_by_id(1)
     task2 = simulator_controller.get_task_by_id(2)
     assert task1 is not None
     assert task2 is not None
 
-    resource.task_list = [task1, task2]
+    driver.task_list = [task1, task2]
 
     # Reorder with bottom mode
-    new_order = simulator_controller.reorder_resource_tasks(
-        resource_id=1, task_ids_to_reorder=[1], apply_from_top=False
+    new_order = simulator_controller.reorder_driver_tasks(
+        driver_id=1, task_ids_to_reorder=[1], apply_from_top=False
     )
 
     # Expected: [2] (unspecified), [1] (specified, at bottom)
     assert new_order == [2, 1]
-    assert resource.task_list == [task2, task1]
+    assert driver.task_list == [task2, task1]

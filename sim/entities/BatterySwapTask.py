@@ -30,7 +30,7 @@ from .task_state import State
 # to avoid circular imports
 if TYPE_CHECKING:  # pragma: no cover
     from .station import Station
-    from .resource import Resource
+    from .driver import Driver
 
 
 class BatterySwapTask(Task):
@@ -93,42 +93,44 @@ class BatterySwapTask(Task):
         """
         self.station = station
 
-    def get_assigned_resource(self) -> Optional["Resource"]:
-        """Get the resource assigned to this task.
+    def get_assigned_driver(self) -> Optional["Driver"]:
+        """Get the driver assigned to this task.
 
         Returns:
-            The assigned resource if any, None otherwise.
+            The assigned driver if any, None otherwise.
         """
-        return self.assigned_resource
+        return self.assigned_driver
 
-    def set_assigned_resource(self, resource: "Resource") -> None:
-        """Assign a resource to this task.
+    def set_assigned_driver(self, driver: "Driver") -> None:
+        """Assign a driver to this task.
 
         Args:
-            resource: The resource to assign.
+            driver: The driver to assign.
 
         Returns:
             None
         """
-        self.assigned_resource = resource
-        self.state = State.ASSIGNED
+        self.assigned_driver = driver
+        # Preserve IN_PROGRESS if already dispatched; otherwise mark ASSIGNED
+        if self.state != State.IN_PROGRESS:
+            self.state = State.ASSIGNED
 
-    def unassign_resource(self) -> None:
-        """Unassign the resource from this task.
+    def unassign_driver(self) -> None:
+        """Unassign the driver from this task.
 
         Returns:
             None
         """
-        self.assigned_resource: Optional["Resource"] = None
+        self.assigned_driver: Optional["Driver"] = None
         self.state = State.OPEN
 
     def is_assigned(self) -> bool:
-        """Check if the task is assigned to a resource.
+        """Check if the task is assigned to a driver.
 
         Returns:
             True if assigned, False otherwise.
         """
-        return self.assigned_resource is not None and self.state == State.ASSIGNED
+        return self.assigned_driver is not None and self.state == State.ASSIGNED
 
     def clear_update(self) -> None:
         """Clear the update flag for this task.
@@ -137,3 +139,16 @@ class BatterySwapTask(Task):
             None
         """
         self.has_updated = False
+
+    # # Backward-compatibility shims for legacy Resource-oriented code/tests
+    # def get_assigned_resource(self) -> Optional["Resource"]:
+    #     # Note: In the refactor, driver is the assignee.
+    #     # For tests expecting a Resource, return same reference.
+    #     return self.assigned_driver  # type: ignore[return-value]
+
+    # def set_assigned_resource(self, resource: "Resource") -> None:
+    #     # Delegate to driver-based API; preserves IN_PROGRESS when set
+    #     self.set_assigned_driver(resource)  # type: ignore[arg-type]
+
+    # def unassign_resource(self) -> None:
+    #     self.unassign_driver()

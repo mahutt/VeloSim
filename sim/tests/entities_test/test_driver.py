@@ -1,0 +1,485 @@
+"""
+MIT License
+
+Copyright (c) 2025 VeloSim Contributors
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+"""
+
+import pytest
+import simpy
+from typing import Any
+
+from sim.entities.driver import Driver
+from sim.entities.position import Position
+from sim.entities.BatterySwapTask import BatterySwapTask
+from sim.entities.task import Task, State
+from sim.entities.station import Station
+
+
+class TestDriver:
+    @pytest.fixture
+    def default_position(self) -> Position:
+        return Position([-73.5673, 45.5017])
+
+    @pytest.fixture
+    def simpy_env(self) -> simpy.Environment:
+        return simpy.Environment()
+
+    @pytest.fixture
+    def driver(
+        self, simpy_env: simpy.Environment, default_position: Position
+    ) -> Driver:
+        return Driver(1, default_position)
+
+    @pytest.fixture
+    def driver_with_tasks(
+        self, simpy_env: simpy.Environment, default_position: Position
+    ) -> Driver:
+        task = BatterySwapTask(1)
+        task2 = BatterySwapTask(2)
+        task3 = BatterySwapTask(3)
+        return Driver(2, default_position, [task, task2, task3])
+
+    def test_driver_initialization(
+        self, simpy_env: simpy.Environment, default_position: Position
+    ) -> None:
+        driver = Driver(1, default_position)
+
+        assert driver.id == 1
+        assert driver.position == default_position
+        assert driver.task_list == []
+        assert driver.has_updated == False
+
+    def test_driver_initialization_with_task_list(
+        self, simpy_env: simpy.Environment, default_position: Position
+    ) -> None:
+        task = BatterySwapTask(1)
+        task2 = BatterySwapTask(2)
+        task3 = BatterySwapTask(3)
+        task_list: list[Task] = [task, task2, task3]
+        driver = Driver(2, default_position, task_list)
+
+        assert driver.id == 2
+        assert driver.position == default_position
+        assert driver.task_list == task_list
+        assert driver.has_updated == False
+
+    def test_get_driver_position(
+        self, driver: Driver, default_position: Position
+    ) -> None:
+        position = driver.get_driver_position()
+        assert position == default_position
+        assert position.get_position() == [-73.5673, 45.5017]
+
+    def test_set_driver_position(self, driver: Driver) -> None:
+        new_position = Position([-74.0000, 40.5017])
+        driver.set_driver_position(new_position)
+
+        assert driver.get_driver_position() == new_position
+        assert driver.position.get_position() == [-74.0000, 40.5017]
+
+    def test_assign_task(self, simpy_env: simpy.Environment, driver: Driver) -> None:
+        initial_count = driver.get_task_count()
+        task = BatterySwapTask(1)
+
+        driver.assign_task(task)
+
+        assert driver.get_task_count() == initial_count + 1
+        assert task in driver.get_task_list()
+
+    def test_assign_multiple_tasks(
+        self, simpy_env: simpy.Environment, driver: Driver
+    ) -> None:
+        task = BatterySwapTask(1)
+        task2 = BatterySwapTask(2)
+        task3 = BatterySwapTask(3)
+        task_list = [task, task2, task3]
+        initial_count = driver.get_task_count()
+
+        for t in task_list:
+            driver.assign_task(t)
+
+        assert driver.get_task_count() == initial_count + len(task_list)
+        for t in task_list:
+            assert t in driver.get_task_list()
+
+    def test_unassign_existing_task(
+        self, simpy_env: simpy.Environment, default_position: Position
+    ) -> None:
+        task = BatterySwapTask(1)
+        task2 = BatterySwapTask(2)
+        task3 = BatterySwapTask(3)
+        driver = Driver(2, default_position, [task, task2, task3])
+        initial_count = driver.get_task_count()
+        task_to_remove = task2
+
+        assert task_to_remove in driver.get_task_list()
+
+        driver.unassign_task(task_to_remove)
+
+        assert driver.get_task_count() == initial_count - 1
+        assert task_to_remove not in driver.get_task_list()
+
+    def test_unassign_nonexistent_task(
+        self, simpy_env: simpy.Environment, default_position: Position
+    ) -> None:
+        task = BatterySwapTask(1)
+        task2 = BatterySwapTask(2)
+        task3 = BatterySwapTask(3)
+        driver = Driver(2, default_position, [task, task2, task3])
+        initial_count = driver.get_task_count()
+        initial_tasks = driver.get_task_list().copy()
+        nonexistent_task = BatterySwapTask(4)
+
+        assert nonexistent_task not in driver.get_task_list()
+
+        driver.unassign_task(nonexistent_task)
+
+        # should stay unchanged
+        assert driver.get_task_count() == initial_count
+        assert driver.get_task_list() == initial_tasks
+
+    def test_get_in_progress_task(
+        self, simpy_env: simpy.Environment, default_position: Position
+    ) -> None:
+        # Arrange
+        task = BatterySwapTask(1)
+        task2 = BatterySwapTask(2)
+        task3 = BatterySwapTask(3)
+        driver = Driver(2, default_position, [task, task2, task3])
+        task2.set_state(State.IN_PROGRESS)
+
+        # Act
+        dispatched_task = driver.get_in_progress_task()
+
+        # Assert
+        assert isinstance(dispatched_task, BatterySwapTask)
+        assert dispatched_task == task2
+
+    def test_get_in_progress_task_not_found(
+        self, simpy_env: simpy.Environment, default_position: Position
+    ) -> None:
+        # Arrange
+        task = BatterySwapTask(1)
+        task2 = BatterySwapTask(2)
+        task3 = BatterySwapTask(3)
+        driver = Driver(2, default_position, [task, task2, task3])
+
+        # Act
+        dispatched_task = driver.get_in_progress_task()
+
+        # Assert
+        assert dispatched_task is None
+
+    def test_dispatch_task_with_no_other_dispatched(
+        self, simpy_env: simpy.Environment, default_position: Position
+    ) -> None:
+        # Arrange
+        task = BatterySwapTask(1)
+        task2 = BatterySwapTask(2)
+        task3 = BatterySwapTask(3)
+        driver = Driver(2, default_position, [task, task2, task3])
+
+        # Act
+        driver.dispatch_task(task2)
+
+        # Assert
+        assert task2.get_state() == State.IN_PROGRESS
+
+    def test_dispatch_task_with_other_dispatched_same_station(
+        self, simpy_env: simpy.Environment, default_position: Position
+    ) -> None:
+        # Arrange
+        task = BatterySwapTask(1)
+        task2 = BatterySwapTask(2)
+        task3 = BatterySwapTask(3)
+        station = Station(1, "Test Station", default_position)
+        driver = Driver(2, default_position, [task, task2, task3])
+        task.set_state(State.IN_PROGRESS)
+        task.set_station(station)
+        task2.set_station(station)
+
+        # Act
+        driver.dispatch_task(task2)
+
+        # Assert
+        assert task2.get_state() == State.IN_PROGRESS
+
+    def test_dispatch_task_with_other_dispatched_diff_station(
+        self, simpy_env: simpy.Environment, default_position: Position
+    ) -> None:
+        # Arrange
+        task = BatterySwapTask(1)
+        task2 = BatterySwapTask(2)
+        task3 = BatterySwapTask(3)
+        station = Station(1, "Test Station", default_position)
+        station2 = Station(2, "Other Station", default_position)
+        driver = Driver(2, default_position, [task, task2, task3])
+        task.set_state(State.IN_PROGRESS)
+        task.set_station(station)
+        task2.set_station(station2)
+
+        # Act and Assert
+        with pytest.raises(Exception, match="Cannot dispatch task at this station"):
+            driver.dispatch_task(task2)
+
+    def test_service_task(
+        self, simpy_env: simpy.Environment, default_position: Position
+    ) -> None:
+        task = BatterySwapTask(1)
+        task2 = BatterySwapTask(2)
+        task3 = BatterySwapTask(3)
+        driver = Driver(2, default_position, [task, task2, task3])
+        initial_count = driver.get_task_count()
+        task_to_service = task2
+
+        assert task_to_service in driver.get_task_list()
+
+        driver.service_task(task_to_service)
+
+        assert driver.get_task_count() == initial_count - 1
+        assert task_to_service not in driver.get_task_list()
+
+    def test_service_nonexistent_task(
+        self, simpy_env: simpy.Environment, default_position: Position
+    ) -> None:
+        task = BatterySwapTask(1)
+        task2 = BatterySwapTask(2)
+        task3 = BatterySwapTask(3)
+        driver = Driver(2, default_position, [task, task2, task3])
+        initial_count = driver.get_task_count()
+        initial_tasks = driver.get_task_list().copy()
+        nonexistent_task = BatterySwapTask(4)
+
+        assert nonexistent_task not in driver.get_task_list()
+
+        driver.service_task(nonexistent_task)
+
+        # should stay unchanged
+        assert driver.get_task_count() == initial_count
+        assert driver.get_task_list() == initial_tasks
+
+    def test_get_task_count_empty(self, driver: Driver) -> None:
+        assert driver.get_task_count() == 0
+
+    def test_get_task_count(self, driver_with_tasks: Driver) -> None:
+        assert driver_with_tasks.get_task_count() == 3
+
+    def test_get_task_list_empty(self, driver: Driver) -> None:
+        task_list = driver.get_task_list()
+        assert task_list == []
+        assert isinstance(task_list, list)
+
+    def test_get_task_list_with_tasks(self, driver_with_tasks: Driver) -> None:
+        task_list = driver_with_tasks.get_task_list()
+        assert isinstance(task_list, list)
+
+    def test_task_list_modifications(
+        self, simpy_env: simpy.Environment, driver: Driver
+    ) -> None:
+        # start with empty list
+        assert driver.get_task_count() == 0
+
+        # add some tasks
+        task = BatterySwapTask(1)
+        task2 = BatterySwapTask(2)
+        task3 = BatterySwapTask(3)
+        driver.assign_task(task)
+        driver.assign_task(task2)
+        driver.assign_task(task3)
+        assert driver.get_task_count() == 3
+        assert set(driver.get_task_list()) == {task, task2, task3}
+
+        # service a task
+        driver.service_task(task2)
+        assert driver.get_task_count() == 2
+        assert task2 not in driver.get_task_list()
+        assert set(driver.get_task_list()) == {task, task3}
+
+        # unassign a task
+        driver.unassign_task(task)
+        assert driver.get_task_count() == 1
+        assert driver.get_task_list() == [task3]
+
+    def test_clear_update(self, driver: Driver) -> None:
+        assert driver.has_updated == False
+
+        driver.has_updated = True
+        assert driver.has_updated == True
+
+        driver.clear_update()
+        assert driver.has_updated == False
+
+    # Tests for reorder_tasks
+
+    def test_reorder_tasks_empty_list_raises_error(
+        self, simpy_env: simpy.Environment, default_position: Position
+    ) -> None:
+        """Test that empty task_ids list raises ValueError."""
+        task1 = BatterySwapTask(1)
+        task2 = BatterySwapTask(2)
+        driver = Driver(1, default_position, [task1, task2])
+
+        with pytest.raises(ValueError, match="task_ids_to_reorder cannot be empty"):
+            driver.reorder_tasks([], apply_from_top=True)
+
+    def test_reorder_tasks_duplicate_ids_raises_error(
+        self, simpy_env: simpy.Environment, default_position: Position
+    ) -> None:
+        """Test that duplicate task IDs raise ValueError."""
+        task1 = BatterySwapTask(1)
+        task2 = BatterySwapTask(2)
+        task3 = BatterySwapTask(3)
+        driver = Driver(1, default_position, [task1, task2, task3])
+
+        with pytest.raises(ValueError, match="contains duplicate task IDs"):
+            driver.reorder_tasks([1, 2, 2], apply_from_top=True)
+
+    def test_reorder_tasks_top_mode_basic(
+        self, simpy_env: simpy.Environment, default_position: Position
+    ) -> None:
+        """Test basic top mode reordering without in-progress tasks."""
+        task1 = BatterySwapTask(1)
+        task2 = BatterySwapTask(2)
+        task3 = BatterySwapTask(3)
+        task4 = BatterySwapTask(4)
+        driver = Driver(1, default_position, [task1, task2, task3, task4])
+
+        # Reorder: want [3, 1] at top, then [2, 4] unspecified
+        new_order = driver.reorder_tasks([3, 1], apply_from_top=True)
+
+        assert new_order == [3, 1, 2, 4]
+        assert driver.task_list == [task3, task1, task2, task4]
+        assert driver.has_updated == True
+
+    def test_reorder_tasks_bottom_mode_basic(
+        self, simpy_env: simpy.Environment, default_position: Position
+    ) -> None:
+        """Test basic bottom mode reordering (reversed at end)."""
+        task1 = BatterySwapTask(1)
+        task2 = BatterySwapTask(2)
+        task3 = BatterySwapTask(3)
+        task4 = BatterySwapTask(4)
+        driver = Driver(1, default_position, [task1, task2, task3, task4])
+
+        # Reorder: unspecified [2, 4], then reversed([3, 1]) = [1, 3]
+        new_order = driver.reorder_tasks([3, 1], apply_from_top=False)
+
+        assert new_order == [2, 4, 1, 3]
+        assert driver.task_list == [task2, task4, task1, task3]
+        assert driver.has_updated == True
+
+    def test_reorder_tasks_with_in_progress_pinned_to_top(
+        self, simpy_env: simpy.Environment, default_position: Position
+    ) -> None:
+        """Test that IN_PROGRESS tasks are always pinned to top."""
+        task1 = BatterySwapTask(1)
+        task2 = BatterySwapTask(2)
+        task3 = BatterySwapTask(3)
+        task4 = BatterySwapTask(4)
+        task5 = BatterySwapTask(5)
+
+        driver = Driver(1, default_position, [task1, task2, task3, task4, task5])
+
+        # Set task2 and task4 as IN_PROGRESS (after Driver creation)
+        task2.set_state(State.IN_PROGRESS)
+        task4.set_state(State.IN_PROGRESS)
+
+        # Reorder with top mode: [5, 3, 1]
+        # Original: [1, 2*, 3, 4*, 5] (* = in-progress)
+        # Expected: [2*, 4*] (in-progress, original order),
+        #           [5, 3, 1] (specified), [] (unspecified)
+        new_order = driver.reorder_tasks([5, 3, 1], apply_from_top=True)
+
+        assert new_order == [2, 4, 5, 3, 1]
+        assert driver.task_list == [task2, task4, task5, task3, task1]
+
+    def test_reorder_tasks_with_in_progress_in_specified_list(
+        self, simpy_env: simpy.Environment, default_position: Position
+    ) -> None:
+        """Test that if a specified task is IN_PROGRESS, it stays at top."""
+        task1 = BatterySwapTask(1)
+        task2 = BatterySwapTask(2)
+        task3 = BatterySwapTask(3)
+        task4 = BatterySwapTask(4)
+
+        driver = Driver(1, default_position, [task1, task2, task3, task4])
+        task3.set_state(State.IN_PROGRESS)
+
+        # Reorder: [3, 1] includes an in-progress task
+        new_order = driver.reorder_tasks([3, 1], apply_from_top=True)
+
+        assert new_order[0] == 3
+        assert driver.task_list[0] == task3
+
+    def test_reorder_tasks_bottom_mode_with_in_progress(
+        self, simpy_env: simpy.Environment, default_position: Position
+    ) -> None:
+        task1 = BatterySwapTask(1)
+        task2 = BatterySwapTask(2)
+        task3 = BatterySwapTask(3)
+        task4 = BatterySwapTask(4)
+
+        driver = Driver(1, default_position, [task1, task2, task3, task4])
+        task2.set_state(State.IN_PROGRESS)
+
+        new_order = driver.reorder_tasks([3, 1], apply_from_top=False)
+
+        assert new_order[0] == 2
+        assert driver.task_list[0] == task2
+
+    def test_reorder_tasks_invalid_task_ids_ignored_with_warning(
+        self, simpy_env: simpy.Environment, default_position: Position, caplog: Any
+    ) -> None:
+        task1 = BatterySwapTask(1)
+        task2 = BatterySwapTask(2)
+        task3 = BatterySwapTask(3)
+        driver = Driver(1, default_position, [task1, task2, task3])
+
+        with caplog.at_level("WARNING"):
+            new_order = driver.reorder_tasks([99, 1], apply_from_top=True)
+
+        assert new_order[0] in [t.id for t in driver.task_list]
+
+    def test_reorder_tasks_all_tasks_specified(
+        self, simpy_env: simpy.Environment, default_position: Position
+    ) -> None:
+        task1 = BatterySwapTask(1)
+        task2 = BatterySwapTask(2)
+        task3 = BatterySwapTask(3)
+        driver = Driver(1, default_position, [task1, task2, task3])
+
+        new_order = driver.reorder_tasks([3, 2, 1], apply_from_top=True)
+
+        assert new_order == [3, 2, 1]
+        assert driver.task_list == [task3, task2, task1]
+
+    def test_reorder_tasks_partial_list_resilience(
+        self, simpy_env: simpy.Environment, default_position: Position
+    ) -> None:
+        task1 = BatterySwapTask(1)
+        task2 = BatterySwapTask(2)
+        task3 = BatterySwapTask(3)
+        task4 = BatterySwapTask(4)
+        driver = Driver(1, default_position, [task1, task2, task3, task4])
+
+        new_order = driver.reorder_tasks([4], apply_from_top=True)
+
+        assert new_order[0] == 4

@@ -26,7 +26,7 @@ import pytest
 import simpy
 from unittest.mock import Mock
 from sim.entities.BatterySwapTask import BatterySwapTask
-from sim.entities.resource import Resource
+from sim.entities.driver import Driver
 from sim.entities.position import Position
 from sim.entities.station import Station
 from sim.entities.task_state import State
@@ -45,9 +45,20 @@ def station(env: simpy.Environment) -> Station:
 
 
 @pytest.fixture
-def resource(env: simpy.Environment) -> Resource:
-    # Create new test resource
-    res = Resource(resource_id=1, position=Position([0.0, 0.0]))
+def resource(env: simpy.Environment) -> Driver:
+    # Create new test driver (resource replacement)
+    res = Driver(driver_id=1, position=Position([0.0, 0.0]))
+    res.env = env
+    # Mock the sim_behaviour and map_controller to avoid AttributeError
+    res.sim_behaviour = Mock()
+    res.map_controller = Mock()
+    return res
+
+
+@pytest.fixture
+def driver(env: simpy.Environment) -> Driver:
+    # Create new test driver (resource replacement)
+    res = Driver(driver_id=1, position=Position([0.0, 0.0]))
     res.env = env
     # Mock the sim_behaviour and map_controller to avoid AttributeError
     res.sim_behaviour = Mock()
@@ -105,7 +116,7 @@ def test_multiple_scheduled_tasks(env: simpy.Environment, station: Station) -> N
 
 
 def test_resource_immediate_dispatch(
-    env: simpy.Environment, station: Station, resource: Resource
+    env: simpy.Environment, station: Station, resource: Driver
 ) -> None:
     task = BatterySwapTask(task_id=1, station=station)
     # Task is OPEN right away (not scheduled)
@@ -122,7 +133,7 @@ def test_resource_immediate_dispatch(
 def test_resource_scheduled_dispatch(env: simpy.Environment, station: Station) -> None:
     # Dispatching with delays
     task = BatterySwapTask(task_id=2, station=station)
-    resource = Resource(resource_id=2, position=Position([0.0, 0.0]))
+    resource = Driver(driver_id=2, position=Position([0.0, 0.0]))
     resource.env = env
     # Mock the sim_behaviour and map_controller to avoid AttributeError
     resource.sim_behaviour = Mock()
@@ -155,7 +166,7 @@ def test_simulation_time_waiting(env: simpy.Environment, station: Station) -> No
 
 
 def test_full_lifecycle_with_scheduling(
-    env: simpy.Environment, station: Station, resource: Resource
+    env: simpy.Environment, station: Station, resource: Driver
 ) -> None:
     # Testing complete task lifecylce with delays
     task = BatterySwapTask(task_id=1, station=station, spawn_delay=2.0)
@@ -179,33 +190,33 @@ def test_full_lifecycle_with_scheduling(
     assert task.get_state() == State.CLOSED
 
 
-def test_task_unassign_resource(
-    env: simpy.Environment, station: Station, resource: Resource
+def test_task_unassign_driver(
+    env: simpy.Environment, station: Station, resource: Driver
 ) -> None:
     # Test unassigning tasks. Assumed that its possible a task might be still available.
     task = BatterySwapTask(task_id=1, station=station)
 
     resource.assign_task(task)
     assert task.get_state() == State.ASSIGNED
-    assert task.get_assigned_resource() == resource
+    assert task.get_assigned_driver() == resource
 
-    task.unassign_resource()
+    task.unassign_driver()
     assert task.get_state() == State.OPEN
-    assert task.get_assigned_resource() is None
+    assert task.get_assigned_driver() is None
 
 
-def test_resource_unassign_task(
-    env: simpy.Environment, station: Station, resource: Resource
+def test_driver_unassign_task(
+    env: simpy.Environment, station: Station, driver: Driver
 ) -> None:
     # Test resource unassigning a task
     task = BatterySwapTask(task_id=1, station=station)
 
-    resource.assign_task(task)
-    assert task in resource.get_task_list()
+    driver.assign_task(task)
+    assert task in driver.get_task_list()
     assert task.get_state() == State.ASSIGNED
 
-    resource.unassign_task(task)
-    assert task not in resource.get_task_list()
+    driver.unassign_task(task)
+    assert task not in driver.get_task_list()
     assert task.get_state() == State.OPEN
 
 
@@ -213,7 +224,7 @@ def test_resource_get_in_progress_task(
     env: simpy.Environment, station: Station
 ) -> None:
     # Ensure that a task cannot get interrupted by another assignment.
-    resource = Resource(resource_id=1, position=Position([0.0, 0.0]))
+    resource = Driver(driver_id=1, position=Position([0.0, 0.0]))
     task1 = BatterySwapTask(task_id=1, station=station)
     task2 = BatterySwapTask(task_id=2, station=station)
 
@@ -233,7 +244,7 @@ def test_dispatch_multiple_tasks_same_station(
     env: simpy.Environment, station: Station
 ) -> None:
     # Test dispatching multiple tasks at the same station
-    resource = Resource(resource_id=1, position=Position([0.0, 0.0]))
+    resource = Driver(driver_id=1, position=Position([0.0, 0.0]))
     task1 = BatterySwapTask(task_id=1, station=station)
     task2 = BatterySwapTask(task_id=2, station=station)
 
@@ -252,7 +263,7 @@ def test_dispatch_task_different_station_raises_exception(
     env: simpy.Environment, station: Station
 ) -> None:
     # Test that dispatching tasks at different stations raises exception.
-    resource = Resource(resource_id=1, position=Position([0.0, 0.0]))
+    resource = Driver(driver_id=1, position=Position([0.0, 0.0]))
     station2 = Station(station_id=2, name="Station 2", position=Position([1.0, 1.0]))
 
     task1 = BatterySwapTask(task_id=1, station=station)
@@ -273,15 +284,15 @@ def test_resource_with_initial_task_list(
     task1 = BatterySwapTask(task_id=1, station=station)
     task2 = BatterySwapTask(task_id=2, station=station)
 
-    resource = Resource(
-        resource_id=1, position=Position([0.0, 0.0]), task_list=[task1, task2]
+    resource = Driver(
+        driver_id=1, position=Position([0.0, 0.0]), task_list=[task1, task2]
     )
 
     assert resource.get_task_count() == 2
     assert task1 in resource.get_task_list()
     assert task2 in resource.get_task_list()
-    assert task1.get_assigned_resource() == resource
-    assert task2.get_assigned_resource() == resource
+    assert task1.get_assigned_driver() == resource
+    assert task2.get_assigned_driver() == resource
 
 
 def test_zero_spawn_delay_creates_open_task(
@@ -297,7 +308,7 @@ def test_zero_dispatch_delay_keeps_task_assigned(
 ) -> None:
     # Test that dispatch_delay of 0 keeps task ASSIGNED (not auto-dispatched).
     task = BatterySwapTask(task_id=1, station=station)
-    resource = Resource(resource_id=1, position=Position([0.0, 0.0]))
+    resource = Driver(driver_id=1, position=Position([0.0, 0.0]))
 
     resource.assign_task(task, dispatch_delay=0)
     assert task.get_state() == State.ASSIGNED
@@ -336,7 +347,7 @@ def test_task_state_string_conversions(
     assert str(task.get_state()) == "open"
 
     # Test ASSIGNED state
-    resource = Resource(resource_id=1, position=Position([0.0, 0.0]))
+    resource = Driver(driver_id=1, position=Position([0.0, 0.0]))
     resource.assign_task(task)
     assert str(task.get_state()) == "assigned"
 
