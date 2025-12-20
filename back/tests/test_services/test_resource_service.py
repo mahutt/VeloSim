@@ -83,6 +83,8 @@ def patch_active_simulations(
 class TestResourceService:
     """Tests for ResourceService using updated active_simulations."""
 
+    @pytest.mark.filterwarnings("ignore::RuntimeWarning")
+    @pytest.mark.filterwarnings("ignore::pytest.PytestUnraisableExceptionWarning")
     def test_assign_task_success(
         self,
         db_session: Session,
@@ -90,6 +92,12 @@ class TestResourceService:
         requesting_user: int,
         patch_active_simulations: Dict[str, Any],
     ) -> None:
+        """Test successful task assignment.
+
+        Note: Warnings suppressed because mocking the simulator can trigger
+        unawaited coroutines in KeyframePersistenceSubscriber._persistence_worker,
+        and event loop cleanup from other tests can cause unraisable exceptions.
+        """
         payload = ResourceTaskAssignRequest(resource_id=1, task_id=100)
         response = resource_service.assign_task(
             db_session, sim_id, requesting_user, payload

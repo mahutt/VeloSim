@@ -31,6 +31,7 @@ from fastapi import (
     WebSocket,
     Depends,
     Query,
+    status,
 )
 from back.api.v1.utils import (
     cleanup_simulation,
@@ -54,11 +55,18 @@ from back.schemas import (
     ResourceTaskReassignResponse,
     ResourceTaskReorderResponse,
 )
+from back.schemas.sim_keyframe import (
+    SimKeyframeListResponse,
+    SimKeyframeResponse,
+)
 from sqlalchemy.orm import Session
 
 from back.auth.dependency import get_user_id, get_user_id_over_websocket
 from back.exceptions import VelosimPermissionError, ItemNotFoundError
 from back.services.resource_service import resource_service
+from back.crud.sim_keyframe import sim_keyframe_crud
+from back.crud.sim_instance import sim_instance_crud
+from back.crud.user import user_crud
 from back.schemas import PlaybackSpeedBase, PlaybackSpeedResponse
 from back.schemas.sim_instance import (
     SimInstanceResponse,
@@ -546,3 +554,165 @@ async def websocket_simulation_stream(
     finally:
         # Clean up the in-memory simulation's resources
         await cleanup_simulation(sim_id, sim_data, sim_info, subscriber, websocket)
+
+
+@router.get("/{sim_id}/keyframes", response_model=SimKeyframeListResponse)
+def get_simulation_keyframes(
+    sim_id: str,
+    page: int = Query(1, ge=1, description="Page number (1-indexed)"),
+    per_page: int = Query(20, ge=1, le=100, description="Items per page"),
+    db: Session = Depends(get_db),
+    requesting_user: int = Depends(get_user_id),
+) -> SimKeyframeListResponse:
+    """Get all keyframes for a simulation with pagination.
+
+    Only the simulation owner or admins can retrieve keyframes.
+
+    Args:
+        sim_id: ID of the simulation instance (UUID string).
+        page: Page number (1-indexed).
+        per_page: Number of items per page.
+        db: Database session.
+        requesting_user: ID of the authenticated user.
+
+    Returns:
+        SimKeyframeListResponse with paginated keyframes.
+
+    Raises:
+        HTTPException: 404 if simulation not found, 403 if unauthorized.
+    """
+    try:
+        # Get simulation data to retrieve db_id
+        # First try active simulations (fast path)
+        if sim_id in simulation_service.active_simulations:
+            sim_data = simulation_service.active_simulations[sim_id]
+            db_id: int = sim_data["db_id"]
+        else:
+            # Fallback to database for historical simulations
+            sim_instance = sim_instance_crud.get_by_uuid(db, sim_id)
+            if not sim_instance:
+                raise ItemNotFoundError("Simulation not found")
+            db_id = sim_instance.id
+
+        # Verify simulation exists and get ownership (for active sims or re-fetch)
+        sim_instance = sim_instance_crud.get(db, db_id)
+        if not sim_instance:
+            raise ItemNotFoundError("Simulation instance not found")
+
+        # Check authorization
+        user = user_crud.get(db, requesting_user)
+        if not user:
+            raise ItemNotFoundError("User not found")
+
+        if sim_instance.user_id != user.id and not user.is_admin:
+            raise VelosimPermissionError(
+                "Unauthorized to access this simulation's keyframes"
+            )
+
+        # Get keyframes with pagination using the db_id
+        skip = (page - 1) * per_page
+        keyframes, total = sim_keyframe_crud.get_by_sim_instance(
+            db, db_id, skip=skip, limit=per_page
+        )
+
+        # Calculate total pages
+        total_pages = math.ceil(total / per_page) if total > 0 else 0
+
+        return SimKeyframeListResponse(
+            keyframes=[SimKeyframeResponse.model_validate(kf) for kf in keyframes],
+            total=total,
+            page=page,
+            per_page=per_page,
+            total_pages=total_pages,
+        )
+
+    except ItemNotFoundError as e:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+    except VelosimPermissionError as e:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(e))
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error retrieving keyframes: {str(e)}",
+        )
+
+
+@router.get("/{sim_id}/keyframes/{sim_seconds}", response_model=SimKeyframeResponse)
+def get_simulation_keyframe_at_time(
+    sim_id: str,
+    sim_seconds: float,
+    db: Session = Depends(get_db),
+    requesting_user: int = Depends(get_user_id),
+) -> SimKeyframeResponse:
+    """Get the keyframe at or before the specified simulation time.
+
+    Returns the most recent keyframe at or before the given time. Only returns
+    frames that occurred earlier (not later) than the requested time.
+
+    Args:
+        sim_id: ID of the simulation instance (UUID string).
+        sim_seconds: Target simulation time in seconds.
+        db: Database session.
+        requesting_user: ID of the authenticated user.
+
+    Returns:
+        SimKeyframeResponse with id, sim_seconds_elapsed, and frame_data.
+
+    Raises:
+        HTTPException: 404 if simulation or keyframe not found, 403 if unauthorized,
+                      422 if sim_seconds is negative.
+    """
+    # Validate sim_seconds is non-negative
+    if sim_seconds < 0:
+        raise HTTPException(
+            status_code=422,
+            detail="sim_seconds must be non-negative",
+        )
+
+    try:
+        # Get simulation data to retrieve db_id
+        # First try active simulations (fast path)
+        if sim_id in simulation_service.active_simulations:
+            sim_data = simulation_service.active_simulations[sim_id]
+            db_id: int = sim_data["db_id"]
+        else:
+            # Fallback to database for historical simulations
+            sim_instance = sim_instance_crud.get_by_uuid(db, sim_id)
+            if not sim_instance:
+                raise ItemNotFoundError("Simulation not found")
+            db_id = sim_instance.id
+
+        # Verify simulation exists and get ownership (for active sims or re-fetch)
+        sim_instance = sim_instance_crud.get(db, db_id)
+        if not sim_instance:
+            raise ItemNotFoundError("Simulation instance not found")
+
+        # Check authorization
+        user = user_crud.get(db, requesting_user)
+        if not user:
+            raise ItemNotFoundError("User not found")
+
+        if sim_instance.user_id != user.id and not user.is_admin:
+            raise VelosimPermissionError(
+                "Unauthorized to access this simulation's keyframes"
+            )
+
+        # Get keyframe at or before specified time (not after) using the db_id
+        keyframe = sim_keyframe_crud.get_by_sim_time(db, db_id, sim_seconds)
+
+        if keyframe is None:
+            raise ItemNotFoundError(
+                f"No keyframe found at or before {sim_seconds} seconds"
+            )
+
+        return SimKeyframeResponse.model_validate(keyframe)
+
+    except ItemNotFoundError as e:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+    except VelosimPermissionError as e:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(e))
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error retrieving keyframe: {str(e)}",
+        )
