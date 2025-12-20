@@ -22,6 +22,7 @@
  * SOFTWARE.
  */
 
+import { useState } from 'react';
 import { X } from 'lucide-react';
 import { Button } from '~/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '~/components/ui/card';
@@ -150,6 +151,52 @@ function StationInfo({ station }: { station: PopulatedStation }) {
 
 function ResourceInfo({ resource }: { resource: PopulatedResource }) {
   const { requestUnassignment } = useTaskAssignment();
+  const { reorderTasks } = useSimulation();
+  const [dropTargetIndex, setDropTargetIndex] = useState<number | null>(null);
+  // Track which task is being dragged to distinguish reordering (within same resource)
+  // from reassignment (to different resource). Null when dragging from a station.
+  const [draggedTaskId, setDraggedTaskId] = useState<number | null>(null);
+
+  const handleDragStart = (taskId: number) => setDraggedTaskId(taskId);
+
+  const handleDragEnd = () => {
+    setDraggedTaskId(null);
+    setDropTargetIndex(null);
+  };
+
+  const handleDragOver = (e: React.DragEvent, targetIndex: number) => {
+    e.preventDefault();
+
+    // Only allow reordering if dragging from within this resource's list
+    // and not dropping at index 0 (protects in-progress tasks)
+    if (draggedTaskId && targetIndex > 0) {
+      e.dataTransfer.dropEffect = 'move';
+      setDropTargetIndex(targetIndex);
+    } else {
+      e.dataTransfer.dropEffect = 'none';
+    }
+  };
+
+  const handleDrop = async (e: React.DragEvent, targetIndex: number) => {
+    e.preventDefault();
+    setDropTargetIndex(null);
+
+    // Prevent reordering if not dragging from this list or dropping at index 0
+    if (!draggedTaskId || targetIndex === 0) return;
+
+    const draggedIndex = resource.tasks.findIndex(
+      (t) => t.id === draggedTaskId
+    );
+    // Exit if task not found or dropped at same position
+    if (draggedIndex === -1 || draggedIndex === targetIndex) return;
+
+    // Calculate new task order by removing task from old position and inserting at new position
+    const taskIds = resource.tasks.map((t) => t.id);
+    taskIds.splice(draggedIndex, 1);
+    taskIds.splice(targetIndex, 0, draggedTaskId);
+
+    await reorderTasks(resource.id, taskIds, true);
+  };
 
   return (
     <div className="space-y-2">
@@ -165,12 +212,24 @@ function ResourceInfo({ resource }: { resource: PopulatedResource }) {
         </p>
         {resource.tasks.length > 0 ? (
           <div className="space-y-2">
-            {resource.tasks.map((task) => (
-              <TaskItem
+            {resource.tasks.map((task, index) => (
+              <div
                 key={task.id}
-                task={task}
-                onUnassign={() => requestUnassignment(resource.id, task.id)}
-              />
+                onDragOver={(e) => handleDragOver(e, index)}
+                onDrop={(e) => handleDrop(e, index)}
+                onDragStart={() => handleDragStart(task.id)}
+                onDragEnd={handleDragEnd}
+                className={
+                  dropTargetIndex === index
+                    ? 'border-t-2 border-blue-500 pt-1'
+                    : ''
+                }
+              >
+                <TaskItem
+                  task={task}
+                  onUnassign={() => requestUnassignment(resource.id, task.id)}
+                />
+              </div>
             ))}
           </div>
         ) : (

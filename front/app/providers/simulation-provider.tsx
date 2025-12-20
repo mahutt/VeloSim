@@ -91,6 +91,11 @@ export type SimulationContextType = {
     newResourceId: number,
     taskId: number
   ) => Promise<void>;
+  reorderTasks: (
+    resourceId: number,
+    taskIds: number[],
+    applyFromTop: boolean
+  ) => Promise<void>;
   simId: string | null;
   isConnected: boolean;
   simulationStatus: SimulationStatus;
@@ -247,6 +252,46 @@ export const SimulationProvider = ({
       displayError(
         'Reassign failed',
         `An error occurred while reassigning task ${taskId} from resource ${prevResourceId} to resource ${newResourceId}. Please try again later.`
+      );
+      throw error;
+    }
+  };
+
+  // Reorder tasks within a resource's task queue
+  // applyFromTop: if true, applies new order from top; if false, preserves in-progress task at index 0
+  const reorderTasks = async (
+    resourceId: number,
+    taskIds: number[],
+    applyFromTop: boolean
+  ) => {
+    const resource = resourcesRef.current.get(resourceId);
+    if (!resource) {
+      throw new Error(`Resource #${resourceId} not found.`);
+    }
+
+    try {
+      const payload = {
+        resource_id: resourceId,
+        task_ids: taskIds,
+        apply_from_top: applyFromTop,
+      };
+
+      const response = await api.post<{
+        resource_id: number;
+        task_order: number[];
+      }>(`/simulation/${simId!}/resources/reorder-tasks`, payload);
+
+      const updatedResource: Resource = {
+        ...resource,
+        taskIds: response.data.task_order,
+      };
+      resourcesRef.current.set(resourceId, updatedResource);
+      updateResourceBarElement();
+      updateSelectedItem(resourceId, SelectedItemType.Resource);
+    } catch (error) {
+      displayError(
+        'Reorder failed',
+        'An error occurred while reordering tasks. Please try again later.'
       );
       throw error;
     }
@@ -746,6 +791,7 @@ export const SimulationProvider = ({
         assignTask,
         unassignTask,
         reassignTask,
+        reorderTasks,
         simId,
         isConnected,
         simulationStatus,

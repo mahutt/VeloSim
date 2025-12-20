@@ -1187,3 +1187,295 @@ test('flushMapUpdates applies updates with current selection state', async () =>
   expect(selectedFeature).toBeDefined();
   expect(selectedFeature.properties.id).toBe(2);
 });
+
+test('reorderTasks posts to API and updates resource task order', async () => {
+  // Mock API to return successful response
+  (api.post as Mock).mockResolvedValueOnce({
+    data: { resource_id: 1, task_order: [20, 30, 10] },
+  });
+
+  const TestReorderComponent = () => {
+    const { reorderTasks, resourcesRef, resourceBarElement } = useSimulation();
+
+    useEffect(() => {
+      resourcesRef.current.set(1, {
+        id: 1,
+        position: [0, 0],
+        taskIds: [10, 20, 30],
+        inProgressTaskId: null,
+      });
+    }, []);
+
+    const taskCount =
+      resourceBarElement.find((r) => r.id === 1)?.taskCount || 0;
+
+    return (
+      <div>
+        <div data-testid="task-count">{String(taskCount)}</div>
+        <div data-testid="task-ids">
+          {JSON.stringify(resourcesRef.current.get(1)?.taskIds || [])}
+        </div>
+        <button
+          data-testid="reorder-btn"
+          onClick={() => reorderTasks(1, [20, 30, 10], true)}
+        >
+          Reorder
+        </button>
+      </div>
+    );
+  };
+
+  const { getByTestId } = render(
+    <MapProvider>
+      <SimulationProvider simId="test-sim-123">
+        <TaskAssignmentProvider>
+          <MapContainer />
+          <TestReorderComponent />
+        </TaskAssignmentProvider>
+      </SimulationProvider>
+    </MapProvider>
+  );
+
+  await waitFor(() => {
+    expect(MockMap.instance).toBeDefined();
+  });
+
+  await act(async () => {
+    MockMap.instance?.callBacks['load']();
+  });
+
+  expect(getByTestId('task-ids')).toHaveTextContent('[10,20,30]');
+
+  const reorderBtn = getByTestId('reorder-btn');
+
+  await act(async () => {
+    reorderBtn.click();
+    await new Promise((r) => setTimeout(r, 50));
+  });
+
+  expect(api.post).toHaveBeenCalledWith(
+    '/simulation/test-sim-123/resources/reorder-tasks',
+    { resource_id: 1, task_ids: [20, 30, 10], apply_from_top: true }
+  );
+
+  await waitFor(() => {
+    expect(getByTestId('task-ids')).toHaveTextContent('[20,30,10]');
+    expect(getByTestId('task-count')).toHaveTextContent('3');
+  });
+});
+
+test('reorderTasks handles API errors gracefully', async () => {
+  const consoleErrorSpy = vi
+    .spyOn(console, 'error')
+    .mockImplementation(() => {});
+
+  // Mock API to return error
+  (api.post as Mock).mockRejectedValueOnce(new Error('Reorder failed'));
+
+  const TestReorderErrorComponent = () => {
+    const { reorderTasks, resourcesRef } = useSimulation();
+
+    useEffect(() => {
+      resourcesRef.current.set(1, {
+        id: 1,
+        position: [0, 0],
+        taskIds: [10, 20, 30],
+        inProgressTaskId: null,
+      });
+    }, []);
+
+    const handleReorder = async () => {
+      try {
+        await reorderTasks(1, [30, 20, 10], true);
+      } catch {
+        // Expected error - do nothing
+      }
+    };
+
+    return (
+      <div>
+        <div data-testid="task-ids">
+          {JSON.stringify(resourcesRef.current.get(1)?.taskIds || [])}
+        </div>
+        <button data-testid="reorder-btn" onClick={handleReorder}>
+          Reorder
+        </button>
+      </div>
+    );
+  };
+
+  const { getByTestId } = render(
+    <MapProvider>
+      <SimulationProvider simId="test-sim-123">
+        <TaskAssignmentProvider>
+          <MapContainer />
+          <TestReorderErrorComponent />
+        </TaskAssignmentProvider>
+      </SimulationProvider>
+    </MapProvider>
+  );
+
+  await waitFor(() => {
+    expect(MockMap.instance).toBeDefined();
+  });
+
+  await act(async () => {
+    MockMap.instance?.callBacks['load']();
+  });
+
+  const reorderBtn = getByTestId('reorder-btn');
+
+  await act(async () => {
+    reorderBtn.click();
+    await new Promise((r) => setTimeout(r, 50));
+  });
+
+  // Task order should remain unchanged after error
+  await waitFor(() => {
+    expect(getByTestId('task-ids')).toHaveTextContent('[10,20,30]');
+  });
+
+  consoleErrorSpy.mockRestore();
+});
+
+test('reorderTasks does nothing when resource does not exist', async () => {
+  const consoleErrorSpy = vi
+    .spyOn(console, 'error')
+    .mockImplementation(() => {});
+
+  const TestReorderNonexistentComponent = () => {
+    const { reorderTasks } = useSimulation();
+
+    const handleReorder = async () => {
+      try {
+        await reorderTasks(999, [10, 20, 30], true);
+      } catch {
+        // Expected error - do nothing
+      }
+    };
+
+    return (
+      <button data-testid="reorder-btn" onClick={handleReorder}>
+        Reorder Nonexistent
+      </button>
+    );
+  };
+
+  const { getByTestId } = render(
+    <MapProvider>
+      <SimulationProvider simId="test-sim-123">
+        <TaskAssignmentProvider>
+          <MapContainer />
+          <TestReorderNonexistentComponent />
+        </TaskAssignmentProvider>
+      </SimulationProvider>
+    </MapProvider>
+  );
+
+  await waitFor(() => {
+    expect(MockMap.instance).toBeDefined();
+  });
+
+  await act(async () => {
+    MockMap.instance?.callBacks['load']();
+  });
+
+  const reorderBtn = getByTestId('reorder-btn');
+
+  await act(async () => {
+    reorderBtn.click();
+    await new Promise((r) => setTimeout(r, 50));
+  });
+
+  // API should not be called
+  expect(api.post).not.toHaveBeenCalledWith(
+    expect.stringContaining('reorder-tasks'),
+    expect.anything()
+  );
+
+  consoleErrorSpy.mockRestore();
+});
+
+test('reorderTasks updates resourceBarElement and triggers map updates', async () => {
+  // Mock API to return successful response
+  (api.post as Mock).mockResolvedValueOnce({
+    data: { resource_id: 1, task_order: [30, 10, 20] },
+  });
+
+  const setMapSourceMock = await import('~/lib/map-helpers').then(
+    (m) => m.setMapSource
+  );
+  (setMapSourceMock as Mock).mockClear();
+
+  const TestReorderMapUpdateComponent = () => {
+    const { reorderTasks, resourcesRef, resourceBarElement } = useSimulation();
+
+    useEffect(() => {
+      resourcesRef.current.set(1, {
+        id: 1,
+        position: [0, 0],
+        taskIds: [10, 20, 30],
+        inProgressTaskId: null,
+      });
+    }, []);
+
+    const taskCount =
+      resourceBarElement.find((r) => r.id === 1)?.taskCount || 0;
+
+    return (
+      <div>
+        <div data-testid="task-count">{String(taskCount)}</div>
+        <button
+          data-testid="reorder-btn"
+          onClick={() => reorderTasks(1, [30, 10, 20], false)}
+        >
+          Reorder
+        </button>
+      </div>
+    );
+  };
+
+  const { getByTestId } = render(
+    <MapProvider>
+      <SimulationProvider simId="test-sim-123">
+        <TaskAssignmentProvider>
+          <MapContainer />
+          <TestReorderMapUpdateComponent />
+        </TaskAssignmentProvider>
+      </SimulationProvider>
+    </MapProvider>
+  );
+
+  await waitFor(() => {
+    expect(MockMap.instance).toBeDefined();
+  });
+
+  await act(async () => {
+    MockMap.instance?.callBacks['load']();
+  });
+
+  (setMapSourceMock as Mock).mockClear();
+  const reorderBtn = getByTestId('reorder-btn');
+
+  await act(async () => {
+    reorderBtn.click();
+    await new Promise((r) => setTimeout(r, 50));
+  });
+
+  // Verify API was called with correct params
+  expect(api.post).toHaveBeenCalledWith(
+    '/simulation/test-sim-123/resources/reorder-tasks',
+    { resource_id: 1, task_ids: [30, 10, 20], apply_from_top: false }
+  );
+
+  // Verify map was updated (resources layer)
+  await waitFor(() => {
+    const resourcesCalls = (setMapSourceMock as Mock).mock.calls.filter(
+      (call) => call[0] === 'resources'
+    );
+    expect(resourcesCalls.length).toBeGreaterThan(0);
+  });
+
+  // Verify task count remains the same
+  expect(getByTestId('task-count')).toHaveTextContent('3');
+});
