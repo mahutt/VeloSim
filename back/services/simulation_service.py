@@ -297,7 +297,7 @@ class SimulationService:
         if db_sim_instance.user_id != user.id and not user.is_admin:
             raise VelosimPermissionError("Unauthorized to stop this simulation.")
 
-        # Stop simulator and delete DB record
+        # Stop simulator (keep DB record for historical access and future resume)
         sim = self.simulator
         if sim is None:
             raise RuntimeError(f"Simulator for simulation {sim_id} not found")
@@ -317,9 +317,6 @@ class SimulationService:
                 logger.error(
                     f"Failed to shutdown keyframe subscriber for {sim_id}: {e}"
                 )
-
-        sim_instance_crud.delete(db, db_id)
-        db.commit()
 
         del self.active_simulations[sim_id]
         # Clean up the lock for this simulation

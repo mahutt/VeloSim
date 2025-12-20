@@ -74,6 +74,9 @@ class KeyframePersistenceSubscriber(Subscriber):
         self.persist_failure_count = 0
         self.queue_drop_count = 0
 
+        # Track last keyframe for final persistence on shutdown
+        self.last_keyframe: Optional[Frame] = None
+
         logger.info(
             "KeyframePersistenceSubscriber initialized for"
             + f"sim_instance_id={sim_instance_id}, "
@@ -234,6 +237,9 @@ class KeyframePersistenceSubscriber(Subscriber):
         if not frame.is_key:
             return
 
+        # Track last keyframe for final persistence on shutdown
+        self.last_keyframe = frame
+
         # Apply interval filtering: persist frame 0, then every Nth frame
         # (0, N, 2N, 3N, ...)
         if self.keyframe_counter % self.persist_interval != 0:
@@ -300,6 +306,20 @@ class KeyframePersistenceSubscriber(Subscriber):
             "Shutting down KeyframePersistenceSubscriber for "
             f"sim_instance_id={self.sim_instance_id}"
         )
+
+        # Force-queue the last keyframe to ensure final state is persisted
+        if self.last_keyframe is not None:
+            try:
+                self.frame_queue.put_nowait(self.last_keyframe)
+                logger.info(
+                    f"Queued final keyframe for sim_instance_id={self.sim_instance_id} "
+                    f"at seq_number={self.last_keyframe.seq_number}"
+                )
+            except asyncio.QueueFull:
+                logger.warning(
+                    f"Could not queue final keyframe for "
+                    f"sim_instance_id={self.sim_instance_id} - queue full"
+                )
 
         # Wait for queue to drain before sending shutdown signal
         drain_timeout = settings.KEYFRAME_DRAIN_TIMEOUT

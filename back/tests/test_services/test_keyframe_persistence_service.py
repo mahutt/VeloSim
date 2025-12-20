@@ -275,6 +275,17 @@ class TestKeyframePersistenceSubscriber:
 
         # Clean up - stop the background event loop
         subscriber.closed = True
+        # Cancel the worker task to prevent pending task warnings
+        if subscriber.worker_task is not None:
+            subscriber.worker_task.cancel()
+        # Send shutdown signal to queue to break worker loop
+        try:
+            subscriber.loop.call_soon_threadsafe(
+                lambda: subscriber.frame_queue.put_nowait(None)
+            )
+        except Exception:
+            pass  # Ignore if queue operations fail during cleanup
+        # Stop the event loop
         subscriber.loop.call_soon_threadsafe(subscriber.loop.stop)
         subscriber.loop_thread.join(timeout=2.0)
 
@@ -339,7 +350,66 @@ class TestKeyframePersistenceSubscriber:
 
                 # Clean up
                 subscriber.closed = True
+                # Cancel the worker task to prevent pending task warnings
+                if subscriber.worker_task is not None:
+                    subscriber.worker_task.cancel()
+                # Send shutdown signal to queue to break worker loop
                 if subscriber.loop is not None:
+                    try:
+                        subscriber.loop.call_soon_threadsafe(
+                            lambda: subscriber.frame_queue.put_nowait(None)
+                        )
+                    except Exception:
+                        pass  # Ignore if queue operations fail during cleanup
                     subscriber.loop.call_soon_threadsafe(subscriber.loop.stop)
                 if subscriber.loop_thread is not None:
                     subscriber.loop_thread.join(timeout=2.0)
+
+    @pytest.mark.asyncio
+    async def test_shutdown_queues_final_keyframe(self) -> None:
+        """Test that shutdown() force-queues the last keyframe for persistence."""
+        with patch(
+            "back.services.keyframe_persistence_service.concurrent.futures.wait"
+        ) as mock_wait:
+            # Mock wait to return immediately as if task completed
+            mock_wait.return_value = ({MagicMock()}, set())
+
+            subscriber = KeyframePersistenceSubscriber(sim_instance_id=123)
+
+            # Mock the worker task
+            mock_task = MagicMock()
+            mock_task.done.return_value = False
+            mock_task.result = MagicMock()
+            subscriber.worker_task = mock_task
+
+            # Create a mock keyframe that would be skipped by interval filtering
+            mock_frame = MagicMock()
+            mock_frame.is_key = True
+            mock_frame.seq_number = 0
+
+            # Simulate receiving keyframes - only some will be persisted by interval
+            # First keyframe (index 0) is always persisted
+            subscriber.on_frame(mock_frame)
+            initial_queue_size = subscriber.frame_queue.qsize()
+
+            # Now send a few more that get filtered by interval
+            for _ in range(3):
+                subscriber.keyframe_counter = 1  # Force skip due to interval
+                mock_frame2 = MagicMock()
+                mock_frame2.is_key = True
+                mock_frame2.seq_number = 5
+                subscriber.on_frame(mock_frame2)
+
+            # Verify last_keyframe was tracked
+            assert subscriber.last_keyframe is not None
+            assert subscriber.last_keyframe.seq_number == 5
+
+            # Shutdown should force-queue the last keyframe
+            await subscriber.shutdown()
+
+            # Verify closed flag was set
+            assert subscriber.closed is True
+
+            # Queue should have more items than before (initial + final keyframe + None)
+            # The final keyframe is added, plus the None shutdown signal
+            assert subscriber.frame_queue.qsize() >= initial_queue_size
