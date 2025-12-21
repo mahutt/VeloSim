@@ -201,9 +201,13 @@ VALUES
     '{
         "start_time": "day1:08:00",
         "end_time": "day1:12:00",
-        "resources": [
-            { "resource_id": 1, "resource_position": [-73.5610, 45.5070] },
-            { "resource_id": 2, "resource_position": [-73.5670, 45.5090] }
+        "vehicles": [
+            {"vehicle_id": 1, "battery_count": 999},
+            {"vehicle_id": 2, "battery_count": 999}
+        ],
+        "drivers": [
+            { "driver_id": 1, "driver_position": [-73.5610, 45.5070], "vehicle_id": 1 },
+            { "driver_id": 2, "driver_position": [-73.5670, 45.5090], "vehicle_id": 2 }
         ],
         "stations": [
             { "station_id": 1, "station_name": "Metcalfe / de Maisonneuve", "station_position": [-73.57314, 45.50137] },
@@ -227,8 +231,11 @@ VALUES
     '{
         "start_time": "day1:13:00",
         "end_time": "day1:17:00",
-        "resources": [
-            { "resource_id": 3, "resource_position": [-73.5740, 45.5030] }
+        "vehicles": [
+            {"vehicle_id": 3, "battery_count": 999}
+        ],
+        "drivers": [
+            { "driver_id": 3, "driver_position": [-73.5740, 45.5030], "vehicle_id": 3 }
         ],
         "stations": [
             { "station_id": 3, "station_name": "St-Denis / Ste-Catherine", "station_position": [-73.56391, 45.51007] },

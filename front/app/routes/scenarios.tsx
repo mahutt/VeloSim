@@ -404,6 +404,8 @@ export default function ScenarioEditor() {
           start_time: c.start_time,
           end_time: c.end_time,
           resources: c.resources,
+          drivers: c.drivers,
+          vehicles: c.vehicles,
           stations: c.stations,
           initial_tasks: c.initial_tasks,
           scheduled_tasks: c.scheduled_tasks,

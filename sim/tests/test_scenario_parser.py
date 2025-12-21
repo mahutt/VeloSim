@@ -26,7 +26,8 @@ import pytest
 from sim.utils.base_parse_strategy import BaseParseStrategy
 from sim.utils.json_parser_strategy import JsonParseStrategy, ScenarioParseError
 from sim.entities.inputParameters import InputParameter
-from sim.entities.resource import Resource
+from sim.entities.driver import Driver
+from sim.entities.vehicle import Vehicle
 from sim.utils.scenario_parser import ScenarioParser
 
 
@@ -62,9 +63,21 @@ def test_json_parse_strategy_valid_input() -> None:
                     "station_position": [-87.6298, 41.8781],
                 },
             ],
-            "resources": [
-                {"resource_id": 1, "resource_position": [-64.0060, 75.7128]},
-                {"resource_id": 2, "resource_position": [-123.2437, 64.0522]},
+            "vehicles": [
+                {"vehicle_id": 101, "battery_count": 999},
+                {"vehicle_id": 102, "battery_count": 999},
+            ],
+            "drivers": [
+                {
+                    "driver_id": 1,
+                    "driver_position": [-64.0060, 75.7128],
+                    "vehicle_id": 101,
+                },
+                {
+                    "driver_id": 2,
+                    "driver_position": [-123.2437, 64.0522],
+                    "vehicle_id": 102,
+                },
             ],
             "initial_tasks": [{"station_id": 8074}],
             "scheduled_tasks": [
@@ -79,12 +92,14 @@ def test_json_parse_strategy_valid_input() -> None:
 
     assert isinstance(params, InputParameter)
     assert len(params.station_entities) == 3
-    assert len(params.resource_entities) == 2
+    assert len(params.driver_entities) == 2
+    assert len(params.vehicle_entities) == 2
     assert len(params.task_entities) == 3
 
     tasks = params.task_entities
     stations = params.station_entities
-    resources = params.resource_entities
+    drivers = params.driver_entities
+    vehicles = params.vehicle_entities
 
     # IDs are auto-generated starting from 1, 2, 3...
     assert tasks[1].station == stations[8074]  # First task (initial)
@@ -96,9 +111,11 @@ def test_json_parse_strategy_valid_input() -> None:
     assert tasks[2].spawn_delay == 4 * 3600  # 4 hours after start
     assert tasks[3].spawn_delay == 7 * 3600  # 7 hours after start
 
-    for res in resources.values():
-        assert isinstance(res, Resource)
-        assert isinstance(res.task_list, list)
+    for drv in drivers.values():
+        assert isinstance(drv, Driver)
+        assert isinstance(drv.task_list, list)
+    for veh in vehicles.values():
+        assert isinstance(veh, Vehicle)
 
 
 def test_json_parse_strategy_invalid_json() -> None:
@@ -135,9 +152,21 @@ def test_json_parse_strategy_with_invalid_time() -> None:
                     "station_position": [-87.6298, 41.8781],
                 },
             ],
-            "resources": [
-                {"resource_id": 1, "resource_position": [-64.0060, 75.7128]},
-                {"resource_id": 2, "resource_position": [-123.2437, 64.0522]},
+            "vehicles": [
+                {"vehicle_id": 101, "battery_count": 999},
+                {"vehicle_id": 102, "battery_count": 999},
+            ],
+            "drivers": [
+                {
+                    "driver_id": 1,
+                    "driver_position": [-64.0060, 75.7128],
+                    "vehicle_id": 101,
+                },
+                {
+                    "driver_id": 2,
+                    "driver_position": [-123.2437, 64.0522],
+                    "vehicle_id": 102,
+                },
             ],
             "initial_tasks": [{"station_id": 8074}],
             "scheduled_tasks": [

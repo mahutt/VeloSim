@@ -30,7 +30,6 @@ from sim.entities.station import Station
 from sim.core.frame_emitter import FrameEmitter
 from sim.entities.task_state import State
 from sim.entities.frame import Frame
-from sim.entities.resource import Resource
 from sim.entities.driver import Driver
 from sim.entities.vehicle import Vehicle
 from sim.entities.clock import Clock
@@ -71,9 +70,6 @@ class SimulatorController:
         self.station_entities: Dict[int, Station] = (
             inputParameters.get_station_entities()
         )
-        self.resource_entities: Dict[int, Resource] = (
-            inputParameters.get_resource_entities()
-        )
         self.driver_entities: Dict[int, Driver] = inputParameters.get_driver_entities()
 
         self.vehicle_entities: Dict[int, Vehicle] = (
@@ -112,13 +108,6 @@ class SimulatorController:
                 # Initial (non-scheduled) tasks are automatically
                 # set to assigned in json_parser_strategy
                 pass
-
-        for _, resource in self.resource_entities.items():
-            resource.set_behaviour(self.sim_behaviour)
-            resource.set_map_controller(self.map_controller)
-            # Rebind to the actual simulation environment
-            resource.env = self.simEnv
-            self.simEnv.process(resource.run())
 
         for _, driver in self.driver_entities.items():
             driver.set_behaviour(self.sim_behaviour)
@@ -200,17 +189,6 @@ class SimulatorController:
         """
         return self.task_entities.get(task_id)
 
-    def get_resource_by_id(self, resource_id: int) -> Optional[Resource]:
-        """Get a resource by its ID.
-
-        Args:
-            resource_id: The resource ID to look up.
-
-        Returns:
-            The resource if found, None otherwise.
-        """
-        return self.resource_entities.get(resource_id)
-
     def get_driver_by_id(self, driver_id: int) -> Optional[Driver]:
         """Get a driver by its ID.
 
@@ -218,7 +196,7 @@ class SimulatorController:
             driver_id: The driver ID to look up.
 
         Returns:
-            The resource if found, None otherwise.
+            The driver if found, None otherwise.
         """
         return self.driver_entities.get(driver_id)
 
@@ -271,14 +249,14 @@ class SimulatorController:
 
         Args:
             task_id: The task ID to assign.
-            driver_id: The resource ID to assign to.
+            driver_id: The driver ID to assign to.
             dispatch_delay: Optional delay before task dispatch.
 
         Returns:
             None
 
         Raises:
-            Exception: If task or resource not found.
+            Exception: If task or driver not found.
         """
         found_task = self.get_task_by_id(task_id)
         found_driver = self.get_driver_by_id(driver_id)
@@ -301,7 +279,7 @@ class SimulatorController:
             None
 
         Raises:
-            Exception: If task or resource not found.
+            Exception: If task or driver not found.
         """
         found_task = self.get_task_by_id(task_id)
         found_driver = self.get_driver_by_id(driver_id)
@@ -320,19 +298,19 @@ class SimulatorController:
         new_driver_id: int,
         dispatch_delay: Optional[float] = None,
     ) -> None:
-        """Reassign a task from one resource to another.
+        """Reassign a task from one driver to another.
 
         Args:
             task_id: The task ID to reassign.
-            old_resource_id: The current resource ID.
-            new_resource_id: The new resource ID to assign to.
+            old_driver_id: The current driver ID.
+            new_driver_id: The new driver ID to assign to.
             dispatch_delay: Optional delay before task dispatch.
 
         Returns:
             None
 
         Raises:
-            Exception: If task or resources not found.
+            Exception: If task or drivers not found.
         """
         try:
             self.unassign_task_from_driver(task_id, old_driver_id)
@@ -428,9 +406,6 @@ class SimulatorController:
         # Stations
         for station in self.station_entities.values():
             station.clear_update()
-        # Resources
-        for resource in self.resource_entities.values():
-            resource.clear_update()
         # Drivers
         for driver in self.driver_entities.values():
             driver.clear_update()
@@ -483,7 +458,7 @@ class SimulatorController:
                     "state": str(task.get_state()),
                     "stationId": task_station.id,
                     # Keep legacy key name for compatibility while using driver
-                    "assignedResourceId": (
+                    "assignedDriverId": (
                         assigned_driver.id if assigned_driver is not None else None
                     ),
                 }
@@ -500,24 +475,6 @@ class SimulatorController:
             if (is_key or station.has_updated)
         ]
 
-        resources = []
-        for resource in self.resource_entities.values():
-            if is_key or resource.has_updated:
-                in_progress_task = resource.get_in_progress_task()
-                resources.append(
-                    {
-                        "id": resource.id,
-                        "position": (resource.get_resource_position().get_position()),
-                        "taskIds": [
-                            task.id for task in resource.get_visible_task_list()
-                        ],
-                        "inProgressTaskId": (
-                            in_progress_task.get_task_id()
-                            if in_progress_task is not None
-                            else None
-                        ),
-                    }
-                )
         drivers = []
         for driver in self.driver_entities.values():
             if is_key or driver.has_updated:

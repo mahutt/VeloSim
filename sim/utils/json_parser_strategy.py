@@ -29,7 +29,6 @@ from pydantic import BaseModel, ValidationError, model_validator, field_validato
 
 from sim.entities.inputParameters import InputParameter
 from sim.entities.station import Station
-from sim.entities.resource import Resource
 from sim.entities.driver import Driver
 from sim.entities.vehicle import Vehicle
 from sim.entities.BatterySwapTask import BatterySwapTask
@@ -828,27 +827,33 @@ class JsonParseStrategy(BaseParseStrategy):
                 position=pos,
             )
 
-        # Build resources
-        resources: Dict[int, Resource] = {}
-        for r in content.get("resources", []):
-            rid = int(r["resource_id"])
-            pos = Position(r.get("resource_position", [0, 0]))
-            resources[rid] = Resource(resource_id=rid, position=pos, task_list=[])
-
-        # Build drivers
-        drivers: Dict[int, Driver] = {}
-        for d in content.get("drivers", []):
-            did = int(d["driver_id"])
-            pos = Position(d.get("driver_position", [0, 0]))
-            drivers[did] = Driver(driver_id=did, position=pos, task_list=[])
-
-        # Build vehicles
         vehicles: Dict[int, Vehicle] = {}
         for v in content.get("vehicles", []):
             vid = int(v["vehicle_id"])
             battery_count = int(v.get("battery_count", 0))
             vehicles[vid] = Vehicle(vehicle_id=vid, battery_count=battery_count)
 
+        # Build drivers
+        drivers: Dict[int, Driver] = {}
+        for d in content.get("drivers", []):
+            did = int(d["driver_id"])
+            pos = Position(d.get("driver_position", [0, 0]))
+            vid_raw = d.get("vehicle_id")
+            vehicle = None
+            if vid_raw is not None:
+                try:
+                    vid = int(vid_raw)
+                    vehicle = vehicles.get(vid)
+                except (TypeError, ValueError):
+                    vehicle = None
+            drivers[did] = Driver(
+                driver_id=did,
+                position=pos,
+                task_list=[],
+                vehicle=vehicle,
+            )
+            if vehicle is not None:
+                vehicle.set_vehicle_driver(drivers[did])
         # Build tasks
         tasks: Dict[int, BatterySwapTask] = {}
         task_id_counter = 1
@@ -886,8 +891,8 @@ class JsonParseStrategy(BaseParseStrategy):
 
         params = InputParameter(
             station_entities=stations,
-            resource_entities=resources,
             driver_entities=drivers,
+            vehicles_entities=vehicles,
             task_entities=tasks,
             real_time_factor=content.get("real_time_factor", 1.0),
             key_frame_freq=content.get("key_frame_freq", 20),

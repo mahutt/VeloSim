@@ -48,7 +48,7 @@ export interface StationTask {
   id: number;
   stationId: number;
   state: TaskState;
-  assignedResourceId: number | null;
+  assignedDriverId: number | null;
 }
 
 // API response types

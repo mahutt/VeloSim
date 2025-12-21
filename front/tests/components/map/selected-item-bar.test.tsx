@@ -125,9 +125,9 @@ describe('SelectedItemBar', () => {
       id: 5,
       position: [-73.58, 45.49] as Position,
       tasks: [
-        { id: 1, stationId: 1, state: 'open', assignedResourceId: null },
-        { id: 2, stationId: 2, state: 'open', assignedResourceId: null },
-        { id: 3, stationId: 3, state: 'open', assignedResourceId: null },
+        { id: 1, stationId: 1, state: 'open', assignedDriverId: null },
+        { id: 2, stationId: 2, state: 'open', assignedDriverId: null },
+        { id: 3, stationId: 3, state: 'open', assignedDriverId: null },
       ],
       route: {
         coordinates: [

@@ -26,7 +26,6 @@ SOFTWARE.
 import json
 from typing import Dict, Mapping, Optional
 from sim.entities.station import Station
-from sim.entities.resource import Resource
 from sim.entities.task import Task
 from sim.entities.driver import Driver
 from sim.entities.vehicle import Vehicle
@@ -38,7 +37,6 @@ class InputParameter:
     def __init__(
         self,
         station_entities: Optional[Dict[int, Station]] = None,
-        resource_entities: Optional[Dict[int, Resource]] = None,
         driver_entities: Optional[Dict[int, Driver]] = None,
         vehicles_entities: Optional[Dict[int, Vehicle]] = None,
         task_entities: Optional[Mapping[int, Task]] = None,
@@ -49,9 +47,6 @@ class InputParameter:
     ) -> None:
         self.station_entities: Dict[int, Station] = (
             station_entities if station_entities is not None else {}
-        )
-        self.resource_entities: Dict[int, Resource] = (
-            resource_entities if resource_entities is not None else {}
         )
 
         self.driver_entities: Dict[int, Driver] = (
@@ -77,14 +72,6 @@ class InputParameter:
             Dictionary mapping station IDs to Station objects.
         """
         return self.station_entities
-
-    def get_resource_entities(self) -> Dict[int, Resource]:
-        """Get the resource entities dictionary.
-
-        Returns:
-            Dictionary mapping resource IDs to Resource objects.
-        """
-        return self.resource_entities
 
     def get_driver_entities(self) -> Dict[int, Driver]:
         """Get the driver entities dictionary.
@@ -157,17 +144,6 @@ class InputParameter:
         """
         self.station_entities = station_entities
 
-    def set_resource_entities(self, resource_entities: Dict[int, Resource]) -> None:
-        """Set the resource entities dictionary.
-
-        Args:
-            resource_entities: Dictionary mapping resource IDs to resources.
-
-        Returns:
-            None
-        """
-        self.resource_entities = resource_entities
-
     def set_driver_entities(self, driver_entities: Dict[int, Driver]) -> None:
         """Set the driver entities dictionary.
 
@@ -235,17 +211,6 @@ class InputParameter:
         """
         self.station_entities[station.id] = station
 
-    def add_resource(self, resource: Resource) -> None:
-        """Add a resource to the entities.
-
-        Args:
-            resource: The resource to add.
-
-        Returns:
-            None
-        """
-        self.resource_entities[resource.id] = resource
-
     def add_driver(self, driver: Driver) -> None:
         """Add a driver to the entities.
 
@@ -292,19 +257,6 @@ class InputParameter:
         deleted_station = self.station_entities.pop(station.id, False)
         if not deleted_station:
             print(f"remove_station(): Station: {station.id} not found")
-
-    def remove_resource(self, resource: Resource) -> None:
-        """Remove a resource from the entities.
-
-        Args:
-            resource: The resource to remove.
-
-        Returns:
-            None
-        """
-        deleted_resource = self.resource_entities.pop(resource.id, False)
-        if not deleted_resource:
-            print(f"remove_resource(): Resource: {resource.id} not found")
 
     def remove_driver(self, driver: Driver) -> None:
         """Remove a driver from the entities.
@@ -354,13 +306,21 @@ class InputParameter:
         """
         return len(self.station_entities)
 
-    def get_resource_count(self) -> int:
-        """Get the number of resources.
+    def get_driver_count(self) -> int:
+        """Get the number of drivers.
 
         Returns:
-            The count of resource entities.
+            The count of driver entities.
         """
-        return len(self.resource_entities)
+        return len(self.driver_entities)
+
+    def get_vehicle_count(self) -> int:
+        """Get the number of vehicle.
+
+        Returns:
+            The count of vehicle entities.
+        """
+        return len(self.vehicle_entities)
 
     def get_task_count(self) -> int:
         """Get the number of tasks.
@@ -374,10 +334,6 @@ class InputParameter:
         data = {
             "stations": {
                 sid: station.name for sid, station in self.station_entities.items()
-            },
-            "resources": {
-                rid: getattr(resource, "name", f"Resource {rid}")
-                for rid, resource in self.resource_entities.items()
             },
             "drivers": {
                 did: getattr(driver, "name", f"Resource {did}")

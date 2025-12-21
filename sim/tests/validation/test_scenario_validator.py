@@ -38,7 +38,14 @@ VALID_SCENARIO_CONTENT: Dict[str, Any] = {
             "station_position": [-73.5, 45.5],
         }
     ],
-    "resources": [{"resource_id": 1, "resource_position": [-73.5, 45.5]}],
+    "vehicles": [{"vehicle_id": 1, "battery_count": 999}],
+    "drivers": [
+        {
+            "driver_id": 1,
+            "driver_position": [-73.5, 45.5],
+            "vehicle_id": 1,
+        }
+    ],
     "initial_tasks": [{"station_id": "1"}],
     "scheduled_tasks": [{"station_id": "1"}],
     "scenario_title": "Test Scenario",
@@ -93,22 +100,20 @@ def test_duplicate_station_id(validator: ScenarioValidator) -> None:
     assert any("Duplicate station ID" in e["message"] for e in errors)
 
 
-def test_duplicate_resource_id(validator: ScenarioValidator) -> None:
+def test_duplicate_vehicle_id(validator: ScenarioValidator) -> None:
     scenario_content: Dict[str, Any] = copy.deepcopy(VALID_SCENARIO_CONTENT)
-    scenario_content["resources"].append(
-        {"resource_id": 1, "resource_position": [-73.6, 45.6]}
-    )
+    scenario_content["vehicles"].append({"vehicle_id": 1, "battery_count": 500})
     errors: List[Dict[str, str]] = validator.validate_all(scenario_content)
-    assert any("Duplicate resource ID" in e["message"] for e in errors)
+    assert any("Duplicate vehicle ID" in e["message"] for e in errors)
 
 
 def test_invalid_lat_lon(validator: ScenarioValidator) -> None:
     scenario_content: Dict[str, Any] = copy.deepcopy(VALID_SCENARIO_CONTENT)
     scenario_content["stations"][0]["station_position"] = [200, 100]  # Invalid
-    scenario_content["resources"][0]["resource_position"] = [-200, -100]  # Invalid
+    scenario_content["drivers"][0]["driver_position"] = [-200, -100]  # Invalid
     errors: List[Dict[str, str]] = validator.validate_all(scenario_content)
     assert any("station_position" in e["field"] for e in errors)
-    assert any("resource_position" in e["field"] for e in errors)
+    assert any("driver_position" in e["field"] for e in errors)
 
 
 def test_task_with_nonexistent_station(validator: ScenarioValidator) -> None:
@@ -123,7 +128,8 @@ def test_task_with_nonexistent_station(validator: ScenarioValidator) -> None:
 def test_empty_lists(validator: ScenarioValidator) -> None:
     scenario_content: Dict[str, Any] = copy.deepcopy(VALID_SCENARIO_CONTENT)
     scenario_content["stations"] = []
-    scenario_content["resources"] = []
+    scenario_content["vehicles"] = []
+    scenario_content["drivers"] = []
     scenario_content["initial_tasks"] = []
     scenario_content["scheduled_tasks"] = []
     errors: List[Dict[str, str]] = validator.validate_all(scenario_content)
@@ -234,24 +240,25 @@ def test_validate_tasks_with_explicit_ids(validator: ScenarioValidator) -> None:
 def test_validation_with_line_numbers() -> None:
     """Test line numbers in validation errors with JSON string."""
     json_string = """{
-  "content": {
-    "start_time": "day1:08:00",
-    "end_time": "day1:12:00",
-    "stations": [
-      {
-        "station_id": 1,
-        "station_name": "Station 1",
-        "station_position": [-73.5, 45.5]
-      }
-    ],
-    "resources": [],
-    "initial_tasks": [
-      {
-        "station_id": "999"
-      }
-    ],
-    "scheduled_tasks": []
-  }
+    "content": {
+        "start_time": "day1:08:00",
+        "end_time": "day1:12:00",
+        "stations": [
+            {
+                "station_id": 1,
+                "station_name": "Station 1",
+                "station_position": [-73.5, 45.5]
+            }
+        ],
+        "vehicles": [],
+        "drivers": [],
+        "initial_tasks": [
+            {
+                "station_id": "999"
+            }
+        ],
+        "scheduled_tasks": []
+    }
 }"""
 
     data = json.loads(json_string)

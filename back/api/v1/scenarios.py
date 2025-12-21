@@ -128,10 +128,17 @@ def get_scenario_template(
                     "station_position": [-74.0060, 40.7128],
                 }
             ],
-            "resources": [
+            "vehicles": [
                 {
-                    "resource_id": 1,
-                    "resource_position": [-74.0060, 40.7128],
+                    "vehicle_id": 1,
+                    "battery_count": 2,
+                }
+            ],
+            "drivers": [
+                {
+                    "driver_id": 1,
+                    "driver_position": [-74.0060, 40.7128],
+                    "vehicle_id": 1,
                 }
             ],
             "initial_tasks": [
@@ -159,8 +166,9 @@ def get_scenario_template(
             "(can span multiple days e.g. 'day2:11:00')\n"
             "- stations: List of station objects with id, name, "
             "and position [lon, lat]\n"
-            "- resources: List of resource objects with id "
-            "and position [lon, lat]\n"
+            "- vehicles: List of vehicle objects with id and battery_count\n"
+            "- drivers: List of driver objects with id, position [lon, lat], "
+            "and vehicle_id (link to a vehicle)\n"
             "- initial_tasks: Tasks to spawn immediately at simulation start.\n"
             "  * station_id: Target station ID (integer, required)\n"
             "  * time: NOT REQUIRED (tasks spawn immediately)\n"
