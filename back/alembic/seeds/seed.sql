@@ -210,11 +210,11 @@ VALUES
             { "station_id": 2, "station_name": "Sanguinet / de Maisonneuve", "station_position": [-73.56261, 45.51344] }
         ],
         "initial_tasks": [
-            { "id": "t1", "station_id": 1, "assigned_resource_id": 1 }
+            { "station_id": 1, "assigned_resource_id": 1 }
         ],
         "scheduled_tasks": [
-            { "id": "t3", "station_id": 1, "time": "day1:09:30" },
-            { "id": "t4", "station_id": 2, "time": "day1:09:45" }
+            { "station_id": 1, "time": "day1:09:30" },
+            { "station_id": 2, "time": "day1:09:45" }
         ]
     }',
     'Test description for Scenario 1.',
@@ -235,11 +235,11 @@ VALUES
             { "station_id": 4, "station_name": "St-André / Ontario", "station_position": [-73.56353, 45.52188] }
         ],
         "initial_tasks": [
-            { "id": "t5", "station_id": 3, "assigned_resource_id": 3 }
+            { "station_id": 3, "assigned_resource_id": 3 }
         ],
         "scheduled_tasks": [
-            { "id": "t7", "station_id": 3, "time": "day1:14:00" },
-            { "id": "t8", "station_id": 4, "time": "day1:15:30" }
+            { "station_id": 3, "time": "day1:14:00" },
+            { "station_id": 4, "time": "day1:15:30" }
         ]
     }',
     'Test description for Scenario 2.',

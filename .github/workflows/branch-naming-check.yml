@@ -50,6 +50,76 @@ jobs:
             exit 1
           fi
 
+      - name: Set up Python for commit validation
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Validate commit messages
+        run: |
+          echo "Validating commit messages in PR #${{ github.event.pull_request.number }}"
+
+          # Get all commits in this PR
+          COMMITS=$(git log --format="%H" ${{ github.event.pull_request.base.sha }}..${{ github.event.pull_request.head.sha }})
+
+          if [ -z "$COMMITS" ]; then
+            echo "⚠️  No commits found in PR"
+            exit 1
+          fi
+
+          INVALID_COMMITS=0
+          TOTAL_COMMITS=0
+
+          echo ""
+          echo "📋 Validating commit message format..."
+          echo ""
+
+          # Create a temporary directory for commit messages
+          TEMP_DIR=$(mktemp -d)
+
+          for COMMIT in $COMMITS; do
+            TOTAL_COMMITS=$((TOTAL_COMMITS + 1))
+            MESSAGE=$(git log --format=%B -n 1 $COMMIT)
+
+            echo "Checking commit $COMMIT"
+            echo "  Message: $(echo "$MESSAGE" | head -n 1)"
+
+            # Write message to temp file
+            TEMP_FILE="$TEMP_DIR/commit_msg_$COMMIT.txt"
+            echo "$MESSAGE" > "$TEMP_FILE"
+
+            # Run Python validation script
+            if python3 scripts/validate_commit_wrapper.py "$TEMP_FILE"; then
+              echo "  ✅ Valid"
+            else
+              echo "  ❌ INVALID"
+              INVALID_COMMITS=$((INVALID_COMMITS + 1))
+            fi
+            echo ""
+          done
+
+          # Cleanup
+          rm -rf "$TEMP_DIR"
+
+          echo "─────────────────────────────────────────────────────────"
+          echo ""
+          echo "📊 Summary:"
+          echo "  Total commits: $TOTAL_COMMITS"
+          echo "  Valid commits: $((TOTAL_COMMITS - INVALID_COMMITS))"
+          echo "  Invalid commits: $INVALID_COMMITS"
+          echo ""
+
+          if [ $INVALID_COMMITS -gt 0 ]; then
+            echo "❌ Commit message validation failed!"
+            echo ""
+            echo "Please update your commit messages to follow the conventional commit format"
+            echo "and include an issue number reference."
+            exit 1
+          else
+            echo "✅ All commit messages are valid!"
+            exit 0
+          fi
+
       - name: Analyze changed files
         id: check-changes
         run: |

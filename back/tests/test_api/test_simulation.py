@@ -56,8 +56,8 @@ SCENARIO_PAYLOAD = {
     "id": 1,
     "name": "Morning Operations",
     "content": {
-        "start_time": "06:00",
-        "end_time": "12:00",
+        "start_time": "day1:06:00",
+        "end_time": "day1:12:00",
         "stations": [
             {
                 "station_id": 1,
@@ -80,14 +80,14 @@ SCENARIO_PAYLOAD = {
             {"resource_id": 102, "resource_position": [45.509, -73.57]},
         ],
         "initial_tasks": [
-            {"id": "t1", "station_id": "1"},
-            {"id": "t2", "station_id": "2"},
+            {"station_id": "1"},
+            {"station_id": "2"},
         ],
         "scheduled_tasks": [
-            {"id": "t3", "time": 600, "station_id": "3"},
-            {"id": "t4", "time": 1800, "station_id": "1"},
-            {"id": "t5", "time": 3600, "station_id": "2"},
-            {"id": "t6", "time": 5400, "station_id": "1"},
+            {"time": "day1:06:10", "station_id": "3"},
+            {"time": "day1:06:30", "station_id": "1"},
+            {"time": "day1:07:00", "station_id": "2"},
+            {"time": "day1:07:30", "station_id": "1"},
         ],
     },
 }

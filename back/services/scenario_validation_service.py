@@ -22,7 +22,6 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 """
 
-# Import validation logic from sim package
-from sim.validation import ScenarioValidator
+from sim.utils.json_parser_strategy import JsonParseStrategy, ScenarioParseError
 
-__all__ = ["ScenarioValidator"]
+__all__ = ["JsonParseStrategy", "ScenarioParseError"]

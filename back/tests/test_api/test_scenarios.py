@@ -184,22 +184,22 @@ class TestScenariosAPI:
 
     # ==================== CREATE SCENARIO TESTS ====================
 
-    @patch("back.api.v1.scenarios.ScenarioValidator")
+    @patch("back.api.v1.scenarios.JsonParseStrategy")
     @patch("back.crud.scenario.scenario_crud.get_by_name_and_user")
     @patch("back.crud.scenario.scenario_crud.create")
     def test_create_scenario_success(
         self,
         mock_create: MagicMock,
         mock_get_by_name: MagicMock,
-        mock_validator_class: MagicMock,
+        mock_parser_class: MagicMock,
         authenticated_client: TestClient,
         test_scenario: ScenarioResponse,
     ) -> None:
         """Test creating a scenario successfully."""
-        # Mock the validator to return no errors
-        mock_validator = MagicMock()
-        mock_validator.validate_all.return_value = []
-        mock_validator_class.return_value = mock_validator
+        # Mock the parser to return no errors
+        mock_parser = MagicMock()
+        mock_parser.validate.return_value = []
+        mock_parser_class.return_value = mock_parser
 
         mock_get_by_name.return_value = None  # No duplicate
         mock_create.return_value = test_scenario
@@ -217,22 +217,22 @@ class TestScenariosAPI:
         assert data.name == test_scenario.name
         assert data.content == test_scenario.content
 
-    @patch("back.api.v1.scenarios.ScenarioValidator")
+    @patch("back.api.v1.scenarios.JsonParseStrategy")
     @patch("back.crud.scenario.scenario_crud.get_by_name_and_user")
     @patch("back.crud.scenario.scenario_crud.create")
     def test_create_scenario_duplicate_name_not_allowed(
         self,
         mock_create: MagicMock,
         mock_get_by_name: MagicMock,
-        mock_validator_class: MagicMock,
+        mock_parser_class: MagicMock,
         authenticated_client: TestClient,
         test_scenario: ScenarioResponse,
     ) -> None:
         """Test creating scenario with duplicate name raises 400."""
-        # Mock the validator to return no errors
-        mock_validator = MagicMock()
-        mock_validator.validate_all.return_value = []
-        mock_validator_class.return_value = mock_validator
+        # Mock the parser to return no errors
+        mock_parser = MagicMock()
+        mock_parser.validate.return_value = []
+        mock_parser_class.return_value = mock_parser
 
         mock_get_by_name.return_value = test_scenario  # Duplicate exists
 
@@ -247,22 +247,22 @@ class TestScenariosAPI:
         assert response.status_code == 400
         assert "already exists" in response.json()["detail"]
 
-    @patch("back.api.v1.scenarios.ScenarioValidator")
+    @patch("back.api.v1.scenarios.JsonParseStrategy")
     @patch("back.crud.scenario.scenario_crud.get_by_name_and_user")
     @patch("back.crud.scenario.scenario_crud.create")
     def test_create_scenario_duplicate_name_allowed(
         self,
         mock_create: MagicMock,
         mock_get_by_name: MagicMock,
-        mock_validator_class: MagicMock,
+        mock_parser_class: MagicMock,
         authenticated_client: TestClient,
         test_scenario: ScenarioResponse,
     ) -> None:
         """Test creating scenario with duplicate name when explicitly allowed."""
-        # Mock the validator to return no errors
-        mock_validator = MagicMock()
-        mock_validator.validate_all.return_value = []
-        mock_validator_class.return_value = mock_validator
+        # Mock the parser to return no errors
+        mock_parser = MagicMock()
+        mock_parser.validate.return_value = []
+        mock_parser_class.return_value = mock_parser
 
         mock_get_by_name.return_value = test_scenario  # Duplicate exists
         mock_create.return_value = test_scenario
@@ -277,25 +277,25 @@ class TestScenariosAPI:
         )
         assert response.status_code == 201
 
-    @patch("back.api.v1.scenarios.ScenarioValidator")
+    @patch("back.api.v1.scenarios.JsonParseStrategy")
     @patch("back.crud.scenario.scenario_crud.get_by_name_and_user")
     def test_create_scenario_validation_error(
         self,
         mock_get_by_name: MagicMock,
-        mock_validator_class: MagicMock,
+        mock_parser_class: MagicMock,
         authenticated_client: TestClient,
     ) -> None:
         """Test creating scenario with invalid content triggers validation errors."""
-        # Mock the validator to return validation errors
-        mock_validator = MagicMock()
-        mock_validator.validate_all.return_value = [
+        # Mock the parser to return validation errors
+        mock_parser = MagicMock()
+        mock_parser.validate.return_value = [
             {
                 "field": "content.stations",
                 "message": "At least one station is required",
                 "line": 5,
             }
         ]
-        mock_validator_class.return_value = mock_validator
+        mock_parser_class.return_value = mock_parser
 
         mock_get_by_name.return_value = None
 
@@ -323,20 +323,20 @@ class TestScenariosAPI:
 
     # ==================== UPDATE SCENARIO TESTS ====================
 
-    @patch("back.api.v1.scenarios.ScenarioValidator")
+    @patch("back.api.v1.scenarios.JsonParseStrategy")
     @patch("back.crud.scenario.scenario_crud.update")
     def test_update_scenario_success(
         self,
         mock_update: MagicMock,
-        mock_validator_class: MagicMock,
+        mock_parser_class: MagicMock,
         authenticated_client: TestClient,
         test_scenario: ScenarioResponse,
     ) -> None:
         """Test updating a scenario successfully."""
-        # Mock the validator (not called when only updating name)
-        mock_validator = MagicMock()
-        mock_validator.validate_all.return_value = []
-        mock_validator_class.return_value = mock_validator
+        # Mock the parser (not called when only updating name)
+        mock_parser = MagicMock()
+        mock_parser.validate.return_value = []
+        mock_parser_class.return_value = mock_parser
 
         updated_scenario = test_scenario.model_copy()
         updated_scenario.name = "Updated Name"
@@ -349,8 +349,8 @@ class TestScenariosAPI:
         assert response.status_code == 200
         data = ScenarioResponse.model_validate(response.json())
         assert data.name == "Updated Name"
-        # Validator should not be called when content is not being updated
-        mock_validator.validate_all.assert_not_called()
+        # Parser should not be called when content is not being updated
+        mock_parser.validate.assert_not_called()
 
     @patch("back.crud.scenario.scenario_crud.update")
     def test_update_scenario_not_found(
@@ -379,20 +379,20 @@ class TestScenariosAPI:
         response = authenticated_client.put("/api/v1/scenarios/1", json={})
         assert response.status_code == 400
 
-    @patch("back.api.v1.scenarios.ScenarioValidator")
+    @patch("back.api.v1.scenarios.JsonParseStrategy")
     @patch("back.crud.scenario.scenario_crud.update")
     def test_update_scenario_with_content_validation(
         self,
         mock_update: MagicMock,
-        mock_validator_class: MagicMock,
+        mock_parser_class: MagicMock,
         authenticated_client: TestClient,
         test_scenario: ScenarioResponse,
     ) -> None:
         """Test updating scenario content triggers validation."""
-        # Mock the validator to return no errors
-        mock_validator = MagicMock()
-        mock_validator.validate_all.return_value = []
-        mock_validator_class.return_value = mock_validator
+        # Mock the parser to return no errors
+        mock_parser = MagicMock()
+        mock_parser.validate.return_value = []
+        mock_parser_class.return_value = mock_parser
 
         updated_scenario = test_scenario.model_copy()
         updated_scenario.content = {"new": "content"}
@@ -403,26 +403,26 @@ class TestScenariosAPI:
             json={"content": {"new": "content"}},
         )
         assert response.status_code == 200
-        # Validator should be called when content is being updated
-        mock_validator.validate_all.assert_called_once_with({"new": "content"})
+        # Parser should be called when content is being updated
+        mock_parser.validate.assert_called_once()
 
-    @patch("back.api.v1.scenarios.ScenarioValidator")
+    @patch("back.api.v1.scenarios.JsonParseStrategy")
     def test_update_scenario_validation_error(
         self,
-        mock_validator_class: MagicMock,
+        mock_parser_class: MagicMock,
         authenticated_client: TestClient,
     ) -> None:
         """Test updating scenario with invalid content triggers validation errors."""
-        # Mock the validator to return validation errors
-        mock_validator = MagicMock()
-        mock_validator.validate_all.return_value = [
+        # Mock the parser to return validation errors
+        mock_parser = MagicMock()
+        mock_parser.validate.return_value = [
             {
                 "field": "content.resources",
                 "message": "Invalid resource configuration",
                 "line": 10,
             }
         ]
-        mock_validator_class.return_value = mock_validator
+        mock_parser_class.return_value = mock_parser
 
         response = authenticated_client.put(
             "/api/v1/scenarios/1",
@@ -631,9 +631,7 @@ class TestScenarioValidation:
                     }
                 ],
                 "resources": [],
-                "initial_tasks": [
-                    {"id": "t1", "station_id": "999"}  # Non-existent station
-                ],
+                "initial_tasks": [{"station_id": "999"}],  # Non-existent station
                 "scheduled_tasks": [],
             }
         }
