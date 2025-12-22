@@ -25,11 +25,17 @@
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { useSimulation } from '~/providers/simulation-provider';
-import SelectedItemBar from '~/components/map/selected-item-bar';
-import { SelectedItemType } from '~/types';
+import {
+  useSimulation,
+  type SimulationContextType,
+} from '~/providers/simulation-provider';
+import SelectedItemBar, {
+  SelectedItemType,
+  type PopulatedResource,
+} from '~/components/map/selected-item-bar';
 import { FeatureToggleProvider } from '~/providers/feature-toggle-provider';
 import { TaskAssignmentProvider } from '~/providers/task-assignment-provider';
+import type { Position } from '~/types';
 
 // Mock the useSimulation hook
 vi.mock('~/providers/simulation-provider', () => ({
@@ -42,8 +48,7 @@ describe('SelectedItemBar', () => {
       speedRef: { current: 1 },
       stationsRef: { current: new Map() },
       resourcesRef: { current: new Map() },
-      resources: [],
-      tasks: [],
+      resourceBarElement: [],
       selectedItem: null,
       selectItem: vi.fn(),
       clearSelection: vi.fn(),
@@ -54,6 +59,8 @@ describe('SelectedItemBar', () => {
       isConnected: false,
       simulationStatus: 'idle',
       isLoading: false,
+      formattedSimTime: null,
+      currentDay: 1,
     });
 
     const { container } = render(
@@ -70,7 +77,7 @@ describe('SelectedItemBar', () => {
     const mockStation = {
       id: 1,
       name: 'Test Station',
-      position: [-73.57776, 45.48944] as [number, number],
+      position: [-73.57776, 45.48944] as Position,
       tasks: [],
     };
 
@@ -93,6 +100,8 @@ describe('SelectedItemBar', () => {
       isConnected: false,
       startSimulation: vi.fn(),
       simulationStatus: 'idle',
+      formattedSimTime: null,
+      currentDay: 1,
     });
 
     render(
@@ -112,16 +121,21 @@ describe('SelectedItemBar', () => {
   });
 
   it('should render resource information when resource is selected', () => {
-    const mockResource = {
+    const mockResource: PopulatedResource = {
       id: 5,
-      position: [-73.58, 45.49] as [number, number],
-      taskList: [1, 2, 3],
+      position: [-73.58, 45.49] as Position,
+      tasks: [
+        { id: 1, stationId: 1, state: 'open', assignedResourceId: null },
+        { id: 2, stationId: 2, state: 'open', assignedResourceId: null },
+        { id: 3, stationId: 3, state: 'open', assignedResourceId: null },
+      ],
       route: {
         coordinates: [
           [-73.58, 45.49],
           [-73.57, 45.5],
-        ] as [number, number][],
+        ] as Position[],
       },
+      inProgressTask: null,
     };
 
     (useSimulation as unknown as ReturnType<typeof vi.fn>).mockReturnValue({
@@ -133,8 +147,7 @@ describe('SelectedItemBar', () => {
       selectItem: vi.fn(),
       stationsRef: { current: new Map() },
       resourcesRef: { current: new Map() },
-      resources: [],
-      tasks: [],
+      resourceBarElement: [],
       assignTask: vi.fn(),
       unassignTask: vi.fn(),
       reassignTask: vi.fn(),
@@ -142,7 +155,11 @@ describe('SelectedItemBar', () => {
       isConnected: false,
       startSimulation: vi.fn(),
       simulationStatus: 'idle',
-    });
+      formattedSimTime: null,
+      currentDay: 1,
+      speedRef: { current: 1 },
+      isLoading: false,
+    } as SimulationContextType);
 
     render(
       <FeatureToggleProvider>
@@ -168,7 +185,7 @@ describe('SelectedItemBar', () => {
     const mockStation = {
       id: 1,
       name: 'Test Station',
-      position: [-73.57776, 45.48944] as [number, number],
+      position: [-73.57776, 45.48944] as Position,
       tasks: [],
     };
 
@@ -189,6 +206,8 @@ describe('SelectedItemBar', () => {
       isConnected: false,
       startSimulation: vi.fn(),
       simulationStatus: 'idle',
+      formattedSimTime: null,
+      currentDay: 1,
     });
 
     render(
@@ -209,7 +228,7 @@ describe('SelectedItemBar', () => {
     const mockStation = {
       id: 1,
       name: 'Test Station',
-      position: [-73.57776, 45.48944] as [number, number],
+      position: [-73.57776, 45.48944] as Position,
       tasks: [
         { id: 1, stationId: 1, type: 'battery_swap' as const },
         { id: 2, stationId: 1, type: 'battery_swap' as const },
@@ -234,6 +253,8 @@ describe('SelectedItemBar', () => {
       isConnected: false,
       startSimulation: vi.fn(),
       simulationStatus: 'idle',
+      formattedSimTime: null,
+      currentDay: 1,
     });
 
     render(

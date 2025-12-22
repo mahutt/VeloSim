@@ -237,7 +237,8 @@ def get_scenario(
 
 
 @router.post("/", response_model=ScenarioResponse, status_code=status.HTTP_201_CREATED)
-def create_scenario(
+async def create_scenario(
+    request_obj: Request,
     request: ScenarioCreateRequest,
     requesting_user: int = Depends(get_user_id),
     db: Session = Depends(get_db),
@@ -246,6 +247,7 @@ def create_scenario(
     Create a new scenario.
 
     Args:
+        request_obj: FastAPI request object for accessing raw body
         request: Scenario creation request with name, content, and options
         requesting_user: ID of the authenticated user
         db: Database session dependency
@@ -265,15 +267,32 @@ def create_scenario(
                     f"Set allow_duplicate_name=true to create anyway."
                 )
 
+        # Get raw body for line number extraction
+        raw_body = await request_obj.body()
+        content_json_string = None
+        try:
+            import json
+
+            full_json = json.loads(raw_body.decode("utf-8"))
+            # Extract just the content field for line mapping
+            if "content" in full_json:
+                content_json_string = json.dumps(full_json["content"], indent=2)
+        except (UnicodeDecodeError, json.JSONDecodeError):
+            pass  # Continue without line numbers if decoding/parsing fails
+
         # Validate scenario content against ScenarioContent schema
         # Supports RFC 3339 datetime format for multi-day scenarios
-        validator = ScenarioValidator()
+        validator = ScenarioValidator(json_string=content_json_string)
         validation_errors = validator.validate_all(request.content)
         if validation_errors:
-            error_details = "; ".join(
-                [f"{err['field']}: {err['message']}" for err in validation_errors]
+            # Return structured error with line numbers in HTTPException detail
+            raise HTTPException(
+                status_code=400,
+                detail={
+                    "message": "Invalid scenario content",
+                    "errors": validation_errors,
+                },
             )
-            raise BadRequestError(f"Invalid scenario content: {error_details}")
 
         # Create the scenario
         scenario_data = ScenarioCreate(
@@ -285,6 +304,8 @@ def create_scenario(
         db_scenario = scenario_crud.create(db, scenario_data)
         return ScenarioResponse.model_validate(db_scenario)
 
+    except HTTPException:
+        raise  # Re-raise HTTPException to preserve structured validation errors
     except BadRequestError as err:
         raise HTTPException(status_code=400, detail=str(err))
     except VelosimPermissionError as err:
@@ -298,7 +319,8 @@ def create_scenario(
 
 
 @router.put("/{scenario_id}", response_model=ScenarioResponse)
-def update_scenario(
+async def update_scenario(
+    request_obj: Request,
     scenario_id: int,
     request: ScenarioUpdateRequest,
     requesting_user: int = Depends(get_user_id),
@@ -308,6 +330,7 @@ def update_scenario(
     Update an existing scenario.
 
     Args:
+        request_obj: FastAPI request object for accessing raw body
         scenario_id: ID of the scenario to update
         request: Scenario update request with optional name, content, and description
         requesting_user: ID of the authenticated user
@@ -319,13 +342,29 @@ def update_scenario(
     try:
         # Validate scenario content if it's being updated
         if request.content is not None:
-            validator = ScenarioValidator()
+            # Get raw body for line number extraction
+            raw_body = await request_obj.body()
+            content_json_string = None
+            try:
+                import json
+
+                full_json = json.loads(raw_body.decode("utf-8"))
+                # Extract just the content field for line mapping
+                if "content" in full_json:
+                    content_json_string = json.dumps(full_json["content"], indent=2)
+            except (UnicodeDecodeError, json.JSONDecodeError):
+                pass  # Continue without line numbers if decoding/parsing fails
+
+            validator = ScenarioValidator(json_string=content_json_string)
             validation_errors = validator.validate_all(request.content)
             if validation_errors:
-                error_details = "; ".join(
-                    [f"{err['field']}: {err['message']}" for err in validation_errors]
+                raise HTTPException(
+                    status_code=400,
+                    detail={
+                        "message": "Invalid scenario content",
+                        "errors": validation_errors,
+                    },
                 )
-                raise BadRequestError(f"Invalid scenario content: {error_details}")
 
         scenario_data = ScenarioUpdate(
             name=request.name,
@@ -337,6 +376,8 @@ def update_scenario(
         )
         return ScenarioResponse.model_validate(db_scenario)
 
+    except HTTPException:
+        raise  # Re-raise HTTPException to preserve structured validation errors
     except ItemNotFoundError as err:
         raise HTTPException(status_code=404, detail=str(err))
     except BadRequestError as err:

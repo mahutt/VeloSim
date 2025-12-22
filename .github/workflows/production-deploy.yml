@@ -3,18 +3,23 @@ name: Production Deployment
 # Required GitHub Secrets:
 # - DEPLOY_SSH_KEY: SSH private key for accessing the production server (ansible user)
 # - DEPLOY_HOST: Production server hostname/IP
+# - DEPLOY_HOST_KEY: Server's SSH host key (e.g., "ssh-ed25519 AAAAC3Nza...")
 # - DEPLOY_USER: SSH username for deployment (default: ansible)
-# - ANSIBLE_VAULT_PASSWORD: Password for decrypting Ansible vault files
 # - POSTGRES_PASSWORD: PostgreSQL database password for the VeloSim user
 # - VITE_MAPBOX_ACCESS_TOKEN: Mapbox API access token for map functionality
 # - DOMAIN_NAME: Domain name for the application (e.g., velosim.app)
 #
+# Note: This deployment does NOT use Ansible Vault. All secrets are passed via
+# environment variables from GitHub Secrets for simplicity and better CI/CD integration.
+#
 # Initial Server Setup:
 # 1. Generate SSH key pair: ssh-keygen -t ed25519 -C "deploy@github-actions" -f ansible_deploy_key
-# 2. Add ansible_deploy_key to GitHub Secrets as DEPLOY_SSH_KEY
-# 3. Add public key to group_vars/all.yml: ansible_deploy_user_pubkey: "ssh-ed25519 AAAAC3..."
-# 4. Run initial deployment with root user to create ansible user
-# 5. Subsequent deployments will use the ansible user
+# 2. Get server's SSH host key: ssh-keyscan -t ed25519 YOUR_SERVER_IP
+# 3. Add ansible_deploy_key to GitHub Secrets as DEPLOY_SSH_KEY
+# 4. Add server's host key to GitHub Secrets as DEPLOY_HOST_KEY
+# 5. Add public key to group_vars/all.yml: ansible_deploy_user_pubkey: "ssh-ed25519 AAAAC3..."
+# 6. Run initial deployment with root user to create ansible user
+# 7. Subsequent deployments will use the ansible user
 
 on:
   push:
@@ -53,12 +58,9 @@ jobs:
 
       - name: Add server to known hosts
         run: |
-          ssh-keyscan -H ${{ secrets.DEPLOY_HOST }} >> ~/.ssh/known_hosts
-
-      - name: Create Ansible vault password file
-        run: |
-          echo "${{ secrets.ANSIBLE_VAULT_PASSWORD }}" > /tmp/vault_pass.txt
-          chmod 600 /tmp/vault_pass.txt
+          mkdir -p ~/.ssh
+          echo "${{ secrets.DEPLOY_HOST }} ${{ secrets.DEPLOY_HOST_KEY }}" >> ~/.ssh/known_hosts
+          chmod 644 ~/.ssh/known_hosts
 
       - name: Deploy with Ansible
         env:
@@ -74,16 +76,10 @@ jobs:
             -i inventories/production \
             -u "${DEPLOY_USER:-ansible}" \
             deploy.yml \
-            --vault-password-file /tmp/vault_pass.txt \
             --tags "$ANSIBLE_TAGS" \
             -e "postgres_password=$POSTGRES_PASSWORD" \
             -e "vite_mapbox_access_token=$VITE_MAPBOX_ACCESS_TOKEN" \
             -v
-
-      - name: Cleanup vault password
-        if: always()
-        run: |
-          rm -f /tmp/vault_pass.txt
 
       - name: Verify deployment
         run: |
@@ -91,13 +87,18 @@ jobs:
           sleep 30
 
           # Check if the application is accessible
-          if curl -f "https://${{ secrets.DOMAIN_NAME }}/api/health" > /dev/null 2>&1; then
+          echo "Testing backend health endpoint..."
+          if curl -f "https://${{ secrets.DOMAIN_NAME }}/health" > /dev/null 2>&1; then
             echo "✅ Backend health check passed"
           else
             echo "❌ Backend health check failed"
+            echo "Attempting to fetch health check for debugging..."
+            curl -v "https://${{ secrets.DOMAIN_NAME }}/health" || true
             exit 1
           fi
 
+          # Check frontend via HTTPS
+          echo "Testing frontend availability..."
           if curl -f "https://${{ secrets.DOMAIN_NAME }}/" > /dev/null 2>&1; then
             echo "✅ Frontend health check passed"
           else

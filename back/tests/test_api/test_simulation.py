@@ -2347,6 +2347,7 @@ class TestWebSocketHelpers:
 
     @pytest.mark.asyncio
     @patch("back.api.v1.utils.sim_websocket_helpers.asyncio.create_task")
+    @pytest.mark.filterwarnings("ignore::RuntimeWarning:.*auto_shutdown_simulation.*")
     async def test_concurrent_attach_operations_use_lock(
         self, mock_create_task: MagicMock
     ) -> None:
@@ -2360,7 +2361,10 @@ class TestWebSocketHelpers:
         # Make create_task properly handle coroutines by closing them
         def create_task_side_effect(coro: Coroutine[Any, Any, None]) -> MagicMock:
             coro.close()
-            return MagicMock()
+            mock_task = MagicMock()
+            # Ensure cancel() doesn't return a coroutine
+            mock_task.cancel.return_value = None
+            return mock_task
 
         mock_create_task.side_effect = create_task_side_effect
 
@@ -2464,6 +2468,7 @@ class TestWebSocketEndpointLogic:
     @patch("back.api.v1.simulation.get_simulation_or_error")
     @patch("back.api.v1.simulation.attach_ws_subscriber")
     @patch("back.api.v1.simulation.start_or_resume_simulation")
+    @pytest.mark.filterwarnings("ignore::RuntimeWarning")
     @patch("back.api.v1.simulation.cleanup_simulation")
     @patch("back.api.v1.utils.sim_websocket_helpers.handle_client_message")
     def test_websocket_message_loop_unknown_action(
@@ -2475,39 +2480,38 @@ class TestWebSocketEndpointLogic:
         mock_get_sim: MagicMock,
         mock_sim_service: MagicMock,
     ) -> None:
-        """Test that unknown actions trigger warnings via handle_client_message"""
-        import warnings
+        """Test that unknown actions trigger warnings via handle_client_message
 
-        # Suppress RuntimeWarning: Python's inspect module introspects the
-        # mocked simulation_service, creating an unawaited
-        # auto_shutdown_simulation coroutine as a side effect
-        with warnings.catch_warnings():
-            warnings.filterwarnings(
-                "ignore",
-                category=RuntimeWarning,
-                message=".*coroutine.*was never awaited",
-            )
+        Note: RuntimeWarning suppressed because MagicMock's internal attribute proxying
+        can create mock coroutines (like 'auto_shutdown_simulation') that are never
+        awaited.
+        """
+        mock_ws = MagicMock()
 
-            mock_ws = MagicMock()
+        # Simulate handling unknown actions through handle_client_message
+        messages = [
+            {"action": "invalid_action"},
+            {"action": "another_unknown"},
+        ]
 
-            # Simulate handling unknown actions through handle_client_message
-            messages = [
-                {"action": "invalid_action"},
-                {"action": "another_unknown"},
-            ]
+        for msg in messages:
+            asyncio.run(mock_handle_msg(mock_ws, msg))
 
-            for msg in messages:
-                asyncio.run(mock_handle_msg(mock_ws, msg))
-
-            # Should call handle_client_message twice (once per unknown action)
-            assert mock_handle_msg.call_count == 2
+        # Should call handle_client_message twice (once per unknown action)
+        assert mock_handle_msg.call_count == 2
 
     @patch("back.api.v1.simulation.simulation_service.active_simulations", {})
     @patch("back.api.v1.simulation.get_simulation_or_error")
+    @pytest.mark.filterwarnings("ignore::RuntimeWarning")
     def test_websocket_simulation_not_found_returns_none(
         self, mock_get_sim: MagicMock
     ) -> None:
-        """Test that get_simulation_or_error returns None for missing sim"""
+        """Test that get_simulation_or_error returns None for missing sim
+
+        Note: RuntimeWarning suppressed because MagicMock's internal attribute proxying
+        can create mock coroutines (like 'auto_shutdown_simulation') that are never
+        awaited.
+        """
         mock_ws = MagicMock()
         mock_ws.client_state = WebSocketState.CONNECTED
 
@@ -2597,6 +2601,7 @@ class TestWebSocketIntegration:
     @patch("back.api.v1.simulation.get_simulation_or_error")
     @patch("back.api.v1.simulation.verify_simulation_access")
     @patch("back.api.v1.simulation.accept_websocket_connection")
+    @pytest.mark.filterwarnings("ignore::RuntimeWarning")
     async def test_websocket_endpoint_full_flow(
         self,
         mock_accept: MagicMock,

@@ -22,12 +22,14 @@
  * SOFTWARE.
  */
 
+import type { Position } from '~/types';
+
 export function interpolateAlongRoute(
-  routeGeometry: [number, number][],
-  oldPosition: [number, number],
-  newPosition: [number, number],
+  routeGeometry: Position[],
+  oldPosition: Position,
+  newPosition: Position,
   progress: number
-): [number, number] {
+): Position {
   // TODO (#21): Upgrade to use Turf.js for road-following interpolation
   // - Use turf.nearestPointOnLine() to snap positions to route geometry
   // - Use turf.along() to get points along actual road LineString

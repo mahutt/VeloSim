@@ -218,9 +218,17 @@ describe('useSimulationWebSocket', () => {
     ws.simulateOpen();
 
     const initialPayload: BackendPayload = {
+      simId: 'test-sim',
       resources: [],
       stations: [],
       tasks: [],
+      clock: {
+        simSecondsPassed: 0,
+        simMinutesPassed: 0,
+        realSecondsPassed: 0,
+        realMinutesPassed: 0,
+        startTime: 0,
+      },
     };
 
     ws.simulateMessage({
@@ -259,7 +267,18 @@ describe('useSimulationWebSocket', () => {
     // Send initial frame first
     ws.simulateMessage({
       seq: 0,
-      payload: { resources: [], stations: [], tasks: [] },
+      payload: {
+        resources: [],
+        stations: [],
+        tasks: [],
+        clock: {
+          simSecondsPassed: 0,
+          simMinutesPassed: 0,
+          realSecondsPassed: 0,
+          realMinutesPassed: 0,
+          startTime: 0,
+        },
+      },
     });
 
     await waitFor(() => {
@@ -268,15 +287,24 @@ describe('useSimulationWebSocket', () => {
 
     // Send frame update
     const updatePayload: BackendPayload = {
+      simId: 'test-sim',
+      tasks: [],
+      stations: [],
       resources: [
         {
-          resource_id: 1,
-          resource_position: [0, 0],
-          resource_tasks: [],
-          task_count: 0,
-          in_progress_task_id: null,
+          id: 1,
+          position: [0, 0],
+          taskIds: [],
+          inProgressTaskId: null,
         },
       ],
+      clock: {
+        simSecondsPassed: 1,
+        simMinutesPassed: 0,
+        realSecondsPassed: 1,
+        realMinutesPassed: 0,
+        startTime: 0,
+      },
     };
 
     ws.simulateMessage({

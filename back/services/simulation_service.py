@@ -41,6 +41,7 @@ from back.schemas.sim_instance import (
 )
 from back.exceptions import VelosimPermissionError, ItemNotFoundError
 from back.grafana_logging.logger import get_logger
+from back.services.keyframe_persistence_service import KeyframePersistenceSubscriber
 
 logger = get_logger(__name__)
 
@@ -94,6 +95,9 @@ class ActiveSimulationData(TypedDict):
     initialization_start_time: NotRequired[
         float
     ]  # Records start time of initialization, used for startup metrics
+    keyframe_subscriber: NotRequired[
+        KeyframePersistenceSubscriber
+    ]  # Keyframe persistence
 
 
 class SimulationService:
@@ -177,8 +181,16 @@ class SimulationService:
         # Create a fresh Simulator for this simulation
         sim = self.simulator
 
-        # Initialize simulation with InputParameter
-        sim_id = sim.initialize(params, subscribers=[])
+        # Create keyframe persistence subscriber
+        keyframe_subscriber = KeyframePersistenceSubscriber(db_sim_instance.id)
+        keyframe_subscriber.start()
+
+        # Initialize simulation with InputParameter and persistence subscriber
+        sim_id = sim.initialize(params, subscribers=[keyframe_subscriber])
+
+        # Update the database record with the simulator's UUID
+        db_sim_instance.uuid = sim_id
+        db.commit()
 
         # Store the simulation data per sim_id
         self.active_simulations[sim_id] = ActiveSimulationData(
@@ -186,6 +198,7 @@ class SimulationService:
             status="initialized",
             sim_time=params.sim_time,
             user_id=user.id,
+            keyframe_subscriber=keyframe_subscriber,
         )
 
         return SimulationResponse(
@@ -287,13 +300,26 @@ class SimulationService:
         if db_sim_instance.user_id != user.id and not user.is_admin:
             raise VelosimPermissionError("Unauthorized to stop this simulation.")
 
-        # Stop simulator and delete DB record
+        # Stop simulator (keep DB record for historical access and future resume)
         sim = self.simulator
         if sim is None:
             raise RuntimeError(f"Simulator for simulation {sim_id} not found")
         sim.stop(sim_id)
-        sim_instance_crud.delete(db, db_id)
-        db.commit()
+
+        # Shutdown keyframe persistence subscriber if present
+        if "keyframe_subscriber" in sim_data:
+            keyframe_sub = sim_data["keyframe_subscriber"]
+            try:
+                # Run async shutdown in the event loop
+                loop = asyncio.get_event_loop()
+                if loop.is_running():
+                    asyncio.create_task(keyframe_sub.shutdown())
+                else:
+                    loop.run_until_complete(keyframe_sub.shutdown())
+            except Exception as e:
+                logger.error(
+                    f"Failed to shutdown keyframe subscriber for {sim_id}: {e}"
+                )
 
         del self.active_simulations[sim_id]
         # Clean up the lock for this simulation

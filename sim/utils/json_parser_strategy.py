@@ -135,6 +135,7 @@ class JsonParseStrategy(BaseParseStrategy):
             real_time_factor=content.get("real_time_factor", 1.0),
             key_frame_freq=content.get("key_frame_freq", 20),
             sim_time=sim_time,
+            start_time=start_time,
         )
 
         return params

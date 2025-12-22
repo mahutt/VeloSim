@@ -30,7 +30,7 @@ import {
 } from '~/lib/map-interactions';
 import type { Map as MapboxMap } from 'mapbox-gl';
 import { MapLayer, MapSource } from '~/lib/map-helpers';
-import { SelectedItemType } from '~/types';
+import { SelectedItemType } from '~/components/map/selected-item-bar';
 // setupMapHoverHandlers imported above
 
 test('setupMapClickHandlers registers event listeners', () => {

@@ -27,9 +27,35 @@ import { Button } from '~/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '~/components/ui/card';
 import { Separator } from '~/components/ui/separator';
 import { useSimulation } from '~/providers/simulation-provider';
-import { SelectedItemType, type Station, type Resource } from '~/types';
+import { type Position, type StationTask } from '~/types';
 import { TaskItem } from '../task/task-item';
 import { useTaskAssignment } from '~/providers/task-assignment-provider';
+
+export enum SelectedItemType {
+  Station = 'station',
+  Resource = 'resource',
+}
+
+export interface PopulatedStation {
+  id: number;
+  name: string;
+  position: Position;
+  tasks: StationTask[];
+}
+
+export interface PopulatedResource {
+  id: number;
+  position: Position;
+  tasks: StationTask[];
+  route?: {
+    coordinates: Position[];
+  };
+  inProgressTask: StationTask | null;
+}
+
+export type SelectedItemBarElement =
+  | { type: SelectedItemType.Station; value: PopulatedStation }
+  | { type: SelectedItemType.Resource; value: PopulatedResource };
 
 export default function SelectedItemBar() {
   const { selectedItem, clearSelection } = useSimulation();
@@ -50,11 +76,7 @@ export default function SelectedItemBar() {
                 ? 'Station'
                 : 'Resource'}
             </span>{' '}
-            <span className="text-foreground">
-              {selectedItem.type === SelectedItemType.Station
-                ? `#${(selectedItem.value as Station).id}`
-                : `#${(selectedItem.value as Resource).id}`}
-            </span>
+            <span className="text-foreground">#{selectedItem.value.id}</span>
           </CardTitle>
           <Button
             variant="ghost"
@@ -68,9 +90,9 @@ export default function SelectedItemBar() {
         <Separator />
         <CardContent>
           {selectedItem.type === SelectedItemType.Station ? (
-            <StationInfo station={selectedItem.value as Station} />
+            <StationInfo station={selectedItem.value} />
           ) : (
-            <ResourceInfo resource={selectedItem.value as Resource} />
+            <ResourceInfo resource={selectedItem.value} />
           )}
         </CardContent>
       </Card>
@@ -78,7 +100,7 @@ export default function SelectedItemBar() {
   );
 }
 
-function StationInfo({ station }: { station: Station }) {
+function StationInfo({ station }: { station: PopulatedStation }) {
   const { resourcesRef } = useSimulation();
   const { requestUnassignment } = useTaskAssignment();
 
@@ -103,12 +125,12 @@ function StationInfo({ station }: { station: Station }) {
             {station.tasks.map((task) => {
               const assignedResource = Array.from(
                 resourcesRef.current.values()
-              ).find((r) => r.taskList && r.taskList.includes(task.id));
+              ).find((r) => r.taskIds && r.taskIds.includes(task.id));
 
               return (
                 <TaskItem
                   key={task.id}
-                  taskId={task.id}
+                  task={task}
                   onUnassign={
                     assignedResource
                       ? () => requestUnassignment(assignedResource.id, task.id)
@@ -126,7 +148,7 @@ function StationInfo({ station }: { station: Station }) {
   );
 }
 
-function ResourceInfo({ resource }: { resource: Resource }) {
+function ResourceInfo({ resource }: { resource: PopulatedResource }) {
   const { requestUnassignment } = useTaskAssignment();
 
   return (
@@ -139,15 +161,15 @@ function ResourceInfo({ resource }: { resource: Resource }) {
       </div>
       <div>
         <p className="text-sm text-muted-foreground">
-          Tasks ({resource.taskList.length})
+          Tasks ({resource.tasks.length})
         </p>
-        {resource.taskList.length > 0 ? (
+        {resource.tasks.length > 0 ? (
           <div className="space-y-2">
-            {resource.taskList.map((id) => (
+            {resource.tasks.map((task) => (
               <TaskItem
-                key={id}
-                taskId={id}
-                onUnassign={() => requestUnassignment(resource.id, id)}
+                key={task.id}
+                task={task}
+                onUnassign={() => requestUnassignment(resource.id, task.id)}
               />
             ))}
           </div>

@@ -18,10 +18,12 @@ RUN npm ci
 COPY front/ ./
 RUN npm run build
 
-# Runtime stage
-FROM node:20-alpine
-WORKDIR /app
-RUN npm install -g serve
-COPY --from=build /app/build/client ./build
-EXPOSE 3000
-CMD ["serve", "-s", "build", "-l", "3000"]
+# Runtime stage - Use nginx to serve static files
+FROM nginx:alpine
+
+# Remove default nginx config and copy our SPA configuration
+RUN rm /etc/nginx/conf.d/default.conf
+COPY front/nginx.conf /etc/nginx/conf.d/default.conf
+
+# Copy the built SPA from build stage
+COPY --from=build /app/build/client /usr/share/nginx/html

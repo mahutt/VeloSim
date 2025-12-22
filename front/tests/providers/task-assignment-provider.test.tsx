@@ -31,6 +31,7 @@ import {
   useTaskAssignment,
 } from '~/providers/task-assignment-provider';
 import { useSimulation } from '~/providers/simulation-provider';
+import type { Resource } from '~/types';
 
 vi.mock('~/providers/simulation-provider', () => ({
   useSimulation: vi.fn(),
@@ -112,8 +113,8 @@ describe('TaskAssignmentProvider', () => {
 
     // resourcesRef contains resource 5 that already has task 42
     const resourcesRef = {
-      current: new Map<number, { id: number; taskList: number[] }>([
-        [5, { id: 5, taskList: [42] }],
+      current: new Map<number, Resource>([
+        [5, { id: 5, taskIds: [42], position: [0, 0], inProgressTaskId: null }],
       ]),
     };
 

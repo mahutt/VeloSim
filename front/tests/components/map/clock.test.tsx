@@ -1,0 +1,73 @@
+/**
+ * MIT License
+ *
+ * Copyright (c) 2025 VeloSim Contributors
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in all
+ * copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ * SOFTWARE.
+ */
+
+import { render, screen } from '@testing-library/react';
+import { vi, describe, it, expect, afterEach } from 'vitest';
+
+const mockUseSimulation = vi.fn();
+
+vi.mock('~/providers/simulation-provider', () => ({
+  useSimulation: () => mockUseSimulation(),
+}));
+
+import Clock from '~/components/map/clock';
+
+describe('Clock', () => {
+  afterEach(() => {
+    mockUseSimulation.mockReset();
+  });
+
+  it('displays formatted simulation time when available', () => {
+    mockUseSimulation.mockReturnValue({
+      formattedSimTime: '12:34',
+      currentDay: 1,
+    });
+
+    render(<Clock />);
+
+    expect(screen.getByText('12:34')).toBeInTheDocument();
+  });
+
+  it("falls back to '--:--' when formattedSimTime is null", () => {
+    mockUseSimulation.mockReturnValue({
+      formattedSimTime: null,
+      currentDay: 1,
+    });
+
+    render(<Clock />);
+
+    expect(screen.getByText('--:--')).toBeInTheDocument();
+  });
+
+  it('displays the current day', () => {
+    mockUseSimulation.mockReturnValue({
+      formattedSimTime: '08:15',
+      currentDay: 3,
+    });
+
+    render(<Clock />);
+
+    expect(screen.getByText('Day 3')).toBeInTheDocument();
+  });
+});

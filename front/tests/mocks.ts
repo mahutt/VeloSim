@@ -23,13 +23,14 @@
  */
 
 import { vi } from 'vitest';
+import type { Position } from '~/types';
 
 type eventType = 'load' | 'move' | 'error';
 
 export class MockMap {
   static instance: undefined | MockMap;
   private container: string | HTMLElement;
-  private center: [number, number];
+  private center: Position;
   private zoom: number;
   private style: string;
   public callBacks: Record<eventType, (arg?: unknown) => void> = {
@@ -44,7 +45,7 @@ export class MockMap {
     style,
   }: {
     container: string | HTMLElement;
-    center: [number, number];
+    center: Position;
     zoom: number;
     style: string;
   }) {

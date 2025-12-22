@@ -106,12 +106,14 @@ export default function PlaybackControls() {
   if (!simId) return null;
 
   return (
-    <div className="z-10 absolute top-4 left-1/2 -translate-x-1/2 bg-gray-50 border shadow rounded-full overflow-hidden">
+    <div className="bg-gray-50 border shadow rounded-full overflow-hidden">
       <div className="grid" style={{ gridTemplateColumns: '1fr 1px 1fr' }}>
-        <div className="px-4 py-2">
+        <div className="px-2 py-1">
           <DropdownMenu>
             <DropdownMenuTrigger className="cursor-pointer" asChild>
-              <button className="select-none text-center w-8">{speed}x</button>
+              <button className="select-none text-center text-sm w-7">
+                {speed}x
+              </button>
             </DropdownMenuTrigger>
             <DropdownMenuContent className="bg-gray-50" aria-disabled={loading}>
               {SPEED_OPTIONS.filter((option) => option !== 0).map((option) => (
@@ -127,11 +129,11 @@ export default function PlaybackControls() {
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
-        <div className="py-2">
+        <div className="py-1">
           <Separator orientation="vertical" />
         </div>
         <button
-          className="group px-4 py-2 flex items-center justify-center disabled:opacity-50 disabled:pointer-events-none"
+          className="group px-2 py-1 flex items-center justify-center disabled:opacity-50 disabled:pointer-events-none"
           onClick={handlePausePlayToggle}
           disabled={loading}
           aria-label={paused ? 'Play simulation' : 'Pause simulation'}
@@ -139,13 +141,13 @@ export default function PlaybackControls() {
         >
           {paused ? (
             <Play
-              className="group-active:scale-90"
+              className="group-active:scale-90 h-4 w-4"
               fill="#0a0a0a"
               strokeWidth={0}
             />
           ) : (
             <Pause
-              className="group-active:scale-90"
+              className="group-active:scale-90 h-4 w-4"
               fill="#0a0a0a"
               strokeWidth={0}
             />

@@ -118,6 +118,7 @@ EXCLUDED_PATHS = {
     '.git',
     '.venv',  # Virtual environment directory
     '.react-router',  # React Router cache directory
+    '_build',  # Sphinx documentation build directory
 
     # Package files
     '__pycache__',

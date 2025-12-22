@@ -71,12 +71,16 @@ import { MapProvider } from '~/providers/map-provider';
 import { TaskAssignmentProvider } from '~/providers/task-assignment-provider';
 import { MockMap } from 'tests/mocks';
 import MapContainer from '~/components/map/map-container';
-import { SelectedItemType } from '~/types';
+import {
+  type BackendPayload,
+  type UseSimulationWebSocketOptions,
+} from '~/types';
 import {
   logSimulationError,
   logMissingEntityError,
 } from '~/utils/simulation-error-utils';
 import api from '~/api';
+import { SelectedItemType } from '~/components/map/selected-item-bar';
 
 // Mock the API module
 vi.mock('~/api', () => {
@@ -108,6 +112,18 @@ vi.mock('~/lib/map-interactions.ts', () => {
   };
 });
 
+let wsOptions: UseSimulationWebSocketOptions | null = null;
+vi.mock('~/hooks/use-simulation-websocket', () => ({
+  useSimulationWebSocket: (opts: UseSimulationWebSocketOptions) => {
+    wsOptions = opts;
+    return {
+      isConnected: true,
+      simulationStatus: 'ready',
+      wsRef: { current: null },
+    };
+  },
+}));
+
 // Mock the fetch API
 const mockFetch = vi.fn();
 global.fetch = mockFetch;
@@ -132,6 +148,16 @@ const TestComponent = () => {
 const mockLogSimulationError = vi.fn();
 const mockLogMissingEntityError = vi.fn();
 
+const ClockProbe = () => {
+  const { formattedSimTime, currentDay } = useSimulation();
+  return (
+    <div>
+      <div data-testid="time">{formattedSimTime ?? 'null'}</div>
+      <div data-testid="day">{currentDay}</div>
+    </div>
+  );
+};
+
 // Mock requestAnimationFrame - prevent infinite recursion by limiting calls
 let rafCallCount = 0;
 global.requestAnimationFrame = vi.fn((cb) => {
@@ -148,6 +174,7 @@ global.cancelAnimationFrame = vi.fn();
 beforeEach(() => {
   vi.clearAllMocks();
   rafCallCount = 0; // Reset RAF call count
+  wsOptions = null;
 
   // Re-apply the simulation error utils mocks
   (logSimulationError as Mock).mockImplementation(mockLogSimulationError);
@@ -246,8 +273,7 @@ test('selectItem selects a station when it exists', async () => {
         id: 1,
         name: 'Test Station',
         position: [0, 0],
-        tasks: [],
-        task_count: 0,
+        taskIds: [],
       });
     }, []);
 
@@ -354,9 +380,8 @@ test('selectItem selects a resource when it exists', async () => {
       resourcesRef.current.set(1, {
         id: 1,
         position: [0, 0],
-        taskList: [],
-        task_count: 0,
-        in_progress_task_id: null,
+        taskIds: [],
+        inProgressTaskId: null,
       });
     }, []);
 
@@ -407,21 +432,21 @@ test('selectItem selects a resource when it exists', async () => {
   });
 });
 
-test('assignTask posts to API and updates resource taskList', async () => {
+test('assignTask posts to API and updates resource taskIds', async () => {
   const TestAssignComponent = () => {
-    const { assignTask, resourcesRef, resources } = useSimulation();
+    const { assignTask, resourcesRef, resourceBarElement } = useSimulation();
 
     useEffect(() => {
       resourcesRef.current.set(1, {
         id: 1,
         position: [0, 0],
-        taskList: [],
-        task_count: 0,
-        in_progress_task_id: null,
+        taskIds: [],
+        inProgressTaskId: null,
       });
     }, []);
 
-    const taskCount = resources.find((r) => r.id === 1)?.taskList?.length || 0;
+    const taskCount =
+      resourceBarElement.find((r) => r.id === 1)?.taskCount || 0;
 
     return (
       <div>
@@ -471,19 +496,19 @@ test('assignTask posts to API and updates resource taskList', async () => {
 
 test('unassignTask posts to API and removes task from resource', async () => {
   const TestUnassignComponent = () => {
-    const { unassignTask, resourcesRef, resources } = useSimulation();
+    const { unassignTask, resourcesRef, resourceBarElement } = useSimulation();
 
     useEffect(() => {
       resourcesRef.current.set(1, {
         id: 1,
         position: [0, 0],
-        taskList: [99],
-        task_count: 1,
-        in_progress_task_id: null,
+        taskIds: [99],
+        inProgressTaskId: null,
       });
     }, []);
 
-    const taskCount = resources.find((r) => r.id === 1)?.taskList?.length || 0;
+    const taskCount =
+      resourceBarElement.find((r) => r.id === 1)?.taskCount || 0;
 
     return (
       <div>
@@ -533,27 +558,25 @@ test('unassignTask posts to API and removes task from resource', async () => {
 
 test('reassignTask posts to API and moves task between resources', async () => {
   const TestReassignComponent = () => {
-    const { reassignTask, resourcesRef, resources } = useSimulation();
+    const { reassignTask, resourcesRef, resourceBarElement } = useSimulation();
 
     useEffect(() => {
       resourcesRef.current.set(1, {
         id: 1,
         position: [0, 0],
-        taskList: [123],
-        task_count: 1,
-        in_progress_task_id: null,
+        taskIds: [123],
+        inProgressTaskId: null,
       });
       resourcesRef.current.set(2, {
         id: 2,
         position: [0, 0],
-        taskList: [],
-        task_count: 0,
-        in_progress_task_id: null,
+        taskIds: [],
+        inProgressTaskId: null,
       });
     }, []);
 
-    const prevCount = resources.find((r) => r.id === 1)?.taskList?.length || 0;
-    const newCount = resources.find((r) => r.id === 2)?.taskList?.length || 0;
+    const prevCount = resourceBarElement.find((r) => r.id === 1)?.taskCount;
+    const newCount = resourceBarElement.find((r) => r.id === 2)?.taskCount;
 
     return (
       <div>
@@ -606,6 +629,232 @@ test('reassignTask posts to API and moves task between resources', async () => {
   });
 });
 
+test('sets clock time and day from initial frame payload', async () => {
+  const { getByTestId } = render(
+    <MapProvider>
+      <SimulationProvider>
+        <TaskAssignmentProvider>
+          <MapContainer />
+          <ClockProbe />
+        </TaskAssignmentProvider>
+      </SimulationProvider>
+    </MapProvider>
+  );
+
+  await waitFor(() => {
+    expect(MockMap.instance).toBeDefined();
+  });
+
+  await act(async () => {
+    MockMap.instance?.callBacks['load']();
+  });
+
+  await act(async () => {
+    wsOptions?.onInitialFrame?.({
+      simId: 'test-sim-123',
+      clock: {
+        simSecondsPassed: 3661,
+        simMinutesPassed: 61,
+        realSecondsPassed: 3661,
+        realMinutesPassed: 61,
+        startTime: 0,
+      },
+      resources: [],
+      stations: [],
+      tasks: [],
+    } as BackendPayload);
+  });
+
+  await waitFor(() => {
+    expect(getByTestId('time')).toHaveTextContent('01:01');
+    expect(getByTestId('day')).toHaveTextContent('1');
+  });
+});
+
+test('advances to next day when sim time crosses 24h', async () => {
+  const { getByTestId } = render(
+    <MapProvider>
+      <SimulationProvider>
+        <TaskAssignmentProvider>
+          <MapContainer />
+          <ClockProbe />
+        </TaskAssignmentProvider>
+      </SimulationProvider>
+    </MapProvider>
+  );
+
+  await waitFor(() => {
+    expect(MockMap.instance).toBeDefined();
+  });
+
+  await act(async () => {
+    MockMap.instance?.callBacks['load']();
+  });
+
+  await act(async () => {
+    wsOptions?.onInitialFrame?.({
+      simId: 'test-sim-123',
+      clock: {
+        simSecondsPassed: 86399,
+        simMinutesPassed: 1439,
+        realSecondsPassed: 86399,
+        realMinutesPassed: 1439,
+        startTime: 0,
+      },
+      resources: [],
+      stations: [],
+      tasks: [],
+    } as BackendPayload);
+  });
+
+  await act(async () => {
+    wsOptions?.onFrameUpdate?.({
+      simId: 'test-sim-123',
+      clock: {
+        simSecondsPassed: 90061,
+        simMinutesPassed: 1501,
+        realSecondsPassed: 90061,
+        realMinutesPassed: 1501,
+        startTime: 0,
+      },
+      resources: [],
+      stations: [],
+      tasks: [],
+    } as BackendPayload);
+  });
+
+  await waitFor(() => {
+    expect(getByTestId('time')).toHaveTextContent('01:01');
+    expect(getByTestId('day')).toHaveTextContent('2');
+  });
+});
+
+test('defaults to 00:00 day 1 for negative sim time', async () => {
+  const { getByTestId } = render(
+    <MapProvider>
+      <SimulationProvider>
+        <TaskAssignmentProvider>
+          <MapContainer />
+          <ClockProbe />
+        </TaskAssignmentProvider>
+      </SimulationProvider>
+    </MapProvider>
+  );
+
+  await waitFor(() => {
+    expect(MockMap.instance).toBeDefined();
+  });
+
+  await act(async () => {
+    MockMap.instance?.callBacks['load']();
+  });
+
+  await act(async () => {
+    wsOptions?.onInitialFrame?.({
+      simId: 'test-sim-123',
+      clock: {
+        simSecondsPassed: -5,
+        simMinutesPassed: -1,
+        realSecondsPassed: -5,
+        realMinutesPassed: -1,
+        startTime: 0,
+      },
+      resources: [],
+      stations: [],
+      tasks: [],
+    } as BackendPayload);
+  });
+
+  await waitFor(() => {
+    expect(getByTestId('time')).toHaveTextContent('00:00');
+    expect(getByTestId('day')).toHaveTextContent('1');
+  });
+});
+
+test('displays time correctly with scenario start_time (08:00)', async () => {
+  const { getByTestId } = render(
+    <MapProvider>
+      <SimulationProvider>
+        <TaskAssignmentProvider>
+          <MapContainer />
+          <ClockProbe />
+        </TaskAssignmentProvider>
+      </SimulationProvider>
+    </MapProvider>
+  );
+
+  await waitFor(() => {
+    expect(MockMap.instance).toBeDefined();
+  });
+
+  await act(async () => {
+    MockMap.instance?.callBacks['load']();
+  });
+
+  await act(async () => {
+    wsOptions?.onInitialFrame?.({
+      simId: 'test-sim-123',
+      clock: {
+        simSecondsPassed: 0,
+        simMinutesPassed: 0,
+        realSecondsPassed: 0,
+        realMinutesPassed: 0,
+        startTime: 28800,
+      },
+      resources: [],
+      stations: [],
+      tasks: [],
+    } as BackendPayload);
+  });
+
+  await waitFor(() => {
+    expect(getByTestId('time')).toHaveTextContent('08:00');
+    expect(getByTestId('day')).toHaveTextContent('1');
+  });
+});
+
+test('advances time correctly with start_time', async () => {
+  const { getByTestId } = render(
+    <MapProvider>
+      <SimulationProvider>
+        <TaskAssignmentProvider>
+          <MapContainer />
+          <ClockProbe />
+        </TaskAssignmentProvider>
+      </SimulationProvider>
+    </MapProvider>
+  );
+
+  await waitFor(() => {
+    expect(MockMap.instance).toBeDefined();
+  });
+
+  await act(async () => {
+    MockMap.instance?.callBacks['load']();
+  });
+
+  await act(async () => {
+    wsOptions?.onInitialFrame?.({
+      simId: 'test-sim-123',
+      clock: {
+        simSecondsPassed: 7200,
+        simMinutesPassed: 120,
+        realSecondsPassed: 7200,
+        realMinutesPassed: 120,
+        startTime: 28800,
+      },
+      resources: [],
+      stations: [],
+      tasks: [],
+    } as BackendPayload);
+  });
+
+  await waitFor(() => {
+    expect(getByTestId('time')).toHaveTextContent('10:00');
+    expect(getByTestId('day')).toHaveTextContent('1');
+  });
+});
+
 test('RAF queue batches multiple rapid selections into single render', async () => {
   const setMapSourceMock = await import('~/lib/map-helpers').then(
     (m) => m.setMapSource
@@ -622,8 +871,7 @@ test('RAF queue batches multiple rapid selections into single render', async () 
           id: i,
           name: `Station ${i}`,
           position: [0, 0],
-          tasks: [],
-          task_count: 0,
+          taskIds: [],
         });
       }
     }, []);
@@ -694,8 +942,7 @@ test('RAF queue batches rapid clearSelection calls', async () => {
         id: 1,
         name: 'Station 1',
         position: [0, 0],
-        tasks: [],
-        task_count: 0,
+        taskIds: [],
       });
     }, []);
 
@@ -780,9 +1027,8 @@ test('RAF queue batches resource selection updates', async () => {
         resourcesRef.current.set(i, {
           id: i,
           position: [0, 0],
-          taskList: [],
-          task_count: 0,
-          in_progress_task_id: null,
+          taskIds: [],
+          inProgressTaskId: null,
         });
       }
     }, []);
@@ -852,15 +1098,13 @@ test('flushMapUpdates applies updates with current selection state', async () =>
         id: 1,
         name: 'Station 1',
         position: [0, 0],
-        tasks: [],
-        task_count: 0,
+        taskIds: [],
       });
       stationsRef.current.set(2, {
         id: 2,
         name: 'Station 2',
         position: [0, 0],
-        tasks: [],
-        task_count: 0,
+        taskIds: [],
       });
     }, []);
 

@@ -38,9 +38,10 @@ import {
   loadMapImages,
   setMapLayers,
 } from '~/lib/map-helpers';
+import type { Position } from '~/types';
 import { logSimulationError } from '~/utils/simulation-error-utils';
 
-export const INITIAL_CENTER = [-73.57776, 45.48944] as [number, number];
+export const INITIAL_CENTER = [-73.57776, 45.48944] as Position;
 export const INITIAL_ZOOM = 10.12;
 
 type MapContextType = {

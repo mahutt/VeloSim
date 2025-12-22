@@ -30,22 +30,25 @@ export interface User {
   is_enabled: boolean;
 }
 
-// Entity types
+// Simulation types
+
+export type Position = [number, number]; // [longitude, latitude]
 
 export interface Station {
   id: number;
   name: string;
-  position: [number, number]; // [longitude, latitude]
-  tasks: StationTask[];
-  task_count?: number;
+  position: Position;
+  taskIds: number[];
 }
+
+// scheduled tasks aren't sent from the backend anymore
+type TaskState = 'open' | 'assigned' | 'inprogress' | 'closed';
 
 export interface StationTask {
   id: number;
   stationId: number;
-  type: 'battery_swap';
-  state?: 'open' | 'assigned' | 'inprogress' | 'completed';
-  assigned_resource_id?: number | null;
+  state: TaskState;
+  assignedResourceId: number | null;
 }
 
 // API response types
@@ -60,10 +63,6 @@ interface PaginatedResponse {
   page: number;
   per_page: number;
   total_pages: number;
-}
-
-export interface GetStationsResponse extends PaginatedResponse {
-  stations: Omit<Station, 'tasks'>[];
 }
 
 export interface ListMySimulationsResponse extends PaginatedResponse {
@@ -87,48 +86,12 @@ export interface InitializeSimulationResponse {
 // Resource types
 export interface Resource {
   id: number;
-  position: [number, number];
-  taskList: number[]; // list of task IDs
+  position: Position;
+  taskIds: number[];
   route?: {
-    coordinates: [number, number][];
+    coordinates: Position[];
   };
-  task_count?: number;
-  in_progress_task_id?: number | null;
-}
-
-// Clock type for simulation timing
-export interface Clock {
-  realSecondsPassed: number;
-  realMinutesPassed: number;
-  simSecondsPassed: number;
-  simMinutesPassed: number;
-}
-
-// WebSocket simulation frame types
-export interface FramePayload {
-  sim_id: string;
-  tasks: StationTask[];
-  stations: Station[];
-  resources: Resource[];
-  clock: Clock;
-}
-
-export interface SimulationFrame {
-  seq_numb: number;
-  timestamp: number;
-  is_key: boolean;
-  payload: FramePayload;
-}
-
-export interface WebSocketSimulationMessage {
-  sim_id: string;
-  db_id: number;
-  status: 'started' | 'running' | 'paused' | 'completed' | 'error';
-  initial_frame: SimulationFrame;
-}
-
-export interface WebSocketFrameMessage {
-  frame: SimulationFrame;
+  inProgressTaskId: number | null;
 }
 
 // WebSocket connection types
@@ -154,16 +117,6 @@ export interface UseSimulationWebSocketReturn {
   wsRef: React.RefObject<WebSocket | null>;
 }
 
-// Selection types
-export enum SelectedItemType {
-  Station = 'station',
-  Resource = 'resource',
-}
-export interface SelectedItem {
-  type: SelectedItemType;
-  value: Station | Resource;
-}
-
 // Scenario types
 export interface Scenario {
   id: number;
@@ -187,43 +140,17 @@ export interface Simulation {
   task_count: number;
 }
 
-// Backend WebSocket payload types (snake_case from backend)
-export interface BackendTask {
-  id: number;
-  state: 'open' | 'assigned' | 'inprogress' | 'completed' | 'scheduled';
-  station_id: number;
-  station_name: string;
-  assigned_resource_id: number | null;
-  scheduled_time?: number;
-}
-
-export interface BackendStation {
-  station_id: number;
-  station_name: string;
-  station_position: [number, number];
-  station_tasks: BackendTask[];
-  task_count: number;
-}
-
-export interface BackendResource {
-  resource_id: number;
-  resource_position: [number, number];
-  resource_tasks: BackendTask[];
-  task_count: number;
-  in_progress_task_id: number | null;
-}
-
 export interface BackendPayload {
-  sim_id?: string;
-  tasks?: BackendTask[];
-  stations?: BackendStation[];
-  resources?: BackendResource[];
-  new_tasks?: BackendTask[];
-  clock?: {
+  simId: string;
+  tasks: StationTask[];
+  stations: Station[];
+  resources: Resource[];
+  clock: {
     simSecondsPassed: number;
     simMinutesPassed: number;
     realSecondsPassed: number;
     realMinutesPassed: number;
+    startTime: number;
   };
 }
 

@@ -32,6 +32,7 @@ from .resource_type import ResourceType
 from .user import User
 from .sim_instance import SimInstance
 from .scenario import Scenario
+from .sim_keyframe import SimKeyframe
 
 __all__ = [
     "Station",
@@ -43,4 +44,5 @@ __all__ = [
     "User",
     "SimInstance",
     "Scenario",
+    "SimKeyframe",
 ]
