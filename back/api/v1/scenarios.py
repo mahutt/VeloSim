@@ -40,7 +40,7 @@ from back.schemas.scenario import (
     ScenarioUpdate,
     ScenarioUpdateRequest,
 )
-from sim.validation import ScenarioValidator
+from sim.utils.json_parser_strategy import JsonParseStrategy
 
 router = APIRouter(prefix="/scenarios", tags=["scenarios"])
 
@@ -89,9 +89,11 @@ async def validate_scenario_content(
             ],
         )
 
-    # Initialize validator with JSON string for line tracking
-    validator = ScenarioValidator(json_string=json_string)
-    validation_errors = validator.validate_all(validation_request.content)
+    # Initialize parser with JSON string for line tracking
+    parser = JsonParseStrategy(
+        scenario_json=validation_request.content, json_string=json_string
+    )
+    validation_errors = parser.validate()
 
     return ValidationResponse(
         valid=len(validation_errors) == 0, errors=validation_errors
@@ -281,9 +283,10 @@ async def create_scenario(
             pass  # Continue without line numbers if decoding/parsing fails
 
         # Validate scenario content against ScenarioContent schema
-        # Supports RFC 3339 datetime format for multi-day scenarios
-        validator = ScenarioValidator(json_string=content_json_string)
-        validation_errors = validator.validate_all(request.content)
+        parser = JsonParseStrategy(
+            scenario_json=request.content, json_string=content_json_string
+        )
+        validation_errors = parser.validate()
         if validation_errors:
             # Return structured error with line numbers in HTTPException detail
             raise HTTPException(
@@ -355,8 +358,10 @@ async def update_scenario(
             except (UnicodeDecodeError, json.JSONDecodeError):
                 pass  # Continue without line numbers if decoding/parsing fails
 
-            validator = ScenarioValidator(json_string=content_json_string)
-            validation_errors = validator.validate_all(request.content)
+            parser = JsonParseStrategy(
+                scenario_json=request.content, json_string=content_json_string
+            )
+            validation_errors = parser.validate()
             if validation_errors:
                 raise HTTPException(
                     status_code=400,

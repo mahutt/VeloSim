@@ -24,7 +24,7 @@ SOFTWARE.
 
 import pytest
 from typing import Any, Dict, List
-from sim.validation import ScenarioValidator
+from sim.utils.json_parser_strategy import _ScenarioValidator as ScenarioValidator
 
 
 @pytest.fixture

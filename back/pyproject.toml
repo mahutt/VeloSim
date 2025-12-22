@@ -49,9 +49,16 @@ addopts = [
     "--strict-config",
     "--verbose",
 ]
+markers = [
+    "asyncio: mark test as requiring asyncio",
+]
 filterwarnings = [
     "ignore::DeprecationWarning:pyproj.transformer",
+    "ignore::RuntimeWarning",
 ]
+
+[tool.pytest_asyncio]
+asyncio_mode = "auto"
 
 [tool.coverage.run]
 source = [

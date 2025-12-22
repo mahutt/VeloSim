@@ -75,7 +75,7 @@ from back.schemas.sim_instance import (
 )
 from back.services import simulation_service
 from back.database.session import get_db
-from sim.utils.json_parser_strategy import JsonParseStrategy
+from sim.utils.json_parser_strategy import JsonParseStrategy, ScenarioParseError
 
 
 router = APIRouter(prefix="/simulation", tags=["simulation"])
@@ -116,14 +116,16 @@ def initialize_simulation(
             scenario = db_scenario.content  # type: ignore[union-attr]
 
         # Parse scenario into InputParameter
-        json_parser = JsonParseStrategy()
-        scenario_params = json_parser.parse(scenario)
+        json_parser = JsonParseStrategy(scenario_json=scenario)
+        scenario_params = json_parser.parse()
 
         # Initialize simulation
         return simulation_service.initialize_simulation(
             db, requesting_user, scenario_params
         )
 
+    except ScenarioParseError as err:
+        raise HTTPException(status_code=400, detail=str(err))
     except VelosimPermissionError as err:
         raise HTTPException(status_code=403, detail=str(err))
     except ItemNotFoundError as ve:

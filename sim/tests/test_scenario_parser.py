@@ -23,9 +23,8 @@ SOFTWARE.
 """
 
 import pytest
-from unittest.mock import patch, MagicMock
 from sim.utils.base_parse_strategy import BaseParseStrategy
-from sim.utils.json_parser_strategy import JsonParseStrategy
+from sim.utils.json_parser_strategy import JsonParseStrategy, ScenarioParseError
 from sim.entities.inputParameters import InputParameter
 from sim.entities.resource import Resource
 from sim.utils.scenario_parser import ScenarioParser
@@ -75,8 +74,8 @@ def test_json_parse_strategy_valid_input() -> None:
         },
     }
 
-    strategy = JsonParseStrategy()
-    params: InputParameter = strategy.parse(scenario_json)
+    strategy = JsonParseStrategy(scenario_json=scenario_json)
+    params: InputParameter = strategy.parse()
 
     assert isinstance(params, InputParameter)
     assert len(params.station_entities) == 3
@@ -103,13 +102,16 @@ def test_json_parse_strategy_valid_input() -> None:
 
 
 def test_json_parse_strategy_invalid_json() -> None:
-    strategy = JsonParseStrategy()
-    with pytest.raises(AttributeError):
-        strategy.parse("string_instead_of_dict")  # type: ignore[arg-type]
+    # String instead of dict should fail
+    strategy = JsonParseStrategy(
+        scenario_json="string_instead_of_dict"  # type: ignore[arg-type]
+    )
+    with pytest.raises((AttributeError, ValueError)):
+        strategy.parse()
 
 
-@patch("builtins.print")
-def test_json_parse_strategy_with_invalid_time(mock_print: MagicMock) -> None:
+def test_json_parse_strategy_with_invalid_time() -> None:
+    """Test that invalid time formats now raise ScenarioParseError."""
     scenario_json_with_bad_time_format = {
         "id": 1,
         "name": "Test Scenario",
@@ -145,13 +147,50 @@ def test_json_parse_strategy_with_invalid_time(mock_print: MagicMock) -> None:
         },
     }
 
-    strategy = JsonParseStrategy()
-    params: InputParameter = strategy.parse(scenario_json_with_bad_time_format)
+    strategy = JsonParseStrategy(scenario_json=scenario_json_with_bad_time_format)
+    # Now validation catches the invalid time format and raises an exception
+    with pytest.raises(ScenarioParseError) as exc_info:
+        strategy.parse()
 
-    mock_print.assert_called_once_with(
-        "Invalid time format 'day2:01', defaulting to 0s."
-    )
-    assert params.sim_time == 0
+    # Verify the error contains information about the invalid time
+    assert "end_time" in str(exc_info.value) or "time" in str(exc_info.value).lower()
+
+
+def test_json_parse_strategy_validate_without_parsing() -> None:
+    """Test that validate method can check scenarios without parsing."""
+    valid_scenario = {
+        "start_time": "day1:00:00",
+        "end_time": "day1:01:00",
+        "stations": [
+            {
+                "station_id": 1,
+                "station_name": "Test Station",
+                "station_position": [-74.0060, 40.7128],
+            }
+        ],
+        "resources": [{"resource_id": 1, "resource_position": [-74.0060, 40.7128]}],
+        "initial_tasks": [{"station_id": 1}],
+        "scheduled_tasks": [],
+    }
+
+    invalid_scenario = {
+        "start_time": "day1:00:00",
+        "end_time": "invalid_time",  # Invalid format
+        "stations": [],
+        "resources": [],
+    }
+
+    strategy = JsonParseStrategy(scenario_json=valid_scenario)
+
+    # Valid scenario should return no errors
+    errors = strategy.validate()
+    assert len(errors) == 0
+
+    # Invalid scenario should return errors
+    strategy_invalid = JsonParseStrategy(scenario_json=invalid_scenario)
+    errors = strategy_invalid.validate()
+    assert len(errors) > 0
+    assert any("time" in str(err).lower() for err in errors)
 
 
 def test_scenario_parser_delegates_to_strategy() -> None:
