@@ -497,23 +497,32 @@ class TestScenarioValidation:
             "content": {
                 "start_time": "day1:08:00",
                 "end_time": "day1:12:00",
+                "vehicle_battery_capacity": 999,
                 "stations": [
                     {
-                        "station_id": 1,
-                        "station_name": "Station 1",
-                        "task_count": 2,
-                        "station_position": [45.5, -73.5],
+                        "name": "Station 1",
+                        "initial_task_count": 2,
+                        "scheduled_tasks": ["day1:09:30"],
+                        "position": [45.5, -73.5],
                     }
                 ],
-                "resources": [
+                "drivers": [
                     {
-                        "resource_id": 1,
-                        "task_count": 2,
-                        "resource_position": [45.5, -73.5],
+                        "name": "Driver 1",
+                        "shift": {
+                            "start_time": "day1:08:00",
+                            "end_time": "day1:12:00",
+                            "lunch_break": "day1:10:00",
+                        },
                     }
                 ],
-                "initial_tasks": [{"station_id": "1"}],
-                "scheduled_tasks": [{"station_id": "1"}],
+                "vehicles": [
+                    {
+                        "name": "Vehicle 1",
+                        "position": [-73.5610, 45.5070],
+                        "battery_count": 999,
+                    }
+                ],
             }
         }
 
@@ -568,10 +577,10 @@ class TestScenarioValidation:
             "content": {
                 "start_time": "day1:12:00",
                 "end_time": "day1:08:00",
+                "vehicle_battery_capacity": 999,
                 "stations": [],
-                "resources": [],
-                "initial_tasks": [],
-                "scheduled_tasks": [],
+                "drivers": [],
+                "vehicles": [],
             }
         }
 
@@ -584,74 +593,16 @@ class TestScenarioValidation:
             for err in data["errors"]
         )
 
-    def test_validate_duplicate_station_id(self, client: TestClient) -> None:
-        """Test validation fails with duplicate station IDs."""
-        invalid_content = {
-            "content": {
-                "start_time": "day1:08:00",
-                "end_time": "day1:12:00",
-                "stations": [
-                    {
-                        "station_id": 1,
-                        "station_name": "Station 1",
-                        "task_count": 2,
-                        "station_position": [45.5, -73.5],
-                    },
-                    {
-                        "station_id": 1,  # Duplicate
-                        "station_name": "Station 2",
-                        "task_count": 2,
-                        "station_position": [45.6, -73.6],
-                    },
-                ],
-                "resources": [],
-                "initial_tasks": [],
-                "scheduled_tasks": [],
-            }
-        }
-
-        response = client.post("/api/v1/scenarios/validate", json=invalid_content)
-        assert response.status_code == 200
-        data = response.json()
-        assert data["valid"] is False
-        assert any("Duplicate station ID" in err["message"] for err in data["errors"])
-
-    def test_validate_task_with_nonexistent_station(self, client: TestClient) -> None:
-        """Test validation fails when task references non-existent station."""
-        invalid_content = {
-            "content": {
-                "start_time": "day1:08:00",
-                "end_time": "day1:12:00",
-                "stations": [
-                    {
-                        "station_id": 1,
-                        "station_name": "Station 1",
-                        "task_count": 1,
-                        "station_position": [45.5, -73.5],
-                    }
-                ],
-                "resources": [],
-                "initial_tasks": [{"station_id": "999"}],  # Non-existent station
-                "scheduled_tasks": [],
-            }
-        }
-
-        response = client.post("/api/v1/scenarios/validate", json=invalid_content)
-        assert response.status_code == 200
-        data = response.json()
-        assert data["valid"] is False
-        assert any("does not exist" in err["message"] for err in data["errors"])
-
     def test_validate_no_authentication_required(self, client: TestClient) -> None:
         """Test validation endpoint does not require authentication."""
         valid_content = {
             "content": {
                 "start_time": "day1:08:00",
                 "end_time": "day1:12:00",
+                "vehicle_battery_capacity": 999,
                 "stations": [],
-                "resources": [],
-                "initial_tasks": [],
-                "scheduled_tasks": [],
+                "drivers": [],
+                "vehicles": [],
             }
         }
 
@@ -671,24 +622,33 @@ class TestValidateScenario:
         valid_content = {
             "content": {
                 "start_time": "day1:08:00",
-                "end_time": "day1:17:00",
+                "end_time": "day1:12:00",
+                "vehicle_battery_capacity": 999,
                 "stations": [
                     {
-                        "station_id": 1,
-                        "station_name": "Station Alpha",
-                        "station_position": [45.5017, -73.5673],
-                        "task_count": 2,
+                        "name": "Station 1",
+                        "initial_task_count": 2,
+                        "scheduled_tasks": ["day1:09:30"],
+                        "position": [45.5, -73.5],
                     }
                 ],
-                "resources": [
+                "drivers": [
                     {
-                        "resource_id": 101,
-                        "resource_position": [45.505, -73.56],
-                        "task_count": 2,
+                        "name": "Driver 1",
+                        "shift": {
+                            "start_time": "day1:08:00",
+                            "end_time": "day1:12:00",
+                            "lunch_break": "day1:10:00",
+                        },
                     }
                 ],
-                "initial_tasks": [{"station_id": "1"}],
-                "scheduled_tasks": [],
+                "vehicles": [
+                    {
+                        "name": "Vehicle 1",
+                        "position": [-73.5610, 45.5070],
+                        "battery_count": 999,
+                    }
+                ],
             }
         }
 
@@ -724,10 +684,10 @@ class TestValidateScenario:
             "content": {
                 "start_time": "8AM",  # Invalid format
                 "end_time": "5PM",  # Invalid format
+                "vehicle_battery_capacity": 999,
                 "stations": [],
-                "resources": [],
-                "initial_tasks": [],
-                "scheduled_tasks": [],
+                "drivers": [],
+                "vehicles": [],
             }
         }
 
@@ -743,10 +703,10 @@ class TestValidateScenario:
             "content": {
                 "start_time": "day1:17:00",
                 "end_time": "day1:08:00",  # Before start_time
+                "vehicle_battery_capacity": 999,
                 "stations": [],
-                "resources": [],
-                "initial_tasks": [],
-                "scheduled_tasks": [],
+                "drivers": [],
+                "vehicles": [],
             }
         }
 

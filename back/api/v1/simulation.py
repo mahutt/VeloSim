@@ -77,7 +77,6 @@ from back.services import simulation_service
 from back.database.session import get_db
 from sim.utils.json_parser_strategy import JsonParseStrategy, ScenarioParseError
 
-
 router = APIRouter(prefix="/simulation", tags=["simulation"])
 
 
@@ -116,6 +115,7 @@ def initialize_simulation(
             scenario = db_scenario.content  # type: ignore[union-attr]
 
         # Parse scenario into InputParameter
+
         json_parser = JsonParseStrategy(scenario_json=scenario)
         scenario_params = json_parser.parse()
 
