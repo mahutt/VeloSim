@@ -125,13 +125,13 @@ def get_scenario_template(
                 {
                     "station_id": 1,
                     "station_name": "Station 1",
-                    "station_position": [-74.0060, 40.7128],
+                    "station_position": [-73.57314, 45.50137],
                 }
             ],
             "resources": [
                 {
                     "resource_id": 1,
-                    "resource_position": [-74.0060, 40.7128],
+                    "resource_position": [-73.561, 45.507],
                 }
             ],
             "initial_tasks": [
