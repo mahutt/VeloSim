@@ -258,7 +258,7 @@ export const SimulationProvider = ({
   };
 
   // Reorder tasks within a resource's task queue
-  // applyFromTop: if true, applies new order from top; if false, preserves in-progress task at index 0
+  // applyFromTop: if true, insert tasks after in-progress; if false, append to end
   const reorderTasks = async (
     resourceId: number,
     taskIds: number[],

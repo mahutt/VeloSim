@@ -212,25 +212,35 @@ function ResourceInfo({ resource }: { resource: PopulatedResource }) {
         </p>
         {resource.tasks.length > 0 ? (
           <div className="space-y-2">
-            {resource.tasks.map((task, index) => (
-              <div
-                key={task.id}
-                onDragOver={(e) => handleDragOver(e, index)}
-                onDrop={(e) => handleDrop(e, index)}
-                onDragStart={() => handleDragStart(task.id)}
-                onDragEnd={handleDragEnd}
-                className={
-                  dropTargetIndex === index
-                    ? 'border-t-2 border-blue-500 pt-1'
-                    : ''
-                }
-              >
-                <TaskItem
-                  task={task}
-                  onUnassign={() => requestUnassignment(resource.id, task.id)}
-                />
-              </div>
-            ))}
+            {resource.tasks.map((task, index) => {
+              const draggedIndex = draggedTaskId
+                ? resource.tasks.findIndex((t) => t.id === draggedTaskId)
+                : -1;
+              const showDropIndicator = dropTargetIndex === index;
+              const isDraggingDown = index > draggedIndex;
+
+              return (
+                <div
+                  key={task.id}
+                  onDragOver={(e) => handleDragOver(e, index)}
+                  onDrop={(e) => handleDrop(e, index)}
+                  onDragStart={() => handleDragStart(task.id)}
+                  onDragEnd={handleDragEnd}
+                  className={
+                    showDropIndicator
+                      ? isDraggingDown
+                        ? 'border-b-2 border-blue-500 pb-1'
+                        : 'border-t-2 border-blue-500 pt-1'
+                      : ''
+                  }
+                >
+                  <TaskItem
+                    task={task}
+                    onUnassign={() => requestUnassignment(resource.id, task.id)}
+                  />
+                </div>
+              );
+            })}
           </div>
         ) : (
           <p className="text-sm">No tasks assigned</p>
