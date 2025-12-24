@@ -886,7 +886,7 @@ class JsonParseStrategy(BaseParseStrategy):
         If validation fails, raises ScenarioParseError with details.
 
         Converts scenario JSON format into an InputParameter object containing
-        all simulation configuration including stations, resources, and tasks.
+        all simulation configuration including stations, drivers, vehicles, and tasks.
 
         Args:
             scenario_json: Optional dictionary containing scenario configuration.

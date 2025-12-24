@@ -490,7 +490,7 @@ class SimulatorController:
                             if in_progress_task is not None
                             else None
                         ),
-                        "currentVehicleId": (
+                        "vehicleId": (
                             current_vehicle.id if current_vehicle is not None else None
                         ),
                     }
@@ -504,7 +504,7 @@ class SimulatorController:
                     {
                         "id": vehicle.id,
                         "batteryCount": vehicle.get_vehicle_battery_count(),
-                        "currentDriver": (
+                        "driverId": (
                             current_driver.id if current_driver is not None else None
                         ),
                     }

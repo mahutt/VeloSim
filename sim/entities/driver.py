@@ -94,6 +94,19 @@ class Driver:
         Returns:
             None
         """
+        # Make sure this driver does not already have a vehicle
+        if self.vehicle is not None:
+            raise Exception(
+                f"Driver Error: driver: {self.id} "
+                f"already assigned to vehicle: {self.vehicle.id}"
+            )
+        # Make sure the vehicle arg does not already have a driver
+        current_driver = vehicle.get_vehicle_driver()
+        if current_driver is not None:
+            raise Exception(
+                f"Driver Error: vehicle: {vehicle.id} "
+                f"already assigned to driver: {current_driver.id}"
+            )
         self.vehicle = vehicle
         self.has_updated = True
 

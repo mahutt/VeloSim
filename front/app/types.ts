@@ -97,7 +97,7 @@ export interface Driver {
 export interface Vehicle {
   id: number;
   driverId: number | null; // null implies at HQ, not on route
-  // inventory: number // will come later
+  batteryCount: number;
 }
 
 // WebSocket connection types

@@ -23,11 +23,9 @@ SOFTWARE.
 """
 
 import simpy
-import logging
 
 from typing import Optional, TYPE_CHECKING
 
-logger = logging.getLogger(__name__)
 
 # to avoid circular imports
 if TYPE_CHECKING:  # pragma: no cover
@@ -65,7 +63,7 @@ class Vehicle:
         """Get the vehicle's current battery count.
 
         Returns:
-            inventory: The vehicle's current battery_count.
+            battery_count: The vehicle's current battery_count.
         """
         return self.battery_count
 
@@ -78,6 +76,20 @@ class Vehicle:
         Returns:
             None
         """
+        # Make sure this vehicle doesn't already have a driver
+        if self.driver is not None:
+            raise Exception(
+                f"Vehicle Error: vehicle: {self.id} "
+                f"already assigned to driver: {self.driver.id}"
+            )
+        # Make sure the driver arg doesn't already have a vehicle
+        current_vehicle = driver.get_driver_vehicle()
+        if current_vehicle is not None:
+            raise Exception(
+                f"Vehicle Error: driver: {driver.id} "
+                f"already assigned to vehicle: {current_vehicle.id}"
+            )
+
         self.driver = driver
         self.has_updated = True
 
