@@ -1,0 +1,9 @@
+global:
+  scrape_interval: 5s
+  evaluation_interval: 5s
+
+scrape_configs:
+  - job_name: "velosim"
+    metrics_path: /api/v1/metric/metrics
+    static_configs:
+      - targets: ["backend:8000"]

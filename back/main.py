@@ -29,6 +29,13 @@ from contextlib import asynccontextmanager
 from fastapi import Depends, FastAPI, HTTPException
 from fastapi.security import OAuth2PasswordRequestForm
 
+# OpenTelemetry imports
+from opentelemetry import metrics
+from opentelemetry.exporter.prometheus import PrometheusMetricReader
+from opentelemetry.sdk.metrics import MeterProvider
+from opentelemetry.sdk.resources import SERVICE_NAME, Resource
+from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
+
 # Auth temporarily disabled
 # from back.auth.dependency import get_user_id
 from back.core.config import settings
@@ -39,6 +46,12 @@ from back.database.session import get_db
 from back.grafana_logging.logger import get_logger
 
 logger = get_logger(__name__)
+
+# Set up OpenTelemetry to export metrics to Prometheus
+resource = Resource(attributes={SERVICE_NAME: "velosim-backend"})
+reader = PrometheusMetricReader()
+provider = MeterProvider(resource=resource, metric_readers=[reader])
+metrics.set_meter_provider(provider)
 
 
 @asynccontextmanager
@@ -75,6 +88,9 @@ app = FastAPI(
     redoc_url="/api/redoc" if settings.ENVIRONMENT != "production" else None,
     lifespan=lifespan,
 )
+
+# Instrument FastAPI with OpenTelemetry to automatically collect http metrics
+FastAPIInstrumentor.instrument_app(app)
 
 
 @app.post("/api/token")

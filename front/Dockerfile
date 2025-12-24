@@ -6,7 +6,7 @@ WORKDIR /app
 ARG VITE_MAPBOX_ACCESS_TOKEN
 ARG VITE_BACKEND_URL
 
-# Set environment variables from build args
+# Set environment variables from build args - keep VITE_ prefix for build time
 ENV VITE_MAPBOX_ACCESS_TOKEN=$VITE_MAPBOX_ACCESS_TOKEN
 ENV VITE_BACKEND_URL=$VITE_BACKEND_URL
 

@@ -42,6 +42,9 @@ from back.schemas import (
     ResourceTaskUnassignResponse,
     ResourceTaskReassignResponse,
 )
+from back.schemas.sim_instance import (
+    SimulationResponse,
+)
 from back.schemas.playback_speed import PlaybackSpeedResponse, SimulationPlaybackStatus
 from back.schemas.resource import (
     ResourceTaskAssignRequest,
@@ -256,6 +259,8 @@ class DummyWebSocket:
     def __init__(self) -> None:
         self.sent: List[FrameData] = []
         self.client_state = WebSocketState.CONNECTED
+        # Add scope to mimic FastAPI's WebSocket object for testing
+        self.scope = {"path": "/api/v1/simulation/stream/test-sim-from-dummy"}
 
     async def send_json(self, data: FrameData) -> None:
         self.sent.append(data)
@@ -267,11 +272,9 @@ class TestSimulationAPI:
     def test_initialize_simulation_success(
         self, mock_init: MagicMock, authenticated_client: TestClient
     ) -> None:
-        mock_init.return_value = {
-            "sim_id": "sim123",
-            "db_id": 42,
-            "status": "initialized",
-        }
+        mock_init.return_value = SimulationResponse(
+            sim_id="sim123", db_id=42, status="initialized"
+        )
         response = authenticated_client.post(
             "/api/v1/simulation/initialize", json=SCENARIO_PAYLOAD
         )
@@ -692,7 +695,8 @@ class TestSimulationAPI:
         )
         assert response.status_code == 422
 
-    def test_websocket_subscriber_on_frame(self) -> None:
+    @patch("back.api.v1.utils.sim_websocket_helpers.simulation_service")
+    def test_websocket_subscriber_on_frame(self, mock_sim_service: MagicMock) -> None:
         """Test that WebSocketSubscriber schedules frames correctly."""
 
         # Create a new event loop for this test
@@ -726,7 +730,10 @@ class TestSimulationAPI:
             loop.close()
             asyncio.set_event_loop(None)
 
-    def test_websocket_subscriber_multiple_frames(self) -> None:
+    @patch("back.api.v1.utils.sim_websocket_helpers.simulation_service")
+    def test_websocket_subscriber_multiple_frames(
+        self, mock_sim_service: MagicMock
+    ) -> None:
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
 
@@ -760,7 +767,8 @@ class TestSimulationAPI:
             loop.close()
             asyncio.set_event_loop(None)
 
-    def test_websocket_subscriber_send_error(self) -> None:
+    @patch("back.api.v1.utils.sim_websocket_helpers.simulation_service")
+    def test_websocket_subscriber_send_error(self, mock_sim_service: MagicMock) -> None:
         class FailingWS(DummyWebSocket):
             async def send_json(self, data: FrameData) -> None:
                 # Simulate realistic ASGI error when websocket is closed
@@ -793,7 +801,10 @@ class TestSimulationAPI:
             loop.close()
             asyncio.set_event_loop(None)
 
-    def test_websocket_subscriber_send_non_asgi_runtime_error(self) -> None:
+    @patch("back.api.v1.utils.sim_websocket_helpers.simulation_service")
+    def test_websocket_subscriber_send_non_asgi_runtime_error(
+        self, mock_sim_service: MagicMock
+    ) -> None:
         """Test that non-ASGI RuntimeErrors are re-raised"""
 
         class FailingWS(DummyWebSocket):
@@ -823,7 +834,10 @@ class TestSimulationAPI:
             loop.close()
             asyncio.set_event_loop(None)
 
-    def test_websocket_subscriber_send_generic_exception(self) -> None:
+    @patch("back.api.v1.utils.sim_websocket_helpers.simulation_service")
+    def test_websocket_subscriber_send_generic_exception(
+        self, mock_sim_service: MagicMock
+    ) -> None:
         """Test that generic exceptions mark subscriber as closed"""
 
         class FailingWS(DummyWebSocket):
@@ -855,7 +869,10 @@ class TestSimulationAPI:
             loop.close()
             asyncio.set_event_loop(None)
 
-    def test_websocket_subscriber_closed_state(self) -> None:
+    @patch("back.api.v1.utils.sim_websocket_helpers.simulation_service")
+    def test_websocket_subscriber_closed_state(
+        self, mock_sim_service: MagicMock
+    ) -> None:
         """Test that WebSocketSubscriber respects closed state"""
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
@@ -884,7 +901,10 @@ class TestSimulationAPI:
             loop.close()
             asyncio.set_event_loop(None)
 
-    def test_websocket_subscriber_disconnected_state(self) -> None:
+    @patch("back.api.v1.utils.sim_websocket_helpers.simulation_service")
+    def test_websocket_subscriber_disconnected_state(
+        self, mock_sim_service: MagicMock
+    ) -> None:
         """Test that WebSocketSubscriber respects websocket disconnected state"""
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
@@ -912,7 +932,10 @@ class TestSimulationAPI:
             loop.close()
             asyncio.set_event_loop(None)
 
-    def test_websocket_subscriber_on_frame_when_closed(self) -> None:
+    @patch("back.api.v1.utils.sim_websocket_helpers.simulation_service")
+    def test_websocket_subscriber_on_frame_when_closed(
+        self, mock_sim_service: MagicMock
+    ) -> None:
         """Test that on_frame doesn't schedule when subscriber is closed"""
         dummy_ws = DummyWebSocket()
         subscriber = WebSocketSubscriber(cast(WebSocket, dummy_ws))
@@ -927,7 +950,10 @@ class TestSimulationAPI:
         # No frames should be sent
         assert len(dummy_ws.sent) == 0
 
-    def test_websocket_subscriber_on_frame_when_disconnected(self) -> None:
+    @patch("back.api.v1.utils.sim_websocket_helpers.simulation_service")
+    def test_websocket_subscriber_on_frame_when_disconnected(
+        self, mock_sim_service: MagicMock
+    ) -> None:
         """Test that on_frame doesn't schedule when websocket is disconnected"""
         dummy_ws = DummyWebSocket()
         dummy_ws.client_state = WebSocketState.DISCONNECTED
@@ -942,7 +968,10 @@ class TestSimulationAPI:
         # No frames should be sent
         assert len(dummy_ws.sent) == 0
 
-    def test_websocket_subscriber_init_and_loop(self) -> None:
+    @patch("back.api.v1.utils.sim_websocket_helpers.simulation_service")
+    def test_websocket_subscriber_init_and_loop(
+        self, mock_sim_service: MagicMock
+    ) -> None:
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
 
@@ -974,7 +1003,10 @@ class TestSimulationAPI:
             loop.close()
             asyncio.set_event_loop(None)
 
-    def test_websocket_subscriber_malformed_frame(self) -> None:
+    @patch("back.api.v1.utils.sim_websocket_helpers.simulation_service")
+    def test_websocket_subscriber_malformed_frame(
+        self, mock_sim_service: MagicMock
+    ) -> None:
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
 
@@ -1529,7 +1561,9 @@ class TestWebSocketHelpers:
         mock_create_task.side_effect = create_task_side_effect
 
         mock_ws1 = MagicMock()
+        mock_ws1.scope = {"path": "/api/v1/simulation/stream/sim123"}
         mock_ws2 = MagicMock()
+        mock_ws2.scope = {"path": "/api/v1/simulation/stream/sim123"}
         emitter = FrameEmitter("test_sim")
 
         sim_data: dict[str, Any] = {"user_id": 1}
@@ -1578,8 +1612,11 @@ class TestWebSocketHelpers:
         mock_create_task.side_effect = create_task_side_effect
 
         mock_ws1 = MagicMock()
+        mock_ws1.scope = {"path": "/api/v1/simulation/stream/orphan-sim-1"}
         mock_ws2 = MagicMock()
+        mock_ws2.scope = {"path": "/api/v1/simulation/stream/orphan-sim-2"}
         mock_ws3 = MagicMock()
+        mock_ws3.scope = {"path": "/api/v1/simulation/stream/sim123"}
         emitter = FrameEmitter("test_sim")
 
         sim_data: dict[str, Any] = {"user_id": 1}
@@ -1690,8 +1727,11 @@ class TestWebSocketHelpers:
         # Should call start_simulation
         mock_start_sim.assert_called_once_with(mock_db, "sim123", 1)
 
+    @patch("back.api.v1.utils.sim_websocket_helpers.simulation_service")
     @pytest.mark.asyncio
-    async def test_cleanup_simulation_pauses_when_no_subscribers(self) -> None:
+    async def test_cleanup_simulation_pauses_when_no_subscribers(
+        self, mock_sim_service: MagicMock
+    ) -> None:
         """Test cleanup pauses simulation when no subscribers remain"""
         from sim.core.frame_emitter import FrameEmitter
         from back.api.v1.utils.sim_websocket_helpers import (
@@ -1701,6 +1741,7 @@ class TestWebSocketHelpers:
 
         mock_ws = MagicMock()
         mock_ws.client_state = WebSocketState.DISCONNECTED
+        mock_ws.scope = {"path": "/api/v1/simulation/stream/test-sim"}
 
         async def mock_close() -> None:
             pass
@@ -1733,8 +1774,11 @@ class TestWebSocketHelpers:
         # Should remove from emitter
         assert len(emitter.subscribers) == 0
 
+    @patch("back.api.v1.utils.sim_websocket_helpers.simulation_service")
     @pytest.mark.asyncio
-    async def test_cleanup_simulation_close_exception(self) -> None:
+    async def test_cleanup_simulation_close_exception(
+        self, mock_sim_service: MagicMock
+    ) -> None:
         """Test cleanup handles exception when closing websocket"""
         from sim.core.frame_emitter import FrameEmitter
         from back.api.v1.utils.sim_websocket_helpers import (
@@ -1744,6 +1788,7 @@ class TestWebSocketHelpers:
 
         mock_ws = MagicMock()
         mock_ws.client_state = WebSocketState.CONNECTED
+        mock_ws.scope = {"path": "/api/v1/simulation/stream/test-sim"}
 
         async def failing_close() -> None:
             raise RuntimeError("Close failed")
@@ -1868,10 +1913,10 @@ class TestWebSocketHelpers:
         mock_sim_service.stop_simulation.assert_not_called()
 
     @patch("back.api.v1.utils.sim_websocket_helpers.asyncio.create_task")
-    @pytest.mark.asyncio
     @patch("back.api.v1.utils.sim_websocket_helpers.asyncio.sleep")
     @patch("back.api.v1.utils.sim_websocket_helpers.simulation_service")
     @patch("back.api.v1.utils.sim_websocket_helpers.get_db")
+    @pytest.mark.asyncio
     async def test_auto_shutdown_simulation_without_subscriber(
         self,
         mock_get_db: MagicMock,
@@ -1954,6 +1999,7 @@ class TestWebSocketHelpers:
         from back.api.v1.utils.sim_websocket_helpers import attach_ws_subscriber
 
         mock_ws = MagicMock()
+        mock_ws.scope = {"path": "/api/v1/simulation/stream/sim123"}
         emitter = FrameEmitter("test_sim")
         old_task = MagicMock()
 
@@ -1989,6 +2035,7 @@ class TestWebSocketHelpers:
         from back.api.v1.utils.sim_websocket_helpers import attach_ws_subscriber
 
         mock_ws = MagicMock()
+        mock_ws.scope = {"path": "/api/v1/simulation/stream/sim123"}
         emitter = FrameEmitter("test_sim")
 
         sim_data: dict[str, Any] = {}  # Missing user_id
@@ -2003,8 +2050,11 @@ class TestWebSocketHelpers:
                     mock_ws,
                 )
 
+    @patch("back.api.v1.utils.sim_websocket_helpers.simulation_service")
     @pytest.mark.asyncio
-    async def test_cleanup_simulation_cancels_shutdown_task(self) -> None:
+    async def test_cleanup_simulation_cancels_shutdown_task(
+        self, mock_sim_service: MagicMock
+    ) -> None:
         """Test cleanup_simulation cancels old shutdown task"""
         from sim.core.frame_emitter import FrameEmitter
         from back.api.v1.utils.sim_websocket_helpers import (
@@ -2014,6 +2064,7 @@ class TestWebSocketHelpers:
 
         mock_ws = MagicMock()
         mock_ws.client_state = WebSocketState.DISCONNECTED
+        mock_ws.scope = {"path": "/api/v1/simulation/stream/test-sim"}
 
         async def mock_close() -> None:
             pass

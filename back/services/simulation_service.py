@@ -92,6 +92,9 @@ class ActiveSimulationData(TypedDict):
     # Optional attributes
     ws_subscriber: NotRequired["WebSocketSubscriber"]  # WebSocket connected
     shutdown_task: NotRequired["asyncio.Task"]  # Auto-shutdown scheduled
+    initialization_start_time: NotRequired[
+        float
+    ]  # Records start time of initialization, used for startup metrics
     keyframe_subscriber: NotRequired[
         KeyframePersistenceSubscriber
     ]  # Keyframe persistence
