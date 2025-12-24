@@ -125,7 +125,7 @@ def get_scenario_template(
             "stations": [
                 {
                     "name": "Station 1",
-                    "position": [-74.0060, 40.7128],
+                    "position": [-73.57314, 45.50137],
                     "initial_task_count": 1,
                     "scheduled_tasks": ["day1:09:00"],
                 }
@@ -133,7 +133,7 @@ def get_scenario_template(
             "vehicles": [
                 {
                     "name": "Vehicle 1",
-                    "position": [-74.0060, 40.7128],
+                    "position": [-73.57314, 45.50137],
                     "battery_count": 2,
                 }
             ],

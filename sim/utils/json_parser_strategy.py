@@ -40,6 +40,8 @@ from sim.utils.base_parse_strategy import BaseParseStrategy
 # Pydantic Validation Models
 # ==============================================================================
 
+DEFAULT_VEHICLE_POSITION: List[float] = [-73.57314, 45.50137]
+
 
 def _validate_day_time_format(time_value: Any) -> str:
     """Validate and parse day-time format string (e.g., 'day1:08:00').
@@ -130,8 +132,8 @@ class VehicleValidator(BaseModel):
     """Validator for vehicle entity data."""
 
     name: str
-    position: PositionValidator
-    battery_count: int
+    position: Optional[PositionValidator]
+    battery_count: Optional[int]
 
 
 class ShiftValidator(BaseModel):
@@ -976,7 +978,11 @@ class JsonParseStrategy(BaseParseStrategy):
                 drivers_from_scenario.pop(0)
                 did = driver_id_counter
                 driver_id_counter += 1
-                pos = Position(v.get("position"))
+                pos = v.get("Position")
+                if v is not None:
+                    pos = Position(v.get("position"))
+                else:
+                    pos = Position(DEFAULT_VEHICLE_POSITION)
                 drivers[did] = Driver(
                     driver_id=did, position=pos, task_list=[], vehicle=vehicles[vid]
                 )

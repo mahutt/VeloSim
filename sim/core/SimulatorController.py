@@ -457,7 +457,6 @@ class SimulatorController:
                     "id": task.get_task_id(),
                     "state": str(task.get_state()),
                     "stationId": task_station.id,
-                    # Keep legacy key name for compatibility while using driver
                     "assignedDriverId": (
                         assigned_driver.id if assigned_driver is not None else None
                     ),
