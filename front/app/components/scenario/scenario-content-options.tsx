@@ -22,14 +22,35 @@
  * SOFTWARE.
  */
 
-const APP_NAME = 'VeloSim';
-const GBFS_STATION_INFORMATION_URL = `https://gbfs.velobixi.com/gbfs/2-2/en/station_information.json`;
-const GBFS_STATION_INFORMATION_STORAGE_KEY = 'gbfs_station_information';
-const TOKEN_STORAGE_KEY = 'access_token';
+import { Ellipsis } from 'lucide-react';
+import type { Dispatch, SetStateAction } from 'react';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuTrigger,
+} from '~/components/ui/dropdown-menu';
+import UseGbfsStationsButton from './use-gbfs-stations-button';
 
-export {
-  APP_NAME,
-  GBFS_STATION_INFORMATION_URL,
-  GBFS_STATION_INFORMATION_STORAGE_KEY,
-  TOKEN_STORAGE_KEY,
-};
+interface ScenarioContentOptionsProps {
+  setScenarioContent: Dispatch<SetStateAction<string>>;
+  onEdit: () => void;
+}
+
+export default function ScenarioContentOptions({
+  setScenarioContent,
+  onEdit,
+}: ScenarioContentOptionsProps) {
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Ellipsis />
+      </DropdownMenuTrigger>
+      <DropdownMenuContent className="w-56" align="end">
+        <UseGbfsStationsButton
+          setScenarioContent={setScenarioContent}
+          onEdit={onEdit}
+        />
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
