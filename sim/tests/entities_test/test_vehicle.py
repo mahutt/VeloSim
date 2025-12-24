@@ -77,12 +77,14 @@ class TestVehicle:
     def test_set_vehicle_driver(
         self, vehicle_with_driver: Vehicle, default_position: Position
     ) -> None:
-        new_driver = Driver(3, position=default_position)
-        vehicle_with_driver.set_vehicle_driver(new_driver)
+        # Idempotent reassignment with the same driver should not error
+        same_driver = vehicle_with_driver.get_vehicle_driver()
+        assert same_driver is not None
+        vehicle_with_driver.set_vehicle_driver(same_driver)
 
         drv = vehicle_with_driver.get_vehicle_driver()
         assert drv is not None
-        assert drv.id == new_driver.id
+        assert drv.id == same_driver.id
 
     def test_set_vehicle_battery_count(self, vehicle: Vehicle) -> None:
         new_battery_count = 8

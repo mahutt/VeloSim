@@ -76,15 +76,15 @@ class Vehicle:
         Returns:
             None
         """
-        # Make sure this vehicle doesn't already have a driver
-        if self.driver is not None:
+        # Reject only if vehicle is bound to a DIFFERENT driver
+        if self.driver is not None and self.driver.id != driver.id:
             raise Exception(
                 f"Vehicle Error: vehicle: {self.id} "
                 f"already assigned to driver: {self.driver.id}"
             )
-        # Make sure the driver arg doesn't already have a vehicle
+        # Reject only if driver is bound to a DIFFERENT vehicle
         current_vehicle = driver.get_driver_vehicle()
-        if current_vehicle is not None:
+        if current_vehicle is not None and current_vehicle.id != self.id:
             raise Exception(
                 f"Vehicle Error: driver: {driver.id} "
                 f"already assigned to vehicle: {current_vehicle.id}"

@@ -94,15 +94,15 @@ class Driver:
         Returns:
             None
         """
-        # Make sure this driver does not already have a vehicle
-        if self.vehicle is not None:
+        # Reject only if driver is bound to a DIFFERENT vehicle
+        if self.vehicle is not None and self.vehicle.id != vehicle.id:
             raise Exception(
                 f"Driver Error: driver: {self.id} "
                 f"already assigned to vehicle: {self.vehicle.id}"
             )
-        # Make sure the vehicle arg does not already have a driver
+        # Reject only if vehicle is bound to a DIFFERENT driver
         current_driver = vehicle.get_vehicle_driver()
-        if current_driver is not None:
+        if current_driver is not None and current_driver.id != self.id:
             raise Exception(
                 f"Driver Error: vehicle: {vehicle.id} "
                 f"already assigned to driver: {current_driver.id}"
@@ -292,7 +292,8 @@ class Driver:
         Returns:
             list[Task]: The full task list including tasks in all states.
         """
-        return self.task_list
+        tasks = self.task_list
+        return tasks
 
     def get_visible_task_list(self) -> list["Task"]:
         """Get the list of tasks visible in the current simulation state.
