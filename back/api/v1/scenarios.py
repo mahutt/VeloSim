@@ -133,7 +133,7 @@ def get_scenario_template(
             "vehicles": [
                 {
                     "name": "Vehicle 1",
-                    "position": [-73.57314, 45.50137],
+                    "position": [-73.561, 45.507],
                     "battery_count": 2,
                 }
             ],
