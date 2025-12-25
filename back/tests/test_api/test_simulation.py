@@ -59,38 +59,29 @@ SCENARIO_PAYLOAD = {
     "id": 1,
     "name": "Morning Operations",
     "content": {
-        "start_time": "day1:06:00",
+        "start_time": "day1:08:00",
         "end_time": "day1:12:00",
+        "vehicle_battery_capacity": 999,
         "stations": [
             {
-                "station_id": 1,
-                "station_name": "Station Alpha",
-                "station_position": [45.5017, -73.5673],
-            },
+                "name": "Station 1",
+                "initial_task_count": 2,
+                "scheduled_tasks": ["day1:09:30"],
+                "position": [45.5, -73.5],
+            }
+        ],
+        "drivers": [
             {
-                "station_id": 2,
-                "station_name": "Station Bravo",
-                "station_position": [45.5088, -73.5540],
-            },
-            {
-                "station_id": 3,
-                "station_name": "Station Charlie",
-                "station_position": [45.5120, -73.5800],
-            },
+                "name": "Driver 1",
+                "shift": {
+                    "start_time": "day1:08:00",
+                    "end_time": "day1:12:00",
+                    "lunch_break": "day1:10:00",
+                },
+            }
         ],
-        "resources": [
-            {"resource_id": 101, "resource_position": [45.505, -73.56]},
-            {"resource_id": 102, "resource_position": [45.509, -73.57]},
-        ],
-        "initial_tasks": [
-            {"station_id": "1"},
-            {"station_id": "2"},
-        ],
-        "scheduled_tasks": [
-            {"time": "day1:06:10", "station_id": "3"},
-            {"time": "day1:06:30", "station_id": "1"},
-            {"time": "day1:07:00", "station_id": "2"},
-            {"time": "day1:07:30", "station_id": "1"},
+        "vehicles": [
+            {"name": "Vehicle 1", "position": [-73.5610, 45.5070], "battery_count": 999}
         ],
     },
 }

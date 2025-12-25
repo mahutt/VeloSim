@@ -23,13 +23,14 @@ SOFTWARE.
 """
 
 from datetime import datetime
-from typing import Dict, List, Any, Set, Optional
+from typing import Dict, List, Any, Set, Optional, cast
 import re
 from pydantic import BaseModel, ValidationError, model_validator, field_validator
 
 from sim.entities.inputParameters import InputParameter
 from sim.entities.station import Station
-from sim.entities.resource import Resource
+from sim.entities.driver import Driver
+from sim.entities.vehicle import Vehicle
 from sim.entities.BatterySwapTask import BatterySwapTask
 from sim.entities.position import Position
 from sim.utils.base_parse_strategy import BaseParseStrategy
@@ -38,6 +39,54 @@ from sim.utils.base_parse_strategy import BaseParseStrategy
 # ==============================================================================
 # Pydantic Validation Models
 # ==============================================================================
+
+DEFAULT_VEHICLE_POSITION: List[float] = [-73.57314, 45.50137]
+
+
+def _validate_day_time_format(time_value: Any) -> str:
+    """Validate and parse day-time format string (e.g., 'day1:08:00').
+
+    Supports: Simple time strings with relative day value (e.g., "day1:08:00")
+
+    Args:
+        time_value: Time value to validate as a string.
+
+    Returns:
+        Validated time string.
+
+    Raises:
+        ValueError: If time format is invalid.
+    """
+    if not isinstance(time_value, str):
+        raise ValueError(f"Time must be a string, got {type(time_value)}")
+
+    try:
+        daytime_str = time_value.split(":", 1)
+        if daytime_str[0] == time_value:
+            raise Exception(f"Invalid time format: {time_value}.")
+        day_str = daytime_str[0]
+        time_str = daytime_str[1]
+
+        # validate day_str
+        pattern = r"^day\d+$"
+        if re.match(pattern, day_str, re.IGNORECASE) is None:
+            raise Exception(
+                f"Invalid time format due provided day {day_str} in {time_value}."
+            )
+
+        # validate time_str
+        try:
+            datetime.strptime(time_str, "%H:%M").time()
+        except Exception:
+            raise Exception(
+                f"Invalid time format due provided time {time_str} in {time_value}."
+            )
+        return time_value
+    except Exception as e:
+        raise ValueError(
+            f"""{e} Retry by using a relative day number
+            and simple time format (e.g. 'day1:08:00')"""
+        )
 
 
 class PositionValidator(BaseModel):
@@ -79,19 +128,87 @@ class PositionValidator(BaseModel):
         return {"lat": lat, "lon": lon}
 
 
-class ResourceValidator(BaseModel):
-    """Validator for resource entity data."""
+class VehicleValidator(BaseModel):
+    """Validator for vehicle entity data."""
 
-    resource_id: int
-    resource_position: PositionValidator
+    name: str
+    position: Optional[PositionValidator] = None
+    battery_count: Optional[int] = 0
+
+
+class ShiftValidator(BaseModel):
+    """Validator for driver shift times."""
+
+    start_time: str
+    end_time: str
+    lunch_break: Optional[str] = None
+
+    @field_validator("start_time", "end_time", "lunch_break", mode="before")
+    @classmethod
+    def validate_shift(cls, v: Any) -> str:
+        """Validate a single shift time value.
+
+        Args:
+            v: Time value to validate as a string.
+
+        Returns:
+            Validated time string in format "dayX:HH:MM".
+
+        Raises:
+            ValueError: If value is not a string or has invalid format.
+        """
+        if isinstance(v, str):
+            return _validate_day_time_format(v)
+        else:
+            raise ValueError(f"Time must be a string or None, got {type(v)}")
+
+
+class DriverValidator(BaseModel):
+    """Validator for driver entity data."""
+
+    name: str
+    shift: ShiftValidator
 
 
 class StationValidator(BaseModel):
     """Validator for station entity data."""
 
-    station_id: int
-    station_name: str
-    station_position: PositionValidator
+    name: str
+    position: PositionValidator
+    initial_task_count: Optional[int] = 0
+    scheduled_tasks: List[str]
+
+    @field_validator("scheduled_tasks", mode="before")
+    @classmethod
+    def parse_time(cls, v: Any) -> List[str]:
+        """Parse time to validate valid format.
+
+        Supports: Simple time strings with relative day value (e.g., "day1:08:00")
+
+        Simulator expects:
+        - Simple time strings with relative day value for `scheduled_tasks`.
+
+        Args:
+            v: Iterable of string times.
+
+        Returns:
+            List of validated time strings.
+
+        Raises:
+            ValueError: If type is not iterable of strings or format is invalid.
+        """
+        times = []
+        if isinstance(v, (list, tuple)):
+            for time_str in v:
+                if isinstance(time_str, str):
+                    times.append(_validate_day_time_format(time_str))
+                else:
+                    raise ValueError(
+                        f"Time must be a string or None, got {type(time_str)}"
+                    )
+            return times
+        else:
+            raise ValueError(f"scheduled_tasks must be iterable type, got {type(v)}")
 
 
 class TaskValidator(BaseModel):
@@ -135,51 +252,26 @@ class TaskValidator(BaseModel):
         (e.g., "day1:08:00")
 
         Args:
-            v: Time value to validate, either string or None.
+            v: Time value to validate as a string.
 
         Returns:
-            Validated time string or None.
+            Validated time string.
 
         Raises:
-            ValueError: If time format is invalid.
+            ValueError: If time is not a string or format is invalid.
         """
         if isinstance(v, str):
-            try:
-                daytime_str = v.split(":", 1)
-                if daytime_str[0] == v:
-                    raise Exception(f"Invalid time format: {v}.")
-                day_str = daytime_str[0]
-                time_str = daytime_str[1]
-
-                # validate day_str
-                pattern = r"^day\d+$"
-                if re.match(pattern, day_str, re.IGNORECASE) is None:
-                    raise Exception(
-                        f"Invalid time format due provided day {day_str} in {v}."
-                    )
-
-                # validate time_str
-                try:
-                    datetime.strptime(time_str, "%H:%M").time()
-                except Exception:
-                    raise Exception(
-                        f"Invalid time format due provided time {time_str} in {v}."
-                    )
-            except Exception as e:
-                raise ValueError(
-                    f"""{e} Retry by using a relative day number
-                    and simple time format (e.g. 'day1:08:00')"""
-                )
-            return v
+            return _validate_day_time_format(v)
         else:
             raise ValueError(f"Time must be a string or None, got {type(v)}")
 
 
-class ScenarioTimes(BaseModel):
+class ScenarioGlobals(BaseModel):
     """Validator for scenario start and end times."""
 
     start_time: str
     end_time: str
+    vehicle_battery_capacity: int
 
     @field_validator("start_time", "end_time", mode="before")
     @classmethod
@@ -198,35 +290,32 @@ class ScenarioTimes(BaseModel):
             ValueError: If time format is invalid.
         """
         if isinstance(v, str):
-            try:
-                daytime_str = v.split(":", 1)
-                if daytime_str[0] == v:
-                    raise Exception(f"Invalid time format: {v}.")
-                day_str = daytime_str[0]
-                time_str = daytime_str[1]
 
-                # validate day_str
-                pattern = r"^day\d+$"
-                if re.match(pattern, day_str, re.IGNORECASE) is None:
-                    raise Exception(
-                        f"Invalid time format due provided day {day_str} in {v}."
-                    )
+            return _validate_day_time_format(v)
 
-                # validate time_str
-                try:
-                    datetime.strptime(time_str, "%H:%M").time()
-                except Exception:
-                    raise Exception(
-                        f"Invalid time format due provided time {time_str} in {v}."
-                    )
-                return v
-            except Exception as e:
-                raise ValueError(
-                    f"""{e} Retry by using a relative day number
-                    and simple time format (e.g. 'day1:08:00')"""
-                )
         else:
             raise ValueError(f"Time must be a string, got {type(v)}")
+
+    @field_validator("vehicle_battery_capacity", mode="before")
+    @classmethod
+    def parse_battery_capacity(cls, v: Any) -> int:
+        """Validate vehicle battery capacity.
+
+        Args:
+            v: Capacity value to validate.
+
+        Returns:
+            The validated positive integer capacity.
+
+        Raises:
+            ValueError: If capacity is not an integer greater than 0.
+        """
+        if isinstance(v, int) and v > 0:
+            return v
+        else:
+            raise ValueError(
+                f"vehicle_battery_capacity should be an integer greater than 0. Got {v}"
+            )
 
 
 # ==============================================================================
@@ -335,7 +424,7 @@ class _ScenarioValidator:
         if prefixed_path in self.line_map:
             return self.line_map[prefixed_path]
 
-        # Try the array element itself (e.g., 'resources[1]')
+        # Try the array element itself (e.g., 'drivers[1]')
         if "[" in field_path:
             array_element = re.match(r"^([^\[]+\[\d+\])", field_path)
             if array_element:
@@ -346,6 +435,20 @@ class _ScenarioValidator:
                 prefixed_element = f"content.{element_path}"
                 if prefixed_element in self.line_map:
                     return self.line_map[prefixed_element]
+
+                # Fallback: use the first known subfield mapping under the array element
+                # This handles inline array objects like `{ "name": "D1" }` where
+                # we may have `drivers[0].name` but not `drivers[0]` mapped.
+                candidate_prefixes = [f"{element_path}.", f"content.{element_path}."]
+                for prefix in candidate_prefixes:
+                    # Collect all matching subfield paths and choose the earliest line
+                    matching = [
+                        self.line_map[k]
+                        for k in self.line_map.keys()
+                        if k.startswith(prefix)
+                    ]
+                    if matching:
+                        return min(matching)
 
         # Try extracting just the field name from paths
         parts = field_path.split(".")
@@ -388,7 +491,7 @@ class _ScenarioValidator:
         errors: List[Dict[str, Any]] = []
 
         # Validate start_time and end_time exist and are properly formatted
-        required_fields = ["start_time", "end_time"]
+        required_fields = ["start_time", "end_time", "vehicle_battery_capacity"]
         for error in self.check_required_fields(content, required_fields):
             line_num = self._get_line_number(error["field"])
             if line_num:
@@ -397,7 +500,7 @@ class _ScenarioValidator:
 
         # Validate time format and constraints
         try:
-            ScenarioTimes(**content)
+            ScenarioGlobals(**content)
         except ValidationError as e:
             for err in e.errors():
                 field_path = ".".join(map(str, err["loc"]))
@@ -413,7 +516,7 @@ class _ScenarioValidator:
         return errors
 
     def validate_stations(self, stations: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
-        """Validate station definitions including IDs, names, and positions.
+        """Validate station definitions including names, positions, and tasks.
 
         Args:
             stations: List of station dictionaries to validate.
@@ -422,16 +525,11 @@ class _ScenarioValidator:
             List of error dictionaries for invalid or duplicate stations.
         """
         errors: List[Dict[str, Any]] = []
-        seen_ids: Set[int] = set()
 
         for idx, s in enumerate(stations):
             for error in self.check_required_fields(
                 s,
-                [
-                    "station_id",
-                    "station_name",
-                    "station_position",
-                ],
+                ["name", "position", "scheduled_tasks"],
             ):
                 field_path = f"stations[{idx}].{error['field']}"
                 line_num = self._get_line_number(field_path)
@@ -440,77 +538,11 @@ class _ScenarioValidator:
                 error["field"] = field_path
                 errors.append(error)
 
-            station_id_raw: Any = s.get("station_id")
-            if isinstance(station_id_raw, int):
-                if station_id_raw in seen_ids:
-                    field_path = f"stations[{idx}].station_id"
-                    dup_error: Dict[str, Any] = {
-                        "field": field_path,
-                        "message": "Duplicate station ID",
-                    }
-                    line_num = self._get_line_number(field_path)
-                    if line_num:
-                        dup_error["line"] = line_num
-                    errors.append(dup_error)
-                seen_ids.add(station_id_raw)
-
             try:
                 StationValidator(**s)
             except ValidationError as e:
                 for err in e.errors():
                     field_name = f"stations[{idx}].{'.'.join(map(str, err['loc']))}"
-                    val_error: Dict[str, Any] = {
-                        "field": field_name,
-                        "message": err["msg"],
-                    }
-                    line_num = self._get_line_number(field_name)
-                    if line_num:
-                        val_error["line"] = line_num
-                    errors.append(val_error)
-
-        return errors
-
-    def validate_resources(
-        self, resources: List[Dict[str, Any]]
-    ) -> List[Dict[str, Any]]:
-        """Validate resource definitions including IDs and positions.
-
-        Args:
-            resources: List of resource dictionaries to validate.
-
-        Returns:
-            List of error dictionaries for invalid or duplicate resources.
-        """
-        errors: List[Dict[str, Any]] = []
-        seen_ids: Set[int] = set()
-
-        for idx, r in enumerate(resources):
-            for error in self.check_required_fields(
-                r, ["resource_id", "resource_position"]
-            ):
-                field_path = f"resources[{idx}].{error['field']}"
-                line_num = self._get_line_number(field_path)
-                if line_num:
-                    error["line"] = line_num
-                error["field"] = field_path
-                errors.append(error)
-
-            try:
-                validated: ResourceValidator = ResourceValidator(**r)
-                if validated.resource_id in seen_ids:
-                    field_path = f"resources[{idx}].resource_id"
-                    dup_error: Dict[str, Any] = {
-                        "field": field_path,
-                        "message": "Duplicate resource ID",
-                    }
-                    line_num = self._get_line_number(field_path)
-                    if line_num:
-                        dup_error["line"] = line_num
-                    errors.append(dup_error)
-                seen_ids.add(validated.resource_id)
-            except ValidationError as e:
-                for err in e.errors():
-                    field_name = f"resources[{idx}].{'.'.join(map(str, err['loc']))}"
                     val_error: Dict[str, Any] = {
                         "field": field_name,
                         "message": err["msg"],
@@ -577,6 +609,87 @@ class _ScenarioValidator:
 
         return errors
 
+    def validate_vehicles(self, vehicles: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """Validate vehicle definitions including required fields and schema.
+
+        Args:
+            vehicles: List of vehicle dictionaries to validate.
+
+        Returns:
+            List of error dictionaries for invalid or duplicate vehicles.
+        """
+        errors: List[Dict[str, Any]] = []
+
+        for idx, v in enumerate(vehicles):
+            # Required fields for vehicles and ID tracking
+            for error in self.check_required_fields(v, ["name"]):
+                field_path = f"vehicles[{idx}].{error['field']}"
+                line_num = self._get_line_number(field_path)
+                if line_num:
+                    error["line"] = line_num
+                error["field"] = field_path
+                errors.append(error)
+
+            # Schema validation via Pydantic
+            try:
+                VehicleValidator(**v)
+            except ValidationError as e:
+                for err in e.errors():
+                    field_name = f"vehicles[{idx}].{'.'.join(map(str, err['loc']))}"
+                    val_error: Dict[str, Any] = {
+                        "field": field_name,
+                        "message": err["msg"],
+                    }
+                    line_num = self._get_line_number(field_name)
+                    if line_num:
+                        val_error["line"] = line_num
+                    errors.append(val_error)
+
+        return errors
+
+    def validate_drivers(
+        self,
+        drivers: List[Dict[str, Any]],
+        valid_vehicle_ids: Optional[Set[int]] = None,
+    ) -> List[Dict[str, Any]]:
+        """Validate driver definitions, shift schema, and vehicle references.
+
+        Args:
+            drivers: List of driver dictionaries to validate.
+            valid_vehicle_ids: Optional set of known vehicle IDs to validate references.
+
+        Returns:
+            List of error dictionaries for invalid or duplicate drivers.
+        """
+        errors: List[Dict[str, Any]] = []
+        valid_vehicle_ids = valid_vehicle_ids or set()
+
+        for idx, d in enumerate(drivers):
+            # Required fields for drivers and ID tracking
+            for error in self.check_required_fields(d, ["name", "shift"]):
+                field_path = f"drivers[{idx}].{error['field']}"
+                line_num = self._get_line_number(field_path)
+                if line_num:
+                    error["line"] = line_num
+                error["field"] = field_path
+                errors.append(error)
+            # Schema validation via Pydantic (name + shift)
+            try:
+                DriverValidator(**d)
+            except ValidationError as e:
+                for err in e.errors():
+                    field_name = f"drivers[{idx}].{'.'.join(map(str, err['loc']))}"
+                    val_error: Dict[str, Any] = {
+                        "field": field_name,
+                        "message": err["msg"],
+                    }
+                    line_num = self._get_line_number(field_name)
+                    if line_num:
+                        val_error["line"] = line_num
+                    errors.append(val_error)
+
+        return errors
+
     def validate_simulation_params(
         self, params: Dict[str, Any]
     ) -> List[Dict[str, Any]]:
@@ -597,8 +710,13 @@ class _ScenarioValidator:
 
         if start_val is not None and end_val is not None:
             try:
-                # Parse times using ScenarioTimes validator
-                scenario_times = ScenarioTimes(start_time=start_val, end_time=end_val)
+                # Parse times using ScenarioGlobals validator
+                capacity: int = cast(int, params.get("vehicle_battery_capacity"))
+                scenario_times = ScenarioGlobals(
+                    start_time=start_val,
+                    end_time=end_val,
+                    vehicle_battery_capacity=capacity,
+                )
 
                 # Validate that end_time is after start_time
                 start_daytime = scenario_times.start_time.split(":", 1)
@@ -654,24 +772,12 @@ class _ScenarioValidator:
         errors: List[Dict[str, Any]] = self.validate_syntax(scenario_content)
 
         stations: List[Dict[str, Any]] = scenario_content.get("stations", [])
-        resources: List[Dict[str, Any]] = scenario_content.get("resources", [])
-        initial_tasks: List[Dict[str, Any]] = scenario_content.get("initial_tasks", [])
-        scheduled_tasks: List[Dict[str, Any]] = scenario_content.get(
-            "scheduled_tasks", []
-        )
+        vehicles: List[Dict[str, Any]] = scenario_content.get("vehicles", [])
+        drivers: List[Dict[str, Any]] = scenario_content.get("drivers", [])
 
         errors.extend(self.validate_stations(stations))
-        errors.extend(self.validate_resources(resources))
-
-        valid_station_ids: Set[int] = {
-            int(s["station_id"]) for s in stations if "station_id" in s
-        }
-        errors.extend(
-            self.validate_tasks(initial_tasks, valid_station_ids, "initial_tasks")
-        )
-        errors.extend(
-            self.validate_tasks(scheduled_tasks, valid_station_ids, "scheduled_tasks")
-        )
+        errors.extend(self.validate_drivers(drivers))
+        errors.extend(self.validate_vehicles(vehicles))
 
         errors.extend(self.validate_simulation_params(scenario_content))
         return errors
@@ -780,7 +886,7 @@ class JsonParseStrategy(BaseParseStrategy):
         If validation fails, raises ScenarioParseError with details.
 
         Converts scenario JSON format into an InputParameter object containing
-        all simulation configuration including stations, resources, and tasks.
+        all simulation configuration including stations, drivers, vehicles, and tasks.
 
         Args:
             scenario_json: Optional dictionary containing scenario configuration.
@@ -815,62 +921,79 @@ class JsonParseStrategy(BaseParseStrategy):
 
         sim_time = end_time - start_time
 
-        # Build stations
+        # Entity Counters
+        task_id_counter = 1
+        station_id_counter = 1
+        vehicle_id_counter = 1
+        driver_id_counter = 1
+
+        # Build stations and tasks
         stations: Dict[int, Station] = {}
+        tasks: Dict[int, BatterySwapTask] = {}
         for s in content.get("stations", []):
-            station_id = int(s["station_id"])
-            pos = Position(s.get("station_position", [0, 0]))
+            station_id = station_id_counter
+            station_id_counter += 1
+            pos = Position(s.get("position", [0, 0]))
             stations[station_id] = Station(
                 station_id=station_id,
-                name=s.get("station_name", f"Station {station_id}"),
+                name=s.get("name", f"Station {station_id}"),
                 position=pos,
             )
 
-        # Build resources
-        resources: Dict[int, Resource] = {}
-        for r in content.get("resources", []):
-            rid = int(r["resource_id"])
-            pos = Position(r.get("resource_position", [0, 0]))
-            resources[rid] = Resource(resource_id=rid, position=pos, task_list=[])
+            # initial tasks
+            initial_task_count = s.get("initial_task_count", 0)
+            for _ in range(initial_task_count):
+                tid = task_id_counter
+                task_id_counter += 1
+                tasks[tid] = BatterySwapTask(
+                    task_id=tid, station=stations[station_id], spawn_delay=0
+                )
+                stations[station_id].add_task(tasks[tid])
 
-        # Build tasks
-        tasks: Dict[int, BatterySwapTask] = {}
-        task_id_counter = 1
+            for t in s.get("scheduled_tasks", []):
+                tid = task_id_counter
+                task_id_counter += 1
+                delay = self._time_to_seconds(t) - start_time
+                tasks[tid] = BatterySwapTask(
+                    task_id=tid, station=stations[station_id], spawn_delay=delay
+                )
+                stations[station_id].add_task(tasks[tid])
 
-        # Initial tasks
-        for t in content.get("initial_tasks", []):
-            tid = task_id_counter
-            task_id_counter += 1
-
-            station_ref = stations[int(t["station_id"])]
-            task = BatterySwapTask(task_id=tid, station=station_ref, spawn_delay=0.0)
-            tasks[tid] = task
-            station_ref.add_task(task)
-
-            # Assign to resource if specified
-            assigned_rid = t.get("assigned_resource_id")
-            if assigned_rid is not None:
-                resources[int(assigned_rid)].assign_task(task)
-
-        # Scheduled tasks
-        for t in content.get("scheduled_tasks", []):
-            tid = task_id_counter
-            task_id_counter += 1
-
-            station_ref = stations[int(t["station_id"])]
-            raw_time = t.get("time", 0)
-            if isinstance(raw_time, str):
-                delay = self._time_to_seconds(raw_time) - start_time
-            else:
-                delay = int(raw_time)
-
-            task = BatterySwapTask(task_id=tid, station=station_ref, spawn_delay=delay)
-            tasks[tid] = task
-            station_ref.add_task(task)
+        # Build Vehicles and Drivers
+        # For now, a driver must have a vehicle to drive and
+        # vice versa, to be added to the sim. Excess of either are discarded
+        vehicles: Dict[int, Vehicle] = {}
+        drivers: Dict[int, Driver] = {}
+        drivers_from_scenario = content.get("drivers", [])
+        for v in content.get("vehicles", []):
+            vid = vehicle_id_counter
+            vehicle_id_counter += 1
+            battery_count = int(v.get("battery_count", 0))
+            vehicles[vid] = Vehicle(vehicle_id=vid, battery_count=battery_count)
+            # Match as many drivers and vehicles as possible.
+            try:
+                # Pop next driver from scenario (details unused here)
+                drivers_from_scenario.pop(0)
+                did = driver_id_counter
+                driver_id_counter += 1
+                pos = v.get("position")
+                if pos:
+                    pos = Position(pos)
+                else:
+                    pos = Position(DEFAULT_VEHICLE_POSITION)
+                drivers[did] = Driver(
+                    driver_id=did, position=pos, task_list=[], vehicle=vehicles[vid]
+                )
+                vehicles[vid].set_vehicle_driver(drivers[did])
+            except IndexError:
+                # We currently only consider driver and vehicle pairs.
+                # Excess drivers/vehicles are currently ignored
+                break
 
         params = InputParameter(
             station_entities=stations,
-            resource_entities=resources,
+            driver_entities=drivers,
+            vehicles_entities=vehicles,
             task_entities=tasks,
             real_time_factor=content.get("real_time_factor", 1.0),
             key_frame_freq=content.get("key_frame_freq", 20),

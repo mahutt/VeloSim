@@ -37,47 +37,53 @@ def validator() -> ScenarioValidator:
 def simulator_format_scenario() -> Dict[str, Any]:
     """Fixture providing a scenario in the format expected by the simulator.
 
-    The simulator expects:
-    - scheduled_tasks.time as simple time format with relative day (e.g. 'day1:08:00')
-    - initial_tasks.time as optional (can be omitted or set to 'day1:00:00')
+    New schema expects:
+    - `vehicle_battery_capacity` as positive integer
+    - `stations`: name, position [lon, lat], initial_task_count,
+        scheduled_tasks ["dayX:HH:MM"]
+    - `vehicles`: name, position [lon, lat], battery_count
+    - `drivers`: name, shift with start_time/end_time/lunch_break
+        as "dayX:HH:MM"
     """
     return {
         "start_time": "day1:08:00",
         "end_time": "day1:17:00",
-        "scenario_title": "Simulator Format Test",
+        "vehicle_battery_capacity": 999,
         "stations": [
             {
-                "station_id": 8074,
-                "station_name": "Station A",
-                "task_count": 3,
-                "station_position": [45.5, -73.5],
+                "name": "Station A",
+                "position": [-73.5, 45.5],
+                "initial_task_count": 3,
+                "scheduled_tasks": ["day1:08:02", "day1:09:00"],
             },
             {
-                "station_id": 2105,
-                "station_name": "Station B",
-                "task_count": 2,
-                "station_position": [40.7, -74.0],
+                "name": "Station B",
+                "position": [-74.0, 40.7],
+                "initial_task_count": 2,
+                "scheduled_tasks": ["day1:08:30"],
             },
         ],
-        "resources": [
+        "vehicles": [
+            {"name": "Vehicle 1", "position": [-73.5, 45.5], "battery_count": 3},
+            {"name": "Vehicle 2", "position": [-74.0, 40.7], "battery_count": 2},
+        ],
+        "drivers": [
             {
-                "resource_id": 1,
-                "task_count": 3,
-                "resource_position": [45.5, -73.5],
+                "name": "Driver 1",
+                "shift": {
+                    "start_time": "day1:08:00",
+                    "end_time": "day1:17:00",
+                    "lunch_break": "day1:12:00",
+                },
             },
             {
-                "resource_id": 2,
-                "task_count": 2,
-                "resource_position": [40.7, -74.0],
+                "name": "Driver 2",
+                "shift": {
+                    "start_time": "day1:08:00",
+                    "end_time": "day1:17:00",
+                    "lunch_break": "day1:12:00",
+                },
             },
-        ],
-        "initial_tasks": [
-            {"station_id": "8074"},  # No time field, no ID
-        ],
-        "scheduled_tasks": [
-            {"station_id": "2105", "time": "day1:08:02"},
-            {"station_id": "2508", "time": "day1:08:30"},
-            {"station_id": "8074", "time": "day1:09:00"},
         ],
     }
 
@@ -89,10 +95,10 @@ def test_simulator_format_compatibility(
     # Add missing station that scheduled_tasks reference
     simulator_format_scenario["stations"].append(
         {
-            "station_id": 2508,
-            "station_name": "Station C",
-            "task_count": 1,
-            "station_position": [45.5, -73.5],
+            "name": "Station C",
+            "position": [45.5, -73.5],
+            "initial_task_count": 1,
+            "scheduled_tasks": [],
         }
     )
 
@@ -108,29 +114,27 @@ def test_valid_time_formats_only(validator: ScenarioValidator) -> None:
     scenario: Dict[str, Any] = {
         "start_time": "day1:08:00",
         "end_time": "day1:17:00",
-        "scenario_title": "Numeric Format Test",
+        "vehicle_battery_capacity": 999,
         "stations": [
             {
-                "station_id": 1,
-                "station_name": "Station 1",
-                "task_count": 5,
-                "station_position": [45.5, -73.5],
+                "name": "Station 1",
+                "position": [-73.5, 45.5],
+                "initial_task_count": 1,
+                "scheduled_tasks": ["day1:08:30", "day1:08:45"],
             }
         ],
-        "resources": [
+        "vehicles": [
+            {"name": "Vehicle 1", "position": [-73.5, 45.5], "battery_count": 5}
+        ],
+        "drivers": [
             {
-                "resource_id": 1,
-                "task_count": 5,
-                "resource_position": [45.5, -73.5],
+                "name": "Driver 1",
+                "shift": {
+                    "start_time": "day1:08:00",
+                    "end_time": "day1:17:00",
+                    "lunch_break": "day1:12:00",
+                },
             }
-        ],
-        "initial_tasks": [
-            {"station_id": "1"},  # No time, no ID (correct)
-            {"station_id": "1", "time": "day1:08:00"},
-        ],
-        "scheduled_tasks": [
-            {"station_id": "1", "time": "day1:08:30"},
-            {"station_id": "1", "time": "day1:08:45"},
         ],
     }
 
@@ -143,26 +147,15 @@ def test_integer_time_formats_rejected(validator: ScenarioValidator) -> None:
     scenario: Dict[str, Any] = {
         "start_time": "day1:08:00",
         "end_time": "day1:17:00",
+        "vehicle_battery_capacity": 999,
         "stations": [
             {
-                "station_id": 1,
-                "station_name": "Station 1",
-                "task_count": 1,
-                "station_position": [45.5, -73.5],
+                "name": "Station 1",
+                "position": [-73.5, 45.5],
+                "initial_task_count": 0,
+                # Integer element should be rejected
+                "scheduled_tasks": [3600],
             }
-        ],
-        "resources": [
-            {
-                "resource_id": 1,
-                "task_count": 1,
-                "resource_position": [45.5, -73.5],
-            }
-        ],
-        "scheduled_tasks": [
-            {
-                "station_id": "1",
-                "time": 3600,
-            },  # integer format - should be rejected
         ],
     }
 
@@ -170,9 +163,9 @@ def test_integer_time_formats_rejected(validator: ScenarioValidator) -> None:
     assert len(errors) > 0
     assert any("Time must be a string" in err["message"] for err in errors)
 
-    # Test RFC 3339 format is rejected
-    scenario["scheduled_tasks"] = [
-        {"station_id": "1", "time": "2025-11-06T14:30:00Z"},
+    # Test RFC 3339 format is rejected (as station scheduled task string)
+    scenario["stations"][0]["scheduled_tasks"] = [
+        "2025-11-06T14:30:00Z",
     ]
     errors = validator.validate_all(scenario)
     assert len(errors) > 0
@@ -184,26 +177,14 @@ def test_zero_time_is_valid(validator: ScenarioValidator) -> None:
     scenario: Dict[str, Any] = {
         "start_time": "day1:08:00",
         "end_time": "day1:17:00",
+        "vehicle_battery_capacity": 999,
         "stations": [
             {
-                "station_id": 1,
-                "station_name": "Station 1",
-                "task_count": 2,
-                "station_position": [45.5, -73.5],
+                "name": "Station 1",
+                "position": [-73.5, 45.5],
+                "initial_task_count": 2,
+                "scheduled_tasks": ["day1:08:00"],
             }
-        ],
-        "resources": [
-            {
-                "resource_id": 1,
-                "task_count": 2,
-                "resource_position": [45.5, -73.5],
-            }
-        ],
-        "initial_tasks": [
-            {"station_id": "1", "time": "day1:08:00"},  # means immediate
-        ],
-        "scheduled_tasks": [
-            {"station_id": "1", "time": "day1:08:00"},  # means immediate
         ],
     }
 
@@ -216,23 +197,14 @@ def test_large_time_values_are_valid(validator: ScenarioValidator) -> None:
     scenario: Dict[str, Any] = {
         "start_time": "day1:08:00",
         "end_time": "day1:17:00",
+        "vehicle_battery_capacity": 999,
         "stations": [
             {
-                "station_id": 1,
-                "station_name": "Station 1",
-                "task_count": 1,
-                "station_position": [45.5, -73.5],
+                "name": "Station 1",
+                "position": [-73.5, 45.5],
+                "initial_task_count": 0,
+                "scheduled_tasks": ["day1:16:00"],
             }
-        ],
-        "resources": [
-            {
-                "resource_id": 1,
-                "task_count": 1,
-                "resource_position": [45.5, -73.5],
-            }
-        ],
-        "scheduled_tasks": [
-            {"station_id": "1", "time": "day1:16:00"},  # 8 hours
         ],
     }
 

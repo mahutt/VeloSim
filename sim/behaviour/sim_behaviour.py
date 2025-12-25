@@ -23,7 +23,7 @@ SOFTWARE.
 """
 
 from sim.behaviour.resource_behaviour.resource_choose_next_task_strategy import (
-    ResourceChooseNextTaskStrategy,
+    DriverChooseNextTaskStrategy,
 )
 
 from sim.behaviour.station_behaviour.strategies.task_popup_strategy import (
@@ -38,7 +38,7 @@ from sim.behaviour.default.default_RCNT_strategy import DefaultRCNTStrategy
 class SimBehaviour:
     """Configuration for simulation behavior strategies."""
 
-    RCNT_strategy: ResourceChooseNextTaskStrategy
+    RCNT_strategy: DriverChooseNextTaskStrategy
 
     TPU_strategy: TaskPopupStrategy
 
@@ -46,11 +46,11 @@ class SimBehaviour:
         self.RCNT_strategy = DefaultRCNTStrategy()
         self.TPU_strategy = DefaultTPUStrategy()
 
-    def set_RCNT_strategy(self, strategy: ResourceChooseNextTaskStrategy) -> None:
-        """Set the resource choose next task strategy.
+    def set_RCNT_strategy(self, strategy: DriverChooseNextTaskStrategy) -> None:
+        """Set the driver choose next task strategy.
 
         Args:
-            strategy: The strategy to use for resource task selection.
+            strategy: The strategy to use for driver task selection.
 
         Returns:
             None

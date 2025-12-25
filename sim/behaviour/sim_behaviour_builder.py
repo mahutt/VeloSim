@@ -24,7 +24,7 @@ SOFTWARE.
 
 from sim.behaviour.sim_behaviour import SimBehaviour
 from sim.behaviour.resource_behaviour.resource_choose_next_task_strategy import (
-    ResourceChooseNextTaskStrategy,
+    DriverChooseNextTaskStrategy,
 )
 
 from sim.behaviour.station_behaviour.strategies.task_popup_strategy import (
@@ -41,11 +41,11 @@ class SimBehaviourBuilder:
     def __init__(self) -> None:
         self.reset()
 
-    def set_RCNT_strategy(self, strategy: ResourceChooseNextTaskStrategy) -> Self:
-        """Set the resource choose next task strategy.
+    def set_RCNT_strategy(self, strategy: DriverChooseNextTaskStrategy) -> Self:
+        """Set the driver choose next task strategy.
 
         Args:
-            strategy: The strategy to use for resource task selection.
+            strategy: The strategy to use for driver task selection.
 
         Returns:
             Self for method chaining.

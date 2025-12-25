@@ -37,13 +37,13 @@ export default function ResourceBar() {
   const [searchQuery, setSearchQuery] = useState('');
 
   const handleSelect = (resourceId: number) => {
-    selectItem(SelectedItemType.Resource, resourceId);
+    selectItem(SelectedItemType.Driver, resourceId);
   };
 
   // Check if a resource is currently selected
   const isResourceSelected = (resourceId: number) => {
     return (
-      selectedItem?.type === SelectedItemType.Resource &&
+      selectedItem?.type === SelectedItemType.Driver &&
       selectedItem.value.id === resourceId
     );
   };

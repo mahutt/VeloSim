@@ -121,53 +121,46 @@ def get_scenario_template(
             "scenario_title": "Example Scenario",
             "start_time": "day1:08:00",
             "end_time": "day1:17:00",
+            "vehicle_battery_capacity": 999,
             "stations": [
                 {
-                    "station_id": 1,
-                    "station_name": "Station 1",
-                    "station_position": [-73.57314, 45.50137],
+                    "name": "Station 1",
+                    "position": [-73.57314, 45.50137],
+                    "initial_task_count": 1,
+                    "scheduled_tasks": ["day1:09:00"],
                 }
             ],
-            "resources": [
+            "vehicles": [
                 {
-                    "resource_id": 1,
-                    "resource_position": [-73.561, 45.507],
+                    "name": "Vehicle 1",
+                    "position": [-73.561, 45.507],
+                    "battery_count": 2,
                 }
             ],
-            "initial_tasks": [
+            "drivers": [
                 {
-                    "station_id": 1,
+                    "name": "Driver 1",
+                    "shift": {
+                        "start_time": "day1:08:00",
+                        "end_time": "day1:17:00",
+                        "lunch_break": "day1:12:00",
+                    },
                 }
-            ],
-            "scheduled_tasks": [
-                {
-                    "station_id": 1,
-                    "time": "day1:08:30",
-                },
-                {
-                    "station_id": 1,
-                    "time": "day1:09:00",
-                },
             ],
         },
         "description": (
-            "Template for scenario creation. Format requirements:\n\n"
-            "- scenario_title: Name of the scenario\n"
-            "- start_time: Simple time format and day1 "
-            "(e.g., 'day1:08:00', 'day1:17:00')\n"
-            "- end_time: Simple time format with relative day "
-            "(can span multiple days e.g. 'day2:11:00')\n"
-            "- stations: List of station objects with id, name, "
-            "and position [lon, lat]\n"
-            "- resources: List of resource objects with id "
-            "and position [lon, lat]\n"
-            "- initial_tasks: Tasks to spawn immediately at simulation start.\n"
-            "  * station_id: Target station ID (integer, required)\n"
-            "  * time: NOT REQUIRED (tasks spawn immediately)\n"
-            "- scheduled_tasks: Tasks to spawn after a delay.\n"
-            "  * station_id: Target station ID (integer, required)\n"
-            "  * time: REQUIRED - Simple time format with relative day "
-            "(e.g., 'day1:09:00', 'day2:10:00' if sim spans multiple days)\n\n"
+            "Template for scenario creation. Updated format:\n\n"
+            "- start_time: Simple time format with relative day (e.g., 'day1:08:00')\n"
+            "- end_time: Simple time format with relative day (can span days)\n"
+            "- vehicle_battery_capacity: Positive integer capacity per vehicle\n"
+            "- stations: List of { name, position [lon, lat], initial_task_count,\n"
+            "  scheduled_tasks[] }\n"
+            "- vehicles: List of { name, position [lon, lat],\n"
+            "  battery_count }\n"
+            "- drivers: List of { name, shift { start_time, end_time,\n"
+            "  lunch_break } }\n\n"
+            "Notes: Tasks are now per-station via initial_task_count and\n"
+            "scheduled_tasks times."
         ),
     }
 

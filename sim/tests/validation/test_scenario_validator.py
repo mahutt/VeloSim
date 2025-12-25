@@ -31,17 +31,28 @@ from sim.utils.json_parser_strategy import _ScenarioValidator as ScenarioValidat
 VALID_SCENARIO_CONTENT: Dict[str, Any] = {
     "start_time": "day1:08:00",
     "end_time": "day1:12:00",
+    "vehicle_battery_capacity": 999,
     "stations": [
         {
-            "station_id": 1,
-            "station_name": "Station 1",
-            "station_position": [-73.5, 45.5],
+            "name": "Station 1",
+            "position": [-73.5, 45.5],
+            "initial_task_count": 1,
+            "scheduled_tasks": ["day1:09:30"],
         }
     ],
-    "resources": [{"resource_id": 1, "resource_position": [-73.5, 45.5]}],
-    "initial_tasks": [{"station_id": "1"}],
-    "scheduled_tasks": [{"station_id": "1"}],
-    "scenario_title": "Test Scenario",
+    "vehicles": [
+        {"name": "Vehicle 1", "position": [-73.56, 45.51], "battery_count": 999}
+    ],
+    "drivers": [
+        {
+            "name": "Driver 1",
+            "shift": {
+                "start_time": "day1:08:00",
+                "end_time": "day1:12:00",
+                "lunch_break": "day1:10:00",
+            },
+        }
+    ],
 }
 
 
@@ -61,6 +72,7 @@ def test_missing_required_fields(validator: ScenarioValidator) -> None:
     errors: List[Dict[str, str]] = validator.validate_all(scenario_content)
     assert any(e["field"] == "start_time" for e in errors)
     assert any(e["field"] == "end_time" for e in errors)
+    assert any(e["field"] == "vehicle_battery_capacity" for e in errors)
 
 
 def test_invalid_time_format(validator: ScenarioValidator) -> None:
@@ -80,52 +92,43 @@ def test_end_time_before_start_time(validator: ScenarioValidator) -> None:
     assert any(e["field"] == "end_time" and "after" in e["message"] for e in errors)
 
 
-def test_duplicate_station_id(validator: ScenarioValidator) -> None:
+def test_station_missing_required_fields(validator: ScenarioValidator) -> None:
     scenario_content: Dict[str, Any] = copy.deepcopy(VALID_SCENARIO_CONTENT)
-    scenario_content["stations"].append(
-        {
-            "station_id": 1,
-            "station_name": "Station Duplicate",
-            "station_position": [-73.6, 45.6],
-        }
-    )
+    scenario_content["stations"].append({})  # missing required fields
     errors: List[Dict[str, str]] = validator.validate_all(scenario_content)
-    assert any("Duplicate station ID" in e["message"] for e in errors)
+    assert any("stations[1].name" == e.get("field") for e in errors)
+    assert any("stations[1].position" == e.get("field") for e in errors)
+    assert any("stations[1].scheduled_tasks" == e.get("field") for e in errors)
 
 
-def test_duplicate_resource_id(validator: ScenarioValidator) -> None:
+def test_vehicle_missing_required_fields(validator: ScenarioValidator) -> None:
     scenario_content: Dict[str, Any] = copy.deepcopy(VALID_SCENARIO_CONTENT)
-    scenario_content["resources"].append(
-        {"resource_id": 1, "resource_position": [-73.6, 45.6]}
-    )
+    scenario_content["vehicles"].append({})
     errors: List[Dict[str, str]] = validator.validate_all(scenario_content)
-    assert any("Duplicate resource ID" in e["message"] for e in errors)
+    assert any("vehicles[1].name" == e.get("field") for e in errors)
 
 
 def test_invalid_lat_lon(validator: ScenarioValidator) -> None:
     scenario_content: Dict[str, Any] = copy.deepcopy(VALID_SCENARIO_CONTENT)
-    scenario_content["stations"][0]["station_position"] = [200, 100]  # Invalid
-    scenario_content["resources"][0]["resource_position"] = [-200, -100]  # Invalid
+    scenario_content["stations"][0]["position"] = [200, 100]  # Invalid lat/lon
+    scenario_content["vehicles"][0]["position"] = [200, 100]  # Invalid lat/lon
     errors: List[Dict[str, str]] = validator.validate_all(scenario_content)
-    assert any("station_position" in e["field"] for e in errors)
-    assert any("resource_position" in e["field"] for e in errors)
+    assert any("stations[0].position" in e.get("field", "") for e in errors)
+    assert any("vehicles[0].position" in e.get("field", "") for e in errors)
 
 
-def test_task_with_nonexistent_station(validator: ScenarioValidator) -> None:
+def test_scheduled_tasks_time_accepts_string(validator: ScenarioValidator) -> None:
     scenario_content: Dict[str, Any] = copy.deepcopy(VALID_SCENARIO_CONTENT)
-    scenario_content["initial_tasks"][0]["station_id"] = "999"
-    errors: List[Dict[str, str]] = validator.validate_all(scenario_content)
-    assert any(
-        "station_id" in e["field"] and "does not exist" in e["message"] for e in errors
-    )
+    scenario_content["stations"][0]["scheduled_tasks"] = ["day1:08:30"]
+    errors = validator.validate_all(scenario_content)
+    assert len(errors) == 0
 
 
 def test_empty_lists(validator: ScenarioValidator) -> None:
     scenario_content: Dict[str, Any] = copy.deepcopy(VALID_SCENARIO_CONTENT)
     scenario_content["stations"] = []
-    scenario_content["resources"] = []
-    scenario_content["initial_tasks"] = []
-    scenario_content["scheduled_tasks"] = []
+    scenario_content["vehicles"] = []
+    scenario_content["drivers"] = []
     errors: List[Dict[str, str]] = validator.validate_all(scenario_content)
     assert isinstance(errors, list)
 
@@ -149,119 +152,92 @@ def test_simple_time_format_still_works(validator: ScenarioValidator) -> None:
     assert len(errors) == 0
 
 
-def test_task_time_with_string_format_accepted(
-    validator: ScenarioValidator,
-) -> None:
-    """Test that task times accept string formats."""
+def test_scheduled_tasks_time_validation(validator: ScenarioValidator) -> None:
+    """Validate scheduled_tasks string format; reject RFC3339."""
     scenario_content: Dict[str, Any] = copy.deepcopy(VALID_SCENARIO_CONTENT)
-    # Ensure we have at least one station with id="1"
-    if (
-        len(scenario_content["stations"]) == 0
-        or scenario_content["stations"][0]["station_id"] != 1
-    ):
-        scenario_content["stations"] = [
-            {
-                "station_id": 1,
-                "station_name": "Test Station",
-                "station_position": [-73.5, 45.5],
-            }
-        ]
-
-    # Test that dayx:HH:MM time format is accepted
-    scenario_content["scheduled_tasks"] = [{"station_id": "1", "time": "day1:08:30"}]
+    # Valid format
+    scenario_content["stations"][0]["scheduled_tasks"] = ["day1:08:30"]
     errors = validator.validate_all(scenario_content)
     assert len(errors) == 0
 
-    # Test that RFC 3339 time format is rejected
-    scenario_content["initial_tasks"] = [
-        {"station_id": "1", "time": "2025-11-06T10:30:00Z"}
-    ]
+    # Invalid (RFC3339) format should be rejected
+    scenario_content["stations"][0]["scheduled_tasks"] = ["2025-11-06T10:30:00Z"]
     errors = validator.validate_all(scenario_content)
     assert len(errors) > 0
-    assert any("Invalid time format" in err["message"] for err in errors)
+    assert any("scheduled_tasks" in err.get("field", "") for err in errors)
 
 
-def test_validate_initial_tasks_time_optional(validator: ScenarioValidator) -> None:
-    """Test that time field is optional for initial_tasks."""
+def test_initial_task_count_optional_time(validator: ScenarioValidator) -> None:
+    """Initial tasks are represented by count and do not require time fields."""
     scenario_content: Dict[str, Any] = copy.deepcopy(VALID_SCENARIO_CONTENT)
-
-    # Test initial_tasks without time field (ID auto-generated)
-    scenario_content["initial_tasks"] = [
-        {"station_id": "1"},  # No time field, no ID
-    ]
-    scenario_content["scheduled_tasks"] = []
+    scenario_content["stations"][0]["initial_task_count"] = 2
+    scenario_content["stations"][0]["scheduled_tasks"] = []
     errors: List[Dict[str, str]] = validator.validate_all(scenario_content)
     assert len(errors) == 0
 
 
-def test_validate_scenario_with_no_task_id(validator: ScenarioValidator) -> None:
-    """Test that id field works without it for tasks (auto-generated by simulator)."""
+def test_vehicle_battery_capacity_required_and_positive(
+    validator: ScenarioValidator,
+) -> None:
     scenario_content: Dict[str, Any] = copy.deepcopy(VALID_SCENARIO_CONTENT)
+    # Missing capacity
+    del scenario_content["vehicle_battery_capacity"]
+    errors = validator.validate_all(scenario_content)
+    assert any(e.get("field") == "vehicle_battery_capacity" for e in errors)
 
-    # Test initial_tasks without id field
-    scenario_content["initial_tasks"] = [
-        {"station_id": "1"},  # No id field - will be auto-generated
-    ]
-    scenario_content["scheduled_tasks"] = [
-        {
-            "station_id": "1",
-            "time": "day1:08:30",
-        },  # No id field - will be auto-generated
-    ]
-    errors: List[Dict[str, str]] = validator.validate_all(scenario_content)
-    assert len(errors) == 0
+    # Non-positive capacity
+    scenario_content = copy.deepcopy(VALID_SCENARIO_CONTENT)
+    scenario_content["vehicle_battery_capacity"] = 0
+    errors = validator.validate_all(scenario_content)
+    assert any(
+        "vehicle_battery_capacity" in e.get("field", "")
+        or "vehicle_battery_capacity" in e.get("message", "")
+        for e in errors
+    )
 
 
-def test_validate_tasks_with_explicit_ids(validator: ScenarioValidator) -> None:
-    """Test that task IDs are explicitly rejected (auto-generated by simulator)."""
+def test_scheduled_tasks_must_be_iterable_strings(validator: ScenarioValidator) -> None:
     scenario_content: Dict[str, Any] = copy.deepcopy(VALID_SCENARIO_CONTENT)
+    # Non-iterable
+    scenario_content["stations"][0]["scheduled_tasks"] = "day1:09:00"
+    errors = validator.validate_all(scenario_content)
+    assert any("scheduled_tasks" in e.get("field", "") for e in errors)
 
-    # Test with explicit IDs - should produce validation errors
-    scenario_content["initial_tasks"] = [
-        {"id": "t1", "station_id": "1"},
-    ]
-    scenario_content["scheduled_tasks"] = [
-        {"id": "t2", "station_id": "1", "time": "day1:08:30"},
-    ]
-    errors: List[Dict[str, str]] = validator.validate_all(scenario_content)
-
-    # Should have errors - IDs are not allowed
-    assert len(errors) == 2
-    assert any("id" in error["message"].lower() for error in errors)
-    assert any("auto-generated" in error["message"].lower() for error in errors)
+    # Iterable but wrong element type
+    scenario_content = copy.deepcopy(VALID_SCENARIO_CONTENT)
+    scenario_content["stations"][0]["scheduled_tasks"] = [{"invalid": "object"}]
+    errors = validator.validate_all(scenario_content)
+    assert any("scheduled_tasks" in e.get("field", "") for e in errors)
 
 
 def test_validation_with_line_numbers() -> None:
     """Test line numbers in validation errors with JSON string."""
     json_string = """{
-  "content": {
-    "start_time": "day1:08:00",
-    "end_time": "day1:12:00",
-    "stations": [
-      {
-        "station_id": 1,
-        "station_name": "Station 1",
-        "station_position": [-73.5, 45.5]
-      }
-    ],
-    "resources": [],
-    "initial_tasks": [
-      {
-        "station_id": "999"
-      }
-    ],
-    "scheduled_tasks": []
-  }
+    "content": {
+        "start_time": "day1:08:00",
+        "end_time": "day1:12:00",
+        "vehicle_battery_capacity": 999,
+        "stations": [
+            {
+                "name": "Station 1",
+                "position": [-73.5, 45.5],
+                "initial_task_count": 0,
+                "scheduled_tasks": ["bad-time-format"]
+            }
+        ],
+        "vehicles": [],
+        "drivers": []
+    }
 }"""
 
     data = json.loads(json_string)
     validator = ScenarioValidator(json_string=json_string)
     errors = validator.validate_all(data["content"])
 
-    # Should have error for nonexistent station
+    # Should have error for invalid scheduled_tasks time
     assert len(errors) > 0
-    station_errors = [e for e in errors if "station_id" in e.get("field", "")]
-    assert len(station_errors) > 0
+    sched_errors = [e for e in errors if "scheduled_tasks" in e.get("field", "")]
+    assert len(sched_errors) > 0
 
     # Line numbers may or may not be present depending on parsing
     # Just verify the structure is correct (has field and message, optionally line)
@@ -298,7 +274,7 @@ def test_position_with_wrong_length_list(validator: ScenarioValidator) -> None:
     """Test position validation with wrong length list."""
     scenario_content: Dict[str, Any] = copy.deepcopy(VALID_SCENARIO_CONTENT)
     # Position list must have exactly 2 coordinates
-    scenario_content["stations"][0]["station_position"] = [-73.5, 45.5, 100.0]
+    scenario_content["stations"][0]["position"] = [-73.5, 45.5, 100.0]
 
     errors = validator.validate_all(scenario_content)
 
@@ -313,7 +289,7 @@ def test_position_with_invalid_type(validator: ScenarioValidator) -> None:
     """Test position validation with invalid type."""
     scenario_content: Dict[str, Any] = copy.deepcopy(VALID_SCENARIO_CONTENT)
     # Position must be dict or list/tuple
-    scenario_content["stations"][0]["station_position"] = "invalid"
+    scenario_content["stations"][0]["position"] = "invalid"
 
     errors = validator.validate_all(scenario_content)
 
@@ -323,64 +299,62 @@ def test_position_with_invalid_type(validator: ScenarioValidator) -> None:
     )
 
 
-def test_task_time_with_invalid_type(validator: ScenarioValidator) -> None:
-    """Test task time validation with invalid type (not int, float, or None)."""
+def test_scheduled_tasks_with_invalid_type(validator: ScenarioValidator) -> None:
+    """Test scheduled_tasks element type must be string time."""
     scenario_content: Dict[str, Any] = copy.deepcopy(VALID_SCENARIO_CONTENT)
-    # Time must be numeric or None
-    scenario_content["scheduled_tasks"] = [
-        {"station_id": "1", "time": {"invalid": "object"}}
-    ]
+    scenario_content["stations"][0]["scheduled_tasks"] = [{"invalid": "object"}]
 
     errors = validator.validate_all(scenario_content)
 
     assert len(errors) > 0
-    assert any("time must be" in error.get("message", "").lower() for error in errors)
+    assert any("scheduled_tasks" in error.get("field", "") for error in errors)
 
 
 def test_array_elements_have_distinct_line_numbers() -> None:
-    """Test that different array elements report different line numbers."""
+    """Missing driver fields in different array elements use distinct lines."""
     json_string = """{
-  "content": {
-    "start_time": "day1:08:00",
-    "end_time": "day1:12:00",
-    "stations": [
-      {
-        "station_id": 1,
-        "station_name": "Station 1",
-        "station_position": [-73.5, 45.5]
-      }
-    ],
-    "resources": [
-      {
-        "resource_id": 1,
-        "resource_position": [-73.5, 45.5]
-      },
-      {
-        "resource_id": 1,
-        "resource_position": [-73.6, 45.6]
-      },
-      {
-        "resource_id": 1,
-        "resource_position": [-73.7, 45.7]
-      }
-    ],
-    "initial_tasks": [],
-    "scheduled_tasks": []
-  }
+    "content": {
+        "start_time": "day1:08:00",
+        "end_time": "day1:12:00",
+        "vehicle_battery_capacity": 999,
+        "stations": [
+            {
+                "name": "Station 1",
+                "position": [-73.5, 45.5],
+                "initial_task_count": 0,
+                "scheduled_tasks": []
+            }
+        ],
+        "vehicles": [
+            {
+                "name": "V1",
+                "position": [-73.56, 45.51],
+                "battery_count": 2
+            }
+        ],
+        "drivers": [
+            { "name": "D1" },
+            { "name": "D2" }
+        ]
+    }
 }"""
 
     data = json.loads(json_string)
     validator = ScenarioValidator(json_string=json_string)
     errors = validator.validate_all(data["content"])
 
-    # Should have errors for duplicate resource IDs
-    dup_errors = [e for e in errors if "Duplicate resource ID" in e.get("message", "")]
-    assert len(dup_errors) >= 2  # At least 2 duplicates of resource_id 1
+    # Should have errors for missing shift on drivers[0] and drivers[1]
+    shift_errors = [
+        e
+        for e in errors
+        if e.get("field", "").startswith("drivers[")
+        and e.get("field", "").endswith(".shift")
+    ]
+    assert len(shift_errors) >= 2
 
     # Check that errors have line numbers and they are different
-    line_numbers = [e.get("line") for e in dup_errors if e.get("line") is not None]
+    line_numbers = [e.get("line") for e in shift_errors if e.get("line") is not None]
     assert len(line_numbers) >= 2
-    # Line numbers should be different for different array elements
     assert (
         len(set(line_numbers)) >= 2
     ), f"Expected distinct line numbers, got: {line_numbers}"

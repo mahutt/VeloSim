@@ -25,19 +25,21 @@ SOFTWARE.
 from dataclasses import dataclass
 from typing import List, Optional
 
-from sim.entities.resource import Resource
+from sim.entities.driver import Driver
+from sim.entities.vehicle import Vehicle
 from sim.entities.station import Station
 from sim.entities.task import Task
 
 
 @dataclass
 class Scenario:
-    """Complete scenario definition with resources, stations, and tasks."""
+    """Complete scenario definition with drivers, vehicles, stations, and tasks."""
 
     scenario_title: Optional[str]
     start_time: str
     end_time: str
-    resources: List[Resource]
+    drivers: List[Driver]
+    vehicles: List[Vehicle]
     stations: List[Station]
     initial_tasks: List[Task]
     scheduled_tasks: List[Task]
@@ -47,7 +49,8 @@ class Scenario:
         scenario_title: Optional[str] = None,
         start_time: str = "",
         end_time: str = "",
-        resources: Optional[List[Resource]] = None,
+        drivers: Optional[List[Driver]] = None,
+        vehicles: Optional[List[Vehicle]] = None,
         stations: Optional[List[Station]] = None,
         initial_tasks: Optional[List[Task]] = None,
         scheduled_tasks: Optional[List[Task]] = None,
@@ -55,7 +58,8 @@ class Scenario:
         self.scenario_title = scenario_title
         self.start_time = start_time
         self.end_time = end_time
-        self.resources = resources or []
+        self.drivers = drivers or []
+        self.vehicles = vehicles or []
         self.stations = stations or []
         self.initial_tasks = initial_tasks or []
         self.scheduled_tasks = scheduled_tasks or []
@@ -66,7 +70,8 @@ class Scenario:
             f"ScenarioConfig("
             f"title='{self.scenario_title}', "
             f"start='{self.start_time}', end='{self.end_time}', "
-            f"resources={len(self.resources)}, "
+            f"drivers={len(self.drivers)}, "
+            f"vehicles={len(self.vehicles)}, "
             f"stations={len(self.stations)}, "
             f"initial_tasks={len(self.initial_tasks)}, "
             f"scheduled_tasks={len(self.scheduled_tasks)})"

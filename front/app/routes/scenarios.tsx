@@ -403,10 +403,10 @@ export default function ScenarioEditor() {
         const ordered = {
           start_time: c.start_time,
           end_time: c.end_time,
-          resources: c.resources,
+          vehicle_battery_capacity: c.vehicle_battery_capacity,
+          drivers: c.drivers,
+          vehicles: c.vehicles,
           stations: c.stations,
-          initial_tasks: c.initial_tasks,
-          scheduled_tasks: c.scheduled_tasks,
         };
         setScenarioContent(JSON.stringify(ordered, null, 2));
         setScenarioName(scenario.name);

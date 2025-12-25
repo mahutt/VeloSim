@@ -23,12 +23,12 @@
  */
 
 import { useState } from 'react';
-import type { Resource } from '~/types';
+import type { Driver } from '~/types';
 import { Item, ItemContent, ItemTitle } from '~/components/ui/item';
 import { useTaskAssignment } from '~/providers/task-assignment-provider';
 
 // Restricted Resource type for ResourceItem component
-export interface ResourceItemElement extends Pick<Resource, 'id'> {
+export interface ResourceItemElement extends Pick<Driver, 'id'> {
   taskCount: number;
 }
 

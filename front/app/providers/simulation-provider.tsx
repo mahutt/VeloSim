@@ -35,12 +35,12 @@ import {
 import { useMap } from './map-provider';
 import { MapSource, setMapSource } from '~/lib/map-helpers';
 import {
-  type Resource,
   type BackendPayload,
   type StationTask,
   type SimulationStatus,
   type Station,
   type Position,
+  type Driver,
 } from '~/types';
 import {
   adaptStationsToGeoJSON,
@@ -75,13 +75,13 @@ export type Speed = (typeof SPEED_OPTIONS)[number];
 export type SimulationContextType = {
   speedRef: React.RefObject<Speed>;
   stationsRef: React.RefObject<Map<number, Station>>;
-  resourcesRef: React.RefObject<Map<number, Resource>>;
+  driversRef: React.RefObject<Map<number, Driver>>;
   resourceBarElement: ResourceBarElement;
   selectedItem: SelectedItemBarElement | null;
   selectItem: (type: SelectedItemType, id: number) => void;
   clearSelection: () => void;
-  assignTask: (resourceId: number, taskId: number) => Promise<void>;
-  unassignTask: (resourceId: number, taskId: number) => Promise<void>;
+  assignTask: (driverId: number, taskId: number) => Promise<void>;
+  unassignTask: (driverId: number, taskId: number) => Promise<void>;
   reassignTask: (
     prevResourceId: number,
     newResourceId: number,
@@ -124,7 +124,7 @@ export const SimulationProvider = ({
 
   // (TOTAL) NON-REACTIVE SIMULATION ENTITY STATE
   const stationsRef = useRef<Map<number, Station>>(new Map());
-  const resourcesRef = useRef<Map<number, Resource>>(new Map());
+  const driversRef = useRef<Map<number, Driver>>(new Map());
   const tasksRef = useRef<Map<number, StationTask>>(new Map());
 
   // (PARTIAL) REACTIVE SIMULATION ENTITY STATE
@@ -136,15 +136,15 @@ export const SimulationProvider = ({
   const [formattedSimTime, setFormattedSimTime] = useState<string | null>(null);
   const [currentDay, setCurrentDay] = useState<number>(1);
 
-  const assignTask = async (resourceId: number, taskId: number) => {
-    const resource = resourcesRef.current.get(resourceId);
+  const assignTask = async (driverId: number, taskId: number) => {
+    const resource = driversRef.current.get(driverId);
 
     if (!resource) {
-      throw new Error(`Resource #${resourceId} not found.`);
+      throw new Error(`Driver #${driverId} not found.`);
     }
 
     try {
-      const payload = { task_id: taskId, resource_id: resourceId };
+      const payload = { task_id: taskId, resource_id: driverId };
       await api.post(`/simulation/${simId!}/resources/assign`, payload);
 
       const updatedResource = resource;
@@ -152,9 +152,9 @@ export const SimulationProvider = ({
         updatedResource.taskIds.push(taskId);
       }
 
-      resourcesRef.current.set(resourceId, updatedResource);
+      driversRef.current.set(driverId, updatedResource);
       updateResourceBarElement();
-      updateSelectedItem(resourceId, SelectedItemType.Resource);
+      updateSelectedItem(driverId, SelectedItemType.Driver);
     } catch (error) {
       displayError(
         'Assignment failed',
@@ -164,23 +164,23 @@ export const SimulationProvider = ({
     }
   };
 
-  const unassignTask = async (resourceId: number, taskId: number) => {
-    const resource = resourcesRef.current.get(resourceId);
+  const unassignTask = async (driverId: number, taskId: number) => {
+    const resource = driversRef.current.get(driverId);
     if (!resource) {
-      throw new Error(`Resource #${resourceId} not found.`);
+      throw new Error(`Driver #${driverId} not found.`);
     }
 
     try {
-      const payload = { task_id: taskId, resource_id: resourceId };
+      const payload = { task_id: taskId, resource_id: driverId };
       await api.post(`/simulation/${simId!}/resources/unassign`, payload);
 
-      const updatedResource: Resource = {
+      const updatedResource: Driver = {
         ...resource,
         taskIds: resource.taskIds.filter((t) => t !== taskId),
       };
-      resourcesRef.current.set(resourceId, updatedResource);
+      driversRef.current.set(driverId, updatedResource);
       updateResourceBarElement();
-      updateSelectedItem(resourceId, SelectedItemType.Resource);
+      updateSelectedItem(driverId, SelectedItemType.Driver);
     } catch (error) {
       displayError(
         'Unassignment failed',
@@ -195,8 +195,8 @@ export const SimulationProvider = ({
     newResourceId: number,
     taskId: number
   ) => {
-    const prevResource = resourcesRef.current.get(prevResourceId);
-    const newResource = resourcesRef.current.get(newResourceId);
+    const prevResource = driversRef.current.get(prevResourceId);
+    const newResource = driversRef.current.get(newResourceId);
     if (!prevResource) {
       throw new Error(`Previous resource #${prevResourceId} not found.`);
     }
@@ -213,30 +213,30 @@ export const SimulationProvider = ({
 
       await api.post(`/simulation/${simId!}/resources/reassign`, payload);
 
-      const updatedPrevResource: Resource = {
+      const updatedPrevResource: Driver = {
         ...prevResource,
         taskIds: prevResource.taskIds.filter((t) => t !== taskId),
       };
-      resourcesRef.current.set(prevResourceId, updatedPrevResource);
+      driversRef.current.set(prevResourceId, updatedPrevResource);
 
       const updatedNewResource = newResource;
       if (!updatedNewResource.taskIds.includes(taskId)) {
         updatedNewResource.taskIds.push(taskId);
       }
 
-      resourcesRef.current.set(newResourceId, updatedNewResource);
+      driversRef.current.set(newResourceId, updatedNewResource);
       updateResourceBarElement();
 
-      if (selectedItem?.type === SelectedItemType.Resource) {
+      if (selectedItem?.type === SelectedItemType.Driver) {
         if ((selectedItem.value as PopulatedResource).id === prevResourceId) {
-          const updated = resourcesRef.current.get(prevResourceId);
+          const updated = driversRef.current.get(prevResourceId);
           if (updated) {
-            updateSelectedItem(prevResourceId, SelectedItemType.Resource);
+            updateSelectedItem(prevResourceId, SelectedItemType.Driver);
           }
         } else if (
           (selectedItem.value as PopulatedResource).id === newResourceId
         ) {
-          updateSelectedItem(newResourceId, SelectedItemType.Resource);
+          updateSelectedItem(newResourceId, SelectedItemType.Driver);
         }
       }
     } catch (error) {
@@ -306,22 +306,22 @@ export const SimulationProvider = ({
       });
     }
 
-    // Update resources that appear in the payload
-    payload.resources.forEach((updatedResource: Resource) => {
+    // Update drivers that appear in the payload
+    payload.drivers.forEach((updatedResource: Driver) => {
       // If the resource doesn't exist, or does exist but has different task count, we need to update the reactive resources list
-      const existingResource = resourcesRef.current.get(updatedResource.id);
+      const existingResource = driversRef.current.get(updatedResource.id);
       shouldUpdateReactiveResources =
         !existingResource ||
         existingResource.taskIds.length !== updatedResource.taskIds.length;
 
-      resourcesRef.current.set(updatedResource.id, updatedResource);
+      driversRef.current.set(updatedResource.id, updatedResource);
 
       // Update reactive selectedItem if this resource is that item
       if (
-        selectedItem?.type === SelectedItemType.Resource &&
+        selectedItem?.type === SelectedItemType.Driver &&
         selectedItem.value.id === updatedResource.id
       ) {
-        updateSelectedItem(updatedResource.id, SelectedItemType.Resource);
+        updateSelectedItem(updatedResource.id, SelectedItemType.Driver);
       }
       renderOnNextFrameRef.current = true;
     });
@@ -364,8 +364,8 @@ export const SimulationProvider = ({
     }
 
     // Update resources
-    if (resourcesRef.current.size > 0) {
-      const resources = Array.from(resourcesRef.current.values());
+    if (driversRef.current.size > 0) {
+      const resources = Array.from(driversRef.current.values());
       const geojson = adaptResourcesToGeoJSON(
         resources,
         selectedResourceId,
@@ -413,11 +413,11 @@ export const SimulationProvider = ({
       });
       selectedStationIdRef.current = itemId;
       selectedResourceIdRef.current = undefined;
-    } else if (type === SelectedItemType.Resource) {
-      const targetResource = resourcesRef.current.get(itemId);
+    } else if (type === SelectedItemType.Driver) {
+      const targetResource = driversRef.current.get(itemId);
       if (!targetResource) return;
       setSelectedItem({
-        type: SelectedItemType.Resource,
+        type: SelectedItemType.Driver,
         value: {
           id: targetResource.id,
           position: targetResource.position,
@@ -438,7 +438,7 @@ export const SimulationProvider = ({
 
   const updateResourceBarElement = () => {
     setResourceBarElement(
-      Array.from(resourcesRef.current.values()).map((resource) => ({
+      Array.from(driversRef.current.values()).map((resource) => ({
         id: resource.id,
         taskCount: resource.taskIds.length,
       }))
@@ -464,7 +464,7 @@ export const SimulationProvider = ({
     const item =
       type === SelectedItemType.Station
         ? stationsRef.current.get(id)
-        : resourcesRef.current.get(id);
+        : driversRef.current.get(id);
 
     if (!item) {
       const entityType =
@@ -486,10 +486,10 @@ export const SimulationProvider = ({
   // Update hover state with immediate visual feedback
   const updateHoverState = (
     stationId: number | null,
-    resourceId: number | null
+    driverId: number | null
   ) => {
     hoveredStationIdRef.current = stationId;
-    hoveredResourceIdRef.current = resourceId;
+    hoveredResourceIdRef.current = driverId;
 
     if (hoverDebounceTimeoutRef.current) {
       clearTimeout(hoverDebounceTimeoutRef.current);
@@ -520,8 +520,8 @@ export const SimulationProvider = ({
 
       handlePayload(payload, selectedItem);
 
-      // For each resource, update the frame start position and target positions
-      payload.resources.forEach((resource: Resource) => {
+      // For each driver, update the frame start position and target positions
+      payload.drivers.forEach((resource: Driver) => {
         const newPosition = resource.position;
         const currentPosition = currentPositionsRef.current.get(resource.id);
         frameStartPositionsRef.current.set(
@@ -565,7 +565,7 @@ export const SimulationProvider = ({
     const t = Math.min(frameElapsedMs / adjustedInterval, 1);
 
     // Update position for each resource
-    resourcesRef.current.forEach((resource) => {
+    driversRef.current.forEach((resource) => {
       const start = frameStartPositionsRef.current.get(resource.id);
       const target = targetPositionsRef.current.get(resource.id);
 
@@ -650,12 +650,12 @@ export const SimulationProvider = ({
       const { type, id } = item;
       if (type === SelectedItemType.Station) {
         updateHoverState(id, null);
-      } else if (type === SelectedItemType.Resource) {
+      } else if (type === SelectedItemType.Driver) {
         updateHoverState(null, id);
       }
     });
 
-    if (stationsRef.current.size > 0 || resourcesRef.current.size > 0) {
+    if (stationsRef.current.size > 0 || driversRef.current.size > 0) {
       console.log('[Map] Map loaded, rendering existing data');
       queueMapUpdate();
     }
@@ -691,7 +691,7 @@ export const SimulationProvider = ({
       value={{
         speedRef,
         stationsRef,
-        resourcesRef,
+        driversRef,
         resourceBarElement,
         selectedItem,
         selectItem,

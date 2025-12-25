@@ -40,7 +40,7 @@ from sim.entities.inputParameters import InputParameter
 from sim.entities.request_type import RequestType
 from sim.entities.station import Station
 from sim.entities.position import Position
-from sim.entities.resource import Resource
+from sim.entities.driver import Driver
 from sim.entities.BatterySwapTask import BatterySwapTask
 
 import sim.core.RealTimeDriver as rtd_mod
@@ -58,7 +58,7 @@ class FakeTPUStrategy:
 
 
 class FakeRCNTStrategy:
-    def select_next_task(self, resource: Resource) -> None:
+    def select_next_task(self, driver: Driver) -> None:
         return None
 
 
@@ -122,11 +122,11 @@ def input_params(simpy_env: simpy.Environment) -> InputParameter:
     params.add_station(station1)
     params.add_station(station2)
 
-    # Add test resources
-    resource1 = Resource(resource_id=1, position=Position([15.0, 25.0]))
-    resource2 = Resource(resource_id=2, position=Position([35.0, 45.0]))
-    params.add_resource(resource1)
-    params.add_resource(resource2)
+    # Add test drivers
+    driver1 = Driver(driver_id=1, position=Position([15.0, 25.0]))
+    driver2 = Driver(driver_id=2, position=Position([35.0, 45.0]))
+    params.add_driver(driver1)
+    params.add_driver(driver2)
 
     # Add test tasks using concrete BatterySwapTask
     task1 = BatterySwapTask(task_id=1, station=station1)
@@ -580,9 +580,9 @@ def test_assign_task_to_resource_success(
         sim_controller = sim_info["simController"]
         task = sim_controller.get_task_by_id(1)
         assert task is not None
-        resource = task.get_assigned_resource()
-        assert resource is not None
-        assert resource.id == 1
+        driver = task.get_assigned_driver()
+        assert driver is not None
+        assert driver.id == 1
 
 
 @patch("builtins.print")
@@ -640,7 +640,7 @@ def test_unassign_task_from_resource_success(
         sim_controller = sim_info["simController"]
         task = sim_controller.get_task_by_id(1)
         assert task is not None
-        assert task.get_assigned_resource() is None
+        assert task.get_assigned_driver() is None
 
 
 @patch("builtins.print")
@@ -696,12 +696,12 @@ def test_reassign_task_success(sim: Simulator, input_params: InputParameter) -> 
         sim_controller = sim_info["simController"]
         task = sim_controller.get_task_by_id(1)
         assert task is not None
-        old_resource = sim_controller.get_resource_by_id(1)
-        assert old_resource is not None
-        new_resource = sim_controller.get_resource_by_id(2)
-        assert new_resource is not None
-        assert task.get_assigned_resource() == new_resource
-        assert task not in old_resource.get_task_list()
+        old_driver = sim_controller.get_driver_by_id(1)
+        assert old_driver is not None
+        new_driver = sim_controller.get_driver_by_id(2)
+        assert new_driver is not None
+        assert task.get_assigned_driver() == new_driver
+        assert task not in old_driver.get_task_list()
 
 
 @patch("builtins.print")
@@ -804,20 +804,20 @@ def test_reorder_resource_tasks_success(
     ):
         sim_id = sim.initialize(input_params, [], FakeSimBehaviour())
 
-    # Get the controller and resource
+    # Get the controller and driver
     sim_info = sim.get_sim_by_id(sim_id)
     assert sim_info is not None
     controller = sim_info["simController"]
-    resource = controller.get_resource_by_id(1)
-    assert resource is not None
+    driver = controller.get_driver_by_id(1)
+    assert driver is not None
 
     # Set up tasks
-    resource.task_list.clear()
+    driver.task_list.clear()
     task1 = controller.get_task_by_id(1)
     task2 = controller.get_task_by_id(2)
     assert task1 is not None
     assert task2 is not None
-    resource.task_list = [task1, task2]
+    driver.task_list = [task1, task2]
 
     # Reorder tasks via Simulator
     new_order = sim.reorder_resource_tasks(
@@ -825,7 +825,7 @@ def test_reorder_resource_tasks_success(
     )
 
     assert new_order == [2, 1]
-    assert resource.task_list == [task2, task1]
+    assert driver.task_list == [task2, task1]
 
 
 def test_reorder_resource_tasks_simulation_not_found(
@@ -882,20 +882,20 @@ def test_reorder_resource_tasks_with_thread_lock(
     ):
         sim_id = sim.initialize(input_params, [], FakeSimBehaviour())
 
-    # Get the controller and resource
+    # Get the controller and driver
     sim_info = sim.get_sim_by_id(sim_id)
     assert sim_info is not None
     controller = sim_info["simController"]
-    resource = controller.get_resource_by_id(1)
-    assert resource is not None
+    driver = controller.get_driver_by_id(1)
+    assert driver is not None
 
     # Set up tasks
-    resource.task_list.clear()
+    driver.task_list.clear()
     task1 = controller.get_task_by_id(1)
     task2 = controller.get_task_by_id(2)
     assert task1 is not None
     assert task2 is not None
-    resource.task_list = [task1, task2]
+    driver.task_list = [task1, task2]
 
     # Mock the lock to verify it's being used
     original_lock = sim.thread_pool_lock

@@ -30,7 +30,8 @@ from sim.entities.station import Station
 from sim.core.frame_emitter import FrameEmitter
 from sim.entities.task_state import State
 from sim.entities.frame import Frame
-from sim.entities.resource import Resource
+from sim.entities.driver import Driver
+from sim.entities.vehicle import Vehicle
 from sim.entities.clock import Clock
 from sim.entities.task import Task
 from sim.entities.inputParameters import InputParameter
@@ -69,9 +70,12 @@ class SimulatorController:
         self.station_entities: Dict[int, Station] = (
             inputParameters.get_station_entities()
         )
-        self.resource_entities: Dict[int, Resource] = (
-            inputParameters.get_resource_entities()
+        self.driver_entities: Dict[int, Driver] = inputParameters.get_driver_entities()
+
+        self.vehicle_entities: Dict[int, Vehicle] = (
+            inputParameters.get_vehicle_entities()
         )
+
         self.task_entities = inputParameters.get_task_entities()
 
     def prep_entities(self) -> None:
@@ -105,12 +109,15 @@ class SimulatorController:
                 # set to assigned in json_parser_strategy
                 pass
 
-        for _, resource in self.resource_entities.items():
-            resource.set_behaviour(self.sim_behaviour)
-            resource.set_map_controller(self.map_controller)
-            # Rebind to the actual simulation environment
-            resource.env = self.simEnv
-            self.simEnv.process(resource.run())
+        for _, driver in self.driver_entities.items():
+            driver.set_behaviour(self.sim_behaviour)
+            driver.set_map_controller(self.map_controller)
+
+            driver.env = self.simEnv
+            self.simEnv.process(driver.run())
+
+        for _, vehicle in self.vehicle_entities.items():
+            vehicle.env = self.simEnv
 
     def start(self, sim_time: int) -> None:
         """Start the simulation for specified time.
@@ -182,16 +189,27 @@ class SimulatorController:
         """
         return self.task_entities.get(task_id)
 
-    def get_resource_by_id(self, resource_id: int) -> Optional[Resource]:
-        """Get a resource by its ID.
+    def get_driver_by_id(self, driver_id: int) -> Optional[Driver]:
+        """Get a driver by its ID.
 
         Args:
-            resource_id: The resource ID to look up.
+            driver_id: The driver ID to look up.
 
         Returns:
-            The resource if found, None otherwise.
+            The driver if found, None otherwise.
         """
-        return self.resource_entities.get(resource_id)
+        return self.driver_entities.get(driver_id)
+
+    def get_vehicle_by_id(self, vehicle_id: int) -> Optional[Vehicle]:
+        """Get a vehicle by its ID.
+
+        Args:
+            vehicle_id: The vehicle ID to look up.
+
+        Returns:
+            The vehicle if found, None otherwise.
+        """
+        return self.vehicle_entities.get(vehicle_id)
 
     def get_station_by_id(self, station_id: int) -> Optional[Station]:
         """Get a station by its ID.
@@ -224,106 +242,106 @@ class SimulatorController:
         else:  # task with same id exists already
             raise Exception(f"Task with id {task_id} already exists")
 
-    def assign_task_to_resource(
-        self, task_id: int, resource_id: int, dispatch_delay: Optional[float] = None
+    def assign_task_to_driver(
+        self, task_id: int, driver_id: int, dispatch_delay: Optional[float] = None
     ) -> None:
-        """Assign a task to a resource.
+        """Assign a task to a driver.
 
         Args:
             task_id: The task ID to assign.
-            resource_id: The resource ID to assign to.
+            driver_id: The driver ID to assign to.
             dispatch_delay: Optional delay before task dispatch.
 
         Returns:
             None
 
         Raises:
-            Exception: If task or resource not found.
+            Exception: If task or driver not found.
         """
         found_task = self.get_task_by_id(task_id)
-        found_resource = self.get_resource_by_id(resource_id)
+        found_driver = self.get_driver_by_id(driver_id)
 
-        if found_task and found_resource:
-            found_resource.assign_task(found_task, dispatch_delay)
+        if found_task and found_driver:
+            found_driver.assign_task(found_task, dispatch_delay)
         elif found_task is None:
             raise Exception(f"Could not find task in sim with id: {task_id}")
         else:
-            raise Exception(f"Could not find resource in sim with id: {resource_id}")
+            raise Exception(f"Could not find driver in sim with id: {driver_id}")
 
-    def unassign_task_from_resource(self, task_id: int, resource_id: int) -> None:
-        """Unassign a task from a resource.
+    def unassign_task_from_driver(self, task_id: int, driver_id: int) -> None:
+        """Unassign a task from a driver.
 
         Args:
             task_id: The task ID to unassign.
-            resource_id: The resource ID to unassign from.
+            driver_id: The driver ID to unassign from.
 
         Returns:
             None
 
         Raises:
-            Exception: If task or resource not found.
+            Exception: If task or driver not found.
         """
         found_task = self.get_task_by_id(task_id)
-        found_resource = self.get_resource_by_id(resource_id)
+        found_driver = self.get_driver_by_id(driver_id)
 
-        if found_task and found_resource:
-            found_resource.unassign_task(found_task)
+        if found_task and found_driver:
+            found_driver.unassign_task(found_task)
         elif found_task is None:
             raise Exception(f"Could not find task in sim with id: {task_id}")
         else:
-            raise Exception(f"Could not find resource in sim with id: {resource_id}")
+            raise Exception(f"Could not find driver in sim with id: {driver_id}")
 
     def reassign_task(
         self,
         task_id: int,
-        old_resource_id: int,
-        new_resource_id: int,
+        old_driver_id: int,
+        new_driver_id: int,
         dispatch_delay: Optional[float] = None,
     ) -> None:
-        """Reassign a task from one resource to another.
+        """Reassign a task from one driver to another.
 
         Args:
             task_id: The task ID to reassign.
-            old_resource_id: The current resource ID.
-            new_resource_id: The new resource ID to assign to.
+            old_driver_id: The current driver ID.
+            new_driver_id: The new driver ID to assign to.
             dispatch_delay: Optional delay before task dispatch.
 
         Returns:
             None
 
         Raises:
-            Exception: If task or resources not found.
+            Exception: If task or drivers not found.
         """
         try:
-            self.unassign_task_from_resource(task_id, old_resource_id)
-            self.assign_task_to_resource(task_id, new_resource_id, dispatch_delay)
+            self.unassign_task_from_driver(task_id, old_driver_id)
+            self.assign_task_to_driver(task_id, new_driver_id, dispatch_delay)
         except Exception as e:
             error_message = str(e)
             if str(task_id) in error_message:
                 raise Exception(
                     f"Reassigning task failed as could not find task {task_id}"
                 )
-            elif str(old_resource_id) in error_message:
+            elif str(old_driver_id) in error_message:
                 raise Exception(
-                    f"Reassigning failed as could not find resource {old_resource_id}"
+                    f"Reassigning failed as could not find driver {old_driver_id}"
                 )
-            elif str(new_resource_id) in error_message:
-                # Assigns back the task to its original resource as reassigning failed
-                self.assign_task_to_resource(task_id, old_resource_id, dispatch_delay)
+            elif str(new_driver_id) in error_message:
+                # Assigns back the task to its original driver as reassigning failed
+                self.assign_task_to_driver(task_id, old_driver_id, dispatch_delay)
                 raise Exception(
-                    f"Reassigning failed as could not find resource {new_resource_id}"
+                    f"Reassigning failed as could not find driver {new_driver_id}"
                 )
             else:
                 raise Exception(f"Reassigning task failed due to error {e}")
 
-    def reorder_resource_tasks(
-        self, resource_id: int, task_ids_to_reorder: list[int], apply_from_top: bool
+    def reorder_driver_tasks(
+        self, driver_id: int, task_ids_to_reorder: list[int], apply_from_top: bool
     ) -> list[int]:
         """
-        Reorder tasks in a resource's task list.
+        Reorder tasks in a driver's task list.
 
         Args:
-            resource_id: ID of the resource whose tasks should be reordered
+            driver_id: ID of the driver whose tasks should be reordered
             task_ids_to_reorder: Partial list of task IDs to reorder
             apply_from_top: If True, specified tasks inserted after in-progress.
                            If False, specified tasks appended to end (reversed).
@@ -332,14 +350,14 @@ class SimulatorController:
             List of task IDs in the new order
 
         Raises:
-            Exception: If resource not found or reordering fails
+            Exception: If driver not found or reordering fails
         """
-        found_resource = self.get_resource_by_id(resource_id)
+        found_driver = self.get_driver_by_id(driver_id)
 
-        if found_resource:
-            return found_resource.reorder_tasks(task_ids_to_reorder, apply_from_top)
+        if found_driver:
+            return found_driver.reorder_tasks(task_ids_to_reorder, apply_from_top)
         else:
-            raise Exception(f"Could not find resource in sim with id: {resource_id}")
+            raise Exception(f"Could not find driver in sim with id: {driver_id}")
 
     # First frame sent from back to front end with station data, etc
     def emit_initial_frame(self) -> None:
@@ -388,9 +406,12 @@ class SimulatorController:
         # Stations
         for station in self.station_entities.values():
             station.clear_update()
-        # Resources
-        for resource in self.resource_entities.values():
-            resource.clear_update()
+        # Drivers
+        for driver in self.driver_entities.values():
+            driver.clear_update()
+        # Vehicles
+        for vehicle in self.vehicle_entities.values():
+            vehicle.clear_update()
 
     def create_frame(self, is_key: bool = False) -> Frame:
         """Create a frame containing entity data.
@@ -430,14 +451,14 @@ class SimulatorController:
                 not is_key and not task.has_updated
             ) or task_station is None:  # stationId should not be null
                 continue
-            assigned_resource = task.get_assigned_resource()
+            assigned_driver = task.get_assigned_driver()
             tasks.append(
                 {
                     "id": task.get_task_id(),
                     "state": str(task.get_state()),
                     "stationId": task_station.id,
-                    "assignedResourceId": (
-                        assigned_resource.id if assigned_resource is not None else None
+                    "assignedDriverId": (
+                        assigned_driver.id if assigned_driver is not None else None
                     ),
                 }
             )
@@ -453,21 +474,37 @@ class SimulatorController:
             if (is_key or station.has_updated)
         ]
 
-        resources = []
-        for resource in self.resource_entities.values():
-            if is_key or resource.has_updated:
-                in_progress_task = resource.get_in_progress_task()
-                resources.append(
+        drivers = []
+        for driver in self.driver_entities.values():
+            if is_key or driver.has_updated:
+                in_progress_task = driver.get_in_progress_task()
+                current_vehicle = driver.get_driver_vehicle()
+                drivers.append(
                     {
-                        "id": resource.id,
-                        "position": (resource.get_resource_position().get_position()),
-                        "taskIds": [
-                            task.id for task in resource.get_visible_task_list()
-                        ],
+                        "id": driver.id,
+                        "position": (driver.get_driver_position().get_position()),
+                        "taskIds": [task.id for task in driver.get_visible_task_list()],
                         "inProgressTaskId": (
                             in_progress_task.get_task_id()
                             if in_progress_task is not None
                             else None
+                        ),
+                        "vehicleId": (
+                            current_vehicle.id if current_vehicle is not None else None
+                        ),
+                    }
+                )
+
+        vehicles = []
+        for vehicle in self.vehicle_entities.values():
+            if is_key or vehicle.has_updated:
+                current_driver = vehicle.get_vehicle_driver()
+                vehicles.append(
+                    {
+                        "id": vehicle.id,
+                        "batteryCount": vehicle.get_vehicle_battery_count(),
+                        "driverId": (
+                            current_driver.id if current_driver is not None else None
                         ),
                     }
                 )
@@ -476,7 +513,8 @@ class SimulatorController:
             "simId": self.frameEmitter.sim_id,
             "tasks": tasks,
             "stations": stations,
-            "resources": resources,
+            "drivers": drivers,
+            "vehicles": vehicles,  # Placeholder for future vehicle entities
             "clock": {
                 "realSecondsPassed": self.clock.real_seconds_passed,
                 "realMinutesPassed": self.clock.real_minutes_passed,

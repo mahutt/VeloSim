@@ -24,7 +24,7 @@ SOFTWARE.
 
 import simpy
 from unittest.mock import Mock
-from sim.entities.resource import Resource
+from sim.entities.driver import Driver
 from sim.entities.position import Position
 from sim.entities.task import Task
 from sim.entities.station import Station
@@ -54,38 +54,57 @@ class FakeTask(Task):
     def set_station(self, station):  # type: ignore[no-untyped-def]
         self.station = station
 
-    def get_assigned_resource(self):  # type: ignore[no-untyped-def]
-        return self.assigned_resource
+    # Driver-based API (current abstract methods)
+    def get_assigned_driver(self):  # type: ignore[no-untyped-def]
+        return self.assigned_driver
 
-    def set_assigned_resource(self, resource):  # type: ignore[no-untyped-def]
-        self.assigned_resource = resource
+    def set_assigned_driver(self, driver):  # type: ignore[no-untyped-def]
+        self.assigned_driver = driver
+        # Preserve IN_PROGRESS if already dispatched
+        if self._state != State.IN_PROGRESS:
+            self._state = State.ASSIGNED
 
-    def unassign_resource(self) -> None:
-        self.assigned_resource = None
+    def unassign_driver(self) -> None:
+        self.assigned_driver = None
+        self._state = State.OPEN
 
     def is_assigned(self) -> bool:
-        return self.assigned_resource is not None
+        # Consider both ASSIGNED and IN_PROGRESS as assigned for dispatch logic
+        return self.assigned_driver is not None and self._state in (
+            State.ASSIGNED,
+            State.IN_PROGRESS,
+        )
+
+    # Back-compat resource-named helpers used by Resource methods in tests
+    def get_assigned_resource(self):  # type: ignore[no-untyped-def]
+        return self.get_assigned_driver()
+
+    def set_assigned_resource(self, resource):  # type: ignore[no-untyped-def]
+        self.set_assigned_driver(resource)
+
+    def unassign_resource(self) -> None:
+        self.unassign_driver()
 
 
 def test_travel_to_returns_immediately_when_already_at_position() -> None:
     """Test that travel_to returns early if already at destination"""
     env = simpy.Environment()
     start_pos = Position([0.0, 0.0])
-    resource = Resource(resource_id=1, position=start_pos)
-    resource.env = env
+    driver = Driver(driver_id=1, position=start_pos)
+    driver.env = env
 
     # Mock map map (shouldn't be called)
     mock_map = Mock()
-    resource.set_map_controller(mock_map)
+    driver.set_map_controller(mock_map)
 
     # Travel to same position - process completes immediately
-    env.process(resource.travel_to(start_pos))
+    env.process(driver.travel_to(start_pos))
     env.run(until=1)
 
     # Should return immediately without calling map map
     mock_map.getRoute.assert_not_called()
     # Resource should still be at same position
-    assert resource.position == start_pos
+    assert driver.position == start_pos
 
 
 def test_travel_to_handles_tuple_return_from_route_next() -> None:
@@ -93,8 +112,8 @@ def test_travel_to_handles_tuple_return_from_route_next() -> None:
     env = simpy.Environment()
     start_pos = Position([0.0, 0.0])
     dest_pos = Position([1.0, 1.0])
-    resource = Resource(resource_id=1, position=start_pos)
-    resource.env = env
+    driver = Driver(driver_id=1, position=start_pos)
+    driver.env = env
 
     # Mock route that returns tuple on first call, then positions
     mock_route = Mock()
@@ -112,19 +131,19 @@ def test_travel_to_handles_tuple_return_from_route_next() -> None:
     # Mock map map
     mock_map = Mock()
     mock_map.getRoute.return_value = mock_route
-    resource.set_map_controller(mock_map)
+    driver.set_map_controller(mock_map)
 
     # Execute travel
-    env.process(resource.travel_to(dest_pos))
+    env.process(driver.travel_to(dest_pos))
     env.run(until=10)
 
     # Verify route was obtained
     mock_map.getRoute.assert_called_once_with(start_pos, dest_pos)
 
     # Verify resource moved through positions
-    assert resource.position == dest_pos
+    assert driver.position == dest_pos
     # current_route should be cleared after travel completes
-    assert resource.current_route is None
+    assert driver.current_route is None
 
 
 def test_travel_to_handles_single_position_return_from_route_next() -> None:
@@ -132,8 +151,8 @@ def test_travel_to_handles_single_position_return_from_route_next() -> None:
     env = simpy.Environment()
     start_pos = Position([0.0, 0.0])
     dest_pos = Position([1.0, 1.0])
-    resource = Resource(resource_id=1, position=start_pos)
-    resource.env = env
+    driver = Driver(driver_id=1, position=start_pos)
+    driver.env = env
 
     # Mock route that returns single position (not tuple)
     mock_route = Mock()
@@ -149,14 +168,14 @@ def test_travel_to_handles_single_position_return_from_route_next() -> None:
     # Mock map map
     mock_map = Mock()
     mock_map.getRoute.return_value = mock_route
-    resource.set_map_controller(mock_map)
+    driver.set_map_controller(mock_map)
 
     # Execute travel
-    env.process(resource.travel_to(dest_pos))
+    env.process(driver.travel_to(dest_pos))
     env.run(until=10)
 
     # Verify resource moved
-    assert resource.position == dest_pos
+    assert driver.position == dest_pos
 
 
 def test_travel_to_can_be_interrupted() -> None:
@@ -164,8 +183,8 @@ def test_travel_to_can_be_interrupted() -> None:
     env = simpy.Environment()
     start_pos = Position([0.0, 0.0])
     dest_pos = Position([5.0, 5.0])
-    resource = Resource(resource_id=1, position=start_pos)
-    resource.env = env
+    driver = Driver(driver_id=1, position=start_pos)
+    driver.env = env
 
     # Mock route with many positions
     mock_route = Mock()
@@ -176,10 +195,10 @@ def test_travel_to_can_be_interrupted() -> None:
     # Mock map map
     mock_map = Mock()
     mock_map.getRoute.return_value = mock_route
-    resource.set_map_controller(mock_map)
+    driver.set_map_controller(mock_map)
 
     # Start travel process
-    travel_process = env.process(resource.travel_to(dest_pos))
+    travel_process = env.process(driver.travel_to(dest_pos))
 
     # Interrupt after 2 time units
     def interrupter():  # type: ignore[no-untyped-def]
@@ -190,28 +209,28 @@ def test_travel_to_can_be_interrupted() -> None:
     env.run(until=10)
 
     # Resource should not have reached destination due to interrupt
-    assert resource.position != dest_pos
+    assert driver.position != dest_pos
 
 
-def test_resource_run_waits_for_initialization() -> None:
-    """Test that resource run() yields at start to allow initialization"""
+def test_driver_run_waits_for_initialization() -> None:
+    """Test that driver run() yields at start to allow initialization"""
     env = simpy.Environment()
-    resource = Resource(resource_id=1, position=Position([0.0, 0.0]))
-    resource.env = env
+    driver = Driver(driver_id=1, position=Position([0.0, 0.0]))
+    driver.env = env
 
     # Add a task so select_next_task will be called
     task = FakeTask(task_id=1)
-    resource.assign_task(task)
+    driver.assign_task(task)
 
     # Set up behaviour and map map after creation
     mock_behaviour = Mock(spec=SimBehaviour)
     mock_behaviour.RCNT_strategy = Mock()
     mock_behaviour.RCNT_strategy.select_next_task.return_value = task
 
-    resource.set_behaviour(mock_behaviour)
+    driver.set_behaviour(mock_behaviour)
     mock_map = Mock()
-    resource.set_map_controller(mock_map)
-    env.process(resource.run())
+    driver.set_map_controller(mock_map)
+    env.process(driver.run())
     # Run for 3 time units (1 for initial yield, then at least one iteration)
     env.run(until=3)
 
@@ -220,26 +239,26 @@ def test_resource_run_waits_for_initialization() -> None:
     assert mock_behaviour.RCNT_strategy.select_next_task.call_count >= 1
 
 
-def test_resource_run_selects_and_dispatches_task() -> None:
-    """Test that resource run() selects and dispatches tasks correctly"""
+def test_driver_run_selects_and_dispatches_task() -> None:
+    """Test that driver run() selects and dispatches tasks correctly"""
     env = simpy.Environment()
     start_pos = Position([0.0, 0.0])
-    resource = Resource(resource_id=1, position=start_pos)
-    resource.env = env
+    driver = Driver(driver_id=1, position=start_pos)
+    driver.env = env
 
     # Create a task at a station
     station_pos = Position([1.0, 1.0])
     station = Station(station_id=1, name="Station1", position=station_pos)
     station.env = env
     task = FakeTask(task_id=1, station=station)
-    resource.assign_task(task)
+    driver.assign_task(task)
 
     # Set up behaviour
     mock_behaviour = Mock(spec=SimBehaviour)
     mock_behaviour.RCNT_strategy = Mock()
     mock_behaviour.RCNT_strategy.select_next_task.return_value = task
 
-    resource.set_behaviour(mock_behaviour)
+    driver.set_behaviour(mock_behaviour)
 
     # Set up map map with mock route
     mock_route = Mock()
@@ -247,10 +266,10 @@ def test_resource_run_selects_and_dispatches_task() -> None:
 
     mock_map = Mock()
     mock_map.getRoute.return_value = mock_route
-    resource.set_map_controller(mock_map)
+    driver.set_map_controller(mock_map)
 
     # Run simulation for just enough time to dispatch but not complete
-    env.process(resource.run())
+    env.process(driver.run())
     env.run(until=3)
 
     # Task should be dispatched (in progress) or already closed if it completed
@@ -260,62 +279,62 @@ def test_resource_run_selects_and_dispatches_task() -> None:
     assert mock_behaviour.RCNT_strategy.select_next_task.called
 
 
-def test_resource_run_services_task_when_at_station() -> None:
-    """Test that resource services task when arriving at station"""
+def test_driver_run_services_task_when_at_station() -> None:
+    """Test that driver services task when arriving at station"""
     env = simpy.Environment()
     station_pos = Position([1.0, 1.0])
 
     # Create station first, THEN resource (so resource.run() starts)
     station = Station(station_id=1, name="Station1", position=station_pos)
     station.env = env
-    resource = Resource(resource_id=1, position=station_pos)
-    resource.env = env
+    driver = Driver(driver_id=1, position=station_pos)
+    driver.env = env
 
     # Create a task and manually set it to in-progress
     task = FakeTask(task_id=1, station=station)
     task.set_state(State.IN_PROGRESS)
-    task.set_assigned_resource(resource)
-    resource.task_list.append(task)
+    task.set_assigned_driver(driver)
+    driver.task_list.append(task)
 
     # Set up behaviour
     mock_behaviour = Mock(spec=SimBehaviour)
     mock_behaviour.RCNT_strategy = Mock()
-    resource.set_behaviour(mock_behaviour)
+    driver.set_behaviour(mock_behaviour)
 
     mock_map = Mock()
-    resource.set_map_controller(mock_map)
+    driver.set_map_controller(mock_map)
 
     # Run simulation - need enough time for initial timeout + processing
-    env.process(resource.run())
+    env.process(driver.run())
     env.run(until=5)
 
     # Task should be serviced (closed and removed)
     assert task.get_state() == State.CLOSED
-    assert task not in resource.task_list
+    assert task not in driver.task_list
 
 
-def test_resource_run_does_not_service_task_when_not_at_station() -> None:
-    """Test that resource doesn't service task when not at station"""
+def test_driver_run_does_not_service_task_when_not_at_station() -> None:
+    """Test that driver doesn't service task when not at station"""
     env = simpy.Environment()
     resource_pos = Position([0.0, 0.0])
     station_pos = Position([1.0, 1.0])
 
     # Create station first
     station = Station(station_id=1, name="Station1", position=station_pos)
-    resource = Resource(resource_id=1, position=resource_pos)
+    driver = Driver(driver_id=1, position=resource_pos)
 
     # Create a task at a different station and manually set to in-progress
     task = FakeTask(task_id=1, station=station)
     task.set_state(State.IN_PROGRESS)
-    task.set_assigned_resource(resource)
-    resource.task_list.append(task)
+    task.set_assigned_driver(driver)
+    driver.task_list.append(task)
 
     # Set up behaviour
     mock_behaviour = Mock(spec=SimBehaviour)
-    resource.set_behaviour(mock_behaviour)
+    driver.set_behaviour(mock_behaviour)
 
     mock_map = Mock()
-    resource.set_map_controller(mock_map)
+    driver.set_map_controller(mock_map)
 
     # Run simulation for a short time
     env.run(until=3)
@@ -325,48 +344,48 @@ def test_resource_run_does_not_service_task_when_not_at_station() -> None:
     assert task.get_state() == State.IN_PROGRESS
 
 
-def test_resource_run_handles_no_tasks() -> None:
-    """Test that resource run() handles case when there are no tasks"""
+def test_driver_run_handles_no_tasks() -> None:
+    """Test that driver run() handles case when there are no tasks"""
     env = simpy.Environment()
-    resource = Resource(resource_id=1, position=Position([0.0, 0.0]))
+    driver = Driver(driver_id=1, position=Position([0.0, 0.0]))
 
     # Set up behaviour
     mock_behaviour = Mock(spec=SimBehaviour)
     mock_behaviour.RCNT_strategy = Mock()
     mock_behaviour.RCNT_strategy.select_next_task.return_value = None
-    resource.set_behaviour(mock_behaviour)
+    driver.set_behaviour(mock_behaviour)
 
     mock_map = Mock()
-    resource.set_map_controller(mock_map)
+    driver.set_map_controller(mock_map)
 
     # Run simulation
     env.run(until=5)
 
     # Should complete without errors
-    assert len(resource.task_list) == 0
+    assert len(driver.task_list) == 0
 
 
-def test_resource_run_handles_none_station_on_task() -> None:
-    """Test that resource run() handles tasks with None station"""
+def test_driver_run_handles_none_station_on_task() -> None:
+    """Test that driver run() handles tasks with None station"""
     env = simpy.Environment()
-    resource = Resource(resource_id=1, position=Position([0.0, 0.0]))
+    driver = Driver(driver_id=1, position=Position([0.0, 0.0]))
 
     # Create a task with no station
     task = FakeTask(task_id=1, station=None)
-    resource.assign_task(task)
+    driver.assign_task(task)
 
     # Set up behaviour to select the task
     mock_behaviour = Mock(spec=SimBehaviour)
     mock_behaviour.RCNT_strategy = Mock()
     mock_behaviour.RCNT_strategy.select_next_task.return_value = task
 
-    resource.set_behaviour(mock_behaviour)
+    driver.set_behaviour(mock_behaviour)
 
     mock_map = Mock()
-    resource.set_map_controller(mock_map)
+    driver.set_map_controller(mock_map)
 
     # Run simulation - should not crash
     env.run(until=3)
 
     # Task should not be dispatched since station is None
-    assert task in resource.task_list
+    assert task in driver.task_list

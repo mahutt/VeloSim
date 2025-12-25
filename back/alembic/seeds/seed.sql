@@ -201,20 +201,26 @@ VALUES
     '{
         "start_time": "day1:08:00",
         "end_time": "day1:12:00",
-        "resources": [
-            { "resource_id": 1, "resource_position": [-73.5610, 45.5070] },
-            { "resource_id": 2, "resource_position": [-73.5670, 45.5090] }
+        "vehicle_battery_capacity": 999,
+        "vehicles": [
+            { "name": "Vehicle 1", "position": [-73.5610, 45.5070], "battery_count": 999 },
+            { "name": "Vehicle 2", "position": [-73.5670, 45.5090], "battery_count": 999 }
+        ],
+        "drivers": [
+            { "name": "Driver 1", "shift": { "start_time": "day1:08:00", "end_time": "day1:12:00", "lunch_break": "day1:10:00" } },
+            { "name": "Driver 2", "shift": { "start_time": "day1:08:00", "end_time": "day1:12:00", "lunch_break": "day1:10:00" } }
         ],
         "stations": [
-            { "station_id": 1, "station_name": "Metcalfe / de Maisonneuve", "station_position": [-73.57314, 45.50137] },
-            { "station_id": 2, "station_name": "Sanguinet / de Maisonneuve", "station_position": [-73.56261, 45.51344] }
-        ],
-        "initial_tasks": [
-            { "station_id": 1, "assigned_resource_id": 1 }
-        ],
-        "scheduled_tasks": [
-            { "station_id": 1, "time": "day1:09:30" },
-            { "station_id": 2, "time": "day1:09:45" }
+            { "name": "Metcalfe / de Maisonneuve", "position": [-73.57314, 45.50137], "initial_task_count": 1, "scheduled_tasks": ["day1:09:30"] },
+            { "name": "Sanguinet / de Maisonneuve", "position": [-73.56261, 45.51344], "initial_task_count": 0, "scheduled_tasks": ["day1:09:45"] },
+            { "name": "St-Denis / Ste-Catherine", "position": [-73.56391, 45.51007], "initial_task_count": 0, "scheduled_tasks": [] },
+            { "name": "St-André / Ontario", "position": [-73.56353, 45.52188], "initial_task_count": 0, "scheduled_tasks": [] },
+            { "name": "St-André / de Maisonneuve", "position": [-73.55974, 45.51708], "initial_task_count": 0, "scheduled_tasks": [] },
+            { "name": "de la Commune / des Soeurs-Grises", "position": [-73.55273, 45.49798], "initial_task_count": 0, "scheduled_tasks": [] },
+            { "name": "Notre-Dame / St-Gabriel", "position": [-73.55504, 45.50711], "initial_task_count": 0, "scheduled_tasks": [] },
+            { "name": "de la Commune / Place Jacques-Cartier", "position": [-73.55183, 45.50761], "initial_task_count": 0, "scheduled_tasks": [] },
+            { "name": "de Maisonneuve / Mansfield (sud)", "position": [-73.57346, 45.50205], "initial_task_count": 0, "scheduled_tasks": [] },
+            { "name": "Métro Place-d''Armes (St-Urbain / Viger)", "position": [-73.55969, 45.50632], "initial_task_count": 0, "scheduled_tasks": [] }
         ]
     }',
     'Test description for Scenario 1.',
@@ -227,19 +233,16 @@ VALUES
     '{
         "start_time": "day1:13:00",
         "end_time": "day1:17:00",
-        "resources": [
-            { "resource_id": 3, "resource_position": [-73.5740, 45.5030] }
+        "vehicle_battery_capacity": 999,
+        "vehicles": [
+            { "name": "Vehicle 3", "position": [-73.5740, 45.5030], "battery_count": 999 }
+        ],
+        "drivers": [
+            { "name": "Driver 3", "shift": { "start_time": "day1:13:00", "end_time": "day1:17:00", "lunch_break": "day1:15:00" } }
         ],
         "stations": [
-            { "station_id": 3, "station_name": "St-Denis / Ste-Catherine", "station_position": [-73.56391, 45.51007] },
-            { "station_id": 4, "station_name": "St-André / Ontario", "station_position": [-73.56353, 45.52188] }
-        ],
-        "initial_tasks": [
-            { "station_id": 3, "assigned_resource_id": 3 }
-        ],
-        "scheduled_tasks": [
-            { "station_id": 3, "time": "day1:14:00" },
-            { "station_id": 4, "time": "day1:15:30" }
+            { "name": "St-Denis / Ste-Catherine", "position": [-73.56391, 45.51007], "initial_task_count": 1, "scheduled_tasks": ["day1:14:00"] },
+            { "name": "St-André / Ontario", "position": [-73.56353, 45.52188], "initial_task_count": 0, "scheduled_tasks": ["day1:15:30"] }
         ]
     }',
     'Test description for Scenario 2.',

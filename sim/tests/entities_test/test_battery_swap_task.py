@@ -27,7 +27,7 @@ import simpy
 from sim.entities.BatterySwapTask import BatterySwapTask, State
 from sim.entities.station import Station
 from sim.entities.position import Position
-from sim.entities.resource import Resource
+from sim.entities.driver import Driver
 
 # from sim.entities.task import Task, State
 
@@ -54,7 +54,7 @@ class TestBatterySwapTask:
         assert task.get_task_id() == 1
         assert task.get_station() == default_station
         assert task.get_state() == State.OPEN
-        assert task.get_assigned_resource() is None
+        assert task.get_assigned_driver() is None
 
     def test_battery_swap_task_creation_with_no_station(
         self, simpy_env: simpy.Environment
@@ -69,7 +69,7 @@ class TestBatterySwapTask:
         assert task.get_task_id() == 1
         assert task.get_station() is None
         assert task.get_state() == State.OPEN
-        assert task.get_assigned_resource() is None
+        assert task.get_assigned_driver() is None
 
     def test_get_and_set_state(self, simpy_env: simpy.Environment) -> None:
         task = BatterySwapTask(1)
@@ -118,36 +118,36 @@ class TestBatterySwapTask:
         assert station is not None
         assert station == default_station
 
-    def test_get_and_set_assigned_resource(
+    def test_get_and_set_assigned_driver(
         self, simpy_env: simpy.Environment, default_station: Station
     ) -> None:
         task = BatterySwapTask(1, default_station)
 
-        # default no resource
-        assigned_resource = task.get_assigned_resource()
-        assert assigned_resource is None
+        # default no driver
+        assigned_driver = task.get_assigned_driver()
+        assert assigned_driver is None
 
-        resource = Resource(1, Position([-73.5673, 45.5017]))
-        task.set_assigned_resource(resource)
-        assigned_resource = task.get_assigned_resource()
-        assert assigned_resource is not None
-        assert assigned_resource == resource
+        driver = Driver(1, Position([-73.5673, 45.5017]))
+        task.set_assigned_driver(driver)
+        assigned_driver = task.get_assigned_driver()
+        assert assigned_driver is not None
+        assert assigned_driver == driver
 
-    def test_unassign_resource(
+    def test_unassign_driver(
         self, simpy_env: simpy.Environment, default_station: Station
     ) -> None:
         # Arrange
         task = BatterySwapTask(1, default_station)
-        resource = Resource(1, Position([-73.5673, 45.5017]))
-        task.set_assigned_resource(resource)
-        assert task.get_assigned_resource() == resource
+        driver = Driver(1, Position([-73.5673, 45.5017]))
+        task.set_assigned_driver(driver)
+        assert task.get_assigned_driver() == driver
         assert task.get_state() == State.ASSIGNED
 
         # Act
-        task.unassign_resource()
+        task.unassign_driver()
 
         # Assert
-        assert task.get_assigned_resource() is None
+        assert task.get_assigned_driver() is None
         assert task.get_state() == State.OPEN
 
     def test_is_assigned_true(
@@ -155,8 +155,8 @@ class TestBatterySwapTask:
     ) -> None:
         # Arrange
         task = BatterySwapTask(1, default_station)
-        resource = Resource(1, Position([-73.5673, 45.5017]))
-        task.set_assigned_resource(resource)
+        driver = Driver(1, Position([-73.5673, 45.5017]))
+        task.set_assigned_driver(driver)
 
         # Act
         assigned = task.is_assigned()

@@ -26,7 +26,8 @@ import pytest
 from sim.utils.base_parse_strategy import BaseParseStrategy
 from sim.utils.json_parser_strategy import JsonParseStrategy, ScenarioParseError
 from sim.entities.inputParameters import InputParameter
-from sim.entities.resource import Resource
+from sim.entities.driver import Driver
+from sim.entities.vehicle import Vehicle
 from sim.utils.scenario_parser import ScenarioParser
 
 
@@ -43,33 +44,45 @@ def test_json_parse_strategy_valid_input() -> None:
         "id": 1,
         "name": "Test Scenario",
         "content": {
-            "start_time": "day1:01:00",
-            "end_time": "day2:01:00",
+            "start_time": "day1:08:00",
+            "end_time": "day1:12:00",
+            "vehicle_battery_capacity": 999,
             "stations": [
                 {
-                    "station_id": 8074,
-                    "station_name": "Lionel-Groulx",
-                    "station_position": [-74.0060, 40.7128],
+                    "name": "Station 1",
+                    "initial_task_count": 2,
+                    "scheduled_tasks": ["day1:09:30"],
+                    "position": [45.5, -73.5],
                 },
                 {
-                    "station_id": 2105,
-                    "station_name": "Guy-Concordia",
-                    "station_position": [-118.2437, 34.0522],
+                    "name": "Station 2",
+                    "initial_task_count": 0,
+                    "scheduled_tasks": ["day1:09:30"],
+                    "position": [45.501, -73.55],
                 },
                 {
-                    "station_id": 2508,
-                    "station_name": "Peel",
-                    "station_position": [-87.6298, 41.8781],
+                    "name": "Station 3",
+                    "initial_task_count": 0,
+                    "scheduled_tasks": [],
+                    "position": [45.511, -73.56],
                 },
             ],
-            "resources": [
-                {"resource_id": 1, "resource_position": [-64.0060, 75.7128]},
-                {"resource_id": 2, "resource_position": [-123.2437, 64.0522]},
+            "drivers": [
+                {
+                    "name": "Driver 1",
+                    "shift": {
+                        "start_time": "day1:08:00",
+                        "end_time": "day1:12:00",
+                        "lunch_break": "day1:10:00",
+                    },
+                }
             ],
-            "initial_tasks": [{"station_id": 8074}],
-            "scheduled_tasks": [
-                {"station_id": 2105, "time": "day1:05:00"},
-                {"station_id": 2508, "time": "day1:08:00"},
+            "vehicles": [
+                {
+                    "name": "Vehicle 1",
+                    "position": [-73.5610, 45.5070],
+                    "battery_count": 999,
+                }
             ],
         },
     }
@@ -79,26 +92,35 @@ def test_json_parse_strategy_valid_input() -> None:
 
     assert isinstance(params, InputParameter)
     assert len(params.station_entities) == 3
-    assert len(params.resource_entities) == 2
-    assert len(params.task_entities) == 3
+    assert len(params.driver_entities) == 1
+    assert len(params.vehicle_entities) == 1
+    assert len(params.task_entities) == 4
 
     tasks = params.task_entities
     stations = params.station_entities
-    resources = params.resource_entities
+    drivers = params.driver_entities
+    vehicles = params.vehicle_entities
 
-    # IDs are auto-generated starting from 1, 2, 3...
-    assert tasks[1].station == stations[8074]  # First task (initial)
-    assert tasks[2].station == stations[2105]  # Second task (scheduled)
-    assert tasks[3].station == stations[2508]  # Third task (scheduled)
+    # With new schema, station IDs are auto-generated sequentially (1..n)
+    # Scenario defines: Station 1 has 2 initial tasks and 1 scheduled at 09:30,
+    # Station 2 has 1 scheduled at 09:30 -> total 4 tasks
+    assert tasks[1].get_station() == stations[1]  # First task (initial, Station 1)
+    assert tasks[2].get_station() == stations[1]  # Second task (initial, Station 1)
+    assert tasks[3].get_station() == stations[1]  # Third task (scheduled, Station 1)
+    assert tasks[4].get_station() == stations[2]  # Fourth task (scheduled, Station 2)
 
     # Check spawn delays
     assert tasks[1].spawn_delay == 0  # Initial task
-    assert tasks[2].spawn_delay == 4 * 3600  # 4 hours after start
-    assert tasks[3].spawn_delay == 7 * 3600  # 7 hours after start
+    assert tasks[2].spawn_delay == 0  # Initial task
+    # Scheduled at 09:30 with start at 08:00 => 1.5 hours (5400 seconds)
+    assert tasks[3].spawn_delay == 90 * 60
+    assert tasks[4].spawn_delay == 90 * 60
 
-    for res in resources.values():
-        assert isinstance(res, Resource)
-        assert isinstance(res.task_list, list)
+    for drv in drivers.values():
+        assert isinstance(drv, Driver)
+        assert isinstance(drv.task_list, list)
+    for veh in vehicles.values():
+        assert isinstance(veh, Vehicle)
 
 
 def test_json_parse_strategy_invalid_json() -> None:
@@ -118,31 +140,56 @@ def test_json_parse_strategy_with_invalid_time() -> None:
         "content": {
             "start_time": "day1:00:00",
             "end_time": "day2:01",  # invalid time format
+            "vehicle_battery_capacity": 999,
             "stations": [
                 {
-                    "station_id": 8074,
-                    "station_name": "Lionel-Groulx",
-                    "station_position": [-74.0060, 40.7128],
+                    "name": "Lionel-Groulx",
+                    "position": [-74.0060, 40.7128],
+                    "initial_task_count": 1,
+                    "scheduled_tasks": [],
                 },
                 {
-                    "station_id": 2105,
-                    "station_name": "Guy-Concordia",
-                    "station_position": [-118.2437, 34.0522],
+                    "name": "Guy-Concordia",
+                    "position": [-118.2437, 34.0522],
+                    "initial_task_count": 0,
+                    "scheduled_tasks": ["day1:05:00"],
                 },
                 {
-                    "station_id": 2508,
-                    "station_name": "Peel",
-                    "station_position": [-87.6298, 41.8781],
+                    "name": "Peel",
+                    "position": [-87.6298, 41.8781],
+                    "initial_task_count": 0,
+                    "scheduled_tasks": ["day1:08:00"],
                 },
             ],
-            "resources": [
-                {"resource_id": 1, "resource_position": [-64.0060, 75.7128]},
-                {"resource_id": 2, "resource_position": [-123.2437, 64.0522]},
+            "vehicles": [
+                {
+                    "name": "Vehicle 1",
+                    "position": [-73.5610, 45.5070],
+                    "battery_count": 999,
+                },
+                {
+                    "name": "Vehicle 2",
+                    "position": [-73.5670, 45.5090],
+                    "battery_count": 999,
+                },
             ],
-            "initial_tasks": [{"station_id": 8074}],
-            "scheduled_tasks": [
-                {"station_id": 2105, "time": "day1:05:00"},
-                {"station_id": 2508, "time": "day1:08:00"},
+            "drivers": [
+                {
+                    "name": "Driver 1",
+                    "shift": {
+                        "start_time": "day1:00:00",
+                        "end_time": "day1:12:00",
+                        "lunch_break": "day1:06:00",
+                    },
+                },
+                {
+                    "name": "Driver 2",
+                    "shift": {
+                        "start_time": "day1:00:00",
+                        "end_time": "day1:12:00",
+                        "lunch_break": "day1:06:00",
+                    },
+                },
             ],
         },
     }
@@ -161,23 +208,37 @@ def test_json_parse_strategy_validate_without_parsing() -> None:
     valid_scenario = {
         "start_time": "day1:00:00",
         "end_time": "day1:01:00",
+        "vehicle_battery_capacity": 999,
         "stations": [
             {
-                "station_id": 1,
-                "station_name": "Test Station",
-                "station_position": [-74.0060, 40.7128],
+                "name": "Test Station",
+                "position": [-74.0060, 40.7128],
+                "initial_task_count": 1,
+                "scheduled_tasks": [],
             }
         ],
-        "resources": [{"resource_id": 1, "resource_position": [-74.0060, 40.7128]}],
-        "initial_tasks": [{"station_id": 1}],
-        "scheduled_tasks": [],
+        "vehicles": [
+            {"name": "Vehicle 1", "position": [-73.5610, 45.5070], "battery_count": 2}
+        ],
+        "drivers": [
+            {
+                "name": "Driver 1",
+                "shift": {
+                    "start_time": "day1:00:00",
+                    "end_time": "day1:01:00",
+                    "lunch_break": "day1:00:30",
+                },
+            }
+        ],
     }
 
     invalid_scenario = {
         "start_time": "day1:00:00",
         "end_time": "invalid_time",  # Invalid format
+        "vehicle_battery_capacity": 999,
         "stations": [],
-        "resources": [],
+        "vehicles": [],
+        "drivers": [],
     }
 
     strategy = JsonParseStrategy(scenario_json=valid_scenario)

@@ -25,7 +25,7 @@ SOFTWARE.
 from sim.behaviour.sim_behaviour_builder import SimBehaviourBuilder
 from sim.behaviour.sim_behaviour import SimBehaviour
 from sim.behaviour.resource_behaviour.resource_choose_next_task_strategy import (
-    ResourceChooseNextTaskStrategy,
+    DriverChooseNextTaskStrategy,
 )
 from sim.behaviour.station_behaviour.strategies.task_popup_strategy import (
     TaskPopupStrategy,
@@ -35,8 +35,8 @@ from sim.behaviour.default.default_RCNT_strategy import DefaultRCNTStrategy
 
 
 # Stub strategies for testing
-class StubRCNTStrategy(ResourceChooseNextTaskStrategy):
-    def select_next_task(self, resource):  # type: ignore[no-untyped-def]
+class StubRCNTStrategy(DriverChooseNextTaskStrategy):
+    def select_next_task(self, driver):  # type: ignore[no-untyped-def]
         return None
 
 

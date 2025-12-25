@@ -27,7 +27,8 @@ import simpy
 from unittest.mock import patch, MagicMock
 from sim.entities.station import Station
 from sim.entities.position import Position
-from sim.entities.resource import Resource
+from sim.entities.driver import Driver
+from sim.entities.vehicle import Vehicle
 from sim.entities.BatterySwapTask import BatterySwapTask
 from sim.entities.inputParameters import InputParameter
 
@@ -52,11 +53,16 @@ def input_params(env: simpy.Environment) -> InputParameter:
     params.add_station(station1)
     params.add_station(station2)
 
+    # Add Test Vehicles
+    vehicles1 = Vehicle(vehicle_id=1, battery_count=999)
+    vehicles2 = Vehicle(vehicle_id=2, battery_count=999)
+    params.add_vehicle(vehicles1)
+    params.add_vehicle(vehicles2)
     # Add test resources
-    resource1 = Resource(resource_id=1, position=Position([15.0, 25.0]))
-    resource2 = Resource(resource_id=2, position=Position([35.0, 45.0]))
-    params.add_resource(resource1)
-    params.add_resource(resource2)
+    driver1 = Driver(driver_id=1, position=Position([15.0, 25.0]))
+    driver2 = Driver(driver_id=2, position=Position([35.0, 45.0]))
+    params.add_driver(driver1)
+    params.add_driver(driver2)
 
     # Add test tasks using concrete BatterySwapTask
     task1 = BatterySwapTask(task_id=1, station=station1)
@@ -72,9 +78,13 @@ def test_get_methods(input_params: InputParameter) -> None:
     assert stations is not None
     assert input_params.get_station_count() == 2
 
-    resources = input_params.get_resource_entities()
-    assert resources is not None
-    assert input_params.get_resource_count() == 2
+    drivers = input_params.get_driver_entities()
+    assert drivers is not None
+    assert input_params.get_driver_count() == 2
+
+    vehicles = input_params.get_vehicle_entities()
+    assert vehicles is not None
+    assert input_params.get_vehicle_count() == 2
 
     tasks = input_params.get_task_entities()
     assert tasks is not None
@@ -106,21 +116,38 @@ def test_set_station_entities(
     assert 1 not in stations.keys()
 
 
-def test_set_resource_entities(
+def test_set_driver_entities(
     input_params: InputParameter, env: simpy.Environment
 ) -> None:
-    original_resources = input_params.get_resource_entities()
-    assert input_params.get_resource_count() == 2
+    original_drivers = input_params.get_driver_entities()
+    assert input_params.get_driver_count() == 2
 
     # Act
-    resource = Resource(resource_id=45, position=Position([15.0, 25.0]))
-    input_params.set_resource_entities({45: resource})
+    driver = Driver(driver_id=45, position=Position([15.0, 25.0]))
+    input_params.set_driver_entities({45: driver})
 
     # Assert
-    resources = input_params.get_resource_entities()
-    assert resources is not original_resources
-    assert resource in resources.values()
-    assert 1 not in resources.keys()
+    drivers = input_params.get_driver_entities()
+    assert drivers is not original_drivers
+    assert driver in drivers.values()
+    assert 1 not in drivers.keys()
+
+
+def test_set_vehicle_entities(
+    input_params: InputParameter, env: simpy.Environment
+) -> None:
+    original_vehicles = input_params.get_vehicle_entities()
+    assert input_params.get_vehicle_count() == 2
+
+    # Act
+    vehicle = Vehicle(vehicle_id=45, battery_count=999)
+    input_params.set_vehicle_entities({45: vehicle})
+
+    # Assert
+    vehicles = input_params.get_vehicle_entities()
+    assert vehicles is not original_vehicles
+    assert vehicle in vehicles.values()
+    assert 1 not in vehicles.keys()
 
 
 def test_set_task_entities(
@@ -182,18 +209,32 @@ def test_add_station(input_params: InputParameter, env: simpy.Environment) -> No
     assert 12 in stations.keys()
 
 
-def test_add_resource(input_params: InputParameter, env: simpy.Environment) -> None:
-    original_resources = input_params.get_resource_entities()
-    assert 12 not in original_resources.keys()
+def test_add_driver(input_params: InputParameter, env: simpy.Environment) -> None:
+    original_drivers = input_params.get_driver_entities()
+    assert 12 not in original_drivers.keys()
 
     # Act
-    resource = Resource(resource_id=12, position=Position([15.0, 25.0]))
-    input_params.add_resource(resource)
+    driver = Driver(driver_id=12, position=Position([15.0, 25.0]))
+    input_params.add_driver(driver)
 
     # Assert
-    resources = input_params.get_resource_entities()
-    assert resource in resources.values()
-    assert 12 in resources.keys()
+    drivers = input_params.get_driver_entities()
+    assert driver in drivers.values()
+    assert 12 in drivers.keys()
+
+
+def test_add_vehicle(input_params: InputParameter, env: simpy.Environment) -> None:
+    original_vehicles = input_params.get_vehicle_entities()
+    assert 12 not in original_vehicles.keys()
+
+    # Act
+    vehicle = Vehicle(vehicle_id=12, battery_count=999)
+    input_params.add_vehicle(vehicle)
+
+    # Assert
+    vehicles = input_params.get_vehicle_entities()
+    assert vehicle in vehicles.values()
+    assert 12 in vehicles.keys()
 
 
 def test_add_task(input_params: InputParameter, env: simpy.Environment) -> None:
@@ -253,41 +294,41 @@ def test_remove_station_fail(
     assert input_params.get_station_count() == 2
 
 
-def test_remove_resource_success(
+def test_remove_driver_success(
     input_params: InputParameter, env: simpy.Environment
 ) -> None:
-    resource = Resource(resource_id=12, position=Position([15.0, 25.0]))
-    input_params.add_resource(resource)
-    addded_resources = input_params.get_resource_entities()
-    assert 12 in addded_resources.keys()
-    assert input_params.get_resource_count() == 3
+    driver = Driver(driver_id=12, position=Position([15.0, 25.0]))
+    input_params.add_driver(driver)
+    added_drivers = input_params.get_driver_entities()
+    assert 12 in added_drivers.keys()
+    assert input_params.get_driver_count() == 3
 
     # Act
-    input_params.remove_resource(resource)
+    input_params.remove_driver(driver)
 
     # Assert
-    resources = input_params.get_resource_entities()
-    assert resource not in resources.values()
-    assert 12 not in resources.keys()
-    assert input_params.get_resource_count() == 2
+    drivers = input_params.get_driver_entities()
+    assert driver not in drivers.values()
+    assert 12 not in drivers.keys()
+    assert input_params.get_driver_count() == 2
 
 
 @patch("builtins.print")
-def test_remove_resource_fail(
+def test_remove_driver_fail(
     mock_print: MagicMock, input_params: InputParameter, env: simpy.Environment
 ) -> None:
-    resources = input_params.get_resource_entities()
-    assert 13 not in resources.keys()
-    assert input_params.get_resource_count() == 2
+    drivers = input_params.get_driver_entities()
+    assert 13 not in drivers.keys()
+    assert input_params.get_driver_count() == 2
 
     # Act
-    resource = Resource(resource_id=13, position=Position([15.0, 25.0]))
-    input_params.remove_resource(resource)
+    driver = Driver(driver_id=13, position=Position([15.0, 25.0]))
+    input_params.remove_driver(driver)
 
     # Assert
-    error = "remove_resource(): Resource: 13 not found"
+    error = "remove_driver(): driver: 13 not found"
     mock_print.assert_called_once_with(error)
-    assert input_params.get_resource_count() == 2
+    assert input_params.get_driver_count() == 2
 
 
 def test_remove_task_success(

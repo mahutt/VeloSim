@@ -35,7 +35,7 @@ function layerToEntityType(layer: MapLayer): SelectedItemType {
     case MapLayer.StationTaskCounts:
       return SelectedItemType.Station;
     case MapLayer.Resources:
-      return SelectedItemType.Resource;
+      return SelectedItemType.Driver;
     default:
       throw new Error(`Unrecognized layer: ${layer}`);
   }

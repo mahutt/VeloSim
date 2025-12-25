@@ -38,58 +38,95 @@ logger = logging.getLogger(__name__)
 if TYPE_CHECKING:  # pragma: no cover
     from .task import Task
     from sim.behaviour.sim_behaviour import SimBehaviour
+    from .vehicle import Vehicle
 
 
-class Resource:
-    """Simulation resource entity that can be assigned tasks."""
+class Driver:
+    """Simulation driver entity that can be assigned tasks."""
 
     map_controller: MapController
     sim_behaviour: "SimBehaviour"
     current_route: Route | None
     env: simpy.Environment
+    vehicle: Optional["Vehicle"]
 
     def __init__(
         self,
-        resource_id: int,
+        driver_id: int,
         position: "Position",  # [longitude, latitude]
         task_list: list["Task"] | None = None,
+        vehicle: Optional["Vehicle"] = None,
     ) -> None:
-        self.id = resource_id
+        self.id = driver_id
         self.position = position
         self.current_route = None
+        self.vehicle = vehicle
         if task_list is not None:
             self.task_list = task_list
             for task in self.task_list:
-                task.set_assigned_resource(self)
+                task.set_assigned_driver(self)
         else:
             self.task_list = []
-        self.has_updated = False  # flag to track if a resource was updated
+        self.has_updated = False  # flag to track if a driver was updated
 
-    def get_resource_position(self) -> "Position":
-        """Get the current position of the resource.
+    def get_driver_position(self) -> "Position":
+        """Get the current position of the driver.
 
         Returns:
-            Position: The current geographical position of the resource.
+            Position: The current geographical position of the driver.
         """
         return self.position
 
+    def get_driver_vehicle(self) -> Optional["Vehicle"]:
+        """Get the drivers current vehicle.
+
+        Returns:
+            Vehicle | None: The drivers current Vehicle if one is set. None otherwise.
+        """
+        return self.vehicle
+
+    def set_driver_vehicle(self, vehicle: "Vehicle") -> None:
+        """Set the driver's current vehicle and mark it as updated.
+
+        Args:
+            vehicle: The vehicle to be associated with the driver.
+
+        Returns:
+            None
+        """
+        # Reject only if driver is bound to a DIFFERENT vehicle
+        if self.vehicle is not None and self.vehicle.id != vehicle.id:
+            raise Exception(
+                f"Driver Error: driver: {self.id} "
+                f"already assigned to vehicle: {self.vehicle.id}"
+            )
+        # Reject only if vehicle is bound to a DIFFERENT driver
+        current_driver = vehicle.get_vehicle_driver()
+        if current_driver is not None and current_driver.id != self.id:
+            raise Exception(
+                f"Driver Error: vehicle: {vehicle.id} "
+                f"already assigned to driver: {current_driver.id}"
+            )
+        self.vehicle = vehicle
+        self.has_updated = True
+
     def set_behaviour(self, sim_behaviour: "SimBehaviour") -> None:
-        """Set the simulation behavior controller for this resource.
+        """Set the simulation behavior controller for this driver.
 
         Args:
             sim_behaviour: The SimBehaviour instance that defines task selection,
-                resource allocation, and other behavioral strategies.
+                driver allocation, and other behavioral strategies.
 
         Returns:
             None
         """
         self.sim_behaviour = sim_behaviour
 
-    def set_resource_position(self, position: "Position") -> None:
-        """Set the resource's position and mark it as updated.
+    def set_driver_position(self, position: "Position") -> None:
+        """Set the driver's position and mark it as updated.
 
         Args:
-            position: The new geographical position for the resource.
+            position: The new geographical position for driver.
 
         Returns:
             None
@@ -110,16 +147,16 @@ class Resource:
         self.map_controller = map_controller
 
     def assign_task(self, task: "Task", dispatch_delay: Optional[float] = None) -> None:
-        """Assign a task to this resource and optionally schedule dispatch.
+        """Assign a task to this driver and optionally schedule dispatch.
 
-        Adds the task to the resource's task list and updates the task's assigned
-        resource reference. The task must be in OPEN state to be assigned.
+        Adds the task to the driver's task list and updates the task's assigned
+        driver reference. The task must be in OPEN state to be assigned.
         If a dispatch delay is provided, the task will be automatically dispatched
         after the specified delay; otherwise, it remains in ASSIGNED state until
         manually dispatched.
 
         Args:
-            task: The task to assign to this resource. Must be in OPEN state.
+            task: The task to assign to this driver. Must be in OPEN state.
             dispatch_delay: Optional delay in simulation time units before automatic
                 dispatch. If None or 0, task remains ASSIGNED until manually dispatched.
 
@@ -128,9 +165,9 @@ class Resource:
         """
         if task.get_state() == State.OPEN:
             self.task_list.append(task)
-            task.set_assigned_resource(self)
+            task.set_assigned_driver(self)
             self.has_updated = True
-            # Task state is now ASSIGNED (set by task.set_assigned_resource)
+            # Task state is now ASSIGNED (set by task.set_assigned_driver)
             # Handle dispatch scheduling
             if dispatch_delay is not None and dispatch_delay > 0:
                 # Schedule dispatch for later
@@ -144,7 +181,7 @@ class Resource:
         """Internal generator that dispatches a task after a specified delay.
 
         This is a SimPy process that waits for the specified delay and then
-        dispatches the task if it's still assigned to this resource.
+        dispatches the task if it's still assigned to this driver.
 
         Args:
             task: The task to dispatch after the delay.
@@ -160,27 +197,27 @@ class Resource:
             self.dispatch_task(task)
 
     def unassign_task(self, task: "Task") -> None:
-        """Remove a task from this resource's task list.
+        """Remove a task from this driver's task list.
 
-        Removes the task from the resource's task list and clears the task's
-        assigned resource reference. Only removes the task if it's currently
+        Removes the task from the driver's task list and clears the task's
+        assigned driver reference. Only removes the task if it's currently
         in the task list and in ASSIGNED state.
 
         Args:
-            task: The task to unassign from this resource.
+            task: The task to unassign from this driver.
 
         Returns:
             None
         """
         if task in self.task_list and task.is_assigned():
             self.task_list.remove(task)
-            task.unassign_resource()
+            task.unassign_driver()
             self.has_updated = True
 
     def get_in_progress_task(self) -> Optional["Task"]:
-        """Get the task currently being worked on by this resource.
+        """Get the task currently being worked on by this driver.
 
-        Searches through the resource's task list for a task in IN_PROGRESS state.
+        Searches through the driver's task list for a task in IN_PROGRESS state.
         Only one task should be in progress at a time.
 
         Returns:
@@ -197,11 +234,11 @@ class Resource:
 
         Changes the task state from ASSIGNED to IN_PROGRESS. The task can only be
         dispatched if no other task is in progress, or if it's at the same station
-        as the currently in-progress task. This ensures resources can only work on
+        as the currently in-progress task. This ensures drivers can only work on
         tasks at one station at a time.
 
         Args:
-            task: The task to dispatch. Must be in this resource's task list and
+            task: The task to dispatch. Must be in this driver's task list and
                 in ASSIGNED state.
 
         Returns:
@@ -223,14 +260,14 @@ class Resource:
                 raise Exception("Cannot dispatch task at this station")
 
     def service_task(self, task: "Task") -> None:
-        """Complete a task and remove it from the resource's task list.
+        """Complete a task and remove it from the driver's task list.
 
-        Marks the task as CLOSED and removes it from the resource's task list.
-        This should be called when a resource has finished servicing a task
+        Marks the task as CLOSED and removes it from the driver's task list.
+        This should be called when a driver has finished servicing a task
         at its station.
 
         Args:
-            task: The task to complete. Must be in this resource's task list.
+            task: The task to complete. Must be in this driver's task list.
 
         Returns:
             None
@@ -241,21 +278,22 @@ class Resource:
             self.has_updated = True
 
     def get_task_count(self) -> int:
-        """Get the total number of tasks assigned to this resource.
+        """Get the total number of tasks assigned to this driver.
 
         Returns:
-            int: The total count of tasks in the resource's task list,
+            int: The total count of tasks in the driver's task list,
                 including all states (SCHEDULED, ASSIGNED, IN_PROGRESS, etc.).
         """
         return len(self.task_list)
 
     def get_task_list(self) -> list["Task"]:
-        """Get the complete list of tasks assigned to this resource.
+        """Get the complete list of tasks assigned to this driver.
 
         Returns:
             list[Task]: The full task list including tasks in all states.
         """
-        return self.task_list
+        tasks = self.task_list
+        return tasks
 
     def get_visible_task_list(self) -> list["Task"]:
         """Get the list of tasks visible in the current simulation state.
@@ -273,7 +311,7 @@ class Resource:
         ]
 
     def get_visible_task_count(self) -> int:
-        """Get the count of visible tasks assigned to this resource.
+        """Get the count of visible tasks assigned to this driver.
 
         Returns:
             int: The number of tasks that are currently visible (excludes
@@ -282,10 +320,10 @@ class Resource:
         return len(self.get_visible_task_list())
 
     def clear_update(self) -> None:
-        """Clear the update flag for this resource.
+        """Clear the update flag for this driver.
 
         Resets the has_updated flag to False, indicating that changes to this
-        resource have been processed or acknowledged.
+        driver have been processed or acknowledged.
 
         Returns:
             None
@@ -296,7 +334,7 @@ class Resource:
         self, task_ids_to_reorder: list[int], apply_from_top: bool
     ) -> list[int]:
         """
-        Reorder tasks in the resource's task list.
+        Reorder tasks in the driver's task list.
 
         In-progress tasks are always pinned to the top in their original order.
         Specified task IDs are reordered according to the provided list.
@@ -341,7 +379,7 @@ class Resource:
         for task_id in task_ids_to_reorder:
             found_task = current_task_map.get(task_id)
             if found_task is None:
-                # Check if task exists in global registry but not in this resource
+                # Check if task exists in global registry but not with this driver
                 # Access controller via sim_behaviour if available
                 if hasattr(self, "sim_behaviour") and hasattr(
                     self.sim_behaviour, "controller"
@@ -350,13 +388,13 @@ class Resource:
                     if global_task is not None:
                         if global_task.get_state() == State.CLOSED:
                             logger.warning(
-                                f"Task {task_id} not in resource "
+                                f"Task {task_id} not associated with driver"
                                 f"{self.id} task list - task has "
                                 f"been completed (state: CLOSED)"
                             )
                         else:
                             logger.warning(
-                                f"Task {task_id} not in resource "
+                                f"Task {task_id} not associated with driver "
                                 f"{self.id} task list - task "
                                 f"exists elsewhere or unassigned"
                             )
@@ -367,7 +405,7 @@ class Resource:
                         )
                 else:
                     logger.warning(
-                        f"Task {task_id} not in resource {self.id} task list"
+                        f"Task {task_id} not associated to driver {self.id} task list"
                     )
             elif found_task.get_state() != State.IN_PROGRESS:
                 # Only add if not already in in_progress_tasks
@@ -399,14 +437,14 @@ class Resource:
         return [task.id for task in new_task_list]
 
     def travel_to(self, position: "Position") -> Generator[Any, None, None]:
-        """SimPy process that moves the resource to a target position.
+        """SimPy process that moves the driver to a target position.
 
         Calculates a route using the MapController and traverses it
-        step-by-step, updating the resource's position at each simulation tick.
+        step-by-step, updating the driver's position at each simulation tick.
         The process yields control back to the simulation environment at each
         step and can be interrupted.
 
-        If the resource is already at the target position, the method returns
+        If the driver is already at the target position, the method returns
         immediately. If no route can be found, logs an error and stays at the
         current position.
 
@@ -429,7 +467,7 @@ class Resource:
             # Route could not be found (no path exists, network error, etc.)
             # Log the error and stay at current position
             print(
-                f"Resource {self.id}: Cannot find route to "
+                f"Driver {self.id}: Cannot find route to "
                 f"{position.get_position()}: {e}"
             )
             return
@@ -444,10 +482,10 @@ class Resource:
                 assert isinstance(
                     next_position, Position
                 )  # route.next() returns Position when as_json=False
-                self.set_resource_position(next_position)
+                self.set_driver_position(next_position)
                 yield self.env.timeout(1)
                 next_position = route.next()
-        # Allows a traveling resource to be interrupted by other simpy entities
+        # Allows a traveling drivers to be interrupted by other simpy entities
         except simpy.Interrupt:
             # TODO Implement interrupt logic
             pass
@@ -458,7 +496,7 @@ class Resource:
     def run(self):  # type: ignore[no-untyped-def]
         """Main SimPy process that runs continuously throughout the simulation.
 
-        This is the resource's main execution loop that handles task selection,
+        This is the driver's main execution loop that handles task selection,
         dispatch, travel, and servicing. The process:
         1. Waits for initialization (sim_behaviour and map_controller setup)
         2. Checks for in-progress tasks and either travels to or services them

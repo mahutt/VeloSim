@@ -95,7 +95,7 @@ test('renders all resources from provider', () => {
   (useSimulation as unknown as ReturnType<typeof vi.fn>).mockReturnValue({
     selectItem,
     stationsRef: { current: new Map() },
-    resourcesRef: { current: new Map() },
+    driversRef: { current: new Map() },
     selectedItem: null,
     clearSelection: vi.fn(),
     assignTaskToResource: vi.fn(),
@@ -121,7 +121,7 @@ test('renders search bar with correct placeholder', () => {
     selectItem,
     resourceBarElement: mockResourceBarElement,
     stationsRef: { current: new Map() },
-    resourcesRef: { current: new Map() },
+    driversRef: { current: new Map() },
     selectedItem: null,
     clearSelection: vi.fn(),
     assignTaskToResource: vi.fn(),
@@ -141,7 +141,7 @@ test('calls selectItem with correct arguments when resource is clicked', () => {
     selectItem,
     resourceBarElement: mockResourceBarElement,
     stationsRef: { current: new Map() },
-    resourcesRef: { current: new Map() },
+    driversRef: { current: new Map() },
     selectedItem: null,
     clearSelection: vi.fn(),
     assignTaskToResource: vi.fn(),
@@ -154,9 +154,9 @@ test('calls selectItem with correct arguments when resource is clicked', () => {
   render(<ResourceBar />);
   const items = screen.getAllByTestId('resource-item');
   fireEvent.click(items[0]);
-  expect(selectItem).toHaveBeenCalledWith(SelectedItemType.Resource, 1);
+  expect(selectItem).toHaveBeenCalledWith(SelectedItemType.Driver, 1);
   fireEvent.click(items[1]);
-  expect(selectItem).toHaveBeenCalledWith(SelectedItemType.Resource, 2);
+  expect(selectItem).toHaveBeenCalledWith(SelectedItemType.Driver, 2);
 });
 
 test('filters resources by ID match', async () => {
@@ -166,7 +166,7 @@ test('filters resources by ID match', async () => {
     selectItem,
     resourceBarElement: mockResourceBarElement,
     stationsRef: { current: new Map() },
-    resourcesRef: { current: new Map() },
+    driversRef: { current: new Map() },
     selectedItem: null,
     clearSelection: vi.fn(),
     assignTaskToResource: vi.fn(),
@@ -194,7 +194,7 @@ test('filters resources by partial ID match', async () => {
     selectItem,
     resourceBarElement: mockResourceBarElement,
     stationsRef: { current: new Map() },
-    resourcesRef: { current: new Map() },
+    driversRef: { current: new Map() },
     selectedItem: null,
     clearSelection: vi.fn(),
     assignTaskToResource: vi.fn(),
@@ -222,7 +222,7 @@ test('shows no resources when search query does not match any ID', async () => {
     selectItem,
     resourceBarElement: mockResourceBarElement,
     stationsRef: { current: new Map() },
-    resourcesRef: { current: new Map() },
+    driversRef: { current: new Map() },
     selectedItem: null,
     clearSelection: vi.fn(),
     assignTaskToResource: vi.fn(),
@@ -249,7 +249,7 @@ test('shows all resources when search query is empty', async () => {
     selectItem,
     resourceBarElement: mockResourceBarElement,
     stationsRef: { current: new Map() },
-    resourcesRef: { current: new Map() },
+    driversRef: { current: new Map() },
     selectedItem: null,
     clearSelection: vi.fn(),
     assignTaskToResource: vi.fn(),
@@ -282,7 +282,7 @@ test('clears search when clear button is clicked', async () => {
     selectItem,
     resourceBarElement: mockResourceBarElement,
     stationsRef: { current: new Map() },
-    resourcesRef: { current: new Map() },
+    driversRef: { current: new Map() },
     selectedItem: null,
     clearSelection: vi.fn(),
     assignTaskToResource: vi.fn(),
@@ -319,7 +319,7 @@ test('search is case insensitive for partial matches', async () => {
     selectItem,
     resourceBarElement: mockResourceBarElement,
     stationsRef: { current: new Map() },
-    resourcesRef: { current: new Map() },
+    driversRef: { current: new Map() },
     selectedItem: null,
     clearSelection: vi.fn(),
     assignTaskToResource: vi.fn(),
@@ -347,9 +347,9 @@ test('maintains selection state while filtering', async () => {
     selectItem,
     resourceBarElement: mockResourceBarElement,
     stationsRef: { current: new Map() },
-    resourcesRef: { current: new Map() },
+    driversRef: { current: new Map() },
     selectedItem: {
-      type: SelectedItemType.Resource,
+      type: SelectedItemType.Driver,
       value: selectedResource,
     },
     clearSelection: vi.fn(),
@@ -378,7 +378,7 @@ test('shows "No resources currently available" when resources array is empty', (
     selectItem,
     resourceBarElement: [],
     stationsRef: { current: new Map() },
-    resourcesRef: { current: new Map() },
+    driversRef: { current: new Map() },
     selectedItem: null,
     clearSelection: vi.fn(),
     assignTaskToResource: vi.fn(),
@@ -401,7 +401,7 @@ test('shows "No resources match your search" when search yields no results', asy
     selectItem,
     resourceBarElement: mockResourceBarElement,
     stationsRef: { current: new Map() },
-    resourcesRef: { current: new Map() },
+    driversRef: { current: new Map() },
     selectedItem: null,
     clearSelection: vi.fn(),
     assignTaskToResource: vi.fn(),
