@@ -132,8 +132,8 @@ class VehicleValidator(BaseModel):
     """Validator for vehicle entity data."""
 
     name: str
-    position: Optional[PositionValidator]
-    battery_count: Optional[int]
+    position: Optional[PositionValidator] = None
+    battery_count: Optional[int] = 0
 
 
 class ShiftValidator(BaseModel):
@@ -141,7 +141,7 @@ class ShiftValidator(BaseModel):
 
     start_time: str
     end_time: str
-    lunch_break: Optional[str]
+    lunch_break: Optional[str] = None
 
     @field_validator("start_time", "end_time", "lunch_break", mode="before")
     @classmethod
@@ -175,7 +175,7 @@ class StationValidator(BaseModel):
 
     name: str
     position: PositionValidator
-    initial_task_count: Optional[int]
+    initial_task_count: Optional[int] = 0
     scheduled_tasks: List[str]
 
     @field_validator("scheduled_tasks", mode="before")
@@ -529,7 +529,7 @@ class _ScenarioValidator:
         for idx, s in enumerate(stations):
             for error in self.check_required_fields(
                 s,
-                ["name", "position", "initial_task_count", "scheduled_tasks"],
+                ["name", "position", "scheduled_tasks"],
             ):
                 field_path = f"stations[{idx}].{error['field']}"
                 line_num = self._get_line_number(field_path)
@@ -622,9 +622,7 @@ class _ScenarioValidator:
 
         for idx, v in enumerate(vehicles):
             # Required fields for vehicles and ID tracking
-            for error in self.check_required_fields(
-                v, ["name", "position", "battery_count"]
-            ):
+            for error in self.check_required_fields(v, ["name"]):
                 field_path = f"vehicles[{idx}].{error['field']}"
                 line_num = self._get_line_number(field_path)
                 if line_num:
@@ -978,10 +976,8 @@ class JsonParseStrategy(BaseParseStrategy):
                 drivers_from_scenario.pop(0)
                 did = driver_id_counter
                 driver_id_counter += 1
-                pos = v.get("Position")
-                if v is not None:
-                    pos = Position(v.get("position"))
-                else:
+                pos = v.get("psosition")
+                if pos is None:
                     pos = Position(DEFAULT_VEHICLE_POSITION)
                 drivers[did] = Driver(
                     driver_id=did, position=pos, task_list=[], vehicle=vehicles[vid]

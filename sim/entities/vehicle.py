@@ -97,7 +97,7 @@ class Vehicle:
         """Set the vehicle's inventory and marks it as updated.
 
         Args:
-            inventory: int corresponding to a quantity of batteries.
+            battery_count: int corresponding to a quantity of batteries.
 
         Returns:
             None
