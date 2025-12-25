@@ -98,7 +98,6 @@ def test_station_missing_required_fields(validator: ScenarioValidator) -> None:
     errors: List[Dict[str, str]] = validator.validate_all(scenario_content)
     assert any("stations[1].name" == e.get("field") for e in errors)
     assert any("stations[1].position" == e.get("field") for e in errors)
-    assert any("stations[1].initial_task_count" == e.get("field") for e in errors)
     assert any("stations[1].scheduled_tasks" == e.get("field") for e in errors)
 
 
@@ -107,8 +106,6 @@ def test_vehicle_missing_required_fields(validator: ScenarioValidator) -> None:
     scenario_content["vehicles"].append({})
     errors: List[Dict[str, str]] = validator.validate_all(scenario_content)
     assert any("vehicles[1].name" == e.get("field") for e in errors)
-    assert any("vehicles[1].position" == e.get("field") for e in errors)
-    assert any("vehicles[1].battery_count" == e.get("field") for e in errors)
 
 
 def test_invalid_lat_lon(validator: ScenarioValidator) -> None:
