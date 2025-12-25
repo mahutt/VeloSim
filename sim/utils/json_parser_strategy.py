@@ -976,8 +976,10 @@ class JsonParseStrategy(BaseParseStrategy):
                 drivers_from_scenario.pop(0)
                 did = driver_id_counter
                 driver_id_counter += 1
-                pos = v.get("psosition")
-                if pos is None:
+                pos = v.get("position")
+                if pos:
+                    pos = Position(pos)
+                else:
                     pos = Position(DEFAULT_VEHICLE_POSITION)
                 drivers[did] = Driver(
                     driver_id=did, position=pos, task_list=[], vehicle=vehicles[vid]
