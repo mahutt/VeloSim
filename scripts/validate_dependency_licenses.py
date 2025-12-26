@@ -152,6 +152,9 @@ KNOWN_PYTHON_PACKAGE_LICENSES = {
     'types-shapely': 'Apache-2.0',
     'types-geopandas': 'Apache-2.0',
     'pytest-asyncio': 'Apache-2.0',
+    'black': 'MIT',
+    'fastapi': 'MIT',
+    'pytest': 'MIT',
 }
 
 def run_command(command: List[str], cwd: str = None) -> Tuple[int, str, str]:
