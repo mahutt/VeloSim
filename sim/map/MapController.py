@@ -22,7 +22,11 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 """
 
+<<<<<<< HEAD
 from sim.entities.map_payload import MapPayload
+=======
+from pandas import Series
+>>>>>>> fe9b619 (feat: add logic to separate traffic dataset to csv files by hour of day with osrm node conversions #464)
 from sim.entities.position import Position
 from sim.entities.route import Route
 from sim.map.routing_provider import RoutingProvider
