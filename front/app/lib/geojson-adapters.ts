@@ -22,6 +22,10 @@
  * SOFTWARE.
  */
 
+import { lineString, point } from '@turf/helpers';
+import along from '@turf/along';
+import length from '@turf/length';
+import lineSlice from '@turf/line-slice';
 import type { Driver, Station } from '~/types';
 
 export function adaptStationsToGeoJSON(
@@ -70,4 +74,88 @@ export function adaptResourcesToGeoJSON(
       },
     })),
   };
+}
+
+export function adaptRouteToGeoJSON(
+  routeGeometry: [number, number][] | null,
+  progress: number
+): {
+  traversed: GeoJSON.FeatureCollection;
+  remaining: GeoJSON.FeatureCollection;
+} {
+  const emptyFeatureCollection: GeoJSON.FeatureCollection = {
+    type: 'FeatureCollection',
+    features: [],
+  };
+
+  if (!routeGeometry || routeGeometry.length < 2) {
+    return {
+      traversed: emptyFeatureCollection,
+      remaining: emptyFeatureCollection,
+    };
+  }
+
+  // Progress is now fractional (0-1), use Turf.js for precise line slicing
+  const routeLine = lineString(routeGeometry);
+  const totalLength = length(routeLine, { units: 'kilometers' });
+  const currentDistance = progress * totalLength;
+
+  // Get the current position on the route
+  const currentPoint = along(routeLine, currentDistance, {
+    units: 'kilometers',
+  });
+  const startPoint = point(routeGeometry[0]);
+  const endPoint = point(routeGeometry[routeGeometry.length - 1]);
+
+  let traversed: GeoJSON.FeatureCollection = emptyFeatureCollection;
+  let remaining: GeoJSON.FeatureCollection = emptyFeatureCollection;
+
+  try {
+    // Slice the route into traversed and remaining portions
+    if (currentDistance > 0.001) {
+      const traversedLine = lineSlice(startPoint, currentPoint, routeLine);
+      if (traversedLine.geometry.coordinates.length >= 2) {
+        traversed = {
+          type: 'FeatureCollection',
+          features: [
+            {
+              type: 'Feature',
+              properties: {},
+              geometry: traversedLine.geometry,
+            },
+          ],
+        };
+      }
+    }
+
+    if (currentDistance < totalLength - 0.001) {
+      const remainingLine = lineSlice(currentPoint, endPoint, routeLine);
+      if (remainingLine.geometry.coordinates.length >= 2) {
+        remaining = {
+          type: 'FeatureCollection',
+          features: [
+            {
+              type: 'Feature',
+              properties: {},
+              geometry: remainingLine.geometry,
+            },
+          ],
+        };
+      }
+    }
+  } catch {
+    // Fallback if slicing fails - show entire route as remaining
+    remaining = {
+      type: 'FeatureCollection',
+      features: [
+        {
+          type: 'Feature',
+          properties: {},
+          geometry: { type: 'LineString', coordinates: routeGeometry },
+        },
+      ],
+    };
+  }
+
+  return { traversed, remaining };
 }

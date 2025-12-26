@@ -61,6 +61,7 @@ class Driver:
         self.position = position
         self.current_route = None
         self.vehicle = vehicle
+        self.route_changed = False  # flag to track if route geometry needs to be sent
         if task_list is not None:
             self.task_list = task_list
             for task in self.task_list:
@@ -322,13 +323,14 @@ class Driver:
     def clear_update(self) -> None:
         """Clear the update flag for this driver.
 
-        Resets the has_updated flag to False, indicating that changes to this
-        driver have been processed or acknowledged.
+        Resets the has_updated and route_changed flags to False, indicating
+        that changes to this driver have been processed or acknowledged.
 
         Returns:
             None
         """
         self.has_updated = False
+        self.route_changed = False
 
     def reorder_tasks(
         self, task_ids_to_reorder: list[int], apply_from_top: bool
@@ -473,6 +475,7 @@ class Driver:
             return
 
         self.current_route = route
+        self.route_changed = True  # Mark that route geometry needs to be sent
         next_position = route.next()
         try:
             while self.position != position and next_position:

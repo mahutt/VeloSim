@@ -33,7 +33,7 @@ import {
 } from 'react';
 
 import { useMap } from './map-provider';
-import { MapSource, setMapSource } from '~/lib/map-helpers';
+import { MapSource, setMapSource, updateRouteDisplay } from '~/lib/map-helpers';
 import {
   type BackendPayload,
   type StationTask,
@@ -65,6 +65,10 @@ import {
   type PopulatedResource,
   type SelectedItemBarElement,
 } from '~/components/map/selected-item-bar';
+import {
+  interpolateAlongRoute,
+  calculateRouteProgress,
+} from '~/lib/animation-helpers';
 
 // Expect to receive frames every 1 second
 const BASE_FRAME_INTERVAL_MS = 1000;
@@ -263,6 +267,9 @@ export const SimulationProvider = ({
   const frameStartPositionsRef = useRef<Map<number, Position>>(new Map());
   const currentPositionsRef = useRef<Map<number, Position>>(new Map());
   const targetPositionsRef = useRef<Map<number, Position>>(new Map());
+  // Route geometry for path-following interpolation
+  const routeGeometriesRef = useRef<Map<number, Position[]>>(new Map());
+  const routeProgressRef = useRef<Map<number, number>>(new Map()); // Track progress along route (0 to total length)
 
   // Global frame timing (shared by all resources)
   const lastFrameTimeRef = useRef<number>(0);
@@ -332,7 +339,7 @@ export const SimulationProvider = ({
     }
   };
 
-  // Helper function to update both map sources
+  // Helper function to update all map sources (stations, resources, and routes)
   const updateMapSources = (
     selectedStationId?: number,
     selectedResourceId?: number
@@ -372,6 +379,16 @@ export const SimulationProvider = ({
         hoveredResourceIdRef.current ?? undefined
       );
       setMapSource(MapSource.Resources, geojson, map);
+    }
+
+    // Update route display for selected resource (or clear if none selected)
+    if (selectedResourceId !== undefined) {
+      const routeGeometry =
+        routeGeometriesRef.current.get(selectedResourceId) ?? null;
+      const progress = routeProgressRef.current.get(selectedResourceId) ?? 0;
+      updateRouteDisplay(routeGeometry, progress, map);
+    } else {
+      updateRouteDisplay(null, 0, map);
     }
   };
 
@@ -529,6 +546,21 @@ export const SimulationProvider = ({
           currentPosition ?? newPosition
         );
         targetPositionsRef.current.set(resource.id, newPosition);
+
+        // Store route geometry if provided (sent in key frames or when route changes)
+        // This is the raw OSRM linestring, not the interpolated points
+        if (resource.route?.coordinates) {
+          routeGeometriesRef.current.set(
+            resource.id,
+            resource.route.coordinates
+          );
+          // Reset progress when new route received - will recalculate from position
+          routeProgressRef.current.set(resource.id, 0);
+        } else if (resource.route === null) {
+          // Backend explicitly signals route completion - clear route data
+          routeGeometriesRef.current.delete(resource.id);
+          routeProgressRef.current.delete(resource.id);
+        }
       });
 
       // Update frame start time
@@ -571,13 +603,27 @@ export const SimulationProvider = ({
 
       if (!start || !target) return;
 
-      // Linear interpolation between start and target positions
-      // TODO: Replace with route-based interpolation once backend sends GeoJSON routes
-      // This will allow resources to follow actual roadways instead of straight lines
-      const currentPos: Position = [
-        start[0] + (target[0] - start[0]) * t, // longitude
-        start[1] + (target[1] - start[1]) * t, // latitude
-      ];
+      let currentPos: Position;
+      const routeGeometry = routeGeometriesRef.current.get(resource.id);
+
+      if (routeGeometry) {
+        // Animate from start to target, projecting onto the raw OSRM linestring
+        // Route clearing is handled by backend sending route: null
+        currentPos = interpolateAlongRoute(routeGeometry, start, target, t);
+
+        // Update route progress for smooth visualization (grey line follows position)
+        const animatedProgress = calculateRouteProgress(
+          routeGeometry,
+          currentPos
+        );
+        routeProgressRef.current.set(resource.id, animatedProgress);
+      } else {
+        // Fallback to linear interpolation if no route geometry
+        currentPos = [
+          start[0] + (target[0] - start[0]) * t,
+          start[1] + (target[1] - start[1]) * t,
+        ];
+      }
 
       // Update current position
       const prevPos = currentPositionsRef.current.get(resource.id);
@@ -601,6 +647,7 @@ export const SimulationProvider = ({
         selectedStationIdRef.current,
         selectedResourceIdRef.current
       );
+
       renderOnNextFrameRef.current = false;
     }
 

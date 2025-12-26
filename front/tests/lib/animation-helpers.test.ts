@@ -23,8 +23,17 @@
  */
 
 import { expect, test } from 'vitest';
-import { interpolateAlongRoute } from '~/lib/animation-helpers';
+import {
+  interpolateAlongRoute,
+  calculateRouteProgress,
+} from '~/lib/animation-helpers';
 import type { Position } from '~/types';
+
+// Helper to check if two positions are approximately equal
+function expectPositionClose(actual: Position, expected: Position) {
+  expect(actual[0]).toBeCloseTo(expected[0], 5);
+  expect(actual[1]).toBeCloseTo(expected[1], 5);
+}
 
 test('interpolateAlongRoute returns old position when progress is 0', () => {
   const route: Position[] = [
@@ -37,7 +46,7 @@ test('interpolateAlongRoute returns old position when progress is 0', () => {
 
   const result = interpolateAlongRoute(route, oldPos, newPos, 0);
 
-  expect(result).toEqual([2, 0]);
+  expectPositionClose(result, [2, 0]);
 });
 
 test('interpolateAlongRoute returns new position when progress is 1', () => {
@@ -51,7 +60,7 @@ test('interpolateAlongRoute returns new position when progress is 1', () => {
 
   const result = interpolateAlongRoute(route, oldPos, newPos, 1);
 
-  expect(result).toEqual([8, 0]);
+  expectPositionClose(result, [8, 0]);
 });
 
 test('interpolateAlongRoute returns midpoint when progress is 0.5', () => {
@@ -64,7 +73,7 @@ test('interpolateAlongRoute returns midpoint when progress is 0.5', () => {
 
   const result = interpolateAlongRoute(route, oldPos, newPos, 0.5);
 
-  expect(result).toEqual([5, 0]);
+  expectPositionClose(result, [5, 0]);
 });
 
 test('interpolateAlongRoute works with negative coordinates', () => {
@@ -78,24 +87,70 @@ test('interpolateAlongRoute works with negative coordinates', () => {
 
   const result = interpolateAlongRoute(route, oldPos, newPos, 0.5);
 
-  expect(result).toEqual([0, 0]);
+  expectPositionClose(result, [0, 0]);
 });
 
-test('interpolateAlongRoute handles complex route geometry', () => {
-  // Route geometry is currently ignored in placeholder implementation
-  // This test verifies current behavior (straight line)
+test('interpolateAlongRoute follows route geometry (not straight line)', () => {
+  // Route with a bend: goes right, then up
   const complexRoute: Position[] = [
     [0, 0],
-    [2, 2],
-    [5, 2],
-    [8, 5],
-    [10, 10],
+    [5, 0],
+    [5, 5],
   ];
+  const oldPos: Position = [0, 0];
+  const newPos: Position = [5, 5];
+
+  // At progress 0.5, should be near the corner at [5, 0], not at [2.5, 2.5]
+  const result = interpolateAlongRoute(complexRoute, oldPos, newPos, 0.5);
+
+  // The midpoint along the L-shaped route should be near the corner
+  expect(result[0]).toBeCloseTo(5, 1);
+  expect(result[1]).toBeCloseTo(0, 1);
+});
+
+test('interpolateAlongRoute falls back to linear for single-point route', () => {
+  const route: Position[] = [[5, 5]];
   const oldPos: Position = [0, 0];
   const newPos: Position = [10, 10];
 
-  const result = interpolateAlongRoute(complexRoute, oldPos, newPos, 0.5);
+  const result = interpolateAlongRoute(route, oldPos, newPos, 0.5);
 
-  // Current implementation does straight line, ignoring route
-  expect(result).toEqual([5, 5]);
+  // Should fall back to linear interpolation
+  expectPositionClose(result, [5, 5]);
+});
+
+test('calculateRouteProgress returns 0 at start', () => {
+  const route: Position[] = [
+    [0, 0],
+    [10, 0],
+  ];
+  const position: Position = [0, 0];
+
+  const progress = calculateRouteProgress(route, position);
+
+  expect(progress).toBeCloseTo(0, 5);
+});
+
+test('calculateRouteProgress returns 1 at end', () => {
+  const route: Position[] = [
+    [0, 0],
+    [10, 0],
+  ];
+  const position: Position = [10, 0];
+
+  const progress = calculateRouteProgress(route, position);
+
+  expect(progress).toBeCloseTo(1, 5);
+});
+
+test('calculateRouteProgress returns 0.5 at midpoint', () => {
+  const route: Position[] = [
+    [0, 0],
+    [10, 0],
+  ];
+  const position: Position = [5, 0];
+
+  const progress = calculateRouteProgress(route, position);
+
+  expect(progress).toBeCloseTo(0.5, 5);
 });

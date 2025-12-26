@@ -479,21 +479,36 @@ class SimulatorController:
             if is_key or driver.has_updated:
                 in_progress_task = driver.get_in_progress_task()
                 current_vehicle = driver.get_driver_vehicle()
-                drivers.append(
-                    {
-                        "id": driver.id,
-                        "position": (driver.get_driver_position().get_position()),
-                        "taskIds": [task.id for task in driver.get_visible_task_list()],
-                        "inProgressTaskId": (
-                            in_progress_task.get_task_id()
-                            if in_progress_task is not None
-                            else None
-                        ),
-                        "vehicleId": (
-                            current_vehicle.id if current_vehicle is not None else None
-                        ),
-                    }
-                )
+                # Build driver data
+                driver_data = {
+                    "id": driver.id,
+                    "position": (driver.get_driver_position().get_position()),
+                    "taskIds": [task.id for task in driver.get_visible_task_list()],
+                    "inProgressTaskId": (
+                        in_progress_task.get_task_id()
+                        if in_progress_task is not None
+                        else None
+                    ),
+                    "vehicleId": (
+                        current_vehicle.id if current_vehicle is not None else None
+                    ),
+                }
+
+                # Include route in key frames (for replayability) or when route changes
+                # Only include route field when there's something to communicate:
+                # - Key frames: always include (coordinates or null)
+                # - Diff frames: only include if route_changed
+                if is_key or driver.route_changed:
+                    if driver.current_route is not None:
+                        # Send raw OSRM coordinates, not interpolated points
+                        driver_data["route"] = {
+                            "coordinates": driver.current_route.get_raw_coordinates()
+                        }
+                    else:
+                        # Explicitly signal no route (cleared)
+                        driver_data["route"] = None
+
+                drivers.append(driver_data)
 
         vehicles = []
         for vehicle in self.vehicle_entities.values():
