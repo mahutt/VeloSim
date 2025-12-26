@@ -83,6 +83,32 @@ export interface InitializeSimulationResponse {
   status: string;
 }
 
+// GBFS Response Types
+
+export interface GBFSStationInformationResponse {
+  last_updated: number;
+  ttl: number;
+  version: string;
+  data: {
+    stations: StationInformation[];
+  };
+}
+
+interface StationInformation {
+  station_id: string;
+  external_id: string;
+  name: string;
+  short_name: string;
+  lat: number;
+  lon: number;
+  rental_methods: string[];
+  capacity: number;
+  electric_bike_surcharge_waiver: boolean;
+  is_charging: boolean;
+  eightd_has_key_dispenser: boolean;
+  has_kiosk: boolean;
+}
+
 export interface Driver {
   id: number;
   position: Position;
@@ -133,6 +159,14 @@ export interface Scenario {
   date_created: string;
   date_updated: string;
   content_size?: number;
+}
+
+// v2 scenario content station definition
+export interface ScenarioContentStation {
+  name: string;
+  position: Position;
+  initial_task_count?: number;
+  scheduled_tasks: string[];
 }
 
 // Simulation types

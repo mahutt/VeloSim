@@ -25,12 +25,14 @@
 import { Button } from '~/components/ui/button';
 import { Textarea } from '~/components/ui/textarea';
 import { Field, FieldLabel } from '~/components/ui/field';
+import ScenarioContentOptions from './scenario-content-options';
+import type { Dispatch, SetStateAction } from 'react';
 
 interface ScenarioTextAreaProps {
   scenarioData: string;
   scenarioDescription: string;
   onDescriptionChange: (desc: string) => void;
-  onChange: (data: string) => void;
+  onChange: Dispatch<SetStateAction<string>>;
   onSave: () => void;
   onExport: () => void;
   onStart: () => void;
@@ -89,7 +91,13 @@ export default function ScenarioTextArea({
       </Field>
 
       <Field data-disabled={isDisabled} className="mt-4">
-        <FieldLabel htmlFor="scenario-json">Scenario JSON</FieldLabel>
+        <div className="flex items-center justify-between">
+          <FieldLabel htmlFor="scenario-json">Scenario JSON</FieldLabel>
+          <ScenarioContentOptions
+            setScenarioContent={onChange}
+            onEdit={onEdit}
+          />
+        </div>
         <Textarea
           id="scenario-json"
           className="h-[28rem] resize-none font-mono"
