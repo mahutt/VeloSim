@@ -101,7 +101,6 @@ def initialize_simulation(
     Returns:
         SimulationResponse containing the initialized simulation details
     """
-    """Initialize a new simulation and return a confirmation response."""
     start_time = time.perf_counter()  # Start timer for total startup metric
     if (scenario is None and scenario_id is None) or (
         scenario is not None and scenario_id is not None
@@ -124,8 +123,9 @@ def initialize_simulation(
 
         # Initialize simulation
         result = simulation_service.initialize_simulation(
-            db, requesting_user, scenario_params
+            db, requesting_user, scenario_params, scenario_payload=scenario
         )
+
         # Store the start time for the total startup metric
         sim_id = result.sim_id
         if sim_id in simulation_service.active_simulations:

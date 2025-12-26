@@ -23,7 +23,7 @@ SOFTWARE.
 """
 
 from datetime import datetime
-from typing import List
+from typing import Any, Dict, List, Optional
 from pydantic import BaseModel, ConfigDict, computed_field
 
 
@@ -36,7 +36,7 @@ class SimInstanceBase(BaseModel):
 class SimInstanceCreate(SimInstanceBase):
     """Schema for creating a new SimInstance."""
 
-    pass
+    scenario_payload: Optional[Dict[str, Any]] = None
 
 
 class SimInstanceResponse(SimInstanceBase):

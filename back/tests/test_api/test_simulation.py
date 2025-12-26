@@ -23,11 +23,13 @@ SOFTWARE.
 """
 
 import asyncio
+from back.schemas.sim_instance import SimulationResponse
 from fastapi import WebSocket
 from fastapi.websockets import WebSocketState
 import pytest
 from unittest.mock import patch, MagicMock, ANY
 from fastapi.testclient import TestClient
+from back.models.scenario import Scenario
 from sqlalchemy.orm import Session
 from typing import Generator, TypedDict, List, cast, Any, Coroutine
 
@@ -42,9 +44,6 @@ from back.schemas import (
     ResourceTaskUnassignResponse,
     ResourceTaskReassignResponse,
 )
-from back.schemas.sim_instance import (
-    SimulationResponse,
-)
 from back.schemas.playback_speed import PlaybackSpeedResponse, SimulationPlaybackStatus
 from back.schemas.resource import (
     ResourceTaskAssignRequest,
@@ -56,34 +55,43 @@ from back.services.simulation_service import simulation_service
 from back.models.user import User
 
 SCENARIO_PAYLOAD = {
-    "id": 1,
-    "name": "Morning Operations",
-    "content": {
-        "start_time": "day1:08:00",
-        "end_time": "day1:12:00",
-        "vehicle_battery_capacity": 999,
-        "stations": [
-            {
-                "name": "Station 1",
-                "initial_task_count": 2,
-                "scheduled_tasks": ["day1:09:30"],
-                "position": [45.5, -73.5],
-            }
-        ],
-        "drivers": [
-            {
-                "name": "Driver 1",
-                "shift": {
-                    "start_time": "day1:08:00",
-                    "end_time": "day1:12:00",
-                    "lunch_break": "day1:10:00",
-                },
-            }
-        ],
-        "vehicles": [
-            {"name": "Vehicle 1", "position": [-73.5610, 45.5070], "battery_count": 999}
-        ],
-    },
+    "start_time": "day1:06:00",
+    "end_time": "day1:12:00",
+    "vehicle_battery_capacity": 100,
+    "stations": [
+        {
+            "name": "Station Alpha",
+            "position": [45.5017, -73.5673],
+            "initial_task_count": 1,
+            "scheduled_tasks": ["day1:07:00", "day1:08:00"],
+        },
+        {
+            "name": "Station Bravo",
+            "position": [45.5088, -73.5540],
+            "initial_task_count": 1,
+            "scheduled_tasks": ["day1:07:30"],
+        },
+        {
+            "name": "Station Charlie",
+            "position": [45.5120, -73.5800],
+            "initial_task_count": 0,
+            "scheduled_tasks": ["day1:06:10", "day1:06:30"],
+        },
+    ],
+    "vehicles": [
+        {"name": "Vehicle 101", "position": [45.505, -73.56], "battery_count": 2},
+        {"name": "Vehicle 102", "position": [45.509, -73.57], "battery_count": 2},
+    ],
+    "drivers": [
+        {
+            "name": "Driver 1",
+            "shift": {
+                "start_time": "day1:06:00",
+                "end_time": "day1:12:00",
+                "lunch_break": "day1:09:00",
+            },
+        },
+    ],
 }
 
 # Apply patches before any simulator code is imported
@@ -250,8 +258,8 @@ class DummyWebSocket:
     def __init__(self) -> None:
         self.sent: List[FrameData] = []
         self.client_state = WebSocketState.CONNECTED
-        # Add scope to mimic FastAPI's WebSocket object for testing
-        self.scope = {"path": "/api/v1/simulation/stream/test-sim-from-dummy"}
+        # Mock scope attribute that WebSocketSubscriber expects
+        self.scope = {"path": "/api/v1/simulation/stream/test-sim-123"}
 
     async def send_json(self, data: FrameData) -> None:
         self.sent.append(data)
@@ -264,7 +272,9 @@ class TestSimulationAPI:
         self, mock_init: MagicMock, authenticated_client: TestClient
     ) -> None:
         mock_init.return_value = SimulationResponse(
-            sim_id="sim123", db_id=42, status="initialized"
+            sim_id="sim123",
+            db_id=42,
+            status="initialized",
         )
         response = authenticated_client.post(
             "/api/v1/simulation/initialize", json=SCENARIO_PAYLOAD
@@ -346,9 +356,12 @@ class TestSimulationAPI:
         # Create a scenario in the database
         scenario = Scenario(
             name="Test Scenario",
-            content=SCENARIO_PAYLOAD["content"],
+            content=SCENARIO_PAYLOAD,
             user_id=1,
         )
+        db.add(scenario)
+        db.commit()
+        db.refresh(scenario)
         db.add(scenario)
         db.commit()
         db.refresh(scenario)
@@ -375,6 +388,124 @@ class TestSimulationAPI:
         call_args = mock_init.call_args
         assert call_args[0][1] == 1  # requesting_user
         # The third argument should be parsed InputParameter
+
+    @patch("back.services.simulation_service.simulation_service.initialize_simulation")
+    def test_initialize_simulation_persists_scenario_payload_inline(
+        self,
+        mock_init: MagicMock,
+        authenticated_client: TestClient,
+        db: Session,
+    ) -> None:
+        """Test that scenario payload is passed when using inline scenario."""
+        # Mock the service response
+        mock_init.return_value = SimulationResponse(
+            sim_id="test-sim-456",
+            db_id=2,
+            status="initialized",
+        )
+
+        # Call endpoint with inline scenario
+        response = authenticated_client.post(
+            "/api/v1/simulation/initialize", json=SCENARIO_PAYLOAD
+        )
+
+        assert response.status_code == 200
+
+        # Verify the service was called with scenario_payload
+        mock_init.assert_called_once()
+        call_args = mock_init.call_args
+        # Check that scenario_payload kwarg was passed
+        assert "scenario_payload" in call_args[1]
+        # Check that the scenario_payload has the expected structure
+        # Note: The parser may normalize the payload (e.g., empty drivers list)
+        scenario_payload = call_args[1]["scenario_payload"]
+        assert scenario_payload["start_time"] == SCENARIO_PAYLOAD["start_time"]
+        assert scenario_payload["end_time"] == SCENARIO_PAYLOAD["end_time"]
+        assert (
+            scenario_payload["vehicle_battery_capacity"]
+            == SCENARIO_PAYLOAD["vehicle_battery_capacity"]
+        )
+        # mypy doesn't know scenario_payload["stations"] is a list
+        assert len(scenario_payload["stations"]) == len(
+            SCENARIO_PAYLOAD["stations"]  # type: ignore[arg-type]
+        )
+
+    @patch("back.services.simulation_service.simulation_service.initialize_simulation")
+    def test_initialize_simulation_persists_scenario_payload_from_db(
+        self,
+        mock_init: MagicMock,
+        authenticated_client: TestClient,
+        db: Session,
+    ) -> None:
+        """Test that scenario payload is passed when using scenario_id."""
+        # Create a scenario in the database
+        scenario_content = {
+            "start_time": "day1:08:00",
+            "end_time": "day1:12:00",
+            "vehicle_battery_capacity": 100,
+            "stations": [
+                {
+                    "name": "Test Station",
+                    "position": [45.5, -73.6],
+                    "initial_task_count": 0,
+                    "scheduled_tasks": [],
+                }
+            ],
+            "vehicles": [
+                {"name": "Test Vehicle", "position": [45.5, -73.6], "battery_count": 2}
+            ],
+            "drivers": [
+                {
+                    "name": "Test Driver",
+                    "shift": {
+                        "start_time": "day1:08:00",
+                        "end_time": "day1:12:00",
+                        "lunch_break": "day1:10:00",
+                    },
+                }
+            ],
+        }
+        scenario = Scenario(
+            name="DB Scenario",
+            content=scenario_content,
+            user_id=1,
+        )
+        db.add(scenario)
+        db.commit()
+        db.refresh(scenario)
+
+        # Mock the service response
+        mock_init.return_value = SimulationResponse(
+            sim_id="test-sim-789",
+            db_id=3,
+            status="initialized",
+        )
+
+        # Call endpoint with scenario_id
+        response = authenticated_client.post(
+            f"/api/v1/simulation/initialize?scenario_id={scenario.id}"
+        )
+
+        assert response.status_code == 200
+
+        # Verify the service was called with scenario_payload (from DB)
+        mock_init.assert_called_once()
+        call_args = mock_init.call_args
+        # Check that scenario_payload kwarg was passed
+        assert "scenario_payload" in call_args[1]
+        # Check that the scenario_payload has the expected structure
+        # Note: The parser may normalize the payload (e.g., empty drivers list)
+        scenario_payload = call_args[1]["scenario_payload"]
+        assert scenario_payload["start_time"] == scenario_content["start_time"]
+        assert scenario_payload["end_time"] == scenario_content["end_time"]
+        assert (
+            scenario_payload["vehicle_battery_capacity"]
+            == scenario_content["vehicle_battery_capacity"]
+        )
+        # mypy doesn't know these are lists
+        assert len(scenario_payload["stations"]) == len(
+            scenario_content["stations"]  # type: ignore[arg-type]
+        )
 
     @patch("back.services.simulation_service.simulation_service.stop_simulation")
     def test_stop_simulation_success(
@@ -686,8 +817,7 @@ class TestSimulationAPI:
         )
         assert response.status_code == 422
 
-    @patch("back.api.v1.utils.sim_websocket_helpers.simulation_service")
-    def test_websocket_subscriber_on_frame(self, mock_sim_service: MagicMock) -> None:
+    def test_websocket_subscriber_on_frame(self) -> None:
         """Test that WebSocketSubscriber schedules frames correctly."""
 
         # Create a new event loop for this test
@@ -721,10 +851,7 @@ class TestSimulationAPI:
             loop.close()
             asyncio.set_event_loop(None)
 
-    @patch("back.api.v1.utils.sim_websocket_helpers.simulation_service")
-    def test_websocket_subscriber_multiple_frames(
-        self, mock_sim_service: MagicMock
-    ) -> None:
+    def test_websocket_subscriber_multiple_frames(self) -> None:
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
 
@@ -758,8 +885,7 @@ class TestSimulationAPI:
             loop.close()
             asyncio.set_event_loop(None)
 
-    @patch("back.api.v1.utils.sim_websocket_helpers.simulation_service")
-    def test_websocket_subscriber_send_error(self, mock_sim_service: MagicMock) -> None:
+    def test_websocket_subscriber_send_error(self) -> None:
         class FailingWS(DummyWebSocket):
             async def send_json(self, data: FrameData) -> None:
                 # Simulate realistic ASGI error when websocket is closed
@@ -792,10 +918,7 @@ class TestSimulationAPI:
             loop.close()
             asyncio.set_event_loop(None)
 
-    @patch("back.api.v1.utils.sim_websocket_helpers.simulation_service")
-    def test_websocket_subscriber_send_non_asgi_runtime_error(
-        self, mock_sim_service: MagicMock
-    ) -> None:
+    def test_websocket_subscriber_send_non_asgi_runtime_error(self) -> None:
         """Test that non-ASGI RuntimeErrors are re-raised"""
 
         class FailingWS(DummyWebSocket):
@@ -825,10 +948,7 @@ class TestSimulationAPI:
             loop.close()
             asyncio.set_event_loop(None)
 
-    @patch("back.api.v1.utils.sim_websocket_helpers.simulation_service")
-    def test_websocket_subscriber_send_generic_exception(
-        self, mock_sim_service: MagicMock
-    ) -> None:
+    def test_websocket_subscriber_send_generic_exception(self) -> None:
         """Test that generic exceptions mark subscriber as closed"""
 
         class FailingWS(DummyWebSocket):
@@ -860,10 +980,7 @@ class TestSimulationAPI:
             loop.close()
             asyncio.set_event_loop(None)
 
-    @patch("back.api.v1.utils.sim_websocket_helpers.simulation_service")
-    def test_websocket_subscriber_closed_state(
-        self, mock_sim_service: MagicMock
-    ) -> None:
+    def test_websocket_subscriber_closed_state(self) -> None:
         """Test that WebSocketSubscriber respects closed state"""
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
@@ -892,10 +1009,7 @@ class TestSimulationAPI:
             loop.close()
             asyncio.set_event_loop(None)
 
-    @patch("back.api.v1.utils.sim_websocket_helpers.simulation_service")
-    def test_websocket_subscriber_disconnected_state(
-        self, mock_sim_service: MagicMock
-    ) -> None:
+    def test_websocket_subscriber_disconnected_state(self) -> None:
         """Test that WebSocketSubscriber respects websocket disconnected state"""
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
@@ -923,10 +1037,7 @@ class TestSimulationAPI:
             loop.close()
             asyncio.set_event_loop(None)
 
-    @patch("back.api.v1.utils.sim_websocket_helpers.simulation_service")
-    def test_websocket_subscriber_on_frame_when_closed(
-        self, mock_sim_service: MagicMock
-    ) -> None:
+    def test_websocket_subscriber_on_frame_when_closed(self) -> None:
         """Test that on_frame doesn't schedule when subscriber is closed"""
         dummy_ws = DummyWebSocket()
         subscriber = WebSocketSubscriber(cast(WebSocket, dummy_ws))
@@ -941,10 +1052,7 @@ class TestSimulationAPI:
         # No frames should be sent
         assert len(dummy_ws.sent) == 0
 
-    @patch("back.api.v1.utils.sim_websocket_helpers.simulation_service")
-    def test_websocket_subscriber_on_frame_when_disconnected(
-        self, mock_sim_service: MagicMock
-    ) -> None:
+    def test_websocket_subscriber_on_frame_when_disconnected(self) -> None:
         """Test that on_frame doesn't schedule when websocket is disconnected"""
         dummy_ws = DummyWebSocket()
         dummy_ws.client_state = WebSocketState.DISCONNECTED
@@ -959,10 +1067,7 @@ class TestSimulationAPI:
         # No frames should be sent
         assert len(dummy_ws.sent) == 0
 
-    @patch("back.api.v1.utils.sim_websocket_helpers.simulation_service")
-    def test_websocket_subscriber_init_and_loop(
-        self, mock_sim_service: MagicMock
-    ) -> None:
+    def test_websocket_subscriber_init_and_loop(self) -> None:
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
 
@@ -994,10 +1099,7 @@ class TestSimulationAPI:
             loop.close()
             asyncio.set_event_loop(None)
 
-    @patch("back.api.v1.utils.sim_websocket_helpers.simulation_service")
-    def test_websocket_subscriber_malformed_frame(
-        self, mock_sim_service: MagicMock
-    ) -> None:
+    def test_websocket_subscriber_malformed_frame(self) -> None:
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
 
@@ -1552,9 +1654,7 @@ class TestWebSocketHelpers:
         mock_create_task.side_effect = create_task_side_effect
 
         mock_ws1 = MagicMock()
-        mock_ws1.scope = {"path": "/api/v1/simulation/stream/sim123"}
         mock_ws2 = MagicMock()
-        mock_ws2.scope = {"path": "/api/v1/simulation/stream/sim123"}
         emitter = FrameEmitter("test_sim")
 
         sim_data: dict[str, Any] = {"user_id": 1}
@@ -1603,11 +1703,8 @@ class TestWebSocketHelpers:
         mock_create_task.side_effect = create_task_side_effect
 
         mock_ws1 = MagicMock()
-        mock_ws1.scope = {"path": "/api/v1/simulation/stream/orphan-sim-1"}
         mock_ws2 = MagicMock()
-        mock_ws2.scope = {"path": "/api/v1/simulation/stream/orphan-sim-2"}
         mock_ws3 = MagicMock()
-        mock_ws3.scope = {"path": "/api/v1/simulation/stream/sim123"}
         emitter = FrameEmitter("test_sim")
 
         sim_data: dict[str, Any] = {"user_id": 1}
@@ -1718,11 +1815,8 @@ class TestWebSocketHelpers:
         # Should call start_simulation
         mock_start_sim.assert_called_once_with(mock_db, "sim123", 1)
 
-    @patch("back.api.v1.utils.sim_websocket_helpers.simulation_service")
     @pytest.mark.asyncio
-    async def test_cleanup_simulation_pauses_when_no_subscribers(
-        self, mock_sim_service: MagicMock
-    ) -> None:
+    async def test_cleanup_simulation_pauses_when_no_subscribers(self) -> None:
         """Test cleanup pauses simulation when no subscribers remain"""
         from sim.core.frame_emitter import FrameEmitter
         from back.api.v1.utils.sim_websocket_helpers import (
@@ -1732,7 +1826,6 @@ class TestWebSocketHelpers:
 
         mock_ws = MagicMock()
         mock_ws.client_state = WebSocketState.DISCONNECTED
-        mock_ws.scope = {"path": "/api/v1/simulation/stream/test-sim"}
 
         async def mock_close() -> None:
             pass
@@ -1765,11 +1858,8 @@ class TestWebSocketHelpers:
         # Should remove from emitter
         assert len(emitter.subscribers) == 0
 
-    @patch("back.api.v1.utils.sim_websocket_helpers.simulation_service")
     @pytest.mark.asyncio
-    async def test_cleanup_simulation_close_exception(
-        self, mock_sim_service: MagicMock
-    ) -> None:
+    async def test_cleanup_simulation_close_exception(self) -> None:
         """Test cleanup handles exception when closing websocket"""
         from sim.core.frame_emitter import FrameEmitter
         from back.api.v1.utils.sim_websocket_helpers import (
@@ -1779,7 +1869,6 @@ class TestWebSocketHelpers:
 
         mock_ws = MagicMock()
         mock_ws.client_state = WebSocketState.CONNECTED
-        mock_ws.scope = {"path": "/api/v1/simulation/stream/test-sim"}
 
         async def failing_close() -> None:
             raise RuntimeError("Close failed")
@@ -1904,10 +1993,10 @@ class TestWebSocketHelpers:
         mock_sim_service.stop_simulation.assert_not_called()
 
     @patch("back.api.v1.utils.sim_websocket_helpers.asyncio.create_task")
+    @pytest.mark.asyncio
     @patch("back.api.v1.utils.sim_websocket_helpers.asyncio.sleep")
     @patch("back.api.v1.utils.sim_websocket_helpers.simulation_service")
     @patch("back.api.v1.utils.sim_websocket_helpers.get_db")
-    @pytest.mark.asyncio
     async def test_auto_shutdown_simulation_without_subscriber(
         self,
         mock_get_db: MagicMock,
@@ -1990,7 +2079,6 @@ class TestWebSocketHelpers:
         from back.api.v1.utils.sim_websocket_helpers import attach_ws_subscriber
 
         mock_ws = MagicMock()
-        mock_ws.scope = {"path": "/api/v1/simulation/stream/sim123"}
         emitter = FrameEmitter("test_sim")
         old_task = MagicMock()
 
@@ -2026,7 +2114,6 @@ class TestWebSocketHelpers:
         from back.api.v1.utils.sim_websocket_helpers import attach_ws_subscriber
 
         mock_ws = MagicMock()
-        mock_ws.scope = {"path": "/api/v1/simulation/stream/sim123"}
         emitter = FrameEmitter("test_sim")
 
         sim_data: dict[str, Any] = {}  # Missing user_id
@@ -2041,11 +2128,8 @@ class TestWebSocketHelpers:
                     mock_ws,
                 )
 
-    @patch("back.api.v1.utils.sim_websocket_helpers.simulation_service")
     @pytest.mark.asyncio
-    async def test_cleanup_simulation_cancels_shutdown_task(
-        self, mock_sim_service: MagicMock
-    ) -> None:
+    async def test_cleanup_simulation_cancels_shutdown_task(self) -> None:
         """Test cleanup_simulation cancels old shutdown task"""
         from sim.core.frame_emitter import FrameEmitter
         from back.api.v1.utils.sim_websocket_helpers import (
@@ -2055,7 +2139,6 @@ class TestWebSocketHelpers:
 
         mock_ws = MagicMock()
         mock_ws.client_state = WebSocketState.DISCONNECTED
-        mock_ws.scope = {"path": "/api/v1/simulation/stream/test-sim"}
 
         async def mock_close() -> None:
             pass

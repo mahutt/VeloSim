@@ -22,10 +22,11 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 """
 
-from typing import TYPE_CHECKING, List, Optional
+from typing import TYPE_CHECKING, Any, List, Optional
 from sqlalchemy import DateTime, ForeignKey, String, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from back.database.session import Base
+from back.models.scenario import JSONBCompatible
 
 if TYPE_CHECKING:
     from .user import User
@@ -59,6 +60,11 @@ class SimInstance(Base):
 
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False)
     user: Mapped["User"] = relationship("User", back_populates="sim_instances")
+
+    # Original scenario payload to enable consistent restarts
+    scenario_payload: Mapped[Optional[Any]] = mapped_column(
+        JSONBCompatible, nullable=True
+    )
 
     tasks: Mapped[List["StationTask"]] = relationship(
         "StationTask", back_populates="sim_instance", cascade="all, delete-orphan"

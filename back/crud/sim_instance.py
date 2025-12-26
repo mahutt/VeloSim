@@ -44,6 +44,7 @@ class SimInstanceCRUD:
         """
         db_sim_instance = SimInstance(
             user_id=sim_instance_data.user_id,
+            scenario_payload=sim_instance_data.scenario_payload,
         )
         db.add(db_sim_instance)
         db.flush()

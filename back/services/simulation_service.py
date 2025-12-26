@@ -159,7 +159,11 @@ class SimulationService:
         return user.is_admin or db_sim_instance.user_id == user.id
 
     def initialize_simulation(
-        self, db: Session, requesting_user: int, params: InputParameter
+        self,
+        db: Session,
+        requesting_user: int,
+        params: InputParameter,
+        scenario_payload: dict | None = None,
     ) -> SimulationResponse:
         """Initialize a new simulation with the given parameters.
 
@@ -167,6 +171,7 @@ class SimulationService:
             db: Database session.
             requesting_user: The ID of the user initializing the simulation.
             params: Input parameters for the simulation.
+            scenario_payload: Original scenario payload to persist for future restarts.
 
         Returns:
             SimulationResponse: Response containing sim_id, db_id, and status.
@@ -174,7 +179,9 @@ class SimulationService:
         user = self._get_requesting_user(db, requesting_user)
 
         # Create DB record
-        sim_instance_data = SimInstanceCreate(user_id=user.id)
+        sim_instance_data = SimInstanceCreate(
+            user_id=user.id, scenario_payload=scenario_payload
+        )
         db_sim_instance = sim_instance_crud.create(db, sim_instance_data)
         db.commit()
 

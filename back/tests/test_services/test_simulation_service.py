@@ -311,6 +311,74 @@ class TestSimulationService:
         assert total == 1
         assert len(active_sims) == 1
 
+    def test_initialize_simulation_with_scenario_payload(
+        self,
+        mock_user_crud: Mock,
+        mock_sim_crud: Mock,
+        mock_db: Mock,
+        test_user: User,
+        simulation_service: SimulationService,
+    ) -> None:
+        """Test that scenario_payload is persisted when creating a sim instance."""
+        from back.schemas.sim_instance import SimInstanceCreate
+
+        # Setup mocks
+        mock_user_crud.get.return_value = test_user
+        mock_sim_instance = Mock()
+        mock_sim_instance.id = 1
+        mock_sim_instance.user_id = test_user.id
+        mock_sim_instance.scenario_payload = None
+        mock_sim_crud.create.return_value = mock_sim_instance
+
+        # Create scenario payload
+        scenario_payload = {
+            "start_time": "08:00",
+            "end_time": "12:00",
+            "stations": [{"station_id": 1, "station_name": "Test"}],
+            "resources": [{"resource_id": 101}],
+        }
+
+        params = InputParameter()
+        simulation_service.initialize_simulation(
+            mock_db, test_user.id, params, scenario_payload=scenario_payload
+        )
+
+        # Verify that create was called with scenario_payload
+        mock_sim_crud.create.assert_called_once()
+        create_call_args = mock_sim_crud.create.call_args[0]
+        sim_instance_create = create_call_args[1]
+        assert isinstance(sim_instance_create, SimInstanceCreate)
+        assert sim_instance_create.scenario_payload == scenario_payload
+
+    def test_initialize_simulation_without_scenario_payload(
+        self,
+        mock_user_crud: Mock,
+        mock_sim_crud: Mock,
+        mock_db: Mock,
+        test_user: User,
+        simulation_service: SimulationService,
+    ) -> None:
+        """Test that initialization works when scenario_payload is not provided."""
+        from back.schemas.sim_instance import SimInstanceCreate
+
+        # Setup mocks
+        mock_user_crud.get.return_value = test_user
+        mock_sim_instance = Mock()
+        mock_sim_instance.id = 1
+        mock_sim_instance.user_id = test_user.id
+        mock_sim_instance.scenario_payload = None
+        mock_sim_crud.create.return_value = mock_sim_instance
+
+        params = InputParameter()
+        simulation_service.initialize_simulation(mock_db, test_user.id, params)
+
+        # Verify that create was called with None scenario_payload
+        mock_sim_crud.create.assert_called_once()
+        create_call_args = mock_sim_crud.create.call_args[0]
+        sim_instance_create = create_call_args[1]
+        assert isinstance(sim_instance_create, SimInstanceCreate)
+        assert sim_instance_create.scenario_payload is None
+
     def test_simulation_not_active(
         self,
         mock_user_crud: Mock,
