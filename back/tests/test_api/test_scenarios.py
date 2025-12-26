@@ -417,8 +417,8 @@ class TestScenariosAPI:
         mock_parser = MagicMock()
         mock_parser.validate.return_value = [
             {
-                "field": "content.resources",
-                "message": "Invalid resource configuration",
+                "field": "content.drivers",
+                "message": "Invalid driver configuration",
                 "line": 10,
             }
         ]
@@ -432,7 +432,7 @@ class TestScenariosAPI:
         detail = response.json()["detail"]
         assert detail["message"] == "Invalid scenario content"
         assert len(detail["errors"]) == 1
-        assert detail["errors"][0]["field"] == "content.resources"
+        assert detail["errors"][0]["field"] == "content.drivers"
         assert detail["errors"][0]["line"] == 10
 
     def test_update_scenario_requires_authentication(self, client: TestClient) -> None:
@@ -537,7 +537,7 @@ class TestScenarioValidation:
         invalid_content: Dict[str, Any] = {
             "content": {
                 "stations": [],
-                "resources": [],
+                "drivers": [],
                 # Missing start_time and end_time
             }
         }
@@ -559,7 +559,7 @@ class TestScenarioValidation:
                 "start_time": "8AM",  # Invalid format
                 "end_time": "1200",  # Invalid format
                 "stations": [],
-                "resources": [],
+                "drivers": [],
                 "initial_tasks": [],
                 "scheduled_tasks": [],
             }
@@ -664,7 +664,7 @@ class TestValidateScenario:
             "content": {
                 # Missing start_time and end_time
                 "stations": [],
-                "resources": [],
+                "drivers": [],
             }
         }
 
@@ -723,7 +723,7 @@ class TestValidateScenario:
                 "start_time": "day1:08:00",
                 "end_time": "day1:17:00",
                 "stations": [],
-                "resources": [],
+                "drivers": [],
                 "initial_tasks": [],
                 "scheduled_tasks": [],
             }
@@ -763,7 +763,7 @@ class TestValidateScenario:
                 "start_time": "day1:08:00",
                 "end_time": "day1:17:00",
                 "stations": [],
-                "resources": [],
+                "drivers": [],
             }
         }
 

@@ -77,7 +77,7 @@ class SimKeyframeListResponse(BaseModel):
                             "simId": "abc-123",
                             "tasks": [],
                             "stations": [],
-                            "resources": [],
+                            "drivers": [],
                             "clock": {"simSecondsPassed": 120.5},
                         },
                         "created_at": "2025-12-18T10:30:00Z",

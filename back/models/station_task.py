@@ -22,7 +22,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 """
 
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING
 from sqlalchemy import DateTime, Enum, ForeignKey, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from back.models import StationTaskType, TaskStatus
@@ -30,7 +30,6 @@ from back.database.session import Base
 
 if TYPE_CHECKING:
     from .station import Station
-    from .resource import Resource
     from .sim_instance import SimInstance
 
 
@@ -62,17 +61,10 @@ class StationTask(Base):
     )
     station_id: Mapped[int] = mapped_column(ForeignKey("stations.id"), nullable=False)
     station: Mapped["Station"] = relationship("Station", back_populates="tasks")
-    resource_id: Mapped[Optional[int]] = mapped_column(
-        ForeignKey("resources.id", ondelete="SET NULL"), nullable=True
-    )
-    resource: Mapped[Optional["Resource"]] = relationship(
-        "Resource", back_populates="tasks"
-    )
 
     def __repr__(self) -> str:
         return (
             f"<StationTask(id={self.id}, type={self.type}, status={self.status}, "
-            f"station_id={self.station_id}, resource_id={self.resource_id}, "
-            f"sim_instance_id={self.sim_instance_id}, "
+            f"station_id={self.station_id}, sim_instance_id={self.sim_instance_id}, "
             f"date_created={self.date_created}, date_updated={self.date_updated})>"
         )

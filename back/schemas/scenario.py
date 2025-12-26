@@ -44,11 +44,11 @@ class Station(BaseModel):
     )
 
 
-class Resource(BaseModel):
-    """Schema for a resource in the scenario."""
+class Driver(BaseModel):
+    """Schema for a driver in the scenario."""
 
-    resource_id: int = Field(..., description="Unique resource identifier")
-    resource_position: List[float] | Position = Field(
+    driver_id: int = Field(..., description="Unique driver identifier")
+    driver_position: List[float] | Position = Field(
         ..., description="Position as [lon, lat] or Position object"
     )
 
@@ -96,8 +96,8 @@ class ScenarioContent(BaseModel):
     stations: List[Station] = Field(
         default_factory=list, description="List of stations in the scenario"
     )
-    resources: List[Resource] = Field(
-        default_factory=list, description="List of resources in the scenario"
+    drivers: List[Driver] = Field(
+        default_factory=list, description="List of drivers in the scenario"
     )
     initial_tasks: List[Task] = Field(
         default_factory=list, description="Initial tasks to be assigned"
@@ -112,10 +112,10 @@ class ScenarioContent(BaseModel):
                 "scenario_title": "Multi-day Delivery Scenario",
                 "start_time": "2025-11-06T08:00:00Z",
                 "end_time": "2025-11-07T17:00:00Z",  # Spans 2 days
-                "resources": [
+                "drivers": [
                     {
-                        "resource_id": 1,
-                        "resource_position": [45.5070, -73.5610],
+                        "driver_id": 1,
+                        "driver_position": [45.5070, -73.5610],
                         "task_count": 5,
                     }
                 ],
@@ -180,10 +180,10 @@ class ScenarioCreateRequest(BaseModel):
                     "scenario_title": "My Test Scenario",
                     "start_time": "08:00",
                     "end_time": "12:00",
-                    "resources": [
+                    "drivers": [
                         {
-                            "resource_id": 1,
-                            "resource_position": [45.5070, -73.5610],
+                            "driver_id": 1,
+                            "driver_position": [45.5070, -73.5610],
                             "task_count": 2,
                         }
                     ],
@@ -231,10 +231,10 @@ class ScenarioUpdateRequest(BaseModel):
                     "scenario_title": "Updated Scenario Name",
                     "start_time": "08:00",
                     "end_time": "12:00",
-                    "resources": [
+                    "drivers": [
                         {
-                            "resource_id": 1,
-                            "resource_position": [45.5070, -73.5610],
+                            "driver_id": 1,
+                            "driver_position": [45.5070, -73.5610],
                             "task_count": 2,
                         }
                     ],
@@ -284,10 +284,10 @@ class ScenarioResponse(BaseModel):
                     "scenario_title": "Test Scenario",
                     "start_time": "08:00",
                     "end_time": "12:00",
-                    "resources": [
+                    "drivers": [
                         {
-                            "resource_id": 1,
-                            "resource_position": [45.5070, -73.5610],
+                            "driver_id": 1,
+                            "driver_position": [45.5070, -73.5610],
                             "task_count": 2,
                         }
                     ],

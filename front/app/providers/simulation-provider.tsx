@@ -144,8 +144,8 @@ export const SimulationProvider = ({
     }
 
     try {
-      const payload = { task_id: taskId, resource_id: driverId };
-      await api.post(`/simulation/${simId!}/resources/assign`, payload);
+      const payload = { task_id: taskId, driver_id: driverId };
+      await api.post(`/simulation/${simId!}/drivers/assign`, payload);
 
       const updatedResource = resource;
       if (!updatedResource.taskIds.includes(taskId)) {
@@ -171,8 +171,8 @@ export const SimulationProvider = ({
     }
 
     try {
-      const payload = { task_id: taskId, resource_id: driverId };
-      await api.post(`/simulation/${simId!}/resources/unassign`, payload);
+      const payload = { task_id: taskId, driver_id: driverId };
+      await api.post(`/simulation/${simId!}/drivers/unassign`, payload);
 
       const updatedResource: Driver = {
         ...resource,
@@ -207,11 +207,11 @@ export const SimulationProvider = ({
     try {
       const payload = {
         task_id: taskId,
-        old_resource_id: prevResourceId,
-        new_resource_id: newResourceId,
+        old_driver_id: prevResourceId,
+        new_driver_id: newResourceId,
       };
 
-      await api.post(`/simulation/${simId!}/resources/reassign`, payload);
+      await api.post(`/simulation/${simId!}/drivers/reassign`, payload);
 
       const updatedPrevResource: Driver = {
         ...prevResource,

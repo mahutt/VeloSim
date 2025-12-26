@@ -306,15 +306,13 @@ class Simulator:
         except Exception as e:
             print(f"Could not add task to sim due to: {e}")
 
-    def assign_task_to_resource(
-        self, sim_id: str, task_id: int, resource_id: int
-    ) -> None:
-        """Assign a task to a specific resource in the simulation.
+    def assign_task_to_driver(self, sim_id: str, task_id: int, driver_id: int) -> None:
+        """Assign a task to a specific driver in the simulation.
 
         Args:
             sim_id: Unique simulation ID.
             task_id: ID of the task to assign.
-            resource_id: ID of the resource to assign the task to.
+            driver_id: ID of the driver to assign the task to.
 
         Returns:
             None
@@ -322,19 +320,19 @@ class Simulator:
         try:
             sim_info = self.get_sim_by_id(sim_id)
             if sim_info is not None:
-                sim_info["simController"].assign_task_to_driver(task_id, resource_id)
+                sim_info["simController"].assign_task_to_driver(task_id, driver_id)
         except Exception as e:
             print(f"Could not assign task due to: {e}")
 
-    def unassign_task_from_resource(
-        self, sim_id: str, task_id: int, resource_id: int
+    def unassign_task_from_driver(
+        self, sim_id: str, task_id: int, driver_id: int
     ) -> None:
-        """Remove a task assignment from a resource in the simulation.
+        """Remove a task assignment from a driver in the simulation.
 
         Args:
             sim_id: Unique simulation ID.
             task_id: ID of the task to unassign.
-            resource_id: ID of the resource to unassign the task from.
+            driver_id: ID of the driver to unassign the task from.
 
         Returns:
             None
@@ -342,22 +340,20 @@ class Simulator:
         try:
             sim_info = self.get_sim_by_id(sim_id)
             if sim_info is not None:
-                sim_info["simController"].unassign_task_from_driver(
-                    task_id, resource_id
-                )
+                sim_info["simController"].unassign_task_from_driver(task_id, driver_id)
         except Exception as e:
             print(f"Could not unassign task due to: {e}")
 
     def reassign_task(
-        self, sim_id: str, task_id: int, old_resource_id: int, new_resource_id: int
+        self, sim_id: str, task_id: int, old_driver_id: int, new_driver_id: int
     ) -> None:
-        """Reassign a task from one resource to another in the simulation.
+        """Reassign a task from one driver to another in the simulation.
 
         Args:
             sim_id: Unique simulation ID.
             task_id: ID of the task to reassign.
-            old_resource_id: ID of the current resource holding the task.
-            new_resource_id: ID of the resource to reassign the task to.
+            old_driver_id: ID of the current driver holding the task.
+            new_driver_id: ID of the driver to reassign the task to.
 
         Returns:
             None
@@ -366,24 +362,24 @@ class Simulator:
             sim_info = self.get_sim_by_id(sim_id)
             if sim_info is not None:
                 sim_info["simController"].reassign_task(
-                    task_id, old_resource_id, new_resource_id
+                    task_id, old_driver_id, new_driver_id
                 )
         except Exception as e:
             print(f"Error occurred: {e}")
 
-    def reorder_resource_tasks(
+    def reorder_driver_tasks(
         self,
         sim_id: str,
-        resource_id: int,
+        driver_id: int,
         task_ids_to_reorder: list[int],
         apply_from_top: bool,
     ) -> list[int]:
         """
-        Reorder tasks in a resource's task list.
+        Reorder tasks in a driver's task list.
 
         Args:
             sim_id: Simulation ID
-            resource_id: ID of the resource whose tasks should be reordered
+            driver_id: ID of the driver whose tasks should be reordered
             task_ids_to_reorder: Partial list of task IDs to reorder
             apply_from_top: If True, specified tasks inserted after in-progress.
                            If False, specified tasks appended to end (reversed).
@@ -392,19 +388,17 @@ class Simulator:
             List of task IDs in the new order
 
         Raises:
-            Exception: If simulation, resource not found, or reordering fails
+            Exception: If simulation, driver not found, or reordering fails
         """
         with self.thread_pool_lock:
             sim_info = self.get_sim_by_id(sim_id)
             if sim_info is not None:
                 try:
                     return sim_info["simController"].reorder_driver_tasks(
-                        resource_id, task_ids_to_reorder, apply_from_top
+                        driver_id, task_ids_to_reorder, apply_from_top
                     )
                 except Exception as e:
-                    # Preserve legacy error wording expected by tests
-                    msg = str(e).replace("driver", "resource")
-                    raise Exception(msg)
+                    raise Exception(f"Error occurred: {e}")
             else:
                 raise Exception(f"Simulation {sim_id} not found")
 

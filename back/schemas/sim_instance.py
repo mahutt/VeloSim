@@ -51,12 +51,12 @@ class SimInstanceResponse(SimInstanceBase):
     @computed_field  # type: ignore[prop-decorator]
     @property
     def resource_count(self) -> int:
-        """Compute the number of resources.
+        """Compute the number of drivers.
 
         Returns:
-            int: Number of resources in the simulation instance.
+            int: Number of drivers in the simulation instance.
         """
-        return len(self.resources) if hasattr(self, "resources") else 0
+        return len(self.drivers) if hasattr(self, "drivers") else 0
 
     @computed_field  # type: ignore[prop-decorator]
     @property

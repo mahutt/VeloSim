@@ -64,7 +64,7 @@ def test_keyframe() -> SimKeyframe:
         id=1,
         sim_instance_id=100,
         sim_seconds_elapsed=120.5,
-        frame_data={"simId": "test-123", "tasks": [], "stations": [], "resources": []},
+        frame_data={"simId": "test-123", "tasks": [], "stations": [], "drivers": []},
         created_at=datetime.now(),
     )
 
