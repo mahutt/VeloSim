@@ -22,15 +22,21 @@
  * SOFTWARE.
  */
 
+import { adaptRouteToGeoJSON } from './geojson-adapters';
+
 export enum MapSource {
   Stations = 'stations',
   Resources = 'resources',
+  RouteTraversed = 'route-traversed',
+  RouteRemaining = 'route-remaining',
 }
 
 export enum MapLayer {
   Stations = 'stations',
   StationTaskCounts = 'station-task-counts',
   Resources = 'resources',
+  RouteTraversed = 'route-traversed',
+  RouteRemaining = 'route-remaining',
 }
 
 export function isMapLayer(value: string): value is MapLayer {
@@ -114,6 +120,37 @@ export function initializeMapSources(map: mapboxgl.Map) {
 }
 
 export function setMapLayers(map: mapboxgl.Map) {
+  // Add route layers first (so they render below markers)
+  map.addLayer({
+    id: MapLayer.RouteTraversed,
+    type: 'line',
+    source: MapSource.RouteTraversed,
+    layout: {
+      'line-join': 'round',
+      'line-cap': 'round',
+    },
+    paint: {
+      'line-color': '#3b82f6',
+      'line-width': 4,
+      'line-opacity': 0.3,
+    },
+  });
+
+  map.addLayer({
+    id: MapLayer.RouteRemaining,
+    type: 'line',
+    source: MapSource.RouteRemaining,
+    layout: {
+      'line-join': 'round',
+      'line-cap': 'round',
+    },
+    paint: {
+      'line-color': '#3b82f6',
+      'line-width': 4,
+      'line-opacity': 0.8,
+    },
+  });
+
   // Add layers for stations
   map.addLayer({
     id: MapLayer.Stations,
@@ -179,4 +216,27 @@ export function setMapSource(
   map: mapboxgl.Map
 ) {
   (map.getSource(source) as mapboxgl.GeoJSONSource).setData(data);
+}
+
+/**
+ * Update route visualization for a selected resource
+ * @param routeGeometry - Full route coordinates (raw OSRM linestring)
+ * @param progress - Current progress through route (0-1 fractional)
+ * @param map - Mapbox map instance
+ */
+export function updateRouteDisplay(
+  routeGeometry: [number, number][] | null,
+  progress: number,
+  map: mapboxgl.Map
+) {
+  const { traversed, remaining } = adaptRouteToGeoJSON(routeGeometry, progress);
+  setMapSource(MapSource.RouteTraversed, traversed, map);
+  setMapSource(MapSource.RouteRemaining, remaining, map);
+}
+
+/**
+ * Clear route visualization
+ */
+export function clearRouteDisplay(map: mapboxgl.Map) {
+  updateRouteDisplay(null, 0, map);
 }

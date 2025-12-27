@@ -100,6 +100,8 @@ vi.mock('~/lib/map-helpers.ts', async (importOriginal) => {
     initializeMapSources: vi.fn(),
     setMapLayers: vi.fn(),
     setMapSource: vi.fn(),
+    clearRouteDisplay: vi.fn(),
+    updateRouteDisplay: vi.fn(),
   };
 });
 

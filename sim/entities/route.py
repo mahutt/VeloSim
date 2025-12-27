@@ -546,6 +546,18 @@ class Route:
         coordinates = [p.get_position() for p in all_points]
         return LineString([(lon, lat) for lon, lat in coordinates])
 
+    def get_raw_coordinates(self) -> List[List[float]]:
+        """Returns the raw OSRM coordinates (not interpolated).
+
+        These are the sparse coordinate points from the OSRM routing response,
+        which define the road geometry without second-by-second interpolation.
+        Used for visualization on the frontend to reduce payload size.
+
+        Returns:
+            List of [lon, lat] coordinate pairs from OSRM.
+        """
+        return self.coordinates
+
     def next(
         self, as_json: bool = False
     ) -> Optional[Union[Dict[str, Union[int, List[float]]], Position]]:

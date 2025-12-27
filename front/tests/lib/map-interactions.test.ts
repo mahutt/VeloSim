@@ -43,8 +43,8 @@ test('setupMapClickHandlers registers event listeners', () => {
   const onItemSelect = vi.fn();
   setupMapClickHandlers(mockMap, onItemSelect);
 
-  // Should register 1 click + 4 cursor listeners (3 layers * 2 events)
-  expect(mockMap.on).toHaveBeenCalledTimes(7);
+  // Should register 1 click + 10 cursor listeners (5 layers * 2 events)
+  expect(mockMap.on).toHaveBeenCalledTimes(11);
   expect(mockMap.on).toHaveBeenCalledWith('click', expect.any(Function));
   expect(mockMap.on).toHaveBeenCalledWith(
     'mouseenter',
