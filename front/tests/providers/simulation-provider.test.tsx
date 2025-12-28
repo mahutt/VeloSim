@@ -489,8 +489,8 @@ test('assignTask posts to API and updates resource taskIds', async () => {
   });
 
   expect(api.post).toHaveBeenCalledWith(
-    '/simulation/test-sim-123/resources/assign',
-    { task_id: 42, resource_id: 1 }
+    '/simulation/test-sim-123/drivers/assign',
+    { task_id: 42, driver_id: 1 }
   );
 
   await waitFor(() => {
@@ -552,8 +552,8 @@ test('unassignTask posts to API and removes task from resource', async () => {
   });
 
   expect(api.post).toHaveBeenCalledWith(
-    '/simulation/test-sim-123/resources/unassign',
-    { task_id: 99, resource_id: 1 }
+    '/simulation/test-sim-123/drivers/unassign',
+    { task_id: 99, driver_id: 1 }
   );
 
   await waitFor(() => {
@@ -626,8 +626,8 @@ test('reassignTask posts to API and moves task between resources', async () => {
   });
 
   expect(api.post).toHaveBeenCalledWith(
-    '/simulation/test-sim-123/resources/reassign',
-    { task_id: 123, old_resource_id: 1, new_resource_id: 2 }
+    '/simulation/test-sim-123/drivers/reassign',
+    { task_id: 123, old_driver_id: 1, new_driver_id: 2 }
   );
 
   await waitFor(() => {

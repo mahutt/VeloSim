@@ -26,7 +26,6 @@ from fastapi import APIRouter
 from .stations import router as stations_router
 from .station_tasks import router as station_tasks_router
 from .simulation import router as simulation_router
-from .resources import router as resources_router
 from .users import router as users_router
 from .logs import router as logs_router
 from .scenarios import router as scenarios_router
@@ -46,7 +45,5 @@ if settings.FEATURE_STATIONS_API_ROUTER:
     api_router.include_router(stations_router)
 if settings.FEATURE_STATION_TASKS_API_ROUTER:
     api_router.include_router(station_tasks_router)
-if settings.FEATURE_RESOURCES_API_ROUTER:
-    api_router.include_router(resources_router)
 
 __all__ = ["api_router"]

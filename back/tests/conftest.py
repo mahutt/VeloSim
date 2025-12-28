@@ -40,7 +40,6 @@ from back.tests.mock_utils import create_mock_db_session
 # Enable any feature flags for testing **before** importing 'app'
 os.environ["FEATURE_STATIONS_API_ROUTER"] = "true"
 os.environ["FEATURE_STATION_TASKS_API_ROUTER"] = "true"
-os.environ["FEATURE_RESOURCES_API_ROUTER"] = "true"
 
 # Set dummy OSRM URL for tests to prevent connection errors
 # This must be set before any simulation code tries to initialize OSRMConnection

@@ -553,7 +553,7 @@ def test_add_task_to_sim_fail(
     sim.stop(a)
 
 
-def test_assign_task_to_resource_success(
+def test_assign_task_to_driver_success(
     sim: Simulator, input_params: InputParameter, simpy_env: simpy.Environment
 ) -> None:
     # Arrange
@@ -572,7 +572,7 @@ def test_assign_task_to_resource_success(
         sim.start(a, 3600)
 
     # Act
-    sim.assign_task_to_resource(a, task_id=1, resource_id=1)
+    sim.assign_task_to_driver(a, task_id=1, driver_id=1)
 
     # Assert
     sim_info = sim.get_sim_by_id(a)
@@ -586,7 +586,7 @@ def test_assign_task_to_resource_success(
 
 
 @patch("builtins.print")
-def test_assign_task_to_resource_fail(
+def test_assign_task_to_driver_fail(
     mock_print: MagicMock, sim: Simulator, input_params: InputParameter
 ) -> None:
     # Arrange
@@ -605,14 +605,14 @@ def test_assign_task_to_resource_fail(
         sim.start(a, 3600)
 
     # Act - Pass non-existent task_id
-    sim.assign_task_to_resource(a, task_id=6, resource_id=1)
+    sim.assign_task_to_driver(a, task_id=6, driver_id=1)
 
     # Assert
     error = "Could not find task in sim with id: 6"
     mock_print.assert_any_call(f"Could not assign task due to: {error}")
 
 
-def test_unassign_task_from_resource_success(
+def test_unassign_task_from_driver_success(
     sim: Simulator, input_params: InputParameter, simpy_env: simpy.Environment
 ) -> None:
     # Arrange
@@ -629,10 +629,10 @@ def test_unassign_task_from_resource_success(
         ),
     ):
         sim.start(a, 3600)
-    sim.assign_task_to_resource(a, task_id=1, resource_id=1)
+    sim.assign_task_to_driver(a, task_id=1, driver_id=1)
 
     # Act
-    sim.unassign_task_from_resource(a, task_id=1, resource_id=1)
+    sim.unassign_task_from_driver(a, task_id=1, driver_id=1)
 
     # Assert
     sim_info = sim.get_sim_by_id(a)
@@ -644,7 +644,7 @@ def test_unassign_task_from_resource_success(
 
 
 @patch("builtins.print")
-def test_unassign_task_from_resource_fail(
+def test_unassign_task_from_driver_fail(
     mock_print: MagicMock, sim: Simulator, input_params: InputParameter
 ) -> None:
     # Arrange
@@ -663,7 +663,7 @@ def test_unassign_task_from_resource_fail(
         sim.start(a, 3600)
 
     # Act - Pass non-existent task_id
-    sim.unassign_task_from_resource(a, task_id=6, resource_id=1)
+    sim.unassign_task_from_driver(a, task_id=6, driver_id=1)
 
     # Assert
     error = "Could not find task in sim with id: 6"
@@ -685,10 +685,10 @@ def test_reassign_task_success(sim: Simulator, input_params: InputParameter) -> 
         ),
     ):
         sim.start(a, 3600)
-    sim.assign_task_to_resource(a, task_id=1, resource_id=1)
+    sim.assign_task_to_driver(a, task_id=1, driver_id=1)
 
     # Act
-    sim.reassign_task(a, task_id=1, old_resource_id=1, new_resource_id=2)
+    sim.reassign_task(a, task_id=1, old_driver_id=1, new_driver_id=2)
 
     # Assert
     sim_info = sim.get_sim_by_id(a)
@@ -727,7 +727,7 @@ def test_reassign_task_fail(
         sim.start(a, 3600)
 
     # Act - Pass non-existent task_id
-    sim.reassign_task(a, task_id=6, old_resource_id=1, new_resource_id=2)
+    sim.reassign_task(a, task_id=6, old_driver_id=1, new_driver_id=2)
 
     # Assert
     error = "Reassigning task failed as could not find task 6"
@@ -787,7 +787,7 @@ def test_stop_all_stops_everything_and_is_idempotent(
     sim.stop_all(join_timeout_per_thread=0.2)
 
 
-def test_reorder_resource_tasks_success(
+def test_reorder_driver_tasks_success(
     sim: Simulator,
     input_params: InputParameter,
     monkeypatch: Any,
@@ -820,33 +820,33 @@ def test_reorder_resource_tasks_success(
     driver.task_list = [task1, task2]
 
     # Reorder tasks via Simulator
-    new_order = sim.reorder_resource_tasks(
-        sim_id=sim_id, resource_id=1, task_ids_to_reorder=[2, 1], apply_from_top=True
+    new_order = sim.reorder_driver_tasks(
+        sim_id=sim_id, driver_id=1, task_ids_to_reorder=[2, 1], apply_from_top=True
     )
 
     assert new_order == [2, 1]
     assert driver.task_list == [task2, task1]
 
 
-def test_reorder_resource_tasks_simulation_not_found(
+def test_reorder_driver_tasks_simulation_not_found(
     sim: Simulator,
 ) -> None:
     """Test reordering with invalid sim_id raises exception."""
     with pytest.raises(Exception, match="Simulation invalid-sim-id does not exist"):
-        sim.reorder_resource_tasks(
+        sim.reorder_driver_tasks(
             sim_id="invalid-sim-id",
-            resource_id=1,
+            driver_id=1,
             task_ids_to_reorder=[1, 2],
             apply_from_top=True,
         )
 
 
-def test_reorder_resource_tasks_resource_not_found(
+def test_reorder_driver_tasks_driver_not_found(
     sim: Simulator,
     input_params: InputParameter,
     monkeypatch: Any,
 ) -> None:
-    """Test reordering with invalid resource_id raises exception."""
+    """Test reordering with invalid driver_id raises exception."""
     monkeypatch.setenv("OSRM_URL", "http://localhost:5000")
 
     with (
@@ -857,16 +857,16 @@ def test_reorder_resource_tasks_resource_not_found(
     ):
         sim_id = sim.initialize(input_params, [], FakeSimBehaviour())
 
-    with pytest.raises(Exception, match="Could not find resource in sim with id: 999"):
-        sim.reorder_resource_tasks(
+    with pytest.raises(Exception, match="Could not find driver in sim with id: 999"):
+        sim.reorder_driver_tasks(
             sim_id=sim_id,
-            resource_id=999,
+            driver_id=999,
             task_ids_to_reorder=[1, 2],
             apply_from_top=True,
         )
 
 
-def test_reorder_resource_tasks_with_thread_lock(
+def test_reorder_driver_tasks_with_thread_lock(
     sim: Simulator,
     input_params: InputParameter,
     monkeypatch: Any,
@@ -903,8 +903,8 @@ def test_reorder_resource_tasks_with_thread_lock(
     sim.thread_pool_lock = mock_lock
 
     # Reorder tasks
-    new_order = sim.reorder_resource_tasks(
-        sim_id=sim_id, resource_id=1, task_ids_to_reorder=[2], apply_from_top=True
+    new_order = sim.reorder_driver_tasks(
+        sim_id=sim_id, driver_id=1, task_ids_to_reorder=[2], apply_from_top=True
     )
 
     # Verify lock was acquired

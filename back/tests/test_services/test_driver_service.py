@@ -26,17 +26,17 @@ from typing import Any, Dict, Generator
 import pytest
 from unittest.mock import Mock, patch
 from sqlalchemy.orm import Session
-from back.services.resource_service import resource_service
+from back.services.driver_service import driver_service
 from back.services.simulation_service import simulation_service
 from back.schemas import (
-    ResourceTaskAssignRequest,
-    ResourceTaskAssignResponse,
-    ResourceTaskUnassignRequest,
-    ResourceTaskUnassignResponse,
-    ResourceTaskReassignRequest,
-    ResourceTaskReassignResponse,
-    ResourceTaskReorderRequest,
-    ResourceTaskReorderResponse,
+    DriverTaskAssignRequest,
+    DriverTaskAssignResponse,
+    DriverTaskUnassignRequest,
+    DriverTaskUnassignResponse,
+    DriverTaskReassignRequest,
+    DriverTaskReassignResponse,
+    DriverTaskReorderRequest,
+    DriverTaskReorderResponse,
 )
 from back.exceptions import VelosimPermissionError, ItemNotFoundError
 from sim.simulator import Simulator
@@ -80,8 +80,8 @@ def patch_active_simulations(
         yield {"verify_access": mock_verify, "simulator": simulator_mock}
 
 
-class TestResourceService:
-    """Tests for ResourceService using updated active_simulations."""
+class TestDriverService:
+    """Tests for DriverService using updated active_simulations."""
 
     @pytest.mark.filterwarnings("ignore::RuntimeWarning")
     @pytest.mark.filterwarnings("ignore::pytest.PytestUnraisableExceptionWarning")
@@ -98,18 +98,18 @@ class TestResourceService:
         unawaited coroutines in KeyframePersistenceSubscriber._persistence_worker,
         and event loop cleanup from other tests can cause unraisable exceptions.
         """
-        payload = ResourceTaskAssignRequest(resource_id=1, task_id=100)
-        response = resource_service.assign_task(
+        payload = DriverTaskAssignRequest(driver_id=1, task_id=100)
+        response = driver_service.assign_task(
             db_session, sim_id, requesting_user, payload
         )
         patch_active_simulations[
             "simulator"
-        ].assign_task_to_resource.assert_called_once_with(
-            sim_id=sim_id, task_id=100, resource_id=1
+        ].assign_task_to_driver.assert_called_once_with(
+            sim_id=sim_id, task_id=100, driver_id=1
         )
-        assert isinstance(response, ResourceTaskAssignResponse)
+        assert isinstance(response, DriverTaskAssignResponse)
         assert response.task_id == 100
-        assert response.resource_id == 1
+        assert response.driver_id == 1
 
     def test_assign_task_permission_denied(
         self,
@@ -117,12 +117,10 @@ class TestResourceService:
         sim_id: str,
         requesting_user: int,
     ) -> None:
-        payload = ResourceTaskAssignRequest(resource_id=1, task_id=100)
+        payload = DriverTaskAssignRequest(driver_id=1, task_id=100)
         with patch.object(simulation_service, "verify_access", return_value=False):
             with pytest.raises(VelosimPermissionError):
-                resource_service.assign_task(
-                    db_session, sim_id, requesting_user, payload
-                )
+                driver_service.assign_task(db_session, sim_id, requesting_user, payload)
 
     def test_assign_task_not_found(
         self,
@@ -131,12 +129,12 @@ class TestResourceService:
         requesting_user: int,
         patch_active_simulations: Dict[str, Any],
     ) -> None:
-        patch_active_simulations["simulator"].assign_task_to_resource.side_effect = (
+        patch_active_simulations["simulator"].assign_task_to_driver.side_effect = (
             Exception("Could not find task")
         )
-        payload = ResourceTaskAssignRequest(resource_id=1, task_id=100)
+        payload = DriverTaskAssignRequest(driver_id=1, task_id=100)
         with pytest.raises(ItemNotFoundError, match="Task 100 not found"):
-            resource_service.assign_task(db_session, sim_id, requesting_user, payload)
+            driver_service.assign_task(db_session, sim_id, requesting_user, payload)
 
     def test_assign_task_runtime_error(
         self,
@@ -145,12 +143,12 @@ class TestResourceService:
         requesting_user: int,
         patch_active_simulations: Dict[str, Any],
     ) -> None:
-        patch_active_simulations["simulator"].assign_task_to_resource.side_effect = (
+        patch_active_simulations["simulator"].assign_task_to_driver.side_effect = (
             Exception("Unexpected failure")
         )
-        payload = ResourceTaskAssignRequest(resource_id=1, task_id=100)
+        payload = DriverTaskAssignRequest(driver_id=1, task_id=100)
         with pytest.raises(RuntimeError, match="Failed operation: Unexpected failure"):
-            resource_service.assign_task(db_session, sim_id, requesting_user, payload)
+            driver_service.assign_task(db_session, sim_id, requesting_user, payload)
 
     def test_unassign_task_success(
         self,
@@ -159,18 +157,18 @@ class TestResourceService:
         requesting_user: int,
         patch_active_simulations: Dict[str, Any],
     ) -> None:
-        payload = ResourceTaskUnassignRequest(resource_id=1, task_id=100)
-        response = resource_service.unassign_task(
+        payload = DriverTaskUnassignRequest(driver_id=1, task_id=100)
+        response = driver_service.unassign_task(
             db_session, sim_id, requesting_user, payload
         )
         patch_active_simulations[
             "simulator"
-        ].unassign_task_from_resource.assert_called_once_with(
-            sim_id=sim_id, task_id=100, resource_id=1
+        ].unassign_task_from_driver.assert_called_once_with(
+            sim_id=sim_id, task_id=100, driver_id=1
         )
-        assert isinstance(response, ResourceTaskUnassignResponse)
+        assert isinstance(response, DriverTaskUnassignResponse)
         assert response.task_id == 100
-        assert response.resource_id == 1
+        assert response.driver_id == 1
 
     def test_unassign_task_permission_denied(
         self,
@@ -178,10 +176,10 @@ class TestResourceService:
         sim_id: str,
         requesting_user: int,
     ) -> None:
-        payload = ResourceTaskUnassignRequest(resource_id=1, task_id=100)
+        payload = DriverTaskUnassignRequest(driver_id=1, task_id=100)
         with patch.object(simulation_service, "verify_access", return_value=False):
             with pytest.raises(VelosimPermissionError):
-                resource_service.unassign_task(
+                driver_service.unassign_task(
                     db_session, sim_id, requesting_user, payload
                 )
 
@@ -189,7 +187,7 @@ class TestResourceService:
         "exception_msg,expected_error",
         [
             ("Could not find task", "Task 100 not found"),
-            ("Could not find resource", "Resource 1 not found"),
+            ("Could not find driver", "Driver 1 not found"),
             ("Unexpected failure", "Failed operation: Unexpected failure"),
         ],
     )
@@ -202,18 +200,18 @@ class TestResourceService:
         expected_error: str,
         patch_active_simulations: Dict[str, Any],
     ) -> None:
-        patch_active_simulations[
-            "simulator"
-        ].unassign_task_from_resource.side_effect = Exception(exception_msg)
-        payload = ResourceTaskUnassignRequest(resource_id=1, task_id=100)
+        patch_active_simulations["simulator"].unassign_task_from_driver.side_effect = (
+            Exception(exception_msg)
+        )
+        payload = DriverTaskUnassignRequest(driver_id=1, task_id=100)
         if "Unexpected" in exception_msg:
             with pytest.raises(RuntimeError, match=expected_error):
-                resource_service.unassign_task(
+                driver_service.unassign_task(
                     db_session, sim_id, requesting_user, payload
                 )
         else:
             with pytest.raises(ItemNotFoundError, match=expected_error):
-                resource_service.unassign_task(
+                driver_service.unassign_task(
                     db_session, sim_id, requesting_user, payload
                 )
 
@@ -224,26 +222,26 @@ class TestResourceService:
         requesting_user: int,
         patch_active_simulations: Dict[str, Any],
     ) -> None:
-        payload = ResourceTaskReassignRequest(
-            task_id=100, old_resource_id=1, new_resource_id=2
+        payload = DriverTaskReassignRequest(
+            task_id=100, old_driver_id=1, new_driver_id=2
         )
-        response = resource_service.reassign_task(
+        response = driver_service.reassign_task(
             db_session, sim_id, requesting_user, payload
         )
         patch_active_simulations["simulator"].reassign_task.assert_called_once_with(
-            sim_id=sim_id, task_id=100, old_resource_id=1, new_resource_id=2
+            sim_id=sim_id, task_id=100, old_driver_id=1, new_driver_id=2
         )
-        assert isinstance(response, ResourceTaskReassignResponse)
+        assert isinstance(response, DriverTaskReassignResponse)
         assert response.task_id == 100
-        assert response.old_resource_id == 1
-        assert response.new_resource_id == 2
+        assert response.old_driver_id == 1
+        assert response.new_driver_id == 2
 
     @pytest.mark.parametrize(
         "exception_msg,expected_error",
         [
             ("100", "Task 100 not found"),
-            ("1", "Old resource 1 not found"),
-            ("2", "New resource 2 not found"),
+            ("1", "Old driver 1 not found"),
+            ("2", "New driver 2 not found"),
             ("Unexpected failure", "Failed operation: Unexpected failure"),
         ],
     )
@@ -259,17 +257,17 @@ class TestResourceService:
         patch_active_simulations["simulator"].reassign_task.side_effect = Exception(
             exception_msg
         )
-        payload = ResourceTaskReassignRequest(
-            task_id=100, old_resource_id=1, new_resource_id=2
+        payload = DriverTaskReassignRequest(
+            task_id=100, old_driver_id=1, new_driver_id=2
         )
         if "Unexpected" in exception_msg:
             with pytest.raises(RuntimeError, match=expected_error):
-                resource_service.reassign_task(
+                driver_service.reassign_task(
                     db_session, sim_id, requesting_user, payload
                 )
         else:
             with pytest.raises(ItemNotFoundError, match=expected_error):
-                resource_service.reassign_task(
+                driver_service.reassign_task(
                     db_session, sim_id, requesting_user, payload
                 )
 
@@ -281,27 +279,27 @@ class TestResourceService:
         patch_active_simulations: Dict[str, Any],
     ) -> None:
         """Test successful task reordering."""
-        patch_active_simulations["simulator"].reorder_resource_tasks.return_value = [
+        patch_active_simulations["simulator"].reorder_driver_tasks.return_value = [
             3,
             1,
             2,
         ]
-        payload = ResourceTaskReorderRequest(
-            resource_id=1, task_ids=[3, 1], apply_from_top=True
+        payload = DriverTaskReorderRequest(
+            driver_id=1, task_ids=[3, 1], apply_from_top=True
         )
-        response = resource_service.reorder_tasks(
+        response = driver_service.reorder_tasks(
             db_session, sim_id, requesting_user, payload
         )
         patch_active_simulations[
             "simulator"
-        ].reorder_resource_tasks.assert_called_once_with(
+        ].reorder_driver_tasks.assert_called_once_with(
             sim_id=sim_id,
-            resource_id=1,
+            driver_id=1,
             task_ids_to_reorder=[3, 1],
             apply_from_top=True,
         )
-        assert isinstance(response, ResourceTaskReorderResponse)
-        assert response.resource_id == 1
+        assert isinstance(response, DriverTaskReorderResponse)
+        assert response.driver_id == 1
         assert response.task_order == [3, 1, 2]
 
     def test_reorder_tasks_permission_denied(
@@ -311,31 +309,31 @@ class TestResourceService:
         requesting_user: int,
     ) -> None:
         """Test reorder with permission denied."""
-        payload = ResourceTaskReorderRequest(
-            resource_id=1, task_ids=[3, 1], apply_from_top=True
+        payload = DriverTaskReorderRequest(
+            driver_id=1, task_ids=[3, 1], apply_from_top=True
         )
         with patch.object(simulation_service, "verify_access", return_value=False):
             with pytest.raises(VelosimPermissionError):
-                resource_service.reorder_tasks(
+                driver_service.reorder_tasks(
                     db_session, sim_id, requesting_user, payload
                 )
 
-    def test_reorder_tasks_resource_not_found(
+    def test_reorder_tasks_driver_not_found(
         self,
         db_session: Session,
         sim_id: str,
         requesting_user: int,
         patch_active_simulations: Dict[str, Any],
     ) -> None:
-        """Test reorder with resource not found."""
-        patch_active_simulations["simulator"].reorder_resource_tasks.side_effect = (
-            Exception("Could not find resource")
+        """Test reorder with driver not found."""
+        patch_active_simulations["simulator"].reorder_driver_tasks.side_effect = (
+            Exception("Could not find driver")
         )
-        payload = ResourceTaskReorderRequest(
-            resource_id=999, task_ids=[1, 2], apply_from_top=True
+        payload = DriverTaskReorderRequest(
+            driver_id=999, task_ids=[1, 2], apply_from_top=True
         )
-        with pytest.raises(ItemNotFoundError, match="Resource 999 not found"):
-            resource_service.reorder_tasks(db_session, sim_id, requesting_user, payload)
+        with pytest.raises(ItemNotFoundError, match="Driver 999 not found"):
+            driver_service.reorder_tasks(db_session, sim_id, requesting_user, payload)
 
     def test_reorder_tasks_empty_list_error(
         self,
@@ -345,17 +343,17 @@ class TestResourceService:
         patch_active_simulations: Dict[str, Any],
     ) -> None:
         """Test reorder with empty task list raises ValueError."""
-        patch_active_simulations["simulator"].reorder_resource_tasks.side_effect = (
+        patch_active_simulations["simulator"].reorder_driver_tasks.side_effect = (
             ValueError("task_ids_to_reorder cannot be empty")
         )
-        payload = ResourceTaskReorderRequest(
-            resource_id=1, task_ids=[1], apply_from_top=True
+        payload = DriverTaskReorderRequest(
+            driver_id=1, task_ids=[1], apply_from_top=True
         )
         with pytest.raises(
             RuntimeError,
             match="Invalid reorder request: task_ids_to_reorder cannot be empty",
         ):
-            resource_service.reorder_tasks(db_session, sim_id, requesting_user, payload)
+            driver_service.reorder_tasks(db_session, sim_id, requesting_user, payload)
 
     def test_reorder_tasks_duplicate_ids_error(
         self,
@@ -365,16 +363,16 @@ class TestResourceService:
         patch_active_simulations: Dict[str, Any],
     ) -> None:
         """Test reorder with duplicate task IDs raises ValueError."""
-        patch_active_simulations["simulator"].reorder_resource_tasks.side_effect = (
+        patch_active_simulations["simulator"].reorder_driver_tasks.side_effect = (
             ValueError("contains duplicate task IDs")
         )
-        payload = ResourceTaskReorderRequest(
-            resource_id=1, task_ids=[1, 2], apply_from_top=True
+        payload = DriverTaskReorderRequest(
+            driver_id=1, task_ids=[1, 2], apply_from_top=True
         )
         with pytest.raises(
             RuntimeError, match="Invalid reorder request: contains duplicate task IDs"
         ):
-            resource_service.reorder_tasks(db_session, sim_id, requesting_user, payload)
+            driver_service.reorder_tasks(db_session, sim_id, requesting_user, payload)
 
     def test_reorder_tasks_runtime_error(
         self,
@@ -384,14 +382,14 @@ class TestResourceService:
         patch_active_simulations: Dict[str, Any],
     ) -> None:
         """Test reorder with unexpected runtime error."""
-        patch_active_simulations["simulator"].reorder_resource_tasks.side_effect = (
+        patch_active_simulations["simulator"].reorder_driver_tasks.side_effect = (
             Exception("Unexpected failure")
         )
-        payload = ResourceTaskReorderRequest(
-            resource_id=1, task_ids=[1, 2], apply_from_top=True
+        payload = DriverTaskReorderRequest(
+            driver_id=1, task_ids=[1, 2], apply_from_top=True
         )
         with pytest.raises(RuntimeError, match="Failed operation: Unexpected failure"):
-            resource_service.reorder_tasks(db_session, sim_id, requesting_user, payload)
+            driver_service.reorder_tasks(db_session, sim_id, requesting_user, payload)
 
     def test_reorder_tasks_bottom_mode(
         self,
@@ -401,20 +399,20 @@ class TestResourceService:
         patch_active_simulations: Dict[str, Any],
     ) -> None:
         """Test task reordering with bottom mode."""
-        patch_active_simulations["simulator"].reorder_resource_tasks.return_value = [
+        patch_active_simulations["simulator"].reorder_driver_tasks.return_value = [
             2,
             3,
             1,
         ]
-        payload = ResourceTaskReorderRequest(
-            resource_id=1, task_ids=[1], apply_from_top=False
+        payload = DriverTaskReorderRequest(
+            driver_id=1, task_ids=[1], apply_from_top=False
         )
-        response = resource_service.reorder_tasks(
+        response = driver_service.reorder_tasks(
             db_session, sim_id, requesting_user, payload
         )
         patch_active_simulations[
             "simulator"
-        ].reorder_resource_tasks.assert_called_once_with(
-            sim_id=sim_id, resource_id=1, task_ids_to_reorder=[1], apply_from_top=False
+        ].reorder_driver_tasks.assert_called_once_with(
+            sim_id=sim_id, driver_id=1, task_ids_to_reorder=[1], apply_from_top=False
         )
         assert response.task_order == [2, 3, 1]

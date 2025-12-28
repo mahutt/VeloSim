@@ -23,9 +23,9 @@ SOFTWARE.
 """
 
 from .simulation_service import simulation_service
-from .resource_service import resource_service
+from .driver_service import driver_service
 
 __all__ = [
     "simulation_service",
-    "resource_service",
+    "driver_service",
 ]

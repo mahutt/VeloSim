@@ -30,7 +30,6 @@ from back.models.scenario import JSONBCompatible
 
 if TYPE_CHECKING:
     from .user import User
-    from .resource import Resource
     from .station_task import StationTask
     from .station import Station
     from .sim_keyframe import SimKeyframe
@@ -69,9 +68,6 @@ class SimInstance(Base):
     tasks: Mapped[List["StationTask"]] = relationship(
         "StationTask", back_populates="sim_instance", cascade="all, delete-orphan"
     )
-    resources: Mapped[List["Resource"]] = relationship(
-        "Resource", back_populates="sim_instance", cascade="all, delete-orphan"
-    )
     stations: Mapped[List["Station"]] = relationship(
         "Station", back_populates="sim_instance", cascade="all, delete-orphan"
     )
@@ -82,7 +78,6 @@ class SimInstance(Base):
     def __repr__(self) -> str:
         return (
             f"<SimInstance(id={self.id}, user_id={self.user_id}, "
-            f"resources={len(self.resources)}, "
             f"stations={len(self.stations)}, "
             f"tasks={len(self.tasks)})>"
         )

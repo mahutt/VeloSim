@@ -27,8 +27,6 @@ from .station import Station
 from .task_status import TaskStatus
 from .station_task_type import StationTaskType
 from .station_task import StationTask
-from .resource import Resource
-from .resource_type import ResourceType
 from .user import User
 from .sim_instance import SimInstance
 from .scenario import Scenario
@@ -39,8 +37,6 @@ __all__ = [
     "TaskStatus",
     "StationTaskType",
     "StationTask",
-    "Resource",
-    "ResourceType",
     "User",
     "SimInstance",
     "Scenario",

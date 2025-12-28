@@ -40,15 +40,15 @@ from sim.simulator import RunInfo
 from back.auth.dependency import get_user_id
 from back.exceptions import VelosimPermissionError, ItemNotFoundError
 from back.schemas import (
-    ResourceTaskAssignResponse,
-    ResourceTaskUnassignResponse,
-    ResourceTaskReassignResponse,
+    DriverTaskAssignResponse,
+    DriverTaskUnassignResponse,
+    DriverTaskReassignResponse,
 )
 from back.schemas.playback_speed import PlaybackSpeedResponse, SimulationPlaybackStatus
-from back.schemas.resource import (
-    ResourceTaskAssignRequest,
-    ResourceTaskReassignRequest,
-    ResourceTaskUnassignRequest,
+from back.schemas.driver import (
+    DriverTaskAssignRequest,
+    DriverTaskReassignRequest,
+    DriverTaskUnassignRequest,
 )
 from back.services.simulation_service import simulation_service
 
@@ -558,7 +558,7 @@ class TestSimulationAPI:
         mock_sim.user_id = 1
         mock_sim.date_created = "2025-01-01T00:00:00"
         mock_sim.date_updated = "2025-01-01T00:00:00"
-        mock_sim.resources = []
+        mock_sim.drivers = []
         mock_sim.stations = []
         mock_sim.tasks = []
 
@@ -597,7 +597,7 @@ class TestSimulationAPI:
         mock_sim1.user_id = 1
         mock_sim1.date_created = "2025-01-01T00:00:00"
         mock_sim1.date_updated = "2025-01-01T00:00:00"
-        mock_sim1.resources = []
+        mock_sim1.drivers = []
         mock_sim1.stations = []
         mock_sim1.tasks = []
 
@@ -606,7 +606,7 @@ class TestSimulationAPI:
         mock_sim2.user_id = 1
         mock_sim2.date_created = "2025-01-01T00:00:00"
         mock_sim2.date_updated = "2025-01-01T00:00:00"
-        mock_sim2.resources = []
+        mock_sim2.drivers = []
         mock_sim2.stations = []
         mock_sim2.tasks = []
 
@@ -1124,31 +1124,31 @@ class TestSimulationAPI:
             loop.close()
             asyncio.set_event_loop(None)
 
-    @patch("back.api.v1.simulation.resource_service.assign_task")
+    @patch("back.api.v1.simulation.driver_service.assign_task")
     def test_assign_task_success(
         self,
         mock_assign: MagicMock,
         authenticated_client: TestClient,
         active_sim_id: str,
     ) -> None:
-        mock_assign.return_value = ResourceTaskAssignResponse(resource_id=7, task_id=42)
-        payload = {"resource_id": 7, "task_id": 42}
+        mock_assign.return_value = DriverTaskAssignResponse(driver_id=7, task_id=42)
+        payload = {"driver_id": 7, "task_id": 42}
 
         response = authenticated_client.post(
-            f"/api/v1/simulation/{active_sim_id}/resources/assign", json=payload
+            f"/api/v1/simulation/{active_sim_id}/drivers/assign", json=payload
         )
 
         assert response.status_code == 200
-        assert response.json() == {"resource_id": 7, "task_id": 42}
+        assert response.json() == {"driver_id": 7, "task_id": 42}
 
         mock_assign.assert_called_once_with(
             db=ANY,
             sim_id=active_sim_id,
             requesting_user=1,
-            task_assign_data=ResourceTaskAssignRequest(**payload),
+            task_assign_data=DriverTaskAssignRequest(**payload),
         )
 
-    @patch("back.api.v1.simulation.resource_service.assign_task")
+    @patch("back.api.v1.simulation.driver_service.assign_task")
     def test_assign_task_permission_error(
         self,
         mock_assign: MagicMock,
@@ -1156,14 +1156,14 @@ class TestSimulationAPI:
         active_sim_id: str,
     ) -> None:
         mock_assign.side_effect = VelosimPermissionError("No permission")
-        payload = {"resource_id": 7, "task_id": 42}
+        payload = {"driver_id": 7, "task_id": 42}
         response = authenticated_client.post(
-            f"/api/v1/simulation/{active_sim_id}/resources/assign", json=payload
+            f"/api/v1/simulation/{active_sim_id}/drivers/assign", json=payload
         )
         assert response.status_code == 403
         assert "No permission" in response.json()["detail"]
 
-    @patch("back.api.v1.simulation.resource_service.assign_task")
+    @patch("back.api.v1.simulation.driver_service.assign_task")
     def test_assign_task_not_found(
         self,
         mock_assign: MagicMock,
@@ -1171,13 +1171,13 @@ class TestSimulationAPI:
         active_sim_id: str,
     ) -> None:
         mock_assign.side_effect = ItemNotFoundError("Task not found")
-        payload = {"resource_id": 999, "task_id": 42}
+        payload = {"driver_id": 999, "task_id": 42}
         response = authenticated_client.post(
-            f"/api/v1/simulation/{active_sim_id}/resources/assign", json=payload
+            f"/api/v1/simulation/{active_sim_id}/drivers/assign", json=payload
         )
         assert response.status_code == 404
 
-    @patch("back.api.v1.simulation.resource_service.assign_task")
+    @patch("back.api.v1.simulation.driver_service.assign_task")
     def test_assign_task_runtime_error(
         self,
         mock_assign: MagicMock,
@@ -1186,14 +1186,14 @@ class TestSimulationAPI:
     ) -> None:
         """Test assign_task handles RuntimeError with 500 status."""
         mock_assign.side_effect = RuntimeError("Simulator error")
-        payload = {"resource_id": 7, "task_id": 42}
+        payload = {"driver_id": 7, "task_id": 42}
         response = authenticated_client.post(
-            f"/api/v1/simulation/{active_sim_id}/resources/assign", json=payload
+            f"/api/v1/simulation/{active_sim_id}/drivers/assign", json=payload
         )
         assert response.status_code == 500
         assert "Simulator error" in response.json()["detail"]
 
-    @patch("back.api.v1.simulation.resource_service.unassign_task")
+    @patch("back.api.v1.simulation.driver_service.unassign_task")
     def test_unassign_task_runtime_error(
         self,
         mock_unassign: MagicMock,
@@ -1202,40 +1202,38 @@ class TestSimulationAPI:
     ) -> None:
         """Test unassign_task handles RuntimeError with 500 status."""
         mock_unassign.side_effect = RuntimeError("Task unassignment failed")
-        payload = {"resource_id": 7, "task_id": 42}
+        payload = {"driver_id": 7, "task_id": 42}
         response = authenticated_client.post(
-            f"/api/v1/simulation/{active_sim_id}/resources/unassign", json=payload
+            f"/api/v1/simulation/{active_sim_id}/drivers/unassign", json=payload
         )
         assert response.status_code == 500
         assert "Task unassignment failed" in response.json()["detail"]
 
-    @patch("back.api.v1.simulation.resource_service.unassign_task")
+    @patch("back.api.v1.simulation.driver_service.unassign_task")
     def test_unassign_task_success(
         self,
         mock_unassign: MagicMock,
         authenticated_client: TestClient,
         active_sim_id: str,
     ) -> None:
-        mock_unassign.return_value = ResourceTaskUnassignResponse(
-            resource_id=7, task_id=42
-        )
-        payload = {"resource_id": 7, "task_id": 42}
+        mock_unassign.return_value = DriverTaskUnassignResponse(driver_id=7, task_id=42)
+        payload = {"driver_id": 7, "task_id": 42}
 
         response = authenticated_client.post(
-            f"/api/v1/simulation/{active_sim_id}/resources/unassign", json=payload
+            f"/api/v1/simulation/{active_sim_id}/drivers/unassign", json=payload
         )
 
         assert response.status_code == 200
-        assert response.json() == {"resource_id": 7, "task_id": 42}
+        assert response.json() == {"driver_id": 7, "task_id": 42}
 
         mock_unassign.assert_called_once_with(
             db=ANY,
             sim_id=active_sim_id,
             requesting_user=1,
-            task_unassign_data=ResourceTaskUnassignRequest(**payload),
+            task_unassign_data=DriverTaskUnassignRequest(**payload),
         )
 
-    @patch("back.api.v1.simulation.resource_service.unassign_task")
+    @patch("back.api.v1.simulation.driver_service.unassign_task")
     def test_unassign_task_permission_error(
         self,
         mock_unassign: MagicMock,
@@ -1243,43 +1241,43 @@ class TestSimulationAPI:
         active_sim_id: str,
     ) -> None:
         mock_unassign.side_effect = VelosimPermissionError("No permission")
-        payload = {"resource_id": 7, "task_id": 42}
+        payload = {"driver_id": 7, "task_id": 42}
         response = authenticated_client.post(
-            f"/api/v1/simulation/{active_sim_id}/resources/unassign", json=payload
+            f"/api/v1/simulation/{active_sim_id}/drivers/unassign", json=payload
         )
         assert response.status_code == 403
 
-    @patch("back.api.v1.simulation.resource_service.reassign_task")
+    @patch("back.api.v1.simulation.driver_service.reassign_task")
     def test_reassign_task_success(
         self,
         mock_reassign: MagicMock,
         authenticated_client: TestClient,
         active_sim_id: str,
     ) -> None:
-        mock_reassign.return_value = ResourceTaskReassignResponse(
-            task_id=42, old_resource_id=7, new_resource_id=8
+        mock_reassign.return_value = DriverTaskReassignResponse(
+            task_id=42, old_driver_id=7, new_driver_id=8
         )
-        payload = {"task_id": 42, "old_resource_id": 7, "new_resource_id": 8}
+        payload = {"task_id": 42, "old_driver_id": 7, "new_driver_id": 8}
 
         response = authenticated_client.post(
-            f"/api/v1/simulation/{active_sim_id}/resources/reassign", json=payload
+            f"/api/v1/simulation/{active_sim_id}/drivers/reassign", json=payload
         )
 
         assert response.status_code == 200
         assert response.json() == {
             "task_id": 42,
-            "old_resource_id": 7,
-            "new_resource_id": 8,
+            "old_driver_id": 7,
+            "new_driver_id": 8,
         }
 
         mock_reassign.assert_called_once_with(
             db=ANY,
             sim_id=active_sim_id,
             requesting_user=1,
-            task_reassign_data=ResourceTaskReassignRequest(**payload),
+            task_reassign_data=DriverTaskReassignRequest(**payload),
         )
 
-    @patch("back.api.v1.simulation.resource_service.reassign_task")
+    @patch("back.api.v1.simulation.driver_service.reassign_task")
     def test_reassign_task_permission_error(
         self,
         mock_reassign: MagicMock,
@@ -1287,13 +1285,13 @@ class TestSimulationAPI:
         active_sim_id: str,
     ) -> None:
         mock_reassign.side_effect = VelosimPermissionError("No permission")
-        payload = {"task_id": 42, "old_resource_id": 7, "new_resource_id": 8}
+        payload = {"task_id": 42, "old_driver_id": 7, "new_driver_id": 8}
         response = authenticated_client.post(
-            f"/api/v1/simulation/{active_sim_id}/resources/reassign", json=payload
+            f"/api/v1/simulation/{active_sim_id}/drivers/reassign", json=payload
         )
         assert response.status_code == 403
 
-    @patch("back.api.v1.simulation.resource_service.reassign_task")
+    @patch("back.api.v1.simulation.driver_service.reassign_task")
     def test_reassign_task_not_found(
         self,
         mock_reassign: MagicMock,
@@ -1301,9 +1299,9 @@ class TestSimulationAPI:
         active_sim_id: str,
     ) -> None:
         mock_reassign.side_effect = ItemNotFoundError("Task not found")
-        payload = {"task_id": 999, "old_resource_id": 7, "new_resource_id": 8}
+        payload = {"task_id": 999, "old_driver_id": 7, "new_driver_id": 8}
         response = authenticated_client.post(
-            f"/api/v1/simulation/{active_sim_id}/resources/reassign", json=payload
+            f"/api/v1/simulation/{active_sim_id}/drivers/reassign", json=payload
         )
         assert response.status_code == 404
 
@@ -1313,9 +1311,9 @@ class TestReorderTasks:
 
     @pytest.fixture
     def mock_reorder(self) -> Generator[MagicMock, None, None]:
-        """Mock the resource_service.reorder_tasks method."""
+        """Mock the driver_service.reorder_tasks method."""
         with patch(
-            "back.api.v1.simulation.resource_service.reorder_tasks"
+            "back.api.v1.simulation.driver_service.reorder_tasks"
         ) as mock_reorder:
             yield mock_reorder
 
@@ -1326,18 +1324,18 @@ class TestReorderTasks:
         active_sim_id: str,
     ) -> None:
         """Test successful task reordering."""
-        from back.schemas import ResourceTaskReorderResponse
+        from back.schemas import DriverTaskReorderResponse
 
-        mock_reorder.return_value = ResourceTaskReorderResponse(
-            resource_id=5, task_order=[3, 1, 2, 4]
+        mock_reorder.return_value = DriverTaskReorderResponse(
+            driver_id=5, task_order=[3, 1, 2, 4]
         )
-        payload = {"resource_id": 5, "task_ids": [3, 1], "apply_from_top": True}
+        payload = {"driver_id": 5, "task_ids": [3, 1], "apply_from_top": True}
         response = authenticated_client.post(
-            f"/api/v1/simulation/{active_sim_id}/resources/reorder-tasks", json=payload
+            f"/api/v1/simulation/{active_sim_id}/drivers/reorder-tasks", json=payload
         )
         assert response.status_code == 200
         data = response.json()
-        assert data["resource_id"] == 5
+        assert data["driver_id"] == 5
         assert data["task_order"] == [3, 1, 2, 4]
         mock_reorder.assert_called_once()
 
@@ -1348,14 +1346,14 @@ class TestReorderTasks:
         active_sim_id: str,
     ) -> None:
         """Test task reordering with bottom mode."""
-        from back.schemas import ResourceTaskReorderResponse
+        from back.schemas import DriverTaskReorderResponse
 
-        mock_reorder.return_value = ResourceTaskReorderResponse(
-            resource_id=5, task_order=[2, 4, 1, 3]
+        mock_reorder.return_value = DriverTaskReorderResponse(
+            driver_id=5, task_order=[2, 4, 1, 3]
         )
-        payload = {"resource_id": 5, "task_ids": [3, 1], "apply_from_top": False}
+        payload = {"driver_id": 5, "task_ids": [3, 1], "apply_from_top": False}
         response = authenticated_client.post(
-            f"/api/v1/simulation/{active_sim_id}/resources/reorder-tasks", json=payload
+            f"/api/v1/simulation/{active_sim_id}/drivers/reorder-tasks", json=payload
         )
         assert response.status_code == 200
         data = response.json()
@@ -1371,9 +1369,9 @@ class TestReorderTasks:
         mock_reorder.side_effect = VelosimPermissionError(
             "Unauthorized to access this simulation"
         )
-        payload = {"resource_id": 5, "task_ids": [1, 2], "apply_from_top": True}
+        payload = {"driver_id": 5, "task_ids": [1, 2], "apply_from_top": True}
         response = authenticated_client.post(
-            f"/api/v1/simulation/{active_sim_id}/resources/reorder-tasks", json=payload
+            f"/api/v1/simulation/{active_sim_id}/drivers/reorder-tasks", json=payload
         )
         assert response.status_code == 403
 
@@ -1383,11 +1381,11 @@ class TestReorderTasks:
         authenticated_client: TestClient,
         active_sim_id: str,
     ) -> None:
-        """Test reorder with resource not found."""
-        mock_reorder.side_effect = ItemNotFoundError("Resource not found")
-        payload = {"resource_id": 999, "task_ids": [1, 2], "apply_from_top": True}
+        """Test reorder with driver not found."""
+        mock_reorder.side_effect = ItemNotFoundError("Driver not found")
+        payload = {"driver_id": 999, "task_ids": [1, 2], "apply_from_top": True}
         response = authenticated_client.post(
-            f"/api/v1/simulation/{active_sim_id}/resources/reorder-tasks", json=payload
+            f"/api/v1/simulation/{active_sim_id}/drivers/reorder-tasks", json=payload
         )
         assert response.status_code == 404
 
@@ -1399,34 +1397,36 @@ class TestReorderTasks:
     ) -> None:
         """Test reorder with runtime error."""
         mock_reorder.side_effect = RuntimeError("Invalid reorder request")
-        payload = {"resource_id": 5, "task_ids": [1, 2], "apply_from_top": True}
+        payload = {"driver_id": 5, "task_ids": [1, 2], "apply_from_top": True}
         response = authenticated_client.post(
-            f"/api/v1/simulation/{active_sim_id}/resources/reorder-tasks", json=payload
+            f"/api/v1/simulation/{active_sim_id}/drivers/reorder-tasks", json=payload
         )
         assert response.status_code == 500
 
     def test_reorder_tasks_empty_list_validation(
         self,
+        mock_reorder: MagicMock,
         authenticated_client: TestClient,
         active_sim_id: str,
     ) -> None:
         """Test that empty task_ids list is rejected at schema level."""
-        payload = {"resource_id": 5, "task_ids": [], "apply_from_top": True}
+        payload = {"driver_id": 5, "task_ids": [], "apply_from_top": True}
         response = authenticated_client.post(
-            f"/api/v1/simulation/{active_sim_id}/resources/reorder-tasks", json=payload
+            f"/api/v1/simulation/{active_sim_id}/drivers/reorder-tasks", json=payload
         )
         # Should fail validation (422 Unprocessable Entity)
         assert response.status_code == 422
 
     def test_reorder_tasks_missing_required_fields(
         self,
+        mock_reorder: MagicMock,
         authenticated_client: TestClient,
         active_sim_id: str,
     ) -> None:
         """Test that missing required fields are rejected."""
-        payload = {"resource_id": 5}  # Missing task_ids and apply_from_top
+        payload = {"driver_id": 5}  # Missing task_ids and apply_from_top
         response = authenticated_client.post(
-            f"/api/v1/simulation/{active_sim_id}/resources/reorder-tasks", json=payload
+            f"/api/v1/simulation/{active_sim_id}/drivers/reorder-tasks", json=payload
         )
         assert response.status_code == 422
 

@@ -47,14 +47,14 @@ from back.api.v1.utils.sim_websocket_helpers import (
 )
 from back.models.scenario import Scenario
 from back.schemas import (
-    ResourceTaskAssignRequest,
-    ResourceTaskUnassignRequest,
-    ResourceTaskReassignRequest,
-    ResourceTaskReorderRequest,
-    ResourceTaskAssignResponse,
-    ResourceTaskUnassignResponse,
-    ResourceTaskReassignResponse,
-    ResourceTaskReorderResponse,
+    DriverTaskAssignRequest,
+    DriverTaskUnassignRequest,
+    DriverTaskReassignRequest,
+    DriverTaskReorderRequest,
+    DriverTaskAssignResponse,
+    DriverTaskUnassignResponse,
+    DriverTaskReassignResponse,
+    DriverTaskReorderResponse,
 )
 from back.schemas.sim_keyframe import (
     SimKeyframeListResponse,
@@ -64,7 +64,7 @@ from sqlalchemy.orm import Session
 
 from back.auth.dependency import get_user_id, get_user_id_over_websocket
 from back.exceptions import VelosimPermissionError, ItemNotFoundError
-from back.services.resource_service import resource_service
+from back.services.driver_service import driver_service
 from back.crud.sim_keyframe import sim_keyframe_crud
 from back.crud.sim_instance import sim_instance_crud
 from back.crud.user import user_crud
@@ -371,29 +371,29 @@ def set_playback_speed(
 
 
 @router.post(
-    "/{sim_id}/resources/assign",
+    "/{sim_id}/drivers/assign",
     status_code=200,
-    response_model=ResourceTaskAssignResponse,
+    response_model=DriverTaskAssignResponse,
 )
-def assign_task_to_resource(
+def assign_task_to_driver(
     sim_id: str,
-    task_assign_data: ResourceTaskAssignRequest,
+    task_assign_data: DriverTaskAssignRequest,
     requesting_user: int = Depends(get_user_id),
     db: Session = Depends(get_db),
-) -> ResourceTaskAssignResponse:
-    """Assign a task to a resource in a running simulation.
+) -> DriverTaskAssignResponse:
+    """Assign a task to a driver in a running simulation.
 
     Args:
         sim_id: ID of the simulation
-        task_assign_data: Task assignment request containing resource and task IDs
+        task_assign_data: Task assignment request containing driver and task IDs
         requesting_user: ID of the authenticated user
         db: Database session dependency
 
     Returns:
-        ResourceTaskAssignResponse confirming the task assignment
+        DriverTaskAssignResponse confirming the task assignment
     """
     try:
-        return resource_service.assign_task(
+        return driver_service.assign_task(
             db=db,
             sim_id=sim_id,
             requesting_user=requesting_user,
@@ -408,29 +408,29 @@ def assign_task_to_resource(
 
 
 @router.post(
-    "/{sim_id}/resources/unassign",
+    "/{sim_id}/drivers/unassign",
     status_code=200,
-    response_model=ResourceTaskUnassignResponse,
+    response_model=DriverTaskUnassignResponse,
 )
-def unassign_task_from_resource(
+def unassign_task_from_driver(
     sim_id: str,
-    task_unassign_data: ResourceTaskUnassignRequest,
+    task_unassign_data: DriverTaskUnassignRequest,
     requesting_user: int = Depends(get_user_id),
     db: Session = Depends(get_db),
-) -> ResourceTaskUnassignResponse:
-    """Unassign a task from a resource in a running simulation.
+) -> DriverTaskUnassignResponse:
+    """Unassign a task from a driver in a running simulation.
 
     Args:
         sim_id: ID of the simulation
-        task_unassign_data: Task unassignment request containing resource and task IDs
+        task_unassign_data: Task unassignment request containing driver and task IDs
         requesting_user: ID of the authenticated user
         db: Database session dependency
 
     Returns:
-        ResourceTaskUnassignResponse confirming the task unassignment
+        DriverTaskUnassignResponse confirming the task unassignment
     """
     try:
-        return resource_service.unassign_task(
+        return driver_service.unassign_task(
             db=db,
             sim_id=sim_id,
             requesting_user=requesting_user,
@@ -445,30 +445,30 @@ def unassign_task_from_resource(
 
 
 @router.post(
-    "/{sim_id}/resources/reassign",
+    "/{sim_id}/drivers/reassign",
     status_code=200,
-    response_model=ResourceTaskReassignResponse,
+    response_model=DriverTaskReassignResponse,
 )
-def reassign_task_between_resources(
+def reassign_task_between_drivers(
     sim_id: str,
-    task_reassign_data: ResourceTaskReassignRequest,
+    task_reassign_data: DriverTaskReassignRequest,
     requesting_user: int = Depends(get_user_id),
     db: Session = Depends(get_db),
-) -> ResourceTaskReassignResponse:
-    """Reassign a task from one resource to another in a running simulation.
+) -> DriverTaskReassignResponse:
+    """Reassign a task from one driver to another in a running simulation.
 
     Args:
         sim_id: ID of the simulation
         task_reassign_data: Task reassignment request with source, target
-            resources and task ID
+            drivers and task ID
         requesting_user: ID of the authenticated user
         db: Database session dependency
 
     Returns:
-        ResourceTaskReassignResponse confirming the task reassignment
+        DriverTaskReassignResponse confirming the task reassignment
     """
     try:
-        return resource_service.reassign_task(
+        return driver_service.reassign_task(
             db=db,
             sim_id=sim_id,
             requesting_user=requesting_user,
@@ -483,29 +483,29 @@ def reassign_task_between_resources(
 
 
 @router.post(
-    "/{sim_id}/resources/reorder-tasks",
+    "/{sim_id}/drivers/reorder-tasks",
     status_code=200,
-    response_model=ResourceTaskReorderResponse,
+    response_model=DriverTaskReorderResponse,
 )
-def reorder_resource_tasks(
+def reorder_driver_tasks(
     sim_id: str,
-    reorder_data: ResourceTaskReorderRequest,
+    reorder_data: DriverTaskReorderRequest,
     requesting_user: int = Depends(get_user_id),
     db: Session = Depends(get_db),
-) -> ResourceTaskReorderResponse:
-    """Reorder tasks in a resource's task list within a running simulation.
+) -> DriverTaskReorderResponse:
+    """Reorder tasks in a driver's task list within a running simulation.
 
     Args:
         sim_id: ID of the simulation
-        reorder_data: Task reorder request containing resource ID and new task order
+        reorder_data: Task reorder request containing driver ID and new task order
         requesting_user: ID of the authenticated user
         db: Database session dependency
 
     Returns:
-        ResourceTaskReorderResponse confirming the task reordering
+        DriverTaskReorderResponse confirming the task reordering
     """
     try:
-        return resource_service.reorder_tasks(
+        return driver_service.reorder_tasks(
             db=db,
             sim_id=sim_id,
             requesting_user=requesting_user,
