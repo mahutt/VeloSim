@@ -62,7 +62,7 @@ import {
 import type { ResourceBarElement } from '~/components/resource/resource-bar';
 import {
   SelectedItemType,
-  type PopulatedResource,
+  type PopulatedDriver,
   type SelectedItemBarElement,
 } from '~/components/map/selected-item-bar';
 import {
@@ -87,12 +87,12 @@ export type SimulationContextType = {
   assignTask: (driverId: number, taskId: number) => Promise<void>;
   unassignTask: (driverId: number, taskId: number) => Promise<void>;
   reassignTask: (
-    prevResourceId: number,
-    newResourceId: number,
+    prevDriverId: number,
+    newDriverId: number,
     taskId: number
   ) => Promise<void>;
   reorderTasks: (
-    resourceId: number,
+    driverId: number,
     taskIds: number[],
     applyFromTop: boolean
   ) => Promise<void>;
@@ -200,24 +200,24 @@ export const SimulationProvider = ({
   };
 
   const reassignTask = async (
-    prevResourceId: number,
-    newResourceId: number,
+    prevDriverId: number,
+    newDriverId: number,
     taskId: number
   ) => {
-    const prevResource = driversRef.current.get(prevResourceId);
-    const newResource = driversRef.current.get(newResourceId);
+    const prevResource = driversRef.current.get(prevDriverId);
+    const newResource = driversRef.current.get(newDriverId);
     if (!prevResource) {
-      throw new Error(`Previous resource #${prevResourceId} not found.`);
+      throw new Error(`Previous driver #${prevDriverId} not found.`);
     }
     if (!newResource) {
-      throw new Error(`New resource #${newResourceId} not found.`);
+      throw new Error(`New driver #${newDriverId} not found.`);
     }
 
     try {
       const payload = {
         task_id: taskId,
-        old_driver_id: prevResourceId,
-        new_driver_id: newResourceId,
+        old_driver_id: prevDriverId,
+        new_driver_id: newDriverId,
       };
 
       await api.post(`/simulation/${simId!}/drivers/reassign`, payload);
@@ -226,68 +226,66 @@ export const SimulationProvider = ({
         ...prevResource,
         taskIds: prevResource.taskIds.filter((t) => t !== taskId),
       };
-      driversRef.current.set(prevResourceId, updatedPrevResource);
+      driversRef.current.set(prevDriverId, updatedPrevResource);
 
       const updatedNewResource = newResource;
       if (!updatedNewResource.taskIds.includes(taskId)) {
         updatedNewResource.taskIds.push(taskId);
       }
 
-      driversRef.current.set(newResourceId, updatedNewResource);
+      driversRef.current.set(newDriverId, updatedNewResource);
       updateResourceBarElement();
 
       if (selectedItem?.type === SelectedItemType.Driver) {
-        if ((selectedItem.value as PopulatedResource).id === prevResourceId) {
-          const updated = driversRef.current.get(prevResourceId);
+        if ((selectedItem.value as PopulatedDriver).id === prevDriverId) {
+          const updated = driversRef.current.get(prevDriverId);
           if (updated) {
-            updateSelectedItem(prevResourceId, SelectedItemType.Driver);
+            updateSelectedItem(prevDriverId, SelectedItemType.Driver);
           }
-        } else if (
-          (selectedItem.value as PopulatedResource).id === newResourceId
-        ) {
-          updateSelectedItem(newResourceId, SelectedItemType.Driver);
+        } else if ((selectedItem.value as PopulatedDriver).id === newDriverId) {
+          updateSelectedItem(newDriverId, SelectedItemType.Driver);
         }
       }
     } catch (error) {
       displayError(
         'Reassign failed',
-        `An error occurred while reassigning task ${taskId} from resource ${prevResourceId} to resource ${newResourceId}. Please try again later.`
+        `An error occurred while reassigning task ${taskId} from driver ${prevDriverId} to driver ${newDriverId}. Please try again later.`
       );
       throw error;
     }
   };
 
-  // Reorder tasks within a resource's task queue
+  // Reorder tasks within a driver's task queue
   // applyFromTop: if true, insert tasks after in-progress; if false, append to end
   const reorderTasks = async (
-    resourceId: number,
+    driverId: number,
     taskIds: number[],
     applyFromTop: boolean
   ) => {
-    const resource = resourcesRef.current.get(resourceId);
+    const resource = driversRef.current.get(driverId);
     if (!resource) {
-      throw new Error(`Resource #${resourceId} not found.`);
+      throw new Error(`Driver #${driverId} not found.`);
     }
 
     try {
       const payload = {
-        resource_id: resourceId,
+        driver_id: driverId,
         task_ids: taskIds,
         apply_from_top: applyFromTop,
       };
 
       const response = await api.post<{
-        resource_id: number;
+        driver_id: number;
         task_order: number[];
-      }>(`/simulation/${simId!}/resources/reorder-tasks`, payload);
+      }>(`/simulation/${simId!}/drivers/reorder`, payload);
 
-      const updatedResource: Resource = {
+      const updatedResource: Driver = {
         ...resource,
         taskIds: response.data.task_order,
       };
-      resourcesRef.current.set(resourceId, updatedResource);
+      driversRef.current.set(driverId, updatedResource);
       updateResourceBarElement();
-      updateSelectedItem(resourceId, SelectedItemType.Resource);
+      updateSelectedItem(driverId, SelectedItemType.Driver);
     } catch (error) {
       displayError(
         'Reorder failed',

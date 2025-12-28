@@ -31,7 +31,7 @@ import {
 } from '~/providers/simulation-provider';
 import SelectedItemBar, {
   SelectedItemType,
-  type PopulatedResource,
+  type PopulatedDriver,
 } from '~/components/map/selected-item-bar';
 import { FeatureToggleProvider } from '~/providers/feature-toggle-provider';
 import { TaskAssignmentProvider } from '~/providers/task-assignment-provider';
@@ -122,7 +122,7 @@ describe('SelectedItemBar', () => {
   });
 
   it('should render resource information when resource is selected', () => {
-    const mockResource: PopulatedResource = {
+    const mockDriver: PopulatedDriver = {
       id: 5,
       position: [-73.58, 45.49] as Position,
       tasks: [
@@ -142,7 +142,7 @@ describe('SelectedItemBar', () => {
     (useSimulation as unknown as ReturnType<typeof vi.fn>).mockReturnValue({
       selectedItem: {
         type: SelectedItemType.Driver,
-        value: mockResource,
+        value: mockDriver,
       },
       clearSelection: vi.fn(),
       selectItem: vi.fn(),
@@ -275,13 +275,13 @@ describe('SelectedItemBar', () => {
   describe('Task Reordering', () => {
     it('should call reorderTasks when task is dropped at a valid position', async () => {
       const reorderTasksMock = vi.fn().mockResolvedValue(undefined);
-      const mockResource: PopulatedResource = {
+      const mockDriver: PopulatedDriver = {
         id: 1,
         position: [-73.58, 45.49] as Position,
         tasks: [
-          { id: 1, stationId: 1, state: 'open', assignedResourceId: 1 },
-          { id: 2, stationId: 2, state: 'open', assignedResourceId: 1 },
-          { id: 3, stationId: 3, state: 'open', assignedResourceId: 1 },
+          { id: 1, stationId: 1, state: 'open', assignedDriverId: 1 },
+          { id: 2, stationId: 2, state: 'open', assignedDriverId: 1 },
+          { id: 3, stationId: 3, state: 'open', assignedDriverId: 1 },
         ],
         route: { coordinates: [] as Position[] },
         inProgressTask: null,
@@ -289,8 +289,8 @@ describe('SelectedItemBar', () => {
 
       (useSimulation as unknown as ReturnType<typeof vi.fn>).mockReturnValue({
         selectedItem: {
-          type: SelectedItemType.Resource,
-          value: mockResource,
+          type: SelectedItemType.Driver,
+          value: mockDriver,
         },
         clearSelection: vi.fn(),
         selectItem: vi.fn(),
@@ -299,7 +299,7 @@ describe('SelectedItemBar', () => {
         reassignTask: vi.fn(),
         reorderTasks: reorderTasksMock,
         stationsRef: { current: new Map() },
-        resourcesRef: { current: new Map() },
+        driversRef: { current: new Map() },
         resourceBarElement: [],
         simId: '1',
         isConnected: true,
@@ -336,13 +336,13 @@ describe('SelectedItemBar', () => {
 
     it('should not call reorderTasks when dropping at index 0', async () => {
       const reorderTasksMock = vi.fn().mockResolvedValue(undefined);
-      const mockResource: PopulatedResource = {
+      const mockDriver: PopulatedDriver = {
         id: 1,
         position: [-73.58, 45.49] as Position,
         tasks: [
-          { id: 1, stationId: 1, state: 'open', assignedResourceId: 1 },
-          { id: 2, stationId: 2, state: 'open', assignedResourceId: 1 },
-          { id: 3, stationId: 3, state: 'open', assignedResourceId: 1 },
+          { id: 1, stationId: 1, state: 'open', assignedDriverId: 1 },
+          { id: 2, stationId: 2, state: 'open', assignedDriverId: 1 },
+          { id: 3, stationId: 3, state: 'open', assignedDriverId: 1 },
         ],
         route: { coordinates: [] as Position[] },
         inProgressTask: null,
@@ -350,8 +350,8 @@ describe('SelectedItemBar', () => {
 
       (useSimulation as unknown as ReturnType<typeof vi.fn>).mockReturnValue({
         selectedItem: {
-          type: SelectedItemType.Resource,
-          value: mockResource,
+          type: SelectedItemType.Driver,
+          value: mockDriver,
         },
         clearSelection: vi.fn(),
         selectItem: vi.fn(),
@@ -360,7 +360,7 @@ describe('SelectedItemBar', () => {
         reassignTask: vi.fn(),
         reorderTasks: reorderTasksMock,
         stationsRef: { current: new Map() },
-        resourcesRef: { current: new Map() },
+        driversRef: { current: new Map() },
         resourceBarElement: [],
         simId: '1',
         isConnected: true,
@@ -393,12 +393,12 @@ describe('SelectedItemBar', () => {
     });
 
     it('should set dropEffect to none when draggedTaskId is null', () => {
-      const mockResource: PopulatedResource = {
+      const mockDriver: PopulatedDriver = {
         id: 1,
         position: [-73.58, 45.49] as Position,
         tasks: [
-          { id: 1, stationId: 1, state: 'open', assignedResourceId: 1 },
-          { id: 2, stationId: 2, state: 'open', assignedResourceId: 1 },
+          { id: 1, stationId: 1, state: 'open', assignedDriverId: 1 },
+          { id: 2, stationId: 2, state: 'open', assignedDriverId: 1 },
         ],
         route: { coordinates: [] as Position[] },
         inProgressTask: null,
@@ -406,8 +406,8 @@ describe('SelectedItemBar', () => {
 
       (useSimulation as unknown as ReturnType<typeof vi.fn>).mockReturnValue({
         selectedItem: {
-          type: SelectedItemType.Resource,
-          value: mockResource,
+          type: SelectedItemType.Driver,
+          value: mockDriver,
         },
         clearSelection: vi.fn(),
         selectItem: vi.fn(),
@@ -416,7 +416,7 @@ describe('SelectedItemBar', () => {
         reassignTask: vi.fn(),
         reorderTasks: vi.fn(),
         stationsRef: { current: new Map() },
-        resourcesRef: { current: new Map() },
+        driversRef: { current: new Map() },
         resourceBarElement: [],
         simId: '1',
         isConnected: true,
@@ -447,13 +447,13 @@ describe('SelectedItemBar', () => {
     });
 
     it('should set dropEffect to none when target index is 0', () => {
-      const mockResource: PopulatedResource = {
+      const mockDriver: PopulatedDriver = {
         id: 1,
         position: [-73.58, 45.49] as Position,
         tasks: [
-          { id: 1, stationId: 1, state: 'open', assignedResourceId: 1 },
-          { id: 2, stationId: 2, state: 'open', assignedResourceId: 1 },
-          { id: 3, stationId: 3, state: 'open', assignedResourceId: 1 },
+          { id: 1, stationId: 1, state: 'open', assignedDriverId: 1 },
+          { id: 2, stationId: 2, state: 'open', assignedDriverId: 1 },
+          { id: 3, stationId: 3, state: 'open', assignedDriverId: 1 },
         ],
         route: { coordinates: [] as Position[] },
         inProgressTask: null,
@@ -461,8 +461,8 @@ describe('SelectedItemBar', () => {
 
       (useSimulation as unknown as ReturnType<typeof vi.fn>).mockReturnValue({
         selectedItem: {
-          type: SelectedItemType.Resource,
-          value: mockResource,
+          type: SelectedItemType.Driver,
+          value: mockDriver,
         },
         clearSelection: vi.fn(),
         selectItem: vi.fn(),
@@ -471,7 +471,7 @@ describe('SelectedItemBar', () => {
         reassignTask: vi.fn(),
         reorderTasks: vi.fn(),
         stationsRef: { current: new Map() },
-        resourcesRef: { current: new Map() },
+        driversRef: { current: new Map() },
         resourceBarElement: [],
         simId: '1',
         isConnected: true,
@@ -506,12 +506,12 @@ describe('SelectedItemBar', () => {
 
     it('should not reorder when dragged task is not found in list', async () => {
       const reorderTasksMock = vi.fn().mockResolvedValue(undefined);
-      const mockResource: PopulatedResource = {
+      const mockDriver: PopulatedDriver = {
         id: 1,
         position: [-73.58, 45.49] as Position,
         tasks: [
-          { id: 1, stationId: 1, state: 'open', assignedResourceId: 1 },
-          { id: 2, stationId: 2, state: 'open', assignedResourceId: 1 },
+          { id: 1, stationId: 1, state: 'open', assignedDriverId: 1 },
+          { id: 2, stationId: 2, state: 'open', assignedDriverId: 1 },
         ],
         route: { coordinates: [] as Position[] },
         inProgressTask: null,
@@ -519,8 +519,8 @@ describe('SelectedItemBar', () => {
 
       (useSimulation as unknown as ReturnType<typeof vi.fn>).mockReturnValue({
         selectedItem: {
-          type: SelectedItemType.Resource,
-          value: mockResource,
+          type: SelectedItemType.Driver,
+          value: mockDriver,
         },
         clearSelection: vi.fn(),
         selectItem: vi.fn(),
@@ -529,7 +529,7 @@ describe('SelectedItemBar', () => {
         reassignTask: vi.fn(),
         reorderTasks: reorderTasksMock,
         stationsRef: { current: new Map() },
-        resourcesRef: { current: new Map() },
+        driversRef: { current: new Map() },
         resourceBarElement: [],
         simId: '1',
         isConnected: true,
@@ -566,13 +566,13 @@ describe('SelectedItemBar', () => {
 
     it('should not reorder when dropping at same index', async () => {
       const reorderTasksMock = vi.fn().mockResolvedValue(undefined);
-      const mockResource: PopulatedResource = {
+      const mockDriver: PopulatedDriver = {
         id: 1,
         position: [-73.58, 45.49] as Position,
         tasks: [
-          { id: 1, stationId: 1, state: 'open', assignedResourceId: 1 },
-          { id: 2, stationId: 2, state: 'open', assignedResourceId: 1 },
-          { id: 3, stationId: 3, state: 'open', assignedResourceId: 1 },
+          { id: 1, stationId: 1, state: 'open', assignedDriverId: 1 },
+          { id: 2, stationId: 2, state: 'open', assignedDriverId: 1 },
+          { id: 3, stationId: 3, state: 'open', assignedDriverId: 1 },
         ],
         route: { coordinates: [] as Position[] },
         inProgressTask: null,
@@ -580,8 +580,8 @@ describe('SelectedItemBar', () => {
 
       (useSimulation as unknown as ReturnType<typeof vi.fn>).mockReturnValue({
         selectedItem: {
-          type: SelectedItemType.Resource,
-          value: mockResource,
+          type: SelectedItemType.Driver,
+          value: mockDriver,
         },
         clearSelection: vi.fn(),
         reorderTasks: reorderTasksMock,
@@ -590,7 +590,7 @@ describe('SelectedItemBar', () => {
         unassignTask: vi.fn(),
         reassignTask: vi.fn(),
         stationsRef: { current: new Map() },
-        resourcesRef: { current: new Map() },
+        driversRef: { current: new Map() },
         resourceBarElement: [],
         simId: '1',
         isConnected: true,

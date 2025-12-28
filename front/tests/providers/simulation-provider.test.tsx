@@ -1195,14 +1195,15 @@ test('reorderTasks posts to API and updates resource task order', async () => {
   });
 
   const TestReorderComponent = () => {
-    const { reorderTasks, resourcesRef, resourceBarElement } = useSimulation();
+    const { reorderTasks, driversRef, resourceBarElement } = useSimulation();
 
     useEffect(() => {
-      resourcesRef.current.set(1, {
+      driversRef.current.set(1, {
         id: 1,
         position: [0, 0],
         taskIds: [10, 20, 30],
         inProgressTaskId: null,
+        vehicleId: null,
       });
     }, []);
 
@@ -1213,7 +1214,7 @@ test('reorderTasks posts to API and updates resource task order', async () => {
       <div>
         <div data-testid="task-count">{String(taskCount)}</div>
         <div data-testid="task-ids">
-          {JSON.stringify(resourcesRef.current.get(1)?.taskIds || [])}
+          {JSON.stringify(driversRef.current.get(1)?.taskIds || [])}
         </div>
         <button
           data-testid="reorder-btn"
@@ -1254,8 +1255,8 @@ test('reorderTasks posts to API and updates resource task order', async () => {
   });
 
   expect(api.post).toHaveBeenCalledWith(
-    '/simulation/test-sim-123/resources/reorder-tasks',
-    { resource_id: 1, task_ids: [20, 30, 10], apply_from_top: true }
+    '/simulation/test-sim-123/drivers/reorder',
+    { driver_id: 1, task_ids: [20, 30, 10], apply_from_top: true }
   );
 
   await waitFor(() => {
@@ -1273,14 +1274,15 @@ test('reorderTasks handles API errors gracefully', async () => {
   (api.post as Mock).mockRejectedValueOnce(new Error('Reorder failed'));
 
   const TestReorderErrorComponent = () => {
-    const { reorderTasks, resourcesRef } = useSimulation();
+    const { reorderTasks, driversRef } = useSimulation();
 
     useEffect(() => {
-      resourcesRef.current.set(1, {
+      driversRef.current.set(1, {
         id: 1,
         position: [0, 0],
         taskIds: [10, 20, 30],
         inProgressTaskId: null,
+        vehicleId: null,
       });
     }, []);
 
@@ -1295,7 +1297,7 @@ test('reorderTasks handles API errors gracefully', async () => {
     return (
       <div>
         <div data-testid="task-ids">
-          {JSON.stringify(resourcesRef.current.get(1)?.taskIds || [])}
+          {JSON.stringify(driversRef.current.get(1)?.taskIds || [])}
         </div>
         <button data-testid="reorder-btn" onClick={handleReorder}>
           Reorder
@@ -1408,14 +1410,15 @@ test('reorderTasks updates resourceBarElement and triggers map updates', async (
   (setMapSourceMock as Mock).mockClear();
 
   const TestReorderMapUpdateComponent = () => {
-    const { reorderTasks, resourcesRef, resourceBarElement } = useSimulation();
+    const { reorderTasks, driversRef, resourceBarElement } = useSimulation();
 
     useEffect(() => {
-      resourcesRef.current.set(1, {
+      driversRef.current.set(1, {
         id: 1,
         position: [0, 0],
         taskIds: [10, 20, 30],
         inProgressTaskId: null,
+        vehicleId: null,
       });
     }, []);
 
@@ -1464,8 +1467,8 @@ test('reorderTasks updates resourceBarElement and triggers map updates', async (
 
   // Verify API was called with correct params
   expect(api.post).toHaveBeenCalledWith(
-    '/simulation/test-sim-123/resources/reorder-tasks',
-    { resource_id: 1, task_ids: [30, 10, 20], apply_from_top: false }
+    '/simulation/test-sim-123/drivers/reorder',
+    { driver_id: 1, task_ids: [30, 10, 20], apply_from_top: false }
   );
 
   // Verify map was updated (resources layer)
