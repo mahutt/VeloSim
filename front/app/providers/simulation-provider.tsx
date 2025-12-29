@@ -277,7 +277,7 @@ export const SimulationProvider = ({
       const response = await api.post<{
         driver_id: number;
         task_order: number[];
-      }>(`/simulation/${simId!}/drivers/reorder`, payload);
+      }>(`/simulation/${simId!}/drivers/reorder-tasks`, payload);
 
       const updatedResource: Driver = {
         ...resource,

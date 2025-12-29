@@ -1255,7 +1255,7 @@ test('reorderTasks posts to API and updates resource task order', async () => {
   });
 
   expect(api.post).toHaveBeenCalledWith(
-    '/simulation/test-sim-123/drivers/reorder',
+    '/simulation/test-sim-123/drivers/reorder-tasks',
     { driver_id: 1, task_ids: [20, 30, 10], apply_from_top: true }
   );
 
@@ -1467,7 +1467,7 @@ test('reorderTasks updates resourceBarElement and triggers map updates', async (
 
   // Verify API was called with correct params
   expect(api.post).toHaveBeenCalledWith(
-    '/simulation/test-sim-123/drivers/reorder',
+    '/simulation/test-sim-123/drivers/reorder-tasks',
     { driver_id: 1, task_ids: [30, 10, 20], apply_from_top: false }
   );
 
