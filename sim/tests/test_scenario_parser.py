@@ -52,19 +52,19 @@ def test_json_parse_strategy_valid_input() -> None:
                     "name": "Station 1",
                     "initial_task_count": 2,
                     "scheduled_tasks": ["day1:09:30"],
-                    "position": [45.5, -73.5],
+                    "position": [-73.5, 45.5],
                 },
                 {
                     "name": "Station 2",
                     "initial_task_count": 0,
                     "scheduled_tasks": ["day1:09:30"],
-                    "position": [45.501, -73.55],
+                    "position": [-73.55, 45.501],
                 },
                 {
                     "name": "Station 3",
                     "initial_task_count": 0,
                     "scheduled_tasks": [],
-                    "position": [45.511, -73.56],
+                    "position": [-73.56, 45.511],
                 },
             ],
             "drivers": [
@@ -144,19 +144,19 @@ def test_json_parse_strategy_with_invalid_time() -> None:
             "stations": [
                 {
                     "name": "Lionel-Groulx",
-                    "position": [-74.0060, 40.7128],
+                    "position": [-73.58, 45.48],
                     "initial_task_count": 1,
                     "scheduled_tasks": [],
                 },
                 {
                     "name": "Guy-Concordia",
-                    "position": [-118.2437, 34.0522],
+                    "position": [-73.57, 45.49],
                     "initial_task_count": 0,
                     "scheduled_tasks": ["day1:05:00"],
                 },
                 {
                     "name": "Peel",
-                    "position": [-87.6298, 41.8781],
+                    "position": [-73.57, 45.50],
                     "initial_task_count": 0,
                     "scheduled_tasks": ["day1:08:00"],
                 },
@@ -212,7 +212,7 @@ def test_json_parse_strategy_validate_without_parsing() -> None:
         "stations": [
             {
                 "name": "Test Station",
-                "position": [-74.0060, 40.7128],
+                "position": [-73.58, 45.48],
                 "initial_task_count": 1,
                 "scheduled_tasks": [],
             }

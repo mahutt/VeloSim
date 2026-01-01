@@ -42,6 +42,15 @@ from sim.utils.base_parse_strategy import BaseParseStrategy
 
 DEFAULT_VEHICLE_POSITION: List[float] = [-73.57314, 45.50137]
 
+# Greater Montreal Area coordinate bounds for scenario validation.
+# All coordinates should respect these bounds, given the project scope.
+GREATER_MONTREAL_COORDINATES: Dict[str, float] = {
+    "lat_min": 45.24000,  # Northwest corner
+    "lat_max": 45.86000,  # Southeast corner
+    "lon_min": -74.26000,  # Northwest corner
+    "lon_max": -73.22000,  # Southeast corner
+}
+
 
 def _validate_day_time_format(time_value: Any) -> str:
     """Validate and parse day-time format string (e.g., 'day1:08:00').
@@ -123,8 +132,33 @@ class PositionValidator(BaseModel):
         lat = float(values["lat"])
         lon = float(values["lon"])
 
+        # Validate global coordinate ranges
         if not (-90 <= lat <= 90) or not (-180 <= lon <= 180):
             raise ValueError(f"Invalid latitude/longitude range: {lat}, {lon}")
+
+        # Validate Greater Montreal Area bounds
+        if not (
+            GREATER_MONTREAL_COORDINATES["lat_min"]
+            <= lat
+            <= GREATER_MONTREAL_COORDINATES["lat_max"]
+        ):
+            raise ValueError(
+                f"Latitude {lat} is outside Greater Montreal Area bounds "
+                f"(must be between {GREATER_MONTREAL_COORDINATES['lat_min']} and "
+                f"{GREATER_MONTREAL_COORDINATES['lat_max']})"
+            )
+
+        if not (
+            GREATER_MONTREAL_COORDINATES["lon_min"]
+            <= lon
+            <= GREATER_MONTREAL_COORDINATES["lon_max"]
+        ):
+            raise ValueError(
+                f"Longitude {lon} is outside Greater Montreal Area bounds "
+                f"(must be between {GREATER_MONTREAL_COORDINATES['lon_min']} and "
+                f"{GREATER_MONTREAL_COORDINATES['lon_max']})"
+            )
+
         return {"lat": lat, "lon": lon}
 
 

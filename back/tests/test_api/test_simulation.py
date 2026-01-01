@@ -61,26 +61,26 @@ SCENARIO_PAYLOAD = {
     "stations": [
         {
             "name": "Station Alpha",
-            "position": [45.5017, -73.5673],
+            "position": [-73.5673, 45.5017],
             "initial_task_count": 1,
             "scheduled_tasks": ["day1:07:00", "day1:08:00"],
         },
         {
             "name": "Station Bravo",
-            "position": [45.5088, -73.5540],
+            "position": [-73.5540, 45.5088],
             "initial_task_count": 1,
             "scheduled_tasks": ["day1:07:30"],
         },
         {
             "name": "Station Charlie",
-            "position": [45.5120, -73.5800],
+            "position": [-73.5800, 45.5120],
             "initial_task_count": 0,
             "scheduled_tasks": ["day1:06:10", "day1:06:30"],
         },
     ],
     "vehicles": [
-        {"name": "Vehicle 101", "position": [45.505, -73.56], "battery_count": 2},
-        {"name": "Vehicle 102", "position": [45.509, -73.57], "battery_count": 2},
+        {"name": "Vehicle 101", "position": [-73.56, 45.505], "battery_count": 2},
+        {"name": "Vehicle 102", "position": [-73.57, 45.509], "battery_count": 2},
     ],
     "drivers": [
         {
@@ -446,13 +446,13 @@ class TestSimulationAPI:
             "stations": [
                 {
                     "name": "Test Station",
-                    "position": [45.5, -73.6],
+                    "position": [-73.6, 45.5],
                     "initial_task_count": 0,
                     "scheduled_tasks": [],
                 }
             ],
             "vehicles": [
-                {"name": "Test Vehicle", "position": [45.5, -73.6], "battery_count": 2}
+                {"name": "Test Vehicle", "position": [-73.6, 45.5], "battery_count": 2}
             ],
             "drivers": [
                 {
