@@ -35,7 +35,6 @@ from sim.entities.task import Task
 class Scenario:
     """Complete scenario definition with drivers, vehicles, stations, and tasks."""
 
-    scenario_title: Optional[str]
     start_time: str
     end_time: str
     drivers: List[Driver]
@@ -46,7 +45,6 @@ class Scenario:
 
     def __init__(
         self,
-        scenario_title: Optional[str] = None,
         start_time: str = "",
         end_time: str = "",
         drivers: Optional[List[Driver]] = None,
@@ -55,7 +53,6 @@ class Scenario:
         initial_tasks: Optional[List[Task]] = None,
         scheduled_tasks: Optional[List[Task]] = None,
     ):
-        self.scenario_title = scenario_title
         self.start_time = start_time
         self.end_time = end_time
         self.drivers = drivers or []
@@ -68,7 +65,6 @@ class Scenario:
         """Readable string summary for debugging or logs."""
         return (
             f"ScenarioConfig("
-            f"title='{self.scenario_title}', "
             f"start='{self.start_time}', end='{self.end_time}', "
             f"drivers={len(self.drivers)}, "
             f"vehicles={len(self.vehicles)}, "

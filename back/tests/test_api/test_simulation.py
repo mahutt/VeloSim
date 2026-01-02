@@ -500,7 +500,7 @@ class TestSimulationAPI:
                 {
                     "name": "Test Station",
                     "position": [45.5, -73.6],
-                    "initial_task_count": 0,
+                    "initial_task_count": 1,
                     "scheduled_tasks": [],
                 }
             ],

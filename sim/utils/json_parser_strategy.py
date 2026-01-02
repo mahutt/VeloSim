@@ -25,7 +25,13 @@ SOFTWARE.
 from datetime import datetime
 from typing import Dict, List, Any, Set, Optional
 import re
-from pydantic import BaseModel, ValidationError, model_validator, field_validator
+from pydantic import (
+    BaseModel,
+    ValidationError,
+    model_validator,
+    field_validator,
+    ConfigDict,
+)
 
 from sim.entities.inputParameters import InputParameter
 from sim.entities.station import Station
@@ -131,6 +137,8 @@ class PositionValidator(BaseModel):
 class VehicleValidator(BaseModel):
     """Validator for vehicle entity data."""
 
+    model_config = ConfigDict(extra="forbid")
+
     name: str
     position: Optional[PositionValidator] = None
     battery_count: Optional[int] = 0
@@ -138,6 +146,8 @@ class VehicleValidator(BaseModel):
 
 class ShiftValidator(BaseModel):
     """Validator for driver shift times."""
+
+    model_config = ConfigDict(extra="forbid")
 
     start_time: str
     end_time: str
@@ -166,12 +176,16 @@ class ShiftValidator(BaseModel):
 class DriverValidator(BaseModel):
     """Validator for driver entity data."""
 
+    model_config = ConfigDict(extra="forbid")
+
     name: str
     shift: ShiftValidator
 
 
 class StationValidator(BaseModel):
     """Validator for station entity data."""
+
+    model_config = ConfigDict(extra="forbid")
 
     name: str
     position: PositionValidator
@@ -213,6 +227,8 @@ class StationValidator(BaseModel):
 
 class TaskValidator(BaseModel):
     """Validator for task entity data."""
+
+    model_config = ConfigDict(extra="forbid")
 
     id: str | None = None
     station_id: int
@@ -269,6 +285,9 @@ class TaskValidator(BaseModel):
 class ScenarioGlobals(BaseModel):
     """Validator for scenario start and end times."""
 
+    model_config = ConfigDict(extra="ignore")
+
+    version: Optional[int] = 1
     start_time: str
     end_time: str
     vehicle_battery_capacity: int
@@ -490,14 +509,6 @@ class _ScenarioValidator:
         """
         errors: List[Dict[str, Any]] = []
 
-        # Validate start_time and end_time exist and are properly formatted
-        required_fields = ["start_time", "end_time", "vehicle_battery_capacity"]
-        for error in self.check_required_fields(content, required_fields):
-            line_num = self._get_line_number(error["field"])
-            if line_num:
-                error["line"] = line_num
-            errors.append(error)
-
         # Validate time format and constraints
         try:
             ScenarioGlobals(**content)
@@ -527,17 +538,6 @@ class _ScenarioValidator:
         errors: List[Dict[str, Any]] = []
 
         for idx, s in enumerate(stations):
-            for error in self.check_required_fields(
-                s,
-                ["name", "position", "scheduled_tasks"],
-            ):
-                field_path = f"stations[{idx}].{error['field']}"
-                line_num = self._get_line_number(field_path)
-                if line_num:
-                    error["line"] = line_num
-                error["field"] = field_path
-                errors.append(error)
-
             try:
                 StationValidator(**s)
             except ValidationError as e:
@@ -574,14 +574,6 @@ class _ScenarioValidator:
         errors: List[Dict[str, Any]] = []
 
         for idx, task in enumerate(tasks):
-            for error in self.check_required_fields(task, ["station_id"]):
-                field_path = f"{task_type}[{idx}].{error['field']}"
-                line_num = self._get_line_number(field_path)
-                if line_num:
-                    error["line"] = line_num
-                error["field"] = field_path
-                errors.append(error)
-
             try:
                 validated: TaskValidator = TaskValidator(**task)
 
@@ -621,15 +613,6 @@ class _ScenarioValidator:
         errors: List[Dict[str, Any]] = []
 
         for idx, v in enumerate(vehicles):
-            # Required fields for vehicles and ID tracking
-            for error in self.check_required_fields(v, ["name"]):
-                field_path = f"vehicles[{idx}].{error['field']}"
-                line_num = self._get_line_number(field_path)
-                if line_num:
-                    error["line"] = line_num
-                error["field"] = field_path
-                errors.append(error)
-
             # Schema validation via Pydantic
             try:
                 VehicleValidator(**v)
@@ -665,14 +648,6 @@ class _ScenarioValidator:
         valid_vehicle_ids = valid_vehicle_ids or set()
 
         for idx, d in enumerate(drivers):
-            # Required fields for drivers and ID tracking
-            for error in self.check_required_fields(d, ["name", "shift"]):
-                field_path = f"drivers[{idx}].{error['field']}"
-                line_num = self._get_line_number(field_path)
-                if line_num:
-                    error["line"] = line_num
-                error["field"] = field_path
-                errors.append(error)
             # Schema validation via Pydantic (name + shift)
             try:
                 DriverValidator(**d)
@@ -752,6 +727,80 @@ class _ScenarioValidator:
 
         return errors
 
+    def validate_logical_constraints(
+        self, content: Dict[str, Any]
+    ) -> List[Dict[str, Any]]:
+        """Validate logical constraints for Release 2.
+
+        Constraints:
+        1. At least 1 station, 1 vehicle, 1 driver
+        2. At least 1 task (initial_task_count or scheduled_tasks)
+        3. No vehicle battery_count > vehicle_battery_capacity
+
+        Args:
+            content: Scenario content dictionary to validate.
+
+        Returns:
+            List of error dictionaries for constraint violations.
+        """
+        errors: List[Dict[str, Any]] = []
+
+        stations: List[Dict[str, Any]] = content.get("stations", [])
+        vehicles: List[Dict[str, Any]] = content.get("vehicles", [])
+        drivers: List[Dict[str, Any]] = content.get("drivers", [])
+        vehicle_battery_capacity = content.get("vehicle_battery_capacity", 0)
+
+        # Constraint 1: At least 1 of each entity
+        if len(stations) == 0:
+            errors.append(
+                {"field": "stations", "message": "At least 1 station is required"}
+            )
+
+        if len(vehicles) == 0:
+            errors.append(
+                {"field": "vehicles", "message": "At least 1 vehicle is required"}
+            )
+
+        if len(drivers) == 0:
+            errors.append(
+                {"field": "drivers", "message": "At least 1 driver is required"}
+            )
+
+        # Constraint 2: At least 1 task
+        total_tasks = sum(
+            s.get("initial_task_count", 0) + len(s.get("scheduled_tasks", []))
+            for s in stations
+        )
+        if total_tasks == 0:
+            errors.append(
+                {
+                    "field": "stations",
+                    "message": (
+                        "At least 1 task is required "
+                        "(via initial_task_count or scheduled_tasks)"
+                    ),
+                }
+            )
+
+        # Constraint 3: Vehicle battery_count <= vehicle_battery_capacity
+        for idx, vehicle in enumerate(vehicles):
+            battery_count = vehicle.get("battery_count", 0)
+            if battery_count > vehicle_battery_capacity:
+                field_path = f"vehicles[{idx}].battery_count"
+                error_dict: Dict[str, Any] = {
+                    "field": field_path,
+                    "message": (
+                        f"battery_count ({battery_count}) cannot exceed "
+                        f"vehicle_battery_capacity ({vehicle_battery_capacity})"
+                    ),
+                }
+                line_num = self._get_line_number(field_path)
+                if line_num:
+                    error_dict["line"] = line_num
+                errors.append(error_dict)
+
+        return errors
+
     def validate_all(self, scenario_content: Dict[str, Any]) -> List[Dict[str, Any]]:
         """Validate all aspects of scenario content.
 
@@ -772,6 +821,7 @@ class _ScenarioValidator:
         errors.extend(self.validate_vehicles(vehicles))
 
         errors.extend(self.validate_simulation_params(scenario_content))
+        errors.extend(self.validate_logical_constraints(scenario_content))
         return errors
 
 

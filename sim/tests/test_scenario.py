@@ -90,7 +90,6 @@ def test_default_initialization() -> None:
     """Ensure Scenario initializes with empty lists when no arguments are passed."""
     scenario = Scenario()
 
-    assert scenario.scenario_title is None
     assert scenario.start_time == ""
     assert scenario.end_time == ""
     assert scenario.drivers == []
@@ -109,7 +108,6 @@ def test_custom_initialization() -> None:
     scheduled_tasks = [MockTask("refuel")]
 
     scenario = Scenario(
-        scenario_title="Morning Run",
         start_time="08:00",
         end_time="12:00",
         drivers=cast(list[Driver], drivers),
@@ -119,7 +117,6 @@ def test_custom_initialization() -> None:
         scheduled_tasks=cast(list[Task], scheduled_tasks),
     )
 
-    assert scenario.scenario_title == "Morning Run"
     assert scenario.start_time == "08:00"
     assert scenario.end_time == "12:00"
     assert scenario.drivers == drivers
@@ -142,7 +139,6 @@ def test_list_defaults_are_independent() -> None:
 def test_str_representation() -> None:
     """Ensure __str__ provides a clear and accurate summary."""
     scenario = Scenario(
-        scenario_title="Evening Shift",
         start_time="18:00",
         end_time="22:00",
         drivers=cast(list[Driver], [MockDriver("alice")]),
@@ -155,7 +151,6 @@ def test_str_representation() -> None:
     result = str(scenario)
 
     assert "ScenarioConfig(" in result
-    assert "title='Evening Shift'" in result
     assert "drivers=1" in result
     assert "vehicles=1" in result
     assert "stations=1" in result
