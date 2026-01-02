@@ -543,7 +543,7 @@ describe('ScenarioEditor', () => {
 
     await waitFor(() => {
       expect(mockDisplayError).toHaveBeenCalledWith(
-        'Scenario validation failed',
+        'Initialization Failed',
         expect.stringContaining('[start_time]')
       );
     });
@@ -554,9 +554,9 @@ describe('ScenarioEditor', () => {
     expect(mockNavigate).not.toHaveBeenCalled();
   });
 
-  it('falls back to detail.message when initialize fails', async () => {
+  it('falls back to detail string when initialize fails', async () => {
     vi.mocked(api.post).mockRejectedValueOnce({
-      response: { data: { detail: { message: 'custom failure' } } },
+      response: { data: { detail: 'custom failure' } },
     });
 
     render(

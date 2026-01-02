@@ -66,6 +66,7 @@ export default function ScenarioEditor() {
     saveScenario,
     overwriteScenario,
     deleteScenario,
+    formatBackendError,
   } = useScenarioOperations();
 
   /**
@@ -200,6 +201,7 @@ export default function ScenarioEditor() {
         return;
       }
 
+      // Parse JSON locally (basic check)
       let parsedContent;
       try {
         parsedContent = JSON.parse(scenarioContent);
@@ -220,69 +222,7 @@ export default function ScenarioEditor() {
       navigate(`/simulation/${response.data.sim_id}`);
     } catch (error: unknown) {
       console.error('Error starting simulation:', error);
-
-      if (
-        typeof error === 'object' &&
-        error !== null &&
-        'response' in error &&
-        typeof error.response === 'object' &&
-        error.response !== null &&
-        'data' in error.response &&
-        typeof error.response.data === 'object' &&
-        error.response.data !== null &&
-        'detail' in error.response.data &&
-        typeof error.response.data.detail === 'object' &&
-        error.response.data.detail !== null &&
-        'errors' in error.response.data.detail &&
-        Array.isArray(error.response.data.detail.errors)
-      ) {
-        const errors = error.response.data.detail.errors;
-
-        displayError(
-          'Scenario validation failed',
-          errors
-            .map((e: { field?: string; message: string; line?: number }) => {
-              const fieldInfo = e.field ? `[${e.field}]: ` : '';
-              const lineInfo = e.line ? ` (line ${e.line})` : '';
-              return `• ${fieldInfo}${e.message}${lineInfo}`;
-            })
-            .join('\n')
-        );
-      } else {
-        let errorMessage = 'Failed to initialize simulation. Please try again.';
-
-        if (
-          typeof error === 'object' &&
-          error !== null &&
-          'response' in error &&
-          typeof error.response === 'object' &&
-          error.response !== null &&
-          'data' in error.response &&
-          typeof error.response.data === 'object' &&
-          error.response.data !== null &&
-          'detail' in error.response.data
-        ) {
-          const detail = error.response.data.detail;
-          if (
-            typeof detail === 'object' &&
-            detail !== null &&
-            'message' in detail
-          ) {
-            errorMessage = String(detail.message);
-          } else if (typeof detail === 'string') {
-            errorMessage = detail;
-          }
-        } else if (
-          typeof error === 'object' &&
-          error !== null &&
-          'message' in error &&
-          typeof error.message === 'string'
-        ) {
-          errorMessage = error.message;
-        }
-
-        displayError('Initialization Failed', errorMessage);
-      }
+      displayError('Initialization Failed', formatBackendError(error));
     }
   };
 
