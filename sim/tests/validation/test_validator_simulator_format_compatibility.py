@@ -58,14 +58,14 @@ def simulator_format_scenario() -> Dict[str, Any]:
             },
             {
                 "name": "Station B",
-                "position": [-74.0, 40.7],
+                "position": [-73.58, 45.48],
                 "initial_task_count": 2,
                 "scheduled_tasks": ["day1:08:30"],
             },
         ],
         "vehicles": [
             {"name": "Vehicle 1", "position": [-73.5, 45.5], "battery_count": 3},
-            {"name": "Vehicle 2", "position": [-74.0, 40.7], "battery_count": 2},
+            {"name": "Vehicle 2", "position": [-73.58, 45.48], "battery_count": 2},
         ],
         "drivers": [
             {
@@ -96,7 +96,7 @@ def test_simulator_format_compatibility(
     simulator_format_scenario["stations"].append(
         {
             "name": "Station C",
-            "position": [45.5, -73.5],
+            "position": [-73.5, 45.5],
             "initial_task_count": 1,
             "scheduled_tasks": [],
         }

@@ -117,6 +117,84 @@ def test_invalid_lat_lon(validator: ScenarioValidator) -> None:
     assert any("vehicles[0].position" in e.get("field", "") for e in errors)
 
 
+def test_coordinates_outside_montreal_bounds(validator: ScenarioValidator) -> None:
+    """Test that coordinates outside Greater Montreal Area bounds are rejected."""
+    scenario_content: Dict[str, Any] = copy.deepcopy(VALID_SCENARIO_CONTENT)
+
+    # Test latitude too high (north of Greater Montreal Area bounds)
+    scenario_content["stations"][0]["position"] = [-73.5, 46.0]
+    errors = validator.validate_all(scenario_content)
+    assert any(
+        "stations[0].position" in e.get("field", "")
+        and "Montreal" in e.get("message", "")
+        for e in errors
+    )
+
+    # Test latitude too low (south of Greater Montreal Area bounds)
+    scenario_content = copy.deepcopy(VALID_SCENARIO_CONTENT)
+    scenario_content["vehicles"][0]["position"] = [-73.5, 45.0]
+    errors = validator.validate_all(scenario_content)
+    assert any(
+        "vehicles[0].position" in e.get("field", "")
+        and "Montreal" in e.get("message", "")
+        for e in errors
+    )
+
+    # Test longitude too far west (outside Greater Montreal Area bounds)
+    scenario_content = copy.deepcopy(VALID_SCENARIO_CONTENT)
+    scenario_content["stations"][0]["position"] = [-75.0, 45.5]
+    errors = validator.validate_all(scenario_content)
+    assert any(
+        "stations[0].position" in e.get("field", "")
+        and "Montreal" in e.get("message", "")
+        for e in errors
+    )
+
+    # Test longitude too far east (outside Greater Montreal Area bounds)
+    scenario_content = copy.deepcopy(VALID_SCENARIO_CONTENT)
+    scenario_content["vehicles"][0]["position"] = [-73.0, 45.5]
+    errors = validator.validate_all(scenario_content)
+    assert any(
+        "vehicles[0].position" in e.get("field", "")
+        and "Montreal" in e.get("message", "")
+        for e in errors
+    )
+
+
+def test_coordinates_within_montreal_bounds(validator: ScenarioValidator) -> None:
+    """Test that coordinates within Greater Montreal Area bounds are accepted."""
+    scenario_content: Dict[str, Any] = copy.deepcopy(VALID_SCENARIO_CONTENT)
+
+    # Test coordinates at the edges of the bounds
+    scenario_content["stations"] = [
+        {
+            "name": "Northwest Station",
+            "position": [-74.26, 45.86],  # Northwest corner
+            "initial_task_count": 0,
+            "scheduled_tasks": [],
+        },
+        {
+            "name": "Southeast Station",
+            "position": [-73.22, 45.24],  # Southeast corner
+            "initial_task_count": 0,
+            "scheduled_tasks": [],
+        },
+        {
+            "name": "Center Station",
+            "position": [-73.5, 45.5],  # Center of Montreal
+            "initial_task_count": 0,
+            "scheduled_tasks": [],
+        },
+    ]
+
+    errors = validator.validate_all(scenario_content)
+    # Should have no errors related to position bounds
+    assert not any(
+        "position" in e.get("field", "") and "Montreal" in e.get("message", "")
+        for e in errors
+    )
+
+
 def test_scheduled_tasks_time_accepts_string(validator: ScenarioValidator) -> None:
     scenario_content: Dict[str, Any] = copy.deepcopy(VALID_SCENARIO_CONTENT)
     scenario_content["stations"][0]["scheduled_tasks"] = ["day1:08:30"]
