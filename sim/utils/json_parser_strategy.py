@@ -43,12 +43,12 @@ from sim.utils.base_parse_strategy import BaseParseStrategy
 DEFAULT_VEHICLE_POSITION: List[float] = [-73.57314, 45.50137]
 
 # Greater Montreal Area coordinate bounds for scenario validation.
-# All coordinates should respect these bounds, given the project scope.
+# All coordinates should respect these boundaries, given the project scope.
 GREATER_MONTREAL_COORDINATES: Dict[str, float] = {
-    "lat_min": 45.24000,  # Northwest corner
-    "lat_max": 45.86000,  # Southeast corner
-    "lon_min": -74.26000,  # Northwest corner
-    "lon_max": -73.22000,  # Southeast corner
+    "lat_min": 45.24000,  # Southern Boundary
+    "lat_max": 45.86000,  # Northern Boundary
+    "lon_min": -74.26000,  # Western Boundary
+    "lon_max": -73.22000,  # Eastern Boundary
 }
 
 
