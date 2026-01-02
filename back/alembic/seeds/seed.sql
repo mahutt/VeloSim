@@ -7,7 +7,6 @@ SET client_encoding = 'UTF8';
 -- Clear existing data (if any)
 TRUNCATE TABLE users RESTART IDENTITY CASCADE;
 
--- Insert initial station data (10 real Montreal users)
 -- Seed data for users table
 INSERT INTO users (username, password_hash, is_admin, date_created, date_updated) VALUES
 ('admin', '$argon2id$v=19$m=65536,t=3,p=4$TTVHTUpLZ0xaSUl4czlCdw$rOCKPpchPyYQcY1fHtsQyQ', true, '2025-01-01 00:00:00', '2025-01-01 00:00:00');
@@ -56,91 +55,6 @@ FROM sim_instances;
 \echo 'Simulation instance seed data loaded successfully!'
 \echo 'Total simulation instances inserted:'
 SELECT COUNT(*) FROM sim_instances;
-
-
--- VeloSim Station Seed Data
--- Contains initial station data for the VeloSim bike sharing system
--- Data sourced from Montreal GBFS feed: https://gbfs.velobixi.com/gbfs/2-2/en/station_information.json
-
--- Clear existing data (if any)
-TRUNCATE TABLE stations RESTART IDENTITY CASCADE;
-
--- Insert initial station data (10 real Montreal stations)
-INSERT INTO stations (name, latitude, longitude, sim_instance_id) VALUES
-    ('Metcalfe / de Maisonneuve', 45.50137, -73.57314, 1),
-    ('Sanguinet / de Maisonneuve', 45.51344, -73.56261, 1),
-    ('St-Denis / Ste-Catherine', 45.51007, -73.56391, 1),
-    ('St-André / Ontario', 45.52188, -73.56353, 1),
-    ('St-André / de Maisonneuve', 45.51708, -73.55974, 1),
-    ('de la Commune / des Soeurs-Grises', 45.49798, -73.55273, 1),
-    ('Notre-Dame / St-Gabriel', 45.50711, -73.55504, 1),
-    ('de la Commune / Place Jacques-Cartier', 45.50761, -73.55183, 1),
-    ('de Maisonneuve / Mansfield (sud)', 45.50205, -73.57346, 1),
-    ('Métro Place-d''Armes (St-Urbain / Viger)', 45.50632, -73.55969, 1);
-
--- Verify the data was inserted
-SELECT
-    id,
-    name,
-    latitude,
-    longitude,
-    sim_instance_id
-FROM stations
-ORDER BY id;
-
--- Display summary
-SELECT
-    COUNT(*) as total_stations
-FROM stations;
-
-\echo 'Station seed data loaded successfully!'
-\echo 'Total stations inserted:'
-SELECT COUNT(*) FROM stations;
-
-
--- VeloSim Station Task Seed Data
--- Contains initial station task data for the VeloSim bike sharing system
--- Tasks represent maintenance and operational work needed at stations
-
--- Clear existing data (if any)
-TRUNCATE TABLE station_tasks RESTART IDENTITY CASCADE;
-
--- Insert initial station task data (one task for each status)
-INSERT INTO station_tasks (type, status, date_created, date_updated, station_id, sim_instance_id) VALUES
-    ('BATTERY_SWAP', 'OPEN', '2025-10-01 09:00:00', '2025-10-01 09:00:00', 1, 1),
-    ('BATTERY_SWAP', 'ASSIGNED', '2025-10-01 11:15:00', '2025-10-01 11:15:00', 2, 1),
-    ('BATTERY_SWAP', 'IN_PROGRESS', '2025-10-01 14:20:00', '2025-10-01 14:20:00', 3, 1),
-    ('BATTERY_SWAP', 'CLOSED', '2025-10-01 08:00:00', '2025-10-01 16:45:00', 4, 1);
-
--- Verify the data was inserted
-SELECT
-    id,
-    type,
-    status,
-    station_id,
-    date_created,
-    date_updated,
-    sim_instance_id
-FROM station_tasks
-ORDER BY id;
-
--- Display summary
-SELECT
-    COUNT(*) as total_tasks
-FROM station_tasks;
-
-SELECT
-    status,
-    COUNT(*) as count
-FROM station_tasks
-GROUP BY status
-ORDER BY status;
-
-\echo 'Station task seed data loaded successfully!'
-\echo 'Total tasks inserted:'
-SELECT COUNT(*) FROM station_tasks;
-\echo 'Tasks by status:'
-SELECT status, COUNT(*) FROM station_tasks GROUP BY status ORDER BY status;
 
 
 -- VeloSim Scenario Seed Data
