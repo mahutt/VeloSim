@@ -503,7 +503,7 @@ class TestScenarioValidation:
                         "name": "Station 1",
                         "initial_task_count": 2,
                         "scheduled_tasks": ["day1:09:30"],
-                        "position": [45.5, -73.5],
+                        "position": [-73.5, 45.5],
                     }
                 ],
                 "drivers": [
@@ -629,7 +629,7 @@ class TestValidateScenario:
                         "name": "Station 1",
                         "initial_task_count": 2,
                         "scheduled_tasks": ["day1:09:30"],
-                        "position": [45.5, -73.5],
+                        "position": [-73.5, 45.5],
                     }
                 ],
                 "drivers": [

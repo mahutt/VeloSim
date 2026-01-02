@@ -23,13 +23,10 @@ SOFTWARE.
 """
 
 from fastapi import APIRouter
-from .stations import router as stations_router
-from .station_tasks import router as station_tasks_router
 from .simulation import router as simulation_router
 from .users import router as users_router
 from .logs import router as logs_router
 from .scenarios import router as scenarios_router
-from back.core.config import settings
 from .metrics import router as metrics_router
 
 # Create the main v1 API router
@@ -41,9 +38,5 @@ api_router.include_router(users_router)
 api_router.include_router(logs_router)
 api_router.include_router(scenarios_router)
 api_router.include_router(metrics_router)
-if settings.FEATURE_STATIONS_API_ROUTER:
-    api_router.include_router(stations_router)
-if settings.FEATURE_STATION_TASKS_API_ROUTER:
-    api_router.include_router(station_tasks_router)
 
 __all__ = ["api_router"]
