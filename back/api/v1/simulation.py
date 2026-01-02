@@ -32,6 +32,7 @@ from fastapi import (
     WebSocket,
     Depends,
     Query,
+    Request,
     status,
 )
 from back.api.v1.utils import (
@@ -77,13 +78,22 @@ from back.schemas.sim_instance import (
 from back.services import simulation_service
 from back.database.session import get_db
 from sim.utils.json_parser_strategy import JsonParseStrategy, ScenarioParseError
+from pydantic import BaseModel
+from typing import Any
 
 router = APIRouter(prefix="/simulation", tags=["simulation"])
 
 
+class InitializeRequest(BaseModel):
+    """Request schema for initializing simulation with scenario content."""
+
+    content: Dict[str, Any]
+
+
 @router.post("/initialize", response_model=SimulationResponse)
-def initialize_simulation(
-    scenario: dict | None = Body(None),
+async def initialize_simulation(
+    request: Request,
+    initialize_request: InitializeRequest | None = Body(None),
     scenario_id: int | None = Query(None),
     db: Session = Depends(get_db),
     requesting_user: int = Depends(get_user_id),
@@ -91,10 +101,10 @@ def initialize_simulation(
     """Initialize a new simulation and return a confirmation response.
 
     Args:
-        scenario: Scenario content dictionary (mutually exclusive with
-            scenario_id)
-        scenario_id: ID of scenario to load from database (mutually
-            exclusive with scenario)
+        initialize_request: Request containing scenario content
+            (mutually exclusive with scenario_id)
+        scenario_id: ID of scenario to load from database
+            (mutually exclusive with initialize_request)
         db: Database session dependency
         requesting_user: ID of the authenticated user
 
@@ -102,23 +112,35 @@ def initialize_simulation(
         SimulationResponse containing the initialized simulation details
     """
     start_time = time.perf_counter()  # Start timer for total startup metric
-    if (scenario is None and scenario_id is None) or (
-        scenario is not None and scenario_id is not None
+    if (initialize_request is None and scenario_id is None) or (
+        initialize_request is not None and scenario_id is not None
     ):
         raise HTTPException(
             status_code=400,
-            detail="Must provide 'scenario' or 'scenario_id', but not both.",
+            detail="Must provide 'scenario content' or 'scenario_id', but not both.",
         )
 
     try:
         # if a scenario_id was provided then load the scenario the from the DB
-        if scenario is None:
+        scenario = None
+        json_string = None
+
+        if initialize_request is not None:
+            scenario = initialize_request.content
+            # Extract raw JSON string for line number tracking
+            # Re-format the content with indentation to match user's editor view
+            try:
+                import json
+
+                json_string = json.dumps(scenario, indent=2)
+            except Exception:
+                json_string = None
+        else:
             db_scenario = db.query(Scenario).filter(Scenario.id == scenario_id).first()
             scenario = db_scenario.content  # type: ignore[union-attr]
 
-        # Parse scenario into InputParameter
-
-        json_parser = JsonParseStrategy(scenario_json=scenario)
+        # Parse scenario into InputParameter with line tracking
+        json_parser = JsonParseStrategy(scenario_json=scenario, json_string=json_string)
         scenario_params = json_parser.parse()
 
         # Initialize simulation
@@ -135,7 +157,15 @@ def initialize_simulation(
         return result
 
     except ScenarioParseError as err:
-        raise HTTPException(status_code=400, detail=str(err))
+        # Return structured validation errors instead of concatenated string
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "valid": False,
+                "errors": err.errors,
+                "message": "Scenario validation failed",
+            },
+        )
     except VelosimPermissionError as err:
         raise HTTPException(status_code=403, detail=str(err))
     except ItemNotFoundError as ve:

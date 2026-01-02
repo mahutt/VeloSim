@@ -200,39 +200,89 @@ export default function ScenarioEditor() {
         return;
       }
 
-      // Parse the scenario content
-      let content;
+      let parsedContent;
       try {
-        content = JSON.parse(scenarioContent);
+        parsedContent = JSON.parse(scenarioContent);
       } catch {
-        displayError(
-          'Invalid Scenario',
-          'The scenario content is not valid JSON. Please fix it before starting.'
-        );
+        displayError('Invalid Scenario', 'Invalid JSON format');
         return;
       }
 
-      // Wrap scenario content in the expected format
-      const scenarioData = {
-        id: selectedScenarioId || 0, // Use 0 for unsaved scenarios
-        name: scenarioName || 'Untitled Scenario',
-        content: content,
+      const requestBody = {
+        content: parsedContent,
       };
 
-      // Call backend API to initialize simulation with scenario data
       const response = await api.post<InitializeSimulationResponse>(
         '/simulation/initialize',
-        scenarioData
+        requestBody
       );
 
-      // Navigate to simulation page with sim_id from response
       navigate(`/simulation/${response.data.sim_id}`);
-    } catch (error) {
+    } catch (error: unknown) {
       console.error('Error starting simulation:', error);
-      displayError(
-        'Initialization Failed',
-        'Failed to initialize simulation. Please try again.'
-      );
+
+      if (
+        typeof error === 'object' &&
+        error !== null &&
+        'response' in error &&
+        typeof error.response === 'object' &&
+        error.response !== null &&
+        'data' in error.response &&
+        typeof error.response.data === 'object' &&
+        error.response.data !== null &&
+        'detail' in error.response.data &&
+        typeof error.response.data.detail === 'object' &&
+        error.response.data.detail !== null &&
+        'errors' in error.response.data.detail &&
+        Array.isArray(error.response.data.detail.errors)
+      ) {
+        const errors = error.response.data.detail.errors;
+
+        displayError(
+          'Scenario validation failed',
+          errors
+            .map((e: { field?: string; message: string; line?: number }) => {
+              const fieldInfo = e.field ? `[${e.field}]: ` : '';
+              const lineInfo = e.line ? ` (line ${e.line})` : '';
+              return `• ${fieldInfo}${e.message}${lineInfo}`;
+            })
+            .join('\n')
+        );
+      } else {
+        let errorMessage = 'Failed to initialize simulation. Please try again.';
+
+        if (
+          typeof error === 'object' &&
+          error !== null &&
+          'response' in error &&
+          typeof error.response === 'object' &&
+          error.response !== null &&
+          'data' in error.response &&
+          typeof error.response.data === 'object' &&
+          error.response.data !== null &&
+          'detail' in error.response.data
+        ) {
+          const detail = error.response.data.detail;
+          if (
+            typeof detail === 'object' &&
+            detail !== null &&
+            'message' in detail
+          ) {
+            errorMessage = String(detail.message);
+          } else if (typeof detail === 'string') {
+            errorMessage = detail;
+          }
+        } else if (
+          typeof error === 'object' &&
+          error !== null &&
+          'message' in error &&
+          typeof error.message === 'string'
+        ) {
+          errorMessage = error.message;
+        }
+
+        displayError('Initialization Failed', errorMessage);
+      }
     }
   };
 

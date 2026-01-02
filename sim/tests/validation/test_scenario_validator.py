@@ -358,3 +358,52 @@ def test_array_elements_have_distinct_line_numbers() -> None:
     assert (
         len(set(line_numbers)) >= 2
     ), f"Expected distinct line numbers, got: {line_numbers}"
+
+
+def _validator_for_params(params: Dict[str, Any]) -> ScenarioValidator:
+    """Helper to construct validator with JSON string for line reporting."""
+    return ScenarioValidator(json_string=json.dumps(params, indent=2))
+
+
+def test_validate_simulation_params_end_before_start_same_day() -> None:
+    params = {
+        "start_time": "day1:12:00",
+        "end_time": "day1:06:00",
+    }
+    validator = _validator_for_params(params)
+
+    errors = validator.validate_simulation_params(params)
+
+    assert len(errors) == 1
+    err = errors[0]
+    assert err["field"] == "end_time"
+    assert err["message"] == "end_time must be after start_time"
+    assert "line" in err and isinstance(err["line"], int)
+
+
+def test_validate_simulation_params_end_before_start_previous_day() -> None:
+    params = {
+        "start_time": "day2:01:00",
+        "end_time": "day1:23:00",
+    }
+    validator = _validator_for_params(params)
+
+    errors = validator.validate_simulation_params(params)
+
+    assert len(errors) == 1
+    err = errors[0]
+    assert err["field"] == "end_time"
+    assert err["message"] == "end_time must be after start_time"
+
+
+def test_validate_simulation_params_value_error_safeguard() -> None:
+    # Invalid time formats should be ignored here and handled by syntax validation
+    params = {
+        "start_time": "day1:bad",
+        "end_time": "day1:also-bad",
+    }
+    validator = _validator_for_params(params)
+
+    errors = validator.validate_simulation_params(params)
+
+    assert errors == []

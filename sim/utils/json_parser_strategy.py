@@ -23,7 +23,7 @@ SOFTWARE.
 """
 
 from datetime import datetime
-from typing import Dict, List, Any, Set, Optional, cast
+from typing import Dict, List, Any, Set, Optional
 import re
 from pydantic import BaseModel, ValidationError, model_validator, field_validator
 
@@ -695,7 +695,7 @@ class _ScenarioValidator:
     ) -> List[Dict[str, Any]]:
         """Validate simulation time parameters.
 
-        Ensures start_time and end_time are valid and that end_time is after start_time.
+        Ensures end_time is after start_time (assumes format is already validated).
 
         Args:
             params: Dictionary containing simulation parameters with
@@ -708,21 +708,21 @@ class _ScenarioValidator:
         start_val: Any = params.get("start_time")
         end_val: Any = params.get("end_time")
 
-        if start_val is not None and end_val is not None:
+        # Only check logical constraint if both values are present and valid strings
+        if (
+            start_val is not None
+            and end_val is not None
+            and isinstance(start_val, str)
+            and isinstance(end_val, str)
+            and ":" in start_val
+            and ":" in end_val
+        ):
             try:
-                # Parse times using ScenarioGlobals validator
-                capacity: int = cast(int, params.get("vehicle_battery_capacity"))
-                scenario_times = ScenarioGlobals(
-                    start_time=start_val,
-                    end_time=end_val,
-                    vehicle_battery_capacity=capacity,
-                )
-
-                # Validate that end_time is after start_time
-                start_daytime = scenario_times.start_time.split(":", 1)
+                # Parse times (format already validated by validate_syntax)
+                start_daytime = start_val.split(":", 1)
                 start_day = start_daytime[0]
                 start_time = start_daytime[1]
-                end_daytime = scenario_times.end_time.split(":", 1)
+                end_daytime = end_val.split(":", 1)
                 end_day = end_daytime[0]
                 end_time = end_daytime[1]
                 error = False
@@ -746,17 +746,9 @@ class _ScenarioValidator:
                     if line_num:
                         time_error["line"] = line_num
                     errors.append(time_error)
-            except ValidationError as e:
-                for err in e.errors():
-                    field_path = ".".join(map(str, err["loc"]))
-                    val_error: Dict[str, Any] = {
-                        "field": field_path,
-                        "message": err["msg"],
-                    }
-                    line_num = self._get_line_number(field_path)
-                    if line_num:
-                        val_error["line"] = line_num
-                    errors.append(val_error)
+            except (ValueError, IndexError):
+                # If parsing fails, format validation will catch it in validate_syntax
+                pass
 
         return errors
 

@@ -507,6 +507,115 @@ describe('ScenarioEditor', () => {
     );
   });
 
+  it('shows structured validation errors from initialize', async () => {
+    vi.mocked(api.post).mockRejectedValueOnce({
+      response: {
+        data: {
+          detail: {
+            errors: [
+              { field: 'start_time', message: 'is required', line: 5 },
+              { message: 'generic issue' },
+            ],
+          },
+        },
+      },
+    });
+
+    render(
+      <BrowserRouter>
+        <ScenarioEditor />
+      </BrowserRouter>
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText('Start Simulation')).toBeInTheDocument();
+    });
+
+    // Valid JSON to reach API call
+    const textarea = screen.getByPlaceholderText(
+      'Paste or type your JSON scenario here...'
+    );
+    fireEvent.change(textarea, {
+      target: { value: '{"resources": [], "stations": []}' },
+    });
+
+    fireEvent.click(screen.getByText('Start Simulation'));
+
+    await waitFor(() => {
+      expect(mockDisplayError).toHaveBeenCalledWith(
+        'Scenario validation failed',
+        expect.stringContaining('[start_time]')
+      );
+    });
+
+    const message = mockDisplayError.mock.calls.at(-1)?.[1] as string;
+    expect(message).toContain('is required');
+    expect(message).toContain('line 5');
+    expect(mockNavigate).not.toHaveBeenCalled();
+  });
+
+  it('falls back to detail.message when initialize fails', async () => {
+    vi.mocked(api.post).mockRejectedValueOnce({
+      response: { data: { detail: { message: 'custom failure' } } },
+    });
+
+    render(
+      <BrowserRouter>
+        <ScenarioEditor />
+      </BrowserRouter>
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText('Start Simulation')).toBeInTheDocument();
+    });
+
+    const textarea = screen.getByPlaceholderText(
+      'Paste or type your JSON scenario here...'
+    );
+    fireEvent.change(textarea, {
+      target: { value: '{"resources": [], "stations": []}' },
+    });
+
+    fireEvent.click(screen.getByText('Start Simulation'));
+
+    await waitFor(() => {
+      expect(mockDisplayError).toHaveBeenCalledWith(
+        'Initialization Failed',
+        'custom failure'
+      );
+    });
+  });
+
+  it('falls back to error.message when initialize throws generic error', async () => {
+    vi.mocked(api.post).mockRejectedValueOnce(new Error('boom'));
+
+    render(
+      <BrowserRouter>
+        <ScenarioEditor />
+      </BrowserRouter>
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText('Start Simulation')).toBeInTheDocument();
+    });
+
+    const textarea = screen.getByPlaceholderText(
+      'Paste or type your JSON scenario here...'
+    );
+    fireEvent.change(textarea, {
+      target: { value: '{"resources": [], "stations": []}' },
+    });
+
+    fireEvent.click(screen.getByText('Start Simulation'));
+
+    await waitFor(() => {
+      expect(mockDisplayError).toHaveBeenCalledWith(
+        'Initialization Failed',
+        'boom'
+      );
+    });
+  });
+
   it('loads scenario content from backend when selected', async () => {
     const testScenario = {
       id: 3,
