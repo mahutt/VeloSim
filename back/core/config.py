@@ -161,10 +161,6 @@ class Settings(BaseSettings):
     KEYFRAME_DRAIN_TIMEOUT: float = float(os.getenv("KEYFRAME_DRAIN_TIMEOUT", "5.0"))
 
     # Feature flags
-    FEATURE_STATIONS_API_ROUTER: bool = env_flag("FEATURE_STATIONS_API_ROUTER")
-    FEATURE_STATION_TASKS_API_ROUTER: bool = env_flag(
-        "FEATURE_STATION_TASKS_API_ROUTER"
-    )
     FEATURE_RESOURCES_API_ROUTER: bool = env_flag("FEATURE_RESOURCES_API_ROUTER")
 
     model_config = SettingsConfigDict(case_sensitive=True)
