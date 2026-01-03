@@ -32,6 +32,7 @@ import { useNavigate } from 'react-router';
 import api from '~/api';
 import { TOKEN_STORAGE_KEY } from '~/constants';
 import type { User } from '~/types';
+import { log, LogLevel } from '~/lib/logger';
 
 export interface AuthState {
   user: User | null;
@@ -98,7 +99,12 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     }
   }, []);
 
-  const logout = () => {
+  const logout = async () => {
+    await log({
+      message: 'User logged out',
+      level: LogLevel.INFO,
+      context: 'user_logout',
+    });
     sessionStorage.removeItem(TOKEN_STORAGE_KEY);
     removeAuthCookie();
     setUser(null);

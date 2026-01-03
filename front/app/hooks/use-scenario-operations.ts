@@ -214,6 +214,7 @@ export function useScenarioOperations() {
     log({
       message: 'Scenario exported',
       level: LogLevel.INFO,
+      context: 'scenario_export',
     });
     downloadJSON(contentToExport, scenarioName);
     return true;

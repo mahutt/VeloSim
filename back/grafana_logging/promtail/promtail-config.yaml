@@ -41,12 +41,16 @@ scrape_configs:
           expressions:
             source: source
             user_id: user_id
+            context: context
             entity_type: entityType
             error_type: errorType
           source: json_data
       - labels:
+          logger:
           source:
           level:
+          context:
+          user_id:
     static_configs:
       - targets:
           - localhost

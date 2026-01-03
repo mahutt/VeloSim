@@ -66,6 +66,17 @@ vi.mock('~/hooks/use-error', () => ({
   default: () => ({ displayError: mockDisplayError }),
 }));
 
+// Mock the logger module
+vi.mock('~/lib/logger', () => ({
+  log: vi.fn(),
+  LogLevel: {
+    DEBUG: 'debug',
+    INFO: 'info',
+    WARNING: 'warning',
+    ERROR: 'error',
+  },
+}));
+
 const mockScenarios = [
   {
     id: 1,
@@ -698,6 +709,12 @@ describe('ScenarioEditor', () => {
 
     const saveButton = screen.getByText('Save');
     fireEvent.click(saveButton);
+
+    await waitFor(() => {
+      expect(toast.success).toHaveBeenCalledWith(
+        'Scenario saved successfully!'
+      );
+    });
   });
 
   it('handles save scenario without returning ID', async () => {
@@ -952,6 +969,12 @@ describe('ScenarioEditor', () => {
 
     const confirmButton = screen.getByText('Continue');
     fireEvent.click(confirmButton);
+
+    await waitFor(() => {
+      expect(toast.success).toHaveBeenCalledWith(
+        'Scenario saved successfully!'
+      );
+    });
   });
 
   describe('ScenarioEditor - Delete Functionality', () => {
@@ -1413,6 +1436,13 @@ describe('ScenarioEditor', () => {
 
       // File input value should be reset
       expect(fileInput.value).toBe('');
+
+      // Wait for save to complete
+      await waitFor(() => {
+        expect(toast.success).toHaveBeenCalledWith(
+          'Scenario saved successfully!'
+        );
+      });
     });
 
     it('handles handleSelectScenario with missing optional fields', async () => {
@@ -1534,6 +1564,147 @@ describe('ScenarioEditor', () => {
       });
 
       fireEvent.click(screen.getByText('Malformed'));
+    });
+  });
+
+  describe('ScenarioEditor - Code Coverage for Logging and Sidebar Refresh', () => {
+    it('logs and refreshes sidebar when importing scenario returns ID', async () => {
+      const file = new File(
+        [JSON.stringify({ stations: [], description: 'Imported scenario' })],
+        'imported.json',
+        { type: 'application/json' }
+      );
+
+      vi.mocked(api.post)
+        .mockResolvedValueOnce({
+          data: { valid: true, errors: [], warnings: [] },
+        })
+        .mockResolvedValueOnce({
+          data: { id: 10 },
+        });
+
+      vi.mocked(api.get).mockResolvedValue({
+        data: {
+          scenarios: [
+            ...mockScenarios,
+            {
+              id: 10,
+              name: 'imported',
+              user_id: 1,
+              content: { stations: [] },
+              date_created: '2025-01-17T10:00:00Z',
+              date_updated: '2025-01-17T10:00:00Z',
+            },
+          ],
+          total: 3,
+          page: 1,
+          per_page: 10,
+          total_pages: 1,
+        },
+      });
+
+      render(
+        <BrowserRouter>
+          <ScenarioEditor />
+        </BrowserRouter>
+      );
+
+      await waitFor(() => {
+        expect(screen.getByText('Scenario Editor')).toBeInTheDocument();
+      });
+
+      const fileInput = document.querySelector(
+        'input[type="file"]'
+      ) as HTMLInputElement;
+
+      Object.defineProperty(fileInput, 'files', {
+        value: [file],
+        writable: false,
+      });
+
+      fireEvent.change(fileInput);
+
+      await waitFor(() => {
+        expect(toast.success).toHaveBeenCalledWith(
+          'Scenario saved successfully!'
+        );
+      });
+
+      // Verify sidebar refresh occurred - this covers lines 181-182
+      await waitFor(() => {
+        expect(api.get).toHaveBeenCalledWith(
+          expect.stringContaining('/scenarios')
+        );
+      });
+    });
+
+    it('refreshes sidebar when save as new returns ID', async () => {
+      render(
+        <BrowserRouter>
+          <ScenarioEditor />
+        </BrowserRouter>
+      );
+
+      await waitFor(() => {
+        expect(screen.getByText('Test Scenario 1')).toBeInTheDocument();
+      });
+
+      fireEvent.click(screen.getByText('Test Scenario 1'));
+
+      await waitFor(() => {
+        expect(screen.getByText('Edit')).toBeInTheDocument();
+      });
+
+      fireEvent.click(screen.getByText('Edit'));
+
+      const textarea = screen.getByPlaceholderText(
+        'Paste or type your JSON scenario here...'
+      );
+      fireEvent.change(textarea, {
+        target: { value: '{"stations": [{"id": "modified"}]}' },
+      });
+
+      fireEvent.click(screen.getByText('Save'));
+
+      await waitFor(() => {
+        expect(screen.getByText('Save As New')).toBeInTheDocument();
+      });
+
+      vi.mocked(api.post).mockClear();
+      vi.mocked(api.get).mockClear();
+
+      vi.mocked(api.post)
+        .mockResolvedValueOnce({
+          data: { valid: true, errors: [], warnings: [] },
+        })
+        .mockResolvedValueOnce({
+          data: { id: 15 },
+        });
+
+      vi.mocked(api.get).mockResolvedValue({
+        data: {
+          scenarios: mockScenarios,
+          total: mockScenarios.length,
+          page: 1,
+          per_page: 10,
+          total_pages: 1,
+        },
+      });
+
+      fireEvent.click(screen.getByText('Save As New'));
+
+      await waitFor(() => {
+        expect(toast.success).toHaveBeenCalledWith(
+          'Scenario saved successfully!'
+        );
+      });
+
+      // Verify sidebar refresh occurred - this covers lines 328-329
+      await waitFor(() => {
+        expect(api.get).toHaveBeenCalledWith(
+          expect.stringContaining('/scenarios')
+        );
+      });
     });
   });
 });
