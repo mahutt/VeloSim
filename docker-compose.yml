@@ -176,14 +176,22 @@ services:
   prometheus:
     image: prom/prometheus:latest
     container_name: velosim-prometheus
+    # Use host's docker group to access socket
+    # 999 is docker group on most Linux systems;
+    # On macOS/Windows with Docker Desktop, root group (0) is used
+    user: "65534:${DOCKER_GROUP_ID:-0}"  # nobody:docker or nobody:root
     ports:
       - "9090:9090"
     volumes:
       - ./back/grafana_logging/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./back/grafana_logging/prometheus/container_names.yml:/etc/prometheus/container_names.yml:ro
       - prometheus_data:/prometheus
+      # Docker socket for service discovery (required for container name resolution)
+      - /var/run/docker.sock:/var/run/docker.sock:ro
     command:
       - '--config.file=/etc/prometheus/prometheus.yml'
       - '--storage.tsdb.path=/prometheus'
+      - '--web.enable-lifecycle'
     restart: unless-stopped
     networks:
       - velosim-net
@@ -208,6 +216,9 @@ services:
       - velosim-net
 
   # --- cAdvisor (Container-level metrics: per-container resource usage) ---
+  # Note: On macOS/Windows, cAdvisor runs inside Docker Desktop's Linux VM,
+  # so some host metrics may show VM resources instead of actual host resources.
+  # Container-level metrics (CPU, memory per container) work correctly on all platforms.
   cadvisor:
     image: gcr.io/cadvisor/cadvisor:latest
     container_name: velosim-cadvisor
@@ -216,10 +227,21 @@ services:
     volumes:
       - /:/rootfs:ro
       - /var/run:/var/run:ro
+      # Mount the Docker socket - works on Linux and Docker Desktop (macOS/Windows)
+      - /var/run/docker.sock:/var/run/docker.sock:ro
       - /sys:/sys:ro
       - /var/lib/docker/:/var/lib/docker:ro
       - /dev/disk/:/dev/disk:ro
     privileged: true
+    # cAdvisor configuration for cross-platform compatibility
+    # --docker_only=true: Only show Docker containers (not system cgroups)
+    # --store_container_labels=true: Store Docker labels as metric labels
+    # --raw_cgroup_prefix_whitelist=/docker: Include Docker container cgroups
+    command:
+      - '--docker_only=true'
+      - '--store_container_labels=true'
+      - '--housekeeping_interval=10s'
+      - '--raw_cgroup_prefix_whitelist=/docker'
     restart: unless-stopped
     networks:
       - velosim-net

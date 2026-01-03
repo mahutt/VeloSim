@@ -98,22 +98,10 @@
             "uid": "prometheus"
           },
           "editorMode": "code",
-          "expr": "sum(rate(container_cpu_usage_seconds_total{name=\"velosim-backend\"}[1m])) * 100",
+          "expr": "velosim_container_cpu_percent * on(container_id_short) group_left(name) container_id_to_name{name=\"velosim-backend\"}",
           "legendFormat": "Backend CPU %",
           "range": true,
           "refId": "A"
-        },
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          },
-          "editorMode": "code",
-          "expr": "sum(rate(container_cpu_usage_seconds_total{name=~\"velosim-.*\"}[1m])) by (name) * 100",
-          "hide": true,
-          "legendFormat": "{{name}}",
-          "range": true,
-          "refId": "B"
         }
       ],
       "title": "Backend CPU Usage (%)",
@@ -208,7 +196,7 @@
             "uid": "prometheus"
           },
           "editorMode": "code",
-          "expr": "container_memory_usage_bytes{name=\"velosim-backend\"}",
+          "expr": "velosim_container_memory_bytes * on(container_id_short) group_left(name) container_id_to_name{name=\"velosim-backend\"}",
           "legendFormat": "Backend RAM Usage",
           "range": true,
           "refId": "A"
@@ -219,7 +207,7 @@
             "uid": "prometheus"
           },
           "editorMode": "code",
-          "expr": "container_memory_working_set_bytes{name=\"velosim-backend\"}",
+          "expr": "velosim_container_memory_working_set_bytes * on(container_id_short) group_left(name) container_id_to_name{name=\"velosim-backend\"}",
           "legendFormat": "Backend Working Set",
           "range": true,
           "refId": "B"
@@ -309,7 +297,7 @@
             "uid": "prometheus"
           },
           "editorMode": "code",
-          "expr": "sum(rate(container_cpu_usage_seconds_total{name=~\"velosim-.*\"}[1m])) by (name) * 100",
+          "expr": "velosim_container_cpu_percent * on(container_id_short) group_left(name) container_id_to_name{name=~\"velosim-.*\"}",
           "legendFormat": "{{name}}",
           "range": true,
           "refId": "A"
@@ -399,7 +387,7 @@
             "uid": "prometheus"
           },
           "editorMode": "code",
-          "expr": "sum(container_memory_usage_bytes{name=~\"velosim-.*\"}) by (name)",
+          "expr": "velosim_container_memory_bytes * on(container_id_short) group_left(name) container_id_to_name{name=~\"velosim-.*\"}",
           "legendFormat": "{{name}}",
           "range": true,
           "refId": "A"
@@ -465,7 +453,7 @@
             "uid": "prometheus"
           },
           "editorMode": "code",
-          "expr": "sum(rate(container_cpu_usage_seconds_total{name=\"velosim-backend\"}[1m])) * 100",
+          "expr": "velosim_container_cpu_percent * on(container_id_short) group_left(name) container_id_to_name{name=\"velosim-backend\"}",
           "legendFormat": "Backend CPU",
           "range": true,
           "refId": "A"
@@ -531,7 +519,7 @@
             "uid": "prometheus"
           },
           "editorMode": "code",
-          "expr": "container_memory_working_set_bytes{name=\"velosim-backend\"}",
+          "expr": "velosim_container_memory_working_set_bytes * on(container_id_short) group_left(name) container_id_to_name{name=\"velosim-backend\"}",
           "legendFormat": "Backend RAM",
           "range": true,
           "refId": "A"
@@ -680,37 +668,7 @@
       "fieldConfig": {
         "defaults": {
           "color": {
-            "mode": "palette-classic"
-          },
-          "custom": {
-            "axisCenteredZero": false,
-            "axisColorMode": "text",
-            "axisLabel": "",
-            "axisPlacement": "auto",
-            "barAlignment": 0,
-            "drawStyle": "line",
-            "fillOpacity": 20,
-            "gradientMode": "none",
-            "hideFrom": {
-              "legend": false,
-              "tooltip": false,
-              "viz": false
-            },
-            "lineInterpolation": "smooth",
-            "lineWidth": 2,
-            "pointSize": 5,
-            "scaleDistribution": {
-              "type": "linear"
-            },
-            "showPoints": "never",
-            "spanNulls": false,
-            "stacking": {
-              "group": "A",
-              "mode": "none"
-            },
-            "thresholdsStyle": {
-              "mode": "off"
-            }
+            "mode": "thresholds"
           },
           "mappings": [],
           "thresholds": {
@@ -719,31 +677,37 @@
               {
                 "color": "green",
                 "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 50
+              },
+              {
+                "color": "red",
+                "value": 80
               }
             ]
           },
-          "unit": "Bps"
+          "unit": "percent"
         },
         "overrides": []
       },
       "gridPos": {
         "h": 8,
-        "w": 12,
-        "x": 0,
+        "w": 6,
+        "x": 12,
         "y": 22
       },
-      "id": 9,
+      "id": 10,
       "options": {
-        "legend": {
-          "calcs": ["mean", "max"],
-          "displayMode": "table",
-          "placement": "bottom",
-          "showLegend": true
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": ["lastNotNull"],
+          "fields": "",
+          "values": false
         },
-        "tooltip": {
-          "mode": "multi",
-          "sort": "desc"
-        }
+        "showThresholdLabels": false,
+        "showThresholdMarkers": true
       },
       "pluginVersion": "11.0.0",
       "targets": [
@@ -753,25 +717,80 @@
             "uid": "prometheus"
           },
           "editorMode": "code",
-          "expr": "sum(rate(container_network_receive_bytes_total{name=\"velosim-backend\"}[1m])) by (name)",
-          "legendFormat": "RX (received)",
+          "expr": "velosim_total_cpu_percent",
+          "legendFormat": "Total CPU",
           "range": true,
           "refId": "A"
+        }
+      ],
+      "title": "Total VeloSim CPU",
+      "type": "gauge"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 2147483648
+              },
+              {
+                "color": "red",
+                "value": 4294967296
+              }
+            ]
+          },
+          "unit": "bytes"
         },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 6,
+        "x": 18,
+        "y": 22
+      },
+      "id": 11,
+      "options": {
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": ["lastNotNull"],
+          "fields": "",
+          "values": false
+        },
+        "showThresholdLabels": false,
+        "showThresholdMarkers": true
+      },
+      "pluginVersion": "11.0.0",
+      "targets": [
         {
           "datasource": {
             "type": "prometheus",
             "uid": "prometheus"
           },
           "editorMode": "code",
-          "expr": "sum(rate(container_network_transmit_bytes_total{name=\"velosim-backend\"}[1m])) by (name)",
-          "legendFormat": "TX (transmitted)",
+          "expr": "velosim_total_memory_bytes",
+          "legendFormat": "Total Memory",
           "range": true,
-          "refId": "B"
+          "refId": "A"
         }
       ],
-      "title": "Backend Network I/O",
-      "type": "timeseries"
+      "title": "Total VeloSim Memory",
+      "type": "gauge"
     }
   ],
   "refresh": "5s",
