@@ -157,7 +157,7 @@ describe('useScenarioOperations', () => {
       });
 
       const validatedContent = await result.current.validateContent(
-        '{"scenario_title": "Test"}'
+        '{"start_time": "day1:08:00"}'
       );
       expect(validatedContent).toBeNull();
     });
@@ -167,7 +167,7 @@ describe('useScenarioOperations', () => {
         wrapper: Wrapper,
       });
 
-      const mockContent = { scenario_title: 'Test', stations: [] };
+      const mockContent = { start_time: 'day1:08:00', stations: [] };
 
       // Mock API to return validation success with warnings
       vi.mocked(api.post).mockResolvedValue({
@@ -193,7 +193,7 @@ describe('useScenarioOperations', () => {
         wrapper: Wrapper,
       });
 
-      const mockContent = { scenario_title: 'Test', stations: [{ id: 1 }] };
+      const mockContent = { start_time: 'day1:08:00', stations: [{ id: 1 }] };
 
       // Mock API to return validation success
       vi.mocked(api.post).mockResolvedValue({
@@ -220,7 +220,7 @@ describe('useScenarioOperations', () => {
       vi.mocked(api.post).mockRejectedValue(new Error('Network error'));
 
       const validatedContent = await result.current.validateContent(
-        '{"scenario_title": "Test"}'
+        '{"start_time": "day1:08:00"}'
       );
 
       expect(validatedContent).toBeNull();
@@ -237,7 +237,7 @@ describe('useScenarioOperations', () => {
       });
 
       const validatedContent = await result.current.validateContent(
-        '{"scenario_title": "Test"}'
+        '{"start_time": "day1:08:00"}'
       );
 
       expect(validatedContent).toBeNull();
@@ -250,7 +250,7 @@ describe('useScenarioOperations', () => {
         wrapper: Wrapper,
       });
 
-      const content = '{"scenario_title": "Test"}';
+      const content = '{"start_time": "day1:08:00"}';
       const filename = 'test-scenario';
 
       result.current.downloadJSON(content, filename);
@@ -266,7 +266,7 @@ describe('useScenarioOperations', () => {
         wrapper: Wrapper,
       });
 
-      const content = '{"scenario_title": "Test"}';
+      const content = '{"start_time": "day1:08:00"}';
       const filename = 'my test scenario';
 
       result.current.downloadJSON(content, filename);
@@ -288,7 +288,7 @@ describe('useScenarioOperations', () => {
         throw new Error('Blob creation failed');
       });
 
-      const content = '{"scenario_title": "Test"}';
+      const content = '{"start_time": "day1:08:00"}';
       const filename = 'test';
 
       // The function catches and logs the error instead of throwing
@@ -306,7 +306,7 @@ describe('useScenarioOperations', () => {
         throw 'String error'; // Not an Error object
       });
 
-      const content = '{"scenario_title": "Test"}';
+      const content = '{"start_time": "day1:08:00"}';
       const filename = 'test';
 
       result.current.downloadJSON(content, filename);
@@ -353,7 +353,7 @@ describe('useScenarioOperations', () => {
       expect(mockClick).not.toHaveBeenCalled();
     });
 
-    it('includes scenario_title in exported content', async () => {
+    it('includes start_time in exported content', async () => {
       const { result } = renderHook(() => useScenarioOperations(), {
         wrapper: Wrapper,
       });

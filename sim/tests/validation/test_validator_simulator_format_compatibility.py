@@ -186,6 +186,19 @@ def test_zero_time_is_valid(validator: ScenarioValidator) -> None:
                 "scheduled_tasks": ["day1:08:00"],
             }
         ],
+        "vehicles": [
+            {"name": "Vehicle 1", "position": [-73.5, 45.5], "battery_count": 2}
+        ],
+        "drivers": [
+            {
+                "name": "Driver 1",
+                "shift": {
+                    "start_time": "day1:08:00",
+                    "end_time": "day1:17:00",
+                    "lunch_break": "day1:12:00",
+                },
+            }
+        ],
     }
 
     errors: List[Dict[str, str]] = validator.validate_all(scenario)
@@ -204,6 +217,19 @@ def test_large_time_values_are_valid(validator: ScenarioValidator) -> None:
                 "position": [-73.5, 45.5],
                 "initial_task_count": 0,
                 "scheduled_tasks": ["day1:16:00"],
+            }
+        ],
+        "vehicles": [
+            {"name": "Vehicle 1", "position": [-73.5, 45.5], "battery_count": 2}
+        ],
+        "drivers": [
+            {
+                "name": "Driver 1",
+                "shift": {
+                    "start_time": "day1:08:00",
+                    "end_time": "day1:17:00",
+                    "lunch_break": "day1:12:00",
+                },
             }
         ],
     }

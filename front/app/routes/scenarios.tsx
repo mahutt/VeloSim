@@ -66,6 +66,7 @@ export default function ScenarioEditor() {
     saveScenario,
     overwriteScenario,
     deleteScenario,
+    formatBackendError,
   } = useScenarioOperations();
 
   /**
@@ -200,39 +201,28 @@ export default function ScenarioEditor() {
         return;
       }
 
-      // Parse the scenario content
-      let content;
+      // Parse JSON locally (basic check)
+      let parsedContent;
       try {
-        content = JSON.parse(scenarioContent);
+        parsedContent = JSON.parse(scenarioContent);
       } catch {
-        displayError(
-          'Invalid Scenario',
-          'The scenario content is not valid JSON. Please fix it before starting.'
-        );
+        displayError('Invalid Scenario', 'Invalid JSON format');
         return;
       }
 
-      // Wrap scenario content in the expected format
-      const scenarioData = {
-        id: selectedScenarioId || 0, // Use 0 for unsaved scenarios
-        name: scenarioName || 'Untitled Scenario',
-        content: content,
+      const requestBody = {
+        content: parsedContent,
       };
 
-      // Call backend API to initialize simulation with scenario data
       const response = await api.post<InitializeSimulationResponse>(
         '/simulation/initialize',
-        scenarioData
+        requestBody
       );
 
-      // Navigate to simulation page with sim_id from response
       navigate(`/simulation/${response.data.sim_id}`);
-    } catch (error) {
+    } catch (error: unknown) {
       console.error('Error starting simulation:', error);
-      displayError(
-        'Initialization Failed',
-        'Failed to initialize simulation. Please try again.'
-      );
+      displayError('Initialization Failed', formatBackendError(error));
     }
   };
 

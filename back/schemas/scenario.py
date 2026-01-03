@@ -77,7 +77,7 @@ class ScenarioContent(BaseModel):
     supporting both type checking and validation.
     """
 
-    scenario_title: Optional[str] = Field(None, description="Title of the scenario")
+    version: Optional[int] = Field(1, description="Schema version (defaults to 1)")
     start_time: datetime | str = Field(
         ...,
         description=(
@@ -109,7 +109,7 @@ class ScenarioContent(BaseModel):
     model_config = ConfigDict(
         json_schema_extra={
             "example": {
-                "scenario_title": "Multi-day Delivery Scenario",
+                "version": 1,
                 "start_time": "2025-11-06T08:00:00Z",
                 "end_time": "2025-11-07T17:00:00Z",  # Spans 2 days
                 "drivers": [
@@ -177,7 +177,6 @@ class ScenarioCreateRequest(BaseModel):
             "example": {
                 "name": "My Test Scenario",
                 "content": {
-                    "scenario_title": "My Test Scenario",
                     "start_time": "08:00",
                     "end_time": "12:00",
                     "drivers": [
@@ -228,7 +227,6 @@ class ScenarioUpdateRequest(BaseModel):
             "example": {
                 "name": "Updated Scenario Name",
                 "content": {
-                    "scenario_title": "Updated Scenario Name",
                     "start_time": "08:00",
                     "end_time": "12:00",
                     "drivers": [
@@ -281,7 +279,6 @@ class ScenarioResponse(BaseModel):
                 "id": 1,
                 "name": "Test Scenario",
                 "content": {
-                    "scenario_title": "Test Scenario",
                     "start_time": "08:00",
                     "end_time": "12:00",
                     "drivers": [

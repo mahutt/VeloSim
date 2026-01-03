@@ -318,5 +318,6 @@ export function useScenarioOperations() {
     saveScenario,
     overwriteScenario,
     deleteScenario,
+    formatBackendError,
   };
 }

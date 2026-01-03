@@ -117,8 +117,8 @@ def get_scenario_template(
         dict: A template scenario with example data and documentation.
     """
     return {
+        "name": "Example Scenario",
         "content": {
-            "scenario_title": "Example Scenario",
             "start_time": "day1:08:00",
             "end_time": "day1:17:00",
             "vehicle_battery_capacity": 999,

@@ -54,7 +54,7 @@ from back.services.simulation_service import simulation_service
 
 from back.models.user import User
 
-SCENARIO_PAYLOAD = {
+SCENARIO_CONTENT = {
     "start_time": "day1:06:00",
     "end_time": "day1:12:00",
     "vehicle_battery_capacity": 100,
@@ -93,6 +93,9 @@ SCENARIO_PAYLOAD = {
         },
     ],
 }
+
+# Wrap the scenario content in the expected format
+SCENARIO_PAYLOAD = {"content": SCENARIO_CONTENT}
 
 # Apply patches before any simulator code is imported
 pytestmark = pytest.mark.usefixtures("mock_heavy_sim_operations")
@@ -315,7 +318,10 @@ class TestSimulationAPI:
         neither scenario nor scenario_id is provided."""
         response = authenticated_client.post("/api/v1/simulation/initialize")
         assert response.status_code == 400
-        assert "Must provide 'scenario' or 'scenario_id'" in response.json()["detail"]
+        assert (
+            "Must provide 'scenario content' or 'scenario_id'"
+            in response.json()["detail"]
+        )
 
     def test_initialize_simulation_both_scenario_and_id(
         self, authenticated_client: TestClient
@@ -341,6 +347,53 @@ class TestSimulationAPI:
         )
         assert response.status_code == 404
         assert "Scenario not found" in response.json()["detail"]
+
+    def test_initialize_simulation_validation_error_structured(
+        self, authenticated_client: TestClient
+    ) -> None:
+        """Test that scenario validation errors return structured error format."""
+        # Send invalid scenario with missing required fields
+        invalid_payload = {"content": {"start_time": "day1:06:00"}}
+        response = authenticated_client.post(
+            "/api/v1/simulation/initialize", json=invalid_payload
+        )
+        assert response.status_code == 400
+        detail = response.json()["detail"]
+        # Check structured error format
+        assert isinstance(detail, dict)
+        assert detail["valid"] is False
+        assert "errors" in detail
+        assert isinstance(detail["errors"], list)
+        assert detail["message"] == "Scenario validation failed"
+        # Check that errors contain required fields info
+        assert len(detail["errors"]) > 0
+
+    def test_initialize_simulation_validation_error_with_line_numbers(
+        self, authenticated_client: TestClient
+    ) -> None:
+        """Test that validation errors include line numbers when available."""
+        # Send scenario with end_time before start_time
+        invalid_payload = {
+            "content": {
+                "start_time": "day1:12:00",
+                "end_time": "day1:06:00",
+                "vehicle_battery_capacity": 100,
+                "stations": [],
+                "vehicles": [],
+                "drivers": [],
+            }
+        }
+        response = authenticated_client.post(
+            "/api/v1/simulation/initialize", json=invalid_payload
+        )
+        assert response.status_code == 400
+        detail = response.json()["detail"]
+        assert isinstance(detail, dict)
+        assert detail["valid"] is False
+        assert "errors" in detail
+        errors = detail["errors"]
+        # Should have error about end_time before start_time
+        assert any("end_time" in str(err).lower() for err in errors)
 
     @patch("back.services.simulation_service.simulation_service.initialize_simulation")
     def test_initialize_simulation_with_scenario_id(
@@ -419,15 +472,15 @@ class TestSimulationAPI:
         # Check that the scenario_payload has the expected structure
         # Note: The parser may normalize the payload (e.g., empty drivers list)
         scenario_payload = call_args[1]["scenario_payload"]
-        assert scenario_payload["start_time"] == SCENARIO_PAYLOAD["start_time"]
-        assert scenario_payload["end_time"] == SCENARIO_PAYLOAD["end_time"]
+        assert scenario_payload["start_time"] == SCENARIO_CONTENT["start_time"]
+        assert scenario_payload["end_time"] == SCENARIO_CONTENT["end_time"]
         assert (
             scenario_payload["vehicle_battery_capacity"]
-            == SCENARIO_PAYLOAD["vehicle_battery_capacity"]
+            == SCENARIO_CONTENT["vehicle_battery_capacity"]
         )
         # mypy doesn't know scenario_payload["stations"] is a list
         assert len(scenario_payload["stations"]) == len(
-            SCENARIO_PAYLOAD["stations"]  # type: ignore[arg-type]
+            SCENARIO_CONTENT["stations"]  # type: ignore[arg-type]
         )
 
     @patch("back.services.simulation_service.simulation_service.initialize_simulation")
@@ -447,7 +500,7 @@ class TestSimulationAPI:
                 {
                     "name": "Test Station",
                     "position": [-73.6, 45.5],
-                    "initial_task_count": 0,
+                    "initial_task_count": 5,  # Changed from 0 to 5 to pass validation
                     "scheduled_tasks": [],
                 }
             ],
