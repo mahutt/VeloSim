@@ -45,7 +45,7 @@ class TestVehicle:
 
     @pytest.fixture
     def vehicle(self) -> Vehicle:
-        return Vehicle(1, battery_count=3)
+        return Vehicle(1, battery_count=3, max_battery_count=20)
 
     @pytest.fixture
     def vehicle_with_driver(self, driver: Driver) -> Vehicle:
@@ -60,36 +60,76 @@ class TestVehicle:
         assert vehicle.driver is not None
         assert battery_count == 3
 
-    def test_get_vehicle_driver(
+    def test_get_driver(
         self, vehicle_with_driver: Vehicle, default_position: Position
     ) -> None:
 
-        driver = vehicle_with_driver.get_vehicle_driver()
+        driver = vehicle_with_driver.get_driver()
 
         assert isinstance(driver, Driver)
         assert driver.id == 1
         assert driver.position == default_position
 
+    def test_get_max_battery_count(self, vehicle: Vehicle) -> None:
+        assert vehicle.get_max_battery_count() == 20
+
+        vehicle.max_battery_count = 10
+        assert vehicle.get_max_battery_count() == 10
+
     def test_vehicle_get_battery_count(self, vehicle: Vehicle) -> None:
-        battery_count = vehicle.get_vehicle_battery_count()
+        battery_count = vehicle.get_battery_count()
         assert battery_count == 3
 
-    def test_set_vehicle_driver(
+    def test_set_driver(
         self, vehicle_with_driver: Vehicle, default_position: Position
     ) -> None:
         # Idempotent reassignment with the same driver should not error
-        same_driver = vehicle_with_driver.get_vehicle_driver()
+        same_driver = vehicle_with_driver.get_driver()
         assert same_driver is not None
-        vehicle_with_driver.set_vehicle_driver(same_driver)
+        vehicle_with_driver.set_driver(same_driver)
 
-        drv = vehicle_with_driver.get_vehicle_driver()
+        drv = vehicle_with_driver.get_driver()
         assert drv is not None
         assert drv.id == same_driver.id
 
-    def test_set_vehicle_battery_count(self, vehicle: Vehicle) -> None:
+    def test_set_battery_count(self, vehicle: Vehicle) -> None:
         new_battery_count = 8
-        vehicle.set_vehicle_battery_count(new_battery_count)
+        vehicle.set_battery_count(new_battery_count)
 
+        assert vehicle.battery_count == new_battery_count
+
+    def test_use_battery(self, vehicle: Vehicle) -> None:
+        # Arrange
+        new_battery_count = 8
+        vehicle.set_battery_count(new_battery_count)
+
+        # Act
+        vehicle.use_battery()
+
+        # Assert
+        assert vehicle.battery_count == new_battery_count - 1
+
+    def test_add_battery(self, vehicle: Vehicle) -> None:
+        # Arrange
+        new_battery_count = 8
+        vehicle.set_battery_count(new_battery_count)
+
+        # Act
+        vehicle.add_battery()
+
+        # Assert
+        assert vehicle.battery_count == new_battery_count + 1
+
+    def test_add_battery_at_max(self, vehicle: Vehicle) -> None:
+        # Arrange
+        vehicle.max_battery_count = 8
+        new_battery_count = 8
+        vehicle.set_battery_count(new_battery_count)
+
+        # Act
+        vehicle.add_battery()
+
+        # Assert
         assert vehicle.battery_count == new_battery_count
 
     def test_clear_update(self, vehicle: Vehicle) -> None:

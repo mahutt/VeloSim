@@ -782,7 +782,7 @@ class _ScenarioValidator:
         stations: List[Dict[str, Any]] = content.get("stations", [])
         vehicles: List[Dict[str, Any]] = content.get("vehicles", [])
         drivers: List[Dict[str, Any]] = content.get("drivers", [])
-        vehicle_battery_capacity = content.get("vehicle_battery_capacity", 0)
+        vehicle_battery_capacity = content.get("vehicle_battery_capacity", 50)
 
         # Constraint 1: At least 1 of each entity
         if len(stations) == 0:
@@ -1041,11 +1041,17 @@ class JsonParseStrategy(BaseParseStrategy):
         vehicles: Dict[int, Vehicle] = {}
         drivers: Dict[int, Driver] = {}
         drivers_from_scenario = content.get("drivers", [])
+        # Global max battery_capacity value (will be per instance in R3)
+        max_battery_count = int(content.get("vehicle_battery_capacity", 50))
         for v in content.get("vehicles", []):
             vid = vehicle_id_counter
             vehicle_id_counter += 1
             battery_count = int(v.get("battery_count", 0))
-            vehicles[vid] = Vehicle(vehicle_id=vid, battery_count=battery_count)
+            vehicles[vid] = Vehicle(
+                vehicle_id=vid,
+                battery_count=battery_count,
+                max_battery_count=max_battery_count,
+            )
             # Match as many drivers and vehicles as possible.
             try:
                 # Pop next driver from scenario (details unused here)
@@ -1060,7 +1066,7 @@ class JsonParseStrategy(BaseParseStrategy):
                 drivers[did] = Driver(
                     driver_id=did, position=pos, task_list=[], vehicle=vehicles[vid]
                 )
-                vehicles[vid].set_vehicle_driver(drivers[did])
+                vehicles[vid].set_driver(drivers[did])
             except IndexError:
                 # We currently only consider driver and vehicle pairs.
                 # Excess drivers/vehicles are currently ignored

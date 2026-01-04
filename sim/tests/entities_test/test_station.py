@@ -149,11 +149,11 @@ class TestStation:
         station.remove_task(task)
         assert station.get_task_count() == 1
 
-    def test_get_station_position(
+    def test_get_position(
         self, simpy_env: simpy.Environment, default_position: Position
     ) -> None:
         station = Station(1, "Test Station", default_position)
 
-        returned_position = station.get_station_position()
+        returned_position = station.get_position()
         assert returned_position == default_position
         assert returned_position.get_position() == [-73.5673, 45.5017]

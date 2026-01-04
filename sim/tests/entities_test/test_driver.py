@@ -25,12 +25,14 @@ SOFTWARE.
 import pytest
 import simpy
 from typing import Any
+from unittest.mock import patch, MagicMock
 
-from sim.entities.driver import Driver
+from sim.entities.driver import Driver, HQ_POSITION, DriverState
 from sim.entities.position import Position
 from sim.entities.BatterySwapTask import BatterySwapTask
 from sim.entities.task import Task, State
 from sim.entities.station import Station
+from sim.entities.vehicle import Vehicle
 
 
 class TestDriver:
@@ -81,19 +83,21 @@ class TestDriver:
         assert driver.task_list == task_list
         assert driver.has_updated == False
 
-    def test_get_driver_position(
-        self, driver: Driver, default_position: Position
-    ) -> None:
-        position = driver.get_driver_position()
+    def test_get_position(self, driver: Driver, default_position: Position) -> None:
+        position = driver.get_position()
         assert position == default_position
         assert position.get_position() == [-73.5673, 45.5017]
 
-    def test_set_driver_position(self, driver: Driver) -> None:
+    def test_set_position(self, driver: Driver) -> None:
         new_position = Position([-74.0000, 40.5017])
-        driver.set_driver_position(new_position)
+        driver.set_position(new_position)
 
-        assert driver.get_driver_position() == new_position
+        assert driver.get_position() == new_position
         assert driver.position.get_position() == [-74.0000, 40.5017]
+
+    def test_get_state(self, driver: Driver) -> None:
+        driver.state = DriverState.ON_SHIFT
+        assert driver.get_state() == DriverState.ON_SHIFT
 
     def test_assign_task(self, simpy_env: simpy.Environment, driver: Driver) -> None:
         initial_count = driver.get_task_count()
@@ -247,6 +251,9 @@ class TestDriver:
         task2 = BatterySwapTask(2)
         task3 = BatterySwapTask(3)
         driver = Driver(2, default_position, [task, task2, task3])
+        vehicle = Vehicle(vehicle_id=1, battery_count=10)
+        vehicle.set_driver(driver)
+        driver.set_vehicle(vehicle)
         initial_count = driver.get_task_count()
         task_to_service = task2
 
@@ -254,6 +261,7 @@ class TestDriver:
 
         driver.service_task(task_to_service)
 
+        assert vehicle.get_battery_count() == 9
         assert driver.get_task_count() == initial_count - 1
         assert task_to_service not in driver.get_task_list()
 
@@ -276,6 +284,70 @@ class TestDriver:
         assert driver.get_task_count() == initial_count
         assert driver.get_task_list() == initial_tasks
 
+    def test_service_task_with_one_battery(
+        self, simpy_env: simpy.Environment, default_position: Position
+    ) -> None:
+        task = BatterySwapTask(1)
+        task2 = BatterySwapTask(2)
+        driver = Driver(2, default_position, [task, task2])
+        driver.env = simpy_env
+        vehicle = Vehicle(vehicle_id=1, battery_count=1)
+        vehicle.set_driver(driver)
+        driver.set_vehicle(vehicle)
+
+        with patch.object(Driver, "return_to_HQ") as mock_hq:
+            driver.service_task(task2)
+            mock_hq.assert_called_once()
+            assert vehicle.battery_count == 0
+
+    def test_return_to_HQ_calls_travel_to(
+        self, simpy_env: simpy.Environment, default_position: Position
+    ) -> None:
+        task = BatterySwapTask(1)
+        task2 = BatterySwapTask(2)
+        driver = Driver(2, default_position, [task, task2])
+        driver.env = simpy_env
+        vehicle = Vehicle(vehicle_id=1, battery_count=1)
+        vehicle.set_driver(driver)
+        driver.set_vehicle(vehicle)
+
+        with patch.object(
+            Driver, "travel_to", return_value=simpy_env.timeout(0)
+        ) as mock_travel:
+            simpy_env.process(driver.return_to_HQ())
+
+            simpy_env.step()
+
+            # 5. Assertions
+            assert driver.get_state() == DriverState.HEADING_TO_HQ
+            mock_travel.assert_called_once_with(HQ_POSITION)
+
+    def test_restock_vehicle_battery_full_restock(
+        self, simpy_env: simpy.Environment, default_position: Position
+    ) -> None:
+        task = BatterySwapTask(1)
+        task2 = BatterySwapTask(2)
+        driver = Driver(2, default_position, [task, task2])
+        driver.env = simpy_env
+        mock_vehicle = MagicMock()
+        mock_vehicle.vehicle_id = 1
+        mock_vehicle.get_battery_count.return_value = 2
+        mock_vehicle.max_battery_count = 10
+        mock_vehicle.set_driver(driver)
+        driver.vehicle = mock_vehicle
+        driver.state = DriverState.RESTOCKING_BATTERIES
+
+        expected_duration = (1200 / 10) * 8
+        start_time = simpy_env.now
+
+        simpy_env.process(driver.restock_vehicle_battery())
+        simpy_env.run()
+
+        assert simpy_env.now == start_time + expected_duration
+        assert mock_vehicle.add_battery.call_count == 8
+
+        assert driver.get_state() == DriverState.ON_SHIFT
+
     def test_get_task_count_empty(self, driver: Driver) -> None:
         assert driver.get_task_count() == 0
 
@@ -294,6 +366,11 @@ class TestDriver:
     def test_task_list_modifications(
         self, simpy_env: simpy.Environment, driver: Driver
     ) -> None:
+        # associate vehicle to driver
+        vehicle = Vehicle(vehicle_id=1, battery_count=10)
+        vehicle.set_driver(driver)
+        driver.set_vehicle(vehicle)
+
         # start with empty list
         assert driver.get_task_count() == 0
 
@@ -310,6 +387,7 @@ class TestDriver:
         # service a task
         driver.service_task(task2)
         assert driver.get_task_count() == 2
+        assert vehicle.get_battery_count() == 9
         assert task2 not in driver.get_task_list()
         assert set(driver.get_task_list()) == {task, task3}
 

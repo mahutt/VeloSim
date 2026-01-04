@@ -24,6 +24,7 @@ SOFTWARE.
 
 import simpy
 import logging
+from enum import Enum
 
 from sim.map.MapController import MapController
 from typing import Optional, TYPE_CHECKING
@@ -39,6 +40,31 @@ if TYPE_CHECKING:  # pragma: no cover
     from .task import Task
     from sim.behaviour.sim_behaviour import SimBehaviour
     from .vehicle import Vehicle
+
+HQ_POSITION = Position([-73.60175631192361, 45.52975346053039])
+FULL_RESTOCK_TIME_SEC = 1200  # 20 minutes to fully restock
+
+
+class DriverState(Enum):
+    """Enumaration of driver states."""
+
+    ON_SHIFT = 0  # Has tasks, but none in progress yet
+    IDLE = 1  # Waiting to be assigned a task. Does have batteries
+    IN_PROGRESS = 2  # Has a task in progress/dispatched or is servicing it
+    HEADING_TO_HQ = 3  # Is returning back to HQ
+    RESTOCKING_BATTERIES = 4  # Is in the process of restocking on batteries at HQ
+
+    def __str__(self) -> str:
+        if self == DriverState.ON_SHIFT:
+            return "on_shift"
+        elif self == DriverState.IDLE:
+            return "idle"
+        elif self == DriverState.IN_PROGRESS:
+            return "in_progress"
+        elif self == DriverState.HEADING_TO_HQ:
+            return "heading_to_hq"
+        elif self == DriverState.RESTOCKING_BATTERIES:
+            return "restocking"
 
 
 class Driver:
@@ -69,8 +95,17 @@ class Driver:
         else:
             self.task_list = []
         self.has_updated = False  # flag to track if a driver was updated
+        # self.state = DriverState.ON_SHIFT  # directly on shift at creation (for now)
+        if (
+            len(self.task_list) == 0
+            and self.vehicle is not None
+            and self.vehicle.get_battery_count() != 0
+        ):
+            self.state = DriverState.IDLE
+        else:
+            self.state = DriverState.ON_SHIFT
 
-    def get_driver_position(self) -> "Position":
+    def get_position(self) -> "Position":
         """Get the current position of the driver.
 
         Returns:
@@ -78,7 +113,16 @@ class Driver:
         """
         return self.position
 
-    def get_driver_vehicle(self) -> Optional["Vehicle"]:
+    def get_state(self) -> DriverState:
+        """
+        Get the driver's current state.
+
+        Returns:
+            state: The current state of the driver.
+        """
+        return self.state
+
+    def get_vehicle(self) -> Optional["Vehicle"]:
         """Get the drivers current vehicle.
 
         Returns:
@@ -86,7 +130,7 @@ class Driver:
         """
         return self.vehicle
 
-    def set_driver_vehicle(self, vehicle: "Vehicle") -> None:
+    def set_vehicle(self, vehicle: "Vehicle") -> None:
         """Set the driver's current vehicle and mark it as updated.
 
         Args:
@@ -102,7 +146,7 @@ class Driver:
                 f"already assigned to vehicle: {self.vehicle.id}"
             )
         # Reject only if vehicle is bound to a DIFFERENT driver
-        current_driver = vehicle.get_vehicle_driver()
+        current_driver = vehicle.get_driver()
         if current_driver is not None and current_driver.id != self.id:
             raise Exception(
                 f"Driver Error: vehicle: {vehicle.id} "
@@ -123,7 +167,7 @@ class Driver:
         """
         self.sim_behaviour = sim_behaviour
 
-    def set_driver_position(self, position: "Position") -> None:
+    def set_position(self, position: "Position") -> None:
         """Set the driver's position and mark it as updated.
 
         Args:
@@ -169,6 +213,11 @@ class Driver:
             task.set_assigned_driver(self)
             self.has_updated = True
             # Task state is now ASSIGNED (set by task.set_assigned_driver)
+
+            # Change state to ON_SHIFT if was waiting for a task
+            if self.state == DriverState.IDLE:
+                self.state = DriverState.ON_SHIFT
+
             # Handle dispatch scheduling
             if dispatch_delay is not None and dispatch_delay > 0:
                 # Schedule dispatch for later
@@ -213,6 +262,9 @@ class Driver:
         if task in self.task_list and task.is_assigned():
             self.task_list.remove(task)
             task.unassign_driver()
+            if self.get_task_count() == 0:
+                self.state = DriverState.IDLE
+
             self.has_updated = True
 
     def get_in_progress_task(self) -> Optional["Task"]:
@@ -256,6 +308,7 @@ class Driver:
                 or task.get_station() == task_in_progress.get_station()
             ):
                 task.set_state(State.IN_PROGRESS)
+                self.state = DriverState.IN_PROGRESS
                 self.has_updated = True
             else:
                 raise Exception("Cannot dispatch task at this station")
@@ -264,6 +317,7 @@ class Driver:
         """Complete a task and remove it from the driver's task list.
 
         Marks the task as CLOSED and removes it from the driver's task list.
+        Also uses up a battery from the vehicle.
         This should be called when a driver has finished servicing a task
         at its station.
 
@@ -273,10 +327,22 @@ class Driver:
         Returns:
             None
         """
-        if task in self.task_list:
+        if (
+            task in self.task_list
+            and self.vehicle is not None
+            and self.vehicle.get_battery_count() != 0
+        ):
             self.task_list.remove(task)
+            battery_count = self.vehicle.use_battery()
             task.set_state(State.CLOSED)
+            self.state = (
+                DriverState.ON_SHIFT if self.get_task_count() > 0 else DriverState.IDLE
+            )
             self.has_updated = True
+
+            if battery_count == 0:
+                # return to HQ for refill
+                self.env.process(self.return_to_HQ())
 
     def get_task_count(self) -> int:
         """Get the total number of tasks assigned to this driver.
@@ -485,7 +551,7 @@ class Driver:
                 assert isinstance(
                     next_position, Position
                 )  # route.next() returns Position when as_json=False
-                self.set_driver_position(next_position)
+                self.set_position(next_position)
                 yield self.env.timeout(1)
                 next_position = route.next()
         # Allows a traveling drivers to be interrupted by other simpy entities
@@ -496,15 +562,60 @@ class Driver:
             # Clear current route when travel completes or is interrupted
             self.current_route = None
 
+    def return_to_HQ(self) -> Generator[Any, Any, Any]:
+        """
+        Make driver return to HQ.
+
+        Sets driver state to HEADING_TO_HQ and makes the driver travel to HQ_Position.
+
+        Returns:
+            Generator that yields for travel_to process.
+        """
+        self.state = DriverState.HEADING_TO_HQ
+        yield self.env.process(self.travel_to(HQ_POSITION))
+
+    def restock_vehicle_battery(self) -> Generator[Any, Any, Any]:
+        """
+        Fully restock batteries of the vehicle.
+
+        Re-stocking time is calculated according to the amount of batteries
+        that are missing to be at full capacity.
+
+        Returns:
+            None
+        """
+        if self.vehicle is not None:
+            # Calculate time it takes to re-stock batteries
+            # Takes 20 minutes (1200 sec) to fully re-stock
+            battery_count = self.vehicle.get_battery_count()
+            max_battery_count = self.vehicle.max_battery_count
+            batteries_to_add = max_battery_count - battery_count
+
+            # Refill incrementally driver's vehicle's battery count
+            if batteries_to_add > 0:
+                interval = FULL_RESTOCK_TIME_SEC / max_battery_count
+                for _ in range(int(batteries_to_add)):
+                    yield self.env.timeout(interval)
+                    self.vehicle.add_battery()
+
+        # continues/starts shift
+        if self.get_task_count() > 0:
+            self.state = DriverState.ON_SHIFT
+        else:  # waits for task
+            self.state = DriverState.IDLE
+
     def run(self):  # type: ignore[no-untyped-def]
         """Main SimPy process that runs continuously throughout the simulation.
 
         This is the driver's main execution loop that handles task selection,
         dispatch, travel, and servicing. The process:
         1. Waits for initialization (sim_behaviour and map_controller setup)
-        2. Checks for in-progress tasks and either travels to or services them
-        3. If no task is in progress, selects and dispatches the next task
-        4. Yields control back to the simulation at each tick
+        2. If vehicle's battery_count is 0, directly heads to HQ
+        3. If driver has batteries and tasks available,
+            selects and dispatches the next tasks
+        4. If driver in-progress, travels to or services them
+        5. If the driver arrives at HQ, restocks on batteries
+        6. Yields control back to the simulation at each tick
 
         The process runs indefinitely until the simulation ends.
 
@@ -516,38 +627,39 @@ class Driver:
         yield self.env.timeout(1)
 
         while True:
-            # @TODO: replace with actual periodic logic
-
-            # Select Next Task
-            if len(self.task_list) > 0:
-                in_progress = self.get_in_progress_task()
-                # shorter, equivalent print for the in-progress task
-                if in_progress:
-                    # We have a task in progress
-                    # Check if we're close enough to the station:
-                    task_station = in_progress.get_station()
-                    if task_station is not None and self.position.close_enough(
-                        task_station.get_station_position()
-                    ):
-                        self.service_task(in_progress)
-                    elif task_station and not self.current_route:
-                        yield self.env.process(
-                            self.travel_to(task_station.get_station_position())
-                        )
-                    # If not at station, travel_to is still in progress
+            if self.state == DriverState.ON_SHIFT:
+                if self.vehicle is not None and self.vehicle.get_battery_count() == 0:
+                    # Return to HQ to restock
+                    self.env.process(self.return_to_HQ())
                 else:
                     # No task in progress, select and dispatch next task
                     next_task = self.sim_behaviour.RCNT_strategy.select_next_task(self)
                     if next_task:
                         # Dispatch the task to mark it as in-progress
                         self.dispatch_task(next_task)
-                        # Travel to the task's station
-                        task_station = next_task.get_station()
-                        if task_station is not None:
-                            task_position = task_station.get_station_position()
-                            yield self.env.process(self.travel_to(task_position))
-                            if self.position == task_position:
-                                self.service_task(next_task)
+
+            elif self.state == DriverState.IN_PROGRESS:
+                # There is a task in progress
+                # Check if we're close enough to the station:
+                in_progress = self.get_in_progress_task()
+                if in_progress is not None:
+                    task_station = in_progress.get_station()
+                    if task_station is not None and self.position.close_enough(
+                        task_station.get_position()
+                    ):
+                        self.service_task(in_progress)
+                    elif task_station is not None and not self.current_route:
+                        yield self.env.process(
+                            self.travel_to(task_station.get_position())
+                        )
+                    # If not at station, travel_to is still in progress
+
+            elif self.state == DriverState.HEADING_TO_HQ:
+                # Driver is heading to hq
+                # Check if we're close enough to HQ:
+                if self.position.close_enough(HQ_POSITION):
+                    self.state = DriverState.RESTOCKING_BATTERIES
+                    yield self.env.process(self.restock_vehicle_battery())
 
             # Wait for next tick
             yield self.env.timeout(1)

@@ -37,21 +37,21 @@ class Vehicle:
 
     env: simpy.Environment
     driver: Optional["Driver"]
-    battery_count: int
 
     def __init__(
         self,
         vehicle_id: int,
         driver: Optional["Driver"] = None,
         battery_count: int = 0,
+        max_battery_count: int = 50,
     ) -> None:
-
         self.id = vehicle_id
         self.driver = driver
         self.battery_count = battery_count
+        self.max_battery_count = max_battery_count
         self.has_updated = False  # flag to track if a vehicle was updated
 
-    def get_vehicle_driver(self) -> Optional["Driver"]:
+    def get_driver(self) -> Optional["Driver"]:
         """Get the vehicle's current driver.
 
         Returns:
@@ -59,7 +59,7 @@ class Vehicle:
         """
         return self.driver
 
-    def get_vehicle_battery_count(self) -> int:
+    def get_battery_count(self) -> int:
         """Get the vehicle's current battery count.
 
         Returns:
@@ -67,7 +67,15 @@ class Vehicle:
         """
         return self.battery_count
 
-    def set_vehicle_driver(self, driver: "Driver") -> None:
+    def get_max_battery_count(self) -> int:
+        """Get the vehicle's max battery count.
+
+        Returns:
+            max_battery_count: The vehicle's max_battery_count.
+        """
+        return self.max_battery_count
+
+    def set_driver(self, driver: "Driver") -> None:
         """Set the vehicle's driver and marks it as updated.
 
         Args:
@@ -83,7 +91,7 @@ class Vehicle:
                 f"already assigned to driver: {self.driver.id}"
             )
         # Reject only if driver is bound to a DIFFERENT vehicle
-        current_vehicle = driver.get_driver_vehicle()
+        current_vehicle = driver.get_vehicle()
         if current_vehicle is not None and current_vehicle.id != self.id:
             raise Exception(
                 f"Vehicle Error: driver: {driver.id} "
@@ -93,7 +101,7 @@ class Vehicle:
         self.driver = driver
         self.has_updated = True
 
-    def set_vehicle_battery_count(self, new_battery_count: int) -> None:
+    def set_battery_count(self, new_battery_count: int) -> None:
         """Set the vehicle's inventory and marks it as updated.
 
         Args:
@@ -104,6 +112,34 @@ class Vehicle:
         """
         self.battery_count = new_battery_count
         self.has_updated = True
+
+    def use_battery(self) -> int:
+        """
+        Decreases by one the vehicle's battery count as long as it is bigger than 0.
+
+        Returns:
+            The battery count after its been decreased.
+        """
+        if self.battery_count > 0:
+            self.battery_count = self.battery_count - 1
+            self.has_updated = True
+        else:
+            raise Exception(
+                f"Cannot use a battery since vehicle {self.id} has none available."
+            )
+        return self.battery_count
+
+    def add_battery(self) -> None:
+        """
+        Increases by one the vehicle's battery count while ensuring its value is
+        never higher than the max_battery_count.
+
+        Returns:
+            None
+        """
+        if self.battery_count < self.max_battery_count:
+            self.battery_count = self.battery_count + 1
+            self.has_updated = True
 
     def clear_update(self) -> None:
         """Clear the update flag for this vehicle.

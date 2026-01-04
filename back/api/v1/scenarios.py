@@ -121,7 +121,7 @@ def get_scenario_template(
         "content": {
             "start_time": "day1:08:00",
             "end_time": "day1:17:00",
-            "vehicle_battery_capacity": 999,
+            "vehicle_battery_capacity": 50,
             "stations": [
                 {
                     "name": "Station 1",

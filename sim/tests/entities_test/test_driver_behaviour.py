@@ -24,12 +24,13 @@ SOFTWARE.
 
 import simpy
 from unittest.mock import Mock
-from sim.entities.driver import Driver
+from sim.entities.driver import Driver, DriverState
 from sim.entities.position import Position
 from sim.entities.task import Task
 from sim.entities.station import Station
 from sim.entities.task_state import State
 from sim.behaviour.sim_behaviour import SimBehaviour
+from sim.entities.vehicle import Vehicle
 
 
 class FakeTask(Task):
@@ -217,6 +218,9 @@ def test_driver_run_waits_for_initialization() -> None:
     env = simpy.Environment()
     driver = Driver(driver_id=1, position=Position([0.0, 0.0]))
     driver.env = env
+    vehicle = Vehicle(vehicle_id=1, battery_count=10)
+    vehicle.set_driver(driver)
+    driver.set_vehicle(vehicle)
 
     # Add a task so select_next_task will be called
     task = FakeTask(task_id=1)
@@ -245,6 +249,9 @@ def test_driver_run_selects_and_dispatches_task() -> None:
     start_pos = Position([0.0, 0.0])
     driver = Driver(driver_id=1, position=start_pos)
     driver.env = env
+    vehicle = Vehicle(vehicle_id=1, battery_count=10)
+    vehicle.set_driver(driver)
+    driver.set_vehicle(vehicle)
 
     # Create a task at a station
     station_pos = Position([1.0, 1.0])
@@ -289,12 +296,16 @@ def test_driver_run_services_task_when_at_station() -> None:
     station.env = env
     driver = Driver(driver_id=1, position=station_pos)
     driver.env = env
+    vehicle = Vehicle(vehicle_id=1, battery_count=10)
+    vehicle.set_driver(driver)
+    driver.set_vehicle(vehicle)
 
     # Create a task and manually set it to in-progress
     task = FakeTask(task_id=1, station=station)
     task.set_state(State.IN_PROGRESS)
     task.set_assigned_driver(driver)
     driver.task_list.append(task)
+    driver.state = DriverState.IN_PROGRESS
 
     # Set up behaviour
     mock_behaviour = Mock(spec=SimBehaviour)
