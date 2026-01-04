@@ -3,68 +3,9 @@ global:
   evaluation_interval: 5s
 
 scrape_configs:
-  - job_name: "velosim"
+  # Python Backend - exposes process metrics automatically via prometheus_client
+  # Metrics: process_cpu_seconds_total, process_resident_memory_bytes, etc.
+  - job_name: "velosim-backend"
     metrics_path: /api/v1/metric/metrics
     static_configs:
       - targets: ["backend:8000"]
-
-  # Node Exporter - Host-level metrics (namely resource usage)
-  - job_name: "node-exporter"
-    static_configs:
-      - targets: ["node-exporter:9100"]
-
-  # cAdvisor - Container-level metrics (per-container resource usage)
-  - job_name: "cadvisor"
-    static_configs:
-      - targets: ["cadvisor:8080"]
-    metric_relabel_configs:
-      # Drop root cgroup metrics (not container-specific)
-      - source_labels: [id]
-        regex: '^/$'
-        action: drop
-      # Drop Docker daemon cgroup (not a container)
-      - source_labels: [id]
-        regex: '^/docker$'
-        action: drop
-      # Drop buildkit metrics
-      - source_labels: [id]
-        regex: '.*/buildkit.*'
-        action: drop
-      # Drop restricted cgroup
-      - source_labels: [id]
-        regex: '^/restricted$'
-        action: drop
-
-  # Docker container metadata - creates metrics with container name labels
-  # This is used for label joins to add container names to cAdvisor metrics
-  - job_name: "docker-containers"
-    docker_sd_configs:
-      - host: unix:///var/run/docker.sock
-        refresh_interval: 30s
-    relabel_configs:
-      # Keep only velosim containers
-      - source_labels: [__meta_docker_container_name]
-        regex: '/velosim-.*'
-        action: keep
-      # Don't actually scrape - just use for metadata
-      - source_labels: []
-        target_label: __address__
-        replacement: "localhost:9999"  # Non-existent endpoint
-      # Extract container name
-      - source_labels: [__meta_docker_container_name]
-        regex: '/?(.*)'
-        target_label: container_name
-      # Extract container ID (short form)
-      - source_labels: [__meta_docker_container_id]
-        regex: '(.{12}).*'
-        target_label: container_id_short
-      # Extract container ID (full)
-      - source_labels: [__meta_docker_container_id]
-        target_label: container_id
-      # Extract compose service
-      - source_labels: [__meta_docker_container_label_com_docker_compose_service]
-        target_label: compose_service
-
-# Recording rules for container name mapping and metrics
-rule_files:
-  - /etc/prometheus/container_names.yml

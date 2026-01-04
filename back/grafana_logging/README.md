@@ -1,6 +1,6 @@
 # VeloSim Logging System
 
-Centralized logging and monitoring infrastructure using **Grafana**, **Loki**, **Promtail**, **Prometheus**, **cAdvisor**, and **Node Exporter** for the VeloSim project.
+Centralized logging and monitoring infrastructure using **Grafana**, **Loki**, **Promtail**, and **Prometheus** for the VeloSim project.
 
 ## 🏗️ Architecture
 
@@ -14,8 +14,7 @@ Centralized logging and monitoring infrastructure using **Grafana**, **Loki**, *
 
 **Monitoring Stack:**
 - **Prometheus** (Port 9090): Metrics collection and time-series database
-- **cAdvisor** (Port 8090): Container-level metrics (CPU, RAM, network per container)
-- **Node Exporter** (Port 9100): Host-level system metrics (CPU, RAM, disk, network)
+- **Python Backend Metrics**: Process-level metrics (CPU, RAM usage) via `prometheus_client`
 
 ## 🚀 Quick Start
 
@@ -226,8 +225,7 @@ rate({job="python_app"} |= "ERROR" [1m])
 1. Navigate to Explore → Prometheus
 2. Click "Metrics browser" button
 3. Search for:
-   - `container_*` - cAdvisor container metrics
-   - `node_*` - Node Exporter system metrics
+   - `process_*` - Python process metrics (CPU, memory, file descriptors)
    - `up` - Service health status
 
 **Or query Prometheus directly**:
@@ -235,8 +233,8 @@ rate({job="python_app"} |= "ERROR" [1m])
 # List all available metrics
 curl http://localhost:9090/api/v1/label/__name__/values
 
-# Query specific metric
-curl 'http://localhost:9090/api/v1/query?query=container_memory_usage_bytes'
+# Query Python backend memory usage
+curl 'http://localhost:9090/api/v1/query?query=process_resident_memory_bytes{job="velosim-backend"}'
 ```
 
 ### File Structure
@@ -285,8 +283,7 @@ back/grafana_logging/
 
 **Troubleshooting:**
 - Check Prometheus targets: http://localhost:9090/targets (all should show "UP")
-- Check cAdvisor metrics: http://localhost:8090/metrics
-- Check Node Exporter metrics: http://localhost:9100/metrics
+- Check backend metrics: http://localhost:8000/api/v1/metric/metrics
 - View Grafana logs: `docker logs velosim-grafana`
 - View Prometheus logs: `docker logs velosim-prometheus`
 
@@ -294,7 +291,7 @@ back/grafana_logging/
 
 **Restart monitoring stack**:
 ```bash
-docker-compose restart grafana prometheus cadvisor node-exporter
+docker-compose restart grafana prometheus
 ```
 
 **View real-time logs**:
