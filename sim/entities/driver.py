@@ -32,6 +32,7 @@ from .task_state import State
 from sim.entities.route import Route
 from typing import Generator, Any
 from .position import Position
+from .shift import Shift
 
 logger = logging.getLogger(__name__)
 
@@ -75,11 +76,13 @@ class Driver:
     current_route: Route | None
     env: simpy.Environment
     vehicle: Optional["Vehicle"]
+    shift: Shift
 
     def __init__(
         self,
         driver_id: int,
         position: "Position",  # [longitude, latitude]
+        shift: Shift,
         task_list: list["Task"] | None = None,
         vehicle: Optional["Vehicle"] = None,
     ) -> None:
@@ -88,6 +91,7 @@ class Driver:
         self.current_route = None
         self.vehicle = vehicle
         self.route_changed = False  # flag to track if route geometry needs to be sent
+        self.shift = shift
         if task_list is not None:
             self.task_list = task_list
             for task in self.task_list:
@@ -153,6 +157,26 @@ class Driver:
                 f"already assigned to driver: {current_driver.id}"
             )
         self.vehicle = vehicle
+        self.has_updated = True
+
+    def get_driver_shift(self) -> Shift:
+        """Get the driver's current shift.
+
+        Returns:
+            Shift: The driver's shift.
+        """
+        return self.shift
+
+    def set_driver_shift(self, shift: Shift) -> None:
+        """Set the driver's shift and mark it as updated.
+
+        Args:
+            shift: The Shift to associate with the driver.
+
+        Returns:
+            None
+        """
+        self.shift = shift
         self.has_updated = True
 
     def set_behaviour(self, sim_behaviour: "SimBehaviour") -> None:

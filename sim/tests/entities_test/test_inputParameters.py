@@ -31,6 +31,10 @@ from sim.entities.driver import Driver
 from sim.entities.vehicle import Vehicle
 from sim.entities.BatterySwapTask import BatterySwapTask
 from sim.entities.inputParameters import InputParameter
+from sim.entities.shift import Shift
+
+# Default shift used for creating drivers in this module
+DEFAULT_SHIFT = Shift(0.0, 24.0, None)
 
 
 @pytest.fixture()
@@ -59,8 +63,8 @@ def input_params(env: simpy.Environment) -> InputParameter:
     params.add_vehicle(vehicles1)
     params.add_vehicle(vehicles2)
     # Add test resources
-    driver1 = Driver(driver_id=1, position=Position([15.0, 25.0]))
-    driver2 = Driver(driver_id=2, position=Position([35.0, 45.0]))
+    driver1 = Driver(driver_id=1, position=Position([15.0, 25.0]), shift=DEFAULT_SHIFT)
+    driver2 = Driver(driver_id=2, position=Position([35.0, 45.0]), shift=DEFAULT_SHIFT)
     params.add_driver(driver1)
     params.add_driver(driver2)
 
@@ -123,7 +127,7 @@ def test_set_driver_entities(
     assert input_params.get_driver_count() == 2
 
     # Act
-    driver = Driver(driver_id=45, position=Position([15.0, 25.0]))
+    driver = Driver(driver_id=45, position=Position([15.0, 25.0]), shift=DEFAULT_SHIFT)
     input_params.set_driver_entities({45: driver})
 
     # Assert
@@ -214,7 +218,7 @@ def test_add_driver(input_params: InputParameter, env: simpy.Environment) -> Non
     assert 12 not in original_drivers.keys()
 
     # Act
-    driver = Driver(driver_id=12, position=Position([15.0, 25.0]))
+    driver = Driver(driver_id=12, position=Position([15.0, 25.0]), shift=DEFAULT_SHIFT)
     input_params.add_driver(driver)
 
     # Assert
@@ -297,7 +301,7 @@ def test_remove_station_fail(
 def test_remove_driver_success(
     input_params: InputParameter, env: simpy.Environment
 ) -> None:
-    driver = Driver(driver_id=12, position=Position([15.0, 25.0]))
+    driver = Driver(driver_id=12, position=Position([15.0, 25.0]), shift=DEFAULT_SHIFT)
     input_params.add_driver(driver)
     added_drivers = input_params.get_driver_entities()
     assert 12 in added_drivers.keys()
@@ -322,7 +326,7 @@ def test_remove_driver_fail(
     assert input_params.get_driver_count() == 2
 
     # Act
-    driver = Driver(driver_id=13, position=Position([15.0, 25.0]))
+    driver = Driver(driver_id=13, position=Position([15.0, 25.0]), shift=DEFAULT_SHIFT)
     input_params.remove_driver(driver)
 
     # Assert

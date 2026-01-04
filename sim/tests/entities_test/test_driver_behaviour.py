@@ -31,6 +31,7 @@ from sim.entities.station import Station
 from sim.entities.task_state import State
 from sim.behaviour.sim_behaviour import SimBehaviour
 from sim.entities.vehicle import Vehicle
+from sim.entities.shift import Shift
 
 
 class FakeTask(Task):
@@ -87,11 +88,15 @@ class FakeTask(Task):
         self.unassign_driver()
 
 
+# Default shift for drivers in these tests
+DEFAULT_SHIFT = Shift(0.0, 24.0, None)
+
+
 def test_travel_to_returns_immediately_when_already_at_position() -> None:
     """Test that travel_to returns early if already at destination"""
     env = simpy.Environment()
     start_pos = Position([0.0, 0.0])
-    driver = Driver(driver_id=1, position=start_pos)
+    driver = Driver(driver_id=1, position=start_pos, shift=DEFAULT_SHIFT)
     driver.env = env
 
     # Mock map map (shouldn't be called)
@@ -113,7 +118,7 @@ def test_travel_to_handles_tuple_return_from_route_next() -> None:
     env = simpy.Environment()
     start_pos = Position([0.0, 0.0])
     dest_pos = Position([1.0, 1.0])
-    driver = Driver(driver_id=1, position=start_pos)
+    driver = Driver(driver_id=1, position=start_pos, shift=DEFAULT_SHIFT)
     driver.env = env
 
     # Mock route that returns tuple on first call, then positions
@@ -155,7 +160,7 @@ def test_travel_to_handles_single_position_return_from_route_next() -> None:
     env = simpy.Environment()
     start_pos = Position([0.0, 0.0])
     dest_pos = Position([1.0, 1.0])
-    driver = Driver(driver_id=1, position=start_pos)
+    driver = Driver(driver_id=1, position=start_pos, shift=DEFAULT_SHIFT)
     driver.env = env
 
     # Mock route that returns single position (not tuple)
@@ -190,7 +195,7 @@ def test_travel_to_can_be_interrupted() -> None:
     env = simpy.Environment()
     start_pos = Position([0.0, 0.0])
     dest_pos = Position([5.0, 5.0])
-    driver = Driver(driver_id=1, position=start_pos)
+    driver = Driver(driver_id=1, position=start_pos, shift=DEFAULT_SHIFT)
     driver.env = env
 
     # Mock route with many positions
@@ -225,7 +230,7 @@ def test_travel_to_can_be_interrupted() -> None:
 def test_driver_run_waits_for_initialization() -> None:
     """Test that driver run() yields at start to allow initialization"""
     env = simpy.Environment()
-    driver = Driver(driver_id=1, position=Position([0.0, 0.0]))
+    driver = Driver(driver_id=1, position=Position([0.0, 0.0]), shift=DEFAULT_SHIFT)
     driver.env = env
     vehicle = Vehicle(vehicle_id=1, battery_count=10)
     vehicle.set_driver(driver)
@@ -256,7 +261,7 @@ def test_driver_run_selects_and_dispatches_task() -> None:
     """Test that driver run() selects and dispatches tasks correctly"""
     env = simpy.Environment()
     start_pos = Position([0.0, 0.0])
-    driver = Driver(driver_id=1, position=start_pos)
+    driver = Driver(driver_id=1, position=start_pos, shift=DEFAULT_SHIFT)
     driver.env = env
     vehicle = Vehicle(vehicle_id=1, battery_count=10)
     vehicle.set_driver(driver)
@@ -304,7 +309,7 @@ def test_driver_run_services_task_when_at_station() -> None:
     # Create station first, THEN resource (so resource.run() starts)
     station = Station(station_id=1, name="Station1", position=station_pos)
     station.env = env
-    driver = Driver(driver_id=1, position=station_pos)
+    driver = Driver(driver_id=1, position=station_pos, shift=DEFAULT_SHIFT)
     driver.env = env
     vehicle = Vehicle(vehicle_id=1, battery_count=10)
     vehicle.set_driver(driver)
@@ -342,7 +347,7 @@ def test_driver_run_does_not_service_task_when_not_at_station() -> None:
 
     # Create station first
     station = Station(station_id=1, name="Station1", position=station_pos)
-    driver = Driver(driver_id=1, position=resource_pos)
+    driver = Driver(driver_id=1, position=resource_pos, shift=DEFAULT_SHIFT)
 
     # Create a task at a different station and manually set to in-progress
     task = FakeTask(task_id=1, station=station)
@@ -368,7 +373,7 @@ def test_driver_run_does_not_service_task_when_not_at_station() -> None:
 def test_driver_run_handles_no_tasks() -> None:
     """Test that driver run() handles case when there are no tasks"""
     env = simpy.Environment()
-    driver = Driver(driver_id=1, position=Position([0.0, 0.0]))
+    driver = Driver(driver_id=1, position=Position([0.0, 0.0]), shift=DEFAULT_SHIFT)
 
     # Set up behaviour
     mock_behaviour = Mock(spec=SimBehaviour)
@@ -389,7 +394,7 @@ def test_driver_run_handles_no_tasks() -> None:
 def test_driver_run_handles_none_station_on_task() -> None:
     """Test that driver run() handles tasks with None station"""
     env = simpy.Environment()
-    driver = Driver(driver_id=1, position=Position([0.0, 0.0]))
+    driver = Driver(driver_id=1, position=Position([0.0, 0.0]), shift=DEFAULT_SHIFT)
 
     # Create a task with no station
     task = FakeTask(task_id=1, station=None)

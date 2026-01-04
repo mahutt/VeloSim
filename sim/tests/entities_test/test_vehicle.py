@@ -27,6 +27,7 @@ import simpy
 from sim.entities.vehicle import Vehicle
 from sim.entities.driver import Driver
 from sim.entities.position import Position
+from sim.entities.shift import Shift
 
 
 class TestVehicle:
@@ -40,8 +41,12 @@ class TestVehicle:
         return simpy.Environment()
 
     @pytest.fixture
-    def driver(self, default_position: Position) -> Driver:
-        return Driver(1, default_position)
+    def default_shift(self) -> Shift:
+        return Shift(0.0, 24.0, None)
+
+    @pytest.fixture
+    def driver(self, default_position: Position, default_shift: Shift) -> Driver:
+        return Driver(1, default_position, default_shift)
 
     @pytest.fixture
     def vehicle(self) -> Vehicle:

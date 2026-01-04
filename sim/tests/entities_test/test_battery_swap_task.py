@@ -28,6 +28,7 @@ from sim.entities.BatterySwapTask import BatterySwapTask, State
 from sim.entities.station import Station
 from sim.entities.position import Position
 from sim.entities.driver import Driver
+from sim.entities.shift import Shift
 
 # from sim.entities.task import Task, State
 
@@ -70,6 +71,9 @@ class TestBatterySwapTask:
         assert task.get_station() is None
         assert task.get_state() == State.OPEN
         assert task.get_assigned_driver() is None
+
+    # Default shift for drivers in this test module
+    DEFAULT_SHIFT = Shift(0.0, 24.0, None)
 
     def test_get_and_set_state(self, simpy_env: simpy.Environment) -> None:
         task = BatterySwapTask(1)
@@ -127,7 +131,7 @@ class TestBatterySwapTask:
         assigned_driver = task.get_assigned_driver()
         assert assigned_driver is None
 
-        driver = Driver(1, Position([-73.5673, 45.5017]))
+        driver = Driver(1, Position([-73.5673, 45.5017]), self.DEFAULT_SHIFT)
         task.set_assigned_driver(driver)
         assigned_driver = task.get_assigned_driver()
         assert assigned_driver is not None
@@ -138,7 +142,7 @@ class TestBatterySwapTask:
     ) -> None:
         # Arrange
         task = BatterySwapTask(1, default_station)
-        driver = Driver(1, Position([-73.5673, 45.5017]))
+        driver = Driver(1, Position([-73.5673, 45.5017]), self.DEFAULT_SHIFT)
         task.set_assigned_driver(driver)
         assert task.get_assigned_driver() == driver
         assert task.get_state() == State.ASSIGNED
@@ -155,7 +159,7 @@ class TestBatterySwapTask:
     ) -> None:
         # Arrange
         task = BatterySwapTask(1, default_station)
-        driver = Driver(1, Position([-73.5673, 45.5017]))
+        driver = Driver(1, Position([-73.5673, 45.5017]), self.DEFAULT_SHIFT)
         task.set_assigned_driver(driver)
 
         # Act

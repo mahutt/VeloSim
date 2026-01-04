@@ -31,6 +31,7 @@ from pydantic import (
     model_validator,
     field_validator,
     ConfigDict,
+    ValidationInfo,
 )
 
 from sim.entities.inputParameters import InputParameter
@@ -38,6 +39,7 @@ from sim.entities.station import Station
 from sim.entities.driver import Driver
 from sim.entities.vehicle import Vehicle
 from sim.entities.BatterySwapTask import BatterySwapTask
+from sim.entities.shift import Shift
 from sim.entities.position import Position
 from sim.utils.base_parse_strategy import BaseParseStrategy
 
@@ -56,6 +58,28 @@ GREATER_MONTREAL_COORDINATES: Dict[str, float] = {
     "lon_min": -74.26000,  # Western Boundary
     "lon_max": -73.22000,  # Eastern Boundary
 }
+
+
+def _to_seconds(time_str: str) -> int:
+    """Convert 'dayX:HH:MM' to total seconds from simulation start.
+
+    Assumes input has already been validated by _validate_day_time_format.
+
+    Args:
+        time_str: Time in format 'dayX:HH:MM'.
+
+    Returns:
+        Total seconds since simulation start.
+    """
+    daytime_split = time_str.split(":", 1)
+    day = daytime_split[0]
+    time = daytime_split[1]
+
+    day_match = re.match(r"^day(\d+)$", day, re.IGNORECASE)
+    day_int = int(day_match.group(1)) - 1  # type: ignore
+
+    t = datetime.strptime(time, "%H:%M")
+    return (day_int * 24) * 3600 + t.hour * 3600 + t.minute * 60
 
 
 def _validate_day_time_format(time_value: Any) -> str:
@@ -205,6 +229,56 @@ class ShiftValidator(BaseModel):
             return _validate_day_time_format(v)
         else:
             raise ValueError(f"Time must be a string or None, got {type(v)}")
+
+    @field_validator("end_time", mode="after")
+    @classmethod
+    def end_after_start(cls, v: str, info: ValidationInfo) -> str:
+        """Ensure end_time is strictly after start_time.
+
+        Args:
+            v: End time string in format "dayX:HH:MM".
+            info: Pydantic validation context containing start_time.
+
+        Returns:
+            The validated end time string.
+
+        Raises:
+            ValueError: If end_time is not strictly after start_time.
+        """
+        start = info.data.get("start_time")
+        if isinstance(start, str):
+            if _to_seconds(v) <= _to_seconds(start):
+                raise ValueError("end_time must be after start_time")
+        return v
+
+    @field_validator("lunch_break", mode="after")
+    @classmethod
+    def lunch_within_shift(
+        cls, v: Optional[str], info: ValidationInfo
+    ) -> Optional[str]:
+        """Ensure lunch_break, if provided, is within the shift interval.
+
+        Args:
+            v: Optional lunch break string in format "dayX:HH:MM".
+            info: Pydantic validation context containing start_time and end_time.
+
+        Returns:
+            The validated lunch break string if provided, otherwise None.
+
+        Raises:
+            ValueError: If lunch_break is not between start_time and end_time.
+        """
+        if v is None:
+            return v
+        start = info.data.get("start_time")
+        end = info.data.get("end_time")
+        if isinstance(start, str) and isinstance(end, str):
+            lunch_s = _to_seconds(v)
+            start_s = _to_seconds(start)
+            end_s = _to_seconds(end)
+            if not (start_s < lunch_s < end_s):
+                raise ValueError("lunch_break must be between start_time and end_time")
+        return v
 
 
 class DriverValidator(BaseModel):
@@ -1055,16 +1129,31 @@ class JsonParseStrategy(BaseParseStrategy):
             # Match as many drivers and vehicles as possible.
             try:
                 # Pop next driver from scenario (details unused here)
-                drivers_from_scenario.pop(0)
+                d = drivers_from_scenario.pop(0)
+
+                # Parse shift
+                shift = d.get("shift")
+                st = self._time_to_seconds(str(shift.get("start_time")))
+                et = self._time_to_seconds(str(shift.get("end_time")))
+                lt = shift.get("lunch_break", None)
+                lt = self._time_to_seconds(str(lt)) if lt is not None else None
+                driver_shift = Shift(start_time=st, end_time=et, lunch_break=lt)
+
                 did = driver_id_counter
+
                 driver_id_counter += 1
                 pos = v.get("position")
                 if pos:
                     pos = Position(pos)
                 else:
-                    pos = Position(DEFAULT_VEHICLE_POSITION)
+                    pos = Position(DEFAULT_BIXI_VEHICLE_POS)
+
                 drivers[did] = Driver(
-                    driver_id=did, position=pos, task_list=[], vehicle=vehicles[vid]
+                    driver_id=did,
+                    position=pos,
+                    task_list=[],
+                    vehicle=vehicles[vid],
+                    shift=driver_shift,
                 )
                 vehicles[vid].set_driver(drivers[did])
             except IndexError:

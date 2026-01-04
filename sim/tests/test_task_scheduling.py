@@ -31,6 +31,7 @@ from sim.entities.position import Position
 from sim.entities.station import Station
 from sim.entities.task_state import State
 from sim.entities.vehicle import Vehicle
+from sim.entities.shift import Shift
 
 
 @pytest.fixture
@@ -46,9 +47,28 @@ def station(env: simpy.Environment) -> Station:
 
 
 @pytest.fixture
+def resource(env: simpy.Environment) -> Driver:
+    # Create new test driver (resource replacement)
+    res = Driver(
+        driver_id=1,
+        position=Position([0.0, 0.0]),
+        shift=Shift(start_time=0.0, end_time=86400.0, lunch_break=None),
+    )
+    res.env = env
+    # Mock the sim_behaviour and map_controller to avoid AttributeError
+    res.sim_behaviour = Mock()
+    res.map_controller = Mock()
+    return res
+
+
+@pytest.fixture
 def driver(env: simpy.Environment) -> Driver:
     # Create new test driver (resource replacement)
-    res = Driver(driver_id=1, position=Position([0.0, 0.0]))
+    res = Driver(
+        driver_id=1,
+        position=Position([0.0, 0.0]),
+        shift=Shift(start_time=0.0, end_time=86400.0, lunch_break=None),
+    )
     res.env = env
     vehicle = Vehicle(vehicle_id=1, battery_count=10)
     vehicle.set_driver(res)
@@ -126,7 +146,11 @@ def test_resource_immediate_dispatch(
 def test_resource_scheduled_dispatch(env: simpy.Environment, station: Station) -> None:
     # Dispatching with delays
     task = BatterySwapTask(task_id=2, station=station)
-    resource = Driver(driver_id=2, position=Position([0.0, 0.0]))
+    resource = Driver(
+        driver_id=2,
+        position=Position([0.0, 0.0]),
+        shift=Shift(start_time=0.0, end_time=86400.0, lunch_break=None),
+    )
     resource.env = env
     # Mock the sim_behaviour and map_controller to avoid AttributeError
     resource.sim_behaviour = Mock()
@@ -217,7 +241,11 @@ def test_resource_get_in_progress_task(
     env: simpy.Environment, station: Station
 ) -> None:
     # Ensure that a task cannot get interrupted by another assignment.
-    resource = Driver(driver_id=1, position=Position([0.0, 0.0]))
+    resource = Driver(
+        driver_id=1,
+        position=Position([0.0, 0.0]),
+        shift=Shift(start_time=0.0, end_time=86400.0, lunch_break=None),
+    )
     vehicle = Vehicle(vehicle_id=1, battery_count=10)
     vehicle.set_driver(resource)
     resource.set_vehicle(vehicle)
@@ -240,7 +268,11 @@ def test_dispatch_multiple_tasks_same_station(
     env: simpy.Environment, station: Station
 ) -> None:
     # Test dispatching multiple tasks at the same station
-    resource = Driver(driver_id=1, position=Position([0.0, 0.0]))
+    resource = Driver(
+        driver_id=1,
+        position=Position([0.0, 0.0]),
+        shift=Shift(start_time=0.0, end_time=86400.0, lunch_break=None),
+    )
     task1 = BatterySwapTask(task_id=1, station=station)
     task2 = BatterySwapTask(task_id=2, station=station)
 
@@ -259,7 +291,11 @@ def test_dispatch_task_different_station_raises_exception(
     env: simpy.Environment, station: Station
 ) -> None:
     # Test that dispatching tasks at different stations raises exception.
-    resource = Driver(driver_id=1, position=Position([0.0, 0.0]))
+    resource = Driver(
+        driver_id=1,
+        position=Position([0.0, 0.0]),
+        shift=Shift(start_time=0.0, end_time=86400.0, lunch_break=None),
+    )
     station2 = Station(station_id=2, name="Station 2", position=Position([1.0, 1.0]))
 
     task1 = BatterySwapTask(task_id=1, station=station)
@@ -281,7 +317,10 @@ def test_resource_with_initial_task_list(
     task2 = BatterySwapTask(task_id=2, station=station)
 
     resource = Driver(
-        driver_id=1, position=Position([0.0, 0.0]), task_list=[task1, task2]
+        driver_id=1,
+        position=Position([0.0, 0.0]),
+        shift=Shift(start_time=0.0, end_time=86400.0, lunch_break=None),
+        task_list=[task1, task2],
     )
 
     assert resource.get_task_count() == 2
@@ -304,7 +343,11 @@ def test_zero_dispatch_delay_keeps_task_assigned(
 ) -> None:
     # Test that dispatch_delay of 0 keeps task ASSIGNED (not auto-dispatched).
     task = BatterySwapTask(task_id=1, station=station)
-    resource = Driver(driver_id=1, position=Position([0.0, 0.0]))
+    resource = Driver(
+        driver_id=1,
+        position=Position([0.0, 0.0]),
+        shift=Shift(start_time=0.0, end_time=86400.0, lunch_break=None),
+    )
 
     resource.assign_task(task, dispatch_delay=0)
     assert task.get_state() == State.ASSIGNED
@@ -343,7 +386,11 @@ def test_task_state_string_conversions(
     assert str(task.get_state()) == "open"
 
     # Test ASSIGNED state
-    resource = Driver(driver_id=1, position=Position([0.0, 0.0]))
+    resource = Driver(
+        driver_id=1,
+        position=Position([0.0, 0.0]),
+        shift=Shift(start_time=0.0, end_time=86400.0, lunch_break=None),
+    )
     vehicle = Vehicle(vehicle_id=1, battery_count=10)
     vehicle.set_driver(resource)
     resource.set_vehicle(vehicle)

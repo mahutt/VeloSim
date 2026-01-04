@@ -33,6 +33,7 @@ from sim.entities.inputParameters import InputParameter
 from sim.entities.frame import Frame
 from sim.entities.station import Station
 from sim.entities.driver import Driver
+from sim.entities.shift import Shift
 from sim.entities.BatterySwapTask import BatterySwapTask
 from sim.entities.position import Position
 from sim.entities.task_state import State
@@ -121,8 +122,10 @@ def input_params(env: simpy.Environment) -> InputParameter:
     params.add_station(station2)
 
     # Add test drivers
-    driver1 = Driver(driver_id=1, position=Position([15.0, 25.0]))
-    driver2 = Driver(driver_id=2, position=Position([35.0, 45.0]))
+    shift1 = Shift(start_time=28800, end_time=43200, lunch_break=36000)
+    shift2 = Shift(start_time=28900, end_time=43200, lunch_break=38000)
+    driver1 = Driver(driver_id=1, position=Position([15.0, 25.0]), shift=shift1)
+    driver2 = Driver(driver_id=2, position=Position([35.0, 45.0]), shift=shift2)
     params.add_driver(driver1)
     params.add_driver(driver2)
 

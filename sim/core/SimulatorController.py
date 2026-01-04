@@ -32,6 +32,7 @@ from sim.entities.task_state import State
 from sim.entities.frame import Frame
 from sim.entities.driver import Driver
 from sim.entities.vehicle import Vehicle
+from sim.entities.shift import Shift
 from sim.entities.clock import Clock
 from sim.entities.task import Task
 from sim.entities.inputParameters import InputParameter
@@ -479,6 +480,7 @@ class SimulatorController:
             if is_key or driver.has_updated:
                 in_progress_task = driver.get_in_progress_task()
                 current_vehicle = driver.get_vehicle()
+                shift: Shift = driver.get_driver_shift()
                 # Build driver data
                 driver_data = {
                     "id": driver.id,
@@ -490,6 +492,11 @@ class SimulatorController:
                         if in_progress_task is not None
                         else None
                     ),
+                    "shift": {
+                        "start_time": shift.get_start_time(),
+                        "end_time": shift.get_end_time(),
+                        "lunch_break": shift.get_lunch_break(),
+                    },
                     "vehicleId": (
                         current_vehicle.id if current_vehicle is not None else None
                     ),
