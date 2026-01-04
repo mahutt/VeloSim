@@ -215,7 +215,7 @@
     },
     {
       "datasource": { "type": "prometheus", "uid": "prometheus" },
-      "description": "Shows how fast memory is growing over time. **~0 bytes/sec** = stable (good). **Positive & steady** = memory leak (investigate). **Negative** = memory being freed (good). **Spiky** = normal allocation patterns. Red line at 100 KB/s indicates sustained growth that may require attention.",
+      "description": "Shows how fast memory is growing over time. **~0 bytes/sec** = stable (good). **Positive & steady** over hours = potential memory leak (investigate). **Negative** = memory being freed (good). **Spiky** = normal allocation patterns during active use. Context matters: growth during simulations is expected, but sustained growth while idle indicates a problem.",
       "fieldConfig": {
         "defaults": {
           "color": { "mode": "palette-classic" },
@@ -236,14 +236,13 @@
             "showPoints": "never",
             "spanNulls": false,
             "stacking": { "group": "A", "mode": "none" },
-            "thresholdsStyle": { "mode": "line" }
+            "thresholdsStyle": { "mode": "off" }
           },
           "mappings": [],
           "thresholds": {
             "mode": "absolute",
             "steps": [
-              { "color": "green", "value": null },
-              { "color": "red", "value": 100000 }
+              { "color": "green", "value": null }
             ]
           },
           "unit": "Bps"
