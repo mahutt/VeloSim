@@ -37,6 +37,7 @@ import OverwriteSaveDialog from '~/components/scenario/overwrite-save-dialog';
 import { useScenarioOperations } from '~/hooks/use-scenario-operations';
 import useError from '~/hooks/use-error';
 import api from '~/api';
+import { log, LogLevel } from '~/lib/logger';
 
 export default function ScenarioEditor() {
   // Refs
@@ -172,6 +173,11 @@ export default function ScenarioEditor() {
 
           if (newId) {
             setSelectedScenarioId(newId);
+            log({
+              message: 'Scenario saved after import',
+              level: LogLevel.INFO,
+              context: 'scenario_save_imported',
+            });
             // Refresh sidebar after successful import
             const scenarios = await loadSavedScenarios();
             setSavedScenarios(scenarios);
@@ -243,7 +249,14 @@ export default function ScenarioEditor() {
         scenarioName,
         scenarioDescription
       );
-      if (newId) setSelectedScenarioId(newId);
+      if (newId) {
+        setSelectedScenarioId(newId);
+        log({
+          message: 'New scenario saved',
+          level: LogLevel.INFO,
+          context: 'scenario_save_new',
+        });
+      }
       // Refresh sidebar after save
       const scenarios = await loadSavedScenarios();
       setSavedScenarios(scenarios);
@@ -294,7 +307,14 @@ export default function ScenarioEditor() {
     setScenarioName(newName);
     setOverwriteDialogOpen(false);
     setIsEditMode(false);
-    if (newId) setSelectedScenarioId(newId);
+    if (newId) {
+      setSelectedScenarioId(newId);
+      log({
+        message: 'Scenario saved as new',
+        level: LogLevel.INFO,
+        context: 'scenario_save_as_new',
+      });
+    }
     // Refresh sidebar after save as new
     const scenarios = await loadSavedScenarios();
     setSavedScenarios(scenarios);
@@ -343,6 +363,11 @@ export default function ScenarioEditor() {
         );
         if (newId) {
           setSelectedScenarioId(newId);
+          log({
+            message: 'Scenario saved after name dialog',
+            level: LogLevel.INFO,
+            context: 'scenario_save_name_dialog',
+          });
           // Refresh sidebar after save
           const scenarios = await loadSavedScenarios();
           setSavedScenarios(scenarios);

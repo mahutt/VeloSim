@@ -26,6 +26,14 @@ import json
 from typing import Optional
 from back.schemas.frontend_log import FrontendLogEntry
 from back.grafana_logging.logger import VeloSimLogger
+from opentelemetry import metrics
+
+meter = metrics.get_meter("velosim.frontend")
+
+frontend_action_counter = meter.create_counter(
+    name="frontend.action.total",
+    description="Count of frontend actions by type",
+)
 
 
 class FrontendLogService:
@@ -51,6 +59,7 @@ class FrontendLogService:
         # Build structured log message matching frontend's format
         log_data = {
             "source": "frontend",
+            "level": log_entry.level.value if log_entry.level else "error",
             "message": log_entry.message,
             "timestamp": log_entry.timestamp,
             "user_id": user_id,
@@ -91,6 +100,15 @@ class FrontendLogService:
             log_entry.level.value if log_entry.level else "error", self.logger.error
         )
         log_func(log_message)
+
+        if log_entry.context:
+            frontend_action_counter.add(
+                1,
+                {
+                    "action": log_entry.context,
+                    "user_id": str(user_id) if user_id is not None else "unknown",
+                },
+            )
 
     def log_batch(
         self, log_entries: list[FrontendLogEntry], user_id: Optional[int] = None

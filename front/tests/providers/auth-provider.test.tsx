@@ -32,6 +32,7 @@ import { TOKEN_STORAGE_KEY } from '~/constants';
 const mockSessionStorage = {
   getItem: vi.fn(),
   setItem: vi.fn(),
+  removeItem: vi.fn(),
   clear: vi.fn(),
 };
 Object.defineProperty(window, 'sessionStorage', {
@@ -54,12 +55,24 @@ vi.mock('~/api', () => {
   };
 });
 
+// Mock logger
+vi.mock('~/lib/logger', () => ({
+  log: vi.fn(),
+  LogLevel: {
+    DEBUG: 'debug',
+    INFO: 'info',
+    WARNING: 'warning',
+    ERROR: 'error',
+  },
+}));
+
 // Mock react-router useNavigate
+const mockNavigate = vi.fn();
 vi.mock('react-router', async (importOriginal) => {
   const actual = await importOriginal<typeof import('react-router')>();
   return {
     ...actual,
-    useNavigate: () => vi.fn(),
+    useNavigate: () => mockNavigate,
   };
 });
 
@@ -239,4 +252,41 @@ test('fetches user data when token exists on mount', async () => {
 
   const userElement = await findByTestId('user');
   expect(JSON.parse(userElement.textContent!).username).toBe('demo_user');
+});
+
+test('logs user logout when logout is called', async () => {
+  mockSessionStorage.getItem.mockReturnValue('some-token');
+  mockNavigate.mockClear();
+
+  const { findByTestId } = render(
+    <AuthProvider>
+      <AuthContext.Consumer>
+        {(value) => {
+          if (!value) throw new Error('AuthContext is undefined');
+          return (
+            <>
+              <TestComponent />
+              <button data-testid="logout-btn" onClick={() => value.logout()}>
+                Logout
+              </button>
+            </>
+          );
+        }}
+      </AuthContext.Consumer>
+    </AuthProvider>
+  );
+
+  const logoutButton = await findByTestId('logout-btn');
+
+  act(() => {
+    logoutButton.click();
+  });
+
+  const { log: mockLog } = vi.mocked(await import('~/lib/logger'));
+  // Verify the log was called with correct context
+  expect(mockLog).toHaveBeenCalledWith({
+    message: 'User logged out',
+    level: 'info',
+    context: 'user_logout',
+  });
 });

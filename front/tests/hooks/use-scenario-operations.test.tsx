@@ -49,6 +49,17 @@ vi.mock('../../app/api', () => ({
   },
 }));
 
+// Mock the logger module
+vi.mock('../../app/lib/logger', () => ({
+  log: vi.fn(),
+  LogLevel: {
+    DEBUG: 'debug',
+    INFO: 'info',
+    WARNING: 'warning',
+    ERROR: 'error',
+  },
+}));
+
 // Wrapper component to provide ErrorProvider context
 const Wrapper = ({ children }: { children: ReactNode }) => (
   <ErrorProvider>{children}</ErrorProvider>
