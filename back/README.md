@@ -105,20 +105,16 @@ alembic revision --autogenerate -m "message"  # Generate migration
 
 Configure these variables in your `.env` file (see [root README](../README.md) for setup):
 
-| Variable                           | Description                                               | Default Value                                         | Required |
-| ---------------------------------- | --------------------------------------------------------- | ----------------------------------------------------- | -------- |
-| `ENVIRONMENT`                      | Application environment                                   | `development`                                         | No       |
-| `DEBUG`                            | Enable debug mode                                         | `true`                                                | No       |
-| `DATABASE_URL`                     | PostgreSQL connection string                              | `postgresql://velosim:velosim@localhost:5433/velosim` | Yes      |
-| `LOG_LEVEL`                        | Minimum log level to record                               | `INFO`                                                | No       |
-| `LOG_TO_FILE`                      | Enable writing logs to file                               | `true`                                                | No       |
-| `LOG_TO_CONSOLE`                   | Enable console output                                     | `true`                                                | No       |
-| `LOG_FILE_PATH`                    | Path to log file                                          | `back/grafana_logging/logs.txt`                       | No       |
-| `SIMULATION_IDLE_TIMEOUT_SECONDS`  | Timeout (seconds) before shutting down an idle simulation | `15`                                                  | No       |
-| `FEATURE_STATIONS_API_ROUTER`      | Enable Stations API router                                | `false`                                               | No       |
-| `FEATURE_STATION_TASKS_API_ROUTER` | Enable Station Tasks API router                           | `false`                                               | No       |
-| `FEATURE_RESOURCES_API_ROUTER`     | Enable Resources API router                               | `false`                                               | No       |
-
+| Variable                          | Description                                               | Default Value                                         | Required |
+| --------------------------------- | --------------------------------------------------------- | ----------------------------------------------------- | -------- |
+| `ENVIRONMENT`                     | Application environment                                   | `development`                                         | No       |
+| `DEBUG`                           | Enable debug mode                                         | `true`                                                | No       |
+| `DATABASE_URL`                    | PostgreSQL connection string                              | `postgresql://velosim:velosim@localhost:5433/velosim` | Yes      |
+| `LOG_LEVEL`                       | Minimum log level to record                               | `INFO`                                                | No       |
+| `LOG_TO_FILE`                     | Enable writing logs to file                               | `true`                                                | No       |
+| `LOG_TO_CONSOLE`                  | Enable console output                                     | `true`                                                | No       |
+| `LOG_FILE_PATH`                   | Path to log file                                          | `back/grafana_logging/logs.txt`                       | No       |
+| `SIMULATION_IDLE_TIMEOUT_SECONDS` | Timeout (seconds) before shutting down an idle simulation | `15`                                                  | No       |
 
 **Environment Options:**
 
@@ -134,14 +130,10 @@ See the [Logging System README](./grafana_logging/README.md) for complete loggin
 
 The following settings are configured in `back/core/config.py`:
 
-| Setting                                 | Value                      | Description                                    |
-| --------------------------------------- | -------------------------- | ---------------------------------------------- |
-| `API_V1_PREFIX`                         | `/api/v1`                  | API version prefix for all endpoints           |
-| `ALLOWED_ORIGINS`                       | Multiple localhost URLs    | CORS allowed origins for development           |
-| `FEATURE_STATIONS_API_ROUTER`           | `true` / `false`           | Feature flag for Stations API endpoints        |
-| `FEATURE_STATION_TASKS_API_ROUTER`      | `true` / `false`           | Feature flag for Station Tasks API endpoints   |
-| `FEATURE_RESOURCES_API_ROUTER`          | `true` / `false`           | Feature flag for Resources API endpoints       |
-
+| Setting           | Value                   | Description                          |
+| ----------------- | ----------------------- | ------------------------------------ |
+| `API_V1_PREFIX`   | `/api/v1`               | API version prefix for all endpoints |
+| `ALLOWED_ORIGINS` | Multiple localhost URLs | CORS allowed origins for development |
 
 ## 🛠️ Development
 
@@ -211,7 +203,7 @@ logger.error("An error occurred", exc_info=True)
 ### View Logs
 
 1. Start the logging stack: `docker-compose up -d`
-2. Open Grafana: http://localhost:3000 (admin/admin)
+2. Open Grafana: http://localhost:3001 (admin/velosim)
 3. Navigate to **Explore** → Query: `{job="python_app"}`
 
 ### Documentation
