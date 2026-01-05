@@ -1,15 +1,20 @@
 # VeloSim Logging System
 
-Centralized logging infrastructure using **Grafana**, **Loki**, and **Promtail** for the VeloSim project.
+Centralized logging and monitoring infrastructure using **Grafana**, **Loki**, **Promtail**, and **Prometheus** for the VeloSim project.
 
 ## 🏗️ Architecture
 
 ### Components
 
-- **Grafana** (Port 3000): Web UI for log visualization and querying
+**Logging Stack:**
+- **Grafana** (Port 3001): Web UI for log visualization, querying, and metrics dashboards
 - **Loki** (Port 3100): Log aggregation and storage backend
 - **Promtail**: Scrapes logs from files and ships them to Loki
 - **Logger Module**: Python API for structured logging across all components
+
+**Monitoring Stack:**
+- **Prometheus** (Port 9090): Metrics collection and time-series database
+- **Python Backend Metrics**: Process-level metrics (CPU, RAM usage) via `prometheus_client`
 
 ## 🚀 Quick Start
 
@@ -193,4 +198,120 @@ Configure logging behavior with these environment variables in your `.env` file:
 
 # Rate of errors per minute
 rate({job="python_app"} |= "ERROR" [1m])
+```
+
+## 🛠️ Developer Guide
+
+### Extending the Monitoring Dashboard
+
+#### Adding New Panels
+
+1. **Via Grafana UI** (Recommended for development):
+   - Open http://localhost:3001 and navigate to the dashboard
+   - Click "Add" → "Visualization"
+   - Select Prometheus datasource
+   - Write your query (see examples below)
+   - Configure panel options (title, unit, thresholds)
+   - Click "Apply" and save the dashboard
+   - Export JSON: Dashboard Settings → JSON Model → Copy
+
+2. **Update the provisioned dashboard**:
+   - Paste the exported JSON into `grafana/provisioning/dashboards/python-performance.json`
+   - Restart Grafana: `docker-compose restart grafana` (or `docker-compose down` followed by `docker compose up -d`)
+
+### Exploring Available Metrics
+
+**Browse all metrics in Grafana**:
+1. Navigate to Explore → Prometheus
+2. Click "Metrics browser" button
+3. Search for:
+   - `process_*` - Python process metrics (CPU, memory, file descriptors)
+   - `up` - Service health status
+
+**Or query Prometheus directly**:
+```bash
+# List all available metrics
+curl http://localhost:9090/api/v1/label/__name__/values
+
+# Query Python backend memory usage
+curl 'http://localhost:9090/api/v1/query?query=process_resident_memory_bytes{job="velosim-backend"}'
+```
+
+### File Structure
+
+```
+back/grafana_logging/
+├── grafana/
+│   └── provisioning/
+│       ├── datasources/           # Datasource configurations
+│       │   ├── loki.yaml          # Loki datasource
+│       │   └── prometheus.yaml    # Prometheus datasource
+│       └── dashboards/            # Auto-provisioned dashboards
+│           ├── dashboards.yaml    # Dashboard provider config
+│           └── python-performance.json  # Performance dashboard
+├── loki/                          # Loki data storage
+├── prometheus/
+│   └── prometheus.yml             # Prometheus scrape config
+├── promtail/
+│   └── promtail-config.yaml       # Log scraping config
+├── logger.py                      # Python logging module
+└── README.md                      # This file
+```
+
+### Useful Resources
+
+**Official Documentation:**
+- [Grafana Docs](https://grafana.com/docs/grafana/latest/) - Dashboard creation, panels, queries
+- [Prometheus Docs](https://prometheus.io/docs/introduction/overview/) - Query language (PromQL), configuration
+- [cAdvisor GitHub](https://github.com/google/cadvisor) - Container metrics reference
+- [Node Exporter GitHub](https://github.com/prometheus/node_exporter) - Available collectors and metrics
+- [Loki Docs](https://grafana.com/docs/loki/latest/) - LogQL query language
+
+**Query Language References:**
+- [PromQL Basics](https://prometheus.io/docs/prometheus/latest/querying/basics/) - Prometheus query syntax
+- [PromQL Functions](https://prometheus.io/docs/prometheus/latest/querying/functions/) - rate(), sum(), avg(), etc.
+- [LogQL Docs](https://grafana.com/docs/loki/latest/logql/) - Log query syntax
+
+**Grafana Dashboard Development:**
+- [Panel Types](https://grafana.com/docs/grafana/latest/panels-visualizations/) - Time series, gauge, stat, etc.
+- [Dashboard JSON Model](https://grafana.com/docs/grafana/latest/dashboards/build-dashboards/view-dashboard-json-model/) - Dashboard structure
+- [Provisioning Dashboards](https://grafana.com/docs/grafana/latest/administration/provisioning/#dashboards) - Auto-load dashboards
+
+**Prometheus Exporters:**
+- [Exporters List](https://prometheus.io/docs/instrumenting/exporters/) - Third-party exporters for various services
+- [Writing Exporters](https://prometheus.io/docs/instrumenting/writing_exporters/) - Create custom exporters
+
+**Troubleshooting:**
+- Check Prometheus targets: http://localhost:9090/targets (all should show "UP")
+- Check backend metrics: http://localhost:8000/api/v1/metric/metrics
+- View Grafana logs: `docker logs velosim-grafana`
+- View Prometheus logs: `docker logs velosim-prometheus`
+
+### Common Development Tasks
+
+**Restart monitoring stack**:
+```bash
+docker-compose restart grafana prometheus
+```
+
+**View real-time logs**:
+```bash
+docker logs -f velosim-grafana
+docker logs -f velosim-prometheus
+```
+
+**Reset Grafana (clear all changes)**:
+```bash
+docker-compose down
+rm -rf back/grafana_logging/grafana_data
+docker-compose up -d
+```
+
+**Test Prometheus scraping**:
+```bash
+# Check if target is being scraped
+curl http://localhost:9090/api/v1/targets
+
+# Query a specific metric
+curl 'http://localhost:9090/api/v1/query?query=up'
 ```

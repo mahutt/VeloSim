@@ -3,7 +3,9 @@ global:
   evaluation_interval: 5s
 
 scrape_configs:
-  - job_name: "velosim"
+  # Python Backend - exposes process metrics automatically via prometheus_client
+  # Metrics: process_cpu_seconds_total, process_resident_memory_bytes, etc.
+  - job_name: "velosim-backend"
     metrics_path: /api/v1/metric/metrics
     static_configs:
       - targets: ["backend:8000"]
