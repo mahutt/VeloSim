@@ -43,7 +43,7 @@ from back.api.v1 import api_router
 from back.services.simulation_service import simulation_service
 from back.auth import Token, authenticate_user
 from back.database.session import get_db
-from back.grafana_logging.logger import get_logger
+from grafana_logging.logger import get_logger
 
 logger = get_logger(__name__)
 

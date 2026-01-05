@@ -25,7 +25,7 @@ SOFTWARE.
 import json
 from typing import Optional
 from back.schemas.frontend_log import FrontendLogEntry
-from back.grafana_logging.logger import VeloSimLogger
+from grafana_logging.logger import VeloSimLogger
 from opentelemetry import metrics
 
 meter = metrics.get_meter("velosim.frontend")

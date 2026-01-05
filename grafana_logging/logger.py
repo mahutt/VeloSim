@@ -51,7 +51,7 @@ class VeloSimLogger:
     and visualized in Grafana via Loki.
 
     Usage:
-        from back.grafana_logging.logger import get_logger
+        from grafana_logging.logger import get_logger
 
         logger = get_logger(__name__)
         logger.info("Application started")
@@ -227,7 +227,7 @@ def get_logger(name: str, level: Optional[str] = None) -> logging.Logger:
         A configured logger instance
 
     Example:
-        >>> from back.grafana_logging.logger import get_logger
+        >>> from grafana_logging.logger import get_logger
         >>> logger = get_logger(__name__)
         >>> logger.info("Application started")
     """

@@ -132,7 +132,7 @@ services:
       - GF_SERVER_DOMAIN={{ domain_name }}
       - GF_SERVER_ROOT_URL=https://{{ domain_name }}/grafana/
     volumes:
-      - {{ app_dir }}/source/back/grafana_logging/grafana/provisioning:/etc/grafana/provisioning:ro
+      - {{ app_dir }}/source/grafana_logging/grafana/provisioning:/etc/grafana/provisioning:ro
     networks:
       - velosim-net
     logging:
