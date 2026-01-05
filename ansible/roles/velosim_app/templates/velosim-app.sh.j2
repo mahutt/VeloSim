@@ -12,6 +12,8 @@ cd "$APP_DIR"
 case "$1" in
     start)
         echo "Starting VeloSim application..."
+        echo "Stopping and removing any existing containers..."
+        docker compose -f "$COMPOSE_FILE" down --remove-orphans || true
         echo "Pulling latest images..."
         docker compose -f "$COMPOSE_FILE" pull
         echo "Building application containers..."
