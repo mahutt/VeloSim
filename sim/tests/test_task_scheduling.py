@@ -30,6 +30,7 @@ from sim.entities.driver import Driver
 from sim.entities.position import Position
 from sim.entities.station import Station
 from sim.entities.task_state import State
+from sim.entities.vehicle import Vehicle
 
 
 @pytest.fixture
@@ -45,21 +46,13 @@ def station(env: simpy.Environment) -> Station:
 
 
 @pytest.fixture
-def resource(env: simpy.Environment) -> Driver:
-    # Create new test driver (resource replacement)
-    res = Driver(driver_id=1, position=Position([0.0, 0.0]))
-    res.env = env
-    # Mock the sim_behaviour and map_controller to avoid AttributeError
-    res.sim_behaviour = Mock()
-    res.map_controller = Mock()
-    return res
-
-
-@pytest.fixture
 def driver(env: simpy.Environment) -> Driver:
     # Create new test driver (resource replacement)
     res = Driver(driver_id=1, position=Position([0.0, 0.0]))
     res.env = env
+    vehicle = Vehicle(vehicle_id=1, battery_count=10)
+    vehicle.set_driver(res)
+    res.set_vehicle(vehicle)
     # Mock the sim_behaviour and map_controller to avoid AttributeError
     res.sim_behaviour = Mock()
     res.map_controller = Mock()
@@ -116,16 +109,16 @@ def test_multiple_scheduled_tasks(env: simpy.Environment, station: Station) -> N
 
 
 def test_resource_immediate_dispatch(
-    env: simpy.Environment, station: Station, resource: Driver
+    env: simpy.Environment, station: Station, driver: Driver
 ) -> None:
     task = BatterySwapTask(task_id=1, station=station)
     # Task is OPEN right away (not scheduled)
 
-    resource.assign_task(task)
+    driver.assign_task(task)
     assert task.get_state() == State.ASSIGNED, "Task should be ASSIGNED"
     # making sure after assigning a task, the state changes correctly.
 
-    resource.dispatch_task(task)
+    driver.dispatch_task(task)
     assert task.get_state() == State.IN_PROGRESS, "Task should be IN_PROGRESS"
     # making sure after dispatching a task, the state changes correctly.
 
@@ -166,7 +159,7 @@ def test_simulation_time_waiting(env: simpy.Environment, station: Station) -> No
 
 
 def test_full_lifecycle_with_scheduling(
-    env: simpy.Environment, station: Station, resource: Driver
+    env: simpy.Environment, station: Station, driver: Driver
 ) -> None:
     # Testing complete task lifecylce with delays
     task = BatterySwapTask(task_id=1, station=station, spawn_delay=2.0)
@@ -180,25 +173,25 @@ def test_full_lifecycle_with_scheduling(
     assert task.get_state() == State.OPEN
 
     assign_time = env.now
-    resource.assign_task(task, dispatch_delay=1.5)
+    driver.assign_task(task, dispatch_delay=1.5)
     assert task.get_state() == State.ASSIGNED
 
     env.run(until=assign_time + 2.0)
     assert task.get_state() == State.IN_PROGRESS
 
-    resource.service_task(task)
+    driver.service_task(task)
     assert task.get_state() == State.CLOSED
 
 
 def test_task_unassign_driver(
-    env: simpy.Environment, station: Station, resource: Driver
+    env: simpy.Environment, station: Station, driver: Driver
 ) -> None:
     # Test unassigning tasks. Assumed that its possible a task might be still available.
     task = BatterySwapTask(task_id=1, station=station)
 
-    resource.assign_task(task)
+    driver.assign_task(task)
     assert task.get_state() == State.ASSIGNED
-    assert task.get_assigned_driver() == resource
+    assert task.get_assigned_driver() == driver
 
     task.unassign_driver()
     assert task.get_state() == State.OPEN
@@ -225,6 +218,9 @@ def test_resource_get_in_progress_task(
 ) -> None:
     # Ensure that a task cannot get interrupted by another assignment.
     resource = Driver(driver_id=1, position=Position([0.0, 0.0]))
+    vehicle = Vehicle(vehicle_id=1, battery_count=10)
+    vehicle.set_driver(resource)
+    resource.set_vehicle(vehicle)
     task1 = BatterySwapTask(task_id=1, station=station)
     task2 = BatterySwapTask(task_id=2, station=station)
 
@@ -348,6 +344,9 @@ def test_task_state_string_conversions(
 
     # Test ASSIGNED state
     resource = Driver(driver_id=1, position=Position([0.0, 0.0]))
+    vehicle = Vehicle(vehicle_id=1, battery_count=10)
+    vehicle.set_driver(resource)
+    resource.set_vehicle(vehicle)
     resource.assign_task(task)
     assert str(task.get_state()) == "assigned"
 

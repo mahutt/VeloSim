@@ -69,10 +69,10 @@ VALUES
     '{
         "start_time": "day1:08:00",
         "end_time": "day1:12:00",
-        "vehicle_battery_capacity": 999,
+        "vehicle_battery_capacity": 20,
         "vehicles": [
-            { "name": "Vehicle 1", "position": [-73.5610, 45.5070], "battery_count": 999 },
-            { "name": "Vehicle 2", "position": [-73.5670, 45.5090], "battery_count": 999 }
+            { "name": "Vehicle 1", "position": [-73.5610, 45.5070], "battery_count": 1 },
+            { "name": "Vehicle 2", "position": [-73.5670, 45.5090], "battery_count": 20 }
         ],
         "drivers": [
             { "name": "Driver 1", "shift": { "start_time": "day1:08:00", "end_time": "day1:12:00", "lunch_break": "day1:10:00" } },
@@ -101,9 +101,9 @@ VALUES
     '{
         "start_time": "day1:13:00",
         "end_time": "day1:17:00",
-        "vehicle_battery_capacity": 999,
+        "vehicle_battery_capacity": 50,
         "vehicles": [
-            { "name": "Vehicle 3", "position": [-73.5740, 45.5030], "battery_count": 999 }
+            { "name": "Vehicle 3", "position": [-73.5740, 45.5030], "battery_count": 50 }
         ],
         "drivers": [
             { "name": "Driver 3", "shift": { "start_time": "day1:13:00", "end_time": "day1:17:00", "lunch_break": "day1:15:00" } }

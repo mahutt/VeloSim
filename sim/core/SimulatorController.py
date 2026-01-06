@@ -467,7 +467,7 @@ class SimulatorController:
             {
                 "id": station.id,
                 "name": station.name,
-                "position": (station.get_station_position().get_position()),
+                "position": (station.get_position().get_position()),
                 "taskIds": [task.id for task in station.get_visible_tasks()],
             }
             for station in self.station_entities.values()
@@ -478,12 +478,13 @@ class SimulatorController:
         for driver in self.driver_entities.values():
             if is_key or driver.has_updated:
                 in_progress_task = driver.get_in_progress_task()
-                current_vehicle = driver.get_driver_vehicle()
+                current_vehicle = driver.get_vehicle()
                 # Build driver data
                 driver_data = {
                     "id": driver.id,
-                    "position": (driver.get_driver_position().get_position()),
+                    "position": (driver.get_position().get_position()),
                     "taskIds": [task.id for task in driver.get_visible_task_list()],
+                    "state": str(driver.get_state()),
                     "inProgressTaskId": (
                         in_progress_task.get_task_id()
                         if in_progress_task is not None
@@ -513,11 +514,12 @@ class SimulatorController:
         vehicles = []
         for vehicle in self.vehicle_entities.values():
             if is_key or vehicle.has_updated:
-                current_driver = vehicle.get_vehicle_driver()
+                current_driver = vehicle.get_driver()
                 vehicles.append(
                     {
                         "id": vehicle.id,
-                        "batteryCount": vehicle.get_vehicle_battery_count(),
+                        "batteryCount": vehicle.get_battery_count(),
+                        "batteryCapacity": vehicle.get_max_battery_count(),
                         "driverId": (
                             current_driver.id if current_driver is not None else None
                         ),

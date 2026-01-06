@@ -131,7 +131,7 @@ class Station:
         """
         return len(self.get_visible_tasks())
 
-    def get_station_position(self) -> "Position":
+    def get_position(self) -> "Position":
         """Get the geographical position of this station.
 
         Returns:
