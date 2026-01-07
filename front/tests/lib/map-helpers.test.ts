@@ -249,7 +249,7 @@ test('updateRouteDisplay clears display when routeGeometry is null', () => {
   const mockGeoJSONSource = { setData: vi.fn() };
   MockMap.instance!.getSource = vi.fn().mockReturnValue(mockGeoJSONSource);
 
-  updateRouteDisplay(null, 0, MockMap.instance! as unknown as mapboxgl.Map);
+  updateRouteDisplay(null, 0, 0, MockMap.instance! as unknown as mapboxgl.Map);
 
   expect(MockMap.instance?.getSource).toHaveBeenCalledWith('route-next-task');
   expect(MockMap.instance?.getSource).toHaveBeenCalledWith(
@@ -270,6 +270,7 @@ test('updateRouteDisplay clears display when routeGeometry has less than 2 point
 
   updateRouteDisplay(
     [[-73.5, 45.5]],
+    0,
     0,
     MockMap.instance! as unknown as mapboxgl.Map
   );
@@ -296,6 +297,7 @@ test('updateRouteDisplay splits route at nextTaskEndIndex', () => {
 
   updateRouteDisplay(
     routeGeometry,
+    0,
     2,
     MockMap.instance! as unknown as mapboxgl.Map
   );
@@ -336,6 +338,7 @@ test('updateRouteDisplay handles nextTaskEndIndex at start (0)', () => {
   updateRouteDisplay(
     routeGeometry,
     0,
+    0,
     MockMap.instance! as unknown as mapboxgl.Map
   );
 
@@ -364,6 +367,7 @@ test('updateRouteDisplay handles nextTaskEndIndex at end of route', () => {
 
   updateRouteDisplay(
     routeGeometry,
+    0,
     3,
     MockMap.instance! as unknown as mapboxgl.Map
   );

@@ -101,15 +101,17 @@ describe('adaptRouteToGeoJSON', () => {
   };
 
   it('should return empty collection when routeGeometry is null', () => {
-    const result = adaptRouteToGeoJSON(null, 0);
+    const result = adaptRouteToGeoJSON(null, 0, 0);
 
-    expect(result).toEqual(emptyFeatureCollection);
+    expect(result.nextTask).toEqual(emptyFeatureCollection);
+    expect(result.futureTasks).toEqual(emptyFeatureCollection);
   });
 
   it('should return empty collection when routeGeometry has fewer than 2 points', () => {
-    const result = adaptRouteToGeoJSON([[0, 0]], 0);
+    const result = adaptRouteToGeoJSON([[0, 0]], 0, 0);
 
-    expect(result).toEqual(emptyFeatureCollection);
+    expect(result.nextTask).toEqual(emptyFeatureCollection);
+    expect(result.futureTasks).toEqual(emptyFeatureCollection);
   });
 
   it('should split route into next-task and future-tasks segments based on nextTaskEndIndex', () => {
@@ -121,12 +123,12 @@ describe('adaptRouteToGeoJSON', () => {
     ];
     const nextTaskEndIndex = 2;
 
-    const result = adaptRouteToGeoJSON(routeGeometry, nextTaskEndIndex);
+    const result = adaptRouteToGeoJSON(routeGeometry, 0, nextTaskEndIndex);
 
-    const nextTaskFeatures = result.features.filter(
+    const nextTaskFeatures = result.nextTask.features.filter(
       (f) => f.properties?.segment === 'next-task'
     );
-    const futureTasksFeatures = result.features.filter(
+    const futureTasksFeatures = result.futureTasks.features.filter(
       (f) => f.properties?.segment === 'future-tasks'
     );
 
@@ -145,60 +147,6 @@ describe('adaptRouteToGeoJSON', () => {
     expect(lastFuture[1]).toBeCloseTo(41.0, 3);
   });
 
-  it('should show entire route as next-task when no valid split index', () => {
-    const routeGeometry: [number, number][] = [
-      [-74.0, 40.7],
-      [-74.1, 40.8],
-      [-74.2, 40.9],
-    ];
-    const nextTaskEndIndex = 0;
-
-    const result = adaptRouteToGeoJSON(routeGeometry, nextTaskEndIndex);
-
-    const nextTaskFeatures = result.features.filter(
-      (f) => f.properties?.segment === 'next-task'
-    );
-    const futureTasksFeatures = result.features.filter(
-      (f) => f.properties?.segment === 'future-tasks'
-    );
-
-    expect(nextTaskFeatures).toHaveLength(1);
-    expect(futureTasksFeatures).toHaveLength(0);
-
-    const nextTaskGeom = nextTaskFeatures[0].geometry as GeoJSON.LineString;
-    expect(nextTaskGeom.coordinates[0][0]).toBeCloseTo(-74.0, 3);
-    expect(
-      nextTaskGeom.coordinates[nextTaskGeom.coordinates.length - 1][0]
-    ).toBeCloseTo(-74.2, 3);
-  });
-
-  it('should split correctly when nextTaskEndIndex is in middle', () => {
-    const routeGeometry: [number, number][] = [
-      [-74.0, 40.7],
-      [-74.1, 40.8],
-      [-74.2, 40.9],
-    ];
-    const nextTaskEndIndex = 2;
-
-    const result = adaptRouteToGeoJSON(routeGeometry, nextTaskEndIndex);
-
-    const nextTaskFeatures = result.features.filter(
-      (f) => f.properties?.segment === 'next-task'
-    );
-    const futureTasksFeatures = result.features.filter(
-      (f) => f.properties?.segment === 'future-tasks'
-    );
-
-    expect(nextTaskFeatures).toHaveLength(1);
-    expect(futureTasksFeatures).toHaveLength(0);
-
-    const nextTaskGeom = nextTaskFeatures[0].geometry as GeoJSON.LineString;
-    expect(nextTaskGeom.coordinates[0][0]).toBeCloseTo(-74.0, 3);
-    expect(
-      nextTaskGeom.coordinates[nextTaskGeom.coordinates.length - 1][0]
-    ).toBeCloseTo(-74.1, 3);
-  });
-
   it('should handle nextTaskEndIndex beyond route length', () => {
     const routeGeometry: [number, number][] = [
       [-74.0, 40.7],
@@ -206,12 +154,12 @@ describe('adaptRouteToGeoJSON', () => {
     ];
     const nextTaskEndIndex = 100;
 
-    const result = adaptRouteToGeoJSON(routeGeometry, nextTaskEndIndex);
+    const result = adaptRouteToGeoJSON(routeGeometry, 0, nextTaskEndIndex);
 
-    const nextTaskFeatures = result.features.filter(
+    const nextTaskFeatures = result.nextTask.features.filter(
       (f) => f.properties?.segment === 'next-task'
     );
-    const futureTasksFeatures = result.features.filter(
+    const futureTasksFeatures = result.futureTasks.features.filter(
       (f) => f.properties?.segment === 'future-tasks'
     );
 

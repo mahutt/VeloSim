@@ -221,40 +221,29 @@ export function setMapSource(
 /**
  * Update route visualization for a selected resource
  * @param routeGeometry - Full route coordinates (raw OSRM linestring)
+ * @param progress - Current progress through route (0-1 fractional)
  * @param nextTaskEndIndex - Index where first task in task queue ends within route
  * @param map - Mapbox map instance
  */
 export function updateRouteDisplay(
   routeGeometry: [number, number][] | null,
+  progress: number,
   nextTaskEndIndex: number,
   map: mapboxgl.Map
 ) {
-  const routeGeoJSON = adaptRouteToGeoJSON(routeGeometry, nextTaskEndIndex);
-
-  const nextTaskFeatures = routeGeoJSON.features.filter(
-    (f) => f.properties?.segment === 'next-task'
-  );
-  const futureTasksFeatures = routeGeoJSON.features.filter(
-    (f) => f.properties?.segment === 'future-tasks'
+  const { nextTask, futureTasks } = adaptRouteToGeoJSON(
+    routeGeometry,
+    progress,
+    nextTaskEndIndex
   );
 
-  const nextTaskGeoJSON: GeoJSON.FeatureCollection = {
-    type: 'FeatureCollection',
-    features: nextTaskFeatures,
-  };
-
-  const futureTasksGeoJSON: GeoJSON.FeatureCollection = {
-    type: 'FeatureCollection',
-    features: futureTasksFeatures,
-  };
-
-  setMapSource(MapSource.RouteNextTask, nextTaskGeoJSON, map);
-  setMapSource(MapSource.RouteFutureTasks, futureTasksGeoJSON, map);
+  setMapSource(MapSource.RouteNextTask, nextTask, map);
+  setMapSource(MapSource.RouteFutureTasks, futureTasks, map);
 }
 
 /**
  * Clear route visualization
  */
 export function clearRouteDisplay(map: mapboxgl.Map) {
-  updateRouteDisplay(null, 0, map);
+  updateRouteDisplay(null, 0, 0, map);
 }
