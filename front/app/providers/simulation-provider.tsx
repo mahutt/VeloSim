@@ -65,10 +65,7 @@ import {
   type PopulatedDriver,
   type SelectedItemBarElement,
 } from '~/components/map/selected-item-bar';
-import {
-  interpolateAlongRoute,
-  calculateRouteProgress,
-} from '~/lib/animation-helpers';
+import { interpolateAlongRoute } from '~/lib/animation-helpers';
 
 // Expect to receive frames every 1 second
 const BASE_FRAME_INTERVAL_MS = 1000;
@@ -312,7 +309,7 @@ export const SimulationProvider = ({
   const targetPositionsRef = useRef<Map<number, Position>>(new Map());
   // Route geometry for path-following interpolation
   const routeGeometriesRef = useRef<Map<number, Position[]>>(new Map());
-  const routeProgressRef = useRef<Map<number, number>>(new Map()); // Track progress along route (0 to total length)
+  const nextTaskEndIndexRef = useRef<Map<number, number>>(new Map());
 
   // Global frame timing (shared by all resources)
   const lastFrameTimeRef = useRef<number>(0);
@@ -428,8 +425,9 @@ export const SimulationProvider = ({
     if (selectedResourceId !== undefined) {
       const routeGeometry =
         routeGeometriesRef.current.get(selectedResourceId) ?? null;
-      const progress = routeProgressRef.current.get(selectedResourceId) ?? 0;
-      updateRouteDisplay(routeGeometry, progress, map);
+      const nextTaskEndIndex =
+        nextTaskEndIndexRef.current.get(selectedResourceId);
+      updateRouteDisplay(routeGeometry, nextTaskEndIndex ?? 0, map);
     } else {
       updateRouteDisplay(null, 0, map);
     }
@@ -597,12 +595,18 @@ export const SimulationProvider = ({
             resource.id,
             resource.route.coordinates
           );
-          // Reset progress when new route received - will recalculate from position
-          routeProgressRef.current.set(resource.id, 0);
+          const routeWithIndex = resource.route as {
+            coordinates: Position[];
+            nextTaskEndIndex: number;
+          };
+          nextTaskEndIndexRef.current.set(
+            resource.id,
+            routeWithIndex.nextTaskEndIndex
+          );
         } else if (resource.route === null) {
           // Backend explicitly signals route completion - clear route data
           routeGeometriesRef.current.delete(resource.id);
-          routeProgressRef.current.delete(resource.id);
+          nextTaskEndIndexRef.current.delete(resource.id);
         }
       });
 
@@ -653,13 +657,6 @@ export const SimulationProvider = ({
         // Animate from start to target, projecting onto the raw OSRM linestring
         // Route clearing is handled by backend sending route: null
         currentPos = interpolateAlongRoute(routeGeometry, start, target, t);
-
-        // Update route progress for smooth visualization (grey line follows position)
-        const animatedProgress = calculateRouteProgress(
-          routeGeometry,
-          currentPos
-        );
-        routeProgressRef.current.set(resource.id, animatedProgress);
       } else {
         // Fallback to linear interpolation if no route geometry
         currentPos = [

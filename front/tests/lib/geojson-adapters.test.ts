@@ -100,107 +100,122 @@ describe('adaptRouteToGeoJSON', () => {
     features: [],
   };
 
-  it('should return empty collections when routeGeometry is null', () => {
+  it('should return empty collection when routeGeometry is null', () => {
     const result = adaptRouteToGeoJSON(null, 0);
 
-    expect(result.traversed).toEqual(emptyFeatureCollection);
-    expect(result.remaining).toEqual(emptyFeatureCollection);
+    expect(result).toEqual(emptyFeatureCollection);
   });
 
-  it('should return empty collections when routeGeometry has fewer than 2 points', () => {
+  it('should return empty collection when routeGeometry has fewer than 2 points', () => {
     const result = adaptRouteToGeoJSON([[0, 0]], 0);
 
-    expect(result.traversed).toEqual(emptyFeatureCollection);
-    expect(result.remaining).toEqual(emptyFeatureCollection);
+    expect(result).toEqual(emptyFeatureCollection);
   });
 
-  it('should split route into traversed and remaining segments based on fractional progress', () => {
+  it('should split route into next-task and future-tasks segments based on nextTaskEndIndex', () => {
     const routeGeometry: [number, number][] = [
       [-74.0, 40.7],
       [-74.1, 40.8],
       [-74.2, 40.9],
       [-74.3, 41.0],
     ];
-    const progress = 0.5; // 50% along the route
+    const nextTaskEndIndex = 2;
 
-    const result = adaptRouteToGeoJSON(routeGeometry, progress);
+    const result = adaptRouteToGeoJSON(routeGeometry, nextTaskEndIndex);
 
-    // Both traversed and remaining should have features
-    expect(result.traversed.features).toHaveLength(1);
-    expect(result.remaining.features).toHaveLength(1);
+    const nextTaskFeatures = result.features.filter(
+      (f) => f.properties?.segment === 'next-task'
+    );
+    const futureTasksFeatures = result.features.filter(
+      (f) => f.properties?.segment === 'future-tasks'
+    );
 
-    // Traversed should start at route start
-    const traversedGeom = result.traversed.features[0]
+    expect(nextTaskFeatures).toHaveLength(1);
+    expect(futureTasksFeatures).toHaveLength(1);
+
+    const nextTaskGeom = nextTaskFeatures[0].geometry as GeoJSON.LineString;
+    expect(nextTaskGeom.coordinates[0][0]).toBeCloseTo(-74.0, 3);
+    expect(nextTaskGeom.coordinates[0][1]).toBeCloseTo(40.7, 3);
+
+    const futureTasksGeom = futureTasksFeatures[0]
       .geometry as GeoJSON.LineString;
-    expect(traversedGeom.coordinates[0][0]).toBeCloseTo(-74.0, 3);
-    expect(traversedGeom.coordinates[0][1]).toBeCloseTo(40.7, 3);
-
-    // Remaining should end at route end
-    const remainingGeom = result.remaining.features[0]
-      .geometry as GeoJSON.LineString;
-    const lastRemaining =
-      remainingGeom.coordinates[remainingGeom.coordinates.length - 1];
-    expect(lastRemaining[0]).toBeCloseTo(-74.3, 3);
-    expect(lastRemaining[1]).toBeCloseTo(41.0, 3);
+    const lastFuture =
+      futureTasksGeom.coordinates[futureTasksGeom.coordinates.length - 1];
+    expect(lastFuture[0]).toBeCloseTo(-74.3, 3);
+    expect(lastFuture[1]).toBeCloseTo(41.0, 3);
   });
 
-  it('should handle progress at the start of the route', () => {
+  it('should show entire route as next-task when no valid split index', () => {
     const routeGeometry: [number, number][] = [
       [-74.0, 40.7],
       [-74.1, 40.8],
       [-74.2, 40.9],
     ];
-    const progress = 0; // 0% progress
+    const nextTaskEndIndex = 0;
 
-    const result = adaptRouteToGeoJSON(routeGeometry, progress);
+    const result = adaptRouteToGeoJSON(routeGeometry, nextTaskEndIndex);
 
-    // Traversed should be empty (no distance covered)
-    expect(result.traversed.features).toHaveLength(0);
+    const nextTaskFeatures = result.features.filter(
+      (f) => f.properties?.segment === 'next-task'
+    );
+    const futureTasksFeatures = result.features.filter(
+      (f) => f.properties?.segment === 'future-tasks'
+    );
 
-    // Remaining should include entire route
-    expect(result.remaining.features).toHaveLength(1);
-    const remainingGeom = result.remaining.features[0]
-      .geometry as GeoJSON.LineString;
-    expect(remainingGeom.coordinates[0][0]).toBeCloseTo(-74.0, 3);
+    expect(nextTaskFeatures).toHaveLength(1);
+    expect(futureTasksFeatures).toHaveLength(0);
+
+    const nextTaskGeom = nextTaskFeatures[0].geometry as GeoJSON.LineString;
+    expect(nextTaskGeom.coordinates[0][0]).toBeCloseTo(-74.0, 3);
     expect(
-      remainingGeom.coordinates[remainingGeom.coordinates.length - 1][0]
+      nextTaskGeom.coordinates[nextTaskGeom.coordinates.length - 1][0]
     ).toBeCloseTo(-74.2, 3);
   });
 
-  it('should handle progress at the end of the route', () => {
+  it('should split correctly when nextTaskEndIndex is in middle', () => {
     const routeGeometry: [number, number][] = [
       [-74.0, 40.7],
       [-74.1, 40.8],
       [-74.2, 40.9],
     ];
-    const progress = 1; // 100% progress
+    const nextTaskEndIndex = 2;
 
-    const result = adaptRouteToGeoJSON(routeGeometry, progress);
+    const result = adaptRouteToGeoJSON(routeGeometry, nextTaskEndIndex);
 
-    // Traversed should include entire route
-    expect(result.traversed.features).toHaveLength(1);
-    const traversedGeom = result.traversed.features[0]
-      .geometry as GeoJSON.LineString;
-    expect(traversedGeom.coordinates[0][0]).toBeCloseTo(-74.0, 3);
+    const nextTaskFeatures = result.features.filter(
+      (f) => f.properties?.segment === 'next-task'
+    );
+    const futureTasksFeatures = result.features.filter(
+      (f) => f.properties?.segment === 'future-tasks'
+    );
+
+    expect(nextTaskFeatures).toHaveLength(1);
+    expect(futureTasksFeatures).toHaveLength(0);
+
+    const nextTaskGeom = nextTaskFeatures[0].geometry as GeoJSON.LineString;
+    expect(nextTaskGeom.coordinates[0][0]).toBeCloseTo(-74.0, 3);
     expect(
-      traversedGeom.coordinates[traversedGeom.coordinates.length - 1][0]
-    ).toBeCloseTo(-74.2, 3);
-
-    // Remaining should be empty (no distance left)
-    expect(result.remaining.features).toHaveLength(0);
+      nextTaskGeom.coordinates[nextTaskGeom.coordinates.length - 1][0]
+    ).toBeCloseTo(-74.1, 3);
   });
 
-  it('should clamp progress to valid range when exceeding 1', () => {
+  it('should handle nextTaskEndIndex beyond route length', () => {
     const routeGeometry: [number, number][] = [
       [-74.0, 40.7],
       [-74.1, 40.8],
     ];
-    const progress = 100; // Way beyond 1
+    const nextTaskEndIndex = 100;
 
-    const result = adaptRouteToGeoJSON(routeGeometry, progress);
+    const result = adaptRouteToGeoJSON(routeGeometry, nextTaskEndIndex);
 
-    // Should be clamped to end of route
-    expect(result.traversed.features).toHaveLength(1);
-    expect(result.remaining.features).toHaveLength(0);
+    const nextTaskFeatures = result.features.filter(
+      (f) => f.properties?.segment === 'next-task'
+    );
+    const futureTasksFeatures = result.features.filter(
+      (f) => f.properties?.segment === 'future-tasks'
+    );
+
+    expect(nextTaskFeatures).toHaveLength(1);
+    expect(futureTasksFeatures).toHaveLength(0);
   });
 });

@@ -212,6 +212,7 @@ class Driver:
             self.task_list.append(task)
             task.set_assigned_driver(self)
             self.has_updated = True
+            self.route_changed = True
             # Task state is now ASSIGNED (set by task.set_assigned_driver)
 
             # Change state to ON_SHIFT if was waiting for a task
@@ -266,6 +267,7 @@ class Driver:
                 self.state = DriverState.IDLE
 
             self.has_updated = True
+            self.route_changed = True
 
     def get_in_progress_task(self) -> Optional["Task"]:
         """Get the task currently being worked on by this driver.
@@ -310,6 +312,7 @@ class Driver:
                 task.set_state(State.IN_PROGRESS)
                 self.state = DriverState.IN_PROGRESS
                 self.has_updated = True
+                self.route_changed = True
             else:
                 raise Exception("Cannot dispatch task at this station")
 
@@ -339,6 +342,7 @@ class Driver:
                 DriverState.ON_SHIFT if self.get_task_count() > 0 else DriverState.IDLE
             )
             self.has_updated = True
+            self.route_changed = True
 
             if battery_count == 0:
                 # return to HQ for refill
@@ -500,6 +504,7 @@ class Driver:
         # Update the task list and mark as updated
         self.task_list = new_task_list
         self.has_updated = True
+        self.route_changed = True
 
         # Return the new task ID order
         return [task.id for task in new_task_list]
@@ -561,6 +566,62 @@ class Driver:
         finally:
             # Clear current route when travel completes or is interrupted
             self.current_route = None
+
+    def get_full_route(self) -> dict | None:
+        """Get the full route for all tasks in driver's task queue.
+
+        Returns:
+            Full route geometry and index where the next task's route ends,
+            or None if there are no tasks / no route can be made.
+
+            The dictionary has the keys:
+                - "coordinates": list[list[float]] of route coordinates.
+                - "nextTaskEndIndex": int index in coordinates where
+                  the first task's route segment ends.
+        """
+        visible_tasks = self.get_visible_task_list()
+
+        if not visible_tasks:
+            return None
+
+        full_geometry: list[list[float]] = []
+        next_task_end_index = 0
+        current_pos = self.position
+
+        for task_idx, task in enumerate(visible_tasks):
+            task_station = task.get_station()
+
+            if task_station is None:
+                continue
+
+            target_pos = task_station.get_position()
+
+            try:
+                route = self.map_controller.getRoute(current_pos, target_pos)
+                segment_coords = route.get_raw_coordinates()
+
+                if full_geometry and segment_coords:
+                    if full_geometry[-1] == segment_coords[0]:
+                        segment_coords = segment_coords[1:]
+
+                full_geometry.extend(segment_coords)
+
+                if task_idx == 0:
+                    next_task_end_index = len(full_geometry)
+
+                current_pos = target_pos
+
+            except ValueError as e:
+                print(
+                    f"Driver {self.id}: Cannot get route segment to {target_pos}: {e}"
+                )
+                break
+
+        return (
+            {"coordinates": full_geometry, "nextTaskEndIndex": next_task_end_index}
+            if full_geometry
+            else None
+        )
 
     def return_to_HQ(self) -> Generator[Any, Any, Any]:
         """
