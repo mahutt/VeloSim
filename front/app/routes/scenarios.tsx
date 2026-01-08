@@ -609,6 +609,11 @@ export default function ScenarioEditor() {
           }
         }}
         onCancel={() => {
+          log({
+            message: 'Loss of unsaved changes prevented',
+            level: LogLevel.INFO,
+            context: 'unsaved_scenario_changes_preserved',
+          });
           setShowUnsavedDialog(false);
           setPendingScenario(null);
           setPendingNewScenario(false);
@@ -616,6 +621,11 @@ export default function ScenarioEditor() {
           blocker.reset?.();
         }}
         onLeave={() => {
+          log({
+            message: 'Unsaved changes explicitly discarded',
+            level: LogLevel.INFO,
+            context: 'unsaved_scenario_changes_discarded',
+          });
           setShowUnsavedDialog(false);
           if (pendingScenario) {
             loadScenario(pendingScenario);
