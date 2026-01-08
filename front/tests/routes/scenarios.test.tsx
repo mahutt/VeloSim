@@ -52,11 +52,13 @@ vi.mock('~/api', () => ({
 }));
 
 const mockNavigate = vi.fn();
+const mockBlocker = { state: 'unblocked', proceed: vi.fn(), reset: vi.fn() };
 vi.mock('react-router', async () => {
   const actual = await vi.importActual('react-router');
   return {
     ...actual,
     useNavigate: () => mockNavigate,
+    useBlocker: () => mockBlocker,
   };
 });
 
@@ -222,6 +224,15 @@ describe('ScenarioEditor', () => {
 
     const newButton = screen.getByText('New');
     fireEvent.click(newButton);
+
+    // Unsaved changes dialog should appear
+    await waitFor(() => {
+      expect(screen.getByText('Unsaved Changes')).toBeInTheDocument();
+    });
+
+    // Click Discard to proceed with New
+    const discardButton = screen.getByText('Discard');
+    fireEvent.click(discardButton);
 
     await waitFor(() => {
       expect(nameInput).toHaveValue('');
@@ -1813,6 +1824,197 @@ describe('ScenarioEditor', () => {
         expect(api.get).toHaveBeenCalledWith(
           expect.stringContaining('/scenarios')
         );
+      });
+    });
+  });
+
+  describe('Unsaved Changes Protection', () => {
+    it('shows dialog when trying to select another scenario with unsaved changes', async () => {
+      render(
+        <BrowserRouter>
+          <ScenarioEditor />
+        </BrowserRouter>
+      );
+
+      await waitFor(() => {
+        expect(screen.getByText('Test Scenario 1')).toBeInTheDocument();
+      });
+
+      // Make changes to the editor
+      const textarea = screen.getByPlaceholderText(
+        'Paste or type your JSON scenario here...'
+      );
+      fireEvent.change(textarea, { target: { value: '{"test": "data"}' } });
+
+      // Try to select another scenario
+      fireEvent.click(screen.getByText('Test Scenario 1'));
+
+      // Dialog should appear
+      await waitFor(() => {
+        expect(screen.getByText('Unsaved Changes')).toBeInTheDocument();
+        expect(
+          screen.getByText(/You have unsaved changes/i)
+        ).toBeInTheDocument();
+      });
+    });
+
+    it('loads new scenario when Continue is clicked in unsaved dialog', async () => {
+      render(
+        <BrowserRouter>
+          <ScenarioEditor />
+        </BrowserRouter>
+      );
+
+      await waitFor(() => {
+        expect(screen.getByText('Test Scenario 1')).toBeInTheDocument();
+      });
+
+      // Make changes
+      const textarea = screen.getByPlaceholderText(
+        'Paste or type your JSON scenario here...'
+      );
+      fireEvent.change(textarea, { target: { value: '{"test": "data"}' } });
+
+      // Try to select another scenario
+      fireEvent.click(screen.getByText('Test Scenario 1'));
+
+      await waitFor(() => {
+        expect(screen.getByText('Unsaved Changes')).toBeInTheDocument();
+      });
+
+      // Click Discard
+      fireEvent.click(screen.getByText('Discard'));
+
+      // Scenario should load
+      await waitFor(() => {
+        expect(screen.queryByText('Unsaved Changes')).not.toBeInTheDocument();
+      });
+    });
+
+    it('keeps current content when Cancel is clicked in unsaved dialog', async () => {
+      render(
+        <BrowserRouter>
+          <ScenarioEditor />
+        </BrowserRouter>
+      );
+
+      await waitFor(() => {
+        expect(screen.getByText('Test Scenario 1')).toBeInTheDocument();
+      });
+
+      // Make changes
+      const textarea = screen.getByPlaceholderText(
+        'Paste or type your JSON scenario here...'
+      ) as HTMLTextAreaElement;
+      fireEvent.change(textarea, { target: { value: '{"test": "data"}' } });
+
+      // Try to select another scenario
+      fireEvent.click(screen.getByText('Test Scenario 1'));
+
+      await waitFor(() => {
+        expect(screen.getByText('Unsaved Changes')).toBeInTheDocument();
+      });
+
+      // Click Cancel
+      fireEvent.click(screen.getByText('Cancel'));
+
+      // Dialog should close and content should remain
+      await waitFor(() => {
+        expect(screen.queryByText('Unsaved Changes')).not.toBeInTheDocument();
+      });
+      expect(textarea.value).toBe('{"test": "data"}');
+    });
+
+    it('shows dialog when trying to create new scenario with unsaved changes', async () => {
+      vi.mocked(api.get).mockImplementation((url) => {
+        if (url === '/scenarios/template') {
+          return Promise.resolve({
+            data: {
+              name: '',
+              description: '',
+              content: {},
+            },
+          });
+        }
+        return Promise.resolve({
+          data: {
+            scenarios: mockScenarios,
+            total: mockScenarios.length,
+            page: 1,
+            per_page: 10,
+            total_pages: 1,
+          },
+        });
+      });
+
+      render(
+        <BrowserRouter>
+          <ScenarioEditor />
+        </BrowserRouter>
+      );
+
+      await waitFor(() => {
+        expect(screen.getByText('Scenario Editor')).toBeInTheDocument();
+      });
+
+      // Make changes
+      const textarea = screen.getByPlaceholderText(
+        'Paste or type your JSON scenario here...'
+      );
+      fireEvent.change(textarea, { target: { value: '{"test": "data"}' } });
+
+      // Click New button
+      fireEvent.click(screen.getByText('New'));
+
+      // Dialog should appear
+      await waitFor(() => {
+        expect(screen.getByText('Unsaved Changes')).toBeInTheDocument();
+      });
+    });
+
+    it('shows dialog when trying to import with unsaved changes', async () => {
+      render(
+        <BrowserRouter>
+          <ScenarioEditor />
+        </BrowserRouter>
+      );
+
+      await waitFor(() => {
+        expect(screen.getByText('Scenario Editor')).toBeInTheDocument();
+      });
+
+      // Make changes
+      const textarea = screen.getByPlaceholderText(
+        'Paste or type your JSON scenario here...'
+      );
+      fireEvent.change(textarea, { target: { value: '{"test": "data"}' } });
+
+      // Click Import button
+      fireEvent.click(screen.getByText('Import'));
+
+      // Dialog should appear
+      await waitFor(() => {
+        expect(screen.getByText('Unsaved Changes')).toBeInTheDocument();
+      });
+    });
+
+    it('does not show dialog when no unsaved changes', async () => {
+      render(
+        <BrowserRouter>
+          <ScenarioEditor />
+        </BrowserRouter>
+      );
+
+      await waitFor(() => {
+        expect(screen.getByText('Test Scenario 1')).toBeInTheDocument();
+      });
+
+      // Select scenario without making changes
+      fireEvent.click(screen.getByText('Test Scenario 1'));
+
+      // Dialog should not appear
+      await waitFor(() => {
+        expect(screen.queryByText('Unsaved Changes')).not.toBeInTheDocument();
       });
     });
   });
