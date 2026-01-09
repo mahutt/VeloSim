@@ -1137,6 +1137,7 @@ class JsonParseStrategy(BaseParseStrategy):
 
             did = driver_id_counter
             driver_id_counter += 1
+            driver_name = scenario_driver.get("name", f"Driver {did}")
 
             drivers[did] = Driver(
                 driver_id=did,
@@ -1146,6 +1147,7 @@ class JsonParseStrategy(BaseParseStrategy):
                 task_list=[],
                 vehicle=None,
                 shift=driver_shift,
+                name=driver_name,
             )
 
         # Collect references to drivers to that are on-shift at simulation start

@@ -65,8 +65,8 @@ export default function ResourceBar() {
   }, [resourceBarElement, searchQuery]);
 
   return (
-    <div className="absolute top-14 right-4 w-60 max-h-[calc(100vh-2rem)]">
-      <Card className="bg-gray-50 gap-0">
+    <div className="w-full flex-1">
+      <Card className="bg-gray-50 gap-0 h-full">
         <CardHeader>
           <SearchBar
             placeholder="Search Resource"

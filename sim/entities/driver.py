@@ -103,8 +103,10 @@ class Driver:
         shift: Shift,
         task_list: list["Task"] | None = None,
         vehicle: Optional["Vehicle"] = None,
+        name: str | None = None,
     ) -> None:
         self.id = driver_id
+        self.name = name if name else f"Driver {driver_id}"
         self.position = position
         self.current_route = None
         self.vehicle = vehicle
@@ -182,6 +184,7 @@ class Driver:
                 f"already assigned to driver: {current_driver.id}"
             )
         self.vehicle = vehicle
+        vehicle.set_driver(self)
         self.has_updated = True
 
     def get_driver_shift(self) -> Shift:

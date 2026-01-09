@@ -43,6 +43,7 @@ import {
   type Driver,
   type Route,
   type Headquarters,
+  type Vehicle,
 } from '~/types';
 import {
   adaptStationsToGeoJSON,
@@ -69,6 +70,11 @@ import {
   type SelectedItemBarElement,
 } from '~/components/map/selected-item-bar';
 import { interpolateAlongRoute } from '~/lib/animation-helpers';
+import type { HQWidgetProps } from '~/components/simulation/hq-widget';
+import {
+  areHQWidgetStatesEqual,
+  createHQWidgetState,
+} from '~/lib/hq-widget-helpers';
 
 // Expect to receive frames every 1 second
 const BASE_FRAME_INTERVAL_MS = 1000;
@@ -102,6 +108,7 @@ export type SimulationContextType = {
   isLoading: boolean; // Convenience flag for UI
   formattedSimTime: string | null;
   currentDay: number;
+  HQWidgetState: HQWidgetProps;
 };
 
 const SimulationContext = createContext<SimulationContextType | undefined>(
@@ -132,9 +139,12 @@ export const SimulationProvider = ({
   const mapUpdateRafIdRef = useRef<number | null>(null);
 
   // (TOTAL) NON-REACTIVE SIMULATION ENTITY STATE
+  const simulationSecondsRef = useRef<number>(0);
+  const startTimeRef = useRef<number>(0);
   const headquartersRef = useRef<Headquarters | null>(null);
   const stationsRef = useRef<Map<number, Station>>(new Map());
   const driversRef = useRef<Map<number, Driver>>(new Map());
+  const vehiclesRef = useRef<Map<number, Vehicle>>(new Map());
   const tasksRef = useRef<Map<number, StationTask>>(new Map());
 
   // (PARTIAL) REACTIVE SIMULATION ENTITY STATE
@@ -145,6 +155,12 @@ export const SimulationProvider = ({
 
   const [formattedSimTime, setFormattedSimTime] = useState<string | null>(null);
   const [currentDay, setCurrentDay] = useState<number>(1);
+
+  const [HQWidgetState, setHQWidgetState] = useState<HQWidgetProps>({
+    entities: null,
+    driversAtHQ: [],
+    driversPendingShift: [],
+  });
 
   const assignTask = async (driverId: number, taskId: number) => {
     const resource = driversRef.current.get(driverId);
@@ -329,6 +345,9 @@ export const SimulationProvider = ({
     payload: BackendPayload,
     selectedItem: SelectedItemBarElement | null
   ) => {
+    simulationSecondsRef.current = payload.clock.simSecondsPassed;
+    startTimeRef.current = payload.clock.startTime;
+
     // Flags:
     let shouldUpdateReactiveResources = false;
 
@@ -336,7 +355,7 @@ export const SimulationProvider = ({
     headquartersRef.current = payload.headquarters;
 
     // Update tasks that appear in the payload
-    if (payload.tasks && payload.tasks.length > 0) {
+    if (payload.tasks.length > 0) {
       payload.tasks.forEach((task) => {
         tasksRef.current.set(task.id, task);
         // Task attributes don't meaningfully update - no need to check to update the selectedItem
@@ -345,7 +364,7 @@ export const SimulationProvider = ({
     }
 
     // Update stations that appear in the payload
-    if (payload.stations && payload.stations.length > 0) {
+    if (payload.stations.length > 0) {
       payload.stations.forEach((updatedStation: Station) => {
         stationsRef.current.set(updatedStation.id, updatedStation);
         // Update reactive selectedItem if this station is that item
@@ -379,10 +398,15 @@ export const SimulationProvider = ({
       renderOnNextFrameRef.current = true;
     });
 
+    payload.vehicles.forEach((updatedVehicle: Vehicle) => {
+      vehiclesRef.current.set(updatedVehicle.id, updatedVehicle);
+    });
+
     // Conditionally updating reactive resources list for resource bar
     if (shouldUpdateReactiveResources) {
       updateResourceBarElement();
     }
+    updateHQWidgetState();
   };
 
   // Helper function to update all map sources (hq, stations, resources, and routes)
@@ -524,6 +548,23 @@ export const SimulationProvider = ({
           taskCount: resource.taskIds.length,
         }))
     );
+  };
+
+  const updateHQWidgetState = () => {
+    const newHQState = createHQWidgetState({
+      driversMap: driversRef.current,
+      vehiclesMap: vehiclesRef.current,
+      simulationSeconds: simulationSecondsRef.current,
+      startTime: startTimeRef.current,
+    });
+    setHQWidgetState((prev) => {
+      // To minimize re-renders, only update state if there are meaningful changes
+      if (areHQWidgetStatesEqual(prev, newHQState)) {
+        return prev;
+      } else {
+        return newHQState;
+      }
+    });
   };
 
   // Clear selection function
@@ -813,6 +854,7 @@ export const SimulationProvider = ({
         isLoading,
         formattedSimTime,
         currentDay,
+        HQWidgetState,
       }}
     >
       {children}

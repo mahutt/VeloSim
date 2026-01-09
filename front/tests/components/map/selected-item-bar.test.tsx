@@ -25,17 +25,16 @@
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import {
-  useSimulation,
-  type SimulationContextType,
-} from '~/providers/simulation-provider';
+import { useSimulation } from '~/providers/simulation-provider';
 import SelectedItemBar, {
   SelectedItemType,
   type PopulatedDriver,
+  type PopulatedStation,
 } from '~/components/map/selected-item-bar';
 import { FeatureToggleProvider } from '~/providers/feature-toggle-provider';
 import { TaskAssignmentProvider } from '~/providers/task-assignment-provider';
 import type { Position } from '~/types';
+import { makeSimulationContext } from 'tests/test-helpers';
 
 // Mock the useSimulation hook
 vi.mock('~/providers/simulation-provider', () => ({
@@ -44,25 +43,9 @@ vi.mock('~/providers/simulation-provider', () => ({
 
 describe('SelectedItemBar', () => {
   it('should not render when no item is selected', () => {
-    vi.mocked(useSimulation).mockReturnValue({
-      speedRef: { current: 1 },
-      stationsRef: { current: new Map() },
-      driversRef: { current: new Map() },
-      resourceBarElement: [],
-      selectedItem: null,
-      selectItem: vi.fn(),
-      clearSelection: vi.fn(),
-      assignTask: vi.fn(),
-      unassignTask: vi.fn(),
-      reassignTask: vi.fn(),
-      reorderTasks: vi.fn(),
-      simId: null,
-      isConnected: false,
-      simulationStatus: 'idle',
-      isLoading: false,
-      formattedSimTime: null,
-      currentDay: 1,
-    });
+    vi.mocked(useSimulation).mockReturnValue(
+      makeSimulationContext({ selectedItem: null })
+    );
 
     const { container } = render(
       <FeatureToggleProvider>
@@ -84,26 +67,15 @@ describe('SelectedItemBar', () => {
 
     const clearSelectionMock = vi.fn();
 
-    (useSimulation as unknown as ReturnType<typeof vi.fn>).mockReturnValue({
-      selectedItem: {
-        type: SelectedItemType.Station,
-        value: mockStation,
-      },
-      clearSelection: clearSelectionMock,
-      selectItem: vi.fn(),
-      stationsRef: { current: new Map() },
-      driversRef: { current: new Map() },
-      resources: [],
-      assignTask: vi.fn(),
-      unassignTask: vi.fn(),
-      reassignTask: vi.fn(),
-      simId: null,
-      isConnected: false,
-      startSimulation: vi.fn(),
-      simulationStatus: 'idle',
-      formattedSimTime: null,
-      currentDay: 1,
-    });
+    (useSimulation as unknown as ReturnType<typeof vi.fn>).mockReturnValue(
+      makeSimulationContext({
+        selectedItem: {
+          type: SelectedItemType.Station,
+          value: mockStation,
+        },
+        clearSelection: clearSelectionMock,
+      })
+    );
 
     render(
       <FeatureToggleProvider>
@@ -139,29 +111,14 @@ describe('SelectedItemBar', () => {
       inProgressTask: null,
     };
 
-    (useSimulation as unknown as ReturnType<typeof vi.fn>).mockReturnValue({
-      selectedItem: {
-        type: SelectedItemType.Driver,
-        value: mockDriver,
-      },
-      clearSelection: vi.fn(),
-      selectItem: vi.fn(),
-      stationsRef: { current: new Map() },
-      driversRef: { current: new Map() },
-      resourceBarElement: [],
-      assignTask: vi.fn(),
-      unassignTask: vi.fn(),
-      reassignTask: vi.fn(),
-      reorderTasks: vi.fn(),
-      simId: null,
-      isConnected: false,
-      startSimulation: vi.fn(),
-      simulationStatus: 'idle',
-      formattedSimTime: null,
-      currentDay: 1,
-      speedRef: { current: 1 },
-      isLoading: false,
-    } as SimulationContextType);
+    (useSimulation as unknown as ReturnType<typeof vi.fn>).mockReturnValue(
+      makeSimulationContext({
+        selectedItem: {
+          type: SelectedItemType.Driver,
+          value: mockDriver,
+        },
+      })
+    );
 
     render(
       <FeatureToggleProvider>
@@ -191,26 +148,15 @@ describe('SelectedItemBar', () => {
       tasks: [],
     };
 
-    (useSimulation as unknown as ReturnType<typeof vi.fn>).mockReturnValue({
-      selectedItem: {
-        type: SelectedItemType.Station,
-        value: mockStation,
-      },
-      clearSelection: clearSelectionMock,
-      selectItem: vi.fn(),
-      stationsRef: { current: new Map() },
-      driversRef: { current: new Map() },
-      resources: [],
-      assignTask: vi.fn(),
-      unassignTask: vi.fn(),
-      reassignTask: vi.fn(),
-      simId: null,
-      isConnected: false,
-      startSimulation: vi.fn(),
-      simulationStatus: 'idle',
-      formattedSimTime: null,
-      currentDay: 1,
-    });
+    (useSimulation as unknown as ReturnType<typeof vi.fn>).mockReturnValue(
+      makeSimulationContext({
+        selectedItem: {
+          type: SelectedItemType.Station,
+          value: mockStation,
+        },
+        clearSelection: clearSelectionMock,
+      })
+    );
 
     render(
       <FeatureToggleProvider>
@@ -227,37 +173,24 @@ describe('SelectedItemBar', () => {
   });
 
   it('should display tasks when station has tasks', () => {
-    const mockStation = {
+    const mockStation: PopulatedStation = {
       id: 1,
       name: 'Test Station',
       position: [-73.57776, 45.48944] as Position,
       tasks: [
-        { id: 1, stationId: 1, type: 'battery_swap' as const },
-        { id: 2, stationId: 1, type: 'battery_swap' as const },
+        { id: 1, stationId: 1, state: 'open', assignedDriverId: null },
+        { id: 2, stationId: 1, state: 'assigned', assignedDriverId: 5 },
       ],
     };
 
-    (useSimulation as unknown as ReturnType<typeof vi.fn>).mockReturnValue({
-      selectedItem: {
-        type: SelectedItemType.Station,
-        value: mockStation,
-      },
-      clearSelection: vi.fn(),
-      selectItem: vi.fn(),
-      stationsRef: { current: new Map() },
-      driversRef: { current: new Map() },
-      resources: [],
-      tasks: [],
-      assignTask: vi.fn(),
-      unassignTask: vi.fn(),
-      reassignTask: vi.fn(),
-      simId: null,
-      isConnected: false,
-      startSimulation: vi.fn(),
-      simulationStatus: 'idle',
-      formattedSimTime: null,
-      currentDay: 1,
-    });
+    (useSimulation as unknown as ReturnType<typeof vi.fn>).mockReturnValue(
+      makeSimulationContext({
+        selectedItem: {
+          type: SelectedItemType.Station,
+          value: mockStation,
+        },
+      })
+    );
 
     render(
       <FeatureToggleProvider>
@@ -287,28 +220,15 @@ describe('SelectedItemBar', () => {
         inProgressTask: null,
       };
 
-      (useSimulation as unknown as ReturnType<typeof vi.fn>).mockReturnValue({
-        selectedItem: {
-          type: SelectedItemType.Driver,
-          value: mockDriver,
-        },
-        clearSelection: vi.fn(),
-        selectItem: vi.fn(),
-        assignTask: vi.fn(),
-        unassignTask: vi.fn(),
-        reassignTask: vi.fn(),
-        reorderTasks: reorderTasksMock,
-        stationsRef: { current: new Map() },
-        driversRef: { current: new Map() },
-        resourceBarElement: [],
-        simId: '1',
-        isConnected: true,
-        speedRef: { current: 1 },
-        isLoading: false,
-        simulationStatus: 'running',
-        formattedSimTime: null,
-        currentDay: 1,
-      } as SimulationContextType);
+      (useSimulation as unknown as ReturnType<typeof vi.fn>).mockReturnValue(
+        makeSimulationContext({
+          selectedItem: {
+            type: SelectedItemType.Driver,
+            value: mockDriver,
+          },
+          reorderTasks: reorderTasksMock,
+        })
+      );
 
       render(
         <FeatureToggleProvider>
@@ -348,28 +268,15 @@ describe('SelectedItemBar', () => {
         inProgressTask: null,
       };
 
-      (useSimulation as unknown as ReturnType<typeof vi.fn>).mockReturnValue({
-        selectedItem: {
-          type: SelectedItemType.Driver,
-          value: mockDriver,
-        },
-        clearSelection: vi.fn(),
-        selectItem: vi.fn(),
-        assignTask: vi.fn(),
-        unassignTask: vi.fn(),
-        reassignTask: vi.fn(),
-        reorderTasks: reorderTasksMock,
-        stationsRef: { current: new Map() },
-        driversRef: { current: new Map() },
-        resourceBarElement: [],
-        simId: '1',
-        isConnected: true,
-        speedRef: { current: 1 },
-        isLoading: false,
-        simulationStatus: 'running',
-        formattedSimTime: null,
-        currentDay: 1,
-      } as SimulationContextType);
+      (useSimulation as unknown as ReturnType<typeof vi.fn>).mockReturnValue(
+        makeSimulationContext({
+          selectedItem: {
+            type: SelectedItemType.Driver,
+            value: mockDriver,
+          },
+          reorderTasks: reorderTasksMock,
+        })
+      );
 
       render(
         <FeatureToggleProvider>
@@ -404,28 +311,14 @@ describe('SelectedItemBar', () => {
         inProgressTask: null,
       };
 
-      (useSimulation as unknown as ReturnType<typeof vi.fn>).mockReturnValue({
-        selectedItem: {
-          type: SelectedItemType.Driver,
-          value: mockDriver,
-        },
-        clearSelection: vi.fn(),
-        selectItem: vi.fn(),
-        assignTask: vi.fn(),
-        unassignTask: vi.fn(),
-        reassignTask: vi.fn(),
-        reorderTasks: vi.fn(),
-        stationsRef: { current: new Map() },
-        driversRef: { current: new Map() },
-        resourceBarElement: [],
-        simId: '1',
-        isConnected: true,
-        speedRef: { current: 1 },
-        isLoading: false,
-        simulationStatus: 'running',
-        formattedSimTime: null,
-        currentDay: 1,
-      } as SimulationContextType);
+      (useSimulation as unknown as ReturnType<typeof vi.fn>).mockReturnValue(
+        makeSimulationContext({
+          selectedItem: {
+            type: SelectedItemType.Driver,
+            value: mockDriver,
+          },
+        })
+      );
 
       render(
         <FeatureToggleProvider>
@@ -459,28 +352,14 @@ describe('SelectedItemBar', () => {
         inProgressTask: null,
       };
 
-      (useSimulation as unknown as ReturnType<typeof vi.fn>).mockReturnValue({
-        selectedItem: {
-          type: SelectedItemType.Driver,
-          value: mockDriver,
-        },
-        clearSelection: vi.fn(),
-        selectItem: vi.fn(),
-        assignTask: vi.fn(),
-        unassignTask: vi.fn(),
-        reassignTask: vi.fn(),
-        reorderTasks: vi.fn(),
-        stationsRef: { current: new Map() },
-        driversRef: { current: new Map() },
-        resourceBarElement: [],
-        simId: '1',
-        isConnected: true,
-        speedRef: { current: 1 },
-        isLoading: false,
-        simulationStatus: 'running',
-        formattedSimTime: null,
-        currentDay: 1,
-      } as SimulationContextType);
+      (useSimulation as unknown as ReturnType<typeof vi.fn>).mockReturnValue(
+        makeSimulationContext({
+          selectedItem: {
+            type: SelectedItemType.Driver,
+            value: mockDriver,
+          },
+        })
+      );
 
       render(
         <FeatureToggleProvider>
@@ -517,28 +396,15 @@ describe('SelectedItemBar', () => {
         inProgressTask: null,
       };
 
-      (useSimulation as unknown as ReturnType<typeof vi.fn>).mockReturnValue({
-        selectedItem: {
-          type: SelectedItemType.Driver,
-          value: mockDriver,
-        },
-        clearSelection: vi.fn(),
-        selectItem: vi.fn(),
-        assignTask: vi.fn(),
-        unassignTask: vi.fn(),
-        reassignTask: vi.fn(),
-        reorderTasks: reorderTasksMock,
-        stationsRef: { current: new Map() },
-        driversRef: { current: new Map() },
-        resourceBarElement: [],
-        simId: '1',
-        isConnected: true,
-        speedRef: { current: 1 },
-        isLoading: false,
-        simulationStatus: 'idle',
-        formattedSimTime: null,
-        currentDay: 1,
-      } as SimulationContextType);
+      (useSimulation as unknown as ReturnType<typeof vi.fn>).mockReturnValue(
+        makeSimulationContext({
+          selectedItem: {
+            type: SelectedItemType.Driver,
+            value: mockDriver,
+          },
+          reorderTasks: reorderTasksMock,
+        })
+      );
 
       render(
         <FeatureToggleProvider>
@@ -578,28 +444,15 @@ describe('SelectedItemBar', () => {
         inProgressTask: null,
       };
 
-      (useSimulation as unknown as ReturnType<typeof vi.fn>).mockReturnValue({
-        selectedItem: {
-          type: SelectedItemType.Driver,
-          value: mockDriver,
-        },
-        clearSelection: vi.fn(),
-        reorderTasks: reorderTasksMock,
-        selectItem: vi.fn(),
-        assignTask: vi.fn(),
-        unassignTask: vi.fn(),
-        reassignTask: vi.fn(),
-        stationsRef: { current: new Map() },
-        driversRef: { current: new Map() },
-        resourceBarElement: [],
-        simId: '1',
-        isConnected: true,
-        speedRef: { current: 1 },
-        isLoading: false,
-        simulationStatus: 'idle',
-        formattedSimTime: null,
-        currentDay: 1,
-      } as SimulationContextType);
+      (useSimulation as unknown as ReturnType<typeof vi.fn>).mockReturnValue(
+        makeSimulationContext({
+          selectedItem: {
+            type: SelectedItemType.Driver,
+            value: mockDriver,
+          },
+          reorderTasks: reorderTasksMock,
+        })
+      );
 
       render(
         <FeatureToggleProvider>

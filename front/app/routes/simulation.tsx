@@ -36,6 +36,7 @@ import { useParams } from 'react-router';
 import { Loader2 } from 'lucide-react';
 import PlaybackControls from '~/components/map/playback-controls';
 import SimulationClock from '~/components/map/clock';
+import HQWidget from '~/components/simulation/hq-widget';
 
 export function meta() {
   return [{ title: 'Simulation' }];
@@ -77,12 +78,16 @@ function SimulationContent() {
       )}
       {!isLoading && (
         <>
-          <div className="absolute top-4 right-4 flex items-center gap-2">
-            <SimulationClock />
-            <PlaybackControls />
-          </div>
-          <ResourceBar />
           <SelectedItemBar />
+          {/* max-h-[calc(100vh-2.5rem) is set so that the Mapbox & OSM copyright notices aren't blocked. */}
+          <div className="w-60 absolute top-4 right-4 flex flex-col gap-2 items-end max-h-[calc(100vh-2.5rem)]">
+            <div className="w-full flex justify-between items-center gap-2">
+              <SimulationClock />
+              <PlaybackControls />
+            </div>
+            <ResourceBar />
+            <HQWidget />
+          </div>
         </>
       )}
     </>

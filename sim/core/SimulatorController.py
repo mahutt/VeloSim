@@ -489,6 +489,7 @@ class SimulatorController:
                 # Build driver data
                 driver_data = {
                     "id": driver.id,
+                    "name": driver.name,
                     "position": (driver.get_position().get_position()),
                     "taskIds": [task.id for task in driver.get_visible_task_list()],
                     "state": str(driver.get_state()),
@@ -498,9 +499,9 @@ class SimulatorController:
                         else None
                     ),
                     "shift": {
-                        "start_time": shift.get_start_time(),
-                        "end_time": shift.get_end_time(),
-                        "lunch_break": shift.get_lunch_break(),
+                        "startTime": shift.get_start_time(),
+                        "endTime": shift.get_end_time(),
+                        "lunchBreak": shift.get_lunch_break(),
                     },
                     "vehicleId": (
                         current_vehicle.id if current_vehicle is not None else None
