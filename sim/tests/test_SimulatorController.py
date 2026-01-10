@@ -122,8 +122,24 @@ def input_params(env: simpy.Environment) -> InputParameter:
     params.add_station(station2)
 
     # Add test drivers
-    shift1 = Shift(start_time=28800, end_time=43200, lunch_break=36000)
-    shift2 = Shift(start_time=28900, end_time=43200, lunch_break=38000)
+    shift1 = Shift(
+        start_time=28800,
+        end_time=43200,
+        lunch_break=36000,
+        sim_start_time=28800,
+        sim_end_time=43200,
+        sim_lunch_break=36000,
+    )
+    shift2 = Shift(
+        start_time=28900,
+        end_time=43200,
+        lunch_break=38000,
+        sim_start_time=28900,
+        sim_end_time=43200,
+        sim_lunch_break=38000,
+    )
+    # Ensure Driver.env is set before creating Driver instances
+    Driver.env = env
     driver1 = Driver(driver_id=1, position=Position([15.0, 25.0]), shift=shift1)
     driver2 = Driver(driver_id=2, position=Position([35.0, 45.0]), shift=shift2)
     params.add_driver(driver1)
@@ -263,6 +279,14 @@ def test_create_diff_frame(simulator_controller: SimulatorController) -> None:
     simulator_controller.station_entities[1].has_updated = True
     simulator_controller.task_entities[1].has_updated = True
     simulator_controller.driver_entities[1].has_updated = True
+    # Ensure driver is not filtered out due to off_shift state
+    driver = simulator_controller.driver_entities[1]
+    # Set a non-off-shift state so it appears in diff frames
+    driver.state = driver.get_state()  # keep current if valid
+    # Force to IDLE to satisfy diff-frame inclusion
+    from sim.entities.driver import DriverState
+
+    driver.state = DriverState.IDLE
 
     frame = simulator_controller.create_frame(is_key=False)
 

@@ -29,6 +29,9 @@ from sim.entities.driver import Driver
 from sim.entities.position import Position
 from sim.entities.shift import Shift
 
+# Ensure Driver has a default environment for initialization in this module
+Driver.env = simpy.Environment()
+
 
 class TestVehicle:
 
@@ -42,7 +45,7 @@ class TestVehicle:
 
     @pytest.fixture
     def default_shift(self) -> Shift:
-        return Shift(0.0, 24.0, None)
+        return Shift(0.0, 24.0, None, 0.0, 24.0, None)
 
     @pytest.fixture
     def driver(self, default_position: Position, default_shift: Shift) -> Driver:

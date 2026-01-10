@@ -115,6 +115,8 @@ class SimulatorController:
             driver.set_map_controller(self.map_controller)
 
             driver.env = self.simEnv
+
+            driver.state = driver.get_initial_state()
             self.simEnv.process(driver.run())
 
         for _, vehicle in self.vehicle_entities.items():
@@ -477,7 +479,9 @@ class SimulatorController:
 
         drivers = []
         for driver in self.driver_entities.values():
-            if is_key or driver.has_updated:
+            if is_key or (
+                driver.has_updated and str(driver.get_state()) != "off_shift"
+            ):
                 in_progress_task = driver.get_in_progress_task()
                 current_vehicle = driver.get_vehicle()
                 shift: Shift = driver.get_driver_shift()

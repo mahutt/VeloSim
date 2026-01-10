@@ -36,8 +36,10 @@ from sim.entities.shift import Shift
 
 @pytest.fixture
 def env() -> simpy.Environment:
-    # Create a new SimPy environment for each test
-    return simpy.Environment()
+    # Create a new SimPy environment for each test and assign to Driver
+    e = simpy.Environment()
+    Driver.env = e
+    return e
 
 
 @pytest.fixture
@@ -52,9 +54,15 @@ def resource(env: simpy.Environment) -> Driver:
     res = Driver(
         driver_id=1,
         position=Position([0.0, 0.0]),
-        shift=Shift(start_time=0.0, end_time=86400.0, lunch_break=None),
+        shift=Shift(
+            start_time=0.0,
+            end_time=86400.0,
+            lunch_break=None,
+            sim_start_time=0.0,
+            sim_end_time=86400.0,
+            sim_lunch_break=None,
+        ),
     )
-    res.env = env
     # Mock the sim_behaviour and map_controller to avoid AttributeError
     res.sim_behaviour = Mock()
     res.map_controller = Mock()
@@ -67,9 +75,15 @@ def driver(env: simpy.Environment) -> Driver:
     res = Driver(
         driver_id=1,
         position=Position([0.0, 0.0]),
-        shift=Shift(start_time=0.0, end_time=86400.0, lunch_break=None),
+        shift=Shift(
+            start_time=0.0,
+            end_time=86400.0,
+            lunch_break=None,
+            sim_start_time=0.0,
+            sim_end_time=86400.0,
+            sim_lunch_break=None,
+        ),
     )
-    res.env = env
     vehicle = Vehicle(vehicle_id=1, battery_count=10)
     vehicle.set_driver(res)
     res.set_vehicle(vehicle)
@@ -149,9 +163,15 @@ def test_resource_scheduled_dispatch(env: simpy.Environment, station: Station) -
     resource = Driver(
         driver_id=2,
         position=Position([0.0, 0.0]),
-        shift=Shift(start_time=0.0, end_time=86400.0, lunch_break=None),
+        shift=Shift(
+            start_time=0.0,
+            end_time=86400.0,
+            lunch_break=None,
+            sim_start_time=0.0,
+            sim_end_time=86400.0,
+            sim_lunch_break=None,
+        ),
     )
-    resource.env = env
     # Mock the sim_behaviour and map_controller to avoid AttributeError
     resource.sim_behaviour = Mock()
     resource.map_controller = Mock()
@@ -244,7 +264,14 @@ def test_resource_get_in_progress_task(
     resource = Driver(
         driver_id=1,
         position=Position([0.0, 0.0]),
-        shift=Shift(start_time=0.0, end_time=86400.0, lunch_break=None),
+        shift=Shift(
+            start_time=0.0,
+            end_time=86400.0,
+            lunch_break=None,
+            sim_start_time=0.0,
+            sim_end_time=86400.0,
+            sim_lunch_break=None,
+        ),
     )
     vehicle = Vehicle(vehicle_id=1, battery_count=10)
     vehicle.set_driver(resource)
@@ -271,7 +298,14 @@ def test_dispatch_multiple_tasks_same_station(
     resource = Driver(
         driver_id=1,
         position=Position([0.0, 0.0]),
-        shift=Shift(start_time=0.0, end_time=86400.0, lunch_break=None),
+        shift=Shift(
+            start_time=0.0,
+            end_time=86400.0,
+            lunch_break=None,
+            sim_start_time=0.0,
+            sim_end_time=86400.0,
+            sim_lunch_break=None,
+        ),
     )
     task1 = BatterySwapTask(task_id=1, station=station)
     task2 = BatterySwapTask(task_id=2, station=station)
@@ -294,7 +328,14 @@ def test_dispatch_task_different_station_raises_exception(
     resource = Driver(
         driver_id=1,
         position=Position([0.0, 0.0]),
-        shift=Shift(start_time=0.0, end_time=86400.0, lunch_break=None),
+        shift=Shift(
+            start_time=0.0,
+            end_time=86400.0,
+            lunch_break=None,
+            sim_start_time=0.0,
+            sim_end_time=86400.0,
+            sim_lunch_break=None,
+        ),
     )
     station2 = Station(station_id=2, name="Station 2", position=Position([1.0, 1.0]))
 
@@ -319,7 +360,14 @@ def test_resource_with_initial_task_list(
     resource = Driver(
         driver_id=1,
         position=Position([0.0, 0.0]),
-        shift=Shift(start_time=0.0, end_time=86400.0, lunch_break=None),
+        shift=Shift(
+            start_time=0.0,
+            end_time=86400.0,
+            lunch_break=None,
+            sim_start_time=0.0,
+            sim_end_time=86400.0,
+            sim_lunch_break=None,
+        ),
         task_list=[task1, task2],
     )
 
@@ -346,7 +394,14 @@ def test_zero_dispatch_delay_keeps_task_assigned(
     resource = Driver(
         driver_id=1,
         position=Position([0.0, 0.0]),
-        shift=Shift(start_time=0.0, end_time=86400.0, lunch_break=None),
+        shift=Shift(
+            start_time=0.0,
+            end_time=86400.0,
+            lunch_break=None,
+            sim_start_time=0.0,
+            sim_end_time=86400.0,
+            sim_lunch_break=None,
+        ),
     )
 
     resource.assign_task(task, dispatch_delay=0)
@@ -389,7 +444,14 @@ def test_task_state_string_conversions(
     resource = Driver(
         driver_id=1,
         position=Position([0.0, 0.0]),
-        shift=Shift(start_time=0.0, end_time=86400.0, lunch_break=None),
+        shift=Shift(
+            start_time=0.0,
+            end_time=86400.0,
+            lunch_break=None,
+            sim_start_time=0.0,
+            sim_end_time=86400.0,
+            sim_lunch_break=None,
+        ),
     )
     vehicle = Vehicle(vehicle_id=1, battery_count=10)
     vehicle.set_driver(resource)

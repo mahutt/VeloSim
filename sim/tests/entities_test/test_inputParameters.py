@@ -34,12 +34,15 @@ from sim.entities.inputParameters import InputParameter
 from sim.entities.shift import Shift
 
 # Default shift used for creating drivers in this module
-DEFAULT_SHIFT = Shift(0.0, 24.0, None)
+DEFAULT_SHIFT = Shift(0.0, 24.0, None, 0.0, 24.0, None)
 
 
 @pytest.fixture()
 def env() -> simpy.Environment:
-    return simpy.Environment()
+    env = simpy.Environment()
+    # Ensure Driver has an env before any instantiation in this module
+    Driver.env = env
+    return env
 
 
 @pytest.fixture()
@@ -127,6 +130,7 @@ def test_set_driver_entities(
     assert input_params.get_driver_count() == 2
 
     # Act
+    Driver.env = env
     driver = Driver(driver_id=45, position=Position([15.0, 25.0]), shift=DEFAULT_SHIFT)
     input_params.set_driver_entities({45: driver})
 
@@ -218,6 +222,7 @@ def test_add_driver(input_params: InputParameter, env: simpy.Environment) -> Non
     assert 12 not in original_drivers.keys()
 
     # Act
+    Driver.env = env
     driver = Driver(driver_id=12, position=Position([15.0, 25.0]), shift=DEFAULT_SHIFT)
     input_params.add_driver(driver)
 
@@ -301,6 +306,7 @@ def test_remove_station_fail(
 def test_remove_driver_success(
     input_params: InputParameter, env: simpy.Environment
 ) -> None:
+    Driver.env = env
     driver = Driver(driver_id=12, position=Position([15.0, 25.0]), shift=DEFAULT_SHIFT)
     input_params.add_driver(driver)
     added_drivers = input_params.get_driver_entities()
@@ -326,6 +332,7 @@ def test_remove_driver_fail(
     assert input_params.get_driver_count() == 2
 
     # Act
+    Driver.env = env
     driver = Driver(driver_id=13, position=Position([15.0, 25.0]), shift=DEFAULT_SHIFT)
     input_params.remove_driver(driver)
 

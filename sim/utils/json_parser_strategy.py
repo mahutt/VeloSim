@@ -1134,10 +1134,23 @@ class JsonParseStrategy(BaseParseStrategy):
                 # Parse shift
                 shift = d.get("shift")
                 st = self._time_to_seconds(str(shift.get("start_time")))
+                sim_st = st - start_time
                 et = self._time_to_seconds(str(shift.get("end_time")))
+                sim_et = et - start_time
                 lt = shift.get("lunch_break", None)
-                lt = self._time_to_seconds(str(lt)) if lt is not None else None
-                driver_shift = Shift(start_time=st, end_time=et, lunch_break=lt)
+                if lt is not None:
+                    lt = self._time_to_seconds(str(lt))
+                    sim_lt = lt - start_time
+                else:
+                    sim_lt = None
+                driver_shift = Shift(
+                    start_time=st,
+                    end_time=et,
+                    lunch_break=lt,
+                    sim_start_time=sim_st,
+                    sim_end_time=sim_et,
+                    sim_lunch_break=sim_lt,
+                )
 
                 did = driver_id_counter
 
