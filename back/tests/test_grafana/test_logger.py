@@ -28,7 +28,7 @@ from unittest.mock import patch
 
 import pytest
 
-from back.grafana_logging.logger import VeloSimLogger, get_logger
+from grafana_logging.logger import VeloSimLogger, get_logger
 
 
 @pytest.fixture
@@ -57,9 +57,9 @@ def test_get_logger_returns_same_instance() -> None:
 
 def test_logger_logs_to_file(temp_log_file: Path) -> None:
     """Test that logger writes to file."""
-    with patch("back.grafana_logging.logger.DEFAULT_LOG_FILE", str(temp_log_file)):
-        with patch("back.grafana_logging.logger.LOG_TO_FILE", True):
-            with patch("back.grafana_logging.logger.LOG_TO_CONSOLE", False):
+    with patch("grafana_logging.logger.DEFAULT_LOG_FILE", str(temp_log_file)):
+        with patch("grafana_logging.logger.LOG_TO_FILE", True):
+            with patch("grafana_logging.logger.LOG_TO_CONSOLE", False):
                 # Clear cached loggers
                 VeloSimLogger._loggers.clear()
 
@@ -76,10 +76,10 @@ def test_logger_logs_to_file(temp_log_file: Path) -> None:
 
 def test_logger_different_levels(temp_log_file: Path) -> None:
     """Test logging at different levels."""
-    with patch("back.grafana_logging.logger.DEFAULT_LOG_FILE", str(temp_log_file)):
-        with patch("back.grafana_logging.logger.LOG_TO_FILE", True):
-            with patch("back.grafana_logging.logger.LOG_TO_CONSOLE", False):
-                with patch("back.grafana_logging.logger.DEFAULT_LOG_LEVEL", "DEBUG"):
+    with patch("grafana_logging.logger.DEFAULT_LOG_FILE", str(temp_log_file)):
+        with patch("grafana_logging.logger.LOG_TO_FILE", True):
+            with patch("grafana_logging.logger.LOG_TO_CONSOLE", False):
+                with patch("grafana_logging.logger.DEFAULT_LOG_LEVEL", "DEBUG"):
                     VeloSimLogger._loggers.clear()
 
                     logger = get_logger("test_levels")
@@ -103,9 +103,7 @@ def test_logger_different_levels(temp_log_file: Path) -> None:
 def test_log_request_function(temp_log_file: Path) -> None:
     """Test the log_request convenience function."""
     # Instead of actually logging to file, just verify the function is called correctly
-    with patch(
-        "back.grafana_logging.logger.VeloSimLogger.get_logger"
-    ) as mock_get_logger:
+    with patch("grafana_logging.logger.VeloSimLogger.get_logger") as mock_get_logger:
         mock_logger = mock_get_logger.return_value
 
         VeloSimLogger.log_request("GET", "/api/v1/stations", 200, 45.2)
@@ -125,9 +123,7 @@ def test_log_request_function(temp_log_file: Path) -> None:
 def test_log_simulation_event(temp_log_file: Path) -> None:
     """Test the log_simulation_event function."""
     # Instead of actually logging to file, just verify the function is called correctly
-    with patch(
-        "back.grafana_logging.logger.VeloSimLogger.get_logger"
-    ) as mock_get_logger:
+    with patch("grafana_logging.logger.VeloSimLogger.get_logger") as mock_get_logger:
         mock_logger = mock_get_logger.return_value
 
         VeloSimLogger.log_simulation_event(
@@ -157,8 +153,8 @@ def test_log_file_creation(tmp_path: Path) -> None:
     """Test that log file is created if it doesn't exist."""
     log_file = tmp_path / "new_logs.txt"
 
-    with patch("back.grafana_logging.logger.DEFAULT_LOG_FILE", str(log_file)):
-        with patch("back.grafana_logging.logger.LOG_TO_FILE", True):
+    with patch("grafana_logging.logger.DEFAULT_LOG_FILE", str(log_file)):
+        with patch("grafana_logging.logger.LOG_TO_FILE", True):
             VeloSimLogger._ensure_log_file_exists()
 
             assert log_file.exists()

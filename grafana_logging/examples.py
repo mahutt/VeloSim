@@ -24,7 +24,7 @@ SOFTWARE.
 
 from typing import Dict, List
 
-from back.grafana_logging.logger import (
+from grafana_logging.logger import (
     get_logger,
     log_request,
     log_simulation_event,

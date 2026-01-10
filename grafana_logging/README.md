@@ -31,7 +31,7 @@ docker-compose ps
 ### 2. Use the Logger in Your Code
 
 ```python
-from back.grafana_logging.logger import get_logger
+from grafana_logging.logger import get_logger
 
 # Create a logger for your module
 logger = get_logger(__name__)
@@ -56,7 +56,7 @@ logger.critical("Critical issue!")
 ### Backend (FastAPI) Logging
 
 ```python
-from back.grafana_logging.logger import get_logger
+from grafana_logging.logger import get_logger
 
 logger = get_logger(__name__)
 
@@ -75,7 +75,7 @@ async def get_stations():
 ### Simulator Logging
 
 ```python
-from back.grafana_logging.logger import get_logger
+from grafana_logging.logger import get_logger
 
 logger = get_logger("simulator")
 
@@ -95,7 +95,7 @@ Create a logging endpoint in rhe FastAPI backend:
 
 ```python
 from fastapi import APIRouter, Body
-from back.grafana_logging.logger import get_logger
+from grafana_logging.logger import get_logger
 
 router = APIRouter()
 frontend_logger = get_logger("frontend")
@@ -173,7 +173,7 @@ Configure logging behavior with these environment variables in your `.env` file:
 | `LOG_LEVEL`      | Minimum log level to record | `INFO`                          | `DEBUG`, `INFO`, `WARNING`, `ERROR`, `CRITICAL` |
 | `LOG_TO_FILE`    | Enable writing logs to file | `true`                          | `true`, `false`                                 |
 | `LOG_TO_CONSOLE` | Enable console output       | `true`                          | `true`, `false`                                 |
-| `LOG_FILE_PATH`  | Path to log file            | `back/grafana_logging/logs.txt` | Any valid file path                             |
+| `LOG_FILE_PATH`  | Path to log file            | `grafana_logging/logs.txt`      | Any valid file path                             |
 
 ## 📊 Grafana Queries
 

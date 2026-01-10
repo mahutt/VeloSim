@@ -25,7 +25,7 @@ SOFTWARE.
 import re
 import time
 import pytest
-from back.grafana_logging import prometheus_example as prom
+from grafana_logging import prometheus_example as prom
 
 
 # Reset _demo_metrics before each test

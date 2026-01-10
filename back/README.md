@@ -113,7 +113,7 @@ Configure these variables in your `.env` file (see [root README](../README.md) f
 | `LOG_LEVEL`                       | Minimum log level to record                               | `INFO`                                                | No       |
 | `LOG_TO_FILE`                     | Enable writing logs to file                               | `true`                                                | No       |
 | `LOG_TO_CONSOLE`                  | Enable console output                                     | `true`                                                | No       |
-| `LOG_FILE_PATH`                   | Path to log file                                          | `back/grafana_logging/logs.txt`                       | No       |
+| `LOG_FILE_PATH`                   | Path to log file                                          | `grafana_logging/logs.txt`                            | No       |
 | `SIMULATION_IDLE_TIMEOUT_SECONDS` | Timeout (seconds) before shutting down an idle simulation | `15`                                                  | No       |
 
 **Environment Options:**
@@ -124,7 +124,7 @@ Configure these variables in your `.env` file (see [root README](../README.md) f
 
 **Log Level Options:** `DEBUG`, `INFO`, `WARNING`, `ERROR`, `CRITICAL`
 
-See the [Logging System README](./grafana_logging/README.md) for complete logging documentation.
+See the Logging System README for complete logging documentation.
 
 ### Hardcoded Settings
 
@@ -193,7 +193,7 @@ VeloSim includes a centralized logging system using **Grafana**, **Loki**, and *
 ### Quick Start
 
 ```python
-from back.grafana_logging.logger import get_logger
+from grafana_logging.logger import get_logger
 
 logger = get_logger(__name__)
 logger.info("Application started")
@@ -210,8 +210,8 @@ logger.error("An error occurred", exc_info=True)
 
 For complete logging documentation, usage examples, and troubleshooting:
 
-- **[Logging System README](./grafana_logging/README.md)** - Complete guide
-- **[Logging Examples](./grafana_logging/examples.py)** - Code examples
+- **[Logging System README](../grafana_logging/README.md)** - Complete guide
+- **[Logging Examples](../grafana_logging/examples.py)** - Code examples
 
 ## 📄 Related Documentation
 

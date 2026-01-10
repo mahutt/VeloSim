@@ -342,8 +342,8 @@ logs
 *.temp
 
 # Grafana/Loki logging runtime files
-back/grafana_logging/logs.txt
-back/grafana_logging/loki/
-back/grafana_logging/promtail/positions/positions.yaml
+grafana_logging/logs.txt
+grafana_logging/loki/
+grafana_logging/promtail/positions/positions.yaml
 
 docs/_build/

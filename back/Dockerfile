@@ -16,6 +16,7 @@ RUN apt-get update && \
 COPY pyproject.toml ./
 COPY back/ ./back
 COPY sim/ ./sim
+COPY grafana_logging/ ./grafana_logging
 
 # Install the package with all dependencies
 RUN python -m pip install --upgrade pip setuptools wheel \
