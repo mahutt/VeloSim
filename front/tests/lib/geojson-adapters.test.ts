@@ -27,7 +27,7 @@ import {
   adaptStationsToGeoJSON,
   adaptRouteToGeoJSON,
 } from '~/lib/geojson-adapters';
-import type { Station } from '~/types';
+import type { Station, Position } from '~/types';
 
 describe('adaptStationsToGeoJSON', () => {
   it('should convert an array of stations to a GeoJSON FeatureCollection', () => {
@@ -101,21 +101,21 @@ describe('adaptRouteToGeoJSON', () => {
   };
 
   it('should return empty collection when routeGeometry is null', () => {
-    const result = adaptRouteToGeoJSON(null, 0, 0);
+    const result = adaptRouteToGeoJSON(null, [0, 0], 0);
 
     expect(result.nextTask).toEqual(emptyFeatureCollection);
     expect(result.futureTasks).toEqual(emptyFeatureCollection);
   });
 
   it('should return empty collection when routeGeometry has fewer than 2 points', () => {
-    const result = adaptRouteToGeoJSON([[0, 0]], 0, 0);
+    const result = adaptRouteToGeoJSON([[0, 0]], [0, 0], 0);
 
     expect(result.nextTask).toEqual(emptyFeatureCollection);
     expect(result.futureTasks).toEqual(emptyFeatureCollection);
   });
 
   it('should split route into next-task and future-tasks segments based on nextTaskEndIndex', () => {
-    const routeGeometry: [number, number][] = [
+    const routeGeometry: Position[] = [
       [-74.0, 40.7],
       [-74.1, 40.8],
       [-74.2, 40.9],
@@ -123,7 +123,11 @@ describe('adaptRouteToGeoJSON', () => {
     ];
     const nextTaskEndIndex = 2;
 
-    const result = adaptRouteToGeoJSON(routeGeometry, 0, nextTaskEndIndex);
+    const result = adaptRouteToGeoJSON(
+      routeGeometry,
+      [-74.0, 40.7],
+      nextTaskEndIndex
+    );
 
     const nextTaskFeatures = result.nextTask.features.filter(
       (f) => f.properties?.segment === 'next-task'
@@ -148,13 +152,17 @@ describe('adaptRouteToGeoJSON', () => {
   });
 
   it('should handle nextTaskEndIndex beyond route length', () => {
-    const routeGeometry: [number, number][] = [
+    const routeGeometry: Position[] = [
       [-74.0, 40.7],
       [-74.1, 40.8],
     ];
     const nextTaskEndIndex = 100;
 
-    const result = adaptRouteToGeoJSON(routeGeometry, 0, nextTaskEndIndex);
+    const result = adaptRouteToGeoJSON(
+      routeGeometry,
+      [-74.0, 40.7],
+      nextTaskEndIndex
+    );
 
     const nextTaskFeatures = result.nextTask.features.filter(
       (f) => f.properties?.segment === 'next-task'
@@ -163,7 +171,7 @@ describe('adaptRouteToGeoJSON', () => {
       (f) => f.properties?.segment === 'future-tasks'
     );
 
-    expect(nextTaskFeatures).toHaveLength(1);
+    expect(nextTaskFeatures).toHaveLength(0);
     expect(futureTasksFeatures).toHaveLength(0);
   });
 });

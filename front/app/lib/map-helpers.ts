@@ -22,6 +22,7 @@
  * SOFTWARE.
  */
 
+import type { Position } from '~/types';
 import { adaptRouteToGeoJSON } from './geojson-adapters';
 
 export enum MapSource {
@@ -226,14 +227,14 @@ export function setMapSource(
  * @param map - Mapbox map instance
  */
 export function updateRouteDisplay(
-  routeGeometry: [number, number][] | null,
-  progress: number,
+  routeGeometry: Position[] | null,
+  position: Position,
   nextTaskEndIndex: number,
   map: mapboxgl.Map
 ) {
   const { nextTask, futureTasks } = adaptRouteToGeoJSON(
     routeGeometry,
-    progress,
+    position,
     nextTaskEndIndex
   );
 
@@ -245,5 +246,5 @@ export function updateRouteDisplay(
  * Clear route visualization
  */
 export function clearRouteDisplay(map: mapboxgl.Map) {
-  updateRouteDisplay(null, 0, 0, map);
+  updateRouteDisplay(null, [0, 0], 0, map);
 }

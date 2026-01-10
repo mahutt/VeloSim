@@ -580,13 +580,28 @@ class Driver:
                   the first task's route segment ends.
         """
         visible_tasks = self.get_visible_task_list()
+        include_hq = self.state == DriverState.HEADING_TO_HQ
 
-        if not visible_tasks:
+        if not visible_tasks and not include_hq:
             return None
 
         full_geometry: list[list[float]] = []
         next_task_end_index = 0
         current_pos = self.position
+
+        # if driver needs to go to HQ, make HQ route the "next task"
+        if include_hq:
+            try:
+                route = self.map_controller.getRoute(current_pos, HQ_POSITION)
+                segment_coords = route.get_raw_coordinates()
+
+                if segment_coords:
+                    full_geometry.extend(segment_coords)
+                    next_task_end_index = len(full_geometry) - 1
+                    current_pos = HQ_POSITION
+
+            except ValueError as e:
+                print(f"Driver {self.id}: Cannot get route to HQ: {e}")
 
         for task_idx, task in enumerate(visible_tasks):
             task_station = task.get_station()
@@ -600,16 +615,16 @@ class Driver:
                 route = self.map_controller.getRoute(current_pos, target_pos)
                 segment_coords = route.get_raw_coordinates()
 
-                if full_geometry and segment_coords:
-                    if full_geometry[-1] == segment_coords[0]:
+                if segment_coords:
+                    if full_geometry and full_geometry[-1] == segment_coords[0]:
                         segment_coords = segment_coords[1:]
 
-                full_geometry.extend(segment_coords)
+                    full_geometry.extend(segment_coords)
 
-                if task_idx == 0:
-                    next_task_end_index = len(full_geometry)
+                    if task_idx == 0:
+                        next_task_end_index = len(full_geometry) - 1
 
-                current_pos = target_pos
+                    current_pos = target_pos
 
             except ValueError as e:
                 print(
@@ -633,6 +648,7 @@ class Driver:
             Generator that yields for travel_to process.
         """
         self.state = DriverState.HEADING_TO_HQ
+        self.route_changed = True
         yield self.env.process(self.travel_to(HQ_POSITION))
 
     def restock_vehicle_battery(self) -> Generator[Any, Any, Any]:

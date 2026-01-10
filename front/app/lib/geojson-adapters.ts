@@ -23,10 +23,8 @@
  */
 
 import { lineString, point } from '@turf/helpers';
-import along from '@turf/along';
-import length from '@turf/length';
 import lineSlice from '@turf/line-slice';
-import type { Driver, Station } from '~/types';
+import type { Driver, Station, Position } from '~/types';
 
 export function adaptStationsToGeoJSON(
   stations: Station[],
@@ -77,8 +75,8 @@ export function adaptResourcesToGeoJSON(
 }
 
 export function adaptRouteToGeoJSON(
-  routeGeometry: [number, number][] | null,
-  progress: number,
+  routeGeometry: Position[] | null,
+  position: Position | null,
   nextTaskEndIndex: number
 ): {
   nextTask: GeoJSON.FeatureCollection;
@@ -89,100 +87,68 @@ export function adaptRouteToGeoJSON(
     features: [],
   };
 
-  if (!routeGeometry || routeGeometry.length < 2) {
+  if (!position || !routeGeometry || routeGeometry.length < 2) {
     return {
       nextTask: emptyFeatureCollection,
       futureTasks: emptyFeatureCollection,
     };
   }
 
-  // Progress is now fractional (0-1), use Turf.js for precise line slicing
-  const routeLine = lineString(routeGeometry);
-  const totalLength = length(routeLine, { units: 'kilometers' });
-  const currentDistance = progress * totalLength;
+  if (nextTaskEndIndex < 0 || nextTaskEndIndex > routeGeometry.length - 1) {
+    return {
+      nextTask: emptyFeatureCollection,
+      futureTasks: emptyFeatureCollection,
+    };
+  }
 
-  // Get the current position on the route
-  const currentPoint = along(routeLine, currentDistance, {
-    units: 'kilometers',
-  });
-  const endPoint = point(routeGeometry[routeGeometry.length - 1]);
+  // 1. split the route at nextTaskEndIndex to avoid snapping to the incorrect part of a line (due to double-backing)
+  const preNextTaskSegment = routeGeometry.slice(0, nextTaskEndIndex + 1);
+  const postNextTaskSegment = routeGeometry.slice(nextTaskEndIndex);
 
-  let nextTask: GeoJSON.FeatureCollection = emptyFeatureCollection;
-  let futureTasks: GeoJSON.FeatureCollection = emptyFeatureCollection;
+  // 2. remove points already travelled on preNextTaskSegment (using position)
+  const nextTaskLine = lineSlice(
+    point(position),
+    point(routeGeometry[nextTaskEndIndex]),
+    lineString(preNextTaskSegment)
+  );
 
-  try {
-    if (nextTaskEndIndex > 0 && nextTaskEndIndex < routeGeometry.length) {
-      const taskBoundaryPoint = point(routeGeometry[nextTaskEndIndex]);
+  if (
+    !nextTaskLine.geometry.coordinates ||
+    nextTaskLine.geometry.coordinates.length < 2
+  ) {
+    return {
+      nextTask: emptyFeatureCollection,
+      futureTasks: emptyFeatureCollection,
+    };
+  }
 
-      // next task, from current position to task boundary
-      const nextTaskLine = lineSlice(
-        currentPoint,
-        taskBoundaryPoint,
-        routeLine
-      );
-      if (nextTaskLine.geometry.coordinates.length >= 2) {
-        nextTask = {
-          type: 'FeatureCollection',
-          features: [
-            {
-              type: 'Feature',
-              properties: { segment: 'next-task' },
-              geometry: nextTaskLine.geometry,
-            },
-          ],
-        };
-      }
-
-      // future task(s), from next task boundary until end
-      if (currentDistance < totalLength - 0.001) {
-        const futureTasksLine = lineSlice(
-          taskBoundaryPoint,
-          endPoint,
-          routeLine
-        );
-        if (futureTasksLine.geometry.coordinates.length >= 2) {
-          futureTasks = {
-            type: 'FeatureCollection',
-            features: [
-              {
-                type: 'Feature',
-                properties: { segment: 'future-tasks' },
-                geometry: futureTasksLine.geometry,
-              },
-            ],
-          };
-        }
-      }
-    } else {
-      // show remaining as next task
-      if (currentDistance < totalLength - 0.001) {
-        const remainingLine = lineSlice(currentPoint, endPoint, routeLine);
-        if (remainingLine.geometry.coordinates.length >= 2) {
-          nextTask = {
-            type: 'FeatureCollection',
-            features: [
-              {
-                type: 'Feature',
-                properties: { segment: 'next-task' },
-                geometry: remainingLine.geometry,
-              },
-            ],
-          };
-        }
-      }
-    }
-  } catch (error) {
-    console.error('[Route] Error slicing route:', error);
-    nextTask = {
+  const result: {
+    nextTask: GeoJSON.FeatureCollection;
+    futureTasks: GeoJSON.FeatureCollection;
+  } = {
+    nextTask: {
       type: 'FeatureCollection',
       features: [
         {
           type: 'Feature',
           properties: { segment: 'next-task' },
-          geometry: { type: 'LineString', coordinates: routeGeometry },
+          geometry: nextTaskLine.geometry,
         },
       ],
-    };
-  }
-  return { nextTask, futureTasks };
+    },
+    futureTasks: {
+      type: 'FeatureCollection',
+      features:
+        postNextTaskSegment.length >= 2
+          ? [
+              {
+                type: 'Feature',
+                properties: { segment: 'future-tasks' },
+                geometry: lineString(postNextTaskSegment).geometry,
+              },
+            ]
+          : [],
+    },
+  };
+  return result;
 }
