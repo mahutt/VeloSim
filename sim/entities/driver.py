@@ -530,7 +530,7 @@ class Driver:
             return
 
         try:
-            route = self.map_controller.getRoute(self.position, position)
+            route = self.map_controller.get_route(self.position, position)
         except ValueError as e:
             # Route could not be found (no path exists, network error, etc.)
             # Log the error and stay at current position

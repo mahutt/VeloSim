@@ -24,9 +24,9 @@ SOFTWARE.
 
 from sim.entities.position import Position
 from sim.entities.route import Route
-from sim.entities.osrm_result import OSRMResult
 from sim.osm.OSRMConnection import OSRMConnection
-from typing import Dict, List, Set, Any, Optional
+from sim.map.route_controller import RouteController
+from typing import Optional
 import json
 from pathlib import Path
 
@@ -37,180 +37,43 @@ class MapController:
     This uses OSRM instead of local graph-based routing.
     """
 
-    _instance = None
-
-    def __new__(cls, *args: Any, **kwargs: Any) -> "MapController":
-        """Implement singleton pattern for MapController.
-
-        Ensures only one instance of MapController exists across the application.
-
-        Args:
-            *args: Variable length argument list.
-            **kwargs: Arbitrary keyword arguments.
-
-        Returns:
-            The singleton MapController instance.
-        """
-        if cls._instance is None:
-            cls._instance = super().__new__(cls)
-        return cls._instance
-
     def __init__(self, osrm_url: Optional[str] = None) -> None:
         """Initialize the MapController with OSRM routing.
 
         Sets up the OSRM connection for routing operations and initializes
-        the road subscription tracking system. This is only executed once
-        due to the singleton pattern.
+        the RouteController for road/route management.
 
         Args:
             osrm_url: Optional URL for the OSRM server. If not provided,
                 will use environment variables to determine the server.
         """
-        if not hasattr(self, "_initialized"):
-            # Initialize the OSRM connection
-            self.osrm = OSRMConnection(osrm_url=osrm_url)
+        # Initialize the OSRM connection
+        self.osrm = OSRMConnection(osrm_url=osrm_url)
 
-            # Dictionary mapping road_id -> set of routes using that road
-            # Using set for O(1) add/remove operations
-            self.road_subscriptions: Dict[int, Set[Route]] = {}
+        # Load config once for all routes
+        config_path = Path(__file__).parent.parent / "config.json"
+        with open(config_path, "r") as f:
+            self.config = json.load(f)
 
-            # Load config once for all routes
-            config_path = Path(__file__).parent.parent / "config.json"
-            with open(config_path, "r") as f:
-                self.config = json.load(f)
+        # Initialize RouteController for road/route management
+        self.route_controller = RouteController(self)
 
-            self._initialized = True
-
-    def getRoute(self, a: Position, b: Position) -> Route:
+    def get_route(self, a: Position, b: Position) -> Route:
         """
-        Given a starting position, a route object will be created
-        containing the shortest path using OSRM.
-        The route will be automatically subscribed to all roads
-        it traverses.
+        Create a route between two positions.
+
+        Delegates entirely to RouteController.
 
         Args:
             a: Starting position
             b: Ending position
 
         Returns:
-            Route: A new Route object subscribed to the MapController
+            Route: A new Route object
 
         Raises:
-            ValueError: If no route can be found between the two
-                positions
+            ValueError: If no route can be found
         """
-        # 1. Get coordinates from positions
-        start_lon, start_lat = a.get_position()
-        end_lon, end_lat = b.get_position()
-
-        try:
-            # 2. Get route from OSRM using coordinates
-            osrm_result_dict = self.osrm.shortest_path_coords(
-                start_lon, start_lat, end_lon, end_lat
-            )
-
-            if not osrm_result_dict:
-                raise ValueError(
-                    f"No route found from ({start_lon}, {start_lat}) "
-                    f"to ({end_lon}, {end_lat})"
-                )
-
-            # 3. Convert OSRM dict to typed OSRMResult
-            osrm_result = OSRMResult.from_dict(osrm_result_dict)
-
-            # 4. Create a new route object with the typed result and injected config
-            traversable_route = Route(osrm_result, self.osrm, self.config)
-
-            # 5. Subscribe all the roads to this route in the
-            # road_subscriptions dictionary
-            traversable_route.subscribe_to_map_controller(self)
-
-            # 6. return the route
-            return traversable_route
-
-        except ValueError:
-            # Re-raise ValueError as-is (route not found)
-            raise
-        except Exception as e:
-            # Catch any other errors (network issues, parsing errors, etc.)
-            raise ValueError(
-                f"Failed to create route from ({start_lon}, {start_lat}) "
-                f"to ({end_lon}, {end_lat}): {str(e)}"
-            ) from e
-
-    def disableRoads(self, road_id_list: List[int]) -> None:
-        """
-        Given a list of road segments with their OSM ID, will disable
-        the roads on the map.
-        For any route containing this road, a new route will be
-        calculated using OSRM.
-
-        Note: Road disabling with OSRM requires either:
-        1. Running a custom OSRM server with modified data
-        2. Client-side filtering (which this implements)
-
-        Args:
-            road_id_list: List of road segment OSM IDs to disable
-
-        Returns:
-            None
-        """
-        # Get all edges from OSRM
-        all_edges = self.osrm.get_all_edges()
-
-        for road_id in road_id_list:
-            # Find routes subscribed to this road
-            if road_id in self.road_subscriptions:
-                # Create a copy of the set to avoid modification during iteration
-                routes_to_recalculate = set(self.road_subscriptions[road_id])
-
-                # Recalculate each route that uses this disabled road
-                for route in routes_to_recalculate:
-                    if not route.is_finished:
-                        success = route.recalculate()
-                        if not success:
-                            msg = (
-                                f"Warning: Route {route.id} could not be "
-                                "recalculated after road "
-                                f"{road_id} was disabled."
-                            )
-                            print(msg)
-
-            # Disable the road in OSM data (for edge lookups)
-            try:
-                edge_mask = all_edges["id"] == road_id
-                if edge_mask.any():
-                    # Remove from edges dataframe
-                    all_edges = all_edges[~edge_mask]
-                    self.osrm.set_edges(all_edges)
-                    print(f"Road {road_id} has been disabled locally.")
-                else:
-                    print(f"Warning: Road {road_id} not found in OSM data.")
-            except Exception as e:
-                print(f"Error disabling road {road_id}: {e}")
-
-    def _subscribe_route_to_road(self, road_id: int, route: Route) -> None:
-        """
-        Subscribes a route to a specific road segment.
-
-        Args:
-            road_id: The OSM ID of the road segment
-            route: The Route object to subscribe
-        """
-        if road_id not in self.road_subscriptions:
-            self.road_subscriptions[road_id] = set()
-        self.road_subscriptions[road_id].add(route)
-
-    def _unsubscribe_route_from_road(self, road_id: int, route: Route) -> None:
-        """
-        Unsubscribes a route from a specific road segment.
-
-        Args:
-            road_id: The OSM ID of the road segment
-            route: The Route object to unsubscribe
-        """
-        if road_id in self.road_subscriptions:
-            self.road_subscriptions[road_id].discard(route)
-            # Clean up empty sets to save memory
-            if not self.road_subscriptions[road_id]:
-                del self.road_subscriptions[road_id]
+        return self.route_controller.get_route_from_positions(
+            a, b, self.osrm, self.config
+        )

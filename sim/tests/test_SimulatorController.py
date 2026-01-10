@@ -24,7 +24,7 @@ SOFTWARE.
 
 import simpy
 import pytest
-from typing import List, Any, Generator
+from typing import List, Any
 from unittest.mock import Mock, patch
 
 from sim.core.SimulatorController import SimulatorController
@@ -82,16 +82,6 @@ class FakeSubscriber(Subscriber):
 
     def on_frame(self, frame: Frame) -> None:
         self.received.append(frame)
-
-
-@pytest.fixture(autouse=True)
-def reset_singleton() -> Generator[None, None, None]:
-    """Reset OSRMConnection singleton before each test"""
-    from sim.osm.OSRMConnection import OSRMConnection
-
-    OSRMConnection._instance = None
-    yield
-    OSRMConnection._instance = None
 
 
 @pytest.fixture()
@@ -666,7 +656,7 @@ def test_start_simulation(
         # Patch heavy routing (OSRM doesn't have build_ch_network)
         with patch.object(
             simulator_controller.map_controller,
-            "getRoute",
+            "get_route",
             return_value=SimpleNamespace(roads=[1, 2]),
         ):
             simulator_controller.start(3600)
