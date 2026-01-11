@@ -592,7 +592,7 @@ class Driver:
         # if driver needs to go to HQ, make HQ route the "next task"
         if include_hq:
             try:
-                route = self.map_controller.getRoute(current_pos, HQ_POSITION)
+                route = self.map_controller.get_route(current_pos, HQ_POSITION)
                 segment_coords = route.get_raw_coordinates()
 
                 if segment_coords:
@@ -612,7 +612,7 @@ class Driver:
             target_pos = task_station.get_position()
 
             try:
-                route = self.map_controller.getRoute(current_pos, target_pos)
+                route = self.map_controller.get_route(current_pos, target_pos)
                 segment_coords = route.get_raw_coordinates()
 
                 if segment_coords:

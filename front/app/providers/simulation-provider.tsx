@@ -654,10 +654,7 @@ export const SimulationProvider = ({
         // constrain interpolation segment to next task segment only
         let constrainedRoute = route.coordinates;
         const nextTaskEndIndex = route.nextTaskEndIndex;
-        if (
-          nextTaskEndIndex !== undefined &&
-          nextTaskEndIndex < constrainedRoute.length
-        ) {
+        if (nextTaskEndIndex < constrainedRoute.length) {
           // animate only up to where the next task ends in the route
           constrainedRoute = constrainedRoute.slice(0, nextTaskEndIndex + 1);
         }
