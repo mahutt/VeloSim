@@ -34,7 +34,7 @@ import jwt
 
 from back.crud.user import user_crud
 from back.database.session import get_db
-from back.grafana_logging.logger import get_logger
+from grafana_logging.logger import get_logger
 
 logger = get_logger(__name__)
 

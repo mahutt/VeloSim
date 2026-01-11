@@ -52,6 +52,20 @@ params = InputParameter()
 subList: List[Subscriber] = []
 
 
+@pytest.fixture(autouse=True)
+def mock_osrm_connection(monkeypatch: Any) -> Any:
+    """Mock OSRM connection for all tests."""
+    # Set environment variable for OSRM URL
+    monkeypatch.setenv("OSRM_URL", "http://localhost:5000")
+
+    # Mock the OSRM connection verification
+    with patch(
+        "sim.osm.OSRMConnection.OSRMConnection._verify_osrm_connection",
+        return_value=True,
+    ):
+        yield
+
+
 class FakeTPUStrategy:
     def check_for_new_task(self, station: Station) -> bool:
         return False
@@ -169,11 +183,8 @@ def test_start_creates_thread_and_emits_output(
     sim_info = sim.get_sim_by_id(sim_id)
     assert sim_info is not None
     ctrl = sim_info["simController"]
-    with (
-        patch.object(ctrl.map_controller.osrm, "build_ch_network", return_value=None),
-        patch.object(
-            ctrl.map_controller, "getRoute", return_value=SimpleNamespace(roads=[1])
-        ),
+    with patch.object(
+        ctrl.map_controller, "get_route", return_value=SimpleNamespace(roads=[1])
     ):
         # Start the simulation
         sim.start(sim_id, 3600)
@@ -214,11 +225,8 @@ def test_start_with_already_running_sim(
     sim_info = sim.get_sim_by_id(sim_id)
     assert sim_info is not None
     ctrl = sim_info["simController"]
-    with (
-        patch.object(ctrl.map_controller.osrm, "build_ch_network", return_value=None),
-        patch.object(
-            ctrl.map_controller, "getRoute", return_value=SimpleNamespace(roads=[1])
-        ),
+    with patch.object(
+        ctrl.map_controller, "get_route", return_value=SimpleNamespace(roads=[1])
     ):
         sim.start(sim_id, 3600)
 
@@ -239,13 +247,10 @@ def test_stop_removes_thread_from_pool(
     sim_info = sim.get_sim_by_id(sim_id)
     assert sim_info is not None
     ctrl = sim_info["simController"]
-    with (
-        patch.object(ctrl.map_controller.osrm, "build_ch_network", return_value=None),
-        patch.object(
-            ctrl.map_controller,
-            "getRoute",
-            return_value=SimpleNamespace(roads=[1]),
-        ),
+    with patch.object(
+        ctrl.map_controller,
+        "get_route",
+        return_value=SimpleNamespace(roads=[1]),
     ):
         sim.start(sim_id, 3600)
 
@@ -281,16 +286,14 @@ def test_multiple_parallel_sims(
     a_ctrl = a_info["simController"]
     b_ctrl = b_info["simController"]
     with (
-        patch.object(a_ctrl.map_controller.osrm, "build_ch_network", return_value=None),
         patch.object(
             a_ctrl.map_controller,
-            "getRoute",
+            "get_route",
             return_value=SimpleNamespace(roads=[1]),
         ),
-        patch.object(b_ctrl.map_controller.osrm, "build_ch_network", return_value=None),
         patch.object(
             b_ctrl.map_controller,
-            "getRoute",
+            "get_route",
             return_value=SimpleNamespace(roads=[1]),
         ),
     ):
@@ -426,13 +429,10 @@ def test_get_sim_by_id_success(
     a_info = sim.get_sim_by_id(a)
     assert a_info is not None
     ctrl = a_info["simController"]
-    with (
-        patch.object(ctrl.map_controller.osrm, "build_ch_network", return_value=None),
-        patch.object(
-            ctrl.map_controller,
-            "getRoute",
-            return_value=SimpleNamespace(roads=[1]),
-        ),
+    with patch.object(
+        ctrl.map_controller,
+        "get_route",
+        return_value=SimpleNamespace(roads=[1]),
     ):
         sim.start(a, 3600)
 
@@ -456,13 +456,10 @@ def test_get_sim_by_id_fail(
     a_info = sim.get_sim_by_id(a)
     assert a_info is not None
     ctrl = a_info["simController"]
-    with (
-        patch.object(ctrl.map_controller.osrm, "build_ch_network", return_value=None),
-        patch.object(
-            ctrl.map_controller,
-            "getRoute",
-            return_value=SimpleNamespace(roads=[1]),
-        ),
+    with patch.object(
+        ctrl.map_controller,
+        "get_route",
+        return_value=SimpleNamespace(roads=[1]),
     ):
         sim.start(a, 3600)
 
@@ -486,13 +483,10 @@ def test_add_task_to_sim_success(
     a_info = sim.get_sim_by_id(a)
     assert a_info is not None
     ctrl = a_info["simController"]
-    with (
-        patch.object(ctrl.map_controller.osrm, "build_ch_network", return_value=None),
-        patch.object(
-            ctrl.map_controller,
-            "getRoute",
-            return_value=SimpleNamespace(roads=[1]),
-        ),
+    with patch.object(
+        ctrl.map_controller,
+        "get_route",
+        return_value=SimpleNamespace(roads=[1]),
     ):
         sim.start(a, 3600)
 
@@ -529,13 +523,10 @@ def test_add_task_to_sim_fail(
     a_info = sim.get_sim_by_id(a)
     assert a_info is not None
     ctrl = a_info["simController"]
-    with (
-        patch.object(ctrl.map_controller.osrm, "build_ch_network", return_value=None),
-        patch.object(
-            ctrl.map_controller,
-            "getRoute",
-            return_value=SimpleNamespace(roads=[1]),
-        ),
+    with patch.object(
+        ctrl.map_controller,
+        "get_route",
+        return_value=SimpleNamespace(roads=[1]),
     ):
         sim.start(a, 3600)
 
@@ -561,13 +552,10 @@ def test_assign_task_to_driver_success(
     a_info = sim.get_sim_by_id(a)
     assert a_info is not None
     ctrl = a_info["simController"]
-    with (
-        patch.object(ctrl.map_controller.osrm, "build_ch_network", return_value=None),
-        patch.object(
-            ctrl.map_controller,
-            "getRoute",
-            return_value=SimpleNamespace(roads=[1]),
-        ),
+    with patch.object(
+        ctrl.map_controller,
+        "get_route",
+        return_value=SimpleNamespace(roads=[1]),
     ):
         sim.start(a, 3600)
 
@@ -594,13 +582,10 @@ def test_assign_task_to_driver_fail(
     a_info = sim.get_sim_by_id(a)
     assert a_info is not None
     ctrl = a_info["simController"]
-    with (
-        patch.object(ctrl.map_controller.osrm, "build_ch_network", return_value=None),
-        patch.object(
-            ctrl.map_controller,
-            "getRoute",
-            return_value=SimpleNamespace(roads=[1]),
-        ),
+    with patch.object(
+        ctrl.map_controller,
+        "get_route",
+        return_value=SimpleNamespace(roads=[1]),
     ):
         sim.start(a, 3600)
 
@@ -620,13 +605,10 @@ def test_unassign_task_from_driver_success(
     a_info = sim.get_sim_by_id(a)
     assert a_info is not None
     ctrl = a_info["simController"]
-    with (
-        patch.object(ctrl.map_controller.osrm, "build_ch_network", return_value=None),
-        patch.object(
-            ctrl.map_controller,
-            "getRoute",
-            return_value=SimpleNamespace(roads=[1]),
-        ),
+    with patch.object(
+        ctrl.map_controller,
+        "get_route",
+        return_value=SimpleNamespace(roads=[1]),
     ):
         sim.start(a, 3600)
     sim.assign_task_to_driver(a, task_id=1, driver_id=1)
@@ -652,13 +634,10 @@ def test_unassign_task_from_driver_fail(
     a_info = sim.get_sim_by_id(a)
     assert a_info is not None
     ctrl = a_info["simController"]
-    with (
-        patch.object(ctrl.map_controller.osrm, "build_ch_network", return_value=None),
-        patch.object(
-            ctrl.map_controller,
-            "getRoute",
-            return_value=SimpleNamespace(roads=[1]),
-        ),
+    with patch.object(
+        ctrl.map_controller,
+        "get_route",
+        return_value=SimpleNamespace(roads=[1]),
     ):
         sim.start(a, 3600)
 
@@ -676,13 +655,10 @@ def test_reassign_task_success(sim: Simulator, input_params: InputParameter) -> 
     a_info = sim.get_sim_by_id(a)
     assert a_info is not None
     ctrl = a_info["simController"]
-    with (
-        patch.object(ctrl.map_controller.osrm, "build_ch_network", return_value=None),
-        patch.object(
-            ctrl.map_controller,
-            "getRoute",
-            return_value=SimpleNamespace(roads=[1]),
-        ),
+    with patch.object(
+        ctrl.map_controller,
+        "get_route",
+        return_value=SimpleNamespace(roads=[1]),
     ):
         sim.start(a, 3600)
     sim.assign_task_to_driver(a, task_id=1, driver_id=1)
@@ -716,13 +692,10 @@ def test_reassign_task_fail(
     a_info = sim.get_sim_by_id(a)
     assert a_info is not None
     ctrl = a_info["simController"]
-    with (
-        patch.object(ctrl.map_controller.osrm, "build_ch_network", return_value=None),
-        patch.object(
-            ctrl.map_controller,
-            "getRoute",
-            return_value=SimpleNamespace(roads=[1]),
-        ),
+    with patch.object(
+        ctrl.map_controller,
+        "get_route",
+        return_value=SimpleNamespace(roads=[1]),
     ):
         sim.start(a, 3600)
 
@@ -756,17 +729,10 @@ def test_stop_all_stops_everything_and_is_idempotent(
         sim_info = sim.get_sim_by_id(sim_id)
         assert sim_info is not None
         ctrl = sim_info["simController"]
-        with (
-            patch.object(
-                ctrl.map_controller.osrm,
-                "build_ch_network",
-                return_value=None,
-            ),
-            patch.object(
-                ctrl.map_controller,
-                "getRoute",
-                return_value=SimpleNamespace(roads=[1]),
-            ),
+        with patch.object(
+            ctrl.map_controller,
+            "get_route",
+            return_value=SimpleNamespace(roads=[1]),
         ):
             sim.start(sim_id, 3600)
         sim_ids.append(sim_id)
@@ -790,19 +756,9 @@ def test_stop_all_stops_everything_and_is_idempotent(
 def test_reorder_driver_tasks_success(
     sim: Simulator,
     input_params: InputParameter,
-    monkeypatch: Any,
 ) -> None:
     """Test successful task reordering via Simulator."""
-    # Set OSRM URL
-    monkeypatch.setenv("OSRM_URL", "http://localhost:5000")
-
-    with (
-        patch(
-            "sim.osm.OSRMConnection.OSRMConnection._verify_osrm_connection",
-            return_value=True,
-        ),
-    ):
-        sim_id = sim.initialize(input_params, [], FakeSimBehaviour())
+    sim_id = sim.initialize(input_params, [], FakeSimBehaviour())
 
     # Get the controller and driver
     sim_info = sim.get_sim_by_id(sim_id)
@@ -844,18 +800,9 @@ def test_reorder_driver_tasks_simulation_not_found(
 def test_reorder_driver_tasks_driver_not_found(
     sim: Simulator,
     input_params: InputParameter,
-    monkeypatch: Any,
 ) -> None:
     """Test reordering with invalid driver_id raises exception."""
-    monkeypatch.setenv("OSRM_URL", "http://localhost:5000")
-
-    with (
-        patch(
-            "sim.osm.OSRMConnection.OSRMConnection._verify_osrm_connection",
-            return_value=True,
-        ),
-    ):
-        sim_id = sim.initialize(input_params, [], FakeSimBehaviour())
+    sim_id = sim.initialize(input_params, [], FakeSimBehaviour())
 
     with pytest.raises(Exception, match="Could not find driver in sim with id: 999"):
         sim.reorder_driver_tasks(
@@ -869,18 +816,9 @@ def test_reorder_driver_tasks_driver_not_found(
 def test_reorder_driver_tasks_with_thread_lock(
     sim: Simulator,
     input_params: InputParameter,
-    monkeypatch: Any,
 ) -> None:
     """Test that reorder acquires thread pool lock."""
-    monkeypatch.setenv("OSRM_URL", "http://localhost:5000")
-
-    with (
-        patch(
-            "sim.osm.OSRMConnection.OSRMConnection._verify_osrm_connection",
-            return_value=True,
-        ),
-    ):
-        sim_id = sim.initialize(input_params, [], FakeSimBehaviour())
+    sim_id = sim.initialize(input_params, [], FakeSimBehaviour())
 
     # Get the controller and driver
     sim_info = sim.get_sim_by_id(sim_id)

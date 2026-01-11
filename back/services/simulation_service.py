@@ -40,7 +40,7 @@ from back.schemas.sim_instance import (
     SimulationResponse,
 )
 from back.exceptions import VelosimPermissionError, ItemNotFoundError
-from back.grafana_logging.logger import get_logger
+from grafana_logging.logger import get_logger
 from back.services.keyframe_persistence_service import KeyframePersistenceSubscriber
 
 logger = get_logger(__name__)

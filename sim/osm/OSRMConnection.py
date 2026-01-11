@@ -22,25 +22,20 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 """
 
-import hashlib
 import logging
 import os
 from typing import Any, Dict, List, Optional, Tuple
 
 import requests
-from pandas import Series
 
 """
 OSRMConnection - Simplified routing using OSRM HTTP API
 
 This class delegates all routing operations to an OSRM
 (Open Source Routing Machine) server.
-It maintains minimal local state, only tracking blocked road coordinates.
 
 Key design principles:
 - Delegate node snapping, routing, and distance calculations to OSRM
-- Use coordinate-based road blocking instead of graph manipulation
-- Provide compatibility wrappers for legacy code expecting node IDs
 - Keep implementation simple and stateless
 """
 
@@ -51,23 +46,13 @@ class OSRMConnection:
     """
     Simplified routing interface using OSRM HTTP API.
 
-    This implementation delegates all routing work to an OSRM server, maintaining
-    only a set of blocked road coordinates for filtering routes.
+    This implementation delegates all routing work to an OSRM server.
 
     Attributes:
         osrm_base_url (str): Base URL of the OSRM server
-        blocked_roads (Dict[Tuple[float, float], float]): Map of (lon, lat)
-            to radius in degrees
         _session (requests.Session): Persistent HTTP session for better
             performance
     """
-
-    _instance = None
-
-    def __new__(cls, *args: Any, **kwargs: Any) -> "OSRMConnection":
-        if cls._instance is None:
-            cls._instance = super(OSRMConnection, cls).__new__(cls)
-        return cls._instance
 
     def __init__(self, osrm_url: Optional[str] = None):
         """
@@ -84,9 +69,6 @@ class OSRMConnection:
         Raises:
             ValueError: If no OSRM URL is provided or configured via environment
         """
-        if hasattr(self, "_initialized"):
-            return
-
         # Priority: explicit parameter > OSRM_URL > OSRM_LOCAL_URL > OSRM_PUBLIC_URL
         self.osrm_base_url = (
             osrm_url
@@ -102,9 +84,7 @@ class OSRMConnection:
                 "variables: OSRM_URL, OSRM_LOCAL_URL, or OSRM_PUBLIC_URL"
             )
 
-        self.blocked_roads: Dict[Tuple[float, float], float] = {}
         self._session = requests.Session()
-        self._initialized = True
 
         # Verify OSRM server is accessible
         if not self._verify_osrm_connection():
@@ -147,7 +127,6 @@ class OSRMConnection:
         start_lat: float,
         end_lon: float,
         end_lat: float,
-        check_blocked: bool = True,
     ) -> Optional[Dict[str, Any]]:
         """
         Get shortest path between two coordinates using OSRM.
@@ -157,7 +136,6 @@ class OSRMConnection:
             start_lat: Starting latitude
             end_lon: Ending longitude
             end_lat: Ending latitude
-            check_blocked: Whether to check for blocked roads in the route
 
         Returns:
             Dict with keys:
@@ -239,19 +217,15 @@ class OSRMConnection:
 
                     steps.append(step_data)
 
-            # Check if route passes through blocked areas
-            if check_blocked and self._route_intersects_blocked(coordinates):
-                logger.info("Route intersects blocked roads, attempting alternative")
-                # TODO: Implement alternative route finding or
-                # waypoint injection
-                # For now, return None to indicate blocked route
-                return None
+            # Parse segments from annotation nodes (OSM node-based identification)
+            segments = self._parse_segments_from_annotations(route)
 
             return {
                 "coordinates": coordinates,
                 "distance": distance,
                 "duration": duration,
                 "steps": steps,  # Add detailed step information
+                "segments": segments,  # OSM node-based segments for RouteController
             }
 
         except requests.RequestException as e:
@@ -273,9 +247,7 @@ class OSRMConnection:
         Returns:
             Distance in meters, or None if no route found
         """
-        result = self.shortest_path_coords(
-            start_lon, start_lat, end_lon, end_lat, check_blocked=False
-        )
+        result = self.shortest_path_coords(start_lon, start_lat, end_lon, end_lat)
         return result["distance"] if result else None
 
     def snap_to_road(self, lon: float, lat: float) -> Tuple[float, float]:
@@ -310,244 +282,111 @@ class OSRMConnection:
             return (lon, lat)
 
     # ============================================================================
-    # Road blocking methods
+    # Segment parsing methods
     # ============================================================================
 
-    def block_road_area(self, lon: float, lat: float, radius: float = 0.001) -> None:
+    def _parse_segments_from_annotations(
+        self, route: Dict[str, Any]
+    ) -> List[Dict[str, Any]]:
         """
-        Block a circular area around a coordinate.
+        Parse OSM node-based segments from OSRM annotation data.
 
-        This adds the coordinate to the blocked set. When routing, paths that
-        pass through this area will be rejected.
+        Extracts annotation.nodes, annotation.distance, and annotation.duration
+        from the OSRM response to build segment data with OSM node identifiers.
+
+        The OSRM annotation structure is:
+        - nodes: [N] array of OSM node IDs along the route
+        - distance: [N-1] array of distances between consecutive nodes
+        - duration: [N-1] array of durations between consecutive nodes
 
         Args:
-            lon: Longitude of center point
-            lat: Latitude of center point
-            radius: Radius in degrees (approximately 100m at 0.001)
+            route: The OSRM route object from the API response
 
         Returns:
-            None
+            List of segment dictionaries with keys:
+            - node_start: Starting OSM node ID
+            - node_end: Ending OSM node ID
+            - distance: Segment distance in meters
+            - duration: Segment duration in seconds
+            - geometry: List of [lon, lat] coordinates for this segment
+            - road_name: Optional street name (always None, not yet implemented)
         """
-        self.blocked_roads[(lon, lat)] = radius
-        logger.debug(f"Blocked road area at ({lon}, {lat}) with radius {radius}")
+        segments: List[Dict[str, Any]] = []
 
-    def unblock_road_area(self, lon: float, lat: float) -> None:
-        """
-        Remove a blocked road area.
+        if "legs" not in route or not route["legs"]:
+            return segments
 
-        Args:
-            lon: Longitude of blocked point
-            lat: Latitude of blocked point
+        leg = route["legs"][0]
+        annotations = leg.get("annotation", {})
 
-        Returns:
-            None
-        """
-        self.blocked_roads.pop((lon, lat), None)
-        logger.debug(f"Unblocked road area at ({lon}, {lat})")
+        nodes = annotations.get("nodes", [])
+        distances = annotations.get("distance", [])
+        durations = annotations.get("duration", [])
 
-    def clear_blocked_roads(self) -> None:
-        """Clear all blocked roads.
+        # Need at least 2 nodes to form a segment
+        if len(nodes) < 2:
+            logger.debug("No annotation nodes available, skipping segment parsing")
+            return segments
 
-        Returns:
-            None
-        """
-        self.blocked_roads.clear()
-        logger.info("Cleared all blocked roads")
-
-    def _route_intersects_blocked(
-        self, coordinates: List[List[float]], tolerance: float = 0.001
-    ) -> bool:
-        """Check if a route passes through any blocked areas.
-
-        Analyzes each line segment of the route to determine if it comes within
-        the blocked radius of any blocked point. This is more accurate than just
-        checking waypoints.
-
-        Args:
-            coordinates: List of [lon, lat] waypoints defining the route.
-            tolerance: Additional tolerance in degrees added to each blocked
-                radius. Defaults to 0.001 degrees (~100m).
-
-        Returns:
-            True if any segment of the route intersects a blocked area, False otherwise.
-        """
-        if not self.blocked_roads:
-            return False
-
-        # Check each line segment of the route
-        for i in range(len(coordinates) - 1):
-            p1_lon, p1_lat = coordinates[i]
-            p2_lon, p2_lat = coordinates[i + 1]
-
-            # Check if this segment comes within range of any blocked point
-            for (blocked_lon, blocked_lat), radius in self.blocked_roads.items():
-                dist = self._point_to_segment_distance(
-                    blocked_lon, blocked_lat, p1_lon, p1_lat, p2_lon, p2_lat
-                )
-                if dist < (radius + tolerance):
-                    return True
-
-        return False
-
-    @staticmethod
-    def _point_to_segment_distance(
-        px: float, py: float, x1: float, y1: float, x2: float, y2: float
-    ) -> float:
-        """
-        Calculate the minimum distance from a point to a line segment.
-
-        Args:
-            px, py: Point coordinates
-            x1, y1: Line segment start coordinates
-            x2, y2: Line segment end coordinates
-
-        Returns:
-            Minimum distance from point to segment (Euclidean approximation)
-        """
-        # Vector from segment start to point
-        dx = x2 - x1
-        dy = y2 - y1
-
-        # Handle degenerate case where segment is a point
-        if dx == 0 and dy == 0:
-            return float(((px - x1) ** 2 + (py - y1) ** 2) ** 0.5)
-
-        # Project point onto line (parameterized by t)
-        # t=0 is at (x1,y1), t=1 is at (x2,y2)
-        t = max(0, min(1, ((px - x1) * dx + (py - y1) * dy) / (dx * dx + dy * dy)))
-
-        # Find closest point on segment
-        nearest_x = x1 + t * dx
-        nearest_y = y1 + t * dy
-
-        # Return distance to nearest point
-        return float(((px - nearest_x) ** 2 + (py - nearest_y) ** 2) ** 0.5)
-
-    # ============================================================================
-    # Compatibility wrappers for node-based interface
-    # ============================================================================
-
-    @staticmethod
-    def _coord_to_virtual_node(lon: float, lat: float) -> int:
-        """Convert a coordinate to a virtual node ID for backward compatibility.
-
-        Creates a stable MD5 hash of the coordinates to generate a consistent
-        integer node ID. This allows legacy code expecting node-based interfaces
-        to work with coordinate-based routing.
-
-        Args:
-            lon: Longitude coordinate.
-            lat: Latitude coordinate.
-
-        Returns:
-            Virtual node ID as an integer hash (first 8 hex digits of MD5).
-        """
-        # Create a stable hash from coordinates
-        coord_str = f"{lon:.6f},{lat:.6f}"
-        return int(hashlib.md5(coord_str.encode()).hexdigest()[:8], 16)
-
-    @staticmethod
-    def _virtual_node_to_coord(
-        node_id: int, coord_lookup: Dict[int, Tuple[float, float]]
-    ) -> Tuple[float, float]:
-        """Convert a virtual node ID back to coordinates.
-
-        Looks up the coordinates for a given virtual node ID. Since node IDs
-        are hashed, this requires an external lookup dictionary maintained by
-        the calling code.
-
-        Args:
-            node_id: Virtual node ID to look up.
-            coord_lookup: Dictionary mapping node IDs to (lon, lat) tuples.
-
-        Returns:
-            Tuple of (lon, lat), or (0.0, 0.0) if node_id not found.
-        """
-        return coord_lookup.get(node_id, (0.0, 0.0))
-
-    def shortest_path(
-        self,
-        start_node: int,
-        end_node: int,
-        coord_lookup: Optional[Dict[int, Tuple[float, float]]] = None,
-    ) -> Optional[List[int]]:
-        """
-        Compatibility wrapper for node-based shortest path queries.
-
-        This method is provided for backward compatibility with code expecting
-        node IDs. New code should use shortest_path_coords() instead.
-
-        Args:
-            start_node: Starting node ID (virtual or real)
-            end_node: Ending node ID (virtual or real)
-            coord_lookup: Dictionary mapping node IDs to (lon, lat) coordinates
-
-        Returns:
-            List of virtual node IDs representing the path, or None if no path found
-        """
-        if coord_lookup is None:
-            raise ValueError("coord_lookup dictionary required for node-based routing")
-
-        # Convert nodes to coordinates
-        start_coord = coord_lookup.get(start_node)
-        end_coord = coord_lookup.get(end_node)
-
-        if not start_coord or not end_coord:
-            logger.error(
-                f"Cannot find coordinates for nodes {start_node} or {end_node}"
+        # Validate array lengths
+        if len(nodes) - 1 != len(distances) or len(nodes) - 1 != len(durations):
+            logger.warning(
+                f"Annotation array length mismatch: nodes={len(nodes)}, "
+                f"distances={len(distances)}, durations={len(durations)}"
             )
-            return None
+            # Try to proceed with minimum available data
+            num_segments = min(len(nodes) - 1, len(distances), len(durations))
+        else:
+            num_segments = len(nodes) - 1
 
-        # Get route as coordinates
-        result = self.shortest_path_coords(*start_coord, *end_coord)
-        if not result:
-            return None
+        # Get route coordinates for geometry assignment
+        coordinates = route.get("geometry", {}).get("coordinates", [])
 
-        # Convert coordinate path to virtual node IDs
-        path = [
-            self._coord_to_virtual_node(lon, lat) for lon, lat in result["coordinates"]
-        ]
-        return path
+        # Road name mapping is not yet implemented - would require matching
+        # segment geometry to step geometry. For now, road_name is always None.
+        step_name_map: Dict[Tuple[int, int], Optional[str]] = {}
 
-    def coordinates_to_nearest_node(self, lon: float, lat: float) -> int:
-        """
-        Compatibility wrapper that snaps to road and returns virtual node ID.
+        # Track coordinate index for geometry assignment
+        coord_index = 0
 
-        New code should use snap_to_road() directly for coordinates.
+        for i in range(num_segments):
+            node_start = nodes[i]
+            node_end = nodes[i + 1]
+            distance = distances[i]
+            duration = durations[i]
 
-        Args:
-            lon: Longitude
-            lat: Latitude
+            # Extract geometry for this segment
+            # Each segment corresponds to one edge between two nodes
+            # In the simplified case, we assign 2 coordinates per segment
+            segment_geometry: List[List[float]] = []
+            if coord_index < len(coordinates):
+                # Start coordinate
+                segment_geometry.append(coordinates[coord_index])
+                # For intermediate segments, the end coordinate of one
+                # is the start of the next
+                if coord_index + 1 < len(coordinates):
+                    segment_geometry.append(coordinates[coord_index + 1])
+                    coord_index += 1
+                elif segment_geometry:
+                    # Last segment - just duplicate the last point
+                    segment_geometry.append(segment_geometry[-1])
 
-        Returns:
-            Virtual node ID for the snapped location
-        """
-        snapped_lon, snapped_lat = self.snap_to_road(lon, lat)
-        return self._coord_to_virtual_node(snapped_lon, snapped_lat)
+            # Look up road name from step data
+            road_name = step_name_map.get((node_start, node_end))
 
-    def get_node_coordinates(self, node_id: int) -> Optional[Series]:
-        """
-        Compatibility wrapper for getting node coordinates.
+            segments.append(
+                {
+                    "node_start": node_start,
+                    "node_end": node_end,
+                    "distance": distance,
+                    "duration": duration,
+                    "geometry": segment_geometry,
+                    "road_name": road_name,
+                }
+            )
 
-        This returns a pandas Series with 'x' and 'y' keys for compatibility
-        with legacy code expecting node-based interfaces.
-
-        Note: This requires maintaining a coord_lookup externally, or the node
-        must be derived from _coord_to_virtual_node() with known coordinates.
-
-        Args:
-            node_id: Virtual node ID
-
-        Returns:
-            Series with 'x' (lon) and 'y' (lat), or None if not found
-        """
-        # This is a limitation of the virtual node approach - we can't
-        # reverse the hash without maintaining a lookup table
-        logger.warning(
-            "get_node_coordinates() called but requires external "
-            "coord_lookup. Consider using coordinate-based methods instead."
-        )
-        return None
+        logger.debug(f"Parsed {len(segments)} segments from OSRM annotations")
+        return segments
 
     # ============================================================================
     # Utility methods
@@ -612,46 +451,16 @@ class OSRMConnection:
         """Cleanup on deletion."""
         self.close()
 
-    # Compatibility methods for edge-based operations
-    def get_all_edges(self) -> Any:
-        """Get all edges in the road network.
 
-        Compatibility method for legacy code expecting edge-based operations.
-        Returns an empty DataFrame since OSRM delegates all routing to the
-        server and doesn't maintain local edge data.
-
-        Returns:
-            Empty pandas DataFrame.
-        """
-        import pandas as pd
-
-        return pd.DataFrame()
-
-    def set_edges(self, edges: Any) -> None:
-        """Set edges in the road network.
-
-        Compatibility method for legacy code expecting edge-based operations.
-        This is a no-op for OSRM since all routing is delegated to the server
-        and no local edge data is maintained.
-
-        Args:
-            edges: Edge data (ignored).
-
-        Returns:
-            None
-        """
-        pass
-
-
-# Convenience singleton getter
+# Convenience getter
 def get_osrm_connection(osrm_url: Optional[str] = None) -> OSRMConnection:
     """
-    Get the singleton OSRMConnection instance.
+    Create an OSRMConnection instance.
 
     Args:
-        osrm_url: Base URL of OSRM server (only used on first call)
+        osrm_url: Base URL of OSRM server
 
     Returns:
-        OSRMConnection singleton instance
+        OSRMConnection instance
     """
     return OSRMConnection(osrm_url)

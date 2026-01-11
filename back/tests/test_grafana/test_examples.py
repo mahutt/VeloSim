@@ -27,7 +27,7 @@ from unittest.mock import patch
 
 import pytest
 
-from back.grafana_logging.examples import (
+from grafana_logging.examples import (
     example_backend_api_logging,
     example_basic_logging,
     example_conditional_logging,
@@ -37,7 +37,7 @@ from back.grafana_logging.examples import (
     example_simulator_logging,
     example_structured_logging,
 )
-from back.grafana_logging.logger import VeloSimLogger
+from grafana_logging.logger import VeloSimLogger
 
 
 @pytest.fixture
@@ -50,10 +50,10 @@ def temp_log_file(tmp_path: Path) -> Path:
 
 def test_example_basic_logging(temp_log_file: Path) -> None:
     """Test that basic logging example works and logs all levels."""
-    with patch("back.grafana_logging.logger.DEFAULT_LOG_FILE", str(temp_log_file)):
-        with patch("back.grafana_logging.logger.LOG_TO_FILE", True):
-            with patch("back.grafana_logging.logger.LOG_TO_CONSOLE", False):
-                with patch("back.grafana_logging.logger.DEFAULT_LOG_LEVEL", "DEBUG"):
+    with patch("grafana_logging.logger.DEFAULT_LOG_FILE", str(temp_log_file)):
+        with patch("grafana_logging.logger.LOG_TO_FILE", True):
+            with patch("grafana_logging.logger.LOG_TO_CONSOLE", False):
+                with patch("grafana_logging.logger.DEFAULT_LOG_LEVEL", "DEBUG"):
                     VeloSimLogger._loggers.clear()
 
                     example_basic_logging()
@@ -72,9 +72,9 @@ def test_example_basic_logging(temp_log_file: Path) -> None:
 
 def test_example_backend_api_logging(temp_log_file: Path) -> None:
     """Test backend API logging example."""
-    with patch("back.grafana_logging.logger.DEFAULT_LOG_FILE", str(temp_log_file)):
-        with patch("back.grafana_logging.logger.LOG_TO_FILE", True):
-            with patch("back.grafana_logging.logger.LOG_TO_CONSOLE", False):
+    with patch("grafana_logging.logger.DEFAULT_LOG_FILE", str(temp_log_file)):
+        with patch("grafana_logging.logger.LOG_TO_FILE", True):
+            with patch("grafana_logging.logger.LOG_TO_CONSOLE", False):
                 VeloSimLogger._loggers.clear()
 
                 result = example_backend_api_logging()
@@ -91,9 +91,9 @@ def test_example_backend_api_logging(temp_log_file: Path) -> None:
 
 def test_example_http_request_logging(temp_log_file: Path) -> None:
     """Test HTTP request logging example."""
-    with patch("back.grafana_logging.logger.DEFAULT_LOG_FILE", str(temp_log_file)):
-        with patch("back.grafana_logging.logger.LOG_TO_FILE", True):
-            with patch("back.grafana_logging.logger.LOG_TO_CONSOLE", False):
+    with patch("grafana_logging.logger.DEFAULT_LOG_FILE", str(temp_log_file)):
+        with patch("grafana_logging.logger.LOG_TO_FILE", True):
+            with patch("grafana_logging.logger.LOG_TO_CONSOLE", False):
                 VeloSimLogger._loggers.clear()
 
                 example_http_request_logging()
@@ -106,9 +106,9 @@ def test_example_http_request_logging(temp_log_file: Path) -> None:
 
 def test_example_simulator_logging(temp_log_file: Path) -> None:
     """Test simulator logging example."""
-    with patch("back.grafana_logging.logger.DEFAULT_LOG_FILE", str(temp_log_file)):
-        with patch("back.grafana_logging.logger.LOG_TO_FILE", True):
-            with patch("back.grafana_logging.logger.LOG_TO_CONSOLE", False):
+    with patch("grafana_logging.logger.DEFAULT_LOG_FILE", str(temp_log_file)):
+        with patch("grafana_logging.logger.LOG_TO_FILE", True):
+            with patch("grafana_logging.logger.LOG_TO_CONSOLE", False):
                 VeloSimLogger._loggers.clear()
 
                 example_simulator_logging()
@@ -132,9 +132,9 @@ def test_example_simulator_logging(temp_log_file: Path) -> None:
 
 def test_example_error_logging_with_context(temp_log_file: Path) -> None:
     """Test error logging with context example."""
-    with patch("back.grafana_logging.logger.DEFAULT_LOG_FILE", str(temp_log_file)):
-        with patch("back.grafana_logging.logger.LOG_TO_FILE", True):
-            with patch("back.grafana_logging.logger.LOG_TO_CONSOLE", False):
+    with patch("grafana_logging.logger.DEFAULT_LOG_FILE", str(temp_log_file)):
+        with patch("grafana_logging.logger.LOG_TO_FILE", True):
+            with patch("grafana_logging.logger.LOG_TO_CONSOLE", False):
                 VeloSimLogger._loggers.clear()
 
                 example_error_logging_with_context()
@@ -149,10 +149,10 @@ def test_example_error_logging_with_context(temp_log_file: Path) -> None:
 
 def test_example_conditional_logging_development(temp_log_file: Path) -> None:
     """Test conditional logging in development environment."""
-    with patch("back.grafana_logging.logger.DEFAULT_LOG_FILE", str(temp_log_file)):
-        with patch("back.grafana_logging.logger.LOG_TO_FILE", True):
-            with patch("back.grafana_logging.logger.LOG_TO_CONSOLE", False):
-                with patch("back.grafana_logging.logger.DEFAULT_LOG_LEVEL", "DEBUG"):
+    with patch("grafana_logging.logger.DEFAULT_LOG_FILE", str(temp_log_file)):
+        with patch("grafana_logging.logger.LOG_TO_FILE", True):
+            with patch("grafana_logging.logger.LOG_TO_CONSOLE", False):
+                with patch("grafana_logging.logger.DEFAULT_LOG_LEVEL", "DEBUG"):
                     with patch.dict(
                         "os.environ", {"ENVIRONMENT": "development"}, clear=False
                     ):
@@ -165,10 +165,10 @@ def test_example_conditional_logging_development(temp_log_file: Path) -> None:
 
 def test_example_conditional_logging_production(temp_log_file: Path) -> None:
     """Test conditional logging in production environment."""
-    with patch("back.grafana_logging.logger.DEFAULT_LOG_FILE", str(temp_log_file)):
-        with patch("back.grafana_logging.logger.LOG_TO_FILE", True):
-            with patch("back.grafana_logging.logger.LOG_TO_CONSOLE", False):
-                with patch("back.grafana_logging.logger.DEFAULT_LOG_LEVEL", "INFO"):
+    with patch("grafana_logging.logger.DEFAULT_LOG_FILE", str(temp_log_file)):
+        with patch("grafana_logging.logger.LOG_TO_FILE", True):
+            with patch("grafana_logging.logger.LOG_TO_CONSOLE", False):
+                with patch("grafana_logging.logger.DEFAULT_LOG_LEVEL", "INFO"):
                     with patch.dict(
                         "os.environ", {"ENVIRONMENT": "production"}, clear=False
                     ):
@@ -181,9 +181,9 @@ def test_example_conditional_logging_production(temp_log_file: Path) -> None:
 
 def test_example_structured_logging(temp_log_file: Path) -> None:
     """Test structured logging example."""
-    with patch("back.grafana_logging.logger.DEFAULT_LOG_FILE", str(temp_log_file)):
-        with patch("back.grafana_logging.logger.LOG_TO_FILE", True):
-            with patch("back.grafana_logging.logger.LOG_TO_CONSOLE", False):
+    with patch("grafana_logging.logger.DEFAULT_LOG_FILE", str(temp_log_file)):
+        with patch("grafana_logging.logger.LOG_TO_FILE", True):
+            with patch("grafana_logging.logger.LOG_TO_CONSOLE", False):
                 VeloSimLogger._loggers.clear()
 
                 example_structured_logging()
@@ -207,10 +207,10 @@ def test_example_frontend_api_logging() -> None:
 
 def test_all_examples_run_without_errors(temp_log_file: Path) -> None:
     """Integration test: run all examples to ensure none raise exceptions."""
-    with patch("back.grafana_logging.logger.DEFAULT_LOG_FILE", str(temp_log_file)):
-        with patch("back.grafana_logging.logger.LOG_TO_FILE", True):
-            with patch("back.grafana_logging.logger.LOG_TO_CONSOLE", False):
-                with patch("back.grafana_logging.logger.DEFAULT_LOG_LEVEL", "DEBUG"):
+    with patch("grafana_logging.logger.DEFAULT_LOG_FILE", str(temp_log_file)):
+        with patch("grafana_logging.logger.LOG_TO_FILE", True):
+            with patch("grafana_logging.logger.LOG_TO_CONSOLE", False):
+                with patch("grafana_logging.logger.DEFAULT_LOG_LEVEL", "DEBUG"):
                     VeloSimLogger._loggers.clear()
 
                     # Run all examples - should not raise any exceptions

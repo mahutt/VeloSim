@@ -34,7 +34,7 @@ from back.database.session import SessionLocal
 from back.crud.sim_keyframe import sim_keyframe_crud
 from back.schemas.sim_keyframe import SimKeyframeCreate
 from back.core.config import settings
-from back.grafana_logging.logger import get_logger
+from grafana_logging.logger import get_logger
 
 logger = get_logger(__name__)
 

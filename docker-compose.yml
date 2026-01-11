@@ -39,12 +39,12 @@ services:
     ports:
       - "3100:3100"
     volumes:
-      - ./back/grafana_logging/loki-config.yaml:/etc/loki/local-config.yaml:ro
-      - ./back/grafana_logging/loki/chunks:/loki/chunks
-      - ./back/grafana_logging/loki/index:/loki/index
-      - ./back/grafana_logging/loki/cache:/loki/cache
-      - ./back/grafana_logging/loki/wal:/loki/wal
-      - ./back/grafana_logging/loki/compactor:/loki/compactor
+      - ./grafana_logging/loki-config.yaml:/etc/loki/local-config.yaml:ro
+      - ./grafana_logging/loki/chunks:/loki/chunks
+      - ./grafana_logging/loki/index:/loki/index
+      - ./grafana_logging/loki/cache:/loki/cache
+      - ./grafana_logging/loki/wal:/loki/wal
+      - ./grafana_logging/loki/compactor:/loki/compactor
     command: -config.file=/etc/loki/local-config.yaml
     restart: unless-stopped
     healthcheck:
@@ -66,11 +66,11 @@ services:
       - GF_SECURITY_ADMIN_PASSWORD=velosim
     volumes:
       # Provisioning files for datasources/dashboards
-      - ./back/grafana_logging/grafana/provisioning/datasources:/etc/grafana/provisioning/datasources:ro
-      - ./back/grafana_logging/grafana/provisioning/dashboards:/etc/grafana/provisioning/dashboards:ro
+      - ./grafana_logging/grafana/provisioning/datasources:/etc/grafana/provisioning/datasources:ro
+      - ./grafana_logging/grafana/provisioning/dashboards:/etc/grafana/provisioning/dashboards:ro
 
       # Persistent Grafana data (dashboards, settings, etc)
-      - ./back/grafana_logging/grafana_data:/var/lib/grafana
+      - ./grafana_logging/grafana_data:/var/lib/grafana
 
     depends_on:
       loki:
@@ -84,11 +84,11 @@ services:
     image: grafana/promtail:2.9.0
     container_name: velosim-promtail
     volumes:
-      - ./back/grafana_logging/promtail/promtail-config.yaml:/etc/promtail/promtail-config.yaml:ro
+      - ./grafana_logging/promtail/promtail-config.yaml:/etc/promtail/promtail-config.yaml:ro
       - /var/lib/docker/containers:/var/lib/docker/containers:ro
       - /var/log:/var/log:ro
-      - ./back/grafana_logging/promtail/positions:/var/lib/promtail
-      - ./back/grafana_logging:/logs:ro
+      - ./grafana_logging/promtail/positions:/var/lib/promtail
+      - ./grafana_logging:/logs:ro
     command: -config.file=/etc/promtail/promtail-config.yaml
     restart: unless-stopped
     depends_on:
@@ -122,6 +122,7 @@ services:
       - "8000:8000"
     volumes:
       - ./back:/app/back
+      - ./grafana_logging:/app/grafana_logging
       - ./sim:/app/sim
       - ./scripts:/app/scripts
     environment:
@@ -179,7 +180,7 @@ services:
     ports:
       - "9090:9090"
     volumes:
-      - ./back/grafana_logging/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./grafana_logging/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
       - prometheus_data:/prometheus
     command:
       - '--config.file=/etc/prometheus/prometheus.yml'

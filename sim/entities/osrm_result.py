@@ -22,24 +22,155 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 """
 
-from dataclasses import dataclass
-from typing import Any, Dict, List, Optional
+# OSRM Result Types - Typed wrappers for OSRM API response data.
+#
+# This module provides dataclasses that map to OSRM (Open Source Routing Machine)
+# API response structures, enabling type-safe access to routing data.
+#
+# OSRM API Documentation Reference:
+#     https://project-osrm.org/docs/v5.5.1/api/
+#
+# Terminology (from OSRM docs):
+#     Route: A complete path through waypoints with total distance/duration.
+#         See: https://project-osrm.org/docs/v5.5.1/api/#route-object
+#
+#     RouteLeg: A route segment between two waypoints. Contains steps and
+#         annotations when requested.
+#         See: https://project-osrm.org/docs/v5.5.1/api/#routeleg-object
+#
+#     RouteStep: A maneuver followed by travel along a single way. Contains
+#         distance, duration, geometry, and road name.
+#         See: https://project-osrm.org/docs/v5.5.1/api/#routestep-object
+#
+#     Annotation: Fine-grained metadata for each coordinate along the route.
+#         Contains arrays for distance, duration, and OSM node IDs.
+#         See: https://project-osrm.org/docs/v5.5.1/api/#annotation-object
+#
+#         Structure:
+#             - nodes: [N] array of OSM node IDs along the route
+#             - distance: [N-1] array of distances (metres) between consecutive nodes
+#             - duration: [N-1] array of durations (seconds) between consecutive nodes
+#
+#     Coordinates: All coordinates use [longitude, latitude] format (GeoJSON order).
+
+from dataclasses import dataclass, field
+from typing import Any, Dict, List, Optional, Tuple
+
+
+@dataclass
+class OSRMSegment:
+    """
+    Represents a single segment between two OSM nodes in an OSRM route.
+
+    Derived from OSRM's Annotation object which provides fine-grained metadata
+    for each coordinate along a route. When `annotations=true` is requested,
+    OSRM returns arrays of OSM node IDs, distances, and durations.
+
+    OSRM Annotation Reference:
+        https://project-osrm.org/docs/v5.5.1/api/#annotation-object
+
+        The annotation structure contains:
+        - nodes: [N] array of OSM node IDs along the route
+        - distance: [N-1] array of distances in metres between consecutive nodes
+        - duration: [N-1] array of durations in seconds between consecutive nodes
+
+        Each OSRMSegment represents one edge (node[i] → node[i+1]) with its
+        corresponding distance[i] and duration[i] values.
+
+    The segment_id (node_start, node_end) tuple uniquely identifies a road
+    segment in the OSM network, allowing for:
+    - Road reuse across multiple routes
+    - Traffic data association with specific road segments
+    - Efficient road ↔ route many-to-many relationship management
+
+    Attributes:
+        node_start: Starting OSM node ID for this segment (from annotation.nodes[i])
+        node_end: Ending OSM node ID for this segment (from annotation.nodes[i+1])
+        distance: Length of this segment in meters (from annotation.distance[i])
+        duration: Base time to traverse in seconds (from annotation.duration[i])
+        geometry: List of [lon, lat] coordinate pairs defining the segment's path
+        road_name: Street or road name (None if unnamed)
+    """
+
+    node_start: int
+    node_end: int
+    distance: float
+    duration: float
+    geometry: List[List[float]]
+    road_name: Optional[str] = None
+
+    def get_segment_id(self) -> Tuple[int, int]:
+        """
+        Get the unique segment identifier as a tuple of OSM node IDs.
+
+        Returns:
+            Tuple of (node_start, node_end) that uniquely identifies this
+            road segment in the OSM network.
+        """
+        return (self.node_start, self.node_end)
+
+    @classmethod
+    def from_annotation_data(
+        cls,
+        node_start: int,
+        node_end: int,
+        distance: float,
+        duration: float,
+        geometry: List[List[float]],
+        road_name: Optional[str] = None,
+    ) -> "OSRMSegment":
+        """
+        Create an OSRMSegment from OSRM annotation data.
+
+        This factory method constructs a segment from the data extracted
+        from OSRM's annotation arrays (nodes, distances, durations).
+
+        Args:
+            node_start: Starting OSM node ID
+            node_end: Ending OSM node ID
+            distance: Segment distance in meters
+            duration: Segment duration in seconds
+            geometry: List of [lon, lat] coordinates for this segment
+            road_name: Optional street name
+
+        Returns:
+            OSRMSegment instance with the provided data
+        """
+        return cls(
+            node_start=node_start,
+            node_end=node_end,
+            distance=distance,
+            duration=duration,
+            geometry=geometry,
+            road_name=road_name,
+        )
 
 
 @dataclass
 class OSRMStep:
     """
-    Represents a single step (road segment) in an OSRM route.
+    Represents a single step (maneuver + road segment) in an OSRM route.
 
-    Each step corresponds to an actual road segment with its own
-    characteristics like name, distance, duration, and geometry.
+    Maps to OSRM's RouteStep object. A step consists of a maneuver such as
+    a turn or merge, followed by a distance of travel along a single way
+    to the subsequent step.
+
+    OSRM RouteStep Reference:
+        https://project-osrm.org/docs/v5.5.1/api/#routestep-object
+
+        RouteStep properties (from OSRM docs):
+        - distance: Distance from maneuver to subsequent step in meters (float)
+        - duration: Estimated travel time in seconds (float)
+        - geometry: Unsimplified geometry of the route segment
+        - name: Name of the way along which travel proceeds
 
     Attributes:
         name: Street or road name (None if unnamed)
         distance: Length of this step in meters
         duration: Time to traverse this step in seconds
         geometry: List of [lon, lat] coordinate pairs defining the step's path
-        speed: Maximum speed for this step in m/s (from OSRM annotations), optional
+        speed: Maximum speed for this step in m/s (derived from annotations,
+        None if unavailable)
     """
 
     name: Optional[str]
@@ -82,20 +213,44 @@ class OSRMResult:
     """
     Represents a complete route result from the OSRM routing engine.
 
+    Maps to OSRM's Route object which represents a route through (potentially
+    multiple) waypoints.
+
+    OSRM Route Reference:
+        https://project-osrm.org/docs/v5.5.1/api/#route-object
+
+        Route properties (from OSRM docs):
+        - distance: Distance traveled by the route in meters (float)
+        - duration: Estimated travel time in seconds (float)
+        - geometry: Whole geometry of the route (format depends on geometries param)
+        - legs: Array of RouteLeg objects between waypoints
+
+    OSRM RouteLeg Reference:
+        https://project-osrm.org/docs/v5.5.1/api/#routeleg-object
+
+        RouteLeg contains:
+        - steps: Array of RouteStep objects (when steps=true)
+        - annotation: Annotation object with node IDs (when annotations=true)
+
     This class provides type-safe access to OSRM route data, eliminating
     the need for dict.get() fallbacks and null-island checks.
 
     Attributes:
-        coordinates: Complete list of [lon, lat] waypoints for the entire route
+        coordinates: Complete list of [lon, lat] waypoints for the entire route.
+            Note: OSRM uses [longitude, latitude] order (GeoJSON format).
         distance: Total route distance in meters
         duration: Total route duration in seconds
-        steps: List of individual road segments that make up the route
+        steps: List of OSRMStep objects (from RouteLeg.steps when steps=true)
+        segments: List of OSRMSegment objects with OSM node-based identification.
+            Populated from RouteLeg.annotation when annotations=true.
+            Falls back to empty list when annotations are unavailable.
     """
 
     coordinates: List[List[float]]
     distance: float
     duration: float
     steps: List[OSRMStep]
+    segments: List[OSRMSegment] = field(default_factory=list)
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "OSRMResult":
@@ -108,6 +263,7 @@ class OSRMResult:
         Args:
             data: Dictionary returned from OSRMConnection.shortest_path_coords()
                   Expected keys: 'coordinates', 'distance', 'duration', 'steps'
+                  Optional keys: 'segments' (list of pre-parsed OSRMSegment dicts)
 
         Returns:
             OSRMResult instance with validated and typed data
@@ -144,11 +300,30 @@ class OSRMResult:
         steps_data = data.get("steps", [])
         steps = [OSRMStep.from_dict(step) for step in steps_data]
 
+        # Parse segments if present (populated by OSRMConnection from annotations)
+        segments: List[OSRMSegment] = []
+        segments_data = data.get("segments", [])
+        for i, seg in enumerate(segments_data):
+            try:
+                segments.append(
+                    OSRMSegment.from_annotation_data(
+                        node_start=seg["node_start"],
+                        node_end=seg["node_end"],
+                        distance=seg["distance"],
+                        duration=seg["duration"],
+                        geometry=seg.get("geometry", []),
+                        road_name=seg.get("road_name"),
+                    )
+                )
+            except KeyError as e:
+                raise ValueError(f"Segment {i} missing required field: {e}")
+
         return cls(
             coordinates=coordinates,
             distance=distance,
             duration=duration,
             steps=steps,
+            segments=segments,
         )
 
     @property

@@ -103,7 +103,7 @@ def test_travel_to_returns_immediately_when_already_at_position() -> None:
     env.run(until=1)
 
     # Should return immediately without calling map map
-    mock_map.getRoute.assert_not_called()
+    mock_map.get_route.assert_not_called()
     # Resource should still be at same position
     assert driver.position == start_pos
 
@@ -129,9 +129,12 @@ def test_travel_to_handles_tuple_return_from_route_next() -> None:
         None,
     ]
 
+    # Mock traffic multiplier (needed for traffic-aware travel logic)
+    mock_route.get_current_traffic_multiplier.return_value = 1.0
+
     # Mock map map
     mock_map = Mock()
-    mock_map.getRoute.return_value = mock_route
+    mock_map.get_route.return_value = mock_route
     driver.set_map_controller(mock_map)
 
     # Execute travel
@@ -139,7 +142,7 @@ def test_travel_to_handles_tuple_return_from_route_next() -> None:
     env.run(until=10)
 
     # Verify route was obtained
-    mock_map.getRoute.assert_called_once_with(start_pos, dest_pos)
+    mock_map.get_route.assert_called_once_with(start_pos, dest_pos)
 
     # Verify resource moved through positions
     assert driver.position == dest_pos
@@ -166,9 +169,12 @@ def test_travel_to_handles_single_position_return_from_route_next() -> None:
         None,
     ]
 
+    # Mock traffic multiplier (needed for traffic-aware travel logic)
+    mock_route.get_current_traffic_multiplier.return_value = 1.0
+
     # Mock map map
     mock_map = Mock()
-    mock_map.getRoute.return_value = mock_route
+    mock_map.get_route.return_value = mock_route
     driver.set_map_controller(mock_map)
 
     # Execute travel
@@ -193,9 +199,12 @@ def test_travel_to_can_be_interrupted() -> None:
 
     mock_route.next.side_effect = [(positions[1], positions)] + positions[2:]
 
+    # Mock traffic multiplier (needed for traffic-aware travel logic)
+    mock_route.get_current_traffic_multiplier.return_value = 1.0
+
     # Mock map map
     mock_map = Mock()
-    mock_map.getRoute.return_value = mock_route
+    mock_map.get_route.return_value = mock_route
     driver.set_map_controller(mock_map)
 
     # Start travel process
@@ -270,9 +279,10 @@ def test_driver_run_selects_and_dispatches_task() -> None:
     # Set up map map with mock route
     mock_route = Mock()
     mock_route.next.side_effect = [(station_pos, [start_pos, station_pos]), None]
+    mock_route.get_current_traffic_multiplier.return_value = 1.0
 
     mock_map = Mock()
-    mock_map.getRoute.return_value = mock_route
+    mock_map.get_route.return_value = mock_route
     driver.set_map_controller(mock_map)
 
     # Run simulation for just enough time to dispatch but not complete

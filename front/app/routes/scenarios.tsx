@@ -23,7 +23,7 @@
  */
 
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { useNavigate } from 'react-router';
+import { useNavigate, useBlocker } from 'react-router';
 import type {
   Scenario,
   ScenarioListResponse,
@@ -34,6 +34,7 @@ import ScenarioTextArea from '~/components/scenario/scenario-textarea';
 import ScenarioSidebar from '~/components/scenario/scenario-sidebar';
 import ScenarioNameDialog from '~/components/scenario/scenario-name-dialog';
 import OverwriteSaveDialog from '~/components/scenario/overwrite-save-dialog';
+import UnsavedChangesDialog from '~/components/scenario/unsaved-changes-dialog';
 import { useScenarioOperations } from '~/hooks/use-scenario-operations';
 import useError from '~/hooks/use-error';
 import api from '~/api';
@@ -57,6 +58,12 @@ export default function ScenarioEditor() {
   const [pendingAction, setPendingAction] = useState<'export' | 'save' | null>(
     null
   );
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  const [initialContent, setInitialContent] = useState('');
+  const [showUnsavedDialog, setShowUnsavedDialog] = useState(false);
+  const [pendingScenario, setPendingScenario] = useState<Scenario | null>(null);
+  const [pendingNewScenario, setPendingNewScenario] = useState(false);
+  const [pendingImport, setPendingImport] = useState(false);
 
   // Hooks
   const navigate = useNavigate();
@@ -69,6 +76,12 @@ export default function ScenarioEditor() {
     deleteScenario,
     formatBackendError,
   } = useScenarioOperations();
+
+  // Block navigation when there are unsaved changes
+  const blocker = useBlocker(
+    ({ currentLocation, nextLocation }) =>
+      hasUnsavedChanges && currentLocation.pathname !== nextLocation.pathname
+  );
 
   /**
    * Load all saved scenarios for the current user
@@ -113,6 +126,19 @@ export default function ScenarioEditor() {
   useEffect(() => {
     loadSavedScenarios().then(setSavedScenarios);
   }, []); // Only run once on mount
+
+  // Detect unsaved changes by comparing current content with initial content
+  useEffect(() => {
+    const hasChanges = scenarioContent.trim() !== initialContent.trim();
+    setHasUnsavedChanges(hasChanges);
+  }, [scenarioContent, initialContent]);
+
+  // Show dialog when navigation is blocked
+  useEffect(() => {
+    if (blocker.state === 'blocked') {
+      setShowUnsavedDialog(true);
+    }
+  }, [blocker.state]);
 
   // Helper function to generate incremented name
   const generateIncrementedName = useCallback(
@@ -173,6 +199,8 @@ export default function ScenarioEditor() {
 
           if (newId) {
             setSelectedScenarioId(newId);
+            // Clear unsaved changes after successful import
+            setInitialContent(contentToSave);
             log({
               message: 'Scenario saved after import',
               level: LogLevel.INFO,
@@ -195,6 +223,16 @@ export default function ScenarioEditor() {
     },
     [saveScenario, displayError, loadSavedScenarios]
   );
+
+  const handleImport = useCallback(() => {
+    if (hasUnsavedChanges) {
+      setPendingImport(true);
+      setShowUnsavedDialog(true);
+      return;
+    }
+
+    fileInputRef.current?.click();
+  }, [hasUnsavedChanges]);
 
   const handleStartScenario = async () => {
     try {
@@ -251,6 +289,8 @@ export default function ScenarioEditor() {
       );
       if (newId) {
         setSelectedScenarioId(newId);
+        // Clear unsaved changes after successful save
+        setInitialContent(scenarioContent);
         log({
           message: 'New scenario saved',
           level: LogLevel.INFO,
@@ -280,7 +320,11 @@ export default function ScenarioEditor() {
         scenarioName,
         scenarioDescription
       );
-      if (newId) setSelectedScenarioId(newId);
+      if (newId) {
+        setSelectedScenarioId(newId);
+        // Clear unsaved changes after successful overwrite
+        setInitialContent(scenarioContent);
+      }
       setOverwriteDialogOpen(false);
       setIsEditMode(false);
       // Refresh sidebar after overwrite
@@ -309,6 +353,8 @@ export default function ScenarioEditor() {
     setIsEditMode(false);
     if (newId) {
       setSelectedScenarioId(newId);
+      // Clear unsaved changes after successful save as new
+      setInitialContent(scenarioContent);
       log({
         message: 'Scenario saved as new',
         level: LogLevel.INFO,
@@ -363,6 +409,8 @@ export default function ScenarioEditor() {
         );
         if (newId) {
           setSelectedScenarioId(newId);
+          // Clear unsaved changes after successful save
+          setInitialContent(scenarioContent);
           log({
             message: 'Scenario saved after name dialog',
             level: LogLevel.INFO,
@@ -387,33 +435,47 @@ export default function ScenarioEditor() {
     ]
   );
 
-  const handleNewScenario = useCallback(() => {
+  // Core logic to load new scenario (without unsaved check)
+  const loadNewScenario = useCallback(() => {
     api
       .get('/scenarios/template')
       .then((response) => {
         const template = response.data;
-        // Use template content directly
         const content = template.content || {};
         const name = template.name || '';
         const description = template.description || '';
 
         setScenarioName(name);
         setScenarioDescription(description);
-        setScenarioContent(JSON.stringify(content, null, 2));
+        const newContent = JSON.stringify(content, null, 2);
+        setScenarioContent(newContent);
+        setInitialContent(newContent);
       })
       .catch(() => {
         setScenarioContent('');
         setScenarioName('');
         setScenarioDescription('');
+        setInitialContent('');
       });
     setSelectedScenarioId(null);
-    setIsEditMode(false); // Reset edit mode
+    setIsEditMode(false);
   }, []);
 
-  const handleSelectScenario = useCallback(
+  const handleNewScenario = useCallback(() => {
+    // Check for unsaved changes
+    if (hasUnsavedChanges) {
+      setPendingNewScenario(true);
+      setShowUnsavedDialog(true);
+      return;
+    }
+
+    loadNewScenario();
+  }, [hasUnsavedChanges, loadNewScenario]);
+
+  // Core logic to load a scenario (without unsaved check)
+  const loadScenario = useCallback(
     (scenario: Scenario) => {
       try {
-        // Reorder keys for consistent display
         const c = scenario.content;
         const ordered = {
           start_time: c.start_time,
@@ -423,7 +485,9 @@ export default function ScenarioEditor() {
           vehicles: c.vehicles,
           stations: c.stations,
         };
-        setScenarioContent(JSON.stringify(ordered, null, 2));
+        const content = JSON.stringify(ordered, null, 2);
+        setScenarioContent(content);
+        setInitialContent(content);
         setScenarioName(scenario.name);
         setScenarioDescription(scenario.description ?? '');
         setSelectedScenarioId(scenario.id);
@@ -436,6 +500,20 @@ export default function ScenarioEditor() {
       }
     },
     [displayError]
+  );
+
+  const handleSelectScenario = useCallback(
+    (scenario: Scenario) => {
+      // Check for unsaved changes
+      if (hasUnsavedChanges) {
+        setPendingScenario(scenario);
+        setShowUnsavedDialog(true);
+        return;
+      }
+
+      loadScenario(scenario);
+    },
+    [hasUnsavedChanges, loadScenario]
   );
 
   const handleDeleteScenario = useCallback(
@@ -476,7 +554,7 @@ export default function ScenarioEditor() {
       <ScenarioToolbar
         scenarioName={scenarioName}
         onNameChange={setScenarioName}
-        onImport={() => fileInputRef.current?.click()}
+        onImport={handleImport}
         onNew={handleNewScenario}
         isEditMode={isEditMode}
         isExistingScenario={!!selectedScenarioId}
@@ -517,6 +595,51 @@ export default function ScenarioEditor() {
         onOverwrite={handleOverwrite}
         onSaveAsNew={handleSaveAsNew}
         scenarioName={scenarioName}
+      />
+
+      <UnsavedChangesDialog
+        open={showUnsavedDialog}
+        onOpenChange={(open) => {
+          setShowUnsavedDialog(open);
+          if (!open) {
+            setPendingScenario(null);
+            setPendingNewScenario(false);
+            setPendingImport(false);
+            blocker.reset?.();
+          }
+        }}
+        onCancel={() => {
+          log({
+            message: 'Loss of unsaved changes prevented',
+            level: LogLevel.INFO,
+            context: 'unsaved_scenario_changes_preserved',
+          });
+          setShowUnsavedDialog(false);
+          setPendingScenario(null);
+          setPendingNewScenario(false);
+          setPendingImport(false);
+          blocker.reset?.();
+        }}
+        onLeave={() => {
+          log({
+            message: 'Unsaved changes explicitly discarded',
+            level: LogLevel.INFO,
+            context: 'unsaved_scenario_changes_discarded',
+          });
+          setShowUnsavedDialog(false);
+          if (pendingScenario) {
+            loadScenario(pendingScenario);
+            setPendingScenario(null);
+          } else if (pendingNewScenario) {
+            loadNewScenario();
+            setPendingNewScenario(false);
+          } else if (pendingImport) {
+            fileInputRef.current?.click();
+            setPendingImport(false);
+          } else {
+            blocker.proceed?.();
+          }
+        }}
       />
     </div>
   );
