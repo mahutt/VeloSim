@@ -47,7 +47,7 @@ if not jwt_secret:
     logger.warning("This means JWT tokens will be invalid after server restart.")
     logger.warning("Set VELOSIM_JWT_SECRET environment variable for production use.")
 
-ACCESS_TOKEN_LIFE = timedelta(minutes=30)
+ACCESS_TOKEN_LIFE = timedelta(hours=12)
 JWT_ALGORITHM = "HS256"
 
 
