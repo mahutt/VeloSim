@@ -32,7 +32,7 @@ from sim.core.frame_emitter import FrameEmitter
 from sim.entities.inputParameters import InputParameter
 from sim.entities.frame import Frame
 from sim.entities.station import Station
-from sim.entities.driver import Driver
+from sim.entities.driver import Driver, DriverState
 from sim.entities.shift import Shift
 from sim.entities.BatterySwapTask import BatterySwapTask
 from sim.entities.position import Position
@@ -142,6 +142,9 @@ def input_params(env: simpy.Environment) -> InputParameter:
     Driver.env = env
     driver1 = Driver(driver_id=1, position=Position([15.0, 25.0]), shift=shift1)
     driver2 = Driver(driver_id=2, position=Position([35.0, 45.0]), shift=shift2)
+    # Stub initial state for tests that access driver.state
+    driver1.state = DriverState.IDLE
+    driver2.state = DriverState.IDLE
     params.add_driver(driver1)
     params.add_driver(driver2)
 

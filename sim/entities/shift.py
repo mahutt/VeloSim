@@ -36,12 +36,16 @@ class Shift:
     for internal sim calculations
 
     Args:
-        start_time: The real-time start time of the shift in hours.
-        end_time: The real-time end time of the shift in hours.
-        lunch_break: Optional real-time lunch break duration in hours. Use None if no lunch.
-        sim_start_time: Optional sim-time start time in hours. Defaults to start_time if not provided.
-        sim_end_time: Optional sim-time end time in hours. Defaults to end_time if not provided.
-        sim_lunch_break: Optional sim-time lunch break duration in hours. Defaults to lunch_break if not provided.
+        start_time: Real-time shift start in hours.
+        end_time: Real-time shift end in hours.
+        lunch_break: Optional real-time lunch break duration in hours.
+            Use None if no lunch.
+        sim_start_time: Optional sim-time start in hours.
+            Defaults to start_time if not provided.
+        sim_end_time: Optional sim-time end in hours.
+            Defaults to end_time if not provided.
+        sim_lunch_break: Optional sim-time lunch break duration in hours.
+            Defaults to lunch_break if not provided.
 
     """
 

@@ -27,7 +27,7 @@ import simpy
 from typing import Any
 from unittest.mock import patch, MagicMock
 
-from sim.entities.driver import Driver, HQ_POSITION, DriverState
+from sim.entities.driver import Driver, DriverState
 from sim.entities.position import Position
 from sim.entities.BatterySwapTask import BatterySwapTask
 from sim.entities.task import Task, State

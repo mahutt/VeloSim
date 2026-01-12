@@ -88,8 +88,8 @@ class FakeTask(Task):
         self.unassign_driver()
 
 
-# Default shift for drivers in these tests
-DEFAULT_SHIFT = Shift(0.0, 24.0, None, 0.0, 24.0, None)
+# Default shift for drivers in these tests (use seconds)
+DEFAULT_SHIFT = Shift(0.0, 24.0 * 60 * 60, None, 0.0, 24.0 * 60 * 60, None)
 
 
 def test_travel_to_returns_immediately_when_already_at_position() -> None:
@@ -249,6 +249,8 @@ def test_driver_run_waits_for_initialization() -> None:
     driver.set_behaviour(mock_behaviour)
     mock_map = Mock()
     driver.set_map_controller(mock_map)
+    # Stub initial state to avoid AttributeError before run loop
+    driver.state = DriverState.IDLE
     env.process(driver.run())
     # Run for 3 time units (1 for initial yield, then at least one iteration)
     env.run(until=3)
@@ -290,6 +292,8 @@ def test_driver_run_selects_and_dispatches_task() -> None:
     mock_map = Mock()
     mock_map.get_route.return_value = mock_route
     driver.set_map_controller(mock_map)
+    # Stub initial state to avoid AttributeError before run loop
+    driver.state = DriverState.IDLE
 
     # Run simulation for just enough time to dispatch but not complete
     env.process(driver.run())
