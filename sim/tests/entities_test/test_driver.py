@@ -561,3 +561,107 @@ class TestDriver:
         new_order = driver.reorder_tasks([4], apply_from_top=True)
 
         assert new_order[0] == 4
+
+    def test_get_full_route_with_hq_next_stop(
+        self, simpy_env: simpy.Environment, default_position: Position
+    ) -> None:
+        """Test that nextTaskEndIndex points to HQ when driver is heading to HQ."""
+        station1 = Station(1, "Station 1", Position([-73.5, 45.5]))
+        station2 = Station(2, "Station 2", Position([-73.6, 45.6]))
+        task1 = BatterySwapTask(1, station=station1)
+        task2 = BatterySwapTask(2, station=station2)
+
+        driver = Driver(1, default_position, [task1, task2])
+
+        mock_map_controller = MagicMock()
+        mock_route_to_hq = MagicMock()
+        mock_route_to_hq.get_raw_coordinates.return_value = [
+            [-73.5673, 45.5017],
+            [-73.59, 45.52],
+            [-73.60175631192361, 45.52975346053039],  # HQ position
+        ]
+        mock_route_to_task1 = MagicMock()
+        mock_route_to_task1.get_raw_coordinates.return_value = [
+            [-73.60175631192361, 45.52975346053039],  # HQ position
+            [-73.55, 45.51],
+            [-73.5, 45.5],  # Task 1 position
+        ]
+        mock_route_to_task2 = MagicMock()
+        mock_route_to_task2.get_raw_coordinates.return_value = [
+            [-73.5, 45.5],  # Task 1 position
+            [-73.55, 45.55],
+            [-73.6, 45.6],  # Task 2 position
+        ]
+
+        mock_map_controller.get_route.side_effect = [
+            mock_route_to_hq,
+            mock_route_to_task1,
+            mock_route_to_task2,
+        ]
+        driver.set_map_controller(mock_map_controller)
+
+        # Set driver state to HEADING_TO_HQ
+        driver.state = DriverState.HEADING_TO_HQ
+
+        # Get full route
+        result = driver.get_full_route()
+
+        assert result is not None
+        assert "coordinates" in result
+        assert "nextTaskEndIndex" in result
+
+        # nextTaskEndIndex should point to HQ endpoint (index 2 in the combined route)
+        # Route: [start, waypoint, HQ, waypoint, task1, waypoint, task2]
+        # HQ is at index 2
+        assert result["nextTaskEndIndex"] == 2
+        assert result["coordinates"][2] == [
+            -73.60175631192361,
+            45.52975346053039,
+        ]  # HQ
+
+    def test_get_full_route_without_hq(
+        self, simpy_env: simpy.Environment, default_position: Position
+    ) -> None:
+        """Test that nextTaskEndIndex points to first task when not heading to HQ."""
+        station1 = Station(1, "Station 1", Position([-73.5, 45.5]))
+        station2 = Station(2, "Station 2", Position([-73.6, 45.6]))
+        task1 = BatterySwapTask(1, station=station1)
+        task2 = BatterySwapTask(2, station=station2)
+
+        driver = Driver(1, default_position, [task1, task2])
+
+        mock_map_controller = MagicMock()
+        mock_route_to_task1 = MagicMock()
+        mock_route_to_task1.get_raw_coordinates.return_value = [
+            [-73.5673, 45.5017],  # Driver position
+            [-73.55, 45.51],
+            [-73.5, 45.5],  # Task 1 position
+        ]
+        mock_route_to_task2 = MagicMock()
+        mock_route_to_task2.get_raw_coordinates.return_value = [
+            [-73.5, 45.5],  # Task 1 position (duplicate will be removed)
+            [-73.55, 45.55],
+            [-73.6, 45.6],  # Task 2 position
+        ]
+
+        mock_map_controller.get_route.side_effect = [
+            mock_route_to_task1,
+            mock_route_to_task2,
+        ]
+        driver.set_map_controller(mock_map_controller)
+
+        # Driver is NOT heading to HQ (default state is ON_SHIFT)
+        driver.state = DriverState.ON_SHIFT
+
+        # Get full route
+        result = driver.get_full_route()
+
+        assert result is not None
+        assert "coordinates" in result
+        assert "nextTaskEndIndex" in result
+
+        # nextTaskEndIndex should point to first task endpoint (index 2)
+        # Route: [start, waypoint, task1, waypoint, task2]
+        # Task1 is at index 2
+        assert result["nextTaskEndIndex"] == 2
+        assert result["coordinates"][2] == [-73.5, 45.5]  # Task 1
