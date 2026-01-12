@@ -106,7 +106,7 @@ class Driver:
         name: str | None = None,
     ) -> None:
         self.id = driver_id
-        self.name = name if name else f"Driver {driver_id}"
+        self.name = name if name is not None else f"Driver {driver_id}"
         self.position = position
         self.current_route = None
         self.vehicle = vehicle

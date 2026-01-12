@@ -61,15 +61,24 @@ vi.mock('~/providers/simulation-provider', async (importOriginal) => {
 const mockResourceBarElement: ResourceBarElement = [
   {
     id: 1,
+    name: 'Driver One',
     taskCount: 3,
+    batteryCount: 1,
+    batteryCapacity: 100,
   },
   {
     id: 2,
+    name: 'Driver Two',
     taskCount: 1,
+    batteryCount: 2,
+    batteryCapacity: 100,
   },
   {
     id: 12,
+    name: 'Driver Twelve',
     taskCount: 0,
+    batteryCount: 0,
+    batteryCapacity: 100,
   },
 ];
 

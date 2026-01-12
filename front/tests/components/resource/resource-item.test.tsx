@@ -48,7 +48,10 @@ vi.mock('~/hooks/use-auth', () => ({
 test('resource item renders with resource data', () => {
   const mockResource: ResourceItemElement = {
     id: 1,
+    name: 'John Doe',
     taskCount: 3,
+    batteryCount: 1,
+    batteryCapacity: 100,
   };
 
   const mockOnSelect = vi.fn();
@@ -63,14 +66,17 @@ test('resource item renders with resource data', () => {
     </MapProvider>
   );
 
+  expect(screen.getByText('John Doe')).toBeDefined();
   expect(screen.getByText('#1')).toBeDefined();
-  expect(screen.getByText('3 tasks')).toBeDefined();
 });
 
 test('resource item renders with selection state', () => {
   const mockResource: ResourceItemElement = {
     id: 1,
+    name: 'Jane Smith',
     taskCount: 5,
+    batteryCount: 0,
+    batteryCapacity: 100,
   };
 
   const mockOnSelect = vi.fn();
@@ -91,7 +97,7 @@ test('resource item renders with selection state', () => {
 
   // Check unselected state styling
   const itemRoot = screen
-    .getByText('#1')
+    .getByText('Jane Smith')
     .closest('div')
     ?.closest('[data-slot="item"]') as HTMLElement | null;
   expect(itemRoot).toBeDefined();
@@ -114,7 +120,7 @@ test('resource item renders with selection state', () => {
   );
 
   const selectedItemRoot = screen
-    .getByText('#1')
+    .getByText('Jane Smith')
     .closest('div')
     ?.closest('[data-slot="item"]') as HTMLElement | null;
   expect(selectedItemRoot).toBeDefined();
@@ -125,7 +131,10 @@ test('resource item renders with selection state', () => {
 test('resource item calls onSelect when clicked', () => {
   const mockResource: ResourceItemElement = {
     id: 2,
+    name: 'Bob Johnson',
     taskCount: 5,
+    batteryCount: 2,
+    batteryCapacity: 100,
   };
 
   const mockOnSelect = vi.fn();
@@ -140,7 +149,7 @@ test('resource item calls onSelect when clicked', () => {
     </MapProvider>
   );
 
-  const container = screen.getByText('#2').closest('div');
+  const container = screen.getByText('Bob Johnson').closest('div');
   if (container) {
     fireEvent.click(container);
   }
@@ -148,10 +157,13 @@ test('resource item calls onSelect when clicked', () => {
   expect(mockOnSelect).toHaveBeenCalledTimes(1);
 });
 
-test('resource item displays correct task count', () => {
-  const mockResource = {
-    id: 5,
-    taskCount: 8,
+test('resource item displays driver name and ID', () => {
+  const mockResource: ResourceItemElement = {
+    id: 3,
+    name: 'Charlie Brown',
+    taskCount: 2,
+    batteryCount: 1,
+    batteryCapacity: 100,
   };
 
   const mockOnSelect = vi.fn();
@@ -166,5 +178,30 @@ test('resource item displays correct task count', () => {
     </MapProvider>
   );
 
-  expect(screen.getByText('8 tasks')).toBeDefined();
+  expect(screen.getByText('Charlie Brown')).toBeDefined();
+  expect(screen.getByText('#3')).toBeDefined();
+});
+
+test('resource item displays battery status indicator', () => {
+  const mockResource: ResourceItemElement = {
+    id: 4,
+    name: 'Diana Prince',
+    taskCount: 1,
+    batteryCount: 2,
+    batteryCapacity: 100,
+  };
+
+  const mockOnSelect = vi.fn();
+
+  render(
+    <MapProvider>
+      <SimulationProvider>
+        <TaskAssignmentProvider>
+          <ResourceItem resource={mockResource} onSelect={mockOnSelect} />
+        </TaskAssignmentProvider>
+      </SimulationProvider>
+    </MapProvider>
+  );
+
+  expect(screen.getByText('2')).toBeDefined();
 });

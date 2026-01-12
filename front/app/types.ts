@@ -145,6 +145,7 @@ export interface Vehicle {
   id: number;
   driverId: number | null; // null implies at HQ, not on route
   batteryCount: number;
+  batteryCapacity: number;
 }
 
 export interface Headquarters {

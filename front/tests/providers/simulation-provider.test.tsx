@@ -78,7 +78,7 @@ import {
 } from '~/utils/simulation-error-utils';
 import api from '~/api';
 import { SelectedItemType } from '~/components/map/selected-item-bar';
-import { makeDriver, makePayload } from 'tests/test-helpers';
+import { makeDriver, makePayload, makeVehicle } from 'tests/test-helpers';
 
 // Mock the API module
 vi.mock('~/api', () => {
@@ -429,9 +429,10 @@ test('selectItem selects a resource when it exists', async () => {
 
 test('assignTask posts to API and updates resource taskIds', async () => {
   const TestAssignComponent = () => {
-    const { assignTask, driversRef, resourceBarElement } = useSimulation();
+    const { assignTask, driversRef, vehiclesRef, resourceBarElement } = useSimulation();
 
     useEffect(() => {
+      vehiclesRef.current.set(1, makeVehicle({ id: 1, batteryCount: 100, batteryCapacity: 500 }));
       driversRef.current.set(
         1,
         makeDriver({ id: 1, taskIds: [], vehicleId: 1 })
@@ -546,9 +547,11 @@ test('unassignTask posts to API and removes task from resource', async () => {
 
 test('reassignTask posts to API and moves task between resources', async () => {
   const TestReassignComponent = () => {
-    const { reassignTask, driversRef, resourceBarElement } = useSimulation();
+    const { reassignTask, driversRef, vehiclesRef, resourceBarElement } = useSimulation();
 
     useEffect(() => {
+      vehiclesRef.current.set(1, makeVehicle({ id: 1, batteryCount: 100, batteryCapacity: 500 }));
+      vehiclesRef.current.set(2, makeVehicle({ id: 2, batteryCount: 80, batteryCapacity: 500 }));
       driversRef.current.set(
         1,
         makeDriver({ id: 1, taskIds: [123], vehicleId: 1 })
@@ -1148,9 +1151,10 @@ test('reorderTasks posts to API and updates resource task order', async () => {
   });
 
   const TestReorderComponent = () => {
-    const { reorderTasks, driversRef, resourceBarElement } = useSimulation();
+    const { reorderTasks, driversRef, vehiclesRef, resourceBarElement } = useSimulation();
 
     useEffect(() => {
+      vehiclesRef.current.set(1, makeVehicle({ id: 1, batteryCount: 100, batteryCapacity: 500 }));
       driversRef.current.set(
         1,
         makeDriver({ id: 1, taskIds: [10, 20, 30], vehicleId: 1 })
@@ -1354,9 +1358,10 @@ test('reorderTasks updates resourceBarElement and triggers map updates', async (
   (setMapSourceMock as Mock).mockClear();
 
   const TestReorderMapUpdateComponent = () => {
-    const { reorderTasks, driversRef, resourceBarElement } = useSimulation();
+    const { reorderTasks, driversRef, vehiclesRef, resourceBarElement } = useSimulation();
 
     useEffect(() => {
+      vehiclesRef.current.set(1, makeVehicle({ id: 1, batteryCount: 100, batteryCapacity: 500 }));
       driversRef.current.set(
         1,
         makeDriver({ id: 1, taskIds: [10, 20, 30], vehicleId: 1 })

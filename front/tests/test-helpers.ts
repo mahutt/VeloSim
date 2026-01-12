@@ -84,6 +84,7 @@ export function makeSimulationContext(
     speedRef: overrides.speedRef ?? { current: 1 },
     stationsRef: overrides.stationsRef ?? { current: new Map() },
     driversRef: overrides.driversRef ?? { current: new Map() },
+    vehiclesRef: overrides.vehiclesRef ?? { current: new Map() },
     resourceBarElement: overrides.resourceBarElement ?? [],
     selectedItem: overrides.selectedItem ?? null,
     selectItem: overrides.selectItem ?? vi.fn(),

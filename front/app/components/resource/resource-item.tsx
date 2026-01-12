@@ -23,13 +23,57 @@
  */
 
 import { useState } from 'react';
-import type { Driver } from '~/types';
 import { Item, ItemContent, ItemTitle } from '~/components/ui/item';
 import { useTaskAssignment } from '~/providers/task-assignment-provider';
+import { Battery, BatteryLow, BatteryMedium, BatteryFull } from 'lucide-react';
+
+function getBatteryIconAndColor(
+  batteryCount: number,
+  batteryCapacity: number
+): {
+  Icon:
+    | typeof Battery
+    | typeof BatteryLow
+    | typeof BatteryMedium
+    | typeof BatteryFull;
+  color: string;
+} {
+  const percentage = (batteryCount / batteryCapacity) * 100;
+
+  if (percentage === 0) {
+    return {
+      Icon: Battery,
+      color: 'text-red-500',
+    };
+  }
+
+  if (percentage <= 40) {
+    return {
+      Icon: BatteryLow,
+      color: 'text-orange-500',
+    };
+  }
+
+  if (percentage <= 75) {
+    return {
+      Icon: BatteryMedium,
+      color: 'text-yellow-500',
+    };
+  }
+
+  return {
+    Icon: BatteryFull,
+    color: 'text-green-500',
+  };
+}
 
 // Restricted Resource type for ResourceItem component
-export interface ResourceItemElement extends Pick<Driver, 'id'> {
+export interface ResourceItemElement {
+  id: number;
+  name: string;
   taskCount: number;
+  batteryCount: number;
+  batteryCapacity: number;
 }
 
 export function ResourceItem({
@@ -93,16 +137,22 @@ export function ResourceItem({
           <ItemTitle
             className={`text-sm font-medium ${isSelected ? 'text-red-700' : ''}`}
           >
-            #{resource.id}
+            {resource.name}
           </ItemTitle>
+          <span className="text-xs text-gray-500">#{resource.id}</span>
         </div>
       </ItemContent>
 
-      <span
-        className={`text-xs ${isSelected ? 'text-red-600' : 'text-gray-400'}`}
-      >
-        {resource.taskCount} {resource.taskCount === 1 ? 'task' : 'tasks'}
-      </span>
+      <div className="flex items-center gap-1.5">
+        {(() => {
+          const { Icon, color } = getBatteryIconAndColor(
+            resource.batteryCount,
+            resource.batteryCapacity
+          );
+          return <Icon className={`h-4 w-4 ${color}`} />;
+        })()}
+        <span className={`text-xs text-gray-400`}>{resource.batteryCount}</span>
+      </div>
     </Item>
   );
 }
