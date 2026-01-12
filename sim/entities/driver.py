@@ -621,7 +621,8 @@ class Driver:
 
                     full_geometry.extend(segment_coords)
 
-                    if task_idx == 0:
+                    # set next_task_end_index to the next task if HQ isn't next
+                    if task_idx == 0 and not include_hq:
                         next_task_end_index = len(full_geometry) - 1
 
                     current_pos = target_pos
