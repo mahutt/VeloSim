@@ -88,26 +88,3 @@ export function interpolateAlongRoute(
 
   return interpolatedPoint.geometry.coordinates as Position;
 }
-
-/**
- * Calculate progress as a fractional distance along the route.
- * Returns a value from 0 to 1 representing how far along the route the position is.
- *
- * @param routeGeometry - Raw OSRM coordinates defining the route
- * @param currentPosition - The current position to calculate progress for
- * @returns Progress from 0 (start) to 1 (end)
- */
-export function calculateRouteProgress(
-  routeGeometry: Position[],
-  currentPosition: Position
-): number {
-  if (routeGeometry.length < 2) return 0;
-
-  const routeLine = lineString(routeGeometry);
-  const routeLength = length(routeLine, { units: 'kilometers' });
-
-  if (routeLength === 0) return 0;
-
-  const location = getLocationOnRoute(routeLine, currentPosition);
-  return Math.max(0, Math.min(location / routeLength, 1));
-}
