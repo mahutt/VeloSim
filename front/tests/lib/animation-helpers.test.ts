@@ -23,10 +23,7 @@
  */
 
 import { expect, test } from 'vitest';
-import {
-  interpolateAlongRoute,
-  calculateRouteProgress,
-} from '~/lib/animation-helpers';
+import { interpolateAlongRoute } from '~/lib/animation-helpers';
 import type { Position } from '~/types';
 
 // Helper to check if two positions are approximately equal
@@ -117,40 +114,4 @@ test('interpolateAlongRoute falls back to linear for single-point route', () => 
 
   // Should fall back to linear interpolation
   expectPositionClose(result, [5, 5]);
-});
-
-test('calculateRouteProgress returns 0 at start', () => {
-  const route: Position[] = [
-    [0, 0],
-    [10, 0],
-  ];
-  const position: Position = [0, 0];
-
-  const progress = calculateRouteProgress(route, position);
-
-  expect(progress).toBeCloseTo(0, 5);
-});
-
-test('calculateRouteProgress returns 1 at end', () => {
-  const route: Position[] = [
-    [0, 0],
-    [10, 0],
-  ];
-  const position: Position = [10, 0];
-
-  const progress = calculateRouteProgress(route, position);
-
-  expect(progress).toBeCloseTo(1, 5);
-});
-
-test('calculateRouteProgress returns 0.5 at midpoint', () => {
-  const route: Position[] = [
-    [0, 0],
-    [10, 0],
-  ];
-  const position: Position = [5, 0];
-
-  const progress = calculateRouteProgress(route, position);
-
-  expect(progress).toBeCloseTo(0.5, 5);
 });
