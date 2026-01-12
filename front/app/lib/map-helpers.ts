@@ -22,21 +22,22 @@
  * SOFTWARE.
  */
 
+import type { Position } from '~/types';
 import { adaptRouteToGeoJSON } from './geojson-adapters';
 
 export enum MapSource {
   Stations = 'stations',
   Resources = 'resources',
-  RouteTraversed = 'route-traversed',
-  RouteRemaining = 'route-remaining',
+  RouteNextTask = 'route-next-task',
+  RouteFutureTasks = 'route-future-tasks',
 }
 
 export enum MapLayer {
   Stations = 'stations',
   StationTaskCounts = 'station-task-counts',
   Resources = 'resources',
-  RouteTraversed = 'route-traversed',
-  RouteRemaining = 'route-remaining',
+  RouteNextTask = 'route-next-task',
+  RouteFutureTasks = 'route-future-tasks',
 }
 
 export function isMapLayer(value: string): value is MapLayer {
@@ -122,24 +123,9 @@ export function initializeMapSources(map: mapboxgl.Map) {
 export function setMapLayers(map: mapboxgl.Map) {
   // Add route layers first (so they render below markers)
   map.addLayer({
-    id: MapLayer.RouteTraversed,
+    id: MapLayer.RouteNextTask,
     type: 'line',
-    source: MapSource.RouteTraversed,
-    layout: {
-      'line-join': 'round',
-      'line-cap': 'round',
-    },
-    paint: {
-      'line-color': '#3b82f6',
-      'line-width': 4,
-      'line-opacity': 0.3,
-    },
-  });
-
-  map.addLayer({
-    id: MapLayer.RouteRemaining,
-    type: 'line',
-    source: MapSource.RouteRemaining,
+    source: MapSource.RouteNextTask,
     layout: {
       'line-join': 'round',
       'line-cap': 'round',
@@ -148,6 +134,21 @@ export function setMapLayers(map: mapboxgl.Map) {
       'line-color': '#3b82f6',
       'line-width': 4,
       'line-opacity': 0.8,
+    },
+  });
+
+  map.addLayer({
+    id: MapLayer.RouteFutureTasks,
+    type: 'line',
+    source: MapSource.RouteFutureTasks,
+    layout: {
+      'line-join': 'round',
+      'line-cap': 'round',
+    },
+    paint: {
+      'line-color': '#3b82f6',
+      'line-width': 4,
+      'line-opacity': 0.3,
     },
   });
 
@@ -222,21 +223,28 @@ export function setMapSource(
  * Update route visualization for a selected resource
  * @param routeGeometry - Full route coordinates (raw OSRM linestring)
  * @param progress - Current progress through route (0-1 fractional)
+ * @param nextTaskEndIndex - Index where first task in task queue ends within route
  * @param map - Mapbox map instance
  */
 export function updateRouteDisplay(
-  routeGeometry: [number, number][] | null,
-  progress: number,
+  routeGeometry: Position[] | null,
+  position: Position,
+  nextTaskEndIndex: number,
   map: mapboxgl.Map
 ) {
-  const { traversed, remaining } = adaptRouteToGeoJSON(routeGeometry, progress);
-  setMapSource(MapSource.RouteTraversed, traversed, map);
-  setMapSource(MapSource.RouteRemaining, remaining, map);
+  const { nextTask, futureTasks } = adaptRouteToGeoJSON(
+    routeGeometry,
+    position,
+    nextTaskEndIndex
+  );
+
+  setMapSource(MapSource.RouteNextTask, nextTask, map);
+  setMapSource(MapSource.RouteFutureTasks, futureTasks, map);
 }
 
 /**
  * Clear route visualization
  */
 export function clearRouteDisplay(map: mapboxgl.Map) {
-  updateRouteDisplay(null, 0, map);
+  updateRouteDisplay(null, [0, 0], 0, map);
 }

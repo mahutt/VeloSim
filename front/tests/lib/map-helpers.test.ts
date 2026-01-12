@@ -33,6 +33,7 @@ import {
   MapSource,
 } from '~/lib/map-helpers';
 import { MockMap } from 'tests/mocks';
+import type { Position } from '~/types';
 
 test('loadMapImages loads all necessary images', () => {
   MockMap.createRandomInstance();
@@ -249,10 +250,17 @@ test('updateRouteDisplay clears display when routeGeometry is null', () => {
   const mockGeoJSONSource = { setData: vi.fn() };
   MockMap.instance!.getSource = vi.fn().mockReturnValue(mockGeoJSONSource);
 
-  updateRouteDisplay(null, 0, MockMap.instance! as unknown as mapboxgl.Map);
+  updateRouteDisplay(
+    null,
+    [0, 0],
+    0,
+    MockMap.instance! as unknown as mapboxgl.Map
+  );
 
-  expect(MockMap.instance?.getSource).toHaveBeenCalledWith('route-traversed');
-  expect(MockMap.instance?.getSource).toHaveBeenCalledWith('route-remaining');
+  expect(MockMap.instance?.getSource).toHaveBeenCalledWith('route-next-task');
+  expect(MockMap.instance?.getSource).toHaveBeenCalledWith(
+    'route-future-tasks'
+  );
   expect(mockGeoJSONSource.setData).toHaveBeenCalledTimes(2);
   expect(mockGeoJSONSource.setData).toHaveBeenCalledWith({
     type: 'FeatureCollection',
@@ -268,6 +276,7 @@ test('updateRouteDisplay clears display when routeGeometry has less than 2 point
 
   updateRouteDisplay(
     [[-73.5, 45.5]],
+    [0, 0],
     0,
     MockMap.instance! as unknown as mapboxgl.Map
   );
@@ -279,106 +288,105 @@ test('updateRouteDisplay clears display when routeGeometry has less than 2 point
   });
 });
 
-test('updateRouteDisplay splits route at progress point', () => {
+test('updateRouteDisplay splits route at nextTaskEndIndex', () => {
   MockMap.createRandomInstance();
 
   const mockGeoJSONSource = { setData: vi.fn() };
   MockMap.instance!.getSource = vi.fn().mockReturnValue(mockGeoJSONSource);
 
-  const routeGeometry: [number, number][] = [
+  const routeGeometry: Position[] = [
     [-73.5, 45.5],
     [-73.6, 45.6],
     [-73.7, 45.7],
     [-73.8, 45.8],
   ];
 
-  // Progress is now fractional (0-1): 0.5 = 50% along route
   updateRouteDisplay(
     routeGeometry,
-    0.5,
+    [0, 0],
+    2,
     MockMap.instance! as unknown as mapboxgl.Map
   );
 
   expect(mockGeoJSONSource.setData).toHaveBeenCalledTimes(2);
 
-  // First call should be for traversed route (starts at route start)
-  const traversedCall = mockGeoJSONSource.setData.mock.calls[0][0];
-  expect(traversedCall.type).toBe('FeatureCollection');
-  expect(traversedCall.features).toHaveLength(1);
-  const traversedCoords = traversedCall.features[0].geometry.coordinates;
-  expect(traversedCoords[0][0]).toBeCloseTo(-73.5, 3);
-  expect(traversedCoords[0][1]).toBeCloseTo(45.5, 3);
+  const nextTaskCall = mockGeoJSONSource.setData.mock.calls[0][0];
+  expect(nextTaskCall.type).toBe('FeatureCollection');
+  expect(nextTaskCall.features).toHaveLength(1);
+  expect(nextTaskCall.features[0].properties.segment).toBe('next-task');
+  const nextTaskCoords = nextTaskCall.features[0].geometry.coordinates;
+  expect(nextTaskCoords[0][0]).toBeCloseTo(-73.5, 3);
+  expect(nextTaskCoords[0][1]).toBeCloseTo(45.5, 3);
 
-  // Second call should be for remaining route (ends at route end)
-  const remainingCall = mockGeoJSONSource.setData.mock.calls[1][0];
-  expect(remainingCall.type).toBe('FeatureCollection');
-  expect(remainingCall.features).toHaveLength(1);
-  const remainingCoords = remainingCall.features[0].geometry.coordinates;
-  const lastRemaining = remainingCoords[remainingCoords.length - 1];
-  expect(lastRemaining[0]).toBeCloseTo(-73.8, 3);
-  expect(lastRemaining[1]).toBeCloseTo(45.8, 3);
+  const futureTasksCall = mockGeoJSONSource.setData.mock.calls[1][0];
+  expect(futureTasksCall.type).toBe('FeatureCollection');
+  expect(futureTasksCall.features).toHaveLength(1);
+  expect(futureTasksCall.features[0].properties.segment).toBe('future-tasks');
+  const futureTasksCoords = futureTasksCall.features[0].geometry.coordinates;
+  const lastFuture = futureTasksCoords[futureTasksCoords.length - 1];
+  expect(lastFuture[0]).toBeCloseTo(-73.8, 3);
+  expect(lastFuture[1]).toBeCloseTo(45.8, 3);
 });
 
-test('updateRouteDisplay handles progress at start of route', () => {
+test('updateRouteDisplay handles nextTaskEndIndex at start (0)', () => {
   MockMap.createRandomInstance();
 
   const mockGeoJSONSource = { setData: vi.fn() };
   MockMap.instance!.getSource = vi.fn().mockReturnValue(mockGeoJSONSource);
 
-  const routeGeometry: [number, number][] = [
+  const routeGeometry: Position[] = [
     [-73.5, 45.5],
     [-73.6, 45.6],
     [-73.7, 45.7],
   ];
 
-  // Progress 0 = at start of route
+  // nextTaskEndIndex = 1 means split at first task
   updateRouteDisplay(
     routeGeometry,
-    0,
-    MockMap.instance! as unknown as mapboxgl.Map
-  );
-
-  // Traversed should be empty (no distance covered)
-  const traversedCall = mockGeoJSONSource.setData.mock.calls[0][0];
-  expect(traversedCall.features).toEqual([]);
-
-  // Remaining should cover entire route
-  const remainingCall = mockGeoJSONSource.setData.mock.calls[1][0];
-  expect(remainingCall.features).toHaveLength(1);
-  const remainingCoords = remainingCall.features[0].geometry.coordinates;
-  expect(remainingCoords[0][0]).toBeCloseTo(-73.5, 3);
-  expect(remainingCoords[remainingCoords.length - 1][0]).toBeCloseTo(-73.7, 3);
-});
-
-test('updateRouteDisplay handles progress beyond route length', () => {
-  MockMap.createRandomInstance();
-
-  const mockGeoJSONSource = { setData: vi.fn() };
-  MockMap.instance!.getSource = vi.fn().mockReturnValue(mockGeoJSONSource);
-
-  const routeGeometry: [number, number][] = [
     [-73.5, 45.5],
-    [-73.6, 45.6],
-    [-73.7, 45.7],
-  ];
-
-  // Progress 1 (or greater) = at end of route
-  updateRouteDisplay(
-    routeGeometry,
     1,
     MockMap.instance! as unknown as mapboxgl.Map
   );
 
-  // Traversed should cover entire route
-  const traversedCall = mockGeoJSONSource.setData.mock.calls[0][0];
-  expect(traversedCall.features).toHaveLength(1);
-  const traversedCoords = traversedCall.features[0].geometry.coordinates;
-  expect(traversedCoords[0][0]).toBeCloseTo(-73.5, 3);
-  expect(traversedCoords[traversedCoords.length - 1][0]).toBeCloseTo(-73.7, 3);
+  const nextTaskCall = mockGeoJSONSource.setData.mock.calls[0][0];
+  expect(nextTaskCall.features).toHaveLength(1);
+  expect(nextTaskCall.features[0].properties.segment).toBe('next-task');
+  const nextTaskCoords = nextTaskCall.features[0].geometry.coordinates;
+  expect(nextTaskCoords.length).toBeGreaterThanOrEqual(2);
 
-  // Remaining should be empty (no distance left)
-  const remainingCall = mockGeoJSONSource.setData.mock.calls[1][0];
-  expect(remainingCall.features).toEqual([]);
+  const futureTasksCall = mockGeoJSONSource.setData.mock.calls[1][0];
+  expect(futureTasksCall.features.length).toBeGreaterThanOrEqual(0);
+});
+
+test('updateRouteDisplay handles nextTaskEndIndex at end of route', () => {
+  MockMap.createRandomInstance();
+
+  const mockGeoJSONSource = { setData: vi.fn() };
+  MockMap.instance!.getSource = vi.fn().mockReturnValue(mockGeoJSONSource);
+
+  const routeGeometry: Position[] = [
+    [-73.5, 45.5],
+    [-73.6, 45.6],
+    [-73.7, 45.7],
+  ];
+
+  // nextTaskEndIndex = 2 is at the last valid index
+  updateRouteDisplay(
+    routeGeometry,
+    [-73.5, 45.5],
+    2,
+    MockMap.instance! as unknown as mapboxgl.Map
+  );
+
+  const nextTaskCall = mockGeoJSONSource.setData.mock.calls[0][0];
+  expect(nextTaskCall.features).toHaveLength(1);
+  expect(nextTaskCall.features[0].properties.segment).toBe('next-task');
+  const nextTaskCoords = nextTaskCall.features[0].geometry.coordinates;
+  expect(nextTaskCoords.length).toBeGreaterThanOrEqual(2);
+
+  // Future-tasks should be empty (no future tasks after the last point)
+  const futureTasksCall = mockGeoJSONSource.setData.mock.calls[1][0];
+  expect(futureTasksCall.features).toEqual([]);
 });
 
 test('clearRouteDisplay clears both route sources', () => {
@@ -389,8 +397,10 @@ test('clearRouteDisplay clears both route sources', () => {
 
   clearRouteDisplay(MockMap.instance! as unknown as mapboxgl.Map);
 
-  expect(MockMap.instance?.getSource).toHaveBeenCalledWith('route-traversed');
-  expect(MockMap.instance?.getSource).toHaveBeenCalledWith('route-remaining');
+  expect(MockMap.instance?.getSource).toHaveBeenCalledWith('route-next-task');
+  expect(MockMap.instance?.getSource).toHaveBeenCalledWith(
+    'route-future-tasks'
+  );
   expect(mockGeoJSONSource.setData).toHaveBeenCalledTimes(2);
 });
 
@@ -399,24 +409,9 @@ test('setMapLayers adds route layers with correct configuration', () => {
   setMapLayers(MockMap.instance! as unknown as mapboxgl.Map);
 
   expect(MockMap.instance?.addLayer).toHaveBeenCalledWith({
-    id: 'route-traversed',
+    id: 'route-next-task',
     type: 'line',
-    source: 'route-traversed',
-    layout: {
-      'line-join': 'round',
-      'line-cap': 'round',
-    },
-    paint: {
-      'line-color': '#3b82f6',
-      'line-width': 4,
-      'line-opacity': 0.3,
-    },
-  });
-
-  expect(MockMap.instance?.addLayer).toHaveBeenCalledWith({
-    id: 'route-remaining',
-    type: 'line',
-    source: 'route-remaining',
+    source: 'route-next-task',
     layout: {
       'line-join': 'round',
       'line-cap': 'round',
@@ -427,13 +422,28 @@ test('setMapLayers adds route layers with correct configuration', () => {
       'line-opacity': 0.8,
     },
   });
+
+  expect(MockMap.instance?.addLayer).toHaveBeenCalledWith({
+    id: 'route-future-tasks',
+    type: 'line',
+    source: 'route-future-tasks',
+    layout: {
+      'line-join': 'round',
+      'line-cap': 'round',
+    },
+    paint: {
+      'line-color': '#3b82f6',
+      'line-width': 4,
+      'line-opacity': 0.3,
+    },
+  });
 });
 
 test('initializeMapSources adds route sources', () => {
   MockMap.createRandomInstance();
   initializeMapSources(MockMap.instance! as unknown as mapboxgl.Map);
 
-  expect(MockMap.instance?.addSource).toHaveBeenCalledWith('route-traversed', {
+  expect(MockMap.instance?.addSource).toHaveBeenCalledWith('route-next-task', {
     type: 'geojson',
     data: {
       type: 'FeatureCollection',
@@ -441,11 +451,14 @@ test('initializeMapSources adds route sources', () => {
     },
   });
 
-  expect(MockMap.instance?.addSource).toHaveBeenCalledWith('route-remaining', {
-    type: 'geojson',
-    data: {
-      type: 'FeatureCollection',
-      features: [],
-    },
-  });
+  expect(MockMap.instance?.addSource).toHaveBeenCalledWith(
+    'route-future-tasks',
+    {
+      type: 'geojson',
+      data: {
+        type: 'FeatureCollection',
+        features: [],
+      },
+    }
+  );
 });

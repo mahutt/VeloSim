@@ -500,14 +500,7 @@ class SimulatorController:
                 # - Key frames: always include (coordinates or null)
                 # - Diff frames: only include if route_changed
                 if is_key or driver.route_changed:
-                    if driver.current_route is not None:
-                        # Send raw OSRM coordinates, not interpolated points
-                        driver_data["route"] = {
-                            "coordinates": driver.current_route.get_raw_coordinates()
-                        }
-                    else:
-                        # Explicitly signal no route (cleared)
-                        driver_data["route"] = None
+                    driver_data["route"] = driver.get_full_route()
 
                 drivers.append(driver_data)
 

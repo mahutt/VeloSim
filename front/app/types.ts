@@ -109,13 +109,16 @@ interface StationInformation {
   has_kiosk: boolean;
 }
 
+export interface Route {
+  coordinates: Position[];
+  nextTaskEndIndex: number;
+}
+
 export interface Driver {
   id: number;
   position: Position;
   taskIds: number[];
-  route?: {
-    coordinates: Position[];
-  };
+  route?: Route;
   inProgressTaskId: number | null;
   vehicleId: number | null; // null implies at HQ, not on route
 }
