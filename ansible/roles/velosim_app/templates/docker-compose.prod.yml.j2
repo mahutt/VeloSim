@@ -120,6 +120,7 @@ services:
         max-file: "3"
 
   # Grafana for monitoring (optional)
+  # Access via SSH tunnel only: ssh -L 3001:localhost:3001 user@server
   grafana:
     image: grafana/grafana:11.0.0
     container_name: velosim-grafana
@@ -129,8 +130,6 @@ services:
     environment:
       - GF_SECURITY_ADMIN_USER=admin
       - GF_SECURITY_ADMIN_PASSWORD={{ grafana_password | default('admin') }}
-      - GF_SERVER_DOMAIN={{ domain_name }}
-      - GF_SERVER_ROOT_URL=https://{{ domain_name }}/grafana/
     volumes:
       - {{ app_dir }}/source/grafana_logging/grafana/provisioning:/etc/grafana/provisioning:ro
     networks:
