@@ -23,7 +23,9 @@
  */
 
 import { type ColumnDef } from '@tanstack/react-table';
+import { useNavigate } from 'react-router';
 import type { Simulation } from '~/types';
+import { Button } from '../ui/button';
 
 export const columns: ColumnDef<Simulation>[] = [
   {
@@ -61,5 +63,23 @@ export const columns: ColumnDef<Simulation>[] = [
   {
     accessorKey: 'task_count',
     header: 'Tasks',
+  },
+  {
+    id: 'resume',
+    header: 'Action',
+    cell: ({ row }) => {
+      const simulationId = row.original.id;
+      const navigate = useNavigate();
+      return (
+        <Button
+          size="sm"
+          onClick={() => {
+            navigate(`/simulation/${simulationId}`);
+          }}
+        >
+          Resume
+        </Button>
+      );
+    },
   },
 ];
