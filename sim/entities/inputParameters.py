@@ -38,7 +38,7 @@ class InputParameter:
         self,
         station_entities: Optional[Dict[int, Station]] = None,
         driver_entities: Optional[Dict[int, Driver]] = None,
-        vehicles_entities: Optional[Dict[int, Vehicle]] = None,
+        vehicle_entities: Optional[Dict[int, Vehicle]] = None,
         task_entities: Optional[Mapping[int, Task]] = None,
         real_time_factor: Optional[float] = None,
         key_frame_freq: Optional[int] = None,
@@ -54,7 +54,7 @@ class InputParameter:
         )
 
         self.vehicle_entities: Dict[int, Vehicle] = (
-            vehicles_entities if vehicles_entities is not None else {}
+            vehicle_entities if vehicle_entities is not None else {}
         )
 
         self.task_entities: Dict[int, Task] = dict(task_entities or {})

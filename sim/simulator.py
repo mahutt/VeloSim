@@ -34,6 +34,7 @@ from sim.utils.subscriber import Subscriber
 from sim.core.SimulatorController import SimulatorController
 from sim.entities.task import Task
 from sim.behaviour.sim_behaviour import SimBehaviour
+from sim.map.MapController import MapController
 
 
 class RunInfo(TypedDict):
@@ -62,6 +63,8 @@ class Simulator:
         input_parameters: InputParameter,
         subscribers: List[Subscriber],
         sim_behaviour: SimBehaviour = SimBehaviour(),
+        run_id: str | None = None,
+        map_controller: MapController | None = None,
     ) -> str:
         """Initialize a simulation instance without starting the simulation loop.
 
@@ -85,7 +88,10 @@ class Simulator:
         """
         # Initialize a simulation and send the initial frame, but don't start
         # the simulation loop.
-        run_id = str(uuid.uuid4())  # threadID / SIM ID
+
+        if run_id is None:
+            run_id = str(uuid.uuid4())
+
         emitter = FrameEmitter(run_id)
 
         for sub in subscribers:
@@ -99,7 +105,11 @@ class Simulator:
             frameEmitter=emitter,
             sim_behaviour=sim_behaviour,
             strict=True,
+            map_controller=map_controller,
         )
+
+        simController.map_controller.get_route
+
         with self.thread_pool_lock:
             if run_id in self.thread_pool:
                 raise RuntimeError(f"Run id already present: {run_id}")

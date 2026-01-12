@@ -42,6 +42,10 @@ from back.schemas.sim_instance import (
 from back.exceptions import VelosimPermissionError, ItemNotFoundError
 from grafana_logging.logger import get_logger
 from back.services.keyframe_persistence_service import KeyframePersistenceSubscriber
+from back.services.simulation_data_service import SimulationDataService
+
+
+from sim.utils.replay_parser import ReplayParser
 
 logger = get_logger(__name__)
 
@@ -107,6 +111,7 @@ class SimulationService:
         # Maps sim_id (UUID from simulator) -> ActiveSimulationData
         self.active_simulations: Dict[str, ActiveSimulationData] = {}
         self.simulator = Simulator()
+        self.simulation_data_service = SimulationDataService()
 
     # Internal helper
     def _get_requesting_user(self, db: Session, requesting_user: int) -> User:
@@ -147,9 +152,9 @@ class SimulationService:
         """
         user = self._get_requesting_user(db, requesting_user)
 
-        sim_data = self.active_simulations.get(sim_id)
-        if not sim_data:
-            raise ItemNotFoundError(f"Simulation {sim_id} is not currently active")
+        sim_data = self.ensure_active_simulation(
+            sim_id=sim_id, db=db, requesting_user=requesting_user
+        )
 
         db_id: int = sim_data["db_id"]
         db_sim_instance = sim_instance_crud.get(db, db_id)
@@ -157,6 +162,89 @@ class SimulationService:
             raise ItemNotFoundError(f"Simulation instance record {db_id} not found")
 
         return user.is_admin or db_sim_instance.user_id == user.id
+
+    def ensure_active_simulation(
+        self, sim_id: str, db: Session, requesting_user: int
+    ) -> ActiveSimulationData:
+        """
+        Retrieve an active simulation instance by its in-memory simulation ID.
+
+        This method looks up the simulation in the active simulations registry and
+        returns its associated ActiveSimulationData object.
+
+        Args:
+            sim_id (str): The in-memory UUID of the active simulation.
+
+        Returns:
+            ActiveSimulationData: The active simulation data associated with the
+            given simulation ID.
+
+        Raises:
+            ItemNotFoundError: If no active simulation exists with the provided ID.
+        """
+
+        sim_data = self.active_simulations.get(sim_id)
+
+        if sim_data:
+            return sim_data
+
+        return self.restore_simulation(db, sim_id, requesting_user)
+
+    def restore_simulation(
+        self, db: Session, sim_id: str, requesting_user: int
+    ) -> ActiveSimulationData:
+        """
+        Restore a simulation from its persisted state.
+
+        Args:
+            sim_id (str): The ID of the simulation to restore.
+
+        Returns:
+            None
+        """
+
+        user = self._get_requesting_user(db, requesting_user)
+
+        db_sim = sim_instance_crud.get_by_uuid(db, sim_id)
+
+        if not db_sim:
+            raise ItemNotFoundError(f"Simulation {sim_id} not found")
+
+        if db_sim.user_id != user.id and not user.is_admin:
+            raise VelosimPermissionError("Unauthorized to restore simulation")
+
+        scenario = self.simulation_data_service.get_scenario(db, sim_id)
+        keyframe = self.simulation_data_service.get_last_persisted_keyframe(db, sim_id)
+
+        parse_tuple = ReplayParser.parse(
+            scenario_json=scenario,
+            keyframe_json=keyframe,
+        )
+
+        input_params = parse_tuple[0]
+        map_controller = parse_tuple[1]
+
+        sim = self.simulator
+
+        keyframe_subscriber = KeyframePersistenceSubscriber(db_sim.id)
+        keyframe_subscriber.start()
+
+        restore_sim_id = sim.initialize(
+            input_params,
+            subscribers=[keyframe_subscriber],
+            run_id=sim_id,
+            map_controller=map_controller,
+        )
+
+        self.active_simulations[restore_sim_id] = ActiveSimulationData(
+            db_id=db_sim.id,
+            status="resumed",
+            sim_time=input_params.sim_time,
+            user_id=db_sim.user_id,
+            keyframe_subscriber=keyframe_subscriber,
+        )
+
+        return self.active_simulations[restore_sim_id]
 
     def initialize_simulation(
         self,

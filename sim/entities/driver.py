@@ -104,11 +104,12 @@ class Driver:
         task_list: list["Task"] | None = None,
         vehicle: Optional["Vehicle"] = None,
         name: str | None = None,
+        route: Optional["Route"] = None,
     ) -> None:
         self.id = driver_id
         self.name = name if name is not None else f"Driver {driver_id}"
         self.position = position
-        self.current_route = None
+        self.current_route = route
         self.vehicle = vehicle
         self.route_changed = False  # flag to track if route geometry needs to be sent
         self.shift = shift

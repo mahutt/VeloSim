@@ -50,9 +50,15 @@ class SimulatorController:
         inputParameters: InputParameter,
         sim_behaviour: SimBehaviour,
         strict: bool = False,
+        map_controller: MapController | None = None,
     ) -> None:
         self.simEnv = simEnv
-        self.map_controller = MapController()
+
+        if map_controller:
+            self.map_controller = map_controller
+        else:
+            self.map_controller = MapController()
+
         # Get parameters directly from InputParameter object
         real_time_factor = inputParameters.get_real_time_factor()
         keyframe_freq = inputParameters.get_key_frame_freq()

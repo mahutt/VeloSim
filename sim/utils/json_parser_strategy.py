@@ -1200,7 +1200,7 @@ class JsonParseStrategy(BaseParseStrategy):
         params = InputParameter(
             station_entities=stations,
             driver_entities=drivers,
-            vehicles_entities=vehicles,
+            vehicle_entities=vehicles,
             task_entities=tasks,
             real_time_factor=content.get("real_time_factor", 1.0),
             key_frame_freq=content.get("key_frame_freq", 20),
