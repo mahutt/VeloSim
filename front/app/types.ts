@@ -129,6 +129,10 @@ export interface Vehicle {
   batteryCount: number;
 }
 
+export interface Headquarters {
+  position: Position;
+}
+
 // WebSocket connection types
 export type SimulationStatus =
   | 'idle' // Not connected
@@ -185,6 +189,7 @@ export interface Simulation {
 
 export interface BackendPayload {
   simId: string;
+  headquarters: Headquarters;
   tasks: StationTask[];
   stations: Station[];
   drivers: Driver[];

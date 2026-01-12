@@ -26,6 +26,7 @@ from sim.core.RealTimeDriver import RealTimeDriver
 import simpy
 import threading
 from typing import Optional, Dict
+from sim.entities.headquarters import Headquarters
 from sim.entities.station import Station
 from sim.core.frame_emitter import FrameEmitter
 from sim.entities.task_state import State
@@ -78,6 +79,7 @@ class SimulatorController:
         )
 
         self.task_entities = inputParameters.get_task_entities()
+        self.prep_entities()
 
     def prep_entities(self) -> None:
         """Prepare all entities for simulation by setting behaviors and env.
@@ -85,6 +87,11 @@ class SimulatorController:
         Returns:
             None
         """
+
+        # create hq entity here
+        self.simEnv.hq = (
+            Headquarters()
+        )  # TODO: make this typesafe by subclassing / wrapping simpy.Environment
 
         for _, station in self.station_entities.items():
             station.set_behaviour(self.sim_behaviour)
@@ -121,6 +128,8 @@ class SimulatorController:
 
         for _, vehicle in self.vehicle_entities.items():
             vehicle.env = self.simEnv
+            if vehicle.get_driver() is None:
+                self.simEnv.hq.push_vehicle(vehicle)
 
     def start(self, sim_time: int) -> None:
         """Start the simulation for specified time.
@@ -131,8 +140,6 @@ class SimulatorController:
         Returns:
             None
         """
-        # Load entities into sim event queue and pass behaviour and/or mapcontroller
-        self.prep_entities()
         # start sim clock
         self.clock.run()
         self.sim_time = sim_time
@@ -532,6 +539,9 @@ class SimulatorController:
 
         payload = {
             "simId": self.frameEmitter.sim_id,
+            "headquarters": {
+                "position": self.simEnv.hq.position.get_position(),
+            },
             "tasks": tasks,
             "stations": stations,
             "drivers": drivers,

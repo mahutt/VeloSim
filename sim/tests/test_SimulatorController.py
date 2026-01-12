@@ -30,6 +30,7 @@ from unittest.mock import Mock, patch
 from sim.core.SimulatorController import SimulatorController
 from sim.core.frame_emitter import FrameEmitter
 from sim.entities.inputParameters import InputParameter
+from sim.entities.headquarters import Headquarters
 from sim.entities.frame import Frame
 from sim.entities.station import Station
 from sim.entities.driver import Driver, DriverState
@@ -182,6 +183,8 @@ def simulator_controller(
             sim_behaviour=FakeSimBehaviour(),
             strict=False,
         )
+    env.hq = Headquarters()
+    controller.sim_time = 0
     return controller
 
 

@@ -45,7 +45,6 @@ if TYPE_CHECKING:  # pragma: no cover
 
 # These constants will eventually be abstracted to logical classes,
 # Or added to a new scenario schema in R3
-HQ_POSITION = Position([-73.60175631192361, 45.52975346053039])
 FULL_RESTOCK_TIME_SEC = 1200  # 20 minutes to fully restock
 LUNCH_BREAK_DURATION = 1800  # 30 minutes for lunch
 LUNCH_DISTANCE_METERS = 1000  # Lunch location ~1km away
@@ -338,6 +337,7 @@ class Driver:
             else:
                 # Fallback in case vehicle lacks unassign_driver
                 vehicle.driver = None
+            self.env.hq.push_vehicle(vehicle)
             # Transition to IDLE since the driver has no vehicle
             self.has_updated = True
 
@@ -660,13 +660,13 @@ class Driver:
         # if driver needs to go to HQ, make HQ route the "next task"
         if include_hq:
             try:
-                route = self.map_controller.get_route(current_pos, HQ_POSITION)
+                route = self.map_controller.get_route(current_pos, self.env.hq.position)
                 segment_coords = route.get_raw_coordinates()
 
                 if segment_coords:
                     full_geometry.extend(segment_coords)
                     next_task_end_index = len(full_geometry) - 1
-                    current_pos = HQ_POSITION
+                    current_pos = self.env.hq.position
 
             except ValueError as e:
                 print(f"Driver {self.id}: Cannot get route to HQ: {e}")
@@ -718,7 +718,7 @@ class Driver:
         """
         # self.state = DriverState.HEADING_TO_HQ
         self.route_changed = True
-        yield self.env.process(self.travel_to(HQ_POSITION))
+        yield self.env.process(self.travel_to(self.env.hq.position))
 
     def restock_vehicle_battery(self) -> Generator[Any, Any, Any]:
         """
@@ -821,6 +821,9 @@ class Driver:
         time_to_shift_end = self.shift.get_sim_end_time() - current_sim_time
         lunch_break = self.shift.get_sim_lunch_break()
 
+        if self.vehicle is None and self.env.hq.has_vehicles():
+            self.set_vehicle(self.env.hq.pop_vehicle())
+
         if time_to_shift_end <= SHIFT_END_BUFFER_TIME or (
             self.vehicle is not None and self.vehicle.get_battery_count() == 0
         ):
@@ -881,11 +884,11 @@ class Driver:
     def _heading_to_hq(self) -> Generator[Any, None, None]:
         """Handle HEADING_TO_HQ travel and arrival logic."""
         yield self.env.process(self.return_to_HQ())
-        if self.position.close_enough(HQ_POSITION):
+        if self.position.close_enough(self.env.hq.position):
             current_sim_time = self.env.now
             time_to_shift_end = self.shift.get_sim_end_time() - current_sim_time
 
-            if time_to_shift_end <= 0:
+            if time_to_shift_end <= SHIFT_END_BUFFER_TIME:
                 for task in self.task_list:
                     self.unassign_task(task)
                 self.unassign_vehicle()

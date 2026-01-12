@@ -24,7 +24,28 @@
 
 import { lineString, point } from '@turf/helpers';
 import lineSlice from '@turf/line-slice';
-import type { Driver, Station, Position } from '~/types';
+import type { Driver, Station, Position, Headquarters } from '~/types';
+
+export function adaptHeadquartersToGeoJSON(
+  headquarters: Headquarters
+): GeoJSON.FeatureCollection {
+  return {
+    type: 'FeatureCollection',
+    features: [
+      {
+        type: 'Feature',
+        properties: {
+          id: 'headquarters',
+          name: 'Headquarters',
+        },
+        geometry: {
+          type: 'Point',
+          coordinates: headquarters.position,
+        },
+      },
+    ],
+  };
+}
 
 export function adaptStationsToGeoJSON(
   stations: Station[],

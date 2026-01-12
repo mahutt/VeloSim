@@ -91,6 +91,14 @@ SCENARIO_CONTENT = {
                 "lunch_break": "day1:09:00",
             },
         },
+        {
+            "name": "Driver 2",
+            "shift": {
+                "start_time": "day1:06:00",
+                "end_time": "day1:12:00",
+                "lunch_break": "day1:09:00",
+            },
+        },
     ],
 }
 
@@ -279,9 +287,13 @@ class TestSimulationAPI:
             db_id=42,
             status="initialized",
         )
+        print("Before request")
         response = authenticated_client.post(
             "/api/v1/simulation/initialize", json=SCENARIO_PAYLOAD
         )
+        print(f"Response: {response.status_code}")
+        print(f"Data: {response.json()}")
+
         assert response.status_code == 200
         data = response.json()
         assert data["sim_id"] == "sim123"

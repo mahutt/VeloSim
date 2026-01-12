@@ -34,6 +34,7 @@ from sim.entities.task import Task, State
 from sim.entities.station import Station
 from sim.entities.vehicle import Vehicle
 from sim.entities.shift import Shift
+from sim.entities.headquarters import Headquarters
 
 
 class TestDriver:
@@ -48,6 +49,7 @@ class TestDriver:
         from sim.entities.driver import Driver
 
         Driver.env = env
+        env.hq = Headquarters()
         return env
 
     # Default shift used across tests
@@ -574,8 +576,9 @@ class TestDriver:
         station2 = Station(2, "Station 2", Position([-73.6, 45.6]))
         task1 = BatterySwapTask(1, station=station1)
         task2 = BatterySwapTask(2, station=station2)
+        shift = Shift(0.0, 24.0, None, 0.0, 24.0, None)
 
-        driver = Driver(1, default_position, [task1, task2])
+        driver = Driver(1, default_position, shift, [task1, task2])
 
         mock_map_controller = MagicMock()
         mock_route_to_hq = MagicMock()
@@ -631,8 +634,9 @@ class TestDriver:
         station2 = Station(2, "Station 2", Position([-73.6, 45.6]))
         task1 = BatterySwapTask(1, station=station1)
         task2 = BatterySwapTask(2, station=station2)
+        shift = Shift(0.0, 24.0, None, 0.0, 24.0, None)
 
-        driver = Driver(1, default_position, [task1, task2])
+        driver = Driver(1, default_position, shift, [task1, task2])
 
         mock_map_controller = MagicMock()
         mock_route_to_task1 = MagicMock()
@@ -655,7 +659,7 @@ class TestDriver:
         driver.set_map_controller(mock_map_controller)
 
         # Driver is NOT heading to HQ (default state is ON_SHIFT)
-        driver.state = DriverState.ON_SHIFT
+        driver.state = DriverState.ON_ROUTE
 
         # Get full route
         result = driver.get_full_route()

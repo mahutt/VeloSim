@@ -29,7 +29,7 @@ import type { Position } from '~/types';
 
 // Entities may be represented by more than 1 layer (e.g., stations and their task counts)
 // So we use a function to map layers to entity types
-function layerToEntityType(layer: MapLayer): SelectedItemType {
+function layerToEntityType(layer: MapLayer): SelectedItemType | null {
   switch (layer) {
     case MapLayer.Stations:
     case MapLayer.StationTaskCounts:
@@ -37,7 +37,7 @@ function layerToEntityType(layer: MapLayer): SelectedItemType {
     case MapLayer.Resources:
       return SelectedItemType.Driver;
     default:
-      throw new Error(`Unrecognized layer: ${layer}`);
+      return null;
   }
 }
 
@@ -82,6 +82,8 @@ export function setupMapClickHandlers(
     }
 
     const type = layerToEntityType(feature.layer.id);
+    if (type === null) return;
+
     const id = Number(feature.properties.id);
     const coordinates = (feature.geometry as GeoJSON.Point).coordinates as [
       number,
@@ -112,6 +114,7 @@ export function setupMapHoverHandlers(
         const id = e.features[0].properties?.id;
         if (id !== undefined) {
           const type = layerToEntityType(layer);
+          if (type === null) return;
           onItemHover({
             type,
             id: Number(id),
