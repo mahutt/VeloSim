@@ -24,6 +24,7 @@ SOFTWARE.
 
 import simpy
 import logging
+import random
 from enum import Enum
 
 from sim.map.MapController import MapController
@@ -47,6 +48,8 @@ if TYPE_CHECKING:  # pragma: no cover
 HQ_POSITION = Position([-73.60175631192361, 45.52975346053039])
 FULL_RESTOCK_TIME_SEC = 1200  # 20 minutes to fully restock
 LUNCH_BREAK_DURATION = 1800  # 30 minutes for lunch
+LUNCH_DISTANCE_METERS = 1000  # Lunch location ~1km away
+METERS_PER_DEGREE = 111111  # conversion factor for lunch location calculation
 SHIFT_END_BUFFER_TIME = 1200  # Start Heading back to HQ 20 min before shifts
 
 
@@ -108,6 +111,7 @@ class Driver:
         self.route_changed = False  # flag to track if route geometry needs to be sent
         self.shift = shift
         # Parse shift into sim shift time
+        self.lunch_location: Optional[Position] = None
 
         if task_list is not None:
             self.task_list = task_list
@@ -827,6 +831,7 @@ class Driver:
             lunch_break is not None
             and lunch_break <= current_sim_time < lunch_break + LUNCH_BREAK_DURATION
         ):
+            self.lunch_location = self._generate_lunch_location()
             self.set_state(DriverState.ON_BREAK)
             return
 
@@ -861,7 +866,10 @@ class Driver:
         self.set_state(DriverState.IDLE)
 
     def _on_break(self) -> Generator[Any, None, None]:
-        """Handle ON_BREAK: wait lunch duration then return to IDLE."""
+        # travel to lunch location
+        if self.lunch_location and not self.position.close_enough(self.lunch_location):
+            yield self.env.process(self.travel_to(self.lunch_location))
+
         yield self.env.timeout(LUNCH_BREAK_DURATION)
         self.set_state(DriverState.IDLE)
 
@@ -887,6 +895,22 @@ class Driver:
             if self.vehicle is not None and self.vehicle.get_battery_count() == 0:
                 self.set_state(DriverState.RESTOCKING_BATTERIES)
                 return
+
+    def _generate_lunch_location(self) -> Position:
+        """Generate a random lunch location
+            LUNCH_DISTANCE_METERS away from driver's current position.
+
+        Returns:
+            Position: A new Position object representing the lunch location.
+        """
+        # convert meters to degrees
+        offset = LUNCH_DISTANCE_METERS / METERS_PER_DEGREE
+        current_lon, current_lat = self.position.get_position()
+
+        delta_lon = random.uniform(-offset, offset)
+        delta_lat = random.uniform(-offset, offset)
+
+        return Position([current_lon + delta_lon, current_lat + delta_lat])
 
     def run(self):  # type: ignore[no-untyped-def]
         """Driver state machine in simple one-liners.
