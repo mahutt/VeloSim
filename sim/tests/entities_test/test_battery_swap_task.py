@@ -24,6 +24,7 @@ SOFTWARE.
 
 import pytest
 import simpy
+from sim.core.simulation_environment import SimulationEnvironment
 from sim.entities.BatterySwapTask import BatterySwapTask, State
 from sim.entities.station import Station
 from sim.entities.position import Position
@@ -123,7 +124,7 @@ class TestBatterySwapTask:
         assert station == default_station
 
     def test_get_and_set_assigned_driver(
-        self, simpy_env: simpy.Environment, default_station: Station
+        self, simpy_env: SimulationEnvironment, default_station: Station
     ) -> None:
         task = BatterySwapTask(1, default_station)
 
@@ -140,7 +141,7 @@ class TestBatterySwapTask:
         assert assigned_driver == driver
 
     def test_unassign_driver(
-        self, simpy_env: simpy.Environment, default_station: Station
+        self, simpy_env: SimulationEnvironment, default_station: Station
     ) -> None:
         # Arrange
         task = BatterySwapTask(1, default_station)
@@ -158,7 +159,7 @@ class TestBatterySwapTask:
         assert task.get_state() == State.OPEN
 
     def test_is_assigned_true(
-        self, simpy_env: simpy.Environment, default_station: Station
+        self, simpy_env: SimulationEnvironment, default_station: Station
     ) -> None:
         # Arrange
         task = BatterySwapTask(1, default_station)

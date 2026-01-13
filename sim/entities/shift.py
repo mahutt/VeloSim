@@ -36,15 +36,15 @@ class Shift:
     for internal sim calculations
 
     Args:
-        start_time: Real-time shift start in hours.
-        end_time: Real-time shift end in hours.
-        lunch_break: Optional real-time lunch break duration in hours.
+        start_time: Real-time shift start in seconds.
+        end_time: Real-time shift end in seconds.
+        lunch_break: Optional real-time lunch break duration in seconds.
             Use None if no lunch.
-        sim_start_time: Optional sim-time start in hours.
+        sim_start_time: Optional sim-time start in seconds.
             Defaults to start_time if not provided.
-        sim_end_time: Optional sim-time end in hours.
+        sim_end_time: Optional sim-time end in seconds.
             Defaults to end_time if not provided.
-        sim_lunch_break: Optional sim-time lunch break duration in hours.
+        sim_lunch_break: Optional sim-time lunch break duration in seconds.
             Defaults to lunch_break if not provided.
 
     """
@@ -76,7 +76,7 @@ class Shift:
         """Get the shift start time.
 
         Returns:
-            float: The start time of the shift in hours.
+            float: The start time of the shift in seconds.
         """
         return self.start_time
 
@@ -84,7 +84,7 @@ class Shift:
         """Set the shift start time.
 
         Args:
-            value: The new start time in hours.
+            value: The new start time in seconds.
         Returns:
             None
         """
@@ -94,7 +94,7 @@ class Shift:
         """Get the shift end time.
 
         Returns:
-            float: The end time of the shift in hours.
+            float: The end time of the shift in seconds.
         """
         return self.end_time
 
@@ -102,7 +102,7 @@ class Shift:
         """Set the shift end time.
 
         Args:
-            value: The new end time in hours.
+            value: The new end time in seconds.
         Returns:
             None
         """
@@ -112,7 +112,7 @@ class Shift:
         """Get the lunch break duration.
 
         Returns:
-            float | None: Lunch break duration in hours, or None if not set.
+            float | None: Lunch break duration in seconds, or None if not set.
         """
         return self.lunch_break
 
@@ -120,7 +120,7 @@ class Shift:
         """Set the lunch break duration.
 
         Args:
-            value: Lunch break duration in hours.
+            value: Lunch break duration in seconds.
 
         Returns:
             None
@@ -132,7 +132,7 @@ class Shift:
         """Get the simulation-prefixed shift start time.
 
         Returns:
-            float: The sim-prefixed start time of the shift in hours.
+            float: The sim-prefixed start time of the shift in seconds.
         """
         return self.sim_start_time
 
@@ -140,7 +140,7 @@ class Shift:
         """Set the simulation-prefixed shift start time.
 
         Args:
-            value: The new start time in hours.
+            value: The new start time in seconds.
         Returns:
             None
         """
@@ -150,7 +150,7 @@ class Shift:
         """Get the simulation-prefixed shift end time.
 
         Returns:
-            float: The sim-prefixed end time of the shift in hours.
+            float: The sim-prefixed end time of the shift in seconds.
         """
         return self.sim_end_time
 
@@ -158,7 +158,7 @@ class Shift:
         """Set the simulation-prefixed shift end time.
 
         Args:
-            value: The new end time in hours.
+            value: The new end time in seconds.
         Returns:
             None
         """
@@ -168,7 +168,7 @@ class Shift:
         """Get the simulation-prefixed lunch break duration.
 
         Returns:
-            float | None: Lunch break duration in hours, or None if not set.
+            float | None: Lunch break duration in seconds, or None if not set.
         """
         return self.sim_lunch_break
 
@@ -176,7 +176,7 @@ class Shift:
         """Set the simulation-prefixed lunch break duration.
 
         Args:
-            value: Lunch break duration in hours.
+            value: Lunch break duration in seconds.
 
         Returns:
             None

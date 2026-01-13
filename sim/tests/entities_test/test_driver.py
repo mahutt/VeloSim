@@ -27,6 +27,7 @@ import simpy
 from typing import Any
 from unittest.mock import patch, MagicMock
 
+from sim.core.simulation_environment import SimulationEnvironment
 from sim.entities.driver import Driver, DriverState
 from sim.entities.position import Position
 from sim.entities.BatterySwapTask import BatterySwapTask
@@ -34,7 +35,6 @@ from sim.entities.task import Task, State
 from sim.entities.station import Station
 from sim.entities.vehicle import Vehicle
 from sim.entities.shift import Shift
-from sim.entities.headquarters import Headquarters
 
 
 class TestDriver:
@@ -44,12 +44,11 @@ class TestDriver:
 
     @pytest.fixture
     def simpy_env(self) -> simpy.Environment:
-        env = simpy.Environment()
+        env = SimulationEnvironment()
         # Ensure Driver has an env before any instantiation
         from sim.entities.driver import Driver
 
         Driver.env = env
-        env.hq = Headquarters()
         return env
 
     # Default shift used across tests
@@ -71,7 +70,7 @@ class TestDriver:
         return Driver(2, default_position, self.DEFAULT_SHIFT, [task, task2, task3])
 
     def test_driver_initialization(
-        self, simpy_env: simpy.Environment, default_position: Position
+        self, simpy_env: SimulationEnvironment, default_position: Position
     ) -> None:
         # Ensure Driver.env is set before instantiation
         from sim.entities.driver import Driver
@@ -85,7 +84,7 @@ class TestDriver:
         assert driver.has_updated == False
 
     def test_driver_initialization_with_task_list(
-        self, simpy_env: simpy.Environment, default_position: Position
+        self, simpy_env: SimulationEnvironment, default_position: Position
     ) -> None:
         from sim.entities.driver import Driver
 
@@ -303,7 +302,7 @@ class TestDriver:
         assert driver.get_task_list() == initial_tasks
 
     def test_service_task_with_one_battery(
-        self, simpy_env: simpy.Environment, default_position: Position
+        self, simpy_env: SimulationEnvironment, default_position: Position
     ) -> None:
         task = BatterySwapTask(1)
         task2 = BatterySwapTask(2)
@@ -319,7 +318,7 @@ class TestDriver:
             assert vehicle.battery_count == 0
 
     def test_restock_vehicle_battery_full_restock(
-        self, simpy_env: simpy.Environment, default_position: Position
+        self, simpy_env: SimulationEnvironment, default_position: Position
     ) -> None:
         task = BatterySwapTask(1)
         task2 = BatterySwapTask(2)

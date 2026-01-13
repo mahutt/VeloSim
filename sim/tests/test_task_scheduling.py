@@ -25,6 +25,7 @@ SOFTWARE.
 import pytest
 import simpy
 from unittest.mock import Mock
+from sim.core.simulation_environment import SimulationEnvironment
 from sim.entities.BatterySwapTask import BatterySwapTask
 from sim.entities.driver import Driver
 from sim.entities.position import Position
@@ -35,9 +36,9 @@ from sim.entities.shift import Shift
 
 
 @pytest.fixture
-def env() -> simpy.Environment:
+def env() -> SimulationEnvironment:
     # Create a new SimPy environment for each test and assign to Driver
-    e = simpy.Environment()
+    e = SimulationEnvironment()
     Driver.env = e
     return e
 

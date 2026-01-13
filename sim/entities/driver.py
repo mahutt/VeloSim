@@ -27,6 +27,7 @@ import logging
 import random
 from enum import Enum
 
+from sim.core.simulation_environment import SimulationEnvironment
 from sim.map.MapController import MapController
 from typing import Optional, TYPE_CHECKING
 from .task_state import State
@@ -91,7 +92,7 @@ class Driver:
     map_controller: MapController
     sim_behaviour: "SimBehaviour"
     current_route: Route | None
-    env: simpy.Environment
+    env: SimulationEnvironment
     vehicle: Optional["Vehicle"]
     shift: Shift
 
@@ -262,10 +263,6 @@ class Driver:
             self.has_updated = True
             self.route_changed = True
             # Task state is now ASSIGNED (set by task.set_assigned_driver)
-
-            # Change state to ON_SHIFT if was waiting for a task
-            # if self.state == DriverState.IDLE:
-            #     self.state = DriverState.ON_SHIFT
 
             # Handle dispatch scheduling
             if dispatch_delay is not None and dispatch_delay > 0:
@@ -822,7 +819,9 @@ class Driver:
         lunch_break = self.shift.get_sim_lunch_break()
 
         if self.vehicle is None and self.env.hq.has_vehicles():
-            self.set_vehicle(self.env.hq.pop_vehicle())
+            vehicle_to_assign = self.env.hq.pop_vehicle()
+            if vehicle_to_assign is not None:
+                self.set_vehicle(vehicle_to_assign)
 
         if time_to_shift_end <= SHIFT_END_BUFFER_TIME or (
             self.vehicle is not None and self.vehicle.get_battery_count() == 0

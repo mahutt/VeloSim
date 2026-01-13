@@ -29,8 +29,8 @@ from unittest.mock import Mock, patch
 
 from sim.core.SimulatorController import SimulatorController
 from sim.core.frame_emitter import FrameEmitter
+from sim.core.simulation_environment import SimulationEnvironment
 from sim.entities.inputParameters import InputParameter
-from sim.entities.headquarters import Headquarters
 from sim.entities.frame import Frame
 from sim.entities.station import Station
 from sim.entities.driver import Driver, DriverState
@@ -87,8 +87,8 @@ class FakeSubscriber(Subscriber):
 
 
 @pytest.fixture()
-def env() -> simpy.Environment:
-    return simpy.Environment()
+def env() -> SimulationEnvironment:
+    return SimulationEnvironment()
 
 
 @pytest.fixture()
@@ -108,7 +108,7 @@ def frame_emitter() -> FrameEmitter:
 
 
 @pytest.fixture()
-def input_params(env: simpy.Environment) -> InputParameter:
+def input_params(env: SimulationEnvironment) -> InputParameter:
     """Create a basic InputParameter with some test entities."""
     params = InputParameter()
 
@@ -160,7 +160,7 @@ def input_params(env: simpy.Environment) -> InputParameter:
 
 @pytest.fixture()
 def simulator_controller(
-    env: simpy.Environment,
+    env: SimulationEnvironment,
     frame_emitter: FrameEmitter,
     input_params: InputParameter,
     fake_time: MockClock,
@@ -183,7 +183,6 @@ def simulator_controller(
             sim_behaviour=FakeSimBehaviour(),
             strict=False,
         )
-    env.hq = Headquarters()
     controller.sim_time = 0
     return controller
 
@@ -711,7 +710,7 @@ def test_start_simulation(
 
 
 def test_custom_keyframe_frequency(
-    env: simpy.Environment,
+    env: SimulationEnvironment,
     frame_emitter: FrameEmitter,
     fake_time: MockClock,
     monkeypatch: Any,
@@ -739,7 +738,7 @@ def test_custom_keyframe_frequency(
 
 
 def test_strict_mode_initialization(
-    env: simpy.Environment,
+    env: SimulationEnvironment,
     frame_emitter: FrameEmitter,
     input_params: InputParameter,
     fake_time: MockClock,

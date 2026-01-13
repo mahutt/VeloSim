@@ -25,8 +25,8 @@ SOFTWARE.
 import threading
 from typing import Dict, List, TypedDict, Optional
 import uuid
-import simpy
 
+from sim.core.simulation_environment import SimulationEnvironment
 from sim.entities.inputParameters import InputParameter
 from sim.entities.request_type import RequestType
 from sim.core.frame_emitter import FrameEmitter
@@ -91,7 +91,7 @@ class Simulator:
         for sub in subscribers:
             emitter.attach(sub)
 
-        env = simpy.Environment()
+        env = SimulationEnvironment()
 
         simController = SimulatorController(
             simEnv=env,

@@ -25,6 +25,7 @@ SOFTWARE.
 import pytest
 import simpy
 from unittest.mock import patch, MagicMock
+from sim.core.simulation_environment import SimulationEnvironment
 from sim.entities.station import Station
 from sim.entities.position import Position
 from sim.entities.driver import Driver
@@ -39,7 +40,7 @@ DEFAULT_SHIFT = Shift(0.0, 24.0, None, 0.0, 24.0, None)
 
 @pytest.fixture()
 def env() -> simpy.Environment:
-    env = simpy.Environment()
+    env = SimulationEnvironment()
     # Ensure Driver has an env before any instantiation in this module
     Driver.env = env
     return env
@@ -124,7 +125,7 @@ def test_set_station_entities(
 
 
 def test_set_driver_entities(
-    input_params: InputParameter, env: simpy.Environment
+    input_params: InputParameter, env: SimulationEnvironment
 ) -> None:
     original_drivers = input_params.get_driver_entities()
     assert input_params.get_driver_count() == 2
@@ -217,7 +218,7 @@ def test_add_station(input_params: InputParameter, env: simpy.Environment) -> No
     assert 12 in stations.keys()
 
 
-def test_add_driver(input_params: InputParameter, env: simpy.Environment) -> None:
+def test_add_driver(input_params: InputParameter, env: SimulationEnvironment) -> None:
     original_drivers = input_params.get_driver_entities()
     assert 12 not in original_drivers.keys()
 
@@ -304,7 +305,7 @@ def test_remove_station_fail(
 
 
 def test_remove_driver_success(
-    input_params: InputParameter, env: simpy.Environment
+    input_params: InputParameter, env: SimulationEnvironment
 ) -> None:
     Driver.env = env
     driver = Driver(driver_id=12, position=Position([15.0, 25.0]), shift=DEFAULT_SHIFT)
@@ -325,7 +326,7 @@ def test_remove_driver_success(
 
 @patch("builtins.print")
 def test_remove_driver_fail(
-    mock_print: MagicMock, input_params: InputParameter, env: simpy.Environment
+    mock_print: MagicMock, input_params: InputParameter, env: SimulationEnvironment
 ) -> None:
     drivers = input_params.get_driver_entities()
     assert 13 not in drivers.keys()

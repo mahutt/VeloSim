@@ -23,10 +23,9 @@ SOFTWARE.
 """
 
 from sim.core.RealTimeDriver import RealTimeDriver
-import simpy
 import threading
 from typing import Optional, Dict
-from sim.entities.headquarters import Headquarters
+from sim.core.simulation_environment import SimulationEnvironment
 from sim.entities.station import Station
 from sim.core.frame_emitter import FrameEmitter
 from sim.entities.task_state import State
@@ -46,7 +45,7 @@ class SimulatorController:
 
     def __init__(
         self,
-        simEnv: simpy.Environment,
+        simEnv: SimulationEnvironment,
         frameEmitter: FrameEmitter,
         inputParameters: InputParameter,
         sim_behaviour: SimBehaviour,
@@ -87,11 +86,6 @@ class SimulatorController:
         Returns:
             None
         """
-
-        # create hq entity here
-        self.simEnv.hq = (
-            Headquarters()
-        )  # TODO: make this typesafe by subclassing / wrapping simpy.Environment
 
         for _, station in self.station_entities.items():
             station.set_behaviour(self.sim_behaviour)

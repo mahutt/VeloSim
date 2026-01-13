@@ -287,13 +287,9 @@ class TestSimulationAPI:
             db_id=42,
             status="initialized",
         )
-        print("Before request")
         response = authenticated_client.post(
             "/api/v1/simulation/initialize", json=SCENARIO_PAYLOAD
         )
-        print(f"Response: {response.status_code}")
-        print(f"Data: {response.json()}")
-
         assert response.status_code == 200
         data = response.json()
         assert data["sim_id"] == "sim123"

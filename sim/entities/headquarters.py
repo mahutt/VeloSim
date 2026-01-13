@@ -32,10 +32,11 @@ class Headquarters:
     position: Position = Position([-73.60175631192361, 45.52975346053039])
     vehicles: list[Vehicle]  # List of vehicles at headquarters (no assigned driver)
 
-    def __init__(self, vehicles: list[Vehicle] = []):
+    def __init__(self, vehicles: list[Vehicle] | None = None):
         self.vehicles = []
-        for vehicle in vehicles:
-            self.push_vehicle(vehicle)
+        if vehicles:
+            for vehicle in vehicles:
+                self.push_vehicle(vehicle)
 
     def push_vehicle(self, vehicle: Vehicle) -> None:
         """Add a vehicle to headquarters' vehicle list.

@@ -36,6 +36,7 @@ from _pytest.capture import CaptureFixture
 from unittest.mock import patch, MagicMock
 
 # Import the module so we can monkeypatch its time.sleep
+from sim.core.simulation_environment import SimulationEnvironment
 from sim.entities.inputParameters import InputParameter
 from sim.entities.request_type import RequestType
 from sim.entities.station import Station
@@ -119,7 +120,7 @@ def default_station(simpy_env: simpy.Environment) -> Station:
 
 
 @pytest.fixture()
-def input_params(simpy_env: simpy.Environment) -> InputParameter:
+def input_params(simpy_env: SimulationEnvironment) -> InputParameter:
     """Create a basic InputParameter with some test entities."""
     params = InputParameter()
 

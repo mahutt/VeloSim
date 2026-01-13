@@ -22,8 +22,8 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 """
 
-import simpy
 from unittest.mock import Mock
+from sim.core.simulation_environment import SimulationEnvironment
 from sim.entities.driver import Driver, DriverState
 from sim.entities.position import Position
 from sim.entities.task import Task
@@ -94,7 +94,7 @@ DEFAULT_SHIFT = Shift(0.0, 24.0 * 60 * 60, None, 0.0, 24.0 * 60 * 60, None)
 
 def test_travel_to_returns_immediately_when_already_at_position() -> None:
     """Test that travel_to returns early if already at destination"""
-    env = simpy.Environment()
+    env = SimulationEnvironment()
     # Ensure Driver.env is set before instantiation
     Driver.env = env
     start_pos = Position([0.0, 0.0])
@@ -116,7 +116,7 @@ def test_travel_to_returns_immediately_when_already_at_position() -> None:
 
 def test_travel_to_handles_tuple_return_from_route_next() -> None:
     """Test that travel_to correctly unpacks tuple from first route.next() call"""
-    env = simpy.Environment()
+    env = SimulationEnvironment()
     Driver.env = env
     start_pos = Position([0.0, 0.0])
     dest_pos = Position([1.0, 1.0])
@@ -158,7 +158,7 @@ def test_travel_to_handles_tuple_return_from_route_next() -> None:
 
 def test_travel_to_handles_single_position_return_from_route_next() -> None:
     """Test that travel_to handles when route.next() returns just a position"""
-    env = simpy.Environment()
+    env = SimulationEnvironment()
     Driver.env = env
     start_pos = Position([0.0, 0.0])
     dest_pos = Position([1.0, 1.0])
@@ -193,7 +193,7 @@ def test_travel_to_handles_single_position_return_from_route_next() -> None:
 
 def test_travel_to_can_be_interrupted() -> None:
     """Test that travel_to handles simpy.Interrupt correctly"""
-    env = simpy.Environment()
+    env = SimulationEnvironment()
     Driver.env = env
     start_pos = Position([0.0, 0.0])
     dest_pos = Position([5.0, 5.0])
@@ -230,7 +230,7 @@ def test_travel_to_can_be_interrupted() -> None:
 
 def test_driver_run_waits_for_initialization() -> None:
     """Test that driver run() yields at start to allow initialization"""
-    env = simpy.Environment()
+    env = SimulationEnvironment()
     Driver.env = env
     driver = Driver(driver_id=1, position=Position([0.0, 0.0]), shift=DEFAULT_SHIFT)
     vehicle = Vehicle(vehicle_id=1, battery_count=10)
@@ -262,7 +262,7 @@ def test_driver_run_waits_for_initialization() -> None:
 
 def test_driver_run_selects_and_dispatches_task() -> None:
     """Test that driver run() selects and dispatches tasks correctly"""
-    env = simpy.Environment()
+    env = SimulationEnvironment()
     Driver.env = env
     start_pos = Position([0.0, 0.0])
     driver = Driver(driver_id=1, position=start_pos, shift=DEFAULT_SHIFT)
@@ -308,7 +308,7 @@ def test_driver_run_selects_and_dispatches_task() -> None:
 
 def test_driver_run_services_task_when_at_station() -> None:
     """Test that driver services task when arriving at station"""
-    env = simpy.Environment()
+    env = SimulationEnvironment()
     Driver.env = env
     station_pos = Position([1.0, 1.0])
 
@@ -346,7 +346,7 @@ def test_driver_run_services_task_when_at_station() -> None:
 
 def test_driver_run_does_not_service_task_when_not_at_station() -> None:
     """Test that driver doesn't service task when not at station"""
-    env = simpy.Environment()
+    env = SimulationEnvironment()
     Driver.env = env
     resource_pos = Position([0.0, 0.0])
     station_pos = Position([1.0, 1.0])
@@ -378,7 +378,7 @@ def test_driver_run_does_not_service_task_when_not_at_station() -> None:
 
 def test_driver_run_handles_no_tasks() -> None:
     """Test that driver run() handles case when there are no tasks"""
-    env = simpy.Environment()
+    env = SimulationEnvironment()
     Driver.env = env
     driver = Driver(driver_id=1, position=Position([0.0, 0.0]), shift=DEFAULT_SHIFT)
 
@@ -400,7 +400,7 @@ def test_driver_run_handles_no_tasks() -> None:
 
 def test_driver_run_handles_none_station_on_task() -> None:
     """Test that driver run() handles tasks with None station"""
-    env = simpy.Environment()
+    env = SimulationEnvironment()
     Driver.env = env
     driver = Driver(driver_id=1, position=Position([0.0, 0.0]), shift=DEFAULT_SHIFT)
 

@@ -23,14 +23,14 @@ SOFTWARE.
 """
 
 import pytest
-import simpy
+from sim.core.simulation_environment import SimulationEnvironment
 from sim.entities.vehicle import Vehicle
 from sim.entities.driver import Driver
 from sim.entities.position import Position
 from sim.entities.shift import Shift
 
 # Ensure Driver has a default environment for initialization in this module
-Driver.env = simpy.Environment()
+Driver.env = SimulationEnvironment()
 
 
 class TestVehicle:
@@ -40,8 +40,8 @@ class TestVehicle:
         return Position([-73.5673, 45.5017])
 
     @pytest.fixture
-    def simpy_env(self) -> simpy.Environment:
-        return simpy.Environment()
+    def simpy_env(self) -> SimulationEnvironment:
+        return SimulationEnvironment()
 
     @pytest.fixture
     def default_shift(self) -> Shift:

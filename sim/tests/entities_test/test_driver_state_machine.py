@@ -22,11 +22,11 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 """
 
-import simpy
 import time
 import pytest
 from unittest.mock import Mock
 
+from sim.core.simulation_environment import SimulationEnvironment
 from sim.entities.driver import Driver, DriverState
 from sim.entities.position import Position
 from sim.entities.shift import Shift
@@ -77,7 +77,7 @@ def test_off_shift_transitions_to_pending_when_within_two_hours(
     fake_time: MockClock,
 ) -> None:
     """Driver in OFF_SHIFT moves to PENDING_SHIFT when start is within 2 hours."""
-    env = simpy.Environment()
+    env = SimulationEnvironment()
     Driver.env = env
     # Start within 2 hours (3600s), end later
     shift = make_shift(sim_start=3600, sim_end=20000)
@@ -99,7 +99,7 @@ def test_off_shift_stays_off_when_start_far_away(
     fake_time: MockClock,
 ) -> None:
     """Driver remains OFF_SHIFT when start time is more than 2 hours away."""
-    env = simpy.Environment()
+    env = SimulationEnvironment()
     Driver.env = env
     # Start far ahead (100000s), end later
     shift = make_shift(sim_start=100000, sim_end=200000)
@@ -119,7 +119,7 @@ def test_idle_heads_to_hq_near_shift_end(
     fake_time: MockClock,
 ) -> None:
     """Driver in IDLE heads to HQ when close to shift end (buffer applies)."""
-    env = simpy.Environment()
+    env = SimulationEnvironment()
     Driver.env = env
     # End soon so buffer triggers immediately
     shift = make_shift(sim_start=0, sim_end=1000)
@@ -148,7 +148,7 @@ def test_idle_enters_lunch_break_during_window(
     fake_time: MockClock,
 ) -> None:
     """Driver in IDLE enters ON_BREAK when current time is within lunch window."""
-    env = simpy.Environment()
+    env = SimulationEnvironment()
     Driver.env = env
     # Lunch at current time (0) so window condition is met immediately
     shift = make_shift(sim_start=0, sim_end=50000, sim_lunch=0)
