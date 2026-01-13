@@ -86,6 +86,7 @@ export type SimulationContextType = {
   speedRef: React.RefObject<Speed>;
   stationsRef: React.RefObject<Map<number, Station>>;
   driversRef: React.RefObject<Map<number, Driver>>;
+  vehiclesRef: React.RefObject<Map<number, Vehicle>>;
   resourceBarElement: ResourceBarElement;
   selectedItem: SelectedItemBarElement | null;
   selectItem: (type: SelectedItemType, id: number) => void;
@@ -543,10 +544,17 @@ export const SimulationProvider = ({
     setResourceBarElement(
       Array.from(driversRef.current.values())
         .filter((driver) => driver.vehicleId !== null)
-        .map((resource) => ({
-          id: resource.id,
-          taskCount: resource.taskIds.length,
-        }))
+        .map((resource) => {
+          const vehicle = vehiclesRef.current.get(resource.vehicleId!);
+
+          return {
+            id: resource.id,
+            name: resource.name,
+            taskCount: resource.taskIds.length,
+            batteryCount: vehicle!.batteryCount,
+            batteryCapacity: vehicle!.batteryCapacity,
+          };
+        })
     );
   };
 
@@ -840,6 +848,7 @@ export const SimulationProvider = ({
         speedRef,
         stationsRef,
         driversRef,
+        vehiclesRef,
         resourceBarElement,
         selectedItem,
         selectItem,
