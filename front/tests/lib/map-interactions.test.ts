@@ -44,7 +44,7 @@ test('setupMapClickHandlers registers event listeners', () => {
   setupMapClickHandlers(mockMap, onItemSelect);
 
   // Should register 1 click + 10 cursor listeners (6 layers * 2 events)
-  expect(mockMap.on).toHaveBeenCalledTimes(13);
+  expect(mockMap.on).toHaveBeenCalledTimes(15);
   expect(mockMap.on).toHaveBeenCalledWith('click', expect.any(Function));
   expect(mockMap.on).toHaveBeenCalledWith(
     'mouseenter',

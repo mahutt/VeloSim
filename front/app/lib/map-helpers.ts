@@ -36,6 +36,7 @@ export enum MapSource {
 export enum MapLayer {
   Headquarters = 'headquarters',
   Stations = 'stations',
+  StationCircle = 'station-circle',
   StationTaskCounts = 'station-task-counts',
   Resources = 'resources',
   RouteNextTask = 'route-next-task',
@@ -161,11 +162,31 @@ export function setMapLayers(map: mapboxgl.Map) {
     },
   });
 
+  // red circles for stations zoomed out
+  map.addLayer({
+    id: 'station-circle',
+    type: 'circle',
+    source: MapSource.Stations,
+    paint: {
+      'circle-radius': [
+        'interpolate',
+        ['linear'],
+        ['get', 'taskCount'],
+        0,
+        2, // no tasks = 2px radius
+        10,
+        5, // 10+ tasks = 5px radius
+      ],
+      'circle-color': '#EE3124',
+    },
+    maxzoom: 13,
+  });
+
   // Add layers for stations
   map.addLayer({
     id: MapLayer.Stations,
     type: 'symbol',
-    source: 'stations',
+    source: MapSource.Stations,
     layout: {
       'icon-image': [
         'case',
@@ -176,27 +197,28 @@ export function setMapLayers(map: mapboxgl.Map) {
         'station-marker',
       ],
       'icon-allow-overlap': true,
+      'icon-size': ['interpolate', ['linear'], ['zoom'], 10, 0.4, 15, 1.0],
     },
+    minzoom: 13,
   });
 
   // Add task count labels above stations
   map.addLayer({
     id: MapLayer.StationTaskCounts,
     type: 'symbol',
-    source: 'stations',
+    source: MapSource.Stations,
     layout: {
       'text-field': ['get', 'taskCount'],
       'text-font': ['Open Sans Bold', 'Arial Unicode MS Bold'],
-      'text-size': 12,
+      'text-size': ['interpolate', ['linear'], ['zoom'], 10, 5, 15, 12],
       'text-offset': [0, -2],
       'text-anchor': 'bottom',
       'text-allow-overlap': true,
     },
     paint: {
-      'text-color': '#ffffff',
-      'text-halo-color': '#000000',
-      'text-halo-width': 2,
+      'text-color': '#000000',
     },
+    minzoom: 13,
   });
 
   // Add layer for headquarters
@@ -207,6 +229,7 @@ export function setMapLayers(map: mapboxgl.Map) {
     layout: {
       'icon-image': 'hq-marker',
       'icon-allow-overlap': true,
+      'icon-size': ['interpolate', ['linear'], ['zoom'], 10, 0.5, 13, 1.0],
     },
   });
 
@@ -214,7 +237,7 @@ export function setMapLayers(map: mapboxgl.Map) {
   map.addLayer({
     id: MapLayer.Resources,
     type: 'symbol',
-    source: 'resources',
+    source: MapSource.Resources,
     layout: {
       'icon-image': [
         'case',
@@ -225,6 +248,7 @@ export function setMapLayers(map: mapboxgl.Map) {
         'resource-marker',
       ],
       'icon-allow-overlap': true,
+      'icon-size': ['interpolate', ['linear'], ['zoom'], 10, 0.5, 13, 1.0],
     },
   });
 }
