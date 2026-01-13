@@ -800,6 +800,11 @@ class Driver:
             self.state = DriverState.HEADING_TO_HQ
             return self.state
 
+        # After all checks pass, check if it's a resume case
+        # and keep what was persisted.
+        if self.state is not None and self.state != DriverState.OFF_SHIFT:
+            return self.state
+
         # Has vehicle and batteries; if tasks exist, start from IDLE
         # Run loop will select and dispatch next task.
         self.state = DriverState.IDLE
@@ -858,7 +863,7 @@ class Driver:
             ):
                 self.set_state(DriverState.SERVICING_STATION)
                 return
-            if task_station is not None and not self.current_route:
+            if task_station is not None:
                 yield self.env.process(self.travel_to(task_station.get_position()))
                 self.set_state(DriverState.SERVICING_STATION)
                 return

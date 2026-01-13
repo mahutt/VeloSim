@@ -32,6 +32,7 @@ from back.schemas import (
     PlaybackSpeedResponse,
     SimulationPlaybackStatus,
 )
+from sim.core.simulation_environment import SimulationEnvironment
 from sim.simulator import Simulator
 from sim.entities.inputParameters import InputParameter
 from back.crud import sim_instance_crud, user_crud
@@ -223,17 +224,22 @@ class SimulationService:
 
         input_params = parse_tuple[0]
         map_controller = parse_tuple[1]
-
+        current_sim_time = parse_tuple[2]
         sim = self.simulator
 
         keyframe_subscriber = KeyframePersistenceSubscriber(db_sim.id)
         keyframe_subscriber.start()
+
+        env = SimulationEnvironment()
+
+        env.run(until=current_sim_time + input_params.start_time)
 
         restore_sim_id = sim.initialize(
             input_params,
             subscribers=[keyframe_subscriber],
             run_id=sim_id,
             map_controller=map_controller,
+            env=env,
         )
 
         self.active_simulations[restore_sim_id] = ActiveSimulationData(

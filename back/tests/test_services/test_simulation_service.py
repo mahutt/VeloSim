@@ -387,11 +387,18 @@ class TestSimulationService:
         test_user: User,
         simulation_service: SimulationService,
     ) -> None:
-        """Sim UUID not in active_simulations raises ItemNotFoundError."""
+        """Inactive simulation attempts restore and fails authorization."""
+
         mock_user_crud.get.return_value = test_user
 
+        # Sim exists in DB but belongs to another user
+        foreign_sim = Mock()
+        foreign_sim.user_id = 999
+        mock_sim_crud.get_by_uuid.return_value = foreign_sim
+
         with pytest.raises(
-            ItemNotFoundError, match="Simulation .* is not currently active"
+            VelosimPermissionError,
+            match="Unauthorized to restore simulation",
         ):
             simulation_service.verify_access(
                 mock_db, "nonexistent-sim-id", test_user.id
@@ -636,10 +643,18 @@ class TestSimulationService:
         test_user: User,
         simulation_service: SimulationService,
     ) -> None:
-        """Test error when sim_id not in active_simulations."""
+        """Starting an inactive simulation triggers restore authorization failure."""
+
         mock_user_crud.get.return_value = test_user
 
-        with pytest.raises(ItemNotFoundError):
+        foreign_sim = Mock()
+        foreign_sim.user_id = 999
+        mock_sim_crud.get_by_uuid.return_value = foreign_sim
+
+        with pytest.raises(
+            VelosimPermissionError,
+            match="Unauthorized to restore simulation",
+        ):
             simulation_service.start_simulation(
                 mock_db, "nonexistent-sim", test_user.id
             )

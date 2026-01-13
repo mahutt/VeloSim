@@ -65,6 +65,7 @@ class Simulator:
         sim_behaviour: SimBehaviour = SimBehaviour(),
         run_id: str | None = None,
         map_controller: MapController | None = None,
+        env: SimulationEnvironment | None = None,
     ) -> str:
         """Initialize a simulation instance without starting the simulation loop.
 
@@ -97,7 +98,10 @@ class Simulator:
         for sub in subscribers:
             emitter.attach(sub)
 
-        env = SimulationEnvironment()
+        if env is None:
+            env = SimulationEnvironment()
+        else:
+            env = env
 
         simController = SimulatorController(
             simEnv=env,

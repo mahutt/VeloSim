@@ -42,6 +42,17 @@ STATE_MAP = {
     "closed": State.CLOSED,
 }
 
+DRIVER_STATE_MAP = {
+    "off_shift": DriverState.OFF_SHIFT,
+    "pending_shift": DriverState.PENDING_SHIFT,
+    "idle": DriverState.IDLE,
+    "on_route": DriverState.ON_ROUTE,
+    "servicing_station": DriverState.SERVICING_STATION,
+    "on_break": DriverState.ON_BREAK,
+    "heading_to_hq": DriverState.HEADING_TO_HQ,
+    "restocking": DriverState.RESTOCKING_BATTERIES,
+}
+
 
 class ReplayParser:
     """
@@ -67,7 +78,7 @@ class ReplayParser:
 
         elif len(parts) == 3:
             day_part, hour_str, minute_str = parts
-            days = int(day_part.replace("day", ""))
+            days = int(day_part.replace("day", "")) - 1
             hours = int(hour_str)
             minutes = int(minute_str)
 
@@ -81,7 +92,7 @@ class ReplayParser:
         cls,
         scenario_json: dict,
         keyframe_json: dict,
-    ) -> tuple[InputParameter, MapController]:
+    ) -> tuple[InputParameter, MapController, int]:
         """
         Reconstruct simulation input parameters from scenario and keyframe data.
 
@@ -98,12 +109,16 @@ class ReplayParser:
                 - The MapController used for route reconstruction.
         """
 
+        scenario_end = cls._time_str_to_seconds(scenario_json["end_time"])
+
+        current_sim = int(keyframe_json["clock"]["simSecondsPassed"])
+
         input_param = InputParameter(
             station_entities={},
             driver_entities={},
             vehicle_entities={},
             task_entities={},
-            sim_time=keyframe_json["clock"]["simSecondsPassed"],
+            sim_time=scenario_end,
             start_time=keyframe_json["clock"]["startTime"],
         )
 
@@ -149,11 +164,22 @@ class ReplayParser:
                     end = Position([coordinates[-1][0], coordinates[-1][1]])
                     route = map_controller.get_route(a=start, b=end)
 
+            shift_data = d.get("shift")
+
+            shift = Shift(
+                start_time=shift_data["startTime"],
+                end_time=shift_data["endTime"],
+                lunch_break=shift_data.get("lunchBreak"),
+                sim_start_time=shift_data["startTime"],
+                sim_end_time=shift_data["endTime"],
+                sim_lunch_break=shift_data.get("lunchBreak"),
+            )
+
             driver = Driver(
                 driver_id=d["id"],
                 position=Position(d["position"]),
                 route=route,
-                shift=Shift(1, 1, 1, 1, 1),
+                shift=shift,
             )
 
             driver.set_map_controller(map_controller)
@@ -207,10 +233,12 @@ class ReplayParser:
             if in_progress_id is not None:
                 task = tasks_by_id[in_progress_id]
                 task.set_state(State.IN_PROGRESS)
-                driver.state = DriverState.SERVICING_STATION
-            elif driver.get_task_count() > 0:
-                driver.state = DriverState.ON_ROUTE
-            else:
-                driver.state = DriverState.IDLE
 
-        return input_param, map_controller
+            state_str = d.get("state")
+            if state_str:
+                state_key = state_str.lower()
+                if state_key not in DRIVER_STATE_MAP:
+                    raise ValueError(f"Unknown driver state: {state_str}")
+                driver.set_state(DRIVER_STATE_MAP[state_key])
+
+        return input_param, map_controller, current_sim

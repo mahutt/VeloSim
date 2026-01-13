@@ -120,12 +120,15 @@ class SimulationDataService:
         """
         sim_instance = db.query(SimInstance).filter(SimInstance.uuid == sim_id).first()
 
+        if sim_instance:
+            current_id = str(sim_instance.id)
+
         if not sim_instance:
             raise ItemNotFoundError(f"Simulation instance with UUID {sim_id} not found")
 
         keyframe = sim_keyframe_crud.get_last_keyframe(
             db,
-            sim_id,
+            sim_instance_id=current_id,
         )
 
         if not keyframe:
