@@ -31,13 +31,16 @@ from pydantic import (
     model_validator,
     field_validator,
     ConfigDict,
+    ValidationInfo,
 )
 
+from sim.entities.headquarters import Headquarters
 from sim.entities.inputParameters import InputParameter
 from sim.entities.station import Station
 from sim.entities.driver import Driver
 from sim.entities.vehicle import Vehicle
 from sim.entities.BatterySwapTask import BatterySwapTask
+from sim.entities.shift import Shift
 from sim.entities.position import Position
 from sim.utils.base_parse_strategy import BaseParseStrategy
 
@@ -45,8 +48,6 @@ from sim.utils.base_parse_strategy import BaseParseStrategy
 # ==============================================================================
 # Pydantic Validation Models
 # ==============================================================================
-
-DEFAULT_VEHICLE_POSITION: List[float] = [-73.57314, 45.50137]
 
 # Greater Montreal Area coordinate bounds for scenario validation.
 # All coordinates should respect these boundaries, given the project scope.
@@ -56,6 +57,28 @@ GREATER_MONTREAL_COORDINATES: Dict[str, float] = {
     "lon_min": -74.26000,  # Western Boundary
     "lon_max": -73.22000,  # Eastern Boundary
 }
+
+
+def _to_seconds(time_str: str) -> int:
+    """Convert 'dayX:HH:MM' to total seconds from simulation start.
+
+    Assumes input has already been validated by _validate_day_time_format.
+
+    Args:
+        time_str: Time in format 'dayX:HH:MM'.
+
+    Returns:
+        Total seconds since simulation start.
+    """
+    daytime_split = time_str.split(":", 1)
+    day = daytime_split[0]
+    time = daytime_split[1]
+
+    day_match = re.match(r"^day(\d+)$", day, re.IGNORECASE)
+    day_int = int(day_match.group(1)) - 1  # type: ignore
+
+    t = datetime.strptime(time, "%H:%M")
+    return (day_int * 24) * 3600 + t.hour * 3600 + t.minute * 60
 
 
 def _validate_day_time_format(time_value: Any) -> str:
@@ -205,6 +228,56 @@ class ShiftValidator(BaseModel):
             return _validate_day_time_format(v)
         else:
             raise ValueError(f"Time must be a string or None, got {type(v)}")
+
+    @field_validator("end_time", mode="after")
+    @classmethod
+    def end_after_start(cls, v: str, info: ValidationInfo) -> str:
+        """Ensure end_time is strictly after start_time.
+
+        Args:
+            v: End time string in format "dayX:HH:MM".
+            info: Pydantic validation context containing start_time.
+
+        Returns:
+            The validated end time string.
+
+        Raises:
+            ValueError: If end_time is not strictly after start_time.
+        """
+        start = info.data.get("start_time")
+        if isinstance(start, str):
+            if _to_seconds(v) <= _to_seconds(start):
+                raise ValueError("end_time must be after start_time")
+        return v
+
+    @field_validator("lunch_break", mode="after")
+    @classmethod
+    def lunch_within_shift(
+        cls, v: Optional[str], info: ValidationInfo
+    ) -> Optional[str]:
+        """Ensure lunch_break, if provided, is within the shift interval.
+
+        Args:
+            v: Optional lunch break string in format "dayX:HH:MM".
+            info: Pydantic validation context containing start_time and end_time.
+
+        Returns:
+            The validated lunch break string if provided, otherwise None.
+
+        Raises:
+            ValueError: If lunch_break is not between start_time and end_time.
+        """
+        if v is None:
+            return v
+        start = info.data.get("start_time")
+        end = info.data.get("end_time")
+        if isinstance(start, str) and isinstance(end, str):
+            lunch_s = _to_seconds(v)
+            start_s = _to_seconds(start)
+            end_s = _to_seconds(end)
+            if not (start_s < lunch_s < end_s):
+                raise ValueError("lunch_break must be between start_time and end_time")
+        return v
 
 
 class DriverValidator(BaseModel):
@@ -1036,41 +1109,91 @@ class JsonParseStrategy(BaseParseStrategy):
                 stations[station_id].add_task(tasks[tid])
 
         # Build Vehicles and Drivers
-        # For now, a driver must have a vehicle to drive and
-        # vice versa, to be added to the sim. Excess of either are discarded
-        vehicles: Dict[int, Vehicle] = {}
         drivers: Dict[int, Driver] = {}
-        drivers_from_scenario = content.get("drivers", [])
+        vehicles: Dict[int, Vehicle] = {}
+
+        # Drivers first
+        scenario_drivers = content.get("drivers", [])
+        for scenario_driver in scenario_drivers:
+            shift = scenario_driver.get("shift")
+            st = self._time_to_seconds(str(shift.get("start_time")))
+            sim_st = st - start_time
+            et = self._time_to_seconds(str(shift.get("end_time")))
+            sim_et = et - start_time
+            lt = shift.get("lunch_break", None)
+            if lt is not None:
+                lt = self._time_to_seconds(str(lt))
+                sim_lt = lt - start_time
+            else:
+                sim_lt = None
+            driver_shift = Shift(
+                start_time=st,
+                end_time=et,
+                lunch_break=lt,
+                sim_start_time=sim_st,
+                sim_end_time=sim_et,
+                sim_lunch_break=sim_lt,
+            )
+
+            did = driver_id_counter
+            driver_id_counter += 1
+
+            drivers[did] = Driver(
+                driver_id=did,
+                # TODO: make driver position snap to road
+                # next to HQ, instead of HQ itself
+                position=Headquarters.position,
+                task_list=[],
+                vehicle=None,
+                shift=driver_shift,
+            )
+
+        # Collect references to drivers to that are on-shift at simulation start
+        on_shift_drivers: List[Driver] = []
+        for driver in drivers.values():
+            if driver.shift.start_time <= start_time < driver.shift.end_time:
+                on_shift_drivers.append(driver)
+
+        # Logical constraint: For every vehicle with a specified position,
+        # there must be a driver that is on-shift at simulation start.
+        # All vehicles without a specified position start at HQ, ready for assignment.
+        # All remaining drivers that are on-shift at simulation start, start idle at HQ.
+
         # Global max battery_capacity value (will be per instance in R3)
         max_battery_count = int(content.get("vehicle_battery_capacity", 50))
-        for v in content.get("vehicles", []):
-            vid = vehicle_id_counter
+        scenario_vehicles = content.get("vehicles", [])
+        for scenario_vehicle in scenario_vehicles:
+            scenario_vehicle_position = scenario_vehicle.get("position")
+            vehicle_id = vehicle_id_counter
             vehicle_id_counter += 1
-            battery_count = int(v.get("battery_count", 0))
-            vehicles[vid] = Vehicle(
-                vehicle_id=vid,
+            battery_count = int(scenario_vehicle.get("battery_count", 0))
+
+            vehicles[vehicle_id] = Vehicle(
+                vehicle_id=vehicle_id,
                 battery_count=battery_count,
                 max_battery_count=max_battery_count,
             )
-            # Match as many drivers and vehicles as possible.
-            try:
-                # Pop next driver from scenario (details unused here)
-                drivers_from_scenario.pop(0)
-                did = driver_id_counter
-                driver_id_counter += 1
-                pos = v.get("position")
-                if pos:
-                    pos = Position(pos)
-                else:
-                    pos = Position(DEFAULT_VEHICLE_POSITION)
-                drivers[did] = Driver(
-                    driver_id=did, position=pos, task_list=[], vehicle=vehicles[vid]
+
+            if scenario_vehicle_position is None:
+                continue
+
+            if not on_shift_drivers:
+                raise ScenarioParseError(
+                    [
+                        {
+                            "field": f"vehicles[{vehicle_id - 1}].position",
+                            "message": (
+                                "No available drivers on-shift at simulation start "
+                                "for vehicle with specified position."
+                            ),
+                        }
+                    ]
                 )
-                vehicles[vid].set_driver(drivers[did])
-            except IndexError:
-                # We currently only consider driver and vehicle pairs.
-                # Excess drivers/vehicles are currently ignored
-                break
+
+            on_shift_driver = on_shift_drivers.pop(0)
+            on_shift_driver.position = Position(scenario_vehicle_position)
+            on_shift_driver.vehicle = vehicles[vehicle_id]
+            vehicles[vehicle_id].set_driver(on_shift_driver)
 
         params = InputParameter(
             station_entities=stations,

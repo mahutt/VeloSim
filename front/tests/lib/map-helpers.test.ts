@@ -38,7 +38,7 @@ import type { Position } from '~/types';
 test('loadMapImages loads all necessary images', () => {
   MockMap.createRandomInstance();
   loadMapImages(MockMap.instance! as unknown as mapboxgl.Map);
-  expect(MockMap.instance?.loadImage).toHaveBeenCalledTimes(6);
+  expect(MockMap.instance?.loadImage).toHaveBeenCalledTimes(7);
   expect(MockMap.instance?.loadImage).toHaveBeenCalledWith(
     '/station.png',
     expect.any(Function)
@@ -81,7 +81,7 @@ test('setMapLayers adds stations layer with correct configuration', () => {
   MockMap.createRandomInstance();
   setMapLayers(MockMap.instance! as unknown as mapboxgl.Map);
 
-  expect(MockMap.instance?.addLayer).toHaveBeenCalledTimes(5);
+  expect(MockMap.instance?.addLayer).toHaveBeenCalledTimes(6);
   expect(MockMap.instance?.addLayer).toHaveBeenCalledWith({
     id: 'stations',
     type: 'symbol',
@@ -143,7 +143,7 @@ test('loadMapImages handles image loading with async callbacks', async () => {
   // Wait for async callbacks
   await new Promise((resolve) => setTimeout(resolve, 10));
 
-  expect(MockMap.instance?.loadImage).toHaveBeenCalledTimes(6);
+  expect(MockMap.instance?.loadImage).toHaveBeenCalledTimes(7);
 });
 
 test('setMapSource updates source data correctly', () => {
@@ -201,8 +201,8 @@ test('loadMapImages successfully adds images when loaded', () => {
 
   loadMapImages(MockMap.instance! as unknown as mapboxgl.Map);
 
-  expect(MockMap.instance?.loadImage).toHaveBeenCalledTimes(6);
-  expect(MockMap.instance?.addImage).toHaveBeenCalledTimes(6);
+  expect(MockMap.instance?.loadImage).toHaveBeenCalledTimes(7);
+  expect(MockMap.instance?.addImage).toHaveBeenCalledTimes(7);
   expect(MockMap.instance?.addImage).toHaveBeenCalledWith(
     'station-marker',
     mockImage
@@ -239,7 +239,7 @@ test('loadMapImages handles image load failure gracefully', () => {
 
   loadMapImages(MockMap.instance! as unknown as mapboxgl.Map);
 
-  expect(MockMap.instance?.loadImage).toHaveBeenCalledTimes(6);
+  expect(MockMap.instance?.loadImage).toHaveBeenCalledTimes(7);
   // Should not call addImage if loadImage fails
   expect(MockMap.instance?.addImage).not.toHaveBeenCalled();
 });

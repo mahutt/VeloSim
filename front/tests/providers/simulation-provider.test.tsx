@@ -71,16 +71,14 @@ import { MapProvider } from '~/providers/map-provider';
 import { TaskAssignmentProvider } from '~/providers/task-assignment-provider';
 import { MockMap } from 'tests/mocks';
 import MapContainer from '~/components/map/map-container';
-import {
-  type BackendPayload,
-  type UseSimulationWebSocketOptions,
-} from '~/types';
+import { type UseSimulationWebSocketOptions } from '~/types';
 import {
   logSimulationError,
   logMissingEntityError,
 } from '~/utils/simulation-error-utils';
 import api from '~/api';
 import { SelectedItemType } from '~/components/map/selected-item-bar';
+import { makePayload } from 'tests/test-helpers';
 
 // Mock the API module
 vi.mock('~/api', () => {
@@ -445,7 +443,7 @@ test('assignTask posts to API and updates resource taskIds', async () => {
         position: [0, 0],
         taskIds: [],
         inProgressTaskId: null,
-        vehicleId: null,
+        vehicleId: 1,
       });
     }, []);
 
@@ -571,14 +569,14 @@ test('reassignTask posts to API and moves task between resources', async () => {
         position: [0, 0],
         taskIds: [123],
         inProgressTaskId: null,
-        vehicleId: null,
+        vehicleId: 1,
       });
       driversRef.current.set(2, {
         id: 2,
         position: [0, 0],
         taskIds: [],
         inProgressTaskId: null,
-        vehicleId: null,
+        vehicleId: 1,
       });
     }, []);
 
@@ -657,20 +655,17 @@ test('sets clock time and day from initial frame payload', async () => {
   });
 
   await act(async () => {
-    wsOptions?.onInitialFrame?.({
-      simId: 'test-sim-123',
-      clock: {
-        simSecondsPassed: 3661,
-        simMinutesPassed: 61,
-        realSecondsPassed: 3661,
-        realMinutesPassed: 61,
-        startTime: 0,
-      },
-      drivers: [],
-      vehicles: [],
-      stations: [],
-      tasks: [],
-    } as BackendPayload);
+    wsOptions?.onInitialFrame?.(
+      makePayload({
+        clock: {
+          simSecondsPassed: 3661,
+          simMinutesPassed: 61,
+          realSecondsPassed: 3661,
+          realMinutesPassed: 61,
+          startTime: 0,
+        },
+      })
+    );
   });
 
   await waitFor(() => {
@@ -700,37 +695,31 @@ test('advances to next day when sim time crosses 24h', async () => {
   });
 
   await act(async () => {
-    wsOptions?.onInitialFrame?.({
-      simId: 'test-sim-123',
-      clock: {
-        simSecondsPassed: 86399,
-        simMinutesPassed: 1439,
-        realSecondsPassed: 86399,
-        realMinutesPassed: 1439,
-        startTime: 0,
-      },
-      drivers: [],
-      vehicles: [],
-      stations: [],
-      tasks: [],
-    } as BackendPayload);
+    wsOptions?.onInitialFrame?.(
+      makePayload({
+        clock: {
+          simSecondsPassed: 86399,
+          simMinutesPassed: 1439,
+          realSecondsPassed: 86399,
+          realMinutesPassed: 1439,
+          startTime: 0,
+        },
+      })
+    );
   });
 
   await act(async () => {
-    wsOptions?.onFrameUpdate?.({
-      simId: 'test-sim-123',
-      clock: {
-        simSecondsPassed: 90061,
-        simMinutesPassed: 1501,
-        realSecondsPassed: 90061,
-        realMinutesPassed: 1501,
-        startTime: 0,
-      },
-      drivers: [],
-      vehicles: [],
-      stations: [],
-      tasks: [],
-    } as BackendPayload);
+    wsOptions?.onFrameUpdate?.(
+      makePayload({
+        clock: {
+          simSecondsPassed: 90061,
+          simMinutesPassed: 1501,
+          realSecondsPassed: 90061,
+          realMinutesPassed: 1501,
+          startTime: 0,
+        },
+      })
+    );
   });
 
   await waitFor(() => {
@@ -760,20 +749,17 @@ test('defaults to 00:00 day 1 for negative sim time', async () => {
   });
 
   await act(async () => {
-    wsOptions?.onInitialFrame?.({
-      simId: 'test-sim-123',
-      clock: {
-        simSecondsPassed: -5,
-        simMinutesPassed: -1,
-        realSecondsPassed: -5,
-        realMinutesPassed: -1,
-        startTime: 0,
-      },
-      drivers: [],
-      vehicles: [],
-      stations: [],
-      tasks: [],
-    } as BackendPayload);
+    wsOptions?.onInitialFrame?.(
+      makePayload({
+        clock: {
+          simSecondsPassed: -5,
+          simMinutesPassed: -1,
+          realSecondsPassed: -5,
+          realMinutesPassed: -1,
+          startTime: 0,
+        },
+      })
+    );
   });
 
   await waitFor(() => {
@@ -803,20 +789,17 @@ test('displays time correctly with scenario start_time (08:00)', async () => {
   });
 
   await act(async () => {
-    wsOptions?.onInitialFrame?.({
-      simId: 'test-sim-123',
-      clock: {
-        simSecondsPassed: 0,
-        simMinutesPassed: 0,
-        realSecondsPassed: 0,
-        realMinutesPassed: 0,
-        startTime: 28800,
-      },
-      drivers: [],
-      vehicles: [],
-      stations: [],
-      tasks: [],
-    } as BackendPayload);
+    wsOptions?.onInitialFrame?.(
+      makePayload({
+        clock: {
+          simSecondsPassed: 0,
+          simMinutesPassed: 0,
+          realSecondsPassed: 0,
+          realMinutesPassed: 0,
+          startTime: 28800,
+        },
+      })
+    );
   });
 
   await waitFor(() => {
@@ -846,20 +829,17 @@ test('advances time correctly with start_time', async () => {
   });
 
   await act(async () => {
-    wsOptions?.onInitialFrame?.({
-      simId: 'test-sim-123',
-      clock: {
-        simSecondsPassed: 7200,
-        simMinutesPassed: 120,
-        realSecondsPassed: 7200,
-        realMinutesPassed: 120,
-        startTime: 28800,
-      },
-      drivers: [],
-      vehicles: [],
-      stations: [],
-      tasks: [],
-    } as BackendPayload);
+    wsOptions?.onInitialFrame?.(
+      makePayload({
+        clock: {
+          simSecondsPassed: 7200,
+          simMinutesPassed: 120,
+          realSecondsPassed: 7200,
+          realMinutesPassed: 120,
+          startTime: 28800,
+        },
+      })
+    );
   });
 
   await waitFor(() => {
@@ -1203,7 +1183,7 @@ test('reorderTasks posts to API and updates resource task order', async () => {
         position: [0, 0],
         taskIds: [10, 20, 30],
         inProgressTaskId: null,
-        vehicleId: null,
+        vehicleId: 1,
       });
     }, []);
 
@@ -1418,7 +1398,7 @@ test('reorderTasks updates resourceBarElement and triggers map updates', async (
         position: [0, 0],
         taskIds: [10, 20, 30],
         inProgressTaskId: null,
-        vehicleId: null,
+        vehicleId: 1,
       });
     }, []);
 

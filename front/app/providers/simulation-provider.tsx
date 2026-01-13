@@ -42,10 +42,12 @@ import {
   type Position,
   type Driver,
   type Route,
+  type Headquarters,
 } from '~/types';
 import {
   adaptStationsToGeoJSON,
   adaptResourcesToGeoJSON,
+  adaptHeadquartersToGeoJSON,
 } from '~/lib/geojson-adapters';
 import {
   setupMapClickHandlers,
@@ -130,6 +132,7 @@ export const SimulationProvider = ({
   const mapUpdateRafIdRef = useRef<number | null>(null);
 
   // (TOTAL) NON-REACTIVE SIMULATION ENTITY STATE
+  const headquartersRef = useRef<Headquarters | null>(null);
   const stationsRef = useRef<Map<number, Station>>(new Map());
   const driversRef = useRef<Map<number, Driver>>(new Map());
   const tasksRef = useRef<Map<number, StationTask>>(new Map());
@@ -329,6 +332,9 @@ export const SimulationProvider = ({
     // Flags:
     let shouldUpdateReactiveResources = false;
 
+    // Update headquarters (currently happens every frame)
+    headquartersRef.current = payload.headquarters;
+
     // Update tasks that appear in the payload
     if (payload.tasks && payload.tasks.length > 0) {
       payload.tasks.forEach((task) => {
@@ -379,7 +385,7 @@ export const SimulationProvider = ({
     }
   };
 
-  // Helper function to update all map sources (stations, resources, and routes)
+  // Helper function to update all map sources (hq, stations, resources, and routes)
   const updateMapSources = (
     selectedStationId?: number,
     selectedResourceId?: number
@@ -399,6 +405,12 @@ export const SimulationProvider = ({
       return;
     }
 
+    // Update headquarters
+    if (headquartersRef.current) {
+      const geojson = adaptHeadquartersToGeoJSON(headquartersRef.current);
+      setMapSource(MapSource.Headquarters, geojson, map);
+    }
+
     // Update stations
     if (stationsRef.current.size > 0) {
       const stations = Array.from(stationsRef.current.values());
@@ -410,9 +422,11 @@ export const SimulationProvider = ({
       setMapSource(MapSource.Stations, geojson, map);
     }
 
-    // Update resources
+    // Update resources - drivers with an assigned vehicle
     if (driversRef.current.size > 0) {
-      const resources = Array.from(driversRef.current.values());
+      const resources = Array.from(driversRef.current.values()).filter(
+        (driver) => driver.vehicleId !== null
+      );
       const geojson = adaptResourcesToGeoJSON(
         resources,
         selectedResourceId,
@@ -432,6 +446,8 @@ export const SimulationProvider = ({
           route.nextTaskEndIndex,
           map
         );
+      } else {
+        updateRouteDisplay(null, [0, 0], 0, map);
       }
     } else {
       updateRouteDisplay(null, [0, 0], 0, map);
@@ -501,10 +517,12 @@ export const SimulationProvider = ({
 
   const updateResourceBarElement = () => {
     setResourceBarElement(
-      Array.from(driversRef.current.values()).map((resource) => ({
-        id: resource.id,
-        taskCount: resource.taskIds.length,
-      }))
+      Array.from(driversRef.current.values())
+        .filter((driver) => driver.vehicleId !== null)
+        .map((resource) => ({
+          id: resource.id,
+          taskCount: resource.taskIds.length,
+        }))
     );
   };
 

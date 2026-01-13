@@ -29,10 +29,12 @@ from unittest.mock import Mock, patch
 
 from sim.core.SimulatorController import SimulatorController
 from sim.core.frame_emitter import FrameEmitter
+from sim.core.simulation_environment import SimulationEnvironment
 from sim.entities.inputParameters import InputParameter
 from sim.entities.frame import Frame
 from sim.entities.station import Station
-from sim.entities.driver import Driver
+from sim.entities.driver import Driver, DriverState
+from sim.entities.shift import Shift
 from sim.entities.BatterySwapTask import BatterySwapTask
 from sim.entities.position import Position
 from sim.entities.task_state import State
@@ -85,8 +87,8 @@ class FakeSubscriber(Subscriber):
 
 
 @pytest.fixture()
-def env() -> simpy.Environment:
-    return simpy.Environment()
+def env() -> SimulationEnvironment:
+    return SimulationEnvironment()
 
 
 @pytest.fixture()
@@ -106,7 +108,7 @@ def frame_emitter() -> FrameEmitter:
 
 
 @pytest.fixture()
-def input_params(env: simpy.Environment) -> InputParameter:
+def input_params(env: SimulationEnvironment) -> InputParameter:
     """Create a basic InputParameter with some test entities."""
     params = InputParameter()
 
@@ -121,8 +123,29 @@ def input_params(env: simpy.Environment) -> InputParameter:
     params.add_station(station2)
 
     # Add test drivers
-    driver1 = Driver(driver_id=1, position=Position([15.0, 25.0]))
-    driver2 = Driver(driver_id=2, position=Position([35.0, 45.0]))
+    shift1 = Shift(
+        start_time=28800,
+        end_time=43200,
+        lunch_break=36000,
+        sim_start_time=28800,
+        sim_end_time=43200,
+        sim_lunch_break=36000,
+    )
+    shift2 = Shift(
+        start_time=28900,
+        end_time=43200,
+        lunch_break=38000,
+        sim_start_time=28900,
+        sim_end_time=43200,
+        sim_lunch_break=38000,
+    )
+    # Ensure Driver.env is set before creating Driver instances
+    Driver.env = env
+    driver1 = Driver(driver_id=1, position=Position([15.0, 25.0]), shift=shift1)
+    driver2 = Driver(driver_id=2, position=Position([35.0, 45.0]), shift=shift2)
+    # Stub initial state for tests that access driver.state
+    driver1.state = DriverState.IDLE
+    driver2.state = DriverState.IDLE
     params.add_driver(driver1)
     params.add_driver(driver2)
 
@@ -137,7 +160,7 @@ def input_params(env: simpy.Environment) -> InputParameter:
 
 @pytest.fixture()
 def simulator_controller(
-    env: simpy.Environment,
+    env: SimulationEnvironment,
     frame_emitter: FrameEmitter,
     input_params: InputParameter,
     fake_time: MockClock,
@@ -160,6 +183,7 @@ def simulator_controller(
             sim_behaviour=FakeSimBehaviour(),
             strict=False,
         )
+    controller.sim_time = 0
     return controller
 
 
@@ -260,6 +284,14 @@ def test_create_diff_frame(simulator_controller: SimulatorController) -> None:
     simulator_controller.station_entities[1].has_updated = True
     simulator_controller.task_entities[1].has_updated = True
     simulator_controller.driver_entities[1].has_updated = True
+    # Ensure driver is not filtered out due to off_shift state
+    driver = simulator_controller.driver_entities[1]
+    # Set a non-off-shift state so it appears in diff frames
+    driver.state = driver.get_state()  # keep current if valid
+    # Force to IDLE to satisfy diff-frame inclusion
+    from sim.entities.driver import DriverState
+
+    driver.state = DriverState.IDLE
 
     frame = simulator_controller.create_frame(is_key=False)
 
@@ -678,7 +710,7 @@ def test_start_simulation(
 
 
 def test_custom_keyframe_frequency(
-    env: simpy.Environment,
+    env: SimulationEnvironment,
     frame_emitter: FrameEmitter,
     fake_time: MockClock,
     monkeypatch: Any,
@@ -706,7 +738,7 @@ def test_custom_keyframe_frequency(
 
 
 def test_strict_mode_initialization(
-    env: simpy.Environment,
+    env: SimulationEnvironment,
     frame_emitter: FrameEmitter,
     input_params: InputParameter,
     fake_time: MockClock,

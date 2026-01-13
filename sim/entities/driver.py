@@ -24,14 +24,17 @@ SOFTWARE.
 
 import simpy
 import logging
+import random
 from enum import Enum
 
+from sim.core.simulation_environment import SimulationEnvironment
 from sim.map.MapController import MapController
 from typing import Optional, TYPE_CHECKING
 from .task_state import State
 from sim.entities.route import Route
 from typing import Generator, Any
 from .position import Position
+from .shift import Shift
 
 logger = logging.getLogger(__name__)
 
@@ -41,26 +44,42 @@ if TYPE_CHECKING:  # pragma: no cover
     from sim.behaviour.sim_behaviour import SimBehaviour
     from .vehicle import Vehicle
 
-HQ_POSITION = Position([-73.60175631192361, 45.52975346053039])
+# These constants will eventually be abstracted to logical classes,
+# Or added to a new scenario schema in R3
 FULL_RESTOCK_TIME_SEC = 1200  # 20 minutes to fully restock
+LUNCH_BREAK_DURATION = 1800  # 30 minutes for lunch
+LUNCH_DISTANCE_METERS = 1000  # Lunch location ~1km away
+METERS_PER_DEGREE = 111111  # conversion factor for lunch location calculation
+SHIFT_END_BUFFER_TIME = 1200  # Start Heading back to HQ 20 min before shifts
 
 
 class DriverState(Enum):
     """Enumaration of driver states."""
 
-    ON_SHIFT = 0  # Has tasks, but none in progress yet
-    IDLE = 1  # Waiting to be assigned a task. Does have batteries
-    IN_PROGRESS = 2  # Has a task in progress/dispatched or is servicing it
-    HEADING_TO_HQ = 3  # Is returning back to HQ
-    RESTOCKING_BATTERIES = 4  # Is in the process of restocking on batteries at HQ
+    OFF_SHIFT = 0  # Off shift
+    PENDING_SHIFT = 1  # Shift Starting soon
+    IDLE = 2  # Waiting to be assigned a task and/or vehicle. Does have batteries
+    ON_ROUTE = 3  # Traveling, specifically to a task.
+    SERVICING_STATION = 4  # Servicing a station
+    ON_BREAK = 5  # Taking a break
+    HEADING_TO_HQ = (
+        6  # Is returning back to HQ (Either off shift or going to get batteries)
+    )
+    RESTOCKING_BATTERIES = 7  # Is in the process of restocking on batteries at HQ
 
     def __str__(self) -> str:
-        if self == DriverState.ON_SHIFT:
-            return "on_shift"
+        if self == DriverState.OFF_SHIFT:
+            return "off_shift"
+        elif self == DriverState.PENDING_SHIFT:
+            return "pending_shift"
         elif self == DriverState.IDLE:
             return "idle"
-        elif self == DriverState.IN_PROGRESS:
-            return "in_progress"
+        elif self == DriverState.ON_ROUTE:
+            return "on_route"
+        elif self == DriverState.SERVICING_STATION:
+            return "servicing_station"
+        elif self == DriverState.ON_BREAK:
+            return "on_break"
         elif self == DriverState.HEADING_TO_HQ:
             return "heading_to_hq"
         elif self == DriverState.RESTOCKING_BATTERIES:
@@ -73,13 +92,15 @@ class Driver:
     map_controller: MapController
     sim_behaviour: "SimBehaviour"
     current_route: Route | None
-    env: simpy.Environment
+    env: SimulationEnvironment
     vehicle: Optional["Vehicle"]
+    shift: Shift
 
     def __init__(
         self,
         driver_id: int,
         position: "Position",  # [longitude, latitude]
+        shift: Shift,
         task_list: list["Task"] | None = None,
         vehicle: Optional["Vehicle"] = None,
     ) -> None:
@@ -88,6 +109,10 @@ class Driver:
         self.current_route = None
         self.vehicle = vehicle
         self.route_changed = False  # flag to track if route geometry needs to be sent
+        self.shift = shift
+        # Parse shift into sim shift time
+        self.lunch_location: Optional[Position] = None
+
         if task_list is not None:
             self.task_list = task_list
             for task in self.task_list:
@@ -95,15 +120,7 @@ class Driver:
         else:
             self.task_list = []
         self.has_updated = False  # flag to track if a driver was updated
-        # self.state = DriverState.ON_SHIFT  # directly on shift at creation (for now)
-        if (
-            len(self.task_list) == 0
-            and self.vehicle is not None
-            and self.vehicle.get_battery_count() != 0
-        ):
-            self.state = DriverState.IDLE
-        else:
-            self.state = DriverState.ON_SHIFT
+        self.state = DriverState.OFF_SHIFT  # Overwritten by sim controller if needed
 
     def get_position(self) -> "Position":
         """Get the current position of the driver.
@@ -121,6 +138,18 @@ class Driver:
             state: The current state of the driver.
         """
         return self.state
+
+    def set_state(self, state: DriverState) -> None:
+        """Set the driver's state and mark it as updated.
+
+        Args:
+            state: The new `DriverState` to apply.
+
+        Returns:
+            None
+        """
+        self.state = state
+        self.has_updated = True
 
     def get_vehicle(self) -> Optional["Vehicle"]:
         """Get the drivers current vehicle.
@@ -153,6 +182,26 @@ class Driver:
                 f"already assigned to driver: {current_driver.id}"
             )
         self.vehicle = vehicle
+        self.has_updated = True
+
+    def get_driver_shift(self) -> Shift:
+        """Get the driver's current shift.
+
+        Returns:
+            Shift: The driver's shift.
+        """
+        return self.shift
+
+    def set_driver_shift(self, shift: Shift) -> None:
+        """Set the driver's shift and mark it as updated.
+
+        Args:
+            shift: The Shift to associate with the driver.
+
+        Returns:
+            None
+        """
+        self.shift = shift
         self.has_updated = True
 
     def set_behaviour(self, sim_behaviour: "SimBehaviour") -> None:
@@ -215,10 +264,6 @@ class Driver:
             self.route_changed = True
             # Task state is now ASSIGNED (set by task.set_assigned_driver)
 
-            # Change state to ON_SHIFT if was waiting for a task
-            if self.state == DriverState.IDLE:
-                self.state = DriverState.ON_SHIFT
-
             # Handle dispatch scheduling
             if dispatch_delay is not None and dispatch_delay > 0:
                 # Schedule dispatch for later
@@ -263,11 +308,35 @@ class Driver:
         if task in self.task_list and task.is_assigned():
             self.task_list.remove(task)
             task.unassign_driver()
-            if self.get_task_count() == 0:
-                self.state = DriverState.IDLE
+            # if self.get_task_count() == 0:
+            #     self.state = DriverState.IDLE
 
             self.has_updated = True
             self.route_changed = True
+
+    def unassign_vehicle(self) -> None:
+        """Unassign the current vehicle from this driver.
+
+        Clears the association between the driver and its vehicle, and
+        clears the vehicle's driver reference. After unassignment, the
+        driver transitions to IDLE.
+
+        Returns:
+            None
+        """
+        if self.vehicle is not None:
+            vehicle = self.vehicle
+            # Clear driver's vehicle reference
+            self.vehicle = None
+            # Clear vehicle's driver reference (if method available)
+            if hasattr(vehicle, "unassign_driver"):
+                vehicle.unassign_driver()
+            else:
+                # Fallback in case vehicle lacks unassign_driver
+                vehicle.driver = None
+            self.env.hq.push_vehicle(vehicle)
+            # Transition to IDLE since the driver has no vehicle
+            self.has_updated = True
 
     def get_in_progress_task(self) -> Optional["Task"]:
         """Get the task currently being worked on by this driver.
@@ -310,7 +379,6 @@ class Driver:
                 or task.get_station() == task_in_progress.get_station()
             ):
                 task.set_state(State.IN_PROGRESS)
-                self.state = DriverState.IN_PROGRESS
                 self.has_updated = True
                 self.route_changed = True
             else:
@@ -338,9 +406,6 @@ class Driver:
             self.task_list.remove(task)
             battery_count = self.vehicle.use_battery()
             task.set_state(State.CLOSED)
-            self.state = (
-                DriverState.ON_SHIFT if self.get_task_count() > 0 else DriverState.IDLE
-            )
             self.has_updated = True
             self.route_changed = True
 
@@ -592,13 +657,13 @@ class Driver:
         # if driver needs to go to HQ, make HQ route the "next task"
         if include_hq:
             try:
-                route = self.map_controller.get_route(current_pos, HQ_POSITION)
+                route = self.map_controller.get_route(current_pos, self.env.hq.position)
                 segment_coords = route.get_raw_coordinates()
 
                 if segment_coords:
                     full_geometry.extend(segment_coords)
                     next_task_end_index = len(full_geometry) - 1
-                    current_pos = HQ_POSITION
+                    current_pos = self.env.hq.position
 
             except ValueError as e:
                 print(f"Driver {self.id}: Cannot get route to HQ: {e}")
@@ -648,9 +713,9 @@ class Driver:
         Returns:
             Generator that yields for travel_to process.
         """
-        self.state = DriverState.HEADING_TO_HQ
+        # self.state = DriverState.HEADING_TO_HQ
         self.route_changed = True
-        yield self.env.process(self.travel_to(HQ_POSITION))
+        yield self.env.process(self.travel_to(self.env.hq.position))
 
     def restock_vehicle_battery(self) -> Generator[Any, Any, Any]:
         """
@@ -676,68 +741,226 @@ class Driver:
                     yield self.env.timeout(interval)
                     self.vehicle.add_battery()
 
-        # continues/starts shift
-        if self.get_task_count() > 0:
-            self.state = DriverState.ON_SHIFT
-        else:  # waits for task
+        # # continues/starts shift
+        # if self.get_task_count() > 0:
+        #     self.state = DriverState.ON_SHIFT
+        # else:  # waits for task
+        #     self.state = DriverState.IDLE
+
+    def get_initial_state(self) -> DriverState:
+        """
+        Get a driver's initial state based on the time and their shift
+
+        Implemented mostly for resumability convenience.
+        A sim could start mid lunch break, near end of shift, etc.
+
+        Returns:
+            DriverState: The computed initial state for the driver.
+        """
+        current_sim_time = self.env.now
+        start_time = self.shift.get_sim_start_time()
+        end_time = self.shift.get_sim_end_time()
+        lunch_time = self.shift.get_sim_lunch_break()
+
+        # Before shift
+        if current_sim_time < start_time - 2 * 60 * 60:
+            self.state = DriverState.OFF_SHIFT
+            return self.state
+
+        # Within pending window ( 2 hours or less before start)
+        if current_sim_time < start_time:
+            self.state = DriverState.PENDING_SHIFT
+            return self.state
+
+        # Near or after shift end, wrap up by heading to HQ
+        if current_sim_time >= end_time - SHIFT_END_BUFFER_TIME:
+            self.state = DriverState.HEADING_TO_HQ
+            return self.state
+
+        # Lunch break window
+        if (
+            lunch_time is not None
+            and lunch_time <= current_sim_time < lunch_time + LUNCH_BREAK_DURATION
+        ):
+            self.state = DriverState.ON_BREAK
+            return self.state
+
+        # During shift: determine operational readiness
+        if self.vehicle is None:
+            # No vehicle assigned: remain idle
             self.state = DriverState.IDLE
+            return self.state
+
+        if self.vehicle.get_battery_count() == 0:
+            # Out of batteries: head to HQ to restock
+            self.state = DriverState.HEADING_TO_HQ
+            return self.state
+
+        # Has vehicle and batteries; if tasks exist, start from IDLE
+        # Run loop will select and dispatch next task.
+        self.state = DriverState.IDLE
+        return self.state
+
+    def _off_shift(self, current_sim_time: float) -> None:
+        """Handle OFF_SHIFT transitions."""
+        time_to_shift = self.shift.get_sim_start_time() - current_sim_time
+        if 0 < time_to_shift <= 60 * 60 * 2:
+            self.set_state(DriverState.PENDING_SHIFT)
+
+    def _pending_shift(self, current_sim_time: float) -> None:
+        """Handle PENDING_SHIFT transitions."""
+        time_to_shift = self.shift.get_sim_start_time() - current_sim_time
+        if time_to_shift <= 0:
+            self.set_state(DriverState.IDLE)
+
+    def _idle(self, current_sim_time: float) -> None:
+        """Handle IDLE transitions and task dispatch decisions."""
+        time_to_shift_end = self.shift.get_sim_end_time() - current_sim_time
+        lunch_break = self.shift.get_sim_lunch_break()
+
+        if self.vehicle is None and self.env.hq.has_vehicles():
+            vehicle_to_assign = self.env.hq.pop_vehicle()
+            if vehicle_to_assign is not None:
+                self.set_vehicle(vehicle_to_assign)
+
+        if time_to_shift_end <= SHIFT_END_BUFFER_TIME or (
+            self.vehicle is not None and self.vehicle.get_battery_count() == 0
+        ):
+            self.set_state(DriverState.HEADING_TO_HQ)
+            return
+
+        if (
+            lunch_break is not None
+            and lunch_break <= current_sim_time < lunch_break + LUNCH_BREAK_DURATION
+        ):
+            self.lunch_location = self._generate_lunch_location()
+            self.set_state(DriverState.ON_BREAK)
+            return
+
+        if self.vehicle is not None and self.get_visible_task_count() > 0:
+            next_task = self.sim_behaviour.RCNT_strategy.select_next_task(self)
+            if next_task:
+                self.dispatch_task(next_task)
+                self.set_state(DriverState.ON_ROUTE)
+                return
+
+    def _on_route(self) -> Generator[Any, None, None]:
+        """Handle ON_ROUTE travel and arrival transitions."""
+        in_progress = self.get_in_progress_task()
+        if in_progress is not None:
+            task_station = in_progress.get_station()
+            if task_station is not None and self.position.close_enough(
+                task_station.get_position()
+            ):
+                self.set_state(DriverState.SERVICING_STATION)
+                return
+            if task_station is not None and not self.current_route:
+                yield self.env.process(self.travel_to(task_station.get_position()))
+                self.set_state(DriverState.SERVICING_STATION)
+                return
+        self.set_state(DriverState.IDLE)
+
+    def _servicing_station(self) -> None:
+        """Handle SERVICING_STATION transitions."""
+        in_progress = self.get_in_progress_task()
+        if in_progress is not None:
+            self.service_task(in_progress)
+        self.set_state(DriverState.IDLE)
+
+    def _on_break(self) -> Generator[Any, None, None]:
+        # travel to lunch location
+        if self.lunch_location and not self.position.close_enough(self.lunch_location):
+            yield self.env.process(self.travel_to(self.lunch_location))
+
+        yield self.env.timeout(LUNCH_BREAK_DURATION)
+        self.set_state(DriverState.IDLE)
+
+    def _restocking_batteries(self) -> Generator[Any, None, None]:
+        """Handle RESTOCKING_BATTERIES: restock then return to IDLE."""
+        yield self.env.process(self.restock_vehicle_battery())
+        self.set_state(DriverState.IDLE)
+
+    def _heading_to_hq(self) -> Generator[Any, None, None]:
+        """Handle HEADING_TO_HQ travel and arrival logic."""
+        yield self.env.process(self.return_to_HQ())
+        if self.position.close_enough(self.env.hq.position):
+            current_sim_time = self.env.now
+            time_to_shift_end = self.shift.get_sim_end_time() - current_sim_time
+
+            if time_to_shift_end <= SHIFT_END_BUFFER_TIME:
+                for task in self.task_list:
+                    self.unassign_task(task)
+                self.unassign_vehicle()
+                self.set_state(DriverState.OFF_SHIFT)
+                return
+
+            if self.vehicle is not None and self.vehicle.get_battery_count() == 0:
+                self.set_state(DriverState.RESTOCKING_BATTERIES)
+                return
+
+    def _generate_lunch_location(self) -> Position:
+        """Generate a random lunch location
+            LUNCH_DISTANCE_METERS away from driver's current position.
+
+        Returns:
+            Position: A new Position object representing the lunch location.
+        """
+        # convert meters to degrees
+        offset = LUNCH_DISTANCE_METERS / METERS_PER_DEGREE
+        current_lon, current_lat = self.position.get_position()
+
+        delta_lon = random.uniform(-offset, offset)
+        delta_lat = random.uniform(-offset, offset)
+
+        return Position([current_lon + delta_lon, current_lat + delta_lat])
 
     def run(self):  # type: ignore[no-untyped-def]
-        """Main SimPy process that runs continuously throughout the simulation.
+        """Driver state machine in simple one-liners.
 
-        This is the driver's main execution loop that handles task selection,
-        dispatch, travel, and servicing. The process:
-        1. Waits for initialization (sim_behaviour and map_controller setup)
-        2. If vehicle's battery_count is 0, directly heads to HQ
-        3. If driver has batteries and tasks available,
-            selects and dispatches the next tasks
-        4. If driver in-progress, travels to or services them
-        5. If the driver arrives at HQ, restocks on batteries
-        6. Yields control back to the simulation at each tick
-
-        The process runs indefinitely until the simulation ends.
-
-        Yields:
-            simpy.Event: Timeout events and travel process events.
+        - OFF_SHIFT: move to pending within 2h of shift start.
+        - PENDING_SHIFT: switch to idle when shift starts.
+        - IDLE: head to HQ near shift end or empty batteries; take lunch during
+            window; dispatch task then go on_route; else stay idle.
+        - ON_ROUTE: travel to task station; then service or go idle if none.
+        - SERVICING_STATION: complete task and return to idle.
+        - ON_BREAK: wait lunch duration, then return to idle.
+        - HEADING_TO_HQ: travel to HQ; end shift (off_shift) at end time or
+            restock if empty.
+        - RESTOCKING_BATTERIES: restock batteries, then return to idle.
         """
         # Yield once at the start to ensure sim_behaviour and
         # map_controller are set
         yield self.env.timeout(1)
 
         while True:
-            if self.state == DriverState.ON_SHIFT:
-                if self.vehicle is not None and self.vehicle.get_battery_count() == 0:
-                    # Return to HQ to restock
-                    self.env.process(self.return_to_HQ())
-                else:
-                    # No task in progress, select and dispatch next task
-                    next_task = self.sim_behaviour.RCNT_strategy.select_next_task(self)
-                    if next_task:
-                        # Dispatch the task to mark it as in-progress
-                        self.dispatch_task(next_task)
 
-            elif self.state == DriverState.IN_PROGRESS:
-                # There is a task in progress
-                # Check if we're close enough to the station:
-                in_progress = self.get_in_progress_task()
-                if in_progress is not None:
-                    task_station = in_progress.get_station()
-                    if task_station is not None and self.position.close_enough(
-                        task_station.get_position()
-                    ):
-                        self.service_task(in_progress)
-                    elif task_station is not None and not self.current_route:
-                        yield self.env.process(
-                            self.travel_to(task_station.get_position())
-                        )
-                    # If not at station, travel_to is still in progress
+            current_sim_time = self.env.now
 
-            elif self.state == DriverState.HEADING_TO_HQ:
-                # Driver is heading to hq
-                # Check if we're close enough to HQ:
-                if self.position.close_enough(HQ_POSITION):
-                    self.state = DriverState.RESTOCKING_BATTERIES
-                    yield self.env.process(self.restock_vehicle_battery())
+            # Driver State Machine
+            match self.state:
 
-            # Wait for next tick
+                case DriverState.OFF_SHIFT:
+                    self._off_shift(current_sim_time)
+
+                case DriverState.PENDING_SHIFT:
+                    self._pending_shift(current_sim_time)
+
+                case DriverState.IDLE:
+                    self._idle(current_sim_time)
+
+                case DriverState.ON_ROUTE:
+                    yield from self._on_route()
+
+                case DriverState.SERVICING_STATION:
+                    self._servicing_station()
+
+                case DriverState.ON_BREAK:
+                    yield from self._on_break()
+
+                case DriverState.RESTOCKING_BATTERIES:
+                    yield from self._restocking_batteries()
+
+                case DriverState.HEADING_TO_HQ:
+                    yield from self._heading_to_hq()
+
             yield self.env.timeout(1)

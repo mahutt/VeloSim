@@ -101,6 +101,18 @@ class Vehicle:
         self.driver = driver
         self.has_updated = True
 
+    def unassign_driver(self) -> None:
+        """Unassign the current driver from this vehicle.
+
+        Clears the association to the driver and marks the vehicle as updated.
+
+        Returns:
+            None
+        """
+        if self.driver is not None:
+            self.driver = None
+            self.has_updated = True
+
     def set_battery_count(self, new_battery_count: int) -> None:
         """Set the vehicle's inventory and marks it as updated.
 

@@ -24,10 +24,12 @@ SOFTWARE.
 
 import pytest
 import simpy
+from sim.core.simulation_environment import SimulationEnvironment
 from sim.entities.BatterySwapTask import BatterySwapTask, State
 from sim.entities.station import Station
 from sim.entities.position import Position
 from sim.entities.driver import Driver
+from sim.entities.shift import Shift
 
 # from sim.entities.task import Task, State
 
@@ -70,6 +72,9 @@ class TestBatterySwapTask:
         assert task.get_station() is None
         assert task.get_state() == State.OPEN
         assert task.get_assigned_driver() is None
+
+    # Default shift for drivers in this test module
+    DEFAULT_SHIFT = Shift(0.0, 24.0, None, 0.0, 24.0, None)
 
     def test_get_and_set_state(self, simpy_env: simpy.Environment) -> None:
         task = BatterySwapTask(1)
@@ -119,7 +124,7 @@ class TestBatterySwapTask:
         assert station == default_station
 
     def test_get_and_set_assigned_driver(
-        self, simpy_env: simpy.Environment, default_station: Station
+        self, simpy_env: SimulationEnvironment, default_station: Station
     ) -> None:
         task = BatterySwapTask(1, default_station)
 
@@ -127,18 +132,21 @@ class TestBatterySwapTask:
         assigned_driver = task.get_assigned_driver()
         assert assigned_driver is None
 
-        driver = Driver(1, Position([-73.5673, 45.5017]))
+        # Ensure env is set before creating driver
+        Driver.env = simpy_env
+        driver = Driver(1, Position([-73.5673, 45.5017]), self.DEFAULT_SHIFT)
         task.set_assigned_driver(driver)
         assigned_driver = task.get_assigned_driver()
         assert assigned_driver is not None
         assert assigned_driver == driver
 
     def test_unassign_driver(
-        self, simpy_env: simpy.Environment, default_station: Station
+        self, simpy_env: SimulationEnvironment, default_station: Station
     ) -> None:
         # Arrange
         task = BatterySwapTask(1, default_station)
-        driver = Driver(1, Position([-73.5673, 45.5017]))
+        Driver.env = simpy_env
+        driver = Driver(1, Position([-73.5673, 45.5017]), self.DEFAULT_SHIFT)
         task.set_assigned_driver(driver)
         assert task.get_assigned_driver() == driver
         assert task.get_state() == State.ASSIGNED
@@ -151,11 +159,12 @@ class TestBatterySwapTask:
         assert task.get_state() == State.OPEN
 
     def test_is_assigned_true(
-        self, simpy_env: simpy.Environment, default_station: Station
+        self, simpy_env: SimulationEnvironment, default_station: Station
     ) -> None:
         # Arrange
         task = BatterySwapTask(1, default_station)
-        driver = Driver(1, Position([-73.5673, 45.5017]))
+        Driver.env = simpy_env
+        driver = Driver(1, Position([-73.5673, 45.5017]), self.DEFAULT_SHIFT)
         task.set_assigned_driver(driver)
 
         # Act

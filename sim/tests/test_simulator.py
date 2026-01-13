@@ -36,11 +36,13 @@ from _pytest.capture import CaptureFixture
 from unittest.mock import patch, MagicMock
 
 # Import the module so we can monkeypatch its time.sleep
+from sim.core.simulation_environment import SimulationEnvironment
 from sim.entities.inputParameters import InputParameter
 from sim.entities.request_type import RequestType
 from sim.entities.station import Station
 from sim.entities.position import Position
 from sim.entities.driver import Driver
+from sim.entities.shift import Shift
 from sim.entities.BatterySwapTask import BatterySwapTask
 
 import sim.core.RealTimeDriver as rtd_mod
@@ -118,7 +120,7 @@ def default_station(simpy_env: simpy.Environment) -> Station:
 
 
 @pytest.fixture()
-def input_params(simpy_env: simpy.Environment) -> InputParameter:
+def input_params(simpy_env: SimulationEnvironment) -> InputParameter:
     """Create a basic InputParameter with some test entities."""
     params = InputParameter()
 
@@ -137,8 +139,26 @@ def input_params(simpy_env: simpy.Environment) -> InputParameter:
     params.add_station(station2)
 
     # Add test drivers
-    driver1 = Driver(driver_id=1, position=Position([15.0, 25.0]))
-    driver2 = Driver(driver_id=2, position=Position([35.0, 45.0]))
+    shift1 = Shift(
+        start_time=28800,
+        end_time=43200,
+        lunch_break=36000,
+        sim_start_time=28800,
+        sim_end_time=43200,
+        sim_lunch_break=36000,
+    )
+    shift2 = Shift(
+        start_time=28900,
+        end_time=43200,
+        lunch_break=38000,
+        sim_start_time=28900,
+        sim_end_time=43200,
+        sim_lunch_break=38000,
+    )
+    # Ensure Driver.env is set before instantiation
+    Driver.env = simpy_env
+    driver1 = Driver(driver_id=1, position=Position([15.0, 25.0]), shift=shift1)
+    driver2 = Driver(driver_id=2, position=Position([35.0, 45.0]), shift=shift2)
     params.add_driver(driver1)
     params.add_driver(driver2)
 

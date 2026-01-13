@@ -41,6 +41,7 @@ vi.mock('~/api', () => ({
 
 // Import the mocked api to access in tests
 import api from '~/api';
+import { makePayload } from 'tests/test-helpers';
 
 // Mock WebSocket
 class MockWebSocket {
@@ -217,12 +218,7 @@ describe('useSimulationWebSocket', () => {
     const ws = MockWebSocket.instances[0];
     ws.simulateOpen();
 
-    const initialPayload: BackendPayload = {
-      simId: 'test-sim',
-      drivers: [],
-      vehicles: [],
-      stations: [],
-      tasks: [],
+    const initialPayload: BackendPayload = makePayload({
       clock: {
         simSecondsPassed: 0,
         simMinutesPassed: 0,
@@ -230,7 +226,7 @@ describe('useSimulationWebSocket', () => {
         realMinutesPassed: 0,
         startTime: 0,
       },
-    };
+    });
 
     ws.simulateMessage({
       seq: 0,
@@ -288,20 +284,7 @@ describe('useSimulationWebSocket', () => {
     });
 
     // Send frame update
-    const updatePayload: BackendPayload = {
-      simId: 'test-sim',
-      tasks: [],
-      stations: [],
-      drivers: [
-        {
-          id: 1,
-          position: [0, 0],
-          taskIds: [],
-          inProgressTaskId: null,
-          vehicleId: null,
-        },
-      ],
-      vehicles: [],
+    const updatePayload: BackendPayload = makePayload({
       clock: {
         simSecondsPassed: 1,
         simMinutesPassed: 0,
@@ -309,7 +292,7 @@ describe('useSimulationWebSocket', () => {
         realMinutesPassed: 0,
         startTime: 0,
       },
-    };
+    });
 
     ws.simulateMessage({
       seq: 1,

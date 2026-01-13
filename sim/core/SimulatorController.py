@@ -23,15 +23,16 @@ SOFTWARE.
 """
 
 from sim.core.RealTimeDriver import RealTimeDriver
-import simpy
 import threading
 from typing import Optional, Dict
+from sim.core.simulation_environment import SimulationEnvironment
 from sim.entities.station import Station
 from sim.core.frame_emitter import FrameEmitter
 from sim.entities.task_state import State
 from sim.entities.frame import Frame
 from sim.entities.driver import Driver
 from sim.entities.vehicle import Vehicle
+from sim.entities.shift import Shift
 from sim.entities.clock import Clock
 from sim.entities.task import Task
 from sim.entities.inputParameters import InputParameter
@@ -44,7 +45,7 @@ class SimulatorController:
 
     def __init__(
         self,
-        simEnv: simpy.Environment,
+        simEnv: SimulationEnvironment,
         frameEmitter: FrameEmitter,
         inputParameters: InputParameter,
         sim_behaviour: SimBehaviour,
@@ -77,6 +78,7 @@ class SimulatorController:
         )
 
         self.task_entities = inputParameters.get_task_entities()
+        self.prep_entities()
 
     def prep_entities(self) -> None:
         """Prepare all entities for simulation by setting behaviors and env.
@@ -114,10 +116,14 @@ class SimulatorController:
             driver.set_map_controller(self.map_controller)
 
             driver.env = self.simEnv
+
+            driver.state = driver.get_initial_state()
             self.simEnv.process(driver.run())
 
         for _, vehicle in self.vehicle_entities.items():
             vehicle.env = self.simEnv
+            if vehicle.get_driver() is None:
+                self.simEnv.hq.push_vehicle(vehicle)
 
     def start(self, sim_time: int) -> None:
         """Start the simulation for specified time.
@@ -128,8 +134,6 @@ class SimulatorController:
         Returns:
             None
         """
-        # Load entities into sim event queue and pass behaviour and/or mapcontroller
-        self.prep_entities()
         # start sim clock
         self.clock.run()
         self.sim_time = sim_time
@@ -476,9 +480,12 @@ class SimulatorController:
 
         drivers = []
         for driver in self.driver_entities.values():
-            if is_key or driver.has_updated:
+            if is_key or (
+                driver.has_updated and str(driver.get_state()) != "off_shift"
+            ):
                 in_progress_task = driver.get_in_progress_task()
                 current_vehicle = driver.get_vehicle()
+                shift: Shift = driver.get_driver_shift()
                 # Build driver data
                 driver_data = {
                     "id": driver.id,
@@ -490,6 +497,11 @@ class SimulatorController:
                         if in_progress_task is not None
                         else None
                     ),
+                    "shift": {
+                        "start_time": shift.get_start_time(),
+                        "end_time": shift.get_end_time(),
+                        "lunch_break": shift.get_lunch_break(),
+                    },
                     "vehicleId": (
                         current_vehicle.id if current_vehicle is not None else None
                     ),
@@ -521,6 +533,9 @@ class SimulatorController:
 
         payload = {
             "simId": self.frameEmitter.sim_id,
+            "headquarters": {
+                "position": self.simEnv.hq.position.get_position(),
+            },
             "tasks": tasks,
             "stations": stations,
             "drivers": drivers,

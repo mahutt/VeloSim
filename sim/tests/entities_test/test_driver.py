@@ -27,12 +27,14 @@ import simpy
 from typing import Any
 from unittest.mock import patch, MagicMock
 
-from sim.entities.driver import Driver, HQ_POSITION, DriverState
+from sim.core.simulation_environment import SimulationEnvironment
+from sim.entities.driver import Driver, DriverState
 from sim.entities.position import Position
 from sim.entities.BatterySwapTask import BatterySwapTask
 from sim.entities.task import Task, State
 from sim.entities.station import Station
 from sim.entities.vehicle import Vehicle
+from sim.entities.shift import Shift
 
 
 class TestDriver:
@@ -42,13 +44,21 @@ class TestDriver:
 
     @pytest.fixture
     def simpy_env(self) -> simpy.Environment:
-        return simpy.Environment()
+        env = SimulationEnvironment()
+        # Ensure Driver has an env before any instantiation
+        from sim.entities.driver import Driver
+
+        Driver.env = env
+        return env
+
+    # Default shift used across tests
+    DEFAULT_SHIFT = Shift(0.0, 24.0, None, 0.0, 24.0, None)
 
     @pytest.fixture
     def driver(
         self, simpy_env: simpy.Environment, default_position: Position
     ) -> Driver:
-        return Driver(1, default_position)
+        return Driver(1, default_position, self.DEFAULT_SHIFT)
 
     @pytest.fixture
     def driver_with_tasks(
@@ -57,12 +67,16 @@ class TestDriver:
         task = BatterySwapTask(1)
         task2 = BatterySwapTask(2)
         task3 = BatterySwapTask(3)
-        return Driver(2, default_position, [task, task2, task3])
+        return Driver(2, default_position, self.DEFAULT_SHIFT, [task, task2, task3])
 
     def test_driver_initialization(
-        self, simpy_env: simpy.Environment, default_position: Position
+        self, simpy_env: SimulationEnvironment, default_position: Position
     ) -> None:
-        driver = Driver(1, default_position)
+        # Ensure Driver.env is set before instantiation
+        from sim.entities.driver import Driver
+
+        Driver.env = simpy_env
+        driver = Driver(1, default_position, self.DEFAULT_SHIFT)
 
         assert driver.id == 1
         assert driver.position == default_position
@@ -70,13 +84,16 @@ class TestDriver:
         assert driver.has_updated == False
 
     def test_driver_initialization_with_task_list(
-        self, simpy_env: simpy.Environment, default_position: Position
+        self, simpy_env: SimulationEnvironment, default_position: Position
     ) -> None:
+        from sim.entities.driver import Driver
+
+        Driver.env = simpy_env
         task = BatterySwapTask(1)
         task2 = BatterySwapTask(2)
         task3 = BatterySwapTask(3)
         task_list: list[Task] = [task, task2, task3]
-        driver = Driver(2, default_position, task_list)
+        driver = Driver(2, default_position, self.DEFAULT_SHIFT, task_list)
 
         assert driver.id == 2
         assert driver.position == default_position
@@ -96,8 +113,8 @@ class TestDriver:
         assert driver.position.get_position() == [-74.0000, 40.5017]
 
     def test_get_state(self, driver: Driver) -> None:
-        driver.state = DriverState.ON_SHIFT
-        assert driver.get_state() == DriverState.ON_SHIFT
+        driver.state = DriverState.IDLE
+        assert driver.get_state() == DriverState.IDLE
 
     def test_assign_task(self, simpy_env: simpy.Environment, driver: Driver) -> None:
         initial_count = driver.get_task_count()
@@ -130,7 +147,7 @@ class TestDriver:
         task = BatterySwapTask(1)
         task2 = BatterySwapTask(2)
         task3 = BatterySwapTask(3)
-        driver = Driver(2, default_position, [task, task2, task3])
+        driver = Driver(2, default_position, self.DEFAULT_SHIFT, [task, task2, task3])
         initial_count = driver.get_task_count()
         task_to_remove = task2
 
@@ -147,7 +164,7 @@ class TestDriver:
         task = BatterySwapTask(1)
         task2 = BatterySwapTask(2)
         task3 = BatterySwapTask(3)
-        driver = Driver(2, default_position, [task, task2, task3])
+        driver = Driver(2, default_position, self.DEFAULT_SHIFT, [task, task2, task3])
         initial_count = driver.get_task_count()
         initial_tasks = driver.get_task_list().copy()
         nonexistent_task = BatterySwapTask(4)
@@ -167,7 +184,7 @@ class TestDriver:
         task = BatterySwapTask(1)
         task2 = BatterySwapTask(2)
         task3 = BatterySwapTask(3)
-        driver = Driver(2, default_position, [task, task2, task3])
+        driver = Driver(2, default_position, self.DEFAULT_SHIFT, [task, task2, task3])
         task2.set_state(State.IN_PROGRESS)
 
         # Act
@@ -184,7 +201,7 @@ class TestDriver:
         task = BatterySwapTask(1)
         task2 = BatterySwapTask(2)
         task3 = BatterySwapTask(3)
-        driver = Driver(2, default_position, [task, task2, task3])
+        driver = Driver(2, default_position, self.DEFAULT_SHIFT, [task, task2, task3])
 
         # Act
         dispatched_task = driver.get_in_progress_task()
@@ -199,7 +216,7 @@ class TestDriver:
         task = BatterySwapTask(1)
         task2 = BatterySwapTask(2)
         task3 = BatterySwapTask(3)
-        driver = Driver(2, default_position, [task, task2, task3])
+        driver = Driver(2, default_position, self.DEFAULT_SHIFT, [task, task2, task3])
 
         # Act
         driver.dispatch_task(task2)
@@ -215,7 +232,7 @@ class TestDriver:
         task2 = BatterySwapTask(2)
         task3 = BatterySwapTask(3)
         station = Station(1, "Test Station", default_position)
-        driver = Driver(2, default_position, [task, task2, task3])
+        driver = Driver(2, default_position, self.DEFAULT_SHIFT, [task, task2, task3])
         task.set_state(State.IN_PROGRESS)
         task.set_station(station)
         task2.set_station(station)
@@ -235,7 +252,7 @@ class TestDriver:
         task3 = BatterySwapTask(3)
         station = Station(1, "Test Station", default_position)
         station2 = Station(2, "Other Station", default_position)
-        driver = Driver(2, default_position, [task, task2, task3])
+        driver = Driver(2, default_position, self.DEFAULT_SHIFT, [task, task2, task3])
         task.set_state(State.IN_PROGRESS)
         task.set_station(station)
         task2.set_station(station2)
@@ -250,7 +267,7 @@ class TestDriver:
         task = BatterySwapTask(1)
         task2 = BatterySwapTask(2)
         task3 = BatterySwapTask(3)
-        driver = Driver(2, default_position, [task, task2, task3])
+        driver = Driver(2, default_position, self.DEFAULT_SHIFT, [task, task2, task3])
         vehicle = Vehicle(vehicle_id=1, battery_count=10)
         vehicle.set_driver(driver)
         driver.set_vehicle(vehicle)
@@ -271,7 +288,7 @@ class TestDriver:
         task = BatterySwapTask(1)
         task2 = BatterySwapTask(2)
         task3 = BatterySwapTask(3)
-        driver = Driver(2, default_position, [task, task2, task3])
+        driver = Driver(2, default_position, self.DEFAULT_SHIFT, [task, task2, task3])
         initial_count = driver.get_task_count()
         initial_tasks = driver.get_task_list().copy()
         nonexistent_task = BatterySwapTask(4)
@@ -285,11 +302,11 @@ class TestDriver:
         assert driver.get_task_list() == initial_tasks
 
     def test_service_task_with_one_battery(
-        self, simpy_env: simpy.Environment, default_position: Position
+        self, simpy_env: SimulationEnvironment, default_position: Position
     ) -> None:
         task = BatterySwapTask(1)
         task2 = BatterySwapTask(2)
-        driver = Driver(2, default_position, [task, task2])
+        driver = Driver(2, default_position, self.DEFAULT_SHIFT, [task, task2])
         driver.env = simpy_env
         vehicle = Vehicle(vehicle_id=1, battery_count=1)
         vehicle.set_driver(driver)
@@ -300,34 +317,12 @@ class TestDriver:
             mock_hq.assert_called_once()
             assert vehicle.battery_count == 0
 
-    def test_return_to_HQ_calls_travel_to(
-        self, simpy_env: simpy.Environment, default_position: Position
-    ) -> None:
-        task = BatterySwapTask(1)
-        task2 = BatterySwapTask(2)
-        driver = Driver(2, default_position, [task, task2])
-        driver.env = simpy_env
-        vehicle = Vehicle(vehicle_id=1, battery_count=1)
-        vehicle.set_driver(driver)
-        driver.set_vehicle(vehicle)
-
-        with patch.object(
-            Driver, "travel_to", return_value=simpy_env.timeout(0)
-        ) as mock_travel:
-            simpy_env.process(driver.return_to_HQ())
-
-            simpy_env.step()
-
-            # 5. Assertions
-            assert driver.get_state() == DriverState.HEADING_TO_HQ
-            mock_travel.assert_called_once_with(HQ_POSITION)
-
     def test_restock_vehicle_battery_full_restock(
-        self, simpy_env: simpy.Environment, default_position: Position
+        self, simpy_env: SimulationEnvironment, default_position: Position
     ) -> None:
         task = BatterySwapTask(1)
         task2 = BatterySwapTask(2)
-        driver = Driver(2, default_position, [task, task2])
+        driver = Driver(2, default_position, self.DEFAULT_SHIFT, [task, task2])
         driver.env = simpy_env
         mock_vehicle = MagicMock()
         mock_vehicle.vehicle_id = 1
@@ -345,8 +340,6 @@ class TestDriver:
 
         assert simpy_env.now == start_time + expected_duration
         assert mock_vehicle.add_battery.call_count == 8
-
-        assert driver.get_state() == DriverState.ON_SHIFT
 
     def test_get_task_count_empty(self, driver: Driver) -> None:
         assert driver.get_task_count() == 0
@@ -413,7 +406,7 @@ class TestDriver:
         """Test that empty task_ids list raises ValueError."""
         task1 = BatterySwapTask(1)
         task2 = BatterySwapTask(2)
-        driver = Driver(1, default_position, [task1, task2])
+        driver = Driver(1, default_position, self.DEFAULT_SHIFT, [task1, task2])
 
         with pytest.raises(ValueError, match="task_ids_to_reorder cannot be empty"):
             driver.reorder_tasks([], apply_from_top=True)
@@ -425,7 +418,7 @@ class TestDriver:
         task1 = BatterySwapTask(1)
         task2 = BatterySwapTask(2)
         task3 = BatterySwapTask(3)
-        driver = Driver(1, default_position, [task1, task2, task3])
+        driver = Driver(1, default_position, self.DEFAULT_SHIFT, [task1, task2, task3])
 
         with pytest.raises(ValueError, match="contains duplicate task IDs"):
             driver.reorder_tasks([1, 2, 2], apply_from_top=True)
@@ -438,7 +431,9 @@ class TestDriver:
         task2 = BatterySwapTask(2)
         task3 = BatterySwapTask(3)
         task4 = BatterySwapTask(4)
-        driver = Driver(1, default_position, [task1, task2, task3, task4])
+        driver = Driver(
+            1, default_position, self.DEFAULT_SHIFT, [task1, task2, task3, task4]
+        )
 
         # Reorder: want [3, 1] at top, then [2, 4] unspecified
         new_order = driver.reorder_tasks([3, 1], apply_from_top=True)
@@ -455,7 +450,9 @@ class TestDriver:
         task2 = BatterySwapTask(2)
         task3 = BatterySwapTask(3)
         task4 = BatterySwapTask(4)
-        driver = Driver(1, default_position, [task1, task2, task3, task4])
+        driver = Driver(
+            1, default_position, self.DEFAULT_SHIFT, [task1, task2, task3, task4]
+        )
 
         # Reorder: unspecified [2, 4], then reversed([3, 1]) = [1, 3]
         new_order = driver.reorder_tasks([3, 1], apply_from_top=False)
@@ -474,7 +471,9 @@ class TestDriver:
         task4 = BatterySwapTask(4)
         task5 = BatterySwapTask(5)
 
-        driver = Driver(1, default_position, [task1, task2, task3, task4, task5])
+        driver = Driver(
+            1, default_position, self.DEFAULT_SHIFT, [task1, task2, task3, task4, task5]
+        )
 
         # Set task2 and task4 as IN_PROGRESS (after Driver creation)
         task2.set_state(State.IN_PROGRESS)
@@ -498,7 +497,9 @@ class TestDriver:
         task3 = BatterySwapTask(3)
         task4 = BatterySwapTask(4)
 
-        driver = Driver(1, default_position, [task1, task2, task3, task4])
+        driver = Driver(
+            1, default_position, self.DEFAULT_SHIFT, [task1, task2, task3, task4]
+        )
         task3.set_state(State.IN_PROGRESS)
 
         # Reorder: [3, 1] includes an in-progress task
@@ -515,7 +516,9 @@ class TestDriver:
         task3 = BatterySwapTask(3)
         task4 = BatterySwapTask(4)
 
-        driver = Driver(1, default_position, [task1, task2, task3, task4])
+        driver = Driver(
+            1, default_position, self.DEFAULT_SHIFT, [task1, task2, task3, task4]
+        )
         task2.set_state(State.IN_PROGRESS)
 
         new_order = driver.reorder_tasks([3, 1], apply_from_top=False)
@@ -529,7 +532,7 @@ class TestDriver:
         task1 = BatterySwapTask(1)
         task2 = BatterySwapTask(2)
         task3 = BatterySwapTask(3)
-        driver = Driver(1, default_position, [task1, task2, task3])
+        driver = Driver(1, default_position, self.DEFAULT_SHIFT, [task1, task2, task3])
 
         with caplog.at_level("WARNING"):
             new_order = driver.reorder_tasks([99, 1], apply_from_top=True)
@@ -542,7 +545,7 @@ class TestDriver:
         task1 = BatterySwapTask(1)
         task2 = BatterySwapTask(2)
         task3 = BatterySwapTask(3)
-        driver = Driver(1, default_position, [task1, task2, task3])
+        driver = Driver(1, default_position, self.DEFAULT_SHIFT, [task1, task2, task3])
 
         new_order = driver.reorder_tasks([3, 2, 1], apply_from_top=True)
 
@@ -556,7 +559,9 @@ class TestDriver:
         task2 = BatterySwapTask(2)
         task3 = BatterySwapTask(3)
         task4 = BatterySwapTask(4)
-        driver = Driver(1, default_position, [task1, task2, task3, task4])
+        driver = Driver(
+            1, default_position, self.DEFAULT_SHIFT, [task1, task2, task3, task4]
+        )
 
         new_order = driver.reorder_tasks([4], apply_from_top=True)
 
@@ -570,8 +575,9 @@ class TestDriver:
         station2 = Station(2, "Station 2", Position([-73.6, 45.6]))
         task1 = BatterySwapTask(1, station=station1)
         task2 = BatterySwapTask(2, station=station2)
+        shift = Shift(0.0, 24.0, None, 0.0, 24.0, None)
 
-        driver = Driver(1, default_position, [task1, task2])
+        driver = Driver(1, default_position, shift, [task1, task2])
 
         mock_map_controller = MagicMock()
         mock_route_to_hq = MagicMock()
@@ -627,8 +633,9 @@ class TestDriver:
         station2 = Station(2, "Station 2", Position([-73.6, 45.6]))
         task1 = BatterySwapTask(1, station=station1)
         task2 = BatterySwapTask(2, station=station2)
+        shift = Shift(0.0, 24.0, None, 0.0, 24.0, None)
 
-        driver = Driver(1, default_position, [task1, task2])
+        driver = Driver(1, default_position, shift, [task1, task2])
 
         mock_map_controller = MagicMock()
         mock_route_to_task1 = MagicMock()
@@ -651,7 +658,7 @@ class TestDriver:
         driver.set_map_controller(mock_map_controller)
 
         # Driver is NOT heading to HQ (default state is ON_SHIFT)
-        driver.state = DriverState.ON_SHIFT
+        driver.state = DriverState.ON_ROUTE
 
         # Get full route
         result = driver.get_full_route()

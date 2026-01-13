@@ -26,6 +26,7 @@ import type { Position } from '~/types';
 import { adaptRouteToGeoJSON } from './geojson-adapters';
 
 export enum MapSource {
+  Headquarters = 'headquarters',
   Stations = 'stations',
   Resources = 'resources',
   RouteNextTask = 'route-next-task',
@@ -33,6 +34,7 @@ export enum MapSource {
 }
 
 export enum MapLayer {
+  Headquarters = 'headquarters',
   Stations = 'stations',
   StationTaskCounts = 'station-task-counts',
   Resources = 'resources',
@@ -99,6 +101,13 @@ export function loadMapImages(map: mapboxgl.Map) {
       path: '/resource-hover.png',
       id: 'resource-marker-hover',
       type: 'resource hover marker image',
+    },
+
+    // HQ image
+    {
+      path: '/hq.png',
+      id: 'hq-marker',
+      type: 'headquarters marker image',
     },
   ];
 
@@ -187,6 +196,17 @@ export function setMapLayers(map: mapboxgl.Map) {
       'text-color': '#ffffff',
       'text-halo-color': '#000000',
       'text-halo-width': 2,
+    },
+  });
+
+  // Add layer for headquarters
+  map.addLayer({
+    id: MapLayer.Headquarters,
+    type: 'symbol',
+    source: MapSource.Headquarters,
+    layout: {
+      'icon-image': 'hq-marker',
+      'icon-allow-overlap': true,
     },
   });
 
