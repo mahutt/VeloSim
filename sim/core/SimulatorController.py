@@ -152,6 +152,10 @@ class SimulatorController:
         if hasattr(self, "sim_thread") and self.sim_thread.is_alive():
             self.sim_thread.join()
 
+        # Clean up map controller resources
+        if hasattr(self, "map_controller") and self.map_controller:
+            self.map_controller.close()
+
         final_frame = self.create_frame(is_key=True)
         self.emit_frame(final_frame)
 

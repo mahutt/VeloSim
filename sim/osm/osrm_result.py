@@ -253,17 +253,209 @@ class OSRMResult:
     segments: List[OSRMSegment] = field(default_factory=list)
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "OSRMResult":
+    def from_osrm_response(cls, response: Dict[str, Any]) -> "OSRMResult":
         """
-        Create an OSRMResult from OSRM API response data.
+        Parse a raw OSRM API response into an OSRMResult.
 
-        This factory method handles validation and type conversion,
-        ensuring all required fields are present and properly typed.
+        This factory method handles the complete parsing of OSRM JSON responses,
+        extracting route geometry, steps, and annotation-based segments.
 
         Args:
-            data: Dictionary returned from OSRMConnection.shortest_path_coords()
-                  Expected keys: 'coordinates', 'distance', 'duration', 'steps'
-                  Optional keys: 'segments' (list of pre-parsed OSRMSegment dicts)
+            response: Raw JSON response from OSRM route API. Expected structure:
+                {
+                    "code": "Ok",
+                    "routes": [{
+                        "geometry": {"coordinates": [[lon, lat], ...]},
+                        "distance": float,
+                        "duration": float,
+                        "legs": [{
+                            "steps": [...],
+                            "annotation": {"nodes": [...], "distance": [...], ...}
+                        }]
+                    }]
+                }
+
+        Returns:
+            OSRMResult instance with parsed route data
+
+        Raises:
+            ValueError: If response is invalid or missing required data
+        """
+        if not isinstance(response, dict):
+            raise ValueError(f"Expected dict, got {type(response).__name__}")
+
+        if response.get("code") != "Ok":
+            raise ValueError(f"OSRM error: {response.get('code', 'Unknown')}")
+
+        routes = response.get("routes", [])
+        if not routes:
+            raise ValueError("No routes in OSRM response")
+
+        route = routes[0]
+
+        # Extract coordinates from geometry
+        geometry = route.get("geometry", {})
+        coordinates = (
+            geometry.get("coordinates", []) if isinstance(geometry, dict) else []
+        )
+        if not coordinates:
+            raise ValueError("No coordinates in route geometry")
+
+        distance = float(route.get("distance", 0))
+        duration = float(route.get("duration", 0))
+
+        # Parse steps from legs
+        steps = cls._parse_steps_from_route(route)
+
+        # Parse segments from annotation nodes
+        segments = cls._parse_segments_from_route(route, coordinates)
+
+        return cls(
+            coordinates=coordinates,
+            distance=distance,
+            duration=duration,
+            steps=steps,
+            segments=segments,
+        )
+
+    @classmethod
+    def _parse_steps_from_route(cls, route: Dict[str, Any]) -> List["OSRMStep"]:
+        """
+        Parse OSRMStep objects from OSRM route legs.
+
+        Extracts steps from the first leg and maps annotation speeds to each step.
+
+        Args:
+            route: OSRM route object containing legs with steps
+
+        Returns:
+            List of OSRMStep objects
+        """
+        steps: List[OSRMStep] = []
+
+        if "legs" not in route or not route["legs"]:
+            return steps
+
+        leg = route["legs"][0]
+        leg_steps = leg.get("steps", [])
+
+        # Get speed annotations if available
+        annotations = leg.get("annotation", {})
+        annotation_speeds = annotations.get("speed", [])
+
+        # Track position in annotation arrays as we process steps
+        annotation_index = 0
+
+        for step in leg_steps:
+            step_data = {
+                "name": step.get("name") or None,
+                "distance": step.get("distance", 0),
+                "duration": step.get("duration", 0),
+                "geometry": step.get("geometry", {}).get("coordinates", []),
+            }
+
+            # Map annotation speeds to this step
+            step_coords = step.get("geometry", {}).get("coordinates", [])
+            num_segments = len(step_coords) - 1 if len(step_coords) > 1 else 0
+
+            if annotation_speeds and num_segments > 0:
+                end_index = min(annotation_index + num_segments, len(annotation_speeds))
+                step_speeds = annotation_speeds[annotation_index:end_index]
+
+                if step_speeds:
+                    step_data["speed"] = max(step_speeds)
+
+                annotation_index = end_index
+
+            steps.append(OSRMStep.from_dict(step_data))
+
+        return steps
+
+    @classmethod
+    def _parse_segments_from_route(
+        cls,
+        route: Dict[str, Any],
+        coordinates: List[List[float]],
+    ) -> List["OSRMSegment"]:
+        """
+        Parse OSM node-based segments from OSRM annotation data.
+
+        Extracts annotation.nodes, annotation.distance, and annotation.duration
+        from the OSRM response to build segment data with OSM node identifiers.
+
+        Args:
+            route: OSRM route object containing legs with annotations
+            coordinates: Route coordinates for geometry assignment
+
+        Returns:
+            List of OSRMSegment objects with node IDs and geometry
+        """
+        segments: List[OSRMSegment] = []
+
+        if "legs" not in route or not route["legs"]:
+            return segments
+
+        leg = route["legs"][0]
+        annotations = leg.get("annotation", {})
+
+        nodes = annotations.get("nodes", [])
+        distances = annotations.get("distance", [])
+        durations = annotations.get("duration", [])
+
+        # Need at least 2 nodes to form a segment
+        if len(nodes) < 2:
+            return segments
+
+        # Determine number of segments based on available data
+        if len(nodes) - 1 != len(distances) or len(nodes) - 1 != len(durations):
+            num_segments = min(len(nodes) - 1, len(distances), len(durations))
+        else:
+            num_segments = len(nodes) - 1
+
+        # Track coordinate index for geometry assignment
+        coord_index = 0
+
+        for i in range(num_segments):
+            node_start = nodes[i]
+            node_end = nodes[i + 1]
+            distance = distances[i]
+            duration = durations[i]
+
+            # Extract geometry for this segment
+            segment_geometry: List[List[float]] = []
+            if coord_index < len(coordinates):
+                segment_geometry.append(coordinates[coord_index])
+                if coord_index + 1 < len(coordinates):
+                    segment_geometry.append(coordinates[coord_index + 1])
+                    coord_index += 1
+                elif segment_geometry:
+                    segment_geometry.append(segment_geometry[-1])
+
+            segments.append(
+                OSRMSegment.from_annotation_data(
+                    node_start=node_start,
+                    node_end=node_end,
+                    distance=distance,
+                    duration=duration,
+                    geometry=segment_geometry,
+                    road_name=None,  # Not yet implemented
+                )
+            )
+
+        return segments
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "OSRMResult":
+        """
+        Create an OSRMResult from pre-parsed data dictionary.
+
+        This factory method handles validation and type conversion for
+        dictionaries that have already been structured (e.g., from tests).
+
+        Args:
+            data: Pre-parsed dictionary with keys:
+                  'coordinates', 'distance', 'duration', 'steps'
+                  Optional: 'segments'
 
         Returns:
             OSRMResult instance with validated and typed data
@@ -325,38 +517,6 @@ class OSRMResult:
             steps=steps,
             segments=segments,
         )
-
-    @property
-    def start_coord(self) -> tuple[float, float]:
-        """Get the starting coordinate as a tuple (lon, lat).
-
-        Extracts the first coordinate from the route's coordinate list and returns
-        it as a tuple. Returns (0.0, 0.0) if coordinates list is empty.
-
-        Returns:
-            tuple[float, float]: Starting coordinate as (longitude, latitude).
-                Returns (0.0, 0.0) if no coordinates available.
-        """
-        if not self.coordinates:
-            return (0.0, 0.0)
-        coord = self.coordinates[0]
-        return (coord[0], coord[1])
-
-    @property
-    def end_coord(self) -> tuple[float, float]:
-        """Get the ending coordinate as a tuple (lon, lat).
-
-        Extracts the last coordinate from the route's coordinate list and returns
-        it as a tuple. Returns (0.0, 0.0) if coordinates list is empty.
-
-        Returns:
-            tuple[float, float]: Ending coordinate as (longitude, latitude).
-                Returns (0.0, 0.0) if no coordinates available.
-        """
-        if not self.coordinates:
-            return (0.0, 0.0)
-        coord = self.coordinates[-1]
-        return (coord[0], coord[1])
 
     def __post_init__(self) -> None:
         """Validate data after initialization."""

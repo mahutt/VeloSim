@@ -22,7 +22,9 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 """
 
-from typing import List, Optional, Tuple, TYPE_CHECKING
+from typing import List, Optional, TYPE_CHECKING
+
+from sim.map.routing_provider import SegmentKey
 
 if TYPE_CHECKING:
     from .position import Position
@@ -35,9 +37,10 @@ class Road:
     Provides id, name, pointcollection, length, and maxspeed attributes
     needed for route traversal and road subscription management.
 
-    Road segments are identified by segment_id: a tuple of (node_start, node_end)
-    OSM node IDs, enabling consistent identification across different routes
-    that share the same road infrastructure.
+    Road segments are identified by segment_key: a tuple of start/end coordinates,
+    enabling consistent identification across different routes that share the
+    same road infrastructure. This approach is provider-neutral and works with
+    any routing engine.
     """
 
     def __init__(
@@ -47,9 +50,6 @@ class Road:
         pointcollection: List["Position"],
         length: float,
         maxspeed: float,
-        segment_id: Optional[Tuple[int, int]] = None,
-        node_start: Optional[int] = None,
-        node_end: Optional[int] = None,
     ):
         """
         Initialize a road segment.
@@ -60,9 +60,6 @@ class Road:
             pointcollection: List of Position objects along the road
             length: Road length in meters
             maxspeed: Maximum speed in m/s
-            segment_id: Optional tuple of (node_start, node_end) OSM node IDs
-            node_start: Optional starting OSM node ID
-            node_end: Optional ending OSM node ID
         """
         self.id = road_id
         self.name = name
@@ -70,45 +67,35 @@ class Road:
         self.length = length
         self.maxspeed = maxspeed
 
-        # OSM node-based identification
-        self.node_start = node_start
-        self.node_end = node_end
-        # Use provided segment_id or construct from node_start/node_end
-        self.segment_id: Optional[Tuple[int, int]] = None
-        if segment_id is not None:
-            self.segment_id = segment_id
-        elif node_start is not None and node_end is not None:
-            self.segment_id = (node_start, node_end)
+    @property
+    def segment_key(self) -> SegmentKey:
+        """
+        Geometry-based identifier for road deduplication.
+
+        Returns:
+            Tuple of ((start_lon, start_lat), (end_lon, end_lat))
+        """
+        start = self.pointcollection[0].get_position()
+        end = self.pointcollection[-1].get_position()
+        return ((start[0], start[1]), (end[0], end[1]))
 
     def __hash__(self) -> int:
-        """Hash based on segment_id, or road_id if segment_id is None.
+        """Hash based on segment_key.
 
         Returns:
             Hash value for use in sets and dicts
         """
-        if self.segment_id is not None:
-            return hash(self.segment_id)
-        return hash(self.id)
+        return hash(self.segment_key)
 
     def __eq__(self, other: object) -> bool:
-        """Check equality based on segment_id, or road_id if segment_id is None.
+        """Check equality based on segment_key.
 
         Args:
             other: Object to compare against
 
         Returns:
-            True if roads are equal, False otherwise
+            True if roads have the same segment_key, False otherwise
         """
         if not isinstance(other, Road):
             return NotImplemented
-        if self.segment_id is not None and other.segment_id is not None:
-            return self.segment_id == other.segment_id
-        return self.id == other.id
-
-    def get_segment_id(self) -> Optional[Tuple[int, int]]:
-        """Get the OSM node-based segment identifier.
-
-        Returns:
-            Tuple of (node_start, node_end) if available, None otherwise
-        """
-        return self.segment_id
+        return self.segment_key == other.segment_key

@@ -28,7 +28,7 @@ import pytest
 from sim.map.route_controller import RouteController
 from sim.entities.road import Road
 from sim.entities.position import Position
-from sim.entities.osrm_result import OSRMSegment, OSRMResult
+from sim.map.routing_provider import RouteSegment, RouteResult, RouteStep
 
 
 class TestRouteControllerInitialization:
@@ -41,7 +41,7 @@ class TestRouteControllerInitialization:
 
         assert controller.map_controller == mock_map_controller
         assert len(controller.roads_to_routes) == 0
-        assert len(controller.segment_id_to_road) == 0
+        assert len(controller.segment_key_to_road) == 0
         assert len(controller.road_id_to_road) == 0
         assert len(controller.routes) == 0
 
@@ -53,15 +53,16 @@ class TestRouteControllerInitialization:
         # Add some dummy data
         mock_road = Mock()
         mock_route = Mock()
+        segment_key = ((0.0, 0.0), (1.0, 1.0))
         controller.roads_to_routes[mock_road] = {mock_route}
-        controller.segment_id_to_road[(123, 456)] = mock_road
+        controller.segment_key_to_road[segment_key] = mock_road
         controller.road_id_to_road[789] = mock_road
         controller.routes.add(mock_route)
 
         controller.clear()
 
         assert len(controller.roads_to_routes) == 0
-        assert len(controller.segment_id_to_road) == 0
+        assert len(controller.segment_key_to_road) == 0
         assert len(controller.road_id_to_road) == 0
         assert len(controller.routes) == 0
 
@@ -69,8 +70,8 @@ class TestRouteControllerInitialization:
 class TestRouteControllerRoadLookup:
     """Tests for road lookup methods."""
 
-    def test_get_road_by_segment_id(self) -> None:
-        """Test looking up a road by segment_id."""
+    def test_get_road_by_segment_key(self) -> None:
+        """Test looking up a road by segment_key (geometry endpoints)."""
         mock_map_controller = Mock()
         controller = RouteController(mock_map_controller)
 
@@ -81,19 +82,17 @@ class TestRouteControllerRoadLookup:
             pointcollection=[Position([0.0, 0.0]), Position([0.5, 0.5])],
             length=50.0,
             maxspeed=10.0,
-            segment_id=(100, 200),
-            node_start=100,
-            node_end=200,
         )
-        controller.segment_id_to_road[(100, 200)] = road
+        segment_key = road.segment_key  # ((0.0, 0.0), (0.5, 0.5))
+        controller.segment_key_to_road[segment_key] = road
         controller.road_id_to_road[123] = road
 
-        # Lookup by segment_id
-        found_road = controller.get_road_by_segment_id((100, 200))
+        # Lookup by segment_key
+        found_road = controller.get_road_by_segment_key(segment_key)
         assert found_road is road
 
         # Lookup non-existent
-        not_found = controller.get_road_by_segment_id((999, 999))
+        not_found = controller.get_road_by_segment_key(((999.0, 999.0), (888.0, 888.0)))
         assert not_found is None
 
     def test_get_road_by_id(self) -> None:
@@ -108,7 +107,6 @@ class TestRouteControllerRoadLookup:
             pointcollection=[Position([0.0, 0.0]), Position([0.5, 0.5])],
             length=50.0,
             maxspeed=10.0,
-            segment_id=(100, 200),
         )
         controller.road_id_to_road[456] = road
 
@@ -141,15 +139,15 @@ class TestRouteControllerRouteRegistration:
 
         controller = RouteController(mock_map_controller)
 
-        # Create a road with specific properties
+        # Create a road with specific properties (geometry-based segment_key)
         mock_road = Mock()
         mock_road.id = 123
-        mock_road.segment_id = (100, 200)
+        mock_road.segment_key = ((0.0, 0.0), (1.0, 1.0))
         mock_route = Mock()
 
         # Register the road first
         controller._register_road_to_route(mock_road, mock_route)
-        controller.segment_id_to_road[(100, 200)] = mock_road
+        controller.segment_key_to_road[((0.0, 0.0), (1.0, 1.0))] = mock_road
         controller.road_id_to_road[123] = mock_road
 
         # Unregister it
@@ -157,7 +155,7 @@ class TestRouteControllerRouteRegistration:
 
         # Road should be deallocated since no routes reference it
         assert mock_road not in controller.roads_to_routes
-        assert (100, 200) not in controller.segment_id_to_road
+        assert ((0.0, 0.0), (1.0, 1.0)) not in controller.segment_key_to_road
         assert 123 not in controller.road_id_to_road
 
     def test_unregister_route(self) -> None:
@@ -167,17 +165,17 @@ class TestRouteControllerRouteRegistration:
 
         mock_road1 = Mock()
         mock_road1.id = 1
-        mock_road1.segment_id = (10, 20)
+        mock_road1.segment_key = ((0.0, 0.0), (1.0, 1.0))
         mock_road2 = Mock()
         mock_road2.id = 2
-        mock_road2.segment_id = (20, 30)
+        mock_road2.segment_key = ((1.0, 1.0), (2.0, 2.0))
         mock_route = Mock()
 
         controller.routes.add(mock_route)
         controller._register_road_to_route(mock_road1, mock_route)
         controller._register_road_to_route(mock_road2, mock_route)
-        controller.segment_id_to_road[(10, 20)] = mock_road1
-        controller.segment_id_to_road[(20, 30)] = mock_road2
+        controller.segment_key_to_road[((0.0, 0.0), (1.0, 1.0))] = mock_road1
+        controller.segment_key_to_road[((1.0, 1.0), (2.0, 2.0))] = mock_road2
         controller.road_id_to_road[1] = mock_road1
         controller.road_id_to_road[2] = mock_road2
 
@@ -211,8 +209,8 @@ class TestRouteControllerQueryMethods:
         assert mock_route1 in routes
         assert mock_route2 in routes
 
-    def test_get_routes_for_segment_id(self) -> None:
-        """Test getting routes by segment_id."""
+    def test_get_routes_for_segment_key(self) -> None:
+        """Test getting routes by segment_key (geometry endpoints)."""
         mock_map_controller = Mock()
         controller = RouteController(mock_map_controller)
 
@@ -223,14 +221,14 @@ class TestRouteControllerQueryMethods:
             pointcollection=[Position([0.0, 0.0]), Position([0.5, 0.5])],
             length=50.0,
             maxspeed=10.0,
-            segment_id=(100, 200),
         )
-        controller.segment_id_to_road[(100, 200)] = road
+        segment_key = road.segment_key  # ((0.0, 0.0), (0.5, 0.5))
+        controller.segment_key_to_road[segment_key] = road
 
         mock_route = Mock()
         controller._register_road_to_route(road, mock_route)
 
-        routes = controller.get_routes_for_segment_id((100, 200))
+        routes = controller.get_routes_for_segment_key(segment_key)
 
         assert len(routes) == 1
         assert mock_route in routes
@@ -271,43 +269,11 @@ class TestRouteControllerQueryMethods:
         assert controller.get_active_road_count() == 1
 
 
-class TestRoadSegmentId:
-    """Tests for Road class segment_id support."""
+class TestRoadSegmentKey:
+    """Tests for Road class segment_key (geometry-based identification)."""
 
-    def test_road_with_segment_id(self) -> None:
-        """Test Road creation with segment_id."""
-        road = Road(
-            road_id=123,
-            name="Test Road",
-            pointcollection=[Position([0.0, 0.0]), Position([1.0, 1.0])],
-            length=100.0,
-            maxspeed=13.89,
-            segment_id=(100, 200),
-            node_start=100,
-            node_end=200,
-        )
-
-        assert road.segment_id == (100, 200)
-        assert road.node_start == 100
-        assert road.node_end == 200
-        assert road.get_segment_id() == (100, 200)
-
-    def test_road_segment_id_from_nodes(self) -> None:
-        """Test Road segment_id constructed from node_start/node_end."""
-        road = Road(
-            road_id=123,
-            name="Test Road",
-            pointcollection=[Position([0.0, 0.0]), Position([1.0, 1.0])],
-            length=100.0,
-            maxspeed=13.89,
-            node_start=300,
-            node_end=400,
-        )
-
-        assert road.segment_id == (300, 400)
-
-    def test_road_without_segment_id(self) -> None:
-        """Test Road without segment_id (legacy behavior)."""
+    def test_road_segment_key_property(self) -> None:
+        """Test Road segment_key derived from geometry endpoints."""
         road = Road(
             road_id=123,
             name="Test Road",
@@ -316,144 +282,162 @@ class TestRoadSegmentId:
             maxspeed=13.89,
         )
 
-        assert road.segment_id is None
-        assert road.get_segment_id() is None
+        # segment_key is based on start/end coordinates
+        expected_key = ((0.0, 0.0), (1.0, 1.0))
+        assert road.segment_key == expected_key
 
-    def test_road_hash_with_segment_id(self) -> None:
-        """Test Road hash based on segment_id."""
+    def test_road_segment_key_multipoint(self) -> None:
+        """Test Road segment_key with multiple intermediate points."""
+        road = Road(
+            road_id=123,
+            name="Test Road",
+            pointcollection=[
+                Position([0.0, 0.0]),
+                Position([0.5, 0.5]),  # Intermediate point
+                Position([0.7, 0.8]),  # Another intermediate
+                Position([1.0, 1.0]),
+            ],
+            length=100.0,
+            maxspeed=13.89,
+        )
+
+        # segment_key only uses first and last points
+        expected_key = ((0.0, 0.0), (1.0, 1.0))
+        assert road.segment_key == expected_key
+
+    def test_road_hash_based_on_segment_key(self) -> None:
+        """Test Road hash based on segment_key (geometry endpoints)."""
         road1 = Road(
             road_id=1,
             name="Road 1",
-            pointcollection=[Position([0.0, 0.0])],
+            pointcollection=[Position([0.0, 0.0]), Position([1.0, 1.0])],
             length=100.0,
             maxspeed=13.89,
-            segment_id=(100, 200),
         )
 
         road2 = Road(
             road_id=2,  # Different ID
             name="Road 2",  # Different name
-            pointcollection=[Position([1.0, 1.0])],  # Different coords
+            pointcollection=[
+                Position([0.0, 0.0]),
+                Position([1.0, 1.0]),
+            ],  # Same endpoints
             length=200.0,  # Different length
             maxspeed=20.0,  # Different speed
-            segment_id=(100, 200),  # Same segment_id
         )
 
-        # Same hash because same segment_id
+        # Same hash because same segment_key (start/end coords)
         assert hash(road1) == hash(road2)
 
-    def test_road_equality_with_segment_id(self) -> None:
-        """Test Road equality based on segment_id."""
+    def test_road_equality_based_on_segment_key(self) -> None:
+        """Test Road equality based on segment_key (geometry endpoints)."""
         road1 = Road(
             road_id=1,
             name="Road 1",
-            pointcollection=[Position([0.0, 0.0])],
+            pointcollection=[Position([0.0, 0.0]), Position([1.0, 1.0])],
             length=100.0,
             maxspeed=13.89,
-            segment_id=(100, 200),
         )
 
         road2 = Road(
             road_id=2,
             name="Road 2",
-            pointcollection=[Position([1.0, 1.0])],
+            pointcollection=[
+                Position([0.0, 0.0]),
+                Position([1.0, 1.0]),
+            ],  # Same endpoints
             length=200.0,
             maxspeed=20.0,
-            segment_id=(100, 200),
         )
 
         road3 = Road(
             road_id=3,
             name="Road 3",
-            pointcollection=[Position([2.0, 2.0])],
+            pointcollection=[
+                Position([2.0, 2.0]),
+                Position([3.0, 3.0]),
+            ],  # Different endpoints
             length=300.0,
             maxspeed=25.0,
-            segment_id=(300, 400),  # Different segment_id
         )
 
-        assert road1 == road2  # Same segment_id
-        assert road1 != road3  # Different segment_id
+        assert road1 == road2  # Same segment_key
+        assert road1 != road3  # Different segment_key
 
-    def test_road_equality_fallback_to_id(self) -> None:
-        """Test Road equality falls back to ID when no segment_id."""
+    def test_road_different_intermediate_points_same_key(self) -> None:
+        """Test roads with different intermediates but same endpoints are equal."""
         road1 = Road(
-            road_id=123,
+            road_id=1,
             name="Road 1",
-            pointcollection=[Position([0.0, 0.0])],
+            pointcollection=[
+                Position([0.0, 0.0]),
+                Position([0.25, 0.25]),  # Different intermediates
+                Position([1.0, 1.0]),
+            ],
             length=100.0,
             maxspeed=13.89,
         )
 
         road2 = Road(
-            road_id=123,
+            road_id=2,
             name="Road 2",
-            pointcollection=[Position([1.0, 1.0])],
-            length=200.0,
-            maxspeed=20.0,
+            pointcollection=[
+                Position([0.0, 0.0]),
+                Position([0.5, 0.5]),  # Different intermediates
+                Position([0.75, 0.75]),
+                Position([1.0, 1.0]),
+            ],
+            length=150.0,
+            maxspeed=15.0,
         )
 
-        road3 = Road(
-            road_id=456,
-            name="Road 3",
-            pointcollection=[Position([2.0, 2.0])],
-            length=300.0,
-            maxspeed=25.0,
-        )
-
-        assert road1 == road2  # Same ID
-        assert road1 != road3  # Different ID
+        # Same segment_key because same start/end points
+        assert road1.segment_key == road2.segment_key
+        assert road1 == road2
+        assert hash(road1) == hash(road2)
 
 
-class TestOSRMSegment:
-    """Tests for OSRMSegment dataclass."""
+class TestRouteSegment:
+    """Tests for RouteSegment dataclass."""
 
-    def test_osrm_segment_creation(self) -> None:
-        """Test OSRMSegment creation."""
-        segment = OSRMSegment(
-            node_start=100,
-            node_end=200,
+    def test_route_segment_creation(self) -> None:
+        """Test RouteSegment creation (provider-neutral, geometry-based)."""
+        segment = RouteSegment(
             distance=50.0,
             duration=5.0,
-            geometry=[[0.0, 0.0], [1.0, 1.0]],
+            geometry=[Position([0.0, 0.0]), Position([1.0, 1.0])],
             road_name="Test Street",
+            maxspeed=10.0,
         )
 
-        assert segment.node_start == 100
-        assert segment.node_end == 200
         assert segment.distance == 50.0
         assert segment.duration == 5.0
         assert len(segment.geometry) == 2
         assert segment.road_name == "Test Street"
+        assert segment.maxspeed == 10.0
 
-    def test_osrm_segment_get_segment_id(self) -> None:
-        """Test OSRMSegment.get_segment_id() method."""
-        segment = OSRMSegment(
-            node_start=123,
-            node_end=456,
+    def test_route_segment_segment_key(self) -> None:
+        """Test RouteSegment segment_key property (geometry-based identification)."""
+        segment = RouteSegment(
+            distance=50.0,
+            duration=5.0,
+            geometry=[Position([0.0, 0.0]), Position([0.5, 0.5]), Position([1.0, 1.0])],
+        )
+
+        # segment_key is based on start/end coordinates
+        expected_key = ((0.0, 0.0), (1.0, 1.0))
+        assert segment.segment_key == expected_key
+
+    def test_route_segment_default_values(self) -> None:
+        """Test RouteSegment with default values."""
+        segment = RouteSegment(
             distance=100.0,
             duration=10.0,
-            geometry=[],
+            geometry=[Position([0.0, 0.0]), Position([1.0, 1.0])],
         )
 
-        assert segment.get_segment_id() == (123, 456)
-
-    def test_osrm_segment_from_annotation_data(self) -> None:
-        """Test OSRMSegment.from_annotation_data() factory method."""
-        segment = OSRMSegment.from_annotation_data(
-            node_start=111,
-            node_end=222,
-            distance=75.0,
-            duration=7.5,
-            geometry=[[0.0, 0.0], [0.5, 0.5], [1.0, 1.0]],
-            road_name="Annotation Road",
-        )
-
-        assert segment.node_start == 111
-        assert segment.node_end == 222
-        assert segment.distance == 75.0
-        assert segment.duration == 7.5
-        assert len(segment.geometry) == 3
-        assert segment.road_name == "Annotation Road"
+        assert segment.road_name is None
+        assert segment.maxspeed is None
 
 
 class TestRouteControllerPointGeneration:
@@ -473,7 +457,7 @@ class TestRouteControllerPointGeneration:
         mock_map_controller = Mock()
         controller = RouteController(mock_map_controller)
 
-        geometry = [[0.0, 0.0], [1.0, 1.0]]
+        geometry = [Position([0.0, 0.0]), Position([1.0, 1.0])]
 
         # Zero speed should return edge points
         result = controller._generate_point_collection(geometry, 100.0, 0.0)
@@ -487,7 +471,7 @@ class TestRouteControllerPointGeneration:
         mock_map_controller = Mock()
         controller = RouteController(mock_map_controller)
 
-        geometry = [[0.0, 0.0], [1.0, 1.0]]
+        geometry = [Position([0.0, 0.0]), Position([1.0, 1.0])]
 
         # Zero length should return edge points
         result = controller._generate_point_collection(geometry, 0.0, 10.0)
@@ -501,7 +485,7 @@ class TestRouteControllerPointGeneration:
         mock_map_controller = Mock()
         controller = RouteController(mock_map_controller)
 
-        geometry = [[0.0, 0.0], [100.0, 0.0]]
+        geometry = [Position([0.0, 0.0]), Position([100.0, 0.0])]
 
         # 100m length at 10m/s = 10 seconds
         result = controller._generate_point_collection(geometry, 100.0, 10.0)
@@ -514,7 +498,7 @@ class TestRouteControllerPointGeneration:
         mock_map_controller = Mock()
         controller = RouteController(mock_map_controller)
 
-        geometry = [[0.0, 0.0], [100.0, 0.0]]
+        geometry = [Position([0.0, 0.0]), Position([100.0, 0.0])]
 
         result = controller._generate_point_collection(
             geometry, 100.0, 10.0, is_final_segment=True
@@ -525,50 +509,50 @@ class TestRouteControllerPointGeneration:
 
 
 class TestRouteControllerRouteCreation:
-    """Tests for route creation from OSRM results."""
+    """Tests for route creation from routing results."""
 
     def test_get_route_from_positions_no_route(self) -> None:
         """Test get_route_from_positions when no route is found."""
         mock_map_controller = Mock()
         controller = RouteController(mock_map_controller)
 
-        mock_osrm = Mock()
-        mock_osrm.shortest_path_coords.return_value = None
+        mock_routing_provider = Mock()
+        mock_routing_provider.get_route.return_value = None
 
         start = Position([0.0, 0.0])
         end = Position([1.0, 1.0])
 
         with pytest.raises(ValueError, match="No route found"):
-            controller.get_route_from_positions(start, end, mock_osrm, {})
+            controller.get_route_from_positions(start, end, mock_routing_provider, {})
 
     def test_get_route_from_positions_success(self) -> None:
         """Test successful route creation from positions."""
         mock_map_controller = Mock()
         controller = RouteController(mock_map_controller)
 
-        mock_osrm = Mock()
-        # Return the processed format that OSRMResult.from_dict expects
-        mock_osrm.shortest_path_coords.return_value = {
-            "coordinates": [[0.0, 0.0], [1.0, 1.0]],
-            "distance": 100.0,
-            "duration": 10.0,
-            "steps": [
-                {
-                    "geometry": [[0.0, 0.0], [1.0, 1.0]],
-                    "distance": 100.0,
-                    "duration": 10.0,
-                    "name": "Test Road",
-                    "mode": "driving",
-                    "maneuver": "depart",
-                }
+        mock_routing_provider = Mock()
+        # Return a RouteResult object
+        mock_routing_provider.get_route.return_value = RouteResult(
+            coordinates=[Position([0.0, 0.0]), Position([1.0, 1.0])],
+            distance=100.0,
+            duration=10.0,
+            steps=[
+                RouteStep(
+                    name="Test Road",
+                    distance=100.0,
+                    duration=10.0,
+                    geometry=[Position([0.0, 0.0]), Position([1.0, 1.0])],
+                )
             ],
-            "segments": [],
-        }
+            segments=[],
+        )
 
         start = Position([0.0, 0.0])
         end = Position([1.0, 1.0])
 
-        route = controller.get_route_from_positions(start, end, mock_osrm, {})
+        route = controller.get_route_from_positions(
+            start, end, mock_routing_provider, {}
+        )
 
         assert route is not None
         assert route in controller.routes
@@ -578,79 +562,20 @@ class TestRouteControllerRouteCreation:
         mock_map_controller = Mock()
         controller = RouteController(mock_map_controller)
 
-        mock_osrm = Mock()
+        mock_routing_provider = Mock()
 
-        osrm_result = OSRMResult(
-            coordinates=[[0.0, 0.0], [1.0, 1.0]],
+        route_result = RouteResult(
+            coordinates=[Position([0.0, 0.0]), Position([1.0, 1.0])],
             distance=100.0,
             duration=10.0,
             steps=[],
+            segments=[],
         )
 
-        route = controller.create_route(osrm_result, mock_osrm, {})
+        route = controller.create_route(route_result, mock_routing_provider, {})
 
         assert route is not None
         assert len(route.roads) == 0
-
-
-class TestRouteControllerStepToSegmentMapping:
-    """Tests for _map_step_to_segment_ids method."""
-
-    def test_map_step_to_segment_ids_empty(self) -> None:
-        """Test mapping with empty inputs."""
-        mock_map_controller = Mock()
-        controller = RouteController(mock_map_controller)
-
-        result = controller._map_step_to_segment_ids([], [])
-
-        assert result == (None, None)
-
-    def test_map_step_to_segment_ids_no_match(self) -> None:
-        """Test mapping when no segments match."""
-        mock_map_controller = Mock()
-        controller = RouteController(mock_map_controller)
-
-        step_geometry = [[0.0, 0.0], [1.0, 1.0]]
-        segments = [
-            OSRMSegment(
-                node_start=100,
-                node_end=200,
-                distance=50.0,
-                duration=5.0,
-                geometry=[[10.0, 10.0], [11.0, 11.0]],  # Different coords
-            )
-        ]
-
-        result = controller._map_step_to_segment_ids(step_geometry, segments)
-
-        assert result == (None, None)
-
-    def test_map_step_to_segment_ids_with_match(self) -> None:
-        """Test mapping with matching segments."""
-        mock_map_controller = Mock()
-        controller = RouteController(mock_map_controller)
-
-        step_geometry = [[0.0, 0.0], [1.0, 1.0]]
-        segments = [
-            OSRMSegment(
-                node_start=100,
-                node_end=200,
-                distance=50.0,
-                duration=5.0,
-                geometry=[[0.0, 0.0], [0.5, 0.5]],  # Start matches
-            ),
-            OSRMSegment(
-                node_start=200,
-                node_end=300,
-                distance=50.0,
-                duration=5.0,
-                geometry=[[0.5, 0.5], [1.0, 1.0]],  # End matches
-            ),
-        ]
-
-        result = controller._map_step_to_segment_ids(step_geometry, segments)
-
-        assert result == (100, 300)
 
 
 class TestRoadEquality:
@@ -661,7 +586,7 @@ class TestRoadEquality:
         road = Road(
             road_id=123,
             name="Test Road",
-            pointcollection=[Position([0.0, 0.0])],
+            pointcollection=[Position([0.0, 0.0]), Position([1.0, 1.0])],
             length=100.0,
             maxspeed=13.89,
         )
@@ -670,15 +595,16 @@ class TestRoadEquality:
 
         assert result is NotImplemented
 
-    def test_road_hash_fallback_to_id(self) -> None:
-        """Test Road hash falls back to ID when no segment_id."""
+    def test_road_hash_uses_segment_key(self) -> None:
+        """Test Road hash is based on segment_key (geometry endpoints)."""
         road = Road(
             road_id=123,
             name="Test Road",
-            pointcollection=[Position([0.0, 0.0])],
+            pointcollection=[Position([0.0, 0.0]), Position([1.0, 1.0])],
             length=100.0,
             maxspeed=13.89,
-            segment_id=None,
         )
 
-        assert hash(road) == hash(123)
+        # Hash is based on segment_key
+        expected_key = ((0.0, 0.0), (1.0, 1.0))
+        assert hash(road) == hash(expected_key)

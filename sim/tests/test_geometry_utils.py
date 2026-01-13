@@ -24,4 +24,4 @@ SOFTWARE.
 
 # Placeholder test file for geometry utilities
 # Tests for geometry utilities removed as _point_to_segment_distance
-# functionality was removed from OSRMConnection
+# functionality was removed from the routing module

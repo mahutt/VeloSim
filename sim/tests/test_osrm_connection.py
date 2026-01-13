@@ -264,14 +264,11 @@ class TestShortestPathCoords:
             result = osrm.shortest_path_coords(-73.5673, 45.5017, -73.5533, 45.5017)
 
             assert result is not None
-            assert "coordinates" in result
-            assert "distance" in result
-            assert "duration" in result
-            assert "steps" in result
-            assert result["distance"] == 500.0
-            assert result["duration"] == 300.0
-            assert len(result["coordinates"]) == 3
-            assert len(result["steps"]) == 2
+            assert result.coordinates is not None
+            assert result.distance == 500.0
+            assert result.duration == 300.0
+            assert len(result.coordinates) == 3
+            assert len(result.steps) == 2
 
     def test_shortest_path_coords_no_route(self, mock_session: Mock) -> None:
         """Test shortest path when no route is found."""
@@ -327,7 +324,7 @@ class TestShortestPathCoords:
             result = osrm.shortest_path_coords(-73.5673, 45.5017, -73.5533, 45.5017)
 
             assert result is not None
-            assert result["steps"] == []
+            assert result.steps == []
 
 
 class TestGetDistanceCoords:
@@ -433,9 +430,9 @@ class TestGetRouteDetails:
             details = osrm.get_route_details(-73.5673, 45.5017, -73.5533, 45.5017)
 
             assert details is not None
-            assert "geometry" in details
-            assert "distance" in details
-            assert "duration" in details
+            assert details.coordinates is not None
+            assert details.distance == 500.0
+            assert details.duration == 300.0
 
     def test_get_route_details_no_route(self, mock_session: Mock) -> None:
         """Test route details when no route found."""

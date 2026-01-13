@@ -22,17 +22,16 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 """
 
-from typing import Dict, List, Optional, Tuple, Union, TYPE_CHECKING
+from typing import TYPE_CHECKING, Dict, List, Optional
 from sim.entities.position import Position
 from sim.entities.road import Road
-from sim.entities.osrm_result import OSRMResult
+from sim.map.routing_provider import RoutingProvider, RouteResult
 from shapely.geometry import LineString
 import logging
 
 logger = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
-    from sim.osm.OSRMConnection import OSRMConnection
     from sim.map.route_controller import RouteController
 
 
@@ -49,21 +48,21 @@ class Route:
 
     def __init__(
         self,
-        route_data: Union[OSRMResult, List[int]],
-        routing_connection: "OSRMConnection",
+        route_data: RouteResult,
+        routing_provider: RoutingProvider,
         config: Dict,
         roads: List[Road],
         route_controller: Optional["RouteController"] = None,
     ) -> None:
         """
-        Initialize a Route from OSRM result.
+        Initialize a Route from routing result.
 
         Routes should be created via RouteController.create_route() which handles
         road building and registration.
 
         Args:
-            route_data: OSRMResult instance with route geometry and metadata
-            routing_connection: OSRMConnection instance for recalculation
+            route_data: RouteResult instance with route geometry and metadata
+            routing_provider: RoutingProvider instance for recalculation
             config: Configuration dictionary with simulation settings
             roads: List of Road objects built by RouteController. Required.
             route_controller: RouteController for road/route management.
@@ -77,12 +76,10 @@ class Route:
         self.current_road_index: int = 0
         self.current_point_index: int = 0
         self.is_finished: bool = False
-        self._last_returned_position: Optional[List[float]] = (
-            None  # Track last position to avoid duplicates
-        )
+        self._last_returned_position: Position | None = None
 
-        # Store routing connection for recalculation
-        self.routing_connection = routing_connection
+        # Store routing provider for recalculation
+        self.routing_provider = routing_provider
 
         # Store config for speed calculations
         self.config = config
@@ -90,29 +87,23 @@ class Route:
         # Store RouteController reference for road management
         self.route_controller: Optional["RouteController"] = route_controller
 
-        # Handle OSRMResult route data
-        if isinstance(route_data, OSRMResult):
-            self.coordinates = route_data.coordinates
-            self.distance = route_data.distance
-            self.duration = route_data.duration
-            self.steps = route_data.steps
+        # Extract route data from RouteResult
+        self.coordinates = route_data.coordinates
+        self.distance = route_data.distance
+        self.duration = route_data.duration
+        self.steps = route_data.steps
 
-            # Store start/end coordinates for recalculation
-            self.start_coord = route_data.start_coord
-            self.end_coord = route_data.end_coord
+        # Store start/end positions for recalculation
+        self.start_position = route_data.start_position
+        self.end_position = route_data.end_position
 
-            # Roads must be provided (built by RouteController)
-            if roads is None:
-                raise ValueError(
-                    "roads parameter is required. "
-                    "Use RouteController.create_route() to create routes."
-                )
-            self.roads = roads
-        else:
-            raise TypeError(
-                f"route_data must be OSRMResult, got {type(route_data).__name__}. "
-                "Please update caller to use OSRMResult.from_dict()."
+        # Roads must be provided (built by RouteController)
+        if roads is None:
+            raise ValueError(
+                "roads parameter is required. "
+                "Use RouteController.create_route() to create routes."
             )
+        self.roads = roads
 
         # If no roads were created, the route was finished from the start
         if not self.roads:
@@ -182,12 +173,12 @@ class Route:
 
         return success
 
-    def _get_current_position(self) -> Optional[Tuple[float, float]]:
+    def _get_current_position(self) -> Position | None:
         """
-        Get the current position coordinates from the route traversal state.
+        Get the current position from the route traversal state.
 
         Returns:
-            Tuple of (lon, lat) or None if position cannot be determined
+            Position object or None if position cannot be determined
         """
         if self.current_road_index >= len(self.roads):
             return None
@@ -196,17 +187,15 @@ class Route:
         if self.current_point_index >= len(current_road.pointcollection):
             return None
 
-        current_position = current_road.pointcollection[self.current_point_index]
-        pos = current_position.get_position()
-        return (pos[0], pos[1])
+        return current_road.pointcollection[self.current_point_index]
 
-    def _get_all_points(self) -> List[Position]:
+    def _get_all_points(self) -> list[Position]:
         """
         Gathers all the positions in the route per road, and returns it.
         Filters out consecutive duplicates at road boundaries.
         """
 
-        all_points_objects: List[Position] = []  # Collection of points
+        all_points_objects: list[Position] = []
 
         for i, road_segment in enumerate(self.roads):
             points = (
@@ -248,21 +237,19 @@ class Route:
         coordinates = [p.get_position() for p in all_points]
         return LineString([(lon, lat) for lon, lat in coordinates])
 
-    def get_raw_coordinates(self) -> List[List[float]]:
-        """Returns the raw OSRM coordinates (not interpolated).
+    def get_raw_coordinates(self) -> list[list[float]]:
+        """Returns the raw route coordinates (not interpolated).
 
-        These are the sparse coordinate points from the OSRM routing response,
+        These are the sparse coordinate points from the routing response,
         which define the road geometry without second-by-second interpolation.
         Used for visualization on the frontend to reduce payload size.
 
         Returns:
-            List of [lon, lat] coordinate pairs from OSRM.
+            List of [lon, lat] coordinate pairs from routing provider.
         """
-        return self.coordinates
+        return [pos.get_position() for pos in self.coordinates]
 
-    def next(
-        self, as_json: bool = False
-    ) -> Optional[Union[Dict[str, Union[int, List[float]]], Position]]:
+    def next(self) -> Position | None:
         """
         Returns the next Position object in the traversal sequence.
 
@@ -270,18 +257,14 @@ class Route:
         beginning of the next. Returns None when the end of the route is reached.
         Skips consecutive duplicate positions.
 
-        Args:
-            as_json (bool): If True, returns in JSON format with id and position.
-                            If False [default], returns Position object.
-
         Returns:
-            Position object, dict with id and position, or None when finished.
+            Position object or None when finished.
         """
         if self.is_finished:
             return None
 
         # Find next non-duplicate position
-        point_to_return = None
+        point_to_return: Position | None = None
         while point_to_return is None and not self.is_finished:
             # Determine the max index for this road
             # (exclude last point if not the final road)
@@ -305,13 +288,11 @@ class Route:
                     # we return the exact destination (fix for issue #447).
                     # Due to no-corner-snap interpolation, the last road's
                     # last point might not be exactly at the destination.
-                    if hasattr(self, "end_coord") and self.end_coord:
-                        dest_lon, dest_lat = self.end_coord
-                        dest_position = [dest_lon, dest_lat]
-                        if self._last_returned_position != dest_position:
+                    if hasattr(self, "end_position") and self.end_position:
+                        if self._last_returned_position != self.end_position:
                             # Return destination as final point
-                            point_to_return = Position(dest_position)
-                            self._last_returned_position = dest_position
+                            point_to_return = self.end_position
+                            self._last_returned_position = self.end_position
                             self.is_finished = True
                             break
                     # if there are no roads left, we are done.
@@ -326,22 +307,12 @@ class Route:
             # Check if this is a duplicate of the last returned position
             if (
                 self._last_returned_position is None
-                or candidate_point.get_position() != self._last_returned_position
+                or candidate_point != self._last_returned_position
             ):
                 point_to_return = candidate_point
-                self._last_returned_position = candidate_point.get_position()
+                self._last_returned_position = candidate_point
 
             # Move to next position (whether it was duplicate or not)
             self.current_point_index += 1
 
-        if point_to_return is None:
-            return None
-
-        # Return based on format
-        if as_json:
-            return {
-                "id": self.id,
-                "position": point_to_return.get_position(),
-            }
-        else:
-            return point_to_return
+        return point_to_return

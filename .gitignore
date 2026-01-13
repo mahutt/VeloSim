@@ -345,5 +345,6 @@ logs
 grafana_logging/logs.txt
 grafana_logging/loki/
 grafana_logging/promtail/positions/positions.yaml
+back/grafana_logging/
 
 docs/_build/

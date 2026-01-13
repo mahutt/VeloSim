@@ -24,7 +24,8 @@ SOFTWARE.
 
 from sim.entities.position import Position
 from sim.entities.route import Route
-from sim.osm.OSRMConnection import OSRMConnection
+from sim.map.routing_provider import RoutingProvider
+from sim.osm.osrm_adapter import OSRMAdapter
 from sim.map.route_controller import RouteController
 from typing import Optional
 import json
@@ -32,23 +33,24 @@ from pathlib import Path
 
 
 class MapController:
-    """Map controller using OSRM for routing.
+    """Map controller for routing operations.
 
-    This uses OSRM instead of local graph-based routing.
+    Provides routing services through a RoutingProvider interface,
+    allowing different routing backends to be used.
     """
 
     def __init__(self, osrm_url: Optional[str] = None) -> None:
-        """Initialize the MapController with OSRM routing.
+        """Initialize the MapController with a routing provider.
 
-        Sets up the OSRM connection for routing operations and initializes
+        Sets up the routing provider for routing operations and initializes
         the RouteController for road/route management.
 
         Args:
-            osrm_url: Optional URL for the OSRM server. If not provided,
+            osrm_url: Optional URL for the routing server. If not provided,
                 will use environment variables to determine the server.
         """
-        # Initialize the OSRM connection
-        self.osrm = OSRMConnection(osrm_url=osrm_url)
+        # Initialize the routing provider (using OSRM adapter by default)
+        self.routing_provider: RoutingProvider = OSRMAdapter(osrm_url=osrm_url)
 
         # Load config once for all routes
         config_path = Path(__file__).parent.parent / "config.json"
@@ -75,5 +77,14 @@ class MapController:
             ValueError: If no route can be found
         """
         return self.route_controller.get_route_from_positions(
-            a, b, self.osrm, self.config
+            a, b, self.routing_provider, self.config
         )
+
+    def close(self) -> None:
+        """Clean up routing provider resources.
+
+        Returns:
+            None
+        """
+        if self.routing_provider:
+            self.routing_provider.close()

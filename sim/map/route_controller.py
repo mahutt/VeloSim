@@ -22,19 +22,18 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 """
 
-from typing import Any, Dict, List, Optional, Set, Tuple, TYPE_CHECKING
+from typing import Any, Dict, List, Optional, Set, TYPE_CHECKING
 import logging
 
 from shapely.geometry import LineString
 
 from sim.entities.road import Road
 from sim.entities.position import Position
-from sim.entities.osrm_result import OSRMResult, OSRMSegment
+from sim.map.routing_provider import RoutingProvider, RouteResult, SegmentKey
 
 if TYPE_CHECKING:
     from sim.entities.route import Route
     from sim.map.MapController import MapController
-    from sim.osm.OSRMConnection import OSRMConnection
 
 logger = logging.getLogger(__name__)
 
@@ -44,14 +43,14 @@ class RouteController:
     Manages the many-to-many relationship between Roads and Routes.
 
     RouteController is responsible for:
-    - Creating and reusing Road objects based on OSM node-based segment IDs
+    - Creating and reusing Road objects based on geometry endpoints
     - Tracking which routes use which roads
     - Handling road allocation/deallocation as routes are created/completed
     - Providing lookup methods for roads and routes
 
-    Road objects are reused across routes when they share the same segment_id
-    (OSM node pair), enabling efficient memory usage and consistent data
-    across all routes using the same infrastructure.
+    Road objects are reused across routes when they share the same segment_key
+    (start/end coordinates), enabling efficient memory usage and consistent data
+    across all routes using the same infrastructure. This approach is provider-neutral.
     """
 
     def __init__(self, map_controller: "MapController") -> None:
@@ -66,8 +65,8 @@ class RouteController:
         # Road -> Set of Routes using that road
         self.roads_to_routes: Dict[Road, Set["Route"]] = {}
 
-        # segment_id (node_start, node_end) -> Road
-        self.segment_id_to_road: Dict[Tuple[int, int], Road] = {}
+        # segment_key (start/end coords) -> Road (geometry-based identification)
+        self.segment_key_to_road: Dict[SegmentKey, Road] = {}
 
         # road_id -> Road lookup
         self.road_id_to_road: Dict[int, Road] = {}
@@ -79,18 +78,18 @@ class RouteController:
         self,
         start: Position,
         end: Position,
-        osrm: "OSRMConnection",
+        routing_provider: RoutingProvider,
         config: Dict[str, Any],
     ) -> "Route":
         """
         Create a route from start to end positions.
 
-        Fetches routing data from OSRM and creates a Route with roads.
+        Fetches routing data from the routing provider and creates a Route with roads.
 
         Args:
             start: Starting position
             end: Ending position
-            osrm: OSRM connection for routing
+            routing_provider: Routing provider for route calculation
             config: Simulation config
 
         Returns:
@@ -99,36 +98,32 @@ class RouteController:
         Raises:
             ValueError: If no route can be found
         """
-        start_lon, start_lat = start.get_position()
-        end_lon, end_lat = end.get_position()
+        route_result = routing_provider.get_route(start, end)
 
-        osrm_result_dict = osrm.shortest_path_coords(
-            start_lon, start_lat, end_lon, end_lat
-        )
-
-        if not osrm_result_dict:
+        if not route_result:
+            start_coords = start.get_position()
+            end_coords = end.get_position()
             raise ValueError(
-                f"No route found from ({start_lon}, {start_lat}) "
-                f"to ({end_lon}, {end_lat})"
+                f"No route found from ({start_coords[0]}, {start_coords[1]}) "
+                f"to ({end_coords[0]}, {end_coords[1]})"
             )
 
-        osrm_result = OSRMResult.from_dict(osrm_result_dict)
-        return self.create_route(osrm_result, osrm, config)
+        return self.create_route(route_result, routing_provider, config)
 
     def create_route(
         self,
-        osrm_result: OSRMResult,
-        osrm_connection: "OSRMConnection",
+        route_result: RouteResult,
+        routing_provider: RoutingProvider,
         config: Dict[str, Any],
     ) -> "Route":
         """
-        Create a Route from an OSRMResult, reusing existing Road objects.
+        Create a Route from a RouteResult, reusing existing Road objects.
 
-        Roads are created/reused based on segment_id (OSM node IDs).
+        Roads are created/reused based on segment_key (geometry endpoints).
 
         Args:
-            osrm_result: The parsed OSRM routing result
-            osrm_connection: OSRM connection for potential rerouting
+            route_result: The parsed routing result
+            routing_provider: Routing provider for potential rerouting
             config: Configuration dictionary for route creation
 
         Returns:
@@ -137,12 +132,14 @@ class RouteController:
         from sim.entities.route import Route
 
         # Create roads from steps (logical road segments with proper turn penalties)
-        roads = self._create_roads_from_steps(osrm_result) if osrm_result.steps else []
+        roads = (
+            self._create_roads_from_steps(route_result) if route_result.steps else []
+        )
 
         # Create the route with the prepared roads
         route = Route(
-            osrm_result,
-            osrm_connection,
+            route_result,
+            routing_provider,
             config,
             roads=roads,
             route_controller=self,
@@ -159,7 +156,7 @@ class RouteController:
 
     def _generate_point_collection(
         self,
-        geometry: List[List[float]],
+        geometry: List[Position],
         length: float,
         maxspeed: float,
         is_final_segment: bool = False,
@@ -173,17 +170,18 @@ class RouteController:
         if not geometry:
             return []
 
+        # Convert Position objects to coordinate tuples for Shapely
+        coords = [pos.get_position() for pos in geometry]
+
         # Edge case: invalid speed or length
         if maxspeed <= 0 or length <= 0:
-            edge_points = [Position([float(geometry[0][0]), float(geometry[0][1])])]
+            edge_points = [geometry[0]]
             if len(geometry) > 1:
-                edge_points.append(
-                    Position([float(geometry[-1][0]), float(geometry[-1][1])])
-                )
+                edge_points.append(geometry[-1])
             return edge_points
 
         # Shapely handles both 2-point and multi-point geometries uniformly
-        linestring = LineString(geometry)
+        linestring = LineString(coords)
         points: List[Position] = []
         num_intervals = int(length / maxspeed)
 
@@ -206,98 +204,33 @@ class RouteController:
             if points[-1].get_position() != end_pos.get_position():
                 points.append(end_pos)
 
-        return (
-            points
-            if points
-            else [Position([float(geometry[0][0]), float(geometry[0][1])])]
-        )
-
-    def _map_step_to_segment_ids(
-        self,
-        step_geometry: List[List[float]],
-        segments: List[OSRMSegment],
-    ) -> Tuple[Optional[int], Optional[int]]:
-        """Map step geometry to OSM node IDs from annotation segments."""
-        if not step_geometry or not segments:
-            return (None, None)
-
-        step_start = (float(step_geometry[0][0]), float(step_geometry[0][1]))
-        step_end = (float(step_geometry[-1][0]), float(step_geometry[-1][1]))
-        node_start: Optional[int] = None
-        node_end: Optional[int] = None
-
-        # Single pass with early termination
-        for seg in segments:
-            if not seg.geometry:
-                continue
-            if node_start is None:
-                seg_start = (float(seg.geometry[0][0]), float(seg.geometry[0][1]))
-                if self._coords_match(step_start, seg_start):
-                    node_start = seg.node_start
-            if node_end is None:
-                seg_end = (float(seg.geometry[-1][0]), float(seg.geometry[-1][1]))
-                if self._coords_match(step_end, seg_end):
-                    node_end = seg.node_end
-            if node_start is not None and node_end is not None:
-                break
-
-        return (node_start, node_end)
-
-    def _coords_match(
-        self,
-        coord1: Tuple[float, float],
-        coord2: Tuple[float, float],
-        tolerance: float = 1e-6,
-    ) -> bool:
-        """Check if two coordinates match within tolerance."""
-        return (
-            abs(coord1[0] - coord2[0]) < tolerance
-            and abs(coord1[1] - coord2[1]) < tolerance
-        )
+        return points if points else [geometry[0]]
 
     def _create_roads_from_steps(
         self,
-        osrm_result: OSRMResult,
+        route_result: RouteResult,
     ) -> List[Road]:
         """
-        Create Road objects from OSRMSteps with segment_id from annotations.
+        Create Road objects from RouteSteps.
 
-        Uses steps for smooth animation while extracting OSM node IDs from
-        annotation segments for future data matching. Steps aggregate
-        multiple annotation segments into logical road units.
+        Uses steps for smooth animation. Roads are identified and deduplicated
+        using geometry-based segment_key (start/end coordinates), which is
+        provider-neutral and works with any routing engine.
 
         Args:
-            osrm_result: OSRMResult with steps (and optionally segments)
+            route_result: RouteResult with steps
 
         Returns:
-            List of Road objects with segment_id when annotations available
+            List of Road objects
         """
         roads: List[Road] = []
-        segments = osrm_result.segments  # May be empty if no annotations
 
-        for step in osrm_result.steps:
+        for step in route_result.steps:
             if not step.geometry:
                 continue
 
-            # Calculate road_id from geometry
-            road_id = hash(tuple(tuple(coord) for coord in step.geometry))
-
-            # Map step to annotation segments for OSM node IDs
-            node_start, node_end = self._map_step_to_segment_ids(
-                step.geometry, segments
-            )
-            segment_id = (node_start, node_end) if node_start and node_end else None
-
-            # Check if we already have this road (by segment_id or road_id)
-            existing_road = None
-            if segment_id and segment_id in self.segment_id_to_road:
-                existing_road = self.segment_id_to_road[segment_id]
-            elif road_id in self.road_id_to_road:
-                existing_road = self.road_id_to_road[road_id]
-
-            if existing_road:
-                roads.append(existing_road)
-                continue
+            # Calculate road_id from geometry (use Position coordinates)
+            road_id = hash(tuple(tuple(pos.get_position()) for pos in step.geometry))
 
             # Derive maxspeed from step data
             maxspeed = step.speed if step.speed else 13.89
@@ -309,18 +242,39 @@ class RouteController:
                 step.geometry, step.distance, maxspeed
             )
 
+            # Skip if no positions were generated
+            if not positions:
+                continue
+
+            # Build segment_key from geometry endpoints
+            start_pos = positions[0].get_position()
+            end_pos = positions[-1].get_position()
+            segment_key: SegmentKey = (
+                (start_pos[0], start_pos[1]),
+                (end_pos[0], end_pos[1]),
+            )
+
+            # Check if we already have this road (by segment_key or road_id)
+            existing_road = None
+            if segment_key in self.segment_key_to_road:
+                existing_road = self.segment_key_to_road[segment_key]
+            elif road_id in self.road_id_to_road:
+                existing_road = self.road_id_to_road[road_id]
+
+            if existing_road:
+                roads.append(existing_road)
+                continue
+
             road = Road(
                 road_id=road_id,
                 name=step.name,
                 pointcollection=positions,
                 length=step.distance,
                 maxspeed=maxspeed,
-                segment_id=segment_id,
             )
 
             # Register in lookups
-            if segment_id:
-                self.segment_id_to_road[segment_id] = road
+            self.segment_key_to_road[segment_key] = road
             self.road_id_to_road[road_id] = road
 
             roads.append(road)
@@ -369,17 +323,17 @@ class RouteController:
     def recalculate_route(
         self,
         route: "Route",
-        current_position: Tuple[float, float],
+        current_position: Position,
     ) -> bool:
         """
         Recalculate a route from current position to its destination.
 
-        Unregisters the route from old roads, fetches a new route from OSRM,
-        builds new roads, and re-registers the route.
+        Unregisters the route from old roads, fetches a new route from the
+        routing provider, builds new roads, and re-registers the route.
 
         Args:
             route: The Route to recalculate
-            current_position: Current (lon, lat) coordinates
+            current_position: Current Position object
 
         Returns:
             bool: True if recalculation was successful, False otherwise
@@ -388,23 +342,20 @@ class RouteController:
             # Unregister from old roads
             self.unregister_route(route)
 
-            # Fetch new route from OSRM
-            current_lon, current_lat = current_position
-            end_lon, end_lat = route.end_coord
-
-            osrm_result_dict = route.routing_connection.shortest_path_coords(
-                current_lon, current_lat, end_lon, end_lat
+            # Fetch new route from routing provider
+            route_result = route.routing_provider.get_route(
+                current_position, route.end_position
             )
 
-            if not osrm_result_dict:
+            if not route_result:
                 logger.warning(f"Route {route.id}: No route found during recalculation")
                 return False
 
-            osrm_result = OSRMResult.from_dict(osrm_result_dict)
-
             # Build new roads from steps
             new_roads = (
-                self._create_roads_from_steps(osrm_result) if osrm_result.steps else []
+                self._create_roads_from_steps(route_result)
+                if route_result.steps
+                else []
             )
 
             if not new_roads:
@@ -419,11 +370,11 @@ class RouteController:
             route.current_point_index = 0
             route._last_returned_position = None
 
-            # Update route metadata from new OSRM result
-            route.coordinates = osrm_result.coordinates
-            route.distance = osrm_result.distance
-            route.duration = osrm_result.duration
-            route.steps = osrm_result.steps
+            # Update route metadata from new route result
+            route.coordinates = route_result.coordinates
+            route.distance = route_result.distance
+            route.duration = route_result.duration
+            route.steps = route_result.steps
 
             # Re-register route and road mappings
             self.routes.add(route)
@@ -440,10 +391,9 @@ class RouteController:
     def _deallocate_road(self, road: Road) -> None:
         """Remove a road from all tracking structures when no routes reference it."""
         self.roads_to_routes.pop(road, None)
-        if road.segment_id is not None:
-            self.segment_id_to_road.pop(road.segment_id, None)
+        self.segment_key_to_road.pop(road.segment_key, None)
         self.road_id_to_road.pop(road.id, None)
-        logger.debug(f"Deallocated road {road.id} (segment_id={road.segment_id})")
+        logger.debug(f"Deallocated road {road.id} (segment_key={road.segment_key})")
 
     def get_routes_for_road(self, road: Road) -> Set["Route"]:
         """Get all routes using a specific road (returns a copy).
@@ -456,28 +406,28 @@ class RouteController:
         """
         return self.roads_to_routes.get(road, set()).copy()
 
-    def get_routes_for_segment_id(self, segment_id: Tuple[int, int]) -> Set["Route"]:
-        """Get all routes using a road with the given segment_id.
+    def get_routes_for_segment_key(self, segment_key: SegmentKey) -> Set["Route"]:
+        """Get all routes using a road with the given segment_key.
 
         Args:
-            segment_id: Tuple of (node_start, node_end) OSM node IDs
+            segment_key: Tuple of ((start_lon, start_lat), (end_lon, end_lat))
 
         Returns:
             Set of Routes using this segment
         """
-        road = self.segment_id_to_road.get(segment_id)
+        road = self.segment_key_to_road.get(segment_key)
         return self.get_routes_for_road(road) if road else set()
 
-    def get_road_by_segment_id(self, segment_id: Tuple[int, int]) -> Optional[Road]:
-        """Get a Road by its segment_id (node_start, node_end).
+    def get_road_by_segment_key(self, segment_key: SegmentKey) -> Optional[Road]:
+        """Get a Road by its segment_key (geometry endpoints).
 
         Args:
-            segment_id: Tuple of (node_start, node_end) OSM node IDs
+            segment_key: Tuple of ((start_lon, start_lat), (end_lon, end_lat))
 
         Returns:
             The Road if found, None otherwise
         """
-        return self.segment_id_to_road.get(segment_id)
+        return self.segment_key_to_road.get(segment_key)
 
     def get_road_by_id(self, road_id: int) -> Optional[Road]:
         """Get a Road by its ID.
@@ -521,6 +471,6 @@ class RouteController:
             None
         """
         self.roads_to_routes.clear()
-        self.segment_id_to_road.clear()
+        self.segment_key_to_road.clear()
         self.road_id_to_road.clear()
         self.routes.clear()
