@@ -81,7 +81,7 @@ test('setMapLayers adds stations layer with correct configuration', () => {
   MockMap.createRandomInstance();
   setMapLayers(MockMap.instance! as unknown as mapboxgl.Map);
 
-  expect(MockMap.instance?.addLayer).toHaveBeenCalledTimes(6);
+  expect(MockMap.instance?.addLayer).toHaveBeenCalledTimes(7);
   expect(MockMap.instance?.addLayer).toHaveBeenCalledWith({
     id: 'stations',
     type: 'symbol',
@@ -96,7 +96,9 @@ test('setMapLayers adds stations layer with correct configuration', () => {
         'station-marker',
       ],
       'icon-allow-overlap': true,
+      'icon-size': ['interpolate', ['linear'], ['zoom'], 10, 0.4, 15, 1.0],
     },
+    minzoom: 13,
   });
 
   expect(MockMap.instance?.addLayer).toHaveBeenCalledWith({
@@ -113,6 +115,7 @@ test('setMapLayers adds stations layer with correct configuration', () => {
         'resource-marker',
       ],
       'icon-allow-overlap': true,
+      'icon-size': ['interpolate', ['linear'], ['zoom'], 10, 0.5, 13, 1.0],
     },
   });
 });
