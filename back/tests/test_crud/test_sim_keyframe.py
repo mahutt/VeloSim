@@ -238,3 +238,76 @@ class TestSimKeyframeCRUD:
 
         with pytest.raises(ItemNotFoundError, match="Keyframe not found"):
             sim_keyframe_crud.delete(mock_db, 99999)
+
+    # ------------------ TICK ------------------ #
+
+    def test_get_returns_keyframe(self, mock_db: Mock, keyframe: SimKeyframe) -> None:
+        mock_query = Mock()
+        mock_filter = Mock()
+
+        mock_filter.first.return_value = keyframe
+        mock_query.filter.return_value = mock_filter
+        mock_db.query.return_value = mock_query
+
+        result = sim_keyframe_crud.get(mock_db, keyframe.id)
+
+        assert result is keyframe
+        mock_db.query.assert_called_once()
+
+    def test_get_keyframe_at_tick_exact_match(
+        self, mock_db: Mock, keyframe: SimKeyframe
+    ) -> None:
+        mock_query = Mock()
+        mock_filter = Mock()
+        mock_order = Mock()
+
+        mock_order.first.return_value = keyframe
+        mock_filter.order_by.return_value = mock_order
+        mock_query.filter.return_value = mock_filter
+        mock_db.query.return_value = mock_query
+
+        result = sim_keyframe_crud.get_keyframe_at_tick(
+            mock_db, sim_id="100", tick=120.5
+        )
+
+        assert result is keyframe
+        assert result.sim_seconds_elapsed == 120.5
+
+    def test_get_keyframe_at_tick_preceding(self, mock_db: Mock) -> None:
+        kf = SimKeyframe(
+            id=1,
+            sim_instance_id="100",
+            sim_seconds_elapsed=80.0,
+            frame_data={},
+        )
+
+        mock_query = Mock()
+        mock_filter = Mock()
+        mock_order = Mock()
+
+        mock_order.first.return_value = kf
+        mock_filter.order_by.return_value = mock_order
+        mock_query.filter.return_value = mock_filter
+        mock_db.query.return_value = mock_query
+
+        result = sim_keyframe_crud.get_keyframe_at_tick(
+            mock_db, sim_id="100", tick=100.0
+        )
+
+        assert result.sim_seconds_elapsed == 80.0
+
+    def test_get_keyframe_at_tick_not_found(self, mock_db: Mock) -> None:
+        mock_query = Mock()
+        mock_filter = Mock()
+        mock_order = Mock()
+
+        mock_order.first.return_value = None
+        mock_filter.order_by.return_value = mock_order
+        mock_query.filter.return_value = mock_filter
+        mock_db.query.return_value = mock_query
+
+        with pytest.raises(
+            ItemNotFoundError,
+            match="No keyframe found at or before tick",
+        ):
+            sim_keyframe_crud.get_keyframe_at_tick(mock_db, sim_id="100", tick=50.0)
