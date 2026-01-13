@@ -114,11 +114,29 @@ export interface Route {
   nextTaskEndIndex: number;
 }
 
+export enum DriverState {
+  OffShift = 'off_shift',
+  PendingShift = 'pending_shift',
+  Idle = 'idle',
+  OnRoute = 'on_route',
+  ServicingStation = 'servicing_station',
+  OnBreak = 'on_break',
+  HeadingToHQ = 'heading_to_hq',
+  RestockingBatteries = 'restocking_batteries',
+}
+
 export interface Driver {
   id: number;
+  name: string;
   position: Position;
   taskIds: number[];
   route?: Route;
+  state: DriverState;
+  shift: {
+    startTime: number;
+    endTime: number;
+    lunchBreak?: number;
+  };
   inProgressTaskId: number | null;
   vehicleId: number | null; // null implies at HQ, not on route
 }

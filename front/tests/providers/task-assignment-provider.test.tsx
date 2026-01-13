@@ -32,6 +32,7 @@ import {
 } from '~/providers/task-assignment-provider';
 import { useSimulation } from '~/providers/simulation-provider';
 import type { Driver } from '~/types';
+import { makeDriver } from 'tests/test-helpers';
 
 vi.mock('~/providers/simulation-provider', () => ({
   useSimulation: vi.fn(),
@@ -114,16 +115,7 @@ describe('TaskAssignmentProvider', () => {
     // driversRef contains resource 5 that already has task 42
     const driversRef = {
       current: new Map<number, Driver>([
-        [
-          5,
-          {
-            id: 5,
-            taskIds: [42],
-            position: [0, 0],
-            inProgressTaskId: null,
-            vehicleId: null,
-          },
-        ],
+        [5, makeDriver({ id: 5, taskIds: [42] })],
       ]),
     };
 

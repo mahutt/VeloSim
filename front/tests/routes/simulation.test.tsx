@@ -26,6 +26,7 @@ import { expect, test, vi, beforeEach } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import Simulation, { meta } from '~/routes/simulation';
 import { createRoutesStub } from 'react-router';
+import { makeSimulationContext } from 'tests/test-helpers';
 
 // Mock MapContainer component
 vi.mock('~/components/map/map-container', () => ({
@@ -56,19 +57,12 @@ vi.mock('~/providers/simulation-provider', () => ({
   SimulationProvider: ({ children }: { children: React.ReactNode }) => (
     <div>{children}</div>
   ),
-  useSimulation: () => ({
-    isLoading: false,
-    simulationStatus: 'ready',
-    stationsRef: { current: new Map() },
-    driversRef: { current: new Map() },
-    resources: [],
-    selectedItem: null,
-    selectItem: vi.fn(),
-    clearSelection: vi.fn(),
-    assignTaskToResource: vi.fn(),
-    simId: 'test-sim-id',
-    isConnected: true,
-  }),
+  useSimulation: () =>
+    makeSimulationContext({
+      simulationStatus: 'ready',
+      simId: 'test-sim-id',
+      isConnected: true,
+    }),
 }));
 
 vi.mock('~/providers/task-assignment-provider', () => ({

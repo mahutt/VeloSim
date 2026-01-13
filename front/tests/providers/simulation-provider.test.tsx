@@ -78,7 +78,7 @@ import {
 } from '~/utils/simulation-error-utils';
 import api from '~/api';
 import { SelectedItemType } from '~/components/map/selected-item-bar';
-import { makePayload } from 'tests/test-helpers';
+import { makeDriver, makePayload } from 'tests/test-helpers';
 
 // Mock the API module
 vi.mock('~/api', () => {
@@ -377,13 +377,7 @@ test('selectItem selects a resource when it exists', async () => {
 
     // Manually add a resource to test selection
     useEffect(() => {
-      driversRef.current.set(1, {
-        id: 1,
-        position: [0, 0],
-        taskIds: [],
-        inProgressTaskId: null,
-        vehicleId: null,
-      });
+      driversRef.current.set(1, makeDriver({ id: 1 }));
     }, []);
 
     return (
@@ -438,13 +432,10 @@ test('assignTask posts to API and updates resource taskIds', async () => {
     const { assignTask, driversRef, resourceBarElement } = useSimulation();
 
     useEffect(() => {
-      driversRef.current.set(1, {
-        id: 1,
-        position: [0, 0],
-        taskIds: [],
-        inProgressTaskId: null,
-        vehicleId: 1,
-      });
+      driversRef.current.set(
+        1,
+        makeDriver({ id: 1, taskIds: [], vehicleId: 1 })
+      );
     }, []);
 
     const taskCount =
@@ -501,13 +492,7 @@ test('unassignTask posts to API and removes task from resource', async () => {
     const { unassignTask, driversRef, resourceBarElement } = useSimulation();
 
     useEffect(() => {
-      driversRef.current.set(1, {
-        id: 1,
-        position: [0, 0],
-        taskIds: [99],
-        inProgressTaskId: null,
-        vehicleId: null,
-      });
+      driversRef.current.set(1, makeDriver({ id: 1, taskIds: [99] }));
     }, []);
 
     const taskCount =
@@ -564,20 +549,14 @@ test('reassignTask posts to API and moves task between resources', async () => {
     const { reassignTask, driversRef, resourceBarElement } = useSimulation();
 
     useEffect(() => {
-      driversRef.current.set(1, {
-        id: 1,
-        position: [0, 0],
-        taskIds: [123],
-        inProgressTaskId: null,
-        vehicleId: 1,
-      });
-      driversRef.current.set(2, {
-        id: 2,
-        position: [0, 0],
-        taskIds: [],
-        inProgressTaskId: null,
-        vehicleId: 1,
-      });
+      driversRef.current.set(
+        1,
+        makeDriver({ id: 1, taskIds: [123], vehicleId: 1 })
+      );
+      driversRef.current.set(
+        2,
+        makeDriver({ id: 2, taskIds: [], vehicleId: 2 })
+      );
     }, []);
 
     const prevCount = resourceBarElement.find((r) => r.id === 1)?.taskCount;
@@ -1017,13 +996,7 @@ test('RAF queue batches resource selection updates', async () => {
     useEffect(() => {
       // Add multiple resources
       for (let i = 1; i <= 5; i++) {
-        driversRef.current.set(i, {
-          id: i,
-          position: [0, 0],
-          taskIds: [],
-          inProgressTaskId: null,
-          vehicleId: null,
-        });
+        driversRef.current.set(i, makeDriver({ id: i }));
       }
     }, []);
 
@@ -1171,20 +1144,17 @@ test('flushMapUpdates applies updates with current selection state', async () =>
 test('reorderTasks posts to API and updates resource task order', async () => {
   // Mock API to return successful response
   (api.post as Mock).mockResolvedValueOnce({
-    data: { resource_id: 1, task_order: [20, 30, 10] },
+    data: { resource_id: 1, task_order: [20, 30, 10], vehicleId: 1 },
   });
 
   const TestReorderComponent = () => {
     const { reorderTasks, driversRef, resourceBarElement } = useSimulation();
 
     useEffect(() => {
-      driversRef.current.set(1, {
-        id: 1,
-        position: [0, 0],
-        taskIds: [10, 20, 30],
-        inProgressTaskId: null,
-        vehicleId: 1,
-      });
+      driversRef.current.set(
+        1,
+        makeDriver({ id: 1, taskIds: [10, 20, 30], vehicleId: 1 })
+      );
     }, []);
 
     const taskCount =
@@ -1257,13 +1227,7 @@ test('reorderTasks handles API errors gracefully', async () => {
     const { reorderTasks, driversRef } = useSimulation();
 
     useEffect(() => {
-      driversRef.current.set(1, {
-        id: 1,
-        position: [0, 0],
-        taskIds: [10, 20, 30],
-        inProgressTaskId: null,
-        vehicleId: null,
-      });
+      driversRef.current.set(1, makeDriver({ id: 1, taskIds: [10, 20, 30] }));
     }, []);
 
     const handleReorder = async () => {
@@ -1393,13 +1357,10 @@ test('reorderTasks updates resourceBarElement and triggers map updates', async (
     const { reorderTasks, driversRef, resourceBarElement } = useSimulation();
 
     useEffect(() => {
-      driversRef.current.set(1, {
-        id: 1,
-        position: [0, 0],
-        taskIds: [10, 20, 30],
-        inProgressTaskId: null,
-        vehicleId: 1,
-      });
+      driversRef.current.set(
+        1,
+        makeDriver({ id: 1, taskIds: [10, 20, 30], vehicleId: 1 })
+      );
     }, []);
 
     const taskCount =

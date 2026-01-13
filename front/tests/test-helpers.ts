@@ -22,7 +22,14 @@
  * SOFTWARE.
  */
 
-import { type BackendPayload } from '~/types';
+import { vi } from 'vitest';
+import type { SimulationContextType } from '~/providers/simulation-provider';
+import {
+  DriverState,
+  type BackendPayload,
+  type Driver,
+  type Vehicle,
+} from '~/types';
 
 export function makePayload(
   overrides: Partial<BackendPayload> = {}
@@ -42,6 +49,59 @@ export function makePayload(
       realSecondsPassed: 0,
       realMinutesPassed: 0,
       startTime: Date.now(),
+    },
+  };
+}
+
+export function makeDriver(overrides: Partial<Driver> = {}): Driver {
+  const id = overrides.id ?? Math.floor(Math.random() * 10000);
+  return {
+    id,
+    name: overrides.name ?? `Driver ${id}`,
+    position: overrides.position ?? [0, 0],
+    taskIds: overrides.taskIds ?? [],
+    state: overrides.state ?? DriverState.OffShift,
+    shift: overrides.shift ?? { startTime: 3600, endTime: 7200 },
+    inProgressTaskId: overrides.inProgressTaskId ?? null,
+    vehicleId: overrides.vehicleId ?? null,
+    route: overrides.route,
+  } as Driver;
+}
+
+export function makeVehicle(overrides: Partial<Vehicle> = {}): Vehicle {
+  const id = overrides.id ?? Math.floor(Math.random() * 10000);
+  return {
+    id,
+    driverId: overrides.driverId ?? null,
+    batteryCount: overrides.batteryCount ?? 0,
+  } as Vehicle;
+}
+
+export function makeSimulationContext(
+  overrides: Partial<SimulationContextType> = {}
+): SimulationContextType {
+  return {
+    speedRef: overrides.speedRef ?? { current: 1 },
+    stationsRef: overrides.stationsRef ?? { current: new Map() },
+    driversRef: overrides.driversRef ?? { current: new Map() },
+    resourceBarElement: overrides.resourceBarElement ?? [],
+    selectedItem: overrides.selectedItem ?? null,
+    selectItem: overrides.selectItem ?? vi.fn(),
+    clearSelection: overrides.clearSelection ?? vi.fn(),
+    assignTask: overrides.assignTask ?? vi.fn(),
+    unassignTask: overrides.unassignTask ?? vi.fn(),
+    reassignTask: overrides.reassignTask ?? vi.fn(),
+    reorderTasks: overrides.reorderTasks ?? vi.fn(),
+    simId: overrides.simId ?? null,
+    isConnected: overrides.isConnected ?? false,
+    simulationStatus: overrides.simulationStatus ?? 'idle',
+    isLoading: overrides.isLoading ?? false,
+    formattedSimTime: overrides.formattedSimTime ?? null,
+    currentDay: overrides.currentDay ?? 1,
+    HQWidgetState: overrides.HQWidgetState ?? {
+      entities: null,
+      driversAtHQ: [],
+      driversPendingShift: [],
     },
   };
 }
