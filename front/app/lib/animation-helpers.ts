@@ -26,7 +26,8 @@ import { lineString, point } from '@turf/helpers';
 import nearestPointOnLine from '@turf/nearest-point-on-line';
 import along from '@turf/along';
 import length from '@turf/length';
-import type { Position } from '~/types';
+import type { Driver, Position, Route } from '~/types';
+import { positionsEqual } from './utils';
 
 /**
  * Project a position onto the route LineString and find its distance from start.
@@ -87,4 +88,76 @@ export function interpolateAlongRoute(
   });
 
   return interpolatedPoint.geometry.coordinates as Position;
+}
+
+/**
+ * Updates driver positions for the current animation loop.
+ *
+ * @param drivers map of driver IDs to Driver objects
+ * @param currentPositions map of driver IDs to their current positions
+ * @param frameStartPositions map of driver IDs to their positions at the start of the frame
+ * @param frameTargetPositions map of driver IDs to their target positions at the end of the frame
+ * @param routes map of driver IDs to their current routes
+ * @param frameProgress progress of the current frame (0 to 1)
+ * @returns true if any driver positions were updated, false otherwise
+ */
+export function updateDriverPositions(
+  drivers: Map<number, Driver>,
+  currentPositions: Map<number, Position>,
+  frameStartPositions: Map<number, Position>,
+  frameTargetPositions: Map<number, Position>,
+  routes: Map<number, Route>,
+  frameProgress: number
+): boolean {
+  let driverPositionsChanged = false;
+  drivers.forEach((driver) => {
+    const start = frameStartPositions.get(driver.id);
+    const target = frameTargetPositions.get(driver.id);
+
+    // If start / target positions aren't set, don't animate
+    if (!start || !target) return;
+
+    let currentPos: Position;
+    const route = routes.get(driver.id);
+
+    if (route) {
+      // animate driver position along route geometry
+      // constrain interpolation segment to next task segment only
+      let constrainedRoute = route.coordinates;
+      const nextTaskEndIndex = route.nextTaskEndIndex;
+      if (nextTaskEndIndex < constrainedRoute.length) {
+        // animate only up to where the next task ends in the route
+        constrainedRoute = constrainedRoute.slice(0, nextTaskEndIndex + 1);
+      }
+      currentPos = interpolateAlongRoute(
+        constrainedRoute,
+        start,
+        target,
+        frameProgress
+      );
+    } else {
+      // Fallback to linear interpolation if no route geometry
+      currentPos = [
+        start[0] + (target[0] - start[0]) * frameProgress,
+        start[1] + (target[1] - start[1]) * frameProgress,
+      ];
+    }
+
+    // Update current position if it has changed since last frame
+    const prevPos = currentPositions.get(driver.id);
+    if (!prevPos || !positionsEqual(prevPos, currentPos)) {
+      currentPositions.set(driver.id, currentPos);
+      driverPositionsChanged = true;
+    }
+
+    // If current and target are the same, clear start / target to prevent further animation
+    if (positionsEqual(currentPos, target)) {
+      frameStartPositions.delete(driver.id);
+      frameTargetPositions.delete(driver.id);
+    }
+
+    // Update the resource object's position
+    driver.position = currentPos;
+  });
+  return driverPositionsChanged;
 }

@@ -22,14 +22,33 @@
  * SOFTWARE.
  */
 
-import { clsx, type ClassValue } from 'clsx';
-import { twMerge } from 'tailwind-merge';
+import { describe, expect, it } from 'vitest';
+import { positionsEqual } from '~/lib/utils';
 import type { Position } from '~/types';
 
-export function cn(...inputs: ClassValue[]) {
-  return twMerge(clsx(inputs));
-}
-
-export function positionsEqual(base: Position, other: Position): boolean {
-  return base[0] === other[0] && base[1] === other[1];
-}
+describe('positionsEqual', () => {
+  it('returns true when the coordinates match', () => {
+    const basePosition: Position = [10, 20];
+    const otherPosition: Position = [10, 20];
+    const result = positionsEqual(basePosition, otherPosition);
+    expect(result).toBe(true);
+  });
+  it('returns false when only longitude does not match', () => {
+    const basePosition: Position = [10, 20];
+    const otherPosition: Position = [11, 20];
+    const result = positionsEqual(basePosition, otherPosition);
+    expect(result).toBe(false);
+  });
+  it('returns false when only latitude does not match', () => {
+    const basePosition: Position = [10, 20];
+    const otherPosition: Position = [10, 21];
+    const result = positionsEqual(basePosition, otherPosition);
+    expect(result).toBe(false);
+  });
+  it('returns false when neither longitude and latitude match', () => {
+    const basePosition: Position = [10, 20];
+    const otherPosition: Position = [11, 21];
+    const result = positionsEqual(basePosition, otherPosition);
+    expect(result).toBe(false);
+  });
+});
