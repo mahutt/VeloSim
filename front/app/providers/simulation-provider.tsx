@@ -432,6 +432,29 @@ export const SimulationProvider = ({
     updateHQWidgetState();
   };
 
+  // Helper function to update selected resource route display
+  const updateSelectedRouteDisplay = (
+    selectedResourceId: number | undefined,
+    map: mapboxgl.Map
+  ) => {
+    if (selectedResourceId !== undefined) {
+      const route = routesRef.current.get(selectedResourceId);
+      const position = currentPositionsRef.current.get(selectedResourceId);
+      if (route && position) {
+        updateRouteDisplay(
+          route.coordinates,
+          position,
+          route.nextStopIndex,
+          map
+        );
+      } else {
+        updateRouteDisplay(null, [0, 0], 0, map);
+      }
+    } else {
+      updateRouteDisplay(null, [0, 0], 0, map);
+    }
+  };
+
   // Helper function to update all map sources (hq, stations, resources, and routes)
   const updateMapSources = (
     selectedStationId?: number,
@@ -491,45 +514,12 @@ export const SimulationProvider = ({
         selectedResourceId,
         map
       );
-
       // Show selected route prominently if one is selected
-      if (selectedResourceId !== undefined) {
-        const route = routesRef.current.get(selectedResourceId);
-        const position = currentPositionsRef.current.get(selectedResourceId);
-        if (route && position) {
-          updateRouteDisplay(
-            route.coordinates,
-            position,
-            route.nextStopIndex,
-            map
-          );
-        } else {
-          updateRouteDisplay(null, [0, 0], 0, map);
-        }
-      } else {
-        // No selection - clear the selected route layer
-        updateRouteDisplay(null, [0, 0], 0, map);
-      }
+      updateSelectedRouteDisplay(selectedResourceId, map);
     } else {
       // Toggle off - only show route for selected resource
       clearAllRoutesDisplay(map);
-
-      if (selectedResourceId !== undefined) {
-        const route = routesRef.current.get(selectedResourceId);
-        const position = currentPositionsRef.current.get(selectedResourceId);
-        if (route && position) {
-          updateRouteDisplay(
-            route.coordinates,
-            position,
-            route.nextStopIndex,
-            map
-          );
-        } else {
-          updateRouteDisplay(null, [0, 0], 0, map);
-        }
-      } else {
-        updateRouteDisplay(null, [0, 0], 0, map);
-      }
+      updateSelectedRouteDisplay(selectedResourceId, map);
     }
   };
 
