@@ -208,6 +208,10 @@ class SimKeyframeCRUD:
             .order_by(SimKeyframe.sim_seconds_elapsed.desc())
             .first()
         )
+
+        if not keyframe:
+            raise ItemNotFoundError("No keyframe found.")
+
         return keyframe
 
 

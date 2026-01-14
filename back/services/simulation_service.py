@@ -217,14 +217,15 @@ class SimulationService:
         scenario = self.simulation_data_service.get_scenario(db, sim_id)
         keyframe = self.simulation_data_service.get_last_persisted_keyframe(db, sim_id)
 
-        parse_tuple = ReplayParser.parse(
+        resume_state = ReplayParser.parse(
             scenario_json=scenario,
             keyframe_json=keyframe,
         )
 
-        input_params = parse_tuple[0]
-        map_controller = parse_tuple[1]
-        current_sim_time = parse_tuple[2]
+        input_params = resume_state.input_parameters
+        map_controller = resume_state.map_controller
+        current_sim_time = resume_state.current_time_seconds
+
         sim = self.simulator
 
         keyframe_subscriber = KeyframePersistenceSubscriber(db_sim.id)

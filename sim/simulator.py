@@ -100,8 +100,6 @@ class Simulator:
 
         if env is None:
             env = SimulationEnvironment()
-        else:
-            env = env
 
         simController = SimulatorController(
             simEnv=env,
@@ -111,8 +109,6 @@ class Simulator:
             strict=True,
             map_controller=map_controller,
         )
-
-        simController.map_controller.get_route
 
         with self.thread_pool_lock:
             if run_id in self.thread_pool:

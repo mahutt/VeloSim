@@ -143,8 +143,6 @@ async def initialize_simulation(
         json_parser = JsonParseStrategy(scenario_json=scenario, json_string=json_string)
         scenario_params = json_parser.parse()
 
-        print("INPUT PARAMS: ", scenario_params)
-
         # Initialize simulation
         result = simulation_service.initialize_simulation(
             db, requesting_user, scenario_params, scenario_payload=scenario
@@ -581,8 +579,6 @@ async def websocket_simulation_stream(
     # Verify the client/user has access to this simulation
     if not await verify_simulation_access(websocket, db, sim_id, requesting_user):
         return
-
-    # if the simulation is not active, -> resume!
 
     # Retrieve simulation data and info
     result = await get_simulation_or_error(sim_id, websocket)

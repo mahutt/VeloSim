@@ -22,36 +22,20 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 """
 
+from typing import Any
 from sim.entities.BatterySwapTask import BatterySwapTask
 from sim.entities.inputParameters import InputParameter
 from sim.entities.position import Position
 from sim.entities.shift import Shift
+from sim.entities.simulation_replay_state import SimulationRuntimeState
 from sim.entities.station import Station
 from sim.entities.driver import Driver, DriverState
 from sim.entities.task_state import State
 from sim.entities.vehicle import Vehicle
 from sim.map.MapController import MapController
+from grafana_logging.logger import get_logger
 
-
-STATE_MAP = {
-    "scheduled": State.SCHEDULED,
-    "open": State.OPEN,
-    "assigned": State.ASSIGNED,
-    "in_progress": State.IN_PROGRESS,
-    "inprogress": State.IN_PROGRESS,
-    "closed": State.CLOSED,
-}
-
-DRIVER_STATE_MAP = {
-    "off_shift": DriverState.OFF_SHIFT,
-    "pending_shift": DriverState.PENDING_SHIFT,
-    "idle": DriverState.IDLE,
-    "on_route": DriverState.ON_ROUTE,
-    "servicing_station": DriverState.SERVICING_STATION,
-    "on_break": DriverState.ON_BREAK,
-    "heading_to_hq": DriverState.HEADING_TO_HQ,
-    "restocking": DriverState.RESTOCKING_BATTERIES,
-}
+logger = get_logger(__name__)
 
 
 class ReplayParser:
@@ -59,6 +43,9 @@ class ReplayParser:
     Reconstructs InputParameter from Scenario + Keyframe DTOs.
     Replay is authoritative state hydration.
     """
+
+    STATE_MAP = {str(e): e for e in State}
+    DRIVER_STATE_MAP = {str(e): e for e in DriverState}
 
     @staticmethod
     def _time_str_to_seconds(time_str: str) -> int:
@@ -87,12 +74,25 @@ class ReplayParser:
 
         return days * 24 * 3600 + hours * 3600 + minutes * 60
 
+    @staticmethod
+    def _is_valid_coordinate_pair(coord: Any) -> bool:
+        """
+        Validates a single coordinate pair [lon, lat].
+        """
+        if not isinstance(coord, (list, tuple)):
+            return False
+        if len(coord) != 2:
+            return False
+        if not all(isinstance(v, (int, float)) for v in coord):
+            return False
+        return True
+
     @classmethod
     def parse(
         cls,
         scenario_json: dict,
         keyframe_json: dict,
-    ) -> tuple[InputParameter, MapController, int]:
+    ) -> SimulationRuntimeState:
         """
         Reconstruct simulation input parameters from scenario and keyframe data.
 
@@ -111,7 +111,7 @@ class ReplayParser:
 
         scenario_end = cls._time_str_to_seconds(scenario_json["end_time"])
 
-        current_sim = int(keyframe_json["clock"]["simSecondsPassed"])
+        current_time_seconds = int(keyframe_json["clock"]["simSecondsPassed"])
 
         input_param = InputParameter(
             station_entities={},
@@ -159,10 +159,33 @@ class ReplayParser:
 
             if route_data:
                 coordinates = route_data.get("coordinates")
-                if coordinates and len(coordinates) >= 2:
-                    start = Position([coordinates[0][0], coordinates[0][1]])
-                    end = Position([coordinates[-1][0], coordinates[-1][1]])
-                    route = map_controller.get_route(a=start, b=end)
+
+                if not isinstance(coordinates, list) or len(coordinates) < 2:
+                    logger.warning(
+                        "Invalid route coordinates for driver %s: %s",
+                        d["id"],
+                        coordinates,
+                    )
+                else:
+                    start_coord = coordinates[0]
+                    end_coord = coordinates[-1]
+
+                    if not (
+                        cls._is_valid_coordinate_pair(start_coord)
+                        and cls._is_valid_coordinate_pair(end_coord)
+                    ):
+                        logger.warning(
+                            "Malformed route coordinates for "
+                            "driver %s: start=%s end=%s",
+                            d["id"],
+                            start_coord,
+                            end_coord,
+                        )
+                    else:
+                        start = Position(start_coord)
+                        end = Position(end_coord)
+
+                        route = map_controller.get_route(a=start, b=end)
 
             shift_data = d.get("shift")
 
@@ -196,10 +219,10 @@ class ReplayParser:
             )
 
             state_str = t["state"].lower()
-            if state_str not in STATE_MAP:
+            if state_str not in cls.STATE_MAP:
                 raise ValueError(f"Unknown task state: {state_str}")
 
-            task.set_state(STATE_MAP[state_str])
+            task.set_state(cls.STATE_MAP[state_str])
             tasks_by_id[task.id] = task
             input_param.add_task(task)
 
@@ -237,8 +260,14 @@ class ReplayParser:
             state_str = d.get("state")
             if state_str:
                 state_key = state_str.lower()
-                if state_key not in DRIVER_STATE_MAP:
+                if state_key not in cls.DRIVER_STATE_MAP:
                     raise ValueError(f"Unknown driver state: {state_str}")
-                driver.set_state(DRIVER_STATE_MAP[state_key])
+                driver.set_state(cls.DRIVER_STATE_MAP[state_key])
 
-        return input_param, map_controller, current_sim
+        # Construct Replay State
+
+        replay_state = SimulationRuntimeState(
+            input_param, map_controller, current_time_seconds
+        )
+
+        return replay_state

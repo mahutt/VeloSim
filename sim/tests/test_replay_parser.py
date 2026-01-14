@@ -75,13 +75,16 @@ def test_replay_parser_parse_minimal_valid_replay(
         "tasks": [{"id": 500, "stationId": 1, "state": "open"}],
     }
 
-    input_param, map_controller, current_sim = ReplayParser.parse(
+    state = ReplayParser.parse(
         scenario_json=scenario_json,
         keyframe_json=keyframe_json,
     )
 
-    assert isinstance(input_param, InputParameter)
-    assert current_sim == 1800
+    # --- core assertions ---
+    assert isinstance(state.input_parameters, InputParameter)
+    assert state.current_time_seconds == 1800
+
+    input_param = state.input_parameters
 
     station = next(iter(input_param.station_entities.values()))
     task = station.tasks[0]
