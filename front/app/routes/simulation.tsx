@@ -35,6 +35,7 @@ import { TaskAssignmentProvider } from '~/providers/task-assignment-provider';
 import { useParams } from 'react-router';
 import { Loader2 } from 'lucide-react';
 import PlaybackControls from '~/components/map/playback-controls';
+import RouteToggle from '~/components/map/route-toggle';
 import SimulationClock from '~/components/map/clock';
 import HQWidget from '~/components/simulation/hq-widget';
 
@@ -84,8 +85,11 @@ function SimulationContent() {
           {/* max-h-[calc(100vh-2.5rem) is set so that the Mapbox & OSM copyright notices aren't blocked. */}
           <div className="w-60 absolute top-4 right-4 flex flex-col gap-2 max-h-[calc(100vh-2.5rem)]">
             <div className="w-full flex justify-between items-center gap-2">
-              <SimulationClock />
-              <PlaybackControls />
+              <div className="flex gap-2">
+                <SimulationClock />
+                <PlaybackControls />
+                <RouteToggle />
+              </div>
             </div>
             <ResourceBar />
             <HQWidget />
