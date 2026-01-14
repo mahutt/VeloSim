@@ -135,6 +135,8 @@ describe('RouteToggle', () => {
       mockContext
     );
 
+    render(<RouteToggle />);
+
     // Open dropdown
     const button = screen.getByRole('button', {
       name: /toggle display options/i,

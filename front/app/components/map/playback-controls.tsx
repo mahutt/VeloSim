@@ -106,16 +106,22 @@ export default function PlaybackControls() {
   if (!simId) return null;
 
   return (
-    <div className="bg-gray-50 border shadow rounded-full overflow-hidden">
-      <div className="grid" style={{ gridTemplateColumns: '1fr 1px 1fr' }}>
-        <div className="px-2 py-1">
+    <div className="bg-background border rounded-md shadow-sm overflow-hidden h-10">
+      <div
+        className="grid h-full"
+        style={{ gridTemplateColumns: '1fr 1px 1fr' }}
+      >
+        <div className="px-2 flex items-center justify-center">
           <DropdownMenu>
             <DropdownMenuTrigger className="cursor-pointer" asChild>
-              <button className="select-none text-center text-sm w-7">
+              <button className="select-none text-center text-sm w-7 hover:text-foreground/80">
                 {speed}x
               </button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent className="bg-gray-50" aria-disabled={loading}>
+            <DropdownMenuContent
+              className="bg-background"
+              aria-disabled={loading}
+            >
               {SPEED_OPTIONS.filter((option) => option !== 0).map((option) => (
                 <DropdownMenuItem
                   key={option}
@@ -129,11 +135,11 @@ export default function PlaybackControls() {
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
-        <div className="py-1">
-          <Separator orientation="vertical" />
+        <div className="flex items-center">
+          <Separator orientation="vertical" className="h-6" />
         </div>
         <button
-          className="group px-2 py-1 flex items-center justify-center disabled:opacity-50 disabled:pointer-events-none"
+          className="group px-2 flex items-center justify-center disabled:opacity-50 disabled:pointer-events-none hover:bg-accent"
           onClick={handlePausePlayToggle}
           disabled={loading}
           aria-label={paused ? 'Play simulation' : 'Pause simulation'}
@@ -142,13 +148,13 @@ export default function PlaybackControls() {
           {paused ? (
             <Play
               className="group-active:scale-90 h-4 w-4"
-              fill="#0a0a0a"
+              fill="currentColor"
               strokeWidth={0}
             />
           ) : (
             <Pause
               className="group-active:scale-90 h-4 w-4"
-              fill="#0a0a0a"
+              fill="currentColor"
               strokeWidth={0}
             />
           )}
