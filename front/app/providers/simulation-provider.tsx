@@ -522,6 +522,7 @@ export const SimulationProvider = ({
         type: SelectedItemType.Driver,
         value: {
           id: targetResource.id,
+          name: targetResource.name,
           position: targetResource.position,
           tasks: targetResource.taskIds.map(
             (taskId: number) => tasksRef.current.get(taskId)!

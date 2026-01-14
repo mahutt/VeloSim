@@ -24,13 +24,11 @@
 
 import { useState } from 'react';
 import { X } from 'lucide-react';
-import { Button } from '~/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '~/components/ui/card';
-import { Separator } from '~/components/ui/separator';
 import { useSimulation } from '~/providers/simulation-provider';
 import { type Position, type StationTask } from '~/types';
 import { TaskItem } from '../task/task-item';
 import { useTaskAssignment } from '~/providers/task-assignment-provider';
+import { ScrollArea } from '~/components/ui/scroll-area';
 
 export enum SelectedItemType {
   Station = 'station',
@@ -46,6 +44,7 @@ export interface PopulatedStation {
 
 export interface PopulatedDriver {
   id: number;
+  name: string;
   position: Position;
   tasks: StationTask[];
   route?: {
@@ -68,88 +67,70 @@ export default function SelectedItemBar() {
   };
 
   return (
-    <div className="absolute top-12 left-4 z-10 w-80">
-      <Card className="bg-gray-50">
-        <CardHeader className="flex flex-row items-center justify-between space-y-0">
-          <CardTitle className="text-lg font-semibold">
-            <span className="text-red-500">
-              {selectedItem.type === SelectedItemType.Station
-                ? 'Station'
-                : 'Driver'}
-            </span>{' '}
-            <span className="text-foreground">#{selectedItem.value.id}</span>
-          </CardTitle>
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={handleClose}
-            className="h-6 w-6"
-          >
-            <X className="h-4 w-4" />
-          </Button>
-        </CardHeader>
-        <Separator />
-        <CardContent>
-          {selectedItem.type === SelectedItemType.Station ? (
-            <StationInfo station={selectedItem.value} />
-          ) : (
-            <DriverInfo driver={selectedItem.value} />
-          )}
-        </CardContent>
-      </Card>
+    <div className="bg-gray-50 relative flex flex-col gap-2 rounded-lg border py-4 shadow-sm">
+      <button
+        className="absolute top-3 right-3 translate-y-[-50%] translate-x-[50%] rounded-full p-2 bg-white shadow-md hover:bg-gray-100 border border-gray-200"
+        onClick={handleClose}
+      >
+        <X className="w-6 h-6" />
+      </button>
+      <div className="flex flex-col px-5">
+        <span className="text-xl font-bold truncate">
+          {selectedItem.value.name}
+        </span>
+        <span className="text-muted-foreground text-sm font-normal">
+          {selectedItem.type === SelectedItemType.Driver ? 'Driver' : 'Station'}{' '}
+          #{selectedItem.value.id}
+        </span>
+      </div>
+      <p className="text-sm text-muted-foreground px-5">
+        {selectedItem.value.tasks.length === 0
+          ? 'No tasks'
+          : `Tasks (${selectedItem.value.tasks.length})`}
+      </p>
+      {selectedItem.value.tasks.length > 0 && (
+        <ScrollArea className="mx-2">
+          <div className="max-h-50 px-3 space-y-1">
+            {selectedItem.type === SelectedItemType.Station ? (
+              <StationTasks station={selectedItem.value} />
+            ) : (
+              <DriverTasks driver={selectedItem.value} />
+            )}
+          </div>
+        </ScrollArea>
+      )}
     </div>
   );
 }
 
-function StationInfo({ station }: { station: PopulatedStation }) {
+function StationTasks({ station }: { station: PopulatedStation }) {
   const { driversRef } = useSimulation();
   const { requestUnassignment } = useTaskAssignment();
 
   return (
-    <div className="space-y-2">
-      <div>
-        <p className="text-sm text-muted-foreground">Name</p>
-        <p className="text-sm">{station.name}</p>
-      </div>
-      <div>
-        <p className="text-sm text-muted-foreground">Position</p>
-        <p className="font-mono text-xs">
-          [{station.position[0].toFixed(5)}, {station.position[1].toFixed(5)}]
-        </p>
-      </div>
-      <div>
-        <p className="text-sm text-muted-foreground">
-          Tasks ({station.tasks.length})
-        </p>
-        {station.tasks.length > 0 ? (
-          <div className="space-y-2">
-            {station.tasks.map((task) => {
-              const assignedResource = Array.from(
-                driversRef.current.values()
-              ).find((r) => r.taskIds && r.taskIds.includes(task.id));
+    <>
+      {station.tasks.map((task) => {
+        const assignedResource = Array.from(driversRef.current.values()).find(
+          (r) => r.taskIds && r.taskIds.includes(task.id)
+        );
 
-              return (
-                <TaskItem
-                  key={task.id}
-                  task={task}
-                  onUnassign={
-                    assignedResource
-                      ? () => requestUnassignment(assignedResource.id, task.id)
-                      : undefined
-                  }
-                />
-              );
-            })}
-          </div>
-        ) : (
-          <p className="text-sm">No tasks</p>
-        )}
-      </div>
-    </div>
+        return (
+          <TaskItem
+            key={task.id}
+            task={task}
+            onUnassign={
+              assignedResource
+                ? () => requestUnassignment(assignedResource.id, task.id)
+                : undefined
+            }
+          />
+        );
+      })}
+    </>
   );
 }
 
-function DriverInfo({ driver }: { driver: PopulatedDriver }) {
+function DriverTasks({ driver }: { driver: PopulatedDriver }) {
   const { requestUnassignment } = useTaskAssignment();
   const { reorderTasks } = useSimulation();
   const [dropTargetIndex, setDropTargetIndex] = useState<number | null>(null);
@@ -196,53 +177,36 @@ function DriverInfo({ driver }: { driver: PopulatedDriver }) {
   };
 
   return (
-    <div className="space-y-2">
-      <div>
-        <p className="text-sm text-muted-foreground">Position</p>
-        <p className="font-mono text-xs">
-          [{driver.position[0].toFixed(5)}, {driver.position[1].toFixed(5)}]
-        </p>
-      </div>
-      <div>
-        <p className="text-sm text-muted-foreground">
-          Tasks ({driver.tasks.length})
-        </p>
-        {driver.tasks.length > 0 ? (
-          <div className="space-y-2">
-            {driver.tasks.map((task, index) => {
-              const draggedIndex = draggedTaskId
-                ? driver.tasks.findIndex((t) => t.id === draggedTaskId)
-                : -1;
-              const showDropIndicator = dropTargetIndex === index;
-              const isDraggingDown = index > draggedIndex;
+    <>
+      {driver.tasks.map((task, index) => {
+        const draggedIndex = draggedTaskId
+          ? driver.tasks.findIndex((t) => t.id === draggedTaskId)
+          : -1;
+        const showDropIndicator = dropTargetIndex === index;
+        const isDraggingDown = index > draggedIndex;
 
-              return (
-                <div
-                  key={task.id}
-                  onDragOver={(e) => handleDragOver(e, index)}
-                  onDrop={(e) => handleDrop(e, index)}
-                  onDragStart={() => handleDragStart(task.id)}
-                  onDragEnd={handleDragEnd}
-                  className={
-                    showDropIndicator
-                      ? isDraggingDown
-                        ? 'border-b-2 border-blue-500 pb-1'
-                        : 'border-t-2 border-blue-500 pt-1'
-                      : ''
-                  }
-                >
-                  <TaskItem
-                    task={task}
-                    onUnassign={() => requestUnassignment(driver.id, task.id)}
-                  />
-                </div>
-              );
-            })}
+        return (
+          <div
+            key={task.id}
+            onDragOver={(e) => handleDragOver(e, index)}
+            onDrop={(e) => handleDrop(e, index)}
+            onDragStart={() => handleDragStart(task.id)}
+            onDragEnd={handleDragEnd}
+            className={
+              showDropIndicator
+                ? isDraggingDown
+                  ? 'border-b-2 border-blue-500 pb-1'
+                  : 'border-t-2 border-blue-500 pt-1'
+                : ''
+            }
+          >
+            <TaskItem
+              task={task}
+              onUnassign={() => requestUnassignment(driver.id, task.id)}
+            />
           </div>
-        ) : (
-          <p className="text-sm">No tasks assigned</p>
-        )}
-      </div>
-    </div>
+        );
+      })}
+    </>
   );
 }
