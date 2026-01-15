@@ -123,7 +123,7 @@ class Driver:
         else:
             self.task_list = []
         self.has_updated = False  # flag to track if a driver was updated
-        self.state = DriverState.OFF_SHIFT  # Overwritten by sim controller if needed
+        self.state: DriverState | None = None  # Overwritten by sim controller if needed
 
     def get_position(self) -> "Position":
         """Get the current position of the driver.
@@ -133,7 +133,7 @@ class Driver:
         """
         return self.position
 
-    def get_state(self) -> DriverState:
+    def get_state(self) -> DriverState | None:
         """
         Get the driver's current state.
 
@@ -798,11 +798,6 @@ class Driver:
         if self.vehicle.get_battery_count() == 0:
             # Out of batteries: head to HQ to restock
             self.state = DriverState.HEADING_TO_HQ
-            return self.state
-
-        # After all checks pass, check if it's a resume case
-        # and keep what was persisted.
-        if self.state is not None and self.state != DriverState.OFF_SHIFT:
             return self.state
 
         # Has vehicle and batteries; if tasks exist, start from IDLE

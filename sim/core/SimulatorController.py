@@ -54,10 +54,7 @@ class SimulatorController:
     ) -> None:
         self.simEnv = simEnv
 
-        if map_controller:
-            self.map_controller = map_controller
-        else:
-            self.map_controller = MapController()
+        self.map_controller = map_controller or MapController()
 
         # Get parameters directly from InputParameter object
         real_time_factor = inputParameters.get_real_time_factor()
@@ -123,7 +120,9 @@ class SimulatorController:
 
             driver.env = self.simEnv
 
-            driver.state = driver.get_initial_state()
+            if driver.state is None:
+                driver.state = driver.get_initial_state()
+
             self.simEnv.process(driver.run())
 
         for _, vehicle in self.vehicle_entities.items():

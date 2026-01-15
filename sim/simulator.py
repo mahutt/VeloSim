@@ -35,6 +35,9 @@ from sim.core.SimulatorController import SimulatorController
 from sim.entities.task import Task
 from sim.behaviour.sim_behaviour import SimBehaviour
 from sim.map.MapController import MapController
+from grafana_logging.logger import get_logger
+
+logger = get_logger(__name__)
 
 
 class RunInfo(TypedDict):
@@ -90,8 +93,13 @@ class Simulator:
         # Initialize a simulation and send the initial frame, but don't start
         # the simulation loop.
 
+        is_resume = run_id is not None
+
         if run_id is None:
             run_id = str(uuid.uuid4())
+
+        if is_resume:
+            logger.info(f"Simulator {run_id} has resumed")
 
         emitter = FrameEmitter(run_id)
 
