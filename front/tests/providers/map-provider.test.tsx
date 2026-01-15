@@ -140,7 +140,10 @@ test('on-load callback sets mapLoaded to true', async () => {
 test('on-error callback logs error, calls logSimulationError and displayError, and reloads on retry', async () => {
   // Mock dependencies
   const mockReload = vi.fn();
-  const errorObj = { message: 'Map failed' };
+  const errorEvent = {
+    error: { message: 'Map failed to load tiles' },
+    sourceId: 'mapbox-streets',
+  };
 
   // Mock window.location.reload
   const originalReload = window.location.reload;
@@ -173,12 +176,18 @@ test('on-error callback logs error, calls logSimulationError and displayError, a
 
   // Trigger error callback
   act(() => {
-    map.callBacks.error(errorObj);
+    map.callBacks.error(errorEvent);
   });
 
-  expect(logSimulationError).toHaveBeenCalledWith(errorObj, 'Map loading', {
-    errorType: 'MAP_LOAD_FAILED',
-  });
+  expect(logSimulationError).toHaveBeenCalledWith(
+    'Map failed to load tiles',
+    'Map loading',
+    {
+      errorType: 'MAP_LOAD_FAILED',
+      sourceId: 'mapbox-streets',
+      originalError: errorEvent.error,
+    }
+  );
   expect(mockDisplayError).toHaveBeenCalledWith(
     'Failed to load map',
     'An error occurred while loading the map. Please try again later.',
