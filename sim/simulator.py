@@ -34,6 +34,10 @@ from sim.utils.subscriber import Subscriber
 from sim.core.SimulatorController import SimulatorController
 from sim.entities.task import Task
 from sim.behaviour.sim_behaviour import SimBehaviour
+from sim.map.MapController import MapController
+from grafana_logging.logger import get_logger
+
+logger = get_logger(__name__)
 
 
 class RunInfo(TypedDict):
@@ -62,6 +66,9 @@ class Simulator:
         input_parameters: InputParameter,
         subscribers: List[Subscriber],
         sim_behaviour: SimBehaviour = SimBehaviour(),
+        run_id: str | None = None,
+        map_controller: MapController | None = None,
+        env: SimulationEnvironment | None = None,
     ) -> str:
         """Initialize a simulation instance without starting the simulation loop.
 
@@ -85,13 +92,22 @@ class Simulator:
         """
         # Initialize a simulation and send the initial frame, but don't start
         # the simulation loop.
-        run_id = str(uuid.uuid4())  # threadID / SIM ID
+
+        is_resume = run_id is not None
+
+        if run_id is None:
+            run_id = str(uuid.uuid4())
+
+        if is_resume:
+            logger.info(f"Simulator {run_id} has resumed")
+
         emitter = FrameEmitter(run_id)
 
         for sub in subscribers:
             emitter.attach(sub)
 
-        env = SimulationEnvironment()
+        if env is None:
+            env = SimulationEnvironment()
 
         simController = SimulatorController(
             simEnv=env,
@@ -99,7 +115,9 @@ class Simulator:
             frameEmitter=emitter,
             sim_behaviour=sim_behaviour,
             strict=True,
+            map_controller=map_controller,
         )
+
         with self.thread_pool_lock:
             if run_id in self.thread_pool:
                 raise RuntimeError(f"Run id already present: {run_id}")

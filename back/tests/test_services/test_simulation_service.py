@@ -24,7 +24,9 @@ SOFTWARE.
 
 import pytest
 from unittest.mock import patch, Mock
-from typing import Generator
+from typing import Generator, cast
+
+from sqlalchemy.orm import Session
 from back.exceptions import VelosimPermissionError, ItemNotFoundError
 from back.models.user import User
 from back.schemas.playback_speed import (
@@ -32,7 +34,7 @@ from back.schemas.playback_speed import (
     PlaybackSpeedBase,
     SimulationPlaybackStatus,
 )
-from back.services.simulation_service import SimulationService
+from back.services.simulation_service import ActiveSimulationData, SimulationService
 from sim.entities.inputParameters import InputParameter
 
 # Apply patches before any simulator code is imported
@@ -387,11 +389,18 @@ class TestSimulationService:
         test_user: User,
         simulation_service: SimulationService,
     ) -> None:
-        """Sim UUID not in active_simulations raises ItemNotFoundError."""
+        """Inactive simulation attempts restore and fails authorization."""
+
         mock_user_crud.get.return_value = test_user
 
+        # Sim exists in DB but belongs to another user
+        foreign_sim = Mock()
+        foreign_sim.user_id = 999
+        mock_sim_crud.get_by_uuid.return_value = foreign_sim
+
         with pytest.raises(
-            ItemNotFoundError, match="Simulation .* is not currently active"
+            VelosimPermissionError,
+            match="Unauthorized to restore simulation",
         ):
             simulation_service.verify_access(
                 mock_db, "nonexistent-sim-id", test_user.id
@@ -636,10 +645,18 @@ class TestSimulationService:
         test_user: User,
         simulation_service: SimulationService,
     ) -> None:
-        """Test error when sim_id not in active_simulations."""
+        """Starting an inactive simulation triggers restore authorization failure."""
+
         mock_user_crud.get.return_value = test_user
 
-        with pytest.raises(ItemNotFoundError):
+        foreign_sim = Mock()
+        foreign_sim.user_id = 999
+        mock_sim_crud.get_by_uuid.return_value = foreign_sim
+
+        with pytest.raises(
+            VelosimPermissionError,
+            match="Unauthorized to restore simulation",
+        ):
             simulation_service.start_simulation(
                 mock_db, "nonexistent-sim", test_user.id
             )
@@ -1074,3 +1091,30 @@ class TestSimulationService:
                 RuntimeError, match="Simulator for simulation .* not found"
             ):
                 simulation_service.get_playback_speed(mock_db, "test-sim", test_user.id)
+
+    def test_ensure_active_simulation_returns_existing(
+        self: "TestSimulationService",
+        mock_user_crud: Mock,
+        mock_sim_crud: Mock,
+        mock_db: Mock,
+        test_user: User,
+        simulation_service: SimulationService,
+    ) -> None:
+        mock_user_crud.get.return_value = test_user
+
+        existing_sim_data: ActiveSimulationData = {
+            "db_id": 1,
+            "status": "running",
+            "sim_time": 123,
+            "user_id": test_user.id,
+        }
+
+        simulation_service.active_simulations["sim-123"] = existing_sim_data
+
+        result = simulation_service.ensure_active_simulation(
+            sim_id="sim-123",
+            db=cast(Session, mock_db),
+            requesting_user=test_user.id,
+        )
+
+        assert result is existing_sim_data

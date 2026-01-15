@@ -104,11 +104,12 @@ class Driver:
         task_list: list["Task"] | None = None,
         vehicle: Optional["Vehicle"] = None,
         name: str | None = None,
+        route: Optional["Route"] = None,
     ) -> None:
         self.id = driver_id
         self.name = name if name is not None else f"Driver {driver_id}"
         self.position = position
-        self.current_route = None
+        self.current_route = route
         self.vehicle = vehicle
         self.route_changed = False  # flag to track if route geometry needs to be sent
         self.shift = shift
@@ -122,7 +123,7 @@ class Driver:
         else:
             self.task_list = []
         self.has_updated = False  # flag to track if a driver was updated
-        self.state = DriverState.OFF_SHIFT  # Overwritten by sim controller if needed
+        self.state: DriverState | None = None  # Overwritten by sim controller if needed
 
     def get_position(self) -> "Position":
         """Get the current position of the driver.
@@ -132,7 +133,7 @@ class Driver:
         """
         return self.position
 
-    def get_state(self) -> DriverState:
+    def get_state(self) -> DriverState | None:
         """
         Get the driver's current state.
 
@@ -854,7 +855,7 @@ class Driver:
             ):
                 self.set_state(DriverState.SERVICING_STATION)
                 return
-            if task_station is not None and not self.current_route:
+            if task_station is not None:
                 yield self.env.process(self.travel_to(task_station.get_position()))
                 self.set_state(DriverState.SERVICING_STATION)
                 return

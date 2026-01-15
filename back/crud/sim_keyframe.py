@@ -76,6 +76,43 @@ class SimKeyframeCRUD:
             raise ItemNotFoundError("Keyframe not found")
         return keyframe
 
+    def get_keyframe_at_tick(
+        self,
+        db: Session,
+        sim_id: str,
+        tick: float,
+    ) -> SimKeyframe:
+        """
+        Retrieve the most recent keyframe at or before a given simulation tick.
+
+        Args:
+            db: Active database session.
+            sim_id: UUID of the simulation instance.
+            tick: Simulation time (in seconds) to retrieve the keyframe for.
+
+        Returns:
+            The keyframe at or immediately preceding the given simulation tick.
+
+        Raises:
+            ItemNotFoundError: If no keyframe exists at or before the given tick.
+        """
+        keyframe = (
+            db.query(SimKeyframe)
+            .filter(
+                SimKeyframe.sim_instance_id == sim_id,
+                SimKeyframe.sim_seconds_elapsed <= tick,
+            )
+            .order_by(SimKeyframe.sim_seconds_elapsed.desc())
+            .first()
+        )
+
+        if not keyframe:
+            raise ItemNotFoundError(
+                f"No keyframe found at or before tick {tick} for simulation {sim_id}"
+            )
+
+        return keyframe
+
     def get_by_sim_instance(
         self, db: Session, sim_instance_id: int, skip: int = 0, limit: int = 100
     ) -> Tuple[List[SimKeyframe], int]:
@@ -149,6 +186,33 @@ class SimKeyframeCRUD:
         keyframe = self.get(db, keyframe_id)
         db.delete(keyframe)
         db.commit()
+
+    def get_last_keyframe(
+        self, db: Session, sim_instance_id: str
+    ) -> Optional[SimKeyframe]:
+        """
+        Retrieve the most recently persisted keyframe for a simulation instance.
+
+        Args:
+            db: Active database session.
+            sim_instance_id: UUID of the simulation instance.
+
+        Returns:
+            The most recent keyframe if one exists, otherwise None.
+
+        """
+
+        keyframe = (
+            db.query(SimKeyframe)
+            .filter(SimKeyframe.sim_instance_id == sim_instance_id)
+            .order_by(SimKeyframe.sim_seconds_elapsed.desc())
+            .first()
+        )
+
+        if not keyframe:
+            raise ItemNotFoundError("No keyframe found.")
+
+        return keyframe
 
 
 # Singleton instance for use throughout the application
