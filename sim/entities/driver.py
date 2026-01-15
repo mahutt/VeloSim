@@ -97,6 +97,7 @@ class Driver:
     env: SimulationEnvironment
     vehicle: Optional["Vehicle"]
     shift: Shift
+    routes: list[Route]
 
     def __init__(
         self,
@@ -126,6 +127,7 @@ class Driver:
             self.task_list = []
         self.has_updated = False  # flag to track if a driver was updated
         self.state: DriverState | None = None  # Overwritten by sim controller if needed
+        self.routes = []
 
     def get_position(self) -> "Position":
         """Get the current position of the driver.
@@ -267,7 +269,7 @@ class Driver:
             self.task_list.append(task)
             task.set_assigned_driver(self)
             self.has_updated = True
-            self.route_changed = True
+            self.compute_routes()
             # Task state is now ASSIGNED (set by task.set_assigned_driver)
 
             # Handle dispatch scheduling
@@ -320,7 +322,7 @@ class Driver:
             #     self.state = DriverState.IDLE
 
             self.has_updated = True
-            self.route_changed = True
+            self.compute_routes()
 
     def unassign_vehicle(self) -> None:
         """Unassign the current vehicle from this driver.
@@ -395,7 +397,7 @@ class Driver:
             if task_in_progress is None:
                 task.set_state(State.IN_PROGRESS)
                 self.has_updated = True
-                self.route_changed = True
+                self.compute_routes()
             else:
                 raise Exception(
                     "Cannot dispatch this task since there exists "
@@ -429,7 +431,7 @@ class Driver:
             battery_count = self.vehicle.use_battery()
             task.set_state(State.CLOSED)
             self.has_updated = True
-            self.route_changed = True
+            self.compute_routes()
 
             if battery_count == 0:
                 # return to HQ for refill
@@ -597,55 +599,32 @@ class Driver:
         # Update the task list and mark as updated
         self.task_list = new_task_list
         self.has_updated = True
-        self.route_changed = True
+        self.compute_routes()
 
         # Return the new task ID order
         return [task.id for task in new_task_list]
 
-    def travel_to(self, position: "Position") -> Generator[Any, None, None]:
-        """SimPy process that moves the driver to a target position.
+    def travel_to_next_stop(self) -> Generator[Any, None, None]:
+        """SimPy process that moves the driver to the next stop in their route.
 
-        Calculates a route using the MapController and traverses it
-        step-by-step, updating the driver's position at each simulation tick.
-        The process yields control back to the simulation environment at each
-        step and can be interrupted.
+        Traverses the first route in self.routes until completion or interruption.
+        The route should already be computed via compute_routes().
 
-        If the driver is already at the target position, the method returns
-        immediately. If no route can be found, logs an error and stays at the
-        current position.
-
-        If the driver is ON_ROUTE but no tasks are in progress,
-        the route is interrupted.
-
-        Args:
-            position: The target Position to travel to.
-
-        Yields:
-            simpy.Event: Timeout events for each step of travel
-                (1 time unit per step).
+        The driver will stop traveling if:
+        - The route is completed
+        - The driver's state is ON_ROUTE but there's no in-progress task
+        - The process is interrupted by another SimPy entity
 
         Returns:
             Generator that yields timeout events during travel.
         """
-        if self.position == position:
+        if not self.routes:
             return
 
+        self.current_route = self.routes[0]
+        next_position = self.current_route.next()
         try:
-            route = self.map_controller.get_route(self.position, position)
-        except ValueError as e:
-            # Route could not be found (no path exists, network error, etc.)
-            # Log the error and stay at current position
-            print(
-                f"Driver {self.id}: Cannot find route to "
-                f"{position.get_position()}: {e}"
-            )
-            return
-
-        self.current_route = route
-        self.route_changed = True  # Mark that route geometry needs to be sent
-        next_position = route.next()
-        try:
-            while self.position != position and next_position:
+            while next_position:
                 # Handle case where driver is on_route but in_progress task
                 # got unassigned or reordered
                 if (
@@ -653,7 +632,6 @@ class Driver:
                     and not self.get_in_progress_task()
                 ):
                     break
-
                 # Handle case where route.next() returns tuple (position, geometry)
                 if isinstance(next_position, tuple):
                     next_position = next_position[0]
@@ -662,7 +640,7 @@ class Driver:
                 )  # route.next() returns Position when as_json=False
                 self.set_position(next_position)
                 yield self.env.timeout(1)
-                next_position = route.next()
+                next_position = self.current_route.next()
         # Allows a traveling drivers to be interrupted by other simpy entities
         except simpy.Interrupt:
             # TODO Implement interrupt logic
@@ -670,92 +648,95 @@ class Driver:
         finally:
             # Clear current route when travel completes or is interrupted
             self.current_route = None
-            self.route_changed = True
+            self.compute_routes()
 
-    def get_full_route(self) -> dict | None:
-        """Get the full route for all tasks in driver's task queue.
+    def get_route_json(self) -> dict | None:
+        """Get the current route for the driver in JSON format.
 
         Returns:
-            Full route geometry and index where the next task's route ends,
-            or None if there are no tasks / no route can be made.
+            Current route geometry as a dictionary, or None if no route is set.
 
-            The dictionary has the keys:
+            The dictionary has the key:
                 - "coordinates": list[list[float]] of route coordinates.
-                - "nextTaskEndIndex": int index in coordinates where
-                  the first task's route segment ends.
         """
-        visible_tasks = self.get_visible_task_list()
-        include_hq = self.state in (
-            DriverState.SEEKING_HQ_FOR_INVENTORY,
-            DriverState.ENDING_SHIFT,
-        )
 
-        if not visible_tasks and not include_hq:
+        if not self.routes:
             return None
 
-        full_geometry: list[list[float]] = []
-        next_task_end_index = 0
-        current_pos = self.position
+        combined_raw_coordinates: list[list[float]] = []
 
-        # if driver needs to go to HQ, make HQ route the "next task"
-        if include_hq:
+        for route in self.routes:
+            segment_coords = route.get_raw_coordinates()
+            if segment_coords:
+                # Remove duplicate coordinates at segment boundaries
+                if combined_raw_coordinates:
+                    segment_coords = segment_coords[1:]
+                combined_raw_coordinates.extend(segment_coords)
+
+        return {
+            "coordinates": combined_raw_coordinates,
+            "nextStopIndex": len(self.routes[0].get_raw_coordinates()) - 1,
+        }
+
+    def compute_routes(self) -> list[Route]:
+        """
+        Compute the full set of routes for the driver based on current state.
+
+        Routes are currently affected by whether the driver is heading to HQ,
+        and by the driver's visible tasks. This function should be called on every
+        transition to / from HEADING_TO_HQ and on every modification of the
+        visible task list.
+
+        Returns:
+            list[Route]: List of Route objects representing the driver's path.
+        """
+        stops: list[Position] = []
+
+        if self.state in [
+            DriverState.SEEKING_HQ_FOR_INVENTORY,
+            DriverState.ENDING_SHIFT,
+        ]:
+            stops.append(self.env.hq.position)
+
+        elif self.state == DriverState.ON_BREAK:
+            if self.lunch_location is None:
+                self.lunch_location = self._generate_lunch_location()
+            stops.append(self.lunch_location)
+
+        # Don't add task stops if ending shift
+        if self.state != DriverState.ENDING_SHIFT:
+            for task in self.get_visible_task_list():
+                station = task.get_station()
+                if station is not None:
+                    stops.append(station.get_position())
+
+        new_routes: list[Route] = []
+
+        for i in range(len(stops)):
+            start_position = self.position if i == 0 else stops[i - 1]
+            end_position = stops[i]
             try:
-                route = self.map_controller.get_route(current_pos, self.env.hq.position)
-                segment_coords = route.get_raw_coordinates()
-
-                if segment_coords:
-                    full_geometry.extend(segment_coords)
-                    next_task_end_index = len(full_geometry) - 1
-                    current_pos = self.env.hq.position
-
-            except ValueError as e:
-                print(f"Driver {self.id}: Cannot get route to HQ: {e}")
-
-        for task_idx, task in enumerate(visible_tasks):
-            task_station = task.get_station()
-
-            if task_station is None:
-                continue
-
-            target_pos = task_station.get_position()
-
-            try:
-                route = self.map_controller.get_route(current_pos, target_pos)
-                segment_coords = route.get_raw_coordinates()
-
-                if segment_coords:
-                    if full_geometry and full_geometry[-1] == segment_coords[0]:
-                        segment_coords = segment_coords[1:]
-
-                    full_geometry.extend(segment_coords)
-
-                    # set next_task_end_index to the next task if HQ isn't next
-                    if task_idx == 0 and not include_hq:
-                        next_task_end_index = len(full_geometry) - 1
-
-                    current_pos = target_pos
-
+                route = self.map_controller.get_route(start_position, end_position)
+                new_routes.append(route)
             except ValueError as e:
                 print(
-                    f"Driver {self.id}: Cannot get route segment to {target_pos}: {e}"
+                    f"Driver {self.id}: Cannot get route from "
+                    f"{start_position} to {end_position}: {e}"
                 )
                 break
-
-        return (
-            {"coordinates": full_geometry, "nextTaskEndIndex": next_task_end_index}
-            if full_geometry
-            else None
-        )
+        self.routes = new_routes
+        self.route_changed = True
+        return self.routes
 
     def return_to_HQ(self) -> Generator[Any, Any, Any]:
         """
         Make driver return to HQ.
 
         Returns:
-            Generator that yields for travel_to process.
+            Generator that yields for travel_to_next_stop process.
         """
-        self.route_changed = True
-        yield self.env.process(self.travel_to(self.env.hq.position))
+        self.compute_routes()
+        yield self.env.process(self.travel_to_next_stop())
 
     def restock_vehicle_battery(self) -> Generator[Any, Any, Any]:
         """
@@ -884,7 +865,6 @@ class Driver:
             lunch_break is not None
             and lunch_break <= current_sim_time < lunch_break + LUNCH_BREAK_DURATION
         ):
-            self.lunch_location = self._generate_lunch_location()
             self.set_state(DriverState.ON_BREAK)
             return
 
@@ -907,7 +887,7 @@ class Driver:
                 self.set_state(DriverState.SERVICING_STATION)
                 return
             if task_station is not None:
-                yield self.env.process(self.travel_to(task_station.get_position()))
+                yield self.env.process(self.travel_to_next_stop())
                 if self.get_in_progress_task() is not None:
                     in_progress.set_state(State.IN_SERVICE)
                     self.set_state(DriverState.SERVICING_STATION)
@@ -923,9 +903,8 @@ class Driver:
         self.set_state(DriverState.IDLE)
 
     def _on_break(self) -> Generator[Any, None, None]:
-        # travel to lunch location
-        if self.lunch_location and not self.position.close_enough(self.lunch_location):
-            yield self.env.process(self.travel_to(self.lunch_location))
+        self.compute_routes()
+        yield self.env.process(self.travel_to_next_stop())
 
         yield self.env.timeout(LUNCH_BREAK_DURATION)
         self.set_state(DriverState.IDLE)

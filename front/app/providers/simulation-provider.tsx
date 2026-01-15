@@ -470,7 +470,7 @@ export const SimulationProvider = ({
         updateRouteDisplay(
           route.coordinates,
           position,
-          route.nextTaskEndIndex,
+          route.nextStopIndex,
           map
         );
       } else {
@@ -675,7 +675,7 @@ export const SimulationProvider = ({
         if (resource.route?.coordinates) {
           routesRef.current.set(resource.id, {
             coordinates: resource.route.coordinates,
-            nextTaskEndIndex: resource.route.nextTaskEndIndex,
+            nextStopIndex: resource.route.nextStopIndex,
           });
         } else if (resource.route === null) {
           // Backend explicitly signals route completion - clear route data

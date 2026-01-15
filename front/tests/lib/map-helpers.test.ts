@@ -291,7 +291,7 @@ test('updateRouteDisplay clears display when routeGeometry has less than 2 point
   });
 });
 
-test('updateRouteDisplay splits route at nextTaskEndIndex', () => {
+test('updateRouteDisplay splits route at nextStopIndex', () => {
   MockMap.createRandomInstance();
 
   const mockGeoJSONSource = { setData: vi.fn() };
@@ -331,7 +331,7 @@ test('updateRouteDisplay splits route at nextTaskEndIndex', () => {
   expect(lastFuture[1]).toBeCloseTo(45.8, 3);
 });
 
-test('updateRouteDisplay handles nextTaskEndIndex at start (0)', () => {
+test('updateRouteDisplay handles nextStopIndex at start (0)', () => {
   MockMap.createRandomInstance();
 
   const mockGeoJSONSource = { setData: vi.fn() };
@@ -343,7 +343,7 @@ test('updateRouteDisplay handles nextTaskEndIndex at start (0)', () => {
     [-73.7, 45.7],
   ];
 
-  // nextTaskEndIndex = 1 means split at first task
+  // nextStopIndex = 1 means split at first task
   updateRouteDisplay(
     routeGeometry,
     [-73.5, 45.5],
@@ -361,7 +361,7 @@ test('updateRouteDisplay handles nextTaskEndIndex at start (0)', () => {
   expect(futureTasksCall.features.length).toBeGreaterThanOrEqual(0);
 });
 
-test('updateRouteDisplay handles nextTaskEndIndex at end of route', () => {
+test('updateRouteDisplay handles nextStopIndex at end of route', () => {
   MockMap.createRandomInstance();
 
   const mockGeoJSONSource = { setData: vi.fn() };
@@ -373,7 +373,7 @@ test('updateRouteDisplay handles nextTaskEndIndex at end of route', () => {
     [-73.7, 45.7],
   ];
 
-  // nextTaskEndIndex = 2 is at the last valid index
+  // nextStopIndex = 2 is at the last valid index
   updateRouteDisplay(
     routeGeometry,
     [-73.5, 45.5],

@@ -306,6 +306,10 @@ def test_resource_get_in_progress_task(
     task1 = BatterySwapTask(task_id=1, station=station)
     task2 = BatterySwapTask(task_id=2, station=station)
 
+    mock_map = Mock()
+    mock_map.get_route.return_value = Mock()
+    resource.set_map_controller(mock_map)
+
     resource.assign_task(task1)
     resource.assign_task(task2)
 
@@ -339,6 +343,10 @@ def test_dispatch_multiple_tasks_same_station(
     task1 = BatterySwapTask(task_id=1, station=station)
     task2 = BatterySwapTask(task_id=2, station=station)
 
+    mock_map = Mock()
+    mock_map.get_route.return_value = Mock()
+    resource.set_map_controller(mock_map)
+
     resource.assign_task(task1)
     resource.assign_task(task2)
 
@@ -369,6 +377,10 @@ def test_dispatch_task_different_station_raises_exception(
         ),
     )
     station2 = Station(station_id=2, name="Station 2", position=Position([1.0, 1.0]))
+
+    mock_map = Mock()
+    mock_map.get_route.return_value = Mock()
+    resource.set_map_controller(mock_map)
 
     task1 = BatterySwapTask(task_id=1, station=station)
     task2 = BatterySwapTask(task_id=2, station=station2)
@@ -438,6 +450,10 @@ def test_zero_dispatch_delay_keeps_task_assigned(
         ),
     )
 
+    mock_map = Mock()
+    mock_map.get_route.return_value = Mock()
+    resource.set_map_controller(mock_map)
+
     resource.assign_task(task, dispatch_delay=0)
     assert task.get_state() == State.ASSIGNED
 
@@ -490,11 +506,16 @@ def test_task_state_string_conversions(
     vehicle = Vehicle(vehicle_id=1, battery_count=10)
     vehicle.set_driver(resource)
     resource.set_vehicle(vehicle)
+
     # ensure local driver has sim_behaviour and TST strategy for service_task
     resource.sim_behaviour = Mock()
     resource.sim_behaviour.TST_strategy = Mock()
     resource.sim_behaviour.TST_strategy.get_task_servicing_time.return_value = 0
-    resource.map_controller = Mock()
+
+    mock_map = Mock()
+    mock_map.get_route.return_value = Mock()
+    resource.set_map_controller(mock_map)
+
     resource.assign_task(task)
     assert str(task.get_state()) == "assigned"
 

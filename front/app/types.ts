@@ -111,7 +111,7 @@ interface StationInformation {
 
 export interface Route {
   coordinates: Position[];
-  nextTaskEndIndex: number;
+  nextStopIndex: number;
 }
 
 export enum DriverState {

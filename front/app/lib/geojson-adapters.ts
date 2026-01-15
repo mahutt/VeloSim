@@ -98,7 +98,7 @@ export function adaptResourcesToGeoJSON(
 export function adaptRouteToGeoJSON(
   routeGeometry: Position[] | null,
   position: Position | null,
-  nextTaskEndIndex: number
+  nextStopIndex: number
 ): {
   nextTask: GeoJSON.FeatureCollection;
   futureTasks: GeoJSON.FeatureCollection;
@@ -115,21 +115,21 @@ export function adaptRouteToGeoJSON(
     };
   }
 
-  if (nextTaskEndIndex < 0 || nextTaskEndIndex > routeGeometry.length - 1) {
+  if (nextStopIndex < 0 || nextStopIndex > routeGeometry.length - 1) {
     return {
       nextTask: emptyFeatureCollection,
       futureTasks: emptyFeatureCollection,
     };
   }
 
-  // 1. split the route at nextTaskEndIndex to avoid snapping to the incorrect part of a line (due to double-backing)
-  const preNextTaskSegment = routeGeometry.slice(0, nextTaskEndIndex + 1);
-  const postNextTaskSegment = routeGeometry.slice(nextTaskEndIndex);
+  // 1. split the route at nextStopIndex to avoid snapping to the incorrect part of a line (due to double-backing)
+  const preNextTaskSegment = routeGeometry.slice(0, nextStopIndex + 1);
+  const postNextTaskSegment = routeGeometry.slice(nextStopIndex);
 
   // 2. remove points already travelled on preNextTaskSegment (using position)
   const nextTaskLine = lineSlice(
     point(position),
-    point(routeGeometry[nextTaskEndIndex]),
+    point(routeGeometry[nextStopIndex]),
     lineString(preNextTaskSegment)
   );
 
