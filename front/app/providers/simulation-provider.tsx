@@ -77,9 +77,6 @@ import {
 } from '~/lib/hq-widget-helpers';
 import { positionsEqual } from '~/lib/utils';
 
-// Expect to receive frames every 1 second
-const BASE_FRAME_INTERVAL_MS = 1000;
-
 export const SPEED_OPTIONS = [0, 0.5, 1, 2, 4, 8] as const;
 export type Speed = (typeof SPEED_OPTIONS)[number];
 
@@ -332,8 +329,8 @@ export const SimulationProvider = ({
   // Route geometry for path-following interpolation
   const routesRef = useRef<Map<number, Route>>(new Map());
 
-  // Global frame timing (shared by all resources)
-  const lastFrameTimeRef = useRef<number>(0);
+  // Last driver update timestamps
+  const lastDriverUpdatesRef = useRef<Map<number, number>>(new Map());
 
   // Animation and cleanup refs
   const animationFrameRef = useRef<number>(0);
@@ -678,10 +675,8 @@ export const SimulationProvider = ({
           // Backend explicitly signals route completion - clear route data
           routesRef.current.delete(resource.id);
         }
+        lastDriverUpdatesRef.current.set(resource.id, performance.now());
       });
-
-      // Update frame start time
-      lastFrameTimeRef.current = performance.now();
 
       // Ensure animation loop is running (in case it stopped)
       ensureAnimationRunning();
@@ -703,16 +698,6 @@ export const SimulationProvider = ({
 
   // Animation loop to interpolate resource positions
   const animateResources = () => {
-    const now = performance.now();
-    const frameElapsedMs = now - lastFrameTimeRef.current;
-
-    // Calculate interpolation progress (0 to 1)
-    const adjustedInterval =
-      speedRef.current === 0
-        ? BASE_FRAME_INTERVAL_MS // If paused, use normal interval to avoid division by zero
-        : BASE_FRAME_INTERVAL_MS / speedRef.current; // Adjust interval based on playback speed
-    const t = Math.min(frameElapsedMs / adjustedInterval, 1);
-
     // Update position for each resource
     const driverPositionsChanged = updateDriverPositions(
       driversRef.current,
@@ -720,7 +705,8 @@ export const SimulationProvider = ({
       frameStartPositionsRef.current,
       targetPositionsRef.current,
       routesRef.current,
-      t
+      lastDriverUpdatesRef.current,
+      speedRef.current
     );
     if (driverPositionsChanged) {
       renderOnNextFrameRef.current = true;

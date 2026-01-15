@@ -127,7 +127,8 @@ describe('updateDriverPositions', () => {
     const frameStartPositions = new Map<number, Position>();
     const frameTargetPositions = new Map<number, Position>();
     const routes = new Map<number, Route>();
-    const frameProgress = 0.5;
+    const lastDriverUpdates = new Map<number, number>();
+    const speed = 1;
 
     const result = updateDriverPositions(
       drivers,
@@ -135,7 +136,8 @@ describe('updateDriverPositions', () => {
       frameStartPositions,
       frameTargetPositions,
       routes,
-      frameProgress
+      lastDriverUpdates,
+      speed
     );
 
     expect(result).toBe(false);
@@ -161,7 +163,10 @@ describe('updateDriverPositions', () => {
         },
       ],
     ]);
-    const frameProgress = 0.5;
+    const lastDriverUpdates = new Map<number, number>([
+      [1, performance.now() - 500],
+    ]);
+    const speed = 1;
 
     const result = updateDriverPositions(
       drivers,
@@ -169,7 +174,8 @@ describe('updateDriverPositions', () => {
       frameStartPositions,
       frameTargetPositions,
       routes,
-      frameProgress
+      lastDriverUpdates,
+      speed
     );
 
     expect(result).toBe(true);
@@ -183,7 +189,10 @@ describe('updateDriverPositions', () => {
     const frameStartPositions = new Map<number, Position>([[1, [0, 0]]]);
     const frameTargetPositions = new Map<number, Position>([[1, [1, 1]]]);
     const routes = new Map<number, Route>();
-    const frameProgress = 0.5;
+    const lastDriverUpdates = new Map<number, number>([
+      [1, performance.now() - 500],
+    ]);
+    const speed = 0;
 
     const result = updateDriverPositions(
       drivers,
@@ -191,7 +200,8 @@ describe('updateDriverPositions', () => {
       frameStartPositions,
       frameTargetPositions,
       routes,
-      frameProgress
+      lastDriverUpdates,
+      speed
     );
 
     expect(result).toBe(true);
@@ -205,7 +215,10 @@ describe('updateDriverPositions', () => {
     const frameStartPositions = new Map<number, Position>([[1, [0, 0]]]);
     const frameTargetPositions = new Map<number, Position>([[1, [1, 1]]]);
     const routes = new Map<number, Route>();
-    const frameProgress = 1;
+    const lastDriverUpdates = new Map<number, number>([
+      [1, performance.now() - 1000],
+    ]);
+    const speed = 1;
 
     const result = updateDriverPositions(
       drivers,
@@ -213,7 +226,8 @@ describe('updateDriverPositions', () => {
       frameStartPositions,
       frameTargetPositions,
       routes,
-      frameProgress
+      lastDriverUpdates,
+      speed
     );
 
     expect(result).toBe(true);

@@ -90,6 +90,9 @@ export function interpolateAlongRoute(
   return interpolatedPoint.geometry.coordinates as Position;
 }
 
+// Expect to receive frames every 1 second
+const BASE_FRAME_INTERVAL_MS = 1000;
+
 /**
  * Updates driver positions for the current animation loop.
  *
@@ -98,7 +101,8 @@ export function interpolateAlongRoute(
  * @param frameStartPositions map of driver IDs to their positions at the start of the frame
  * @param frameTargetPositions map of driver IDs to their target positions at the end of the frame
  * @param routes map of driver IDs to their current routes
- * @param frameProgress progress of the current frame (0 to 1)
+ * @param lastDriverUpdates map of driver IDs to the timestamp of their last position update
+ * @param speed simulation speed factor (1 = normal speed, 0 = paused)
  * @returns true if any driver positions were updated, false otherwise
  */
 export function updateDriverPositions(
@@ -107,7 +111,8 @@ export function updateDriverPositions(
   frameStartPositions: Map<number, Position>,
   frameTargetPositions: Map<number, Position>,
   routes: Map<number, Route>,
-  frameProgress: number
+  lastDriverUpdates: Map<number, number>,
+  speed: number
 ): boolean {
   let driverPositionsChanged = false;
   drivers.forEach((driver) => {
@@ -116,6 +121,18 @@ export function updateDriverPositions(
 
     // If start / target positions aren't set, don't animate
     if (!start || !target) return;
+
+    // Calculate interpolation progress (0 to 1)
+    const now = performance.now();
+    const frameElapsedMs = now - (lastDriverUpdates.get(driver.id) || 0);
+    const speedAdjustedFrameInterval =
+      speed === 0
+        ? BASE_FRAME_INTERVAL_MS // If paused, use normal interval to avoid division by zero
+        : BASE_FRAME_INTERVAL_MS / speed;
+    const frameIntervalProgress = Math.min(
+      frameElapsedMs / speedAdjustedFrameInterval,
+      1
+    );
 
     let currentPos: Position;
     const route = routes.get(driver.id);
@@ -133,13 +150,13 @@ export function updateDriverPositions(
         constrainedRoute,
         start,
         target,
-        frameProgress
+        frameIntervalProgress
       );
     } else {
       // Fallback to linear interpolation if no route geometry
       currentPos = [
-        start[0] + (target[0] - start[0]) * frameProgress,
-        start[1] + (target[1] - start[1]) * frameProgress,
+        start[0] + (target[0] - start[0]) * frameIntervalProgress,
+        start[1] + (target[1] - start[1]) * frameIntervalProgress,
       ];
     }
 
