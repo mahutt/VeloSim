@@ -509,9 +509,6 @@ class Driver:
         # Track which IDs we've seen to maintain original order
         specified_ids_set = set(task_ids_to_reorder)
 
-        # Flag to handle case when an in_progress task was moved
-        in_progress_task_changed = False
-
         # First pass: collect specified tasks (incl. in-progress)
         for task_id in task_ids_to_reorder:
             found_task = current_task_map.get(task_id)
@@ -545,8 +542,8 @@ class Driver:
                         f"Task {task_id} not associated to driver {self.id} task list"
                     )
             else:
-                if found_task.get_state() == State.IN_PROGRESS:
-                    in_progress_task_changed = True
+                """if found_task.get_state() == State.IN_PROGRESS:
+                in_progress_task_changed = True"""
                 specified_tasks.append(found_task)
 
         # Second pass: collect unspecified tasks (excl. in-progress)
@@ -556,13 +553,6 @@ class Driver:
                     unspecified_in_progress_tasks.append(task)
                 else:
                     unspecified_tasks.append(task)
-
-        # If an in-progress task was reordered, set its state to ASSIGNED as the driver
-        # will prioritize another task
-        if in_progress_task_changed:
-            for task in self.task_list:
-                if task.get_state() == State.IN_PROGRESS:
-                    task.set_state(State.ASSIGNED)
 
         # Build the new task list based on mode
         if apply_from_top:
@@ -577,6 +567,13 @@ class Driver:
                 + unspecified_tasks
                 + list(reversed(specified_tasks))
             )
+
+        # If an in-progress task was reordered, set its state to ASSIGNED as the driver
+        # will prioritize another task
+        if new_task_list[0].get_state() != State.IN_PROGRESS:
+            for task in self.task_list:
+                if task.get_state() == State.IN_PROGRESS:
+                    task.set_state(State.ASSIGNED)
 
         # Update the task list and mark as updated
         self.task_list = new_task_list
