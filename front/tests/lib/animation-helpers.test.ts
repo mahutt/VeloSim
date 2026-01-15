@@ -22,9 +22,13 @@
  * SOFTWARE.
  */
 
-import { expect, test } from 'vitest';
-import { interpolateAlongRoute } from '~/lib/animation-helpers';
-import type { Position } from '~/types';
+import { makeDriver } from 'tests/test-helpers';
+import { describe, expect, it, test } from 'vitest';
+import {
+  interpolateAlongRoute,
+  updateDriverPositions,
+} from '~/lib/animation-helpers';
+import type { Driver, Position, Route } from '~/types';
 
 // Helper to check if two positions are approximately equal
 function expectPositionClose(actual: Position, expected: Position) {
@@ -114,4 +118,120 @@ test('interpolateAlongRoute falls back to linear for single-point route', () => 
 
   // Should fall back to linear interpolation
   expectPositionClose(result, [5, 5]);
+});
+
+describe('updateDriverPositions', () => {
+  it("doesn't update a driver's position when no start / target positions are available", () => {
+    const drivers = new Map<number, Driver>([[1, makeDriver({ id: 1 })]]);
+    const currentPositions = new Map<number, Position>([[1, [0, 0]]]);
+    const frameStartPositions = new Map<number, Position>();
+    const frameTargetPositions = new Map<number, Position>();
+    const routes = new Map<number, Route>();
+    const lastDriverUpdates = new Map<number, number>();
+    const speed = 1;
+
+    const result = updateDriverPositions(
+      drivers,
+      currentPositions,
+      frameStartPositions,
+      frameTargetPositions,
+      routes,
+      lastDriverUpdates,
+      speed
+    );
+
+    expect(result).toBe(false);
+    expect(currentPositions.get(1)).toEqual([0, 0]);
+  });
+
+  it("updates a driver's position when start / target positions are available", () => {
+    const drivers = new Map<number, Driver>([[1, makeDriver({ id: 1 })]]);
+    const currentPositions = new Map<number, Position>([[1, [0.1, 0.1]]]);
+    const frameStartPositions = new Map<number, Position>([[1, [0, 0]]]);
+    const frameTargetPositions = new Map<number, Position>([[1, [1, 1]]]);
+    const routes = new Map<number, Route>([
+      [
+        1,
+        {
+          coordinates: [
+            [-1, -1],
+            [0, 0],
+            [0, 1],
+            [1, 1],
+          ],
+          nextTaskEndIndex: 3,
+        },
+      ],
+    ]);
+    const lastDriverUpdates = new Map<number, number>([
+      [1, performance.now() - 500],
+    ]);
+    const speed = 1;
+
+    const result = updateDriverPositions(
+      drivers,
+      currentPositions,
+      frameStartPositions,
+      frameTargetPositions,
+      routes,
+      lastDriverUpdates,
+      speed
+    );
+
+    expect(result).toBe(true);
+    expect(currentPositions.get(1)![0]).toBeCloseTo(0);
+    expect(currentPositions.get(1)![1]).toBeCloseTo(1);
+  });
+
+  it('uses linear interpolation when no route is available', () => {
+    const drivers = new Map<number, Driver>([[1, makeDriver({ id: 1 })]]);
+    const currentPositions = new Map<number, Position>([[1, [0.1, 0.1]]]);
+    const frameStartPositions = new Map<number, Position>([[1, [0, 0]]]);
+    const frameTargetPositions = new Map<number, Position>([[1, [1, 1]]]);
+    const routes = new Map<number, Route>();
+    const lastDriverUpdates = new Map<number, number>([
+      [1, performance.now() - 500],
+    ]);
+    const speed = 0;
+
+    const result = updateDriverPositions(
+      drivers,
+      currentPositions,
+      frameStartPositions,
+      frameTargetPositions,
+      routes,
+      lastDriverUpdates,
+      speed
+    );
+
+    expect(result).toBe(true);
+    expect(currentPositions.get(1)![0]).toBeCloseTo(0.5);
+    expect(currentPositions.get(1)![1]).toBeCloseTo(0.5);
+  });
+
+  it('clears the start / target positions if the target is reached', () => {
+    const drivers = new Map<number, Driver>([[1, makeDriver({ id: 1 })]]);
+    const currentPositions = new Map<number, Position>([[1, [0.1, 0.1]]]);
+    const frameStartPositions = new Map<number, Position>([[1, [0, 0]]]);
+    const frameTargetPositions = new Map<number, Position>([[1, [1, 1]]]);
+    const routes = new Map<number, Route>();
+    const lastDriverUpdates = new Map<number, number>([
+      [1, performance.now() - 1000],
+    ]);
+    const speed = 1;
+
+    const result = updateDriverPositions(
+      drivers,
+      currentPositions,
+      frameStartPositions,
+      frameTargetPositions,
+      routes,
+      lastDriverUpdates,
+      speed
+    );
+
+    expect(result).toBe(true);
+    expect(frameStartPositions.has(1)).toBe(false);
+    expect(frameTargetPositions.has(1)).toBe(false);
+  });
 });

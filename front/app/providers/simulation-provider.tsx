@@ -69,15 +69,13 @@ import {
   type PopulatedDriver,
   type SelectedItemBarElement,
 } from '~/components/map/selected-item-bar';
-import { interpolateAlongRoute } from '~/lib/animation-helpers';
+import { updateDriverPositions } from '~/lib/animation-helpers';
 import type { HQWidgetProps } from '~/components/simulation/hq-widget';
 import {
   areHQWidgetStatesEqual,
   createHQWidgetState,
 } from '~/lib/hq-widget-helpers';
-
-// Expect to receive frames every 1 second
-const BASE_FRAME_INTERVAL_MS = 1000;
+import { positionsEqual } from '~/lib/utils';
 
 export const SPEED_OPTIONS = [0, 0.5, 1, 2, 4, 8] as const;
 export type Speed = (typeof SPEED_OPTIONS)[number];
@@ -331,8 +329,8 @@ export const SimulationProvider = ({
   // Route geometry for path-following interpolation
   const routesRef = useRef<Map<number, Route>>(new Map());
 
-  // Global frame timing (shared by all resources)
-  const lastFrameTimeRef = useRef<number>(0);
+  // Last driver update timestamps
+  const lastDriverUpdatesRef = useRef<Map<number, number>>(new Map());
 
   // Animation and cleanup refs
   const animationFrameRef = useRef<number>(0);
@@ -654,11 +652,17 @@ export const SimulationProvider = ({
       payload.drivers.forEach((resource: Driver) => {
         const newPosition = resource.position;
         const currentPosition = currentPositionsRef.current.get(resource.id);
-        frameStartPositionsRef.current.set(
-          resource.id,
-          currentPosition ?? newPosition
-        );
-        targetPositionsRef.current.set(resource.id, newPosition);
+
+        // If currentPosition isn't set, initialize it to newPosition
+        if (!currentPosition) {
+          currentPositionsRef.current.set(resource.id, newPosition);
+        }
+        // If currentPosition is set and isn't equal to newPosition, we must trigger
+        // animation to the new position by setting frame start and target positions
+        else if (!positionsEqual(currentPosition, newPosition)) {
+          frameStartPositionsRef.current.set(resource.id, currentPosition);
+          targetPositionsRef.current.set(resource.id, newPosition);
+        }
 
         // Store route geometry if provided (sent in key frames or when route changes)
         // This is the raw OSRM linestring, not the interpolated points
@@ -671,10 +675,8 @@ export const SimulationProvider = ({
           // Backend explicitly signals route completion - clear route data
           routesRef.current.delete(resource.id);
         }
+        lastDriverUpdatesRef.current.set(resource.id, performance.now());
       });
-
-      // Update frame start time
-      lastFrameTimeRef.current = performance.now();
 
       // Ensure animation loop is running (in case it stopped)
       ensureAnimationRunning();
@@ -696,58 +698,19 @@ export const SimulationProvider = ({
 
   // Animation loop to interpolate resource positions
   const animateResources = () => {
-    const now = performance.now();
-    const frameElapsedMs = now - lastFrameTimeRef.current;
-
-    // Calculate interpolation progress (0 to 1)
-    const adjustedInterval =
-      speedRef.current === 0
-        ? BASE_FRAME_INTERVAL_MS // If paused, use normal interval to avoid division by zero
-        : BASE_FRAME_INTERVAL_MS / speedRef.current; // Adjust interval based on playback speed
-    const t = Math.min(frameElapsedMs / adjustedInterval, 1);
-
     // Update position for each resource
-    driversRef.current.forEach((resource) => {
-      const start = frameStartPositionsRef.current.get(resource.id);
-      const target = targetPositionsRef.current.get(resource.id);
-
-      if (!start || !target) return;
-
-      let currentPos: Position;
-      const route = routesRef.current.get(resource.id);
-
-      if (route) {
-        // animate driver position along route geometry
-        // constrain interpolation segment to next task segment only
-        let constrainedRoute = route.coordinates;
-        const nextTaskEndIndex = route.nextTaskEndIndex;
-        if (nextTaskEndIndex < constrainedRoute.length) {
-          // animate only up to where the next task ends in the route
-          constrainedRoute = constrainedRoute.slice(0, nextTaskEndIndex + 1);
-        }
-        currentPos = interpolateAlongRoute(constrainedRoute, start, target, t);
-      } else {
-        // Fallback to linear interpolation if no route geometry
-        currentPos = [
-          start[0] + (target[0] - start[0]) * t,
-          start[1] + (target[1] - start[1]) * t,
-        ];
-      }
-
-      // Update current position
-      const prevPos = currentPositionsRef.current.get(resource.id);
-      if (
-        !prevPos ||
-        prevPos[0] !== currentPos[0] ||
-        prevPos[1] !== currentPos[1]
-      ) {
-        currentPositionsRef.current.set(resource.id, currentPos);
-        renderOnNextFrameRef.current = true;
-      }
-
-      // Update the resource object's position
-      resource.position = currentPos;
-    });
+    const driverPositionsChanged = updateDriverPositions(
+      driversRef.current,
+      currentPositionsRef.current,
+      frameStartPositionsRef.current,
+      targetPositionsRef.current,
+      routesRef.current,
+      lastDriverUpdatesRef.current,
+      speedRef.current
+    );
+    if (driverPositionsChanged) {
+      renderOnNextFrameRef.current = true;
+    }
 
     // Only update map if positions or station tasks changed
     if (renderOnNextFrameRef.current) {

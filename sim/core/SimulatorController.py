@@ -484,9 +484,7 @@ class SimulatorController:
 
         drivers = []
         for driver in self.driver_entities.values():
-            if is_key or (
-                driver.has_updated and str(driver.get_state()) != "off_shift"
-            ):
+            if is_key or (driver.has_updated):
                 in_progress_task = driver.get_in_progress_task()
                 current_vehicle = driver.get_vehicle()
                 shift: Shift = driver.get_driver_shift()

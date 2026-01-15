@@ -331,12 +331,8 @@ class Driver:
             vehicle = self.vehicle
             # Clear driver's vehicle reference
             self.vehicle = None
-            # Clear vehicle's driver reference (if method available)
-            if hasattr(vehicle, "unassign_driver"):
-                vehicle.unassign_driver()
-            else:
-                # Fallback in case vehicle lacks unassign_driver
-                vehicle.driver = None
+            # Clear vehicle's driver reference
+            vehicle.unassign_driver()
             self.env.hq.push_vehicle(vehicle)
             # Transition to IDLE since the driver has no vehicle
             self.has_updated = True
@@ -634,6 +630,7 @@ class Driver:
         finally:
             # Clear current route when travel completes or is interrupted
             self.current_route = None
+            self.route_changed = True
 
     def get_full_route(self) -> dict | None:
         """Get the full route for all tasks in driver's task queue.
