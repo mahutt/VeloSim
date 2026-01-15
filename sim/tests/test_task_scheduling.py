@@ -295,7 +295,7 @@ def test_resource_get_in_progress_task(
 def test_dispatch_multiple_tasks_same_station(
     env: simpy.Environment, station: Station
 ) -> None:
-    # Test dispatching multiple tasks at the same station
+    # Test dispatching multiple tasks at the same station raises an exception
     resource = Driver(
         driver_id=1,
         position=Position([0.0, 0.0]),
@@ -317,9 +317,11 @@ def test_dispatch_multiple_tasks_same_station(
     resource.dispatch_task(task1)
     assert task1.get_state() == State.IN_PROGRESS
 
-    # Should be able to dispatch task2 since it's at the same station
-    resource.dispatch_task(task2)
-    assert task2.get_state() == State.IN_PROGRESS
+    with pytest.raises(
+        Exception,
+        match="Cannot dispatch this task since there exists one already in-progress",
+    ):
+        resource.dispatch_task(task2)
 
 
 def test_dispatch_task_different_station_raises_exception(
@@ -347,7 +349,10 @@ def test_dispatch_task_different_station_raises_exception(
     resource.assign_task(task2)
     resource.dispatch_task(task1)
 
-    with pytest.raises(Exception, match="Cannot dispatch task at this station"):
+    with pytest.raises(
+        Exception,
+        match="Cannot dispatch this task since there exists one already in-progress",
+    ):
         resource.dispatch_task(task2)
 
 

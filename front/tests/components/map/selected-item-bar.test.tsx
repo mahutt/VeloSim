@@ -33,7 +33,7 @@ import SelectedItemBar, {
 } from '~/components/map/selected-item-bar';
 import { FeatureToggleProvider } from '~/providers/feature-toggle-provider';
 import { TaskAssignmentProvider } from '~/providers/task-assignment-provider';
-import type { Position } from '~/types';
+import type { Position, StationTask } from '~/types';
 import { makeSimulationContext } from 'tests/test-helpers';
 
 // Mock the useSimulation hook
@@ -93,7 +93,7 @@ describe('SelectedItemBar', () => {
     expect(screen.getByText('Tasks (0)')).toBeInTheDocument();
   });
 
-  it('should render resource information when resource is selected', () => {
+  it('should render driver information when driver is selected', () => {
     const mockDriver: PopulatedDriver = {
       id: 5,
       position: [-73.58, 45.49] as Position,
@@ -135,6 +135,55 @@ describe('SelectedItemBar', () => {
     expect(screen.getByText('Task #1')).toBeInTheDocument();
     expect(screen.getByText('Task #2')).toBeInTheDocument();
     expect(screen.getByText('Task #3')).toBeInTheDocument();
+  });
+
+  it('should render driver in progress task when driver is selected', () => {
+    const inProgressTask: StationTask = {
+      id: 1,
+      stationId: 1,
+      state: 'inprogress',
+      assignedDriverId: null,
+    };
+    const mockDriver: PopulatedDriver = {
+      id: 5,
+      position: [-73.58, 45.49] as Position,
+      tasks: [
+        inProgressTask,
+        { id: 2, stationId: 2, state: 'open', assignedDriverId: null },
+        { id: 3, stationId: 3, state: 'open', assignedDriverId: null },
+      ],
+      route: {
+        coordinates: [
+          [-73.58, 45.49],
+          [-73.57, 45.5],
+        ] as Position[],
+      },
+      inProgressTask: inProgressTask,
+    };
+
+    (useSimulation as unknown as ReturnType<typeof vi.fn>).mockReturnValue(
+      makeSimulationContext({
+        selectedItem: {
+          type: SelectedItemType.Driver,
+          value: mockDriver,
+        },
+      })
+    );
+
+    render(
+      <FeatureToggleProvider>
+        <TaskAssignmentProvider>
+          <SelectedItemBar />
+        </TaskAssignmentProvider>
+      </FeatureToggleProvider>
+    );
+
+    expect(screen.getByText('Driver')).toBeInTheDocument();
+    expect(screen.getByText('#5')).toBeInTheDocument();
+    expect(screen.getByText('Position')).toBeInTheDocument();
+    expect(screen.getByText('Tasks (3)')).toBeInTheDocument();
+    expect(screen.getByText('Task #1')).toBeInTheDocument();
+    expect(screen.getByText(/in progress/i)).toBeInTheDocument();
   });
 
   it('should call clearSelection when close button is clicked', async () => {
@@ -254,7 +303,7 @@ describe('SelectedItemBar', () => {
       expect(reorderTasksMock).toHaveBeenCalledWith(1, [2, 3, 1], true);
     });
 
-    it('should not call reorderTasks when dropping at index 0', async () => {
+    it('should call reorderTasks when dropping at index 0', async () => {
       const reorderTasksMock = vi.fn().mockResolvedValue(undefined);
       const mockDriver: PopulatedDriver = {
         id: 1,
@@ -296,7 +345,7 @@ describe('SelectedItemBar', () => {
       fireEvent.drop(taskWrappers[0]);
 
       // Should not call reorderTasks
-      expect(reorderTasksMock).not.toHaveBeenCalled();
+      expect(reorderTasksMock).toHaveBeenCalled();
     });
 
     it('should set dropEffect to none when draggedTaskId is null', () => {

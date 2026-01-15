@@ -42,7 +42,7 @@ export interface Station {
 }
 
 // scheduled tasks aren't sent from the backend anymore
-type TaskState = 'open' | 'assigned' | 'inprogress' | 'closed';
+type TaskState = 'open' | 'assigned' | 'inprogress' | 'inservice' | 'closed';
 
 export interface StationTask {
   id: number;

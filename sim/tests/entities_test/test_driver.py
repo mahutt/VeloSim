@@ -209,6 +209,38 @@ class TestDriver:
         # Assert
         assert dispatched_task is None
 
+    def test_get_in_service_task(
+        self, simpy_env: simpy.Environment, default_position: Position
+    ) -> None:
+        # Arrange
+        task = BatterySwapTask(1)
+        task2 = BatterySwapTask(2)
+        task3 = BatterySwapTask(3)
+        driver = Driver(2, default_position, self.DEFAULT_SHIFT, [task, task2, task3])
+        task2.set_state(State.IN_SERVICE)
+
+        # Act
+        serviced_task = driver.get_in_service_task()
+
+        # Assert
+        assert isinstance(serviced_task, BatterySwapTask)
+        assert serviced_task == task2
+
+    def test_get_in_service_task_not_found(
+        self, simpy_env: simpy.Environment, default_position: Position
+    ) -> None:
+        # Arrange
+        task = BatterySwapTask(1)
+        task2 = BatterySwapTask(2)
+        task3 = BatterySwapTask(3)
+        driver = Driver(2, default_position, self.DEFAULT_SHIFT, [task, task2, task3])
+
+        # Act
+        serviced_task = driver.get_in_service_task()
+
+        # Assert
+        assert serviced_task is None
+
     def test_dispatch_task_with_no_other_dispatched(
         self, simpy_env: simpy.Environment, default_position: Position
     ) -> None:
@@ -237,11 +269,13 @@ class TestDriver:
         task.set_station(station)
         task2.set_station(station)
 
-        # Act
-        driver.dispatch_task(task2)
-
-        # Assert
-        assert task2.get_state() == State.IN_PROGRESS
+        # Act and Assert
+        with pytest.raises(
+            Exception,
+            match="Cannot dispatch this task since there "
+            "exists one already in-progress",
+        ):
+            driver.dispatch_task(task2)
 
     def test_dispatch_task_with_other_dispatched_diff_station(
         self, simpy_env: simpy.Environment, default_position: Position
@@ -258,7 +292,11 @@ class TestDriver:
         task2.set_station(station2)
 
         # Act and Assert
-        with pytest.raises(Exception, match="Cannot dispatch task at this station"):
+        with pytest.raises(
+            Exception,
+            match="Cannot dispatch this task since there "
+            "exists one already in-progress",
+        ):
             driver.dispatch_task(task2)
 
     def test_service_task(
@@ -461,7 +499,34 @@ class TestDriver:
         assert driver.task_list == [task2, task4, task1, task3]
         assert driver.has_updated == True
 
-    def test_reorder_tasks_with_in_progress_pinned_to_top(
+    def test_reorder_tasks_with_in_progress_unspecified(
+        self, simpy_env: simpy.Environment, default_position: Position
+    ) -> None:
+        """
+        Test that IN_PROGRESS tasks which are not specified go in the unspecified list.
+        """
+        task1 = BatterySwapTask(1)
+        task2 = BatterySwapTask(2)
+        task3 = BatterySwapTask(3)
+        task4 = BatterySwapTask(4)
+        task5 = BatterySwapTask(5)
+
+        driver = Driver(
+            1, default_position, self.DEFAULT_SHIFT, [task1, task2, task3, task4, task5]
+        )
+
+        # Set task2 as IN_PROGRESS (after Driver creation)
+        task2.set_state(State.IN_PROGRESS)
+
+        # Reorder with top mode: [5, 3, 1]
+        # Original: [1, 2*, 3, 4, 5] (* = in-progress)
+        # Expected: [5, 3, 1] (specified), [2, 4] (unspecified)
+        new_order = driver.reorder_tasks([5, 3, 1], apply_from_top=True)
+
+        assert new_order == [5, 3, 1, 2, 4]
+        assert driver.task_list == [task5, task3, task1, task2, task4]
+
+    def test_reorder_tasks_with_in_service_pinned_to_top(
         self, simpy_env: simpy.Environment, default_position: Position
     ) -> None:
         """Test that IN_PROGRESS tasks are always pinned to top."""
@@ -475,18 +540,16 @@ class TestDriver:
             1, default_position, self.DEFAULT_SHIFT, [task1, task2, task3, task4, task5]
         )
 
-        # Set task2 and task4 as IN_PROGRESS (after Driver creation)
-        task2.set_state(State.IN_PROGRESS)
-        task4.set_state(State.IN_PROGRESS)
+        # Set task2 as IN_SERVICE (after Driver creation)
+        task2.set_state(State.IN_SERVICE)
 
         # Reorder with top mode: [5, 3, 1]
-        # Original: [1, 2*, 3, 4*, 5] (* = in-progress)
-        # Expected: [2*, 4*] (in-progress, original order),
-        #           [5, 3, 1] (specified), [] (unspecified)
+        # Original: [1, 2*, 3, 4, 5] (* = in-service)
+        # Expected: [2*, 5, 3, 1, 4]
         new_order = driver.reorder_tasks([5, 3, 1], apply_from_top=True)
 
-        assert new_order == [2, 4, 5, 3, 1]
-        assert driver.task_list == [task2, task4, task5, task3, task1]
+        assert new_order == [2, 5, 3, 1, 4]
+        assert driver.task_list == [task2, task5, task3, task1, task4]
 
     def test_reorder_tasks_with_in_progress_in_specified_list(
         self, simpy_env: simpy.Environment, default_position: Position
@@ -566,6 +629,32 @@ class TestDriver:
         new_order = driver.reorder_tasks([4], apply_from_top=True)
 
         assert new_order[0] == 4
+
+    def test_reorder_tasks_with_in_progress_task_being_moved(
+        self, default_position: Position
+    ) -> None:
+        """Test that reordered IN_PROGRESS tasks are set to assigned."""
+        task1 = BatterySwapTask(1)
+        task2 = BatterySwapTask(2)
+        task3 = BatterySwapTask(3)
+        task4 = BatterySwapTask(4)
+        task5 = BatterySwapTask(5)
+
+        driver = Driver(
+            1, default_position, self.DEFAULT_SHIFT, [task1, task2, task3, task4, task5]
+        )
+
+        # Set task2 as IN_PROGRESS (after Driver creation)
+        task2.set_state(State.IN_PROGRESS)
+
+        # Reorder with top mode: [5, 3, 1]
+        # Original: [1, 2*, 3, 4, 5] (* = in-progress)
+        # Expected: [5, 2, 4, 3, 1]
+        new_order = driver.reorder_tasks([5, 2, 4, 3, 1], apply_from_top=True)
+
+        assert new_order == [5, 2, 4, 3, 1]
+        assert driver.task_list == [task5, task2, task4, task3, task1]
+        assert task2.get_state() == State.ASSIGNED
 
     def test_get_full_route_with_hq_next_stop(
         self, simpy_env: simpy.Environment, default_position: Position
