@@ -695,8 +695,7 @@ class TestDriver:
         ]
         driver.set_map_controller(mock_map_controller)
 
-        # Set driver state to HEADING_TO_HQ
-        driver.state = DriverState.HEADING_TO_HQ
+        driver.state = DriverState.SEEKING_HQ_FOR_INVENTORY
 
         # Get full route
         result = driver.get_full_route()
@@ -761,3 +760,21 @@ class TestDriver:
         # Task1 is at index 2
         assert result["nextTaskEndIndex"] == 2
         assert result["coordinates"][2] == [-73.5, 45.5]  # Task 1
+
+    def test_set_state_sets_update_flag(self, driver: Driver) -> None:
+        driver.state = DriverState.IDLE
+        driver.set_state(DriverState.ENDING_SHIFT)
+        assert driver.has_updated == True
+
+    def test_unassign_vehicle(self, driver: Driver) -> None:
+        vehicle = Vehicle(vehicle_id=1, battery_count=10)
+        driver.set_vehicle(vehicle)
+        vehicle.set_driver(driver)
+
+        hq_vehicle_quant = len(driver.env.hq.vehicles)
+        driver.unassign_vehicle()
+
+        assert driver.vehicle is None
+        assert vehicle.driver is None
+        assert len(driver.env.hq.vehicles) == (hq_vehicle_quant + 1)
+        assert driver.has_updated == True

@@ -141,7 +141,7 @@ def test_idle_heads_to_hq_near_shift_end(
     env.process(driver.run())
     env.run(until=2)
 
-    assert driver.get_state() == DriverState.HEADING_TO_HQ
+    assert driver.get_state() == DriverState.ENDING_SHIFT
 
 
 def test_idle_enters_lunch_break_during_window(
@@ -169,3 +169,20 @@ def test_idle_enters_lunch_break_during_window(
     env.run(until=2)
 
     assert driver.get_state() == DriverState.ON_BREAK
+
+
+def test_idle_enters_seeking_hq_when_inventory_empty(fake_time: MockClock) -> None:
+    env = SimulationEnvironment()
+    Driver.env = env
+
+    shift = make_shift(sim_start=0, sim_end=50000, sim_lunch=0)
+    driver = Driver(driver_id=4, position=Position([0.0, 0.0]), shift=shift)
+
+    vehicle = Vehicle(vehicle_id=2, battery_count=0)
+    vehicle.set_driver(driver)
+    driver.set_vehicle(vehicle)
+
+    driver.state = DriverState.IDLE
+    env.process(driver.run())
+    env.run(until=2)
+    assert driver.get_state() == DriverState.SEEKING_HQ_FOR_INVENTORY

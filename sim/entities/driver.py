@@ -62,10 +62,10 @@ class DriverState(Enum):
     ON_ROUTE = 3  # Traveling, specifically to a task.
     SERVICING_STATION = 4  # Servicing a station
     ON_BREAK = 5  # Taking a break
-    HEADING_TO_HQ = (
-        6  # Is returning back to HQ (Either off shift or going to get batteries)
-    )
+
+    SEEKING_HQ_FOR_INVENTORY = 6  # Is returning back to HQ to refill batteries
     RESTOCKING_BATTERIES = 7  # Is in the process of restocking on batteries at HQ
+    ENDING_SHIFT = 8  # Heading to hq to end shift for the day
 
     def __str__(self) -> str:
         if self == DriverState.OFF_SHIFT:
@@ -80,10 +80,12 @@ class DriverState(Enum):
             return "servicing_station"
         elif self == DriverState.ON_BREAK:
             return "on_break"
-        elif self == DriverState.HEADING_TO_HQ:
-            return "heading_to_hq"
+        elif self == DriverState.SEEKING_HQ_FOR_INVENTORY:
+            return "seeking_hq_for_inventory"
         elif self == DriverState.RESTOCKING_BATTERIES:
             return "restocking"
+        elif self == DriverState.ENDING_SHIFT:
+            return "ending_shift"
 
 
 class Driver:
@@ -679,7 +681,10 @@ class Driver:
                   the first task's route segment ends.
         """
         visible_tasks = self.get_visible_task_list()
-        include_hq = self.state == DriverState.HEADING_TO_HQ
+        include_hq = self.state in (
+            DriverState.SEEKING_HQ_FOR_INVENTORY,
+            DriverState.ENDING_SHIFT,
+        )
 
         if not visible_tasks and not include_hq:
             return None
@@ -742,12 +747,9 @@ class Driver:
         """
         Make driver return to HQ.
 
-        Sets driver state to HEADING_TO_HQ and makes the driver travel to HQ_Position.
-
         Returns:
             Generator that yields for travel_to process.
         """
-        # self.state = DriverState.HEADING_TO_HQ
         self.route_changed = True
         yield self.env.process(self.travel_to(self.env.hq.position))
 
@@ -808,7 +810,7 @@ class Driver:
 
         # Near or after shift end, wrap up by heading to HQ
         if current_sim_time >= end_time - SHIFT_END_BUFFER_TIME:
-            self.state = DriverState.HEADING_TO_HQ
+            self.state = DriverState.ENDING_SHIFT
             return self.state
 
         # Lunch break window
@@ -827,7 +829,7 @@ class Driver:
 
         if self.vehicle.get_battery_count() == 0:
             # Out of batteries: head to HQ to restock
-            self.state = DriverState.HEADING_TO_HQ
+            self.state = DriverState.SEEKING_HQ_FOR_INVENTORY
             return self.state
 
         # Has vehicle and batteries; if tasks exist, start from IDLE
@@ -857,10 +859,14 @@ class Driver:
             if vehicle_to_assign is not None:
                 self.set_vehicle(vehicle_to_assign)
 
-        if time_to_shift_end <= SHIFT_END_BUFFER_TIME or (
-            self.vehicle is not None and self.vehicle.get_battery_count() == 0
-        ):
-            self.set_state(DriverState.HEADING_TO_HQ)
+        if time_to_shift_end <= SHIFT_END_BUFFER_TIME:
+            self.set_state(DriverState.ENDING_SHIFT)
+            return
+
+        if self.vehicle is not None and self.vehicle.get_battery_count() == 0:
+            # `set_state` mutates `self.state` and returns None — do not assign
+            # its return value back to `self.state` (that would set it to None).
+            self.set_state(DriverState.SEEKING_HQ_FOR_INVENTORY)
             return
 
         if (
@@ -913,28 +919,23 @@ class Driver:
         yield self.env.timeout(LUNCH_BREAK_DURATION)
         self.set_state(DriverState.IDLE)
 
+    def _seeking_hq_for_inventory(self) -> Generator[Any, None, None]:
+        yield self.env.process(self.return_to_HQ())
+        if self.position.close_enough(self.env.hq.position):
+            self.set_state(DriverState.RESTOCKING_BATTERIES)
+
+    def _ending_shift(self) -> Generator[Any, None, None]:
+        yield self.env.process(self.return_to_HQ())
+        if self.position.close_enough(self.env.hq.position):
+            for task in self.task_list:
+                self.unassign_task(task)
+            self.unassign_vehicle()
+            self.set_state(DriverState.OFF_SHIFT)
+
     def _restocking_batteries(self) -> Generator[Any, None, None]:
         """Handle RESTOCKING_BATTERIES: restock then return to IDLE."""
         yield self.env.process(self.restock_vehicle_battery())
         self.set_state(DriverState.IDLE)
-
-    def _heading_to_hq(self) -> Generator[Any, None, None]:
-        """Handle HEADING_TO_HQ travel and arrival logic."""
-        yield self.env.process(self.return_to_HQ())
-        if self.position.close_enough(self.env.hq.position):
-            current_sim_time = self.env.now
-            time_to_shift_end = self.shift.get_sim_end_time() - current_sim_time
-
-            if time_to_shift_end <= SHIFT_END_BUFFER_TIME:
-                for task in self.task_list:
-                    self.unassign_task(task)
-                self.unassign_vehicle()
-                self.set_state(DriverState.OFF_SHIFT)
-                return
-
-            if self.vehicle is not None and self.vehicle.get_battery_count() == 0:
-                self.set_state(DriverState.RESTOCKING_BATTERIES)
-                return
 
     def _generate_lunch_location(self) -> Position:
         """Generate a random lunch location
@@ -962,8 +963,8 @@ class Driver:
         - ON_ROUTE: travel to task station; then service or go idle if none.
         - SERVICING_STATION: complete task and return to idle.
         - ON_BREAK: wait lunch duration, then return to idle.
-        - HEADING_TO_HQ: travel to HQ; end shift (off_shift) at end time or
-            restock if empty.
+        - ENDING_SHIFT: travel to HQ to end shift
+        - SEEKING_HQ_FOR_INVENTORY: travel to HQ to refil batteries
         - RESTOCKING_BATTERIES: restock batteries, then return to idle.
         """
         # Yield once at the start to ensure sim_behaviour and
@@ -995,10 +996,13 @@ class Driver:
                 case DriverState.ON_BREAK:
                     yield from self._on_break()
 
+                case DriverState.SEEKING_HQ_FOR_INVENTORY:
+                    yield from self._seeking_hq_for_inventory()
+
                 case DriverState.RESTOCKING_BATTERIES:
                     yield from self._restocking_batteries()
 
-                case DriverState.HEADING_TO_HQ:
-                    yield from self._heading_to_hq()
+                case DriverState.ENDING_SHIFT:
+                    yield from self._ending_shift()
 
             yield self.env.timeout(1)
