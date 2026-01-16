@@ -1818,8 +1818,12 @@ class TestWebSocketHelpers:
         # Should not call resume since already running
         mock_driver.resume.assert_not_called()
 
-    def test_start_or_resume_simulation_resume_paused(self) -> None:
-        """Test start_or_resume resumes a paused simulation"""
+    @patch("back.api.v1.utils.sim_websocket_helpers.simulation_service")
+    def test_start_or_resume_simulation_resume_paused(
+        self, mock_service: MagicMock
+    ) -> None:
+        """Test start_or_resume resumes a paused simulation (auto-paused on
+        disconnect)"""
         from back.api.v1.utils.sim_websocket_helpers import start_or_resume_simulation
 
         mock_ws = MagicMock()
@@ -1831,17 +1835,231 @@ class TestWebSocketHelpers:
         mock_driver = MagicMock()
         mock_driver.running = False
 
+        mock_emitter = MagicMock()
         sim_info: dict[str, Any] = {
             "thread": MagicMock(),
             "simController": MagicMock(realTimeDriver=mock_driver),
+            "emitter": mock_emitter,
+        }
+
+        # Mock active_simulations with paused_by_user=False (auto-paused)
+        mock_service.active_simulations = {
+            "sim123": {"user_id": 1, "paused_by_user": False}
         }
 
         asyncio.run(
             start_or_resume_simulation(cast(RunInfo, sim_info), "sim123", mock_ws, 1)
         )
 
-        # Should resume the driver
+        # Should resume the driver since it was auto-paused
         mock_driver.resume.assert_called_once()
+
+    @patch("back.api.v1.utils.sim_websocket_helpers.simulation_service")
+    def test_start_or_resume_simulation_user_paused_stays_paused(
+        self, mock_service: MagicMock
+    ) -> None:
+        """Test start_or_resume keeps user-paused simulation paused and emits frame"""
+        from back.api.v1.utils.sim_websocket_helpers import start_or_resume_simulation
+        from sim.entities.frame import Frame
+
+        mock_ws = MagicMock()
+
+        async def mock_send_json(data: Any) -> None:
+            pass
+
+        mock_ws.send_json = mock_send_json
+        mock_driver = MagicMock()
+        mock_driver.running = False
+
+        mock_controller = MagicMock()
+        mock_controller.realTimeDriver = mock_driver
+        mock_controller.frameCounter = 100
+        mock_frame = Frame(seq_numb=100, payload={}, is_key=True)
+        mock_controller.create_frame.return_value = mock_frame
+
+        mock_emitter = MagicMock()
+        sim_info: dict[str, Any] = {
+            "thread": MagicMock(),
+            "simController": mock_controller,
+            "emitter": mock_emitter,
+        }
+
+        # Mock active_simulations with paused_by_user=True (user-paused)
+        sim_data_dict = {"user_id": 1, "paused_by_user": True}
+        mock_service.active_simulations.get.return_value = sim_data_dict
+
+        asyncio.run(
+            start_or_resume_simulation(cast(RunInfo, sim_info), "sim123", mock_ws, 1)
+        )
+
+        # Should NOT resume the driver since user paused it
+        mock_driver.resume.assert_not_called()
+
+        # Should emit a frame with paused_by_user=True
+        mock_controller.create_frame.assert_called_once_with(
+            is_key=True, paused_by_user=True
+        )
+        mock_controller.emit_frame.assert_called_once_with(mock_frame)
+
+    @patch("back.api.v1.utils.sim_websocket_helpers.simulation_service")
+    def test_start_or_resume_simulation_missing_paused_by_user_defaults_false(
+        self, mock_service: MagicMock
+    ) -> None:
+        """Test that missing paused_by_user flag defaults to False (auto-resume)"""
+        from back.api.v1.utils.sim_websocket_helpers import start_or_resume_simulation
+
+        mock_ws = MagicMock()
+
+        async def mock_send_json(data: Any) -> None:
+            pass
+
+        mock_ws.send_json = mock_send_json
+        mock_driver = MagicMock()
+        mock_driver.running = False
+
+        mock_emitter = MagicMock()
+        sim_info: dict[str, Any] = {
+            "thread": MagicMock(),
+            "simController": MagicMock(realTimeDriver=mock_driver),
+            "emitter": mock_emitter,
+        }
+
+        # Mock active_simulations WITHOUT paused_by_user flag
+        mock_service.active_simulations = {"sim123": {"user_id": 1}}
+
+        asyncio.run(
+            start_or_resume_simulation(cast(RunInfo, sim_info), "sim123", mock_ws, 1)
+        )
+
+        # Should resume (default to False means auto-paused)
+        mock_driver.resume.assert_called_once()
+
+    @patch("back.api.v1.utils.sim_websocket_helpers.simulation_service")
+    def test_start_or_resume_simulation_auto_resume_clears_flag(
+        self, mock_service: MagicMock
+    ) -> None:
+        """Test that auto-resuming clears the paused_by_user flag"""
+        from back.api.v1.utils.sim_websocket_helpers import start_or_resume_simulation
+
+        mock_ws = MagicMock()
+
+        async def mock_send_json(data: Any) -> None:
+            pass
+
+        mock_ws.send_json = mock_send_json
+        mock_driver = MagicMock()
+        mock_driver.running = False
+
+        mock_emitter = MagicMock()
+        sim_info: dict[str, Any] = {
+            "thread": MagicMock(),
+            "simController": MagicMock(realTimeDriver=mock_driver),
+            "emitter": mock_emitter,
+        }
+
+        # Mock active_simulations with paused_by_user=False
+        sim_data = {"user_id": 1, "paused_by_user": False}
+        mock_service.active_simulations.get.return_value = sim_data
+
+        asyncio.run(
+            start_or_resume_simulation(cast(RunInfo, sim_info), "sim123", mock_ws, 1)
+        )
+
+        # Flag should be removed after resume from the dict
+        assert "paused_by_user" not in sim_data
+
+    @patch("back.api.v1.utils.sim_websocket_helpers.get_db")
+    @patch("back.api.v1.utils.sim_websocket_helpers.simulation_service")
+    def test_start_or_resume_simulation_restored_paused_emits_keyframe(
+        self,
+        mock_service: MagicMock,
+        mock_get_db: MagicMock,
+    ) -> None:
+        """Test restored paused simulation emits keyframe for frontend"""
+        from back.api.v1.utils.sim_websocket_helpers import start_or_resume_simulation
+        from sim.entities.frame import Frame
+
+        mock_db = MagicMock()
+        mock_get_db.return_value = iter([mock_db])
+
+        mock_ws = MagicMock()
+
+        async def mock_send_json(data: Any) -> None:
+            pass
+
+        mock_ws.send_json = mock_send_json
+        mock_driver = MagicMock()
+        mock_driver.running = False
+
+        mock_controller = MagicMock()
+        mock_controller.realTimeDriver = mock_driver
+        mock_controller.frameCounter = 50
+
+        sim_info: dict[str, Any] = {
+            "thread": None,  # Restored simulation
+            "simController": mock_controller,
+        }
+
+        # Mock restored keyframe in sim_data
+        restored_keyframe = {"clock": {"time": 100}, "entities": []}
+        sim_data_dict = {"user_id": 1, "restored_keyframe": restored_keyframe}
+        mock_service.active_simulations.get.return_value = sim_data_dict
+
+        asyncio.run(
+            start_or_resume_simulation(cast(RunInfo, sim_info), "sim123", mock_ws, 1)
+        )
+
+        # Should start the simulation
+        mock_service.start_simulation.assert_called_once_with(mock_db, "sim123", 1)
+
+        # Should emit the restored keyframe since paused
+        mock_controller.emit_frame.assert_called_once()
+        emitted_frame = mock_controller.emit_frame.call_args[0][0]
+        assert isinstance(emitted_frame, Frame)
+        assert emitted_frame.is_key is True
+        assert emitted_frame.payload_dict == restored_keyframe
+
+    @patch("back.api.v1.utils.sim_websocket_helpers.get_db")
+    @patch("back.api.v1.utils.sim_websocket_helpers.simulation_service")
+    def test_start_or_resume_simulation_restored_running_no_emit(
+        self,
+        mock_service: MagicMock,
+        mock_get_db: MagicMock,
+    ) -> None:
+        """Test restored running simulation doesn't manually emit frame"""
+        from back.api.v1.utils.sim_websocket_helpers import start_or_resume_simulation
+
+        mock_db = MagicMock()
+        mock_get_db.return_value = iter([mock_db])
+
+        mock_ws = MagicMock()
+
+        async def mock_send_json(data: Any) -> None:
+            pass
+
+        mock_ws.send_json = mock_send_json
+        mock_driver = MagicMock()
+        mock_driver.running = True  # Restored as running
+
+        mock_controller = MagicMock()
+        mock_controller.realTimeDriver = mock_driver
+
+        sim_info: dict[str, Any] = {
+            "thread": None,  # Restored simulation
+            "simController": mock_controller,
+        }
+
+        mock_service.active_simulations = {"sim123": {"user_id": 1}}
+
+        asyncio.run(
+            start_or_resume_simulation(cast(RunInfo, sim_info), "sim123", mock_ws, 1)
+        )
+
+        # Should start the simulation
+        mock_service.start_simulation.assert_called_once_with(mock_db, "sim123", 1)
+
+        # Should NOT emit a frame (will emit naturally as it runs)
+        mock_controller.emit_frame.assert_not_called()
 
     @patch("back.api.v1.utils.sim_websocket_helpers.get_db")
     @patch(
@@ -1959,6 +2177,142 @@ class TestWebSocketHelpers:
         # Cleanup should still complete
         assert subscriber.closed is True
         assert len(emitter.subscribers) == 0
+
+    @pytest.mark.asyncio
+    @patch("back.api.v1.utils.sim_websocket_helpers.simulation_service")
+    async def test_cleanup_simulation_running_emits_keyframe_paused_by_user_false(
+        self, mock_service: MagicMock
+    ) -> None:
+        """Test cleanup emits keyframe with paused_by_user=False for running sim"""
+        from sim.core.frame_emitter import FrameEmitter
+        from sim.entities.frame import Frame
+        from back.api.v1.utils.sim_websocket_helpers import (
+            cleanup_simulation,
+            WebSocketSubscriber,
+        )
+
+        mock_ws = MagicMock()
+        mock_ws.client_state = WebSocketState.DISCONNECTED
+
+        async def mock_close() -> None:
+            pass
+
+        mock_ws.close = mock_close
+
+        emitter = FrameEmitter("sim123")
+        subscriber = WebSocketSubscriber(mock_ws)
+        emitter.attach(subscriber)
+
+        mock_driver = MagicMock()
+        mock_driver.running = True  # Simulation is running
+
+        mock_controller = MagicMock()
+        mock_controller.realTimeDriver = mock_driver
+        mock_frame = Frame(seq_numb=100, payload={}, is_key=True)
+        mock_controller.create_frame.return_value = mock_frame
+
+        mock_keyframe_subscriber = MagicMock()
+
+        sim_info: dict[str, Any] = {
+            "emitter": emitter,
+            "simController": mock_controller,
+        }
+        sim_data: dict[str, Any] = {
+            "ws_subscriber": subscriber,
+            "user_id": 1,
+            "keyframe_subscriber": mock_keyframe_subscriber,
+        }
+        mock_service.active_simulations = {"sim123": sim_data}
+
+        await cleanup_simulation(
+            "sim123",
+            cast(ActiveSimulationData, sim_data),
+            cast(RunInfo, sim_info),
+            subscriber,
+            mock_ws,
+        )
+
+        # Should create keyframe with paused_by_user=False (auto-paused)
+        mock_controller.create_frame.assert_called_once_with(
+            is_key=True, paused_by_user=False
+        )
+        mock_controller.emit_frame.assert_called_once_with(mock_frame)
+
+        # Should force-persist the keyframe
+        mock_keyframe_subscriber.force_persist_keyframe.assert_called_once_with(
+            mock_frame
+        )
+
+        # Should set paused_by_user flag to False in sim_data
+        assert sim_data["paused_by_user"] is False
+
+    @pytest.mark.asyncio
+    @patch("back.api.v1.utils.sim_websocket_helpers.simulation_service")
+    async def test_cleanup_simulation_paused_emits_keyframe_paused_by_user_true(
+        self, mock_service: MagicMock
+    ) -> None:
+        """Test cleanup emits keyframe with paused_by_user=True for paused sim"""
+        from sim.core.frame_emitter import FrameEmitter
+        from sim.entities.frame import Frame
+        from back.api.v1.utils.sim_websocket_helpers import (
+            cleanup_simulation,
+            WebSocketSubscriber,
+        )
+
+        mock_ws = MagicMock()
+        mock_ws.client_state = WebSocketState.DISCONNECTED
+
+        async def mock_close() -> None:
+            pass
+
+        mock_ws.close = mock_close
+
+        emitter = FrameEmitter("sim123")
+        subscriber = WebSocketSubscriber(mock_ws)
+        emitter.attach(subscriber)
+
+        mock_driver = MagicMock()
+        mock_driver.running = False  # Simulation is paused by user
+
+        mock_controller = MagicMock()
+        mock_controller.realTimeDriver = mock_driver
+        mock_frame = Frame(seq_numb=100, payload={}, is_key=True)
+        mock_controller.create_frame.return_value = mock_frame
+
+        mock_keyframe_subscriber = MagicMock()
+
+        sim_info: dict[str, Any] = {
+            "emitter": emitter,
+            "simController": mock_controller,
+        }
+        sim_data: dict[str, Any] = {
+            "ws_subscriber": subscriber,
+            "user_id": 1,
+            "keyframe_subscriber": mock_keyframe_subscriber,
+        }
+        mock_service.active_simulations = {"sim123": sim_data}
+
+        await cleanup_simulation(
+            "sim123",
+            cast(ActiveSimulationData, sim_data),
+            cast(RunInfo, sim_info),
+            subscriber,
+            mock_ws,
+        )
+
+        # Should create keyframe with paused_by_user=True (user-paused)
+        mock_controller.create_frame.assert_called_once_with(
+            is_key=True, paused_by_user=True
+        )
+        mock_controller.emit_frame.assert_called_once_with(mock_frame)
+
+        # Should force-persist the keyframe
+        mock_keyframe_subscriber.force_persist_keyframe.assert_called_once_with(
+            mock_frame
+        )
+
+        # Should set paused_by_user flag to True in sim_data
+        assert sim_data["paused_by_user"] is True
 
     def test_safe_send_json_when_disconnected(self) -> None:
         """Test safe_send_json doesn't send when WebSocket is disconnected"""

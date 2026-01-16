@@ -872,3 +872,81 @@ def test_reorder_driver_tasks_with_thread_lock(
 
     # Restore original lock
     sim.thread_pool_lock = original_lock
+
+
+def test_initialize_with_initial_running_false_pauses_simulation(
+    sim: Simulator,
+    input_params: InputParameter,
+) -> None:
+    """Test that initialize with initial_running=False pauses the simulation."""
+    # Act
+    sim_id = sim.initialize(input_params, subList, initial_running=False)
+
+    # Assert
+    sim_info = sim.get_sim_by_id(sim_id)
+    assert sim_info is not None
+    controller = sim_info["simController"]
+    assert controller.realTimeDriver.running is False
+
+
+def test_initialize_with_initial_running_true_keeps_simulation_running(
+    sim: Simulator,
+    input_params: InputParameter,
+) -> None:
+    """Test that initialize with initial_running=True keeps simulation running."""
+    # Act
+    sim_id = sim.initialize(input_params, subList, initial_running=True)
+
+    # Assert
+    sim_info = sim.get_sim_by_id(sim_id)
+    assert sim_info is not None
+    controller = sim_info["simController"]
+    assert controller.realTimeDriver.running is True
+
+
+def test_initialize_with_real_time_factor_sets_driver_speed(
+    sim: Simulator,
+    input_params: InputParameter,
+) -> None:
+    """Test that initialize with real_time_factor sets the driver speed."""
+    # Act
+    sim_id = sim.initialize(input_params, subList, real_time_factor=2.5)
+
+    # Assert
+    sim_info = sim.get_sim_by_id(sim_id)
+    assert sim_info is not None
+    controller = sim_info["simController"]
+    assert controller.realTimeDriver.real_time_factor == 2.5
+
+
+def test_initialize_with_real_time_factor_none_uses_default(
+    sim: Simulator,
+    input_params: InputParameter,
+) -> None:
+    """Test that initialize with real_time_factor=None uses default (1.0)."""
+    # Act
+    sim_id = sim.initialize(input_params, subList, real_time_factor=None)
+
+    # Assert
+    sim_info = sim.get_sim_by_id(sim_id)
+    assert sim_info is not None
+    controller = sim_info["simController"]
+    assert controller.realTimeDriver.real_time_factor == 1.0
+
+
+def test_initialize_with_paused_and_custom_speed(
+    sim: Simulator,
+    input_params: InputParameter,
+) -> None:
+    """Test that initialize can set both paused state and custom speed."""
+    # Act
+    sim_id = sim.initialize(
+        input_params, subList, initial_running=False, real_time_factor=0.5
+    )
+
+    # Assert
+    sim_info = sim.get_sim_by_id(sim_id)
+    assert sim_info is not None
+    controller = sim_info["simController"]
+    assert controller.realTimeDriver.running is False
+    assert controller.realTimeDriver.real_time_factor == 0.5

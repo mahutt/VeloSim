@@ -112,6 +112,10 @@ class ReplayParser:
         scenario_end = cls._time_str_to_seconds(scenario_json["end_time"])
 
         current_time_seconds = int(keyframe_json["clock"]["simSecondsPassed"])
+        # Old keyframes persisted might not have values for these fields, hence fallback
+        was_running = keyframe_json["clock"].get("running", True)
+        real_time_factor = keyframe_json["clock"].get("realTimeFactor", 1.0)
+        paused_by_user = keyframe_json["clock"].get("pausedByUser", False)
 
         input_param = InputParameter(
             station_entities={},
@@ -267,7 +271,12 @@ class ReplayParser:
         # Construct Replay State
 
         replay_state = SimulationRuntimeState(
-            input_param, map_controller, current_time_seconds
+            input_param,
+            map_controller,
+            current_time_seconds,
+            was_running=was_running,
+            real_time_factor=real_time_factor,
+            paused_by_user=paused_by_user,
         )
 
         return replay_state
