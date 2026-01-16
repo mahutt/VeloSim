@@ -76,9 +76,14 @@ export const MapProvider = ({ children }: { children: ReactNode }) => {
       setMapLoaded(true);
     });
 
-    mapRef.current.on('error', (error) => {
-      logSimulationError(error, 'Map loading', {
+    mapRef.current.on('error', (event) => {
+      const errorMessage = event.error?.message || 'Unknown map error';
+      const sourceId = (event as { sourceId?: string }).sourceId;
+
+      logSimulationError(errorMessage, 'Map loading', {
         errorType: 'MAP_LOAD_FAILED',
+        sourceId,
+        originalError: event.error,
       });
       displayError(
         'Failed to load map',
