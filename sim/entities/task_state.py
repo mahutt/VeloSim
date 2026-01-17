@@ -33,7 +33,8 @@ class State(Enum):
     OPEN = 1
     ASSIGNED = 2
     IN_PROGRESS = 3
-    CLOSED = 4
+    IN_SERVICE = 4
+    CLOSED = 5
 
     # get string state by doing str(state)
     def __str__(self) -> str:
@@ -45,5 +46,7 @@ class State(Enum):
             return "assigned"
         elif self == State.IN_PROGRESS:
             return "inprogress"
+        elif self == State.IN_SERVICE:
+            return "inservice"
         elif self == State.CLOSED:
             return "closed"

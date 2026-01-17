@@ -36,8 +36,9 @@ export function TaskItem({
   onUnassign?: () => void;
 }) {
   const taskIsInProgress = task.state === 'inprogress';
+  const taskIsInService = task.state === 'inservice';
 
-  const dragEnabled = useFeature('taskDragAndDrop') && !taskIsInProgress;
+  const dragEnabled = useFeature('taskDragAndDrop') && !taskIsInService;
 
   const handleDragStart = (e: React.DragEvent<HTMLDivElement>) => {
     e.dataTransfer.effectAllowed = 'move';
@@ -58,17 +59,22 @@ export function TaskItem({
       <ItemContent>
         <ItemTitle>Task #{task.id}</ItemTitle>
       </ItemContent>
-      {!taskIsInProgress && onUnassign ? (
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={onUnassign}
-          className="h-6 w-6"
-        >
-          <X className="h-4 w-4" />
-        </Button>
-      ) : taskIsInProgress ? (
-        <span className="text-sm text-gray-500 italic">In Progress</span>
+      {onUnassign ? (
+        <>
+          {taskIsInProgress && (
+            <span className="text-sm text-gray-500 italic">In Progress</span>
+          )}
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={onUnassign}
+            className="h-6 w-6"
+          >
+            <X className="h-4 w-4" />
+          </Button>
+        </>
+      ) : taskIsInService ? (
+        <span className="text-sm text-gray-500 italic">In Service</span>
       ) : null}
     </Item>
   );

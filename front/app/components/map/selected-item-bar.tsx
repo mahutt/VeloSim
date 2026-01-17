@@ -168,8 +168,7 @@ function DriverInfo({ driver }: { driver: PopulatedDriver }) {
     e.preventDefault();
 
     // Only allow reordering if dragging from within this driver's list
-    // and not dropping at index 0 (protects in-progress tasks)
-    if (draggedTaskId && targetIndex > 0) {
+    if (draggedTaskId) {
       e.dataTransfer.dropEffect = 'move';
       setDropTargetIndex(targetIndex);
     } else {
@@ -181,8 +180,8 @@ function DriverInfo({ driver }: { driver: PopulatedDriver }) {
     e.preventDefault();
     setDropTargetIndex(null);
 
-    // Prevent reordering if not dragging from this list or dropping at index 0
-    if (!draggedTaskId || targetIndex === 0) return;
+    // Prevent reordering if not dragging from this list
+    if (!draggedTaskId) return;
 
     const draggedIndex = driver.tasks.findIndex((t) => t.id === draggedTaskId);
     // Exit if task not found or dropped at same position

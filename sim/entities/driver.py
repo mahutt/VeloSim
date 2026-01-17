@@ -301,7 +301,7 @@ class Driver:
 
         Removes the task from the driver's task list and clears the task's
         assigned driver reference. Only removes the task if it's currently
-        in the task list and in ASSIGNED state.
+        in the task list and either in ASSIGNED state or IN_PROGRESS state.
 
         Args:
             task: The task to unassign from this driver.
@@ -309,7 +309,9 @@ class Driver:
         Returns:
             None
         """
-        if task in self.task_list and task.is_assigned():
+        if task in self.task_list and (
+            task.is_assigned() or task.get_state() == State.IN_PROGRESS
+        ):
             self.task_list.remove(task)
             task.unassign_driver()
             # if self.get_task_count() == 0:
@@ -353,13 +355,27 @@ class Driver:
                 return task
         return None
 
+    def get_in_service_task(self) -> Optional["Task"]:
+        """Get the task currently being serviced by this driver.
+
+        Searches through the driver's task list for a task in IN_SERVICE state.
+        Only one task should be in service at a time.
+
+        Returns:
+            Optional[Task]: The task currently in service, or None if no task
+                is currently being serviced on.
+        """
+        for task in self.task_list:
+            if task.get_state() == State.IN_SERVICE:
+                return task
+        return None
+
     def dispatch_task(self, task: "Task") -> None:
-        """Dispatch a task to IN_PROGRESS state with station validation.
+        """Dispatch a task to IN_PROGRESS state.
 
         Changes the task state from ASSIGNED to IN_PROGRESS. The task can only be
-        dispatched if no other task is in progress, or if it's at the same station
-        as the currently in-progress task. This ensures drivers can only work on
-        tasks at one station at a time.
+        dispatched if no other task is in progress. This ensures drivers can only work
+        on one task at a time.
 
         Args:
             task: The task to dispatch. Must be in this driver's task list and
@@ -369,20 +385,20 @@ class Driver:
             None
 
         Raises:
-            Exception: If attempting to dispatch a task at a different station
+            Exception: If attempting to dispatch a task
                 while another task is in progress.
         """
         if task in self.task_list and task.is_assigned():
             task_in_progress = self.get_in_progress_task()
-            if (
-                task_in_progress is None
-                or task.get_station() == task_in_progress.get_station()
-            ):
+            if task_in_progress is None:
                 task.set_state(State.IN_PROGRESS)
                 self.has_updated = True
                 self.route_changed = True
             else:
-                raise Exception("Cannot dispatch task at this station")
+                raise Exception(
+                    "Cannot dispatch this task since there exists "
+                    "one already in-progress"
+                )
 
     def service_task(self, task: "Task") -> None:
         """Complete a task and remove it from the driver's task list.
@@ -473,7 +489,7 @@ class Driver:
         """
         Reorder tasks in the driver's task list.
 
-        In-progress tasks are always pinned to the top in their original order.
+        In-service task is pinned at the top if any
         Specified task IDs are reordered according to the provided list.
         Unspecified tasks maintain their original order.
 
@@ -500,19 +516,14 @@ class Driver:
         current_task_map = {task.id: task for task in self.task_list}
 
         # Separate tasks into categories
-        in_progress_tasks: list["Task"] = []
+        in_service_task = None
         specified_tasks: list["Task"] = []
         unspecified_tasks: list["Task"] = []
 
         # Track which IDs we've seen to maintain original order
         specified_ids_set = set(task_ids_to_reorder)
 
-        # First pass: collect in-progress tasks in original order
-        for task in self.task_list:
-            if task.get_state() == State.IN_PROGRESS:
-                in_progress_tasks.append(task)
-
-        # Second pass: collect specified tasks (excl. in-progress)
+        # First pass: collect specified tasks (incl. in-progress)
         for task_id in task_ids_to_reorder:
             found_task = current_task_map.get(task_id)
             if found_task is None:
@@ -544,27 +555,38 @@ class Driver:
                     logger.warning(
                         f"Task {task_id} not associated to driver {self.id} task list"
                     )
-            elif found_task.get_state() != State.IN_PROGRESS:
-                # Only add if not already in in_progress_tasks
+            elif found_task.get_state() != State.IN_SERVICE:
+                # in-service tasks should not be reordered
                 specified_tasks.append(found_task)
 
-        # Third pass: collect unspecified tasks (excl. in-progress)
+        # Second pass: collect unspecified tasks (excl. in-service)
         for task in self.task_list:
             if (
                 task.id not in specified_ids_set
-                and task.get_state() != State.IN_PROGRESS
+                and task.get_state() != State.IN_SERVICE
             ):
                 unspecified_tasks.append(task)
+            elif task.get_state() == State.IN_SERVICE:
+                in_service_task = task
 
         # Build the new task list based on mode
         if apply_from_top:
-            # [in_progress, specified, unspecified]
-            new_task_list = in_progress_tasks + specified_tasks + unspecified_tasks
+            # [in_service, specified, unspecified]
+            new_task_list = specified_tasks + unspecified_tasks
         else:
-            # [in_progress, unspecified, reversed(specified)]
-            new_task_list = (
-                in_progress_tasks + unspecified_tasks + list(reversed(specified_tasks))
-            )
+            # [in_service, unspecified, reversed(specified)]
+            new_task_list = unspecified_tasks + list(reversed(specified_tasks))
+
+        # Add in-service task at top of list if not None
+        if in_service_task is not None:
+            new_task_list.insert(0, in_service_task)
+
+        # If an in-progress task was reordered, set its state to ASSIGNED as the driver
+        # will prioritize another task
+        if new_task_list and new_task_list[0].get_state() != State.IN_PROGRESS:
+            in_progress_task = self.get_in_progress_task()
+            if in_progress_task is not None:
+                in_progress_task.set_state(State.ASSIGNED)
 
         # Update the task list and mark as updated
         self.task_list = new_task_list
@@ -585,6 +607,9 @@ class Driver:
         If the driver is already at the target position, the method returns
         immediately. If no route can be found, logs an error and stays at the
         current position.
+
+        If the driver is ON_ROUTE but no tasks are in progress,
+        the route is interrupted.
 
         Args:
             position: The target Position to travel to.
@@ -615,6 +640,14 @@ class Driver:
         next_position = route.next()
         try:
             while self.position != position and next_position:
+                # Handle case where driver is on_route but in_progress task
+                # got unassigned or reordered
+                if (
+                    self.state == DriverState.ON_ROUTE
+                    and not self.get_in_progress_task()
+                ):
+                    break
+
                 # Handle case where route.next() returns tuple (position, geometry)
                 if isinstance(next_position, tuple):
                     next_position = next_position[0]
@@ -853,19 +886,23 @@ class Driver:
             if task_station is not None and self.position.close_enough(
                 task_station.get_position()
             ):
+                in_progress.set_state(State.IN_SERVICE)
                 self.set_state(DriverState.SERVICING_STATION)
                 return
             if task_station is not None:
                 yield self.env.process(self.travel_to(task_station.get_position()))
-                self.set_state(DriverState.SERVICING_STATION)
-                return
+                if self.get_in_progress_task() is not None:
+                    in_progress.set_state(State.IN_SERVICE)
+                    self.set_state(DriverState.SERVICING_STATION)
+                    return
+                # else sets state to IDLE
         self.set_state(DriverState.IDLE)
 
     def _servicing_station(self) -> None:
         """Handle SERVICING_STATION transitions."""
-        in_progress = self.get_in_progress_task()
-        if in_progress is not None:
-            self.service_task(in_progress)
+        in_service = self.get_in_service_task()
+        if in_service is not None:
+            self.service_task(in_service)
         self.set_state(DriverState.IDLE)
 
     def _on_break(self) -> Generator[Any, None, None]:

@@ -832,8 +832,8 @@ def test_reorder_driver_tasks_with_in_progress_tasks(
         driver_id=1, task_ids_to_reorder=[2], apply_from_top=True
     )
 
-    assert new_order == [1, 2]  # task1 pinned, task2 specified
-    assert driver.task_list[0] == task1  # in-progress task first
+    assert new_order == [2, 1]  # task2 specified, task1 moved back
+    assert driver.task_list[0] == task2  # new in-progress task
 
 
 def test_reorder_driver_tasks_bottom_mode(

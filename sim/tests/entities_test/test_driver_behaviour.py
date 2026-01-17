@@ -22,7 +22,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 """
 
-from unittest.mock import Mock
+from unittest.mock import Mock, patch
 from sim.core.simulation_environment import SimulationEnvironment
 from sim.entities.driver import Driver, DriverState
 from sim.entities.position import Position
@@ -208,7 +208,7 @@ def test_travel_to_can_be_interrupted() -> None:
     # Mock traffic multiplier (needed for traffic-aware travel logic)
     mock_route.get_current_traffic_multiplier.return_value = 1.0
 
-    # Mock map map
+    # Mock map controller
     mock_map = Mock()
     mock_map.get_route.return_value = mock_route
     driver.set_map_controller(mock_map)
@@ -226,6 +226,42 @@ def test_travel_to_can_be_interrupted() -> None:
 
     # Resource should not have reached destination due to interrupt
     assert driver.position != dest_pos
+
+
+def test_travel_to_stops_immediately_when_on_route_without_tasks() -> None:
+    env = SimulationEnvironment()
+    Driver.env = env
+    start_position = Position([0.0, 0.0])
+    target_position = Position([5.0, 5.0])
+    driver = Driver(driver_id=1, position=start_position, shift=DEFAULT_SHIFT)
+    driver.state = DriverState.ON_ROUTE
+
+    mock_route = Mock()
+    intermediate_pos = Position([0.5, 0.5])
+
+    # Returns single positions, then None
+    mock_route.next.side_effect = [
+        intermediate_pos,
+        target_position,
+        None,
+    ]
+
+    # Mock traffic multiplier (needed for traffic-aware travel logic)
+    mock_route.get_current_traffic_multiplier.return_value = 1.0
+
+    # Mock map map
+    mock_map = Mock()
+    mock_map.get_route.return_value = mock_route
+    driver.set_map_controller(mock_map)
+
+    # Start travel process
+    with patch.object(driver, "get_in_progress_task", return_value=None):
+        env.process(driver.travel_to(target_position))
+        env.run(until=10)
+
+        # It should be called exactly once: before the while loop starts.
+        assert mock_route.next.call_count == 1
+        assert driver.current_route is None
 
 
 def test_driver_run_waits_for_initialization() -> None:
