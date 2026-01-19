@@ -576,11 +576,95 @@ async def _notify_connection_established(websocket: WebSocket, sim_id: str) -> N
     )
 
 
+async def _handle_restored_simulation(
+    sim_info: RunInfo,
+    sim_id: str,
+    websocket: WebSocket,
+    requesting_user: int,
+    is_paused: bool,
+) -> None:
+    """Handle reconnection to a restored simulation (thread was closed, restarted from
+    DB)."""
+    driver = sim_info["simController"].realTimeDriver
+    logger.info(f"Starting restored sim {sim_id}, driver.running={driver.running}")
+    _start_simulation(sim_id, requesting_user)
+    logger.info(f"After start, driver.running={driver.running}")
+    await _notify_simulation_started(websocket, sim_id)
+
+    # If restored sim is running, frames will be emitted naturally
+    if not is_paused:
+        logger.info("Restored sim is running, will emit frames naturally")
+        return
+
+    # Paused sims don't emit frames in their run loop, so emit restored keyframe
+    logger.info("Restored sim is paused, emitting restored keyframe")
+    sim_data = simulation_service.active_simulations.get(sim_id)
+    if not sim_data:
+        logger.error(f"Could not find sim_data for {sim_id}")
+        return
+
+    _emit_restored_keyframe(sim_info, sim_data)
+
+
+def _emit_restored_keyframe(sim_info: RunInfo, sim_data: ActiveSimulationData) -> None:
+    """Emit the restored keyframe for a paused simulation."""
+    sim_controller = sim_info["simController"]
+    restored_keyframe = sim_data.get("restored_keyframe")
+    paused_by_user = sim_data.get("paused_by_user", False)
+
+    if restored_keyframe:
+        logger.info("Found restored keyframe, creating frame from payload")
+        frame = Frame(
+            seq_numb=sim_controller.frameCounter,
+            payload=restored_keyframe,
+            is_key=True,
+        )
+        sim_controller.emit_frame(frame)
+        logger.info("Emitted restored keyframe")
+    else:
+        logger.warning("No restored keyframe found, creating new frame")
+        initial_frame = sim_controller.create_frame(
+            is_key=True, paused_by_user=paused_by_user
+        )
+        sim_controller.emit_frame(initial_frame)
+
+
+async def _handle_paused_simulation(
+    sim_info: RunInfo, sim_id: str, websocket: WebSocket
+) -> None:
+    """Handle reconnection to a paused simulation (may be auto-paused or
+    user-paused)."""
+    sim_data = simulation_service.active_simulations.get(sim_id)
+    paused_by_user = sim_data.get("paused_by_user", False) if sim_data else False
+
+    if paused_by_user:
+        # User had paused it, keep it paused - but emit a frame for FE
+        logger.info(
+            f"Reconnect to user-paused sim {sim_id}, staying paused, emitting frame"
+        )
+        sim_controller = sim_info["simController"]
+        current_frame = sim_controller.create_frame(is_key=True, paused_by_user=True)
+        sim_controller.emit_frame(current_frame)
+    else:
+        # Was auto-paused on disconnect, resume it
+        logger.info(f"Reconnecting to auto-paused sim {sim_id}, resuming")
+        _resume_simulation(sim_info)
+        # Clear the flag
+        if sim_data:
+            sim_data.pop("paused_by_user", None)
+
+    await _notify_connection_established(websocket, sim_id)
+
+
 async def start_or_resume_simulation(
     sim_info: RunInfo, sim_id: str, websocket: WebSocket, requesting_user: int
 ) -> None:
     """
     Start or resume simulation based on current state and notify the client.
+
+    For paused simulations, only auto-resumes if the pause was automatic
+    (e.g., due to disconnect). User-initiated pauses are preserved across
+    reconnects.
 
     Args:
         sim_info: The simulation run information.
@@ -591,14 +675,24 @@ async def start_or_resume_simulation(
     Returns:
         None
     """
-    if _is_simulation_not_started(sim_info):
-        _start_simulation(sim_id, requesting_user)
-        await _notify_simulation_started(websocket, sim_id)
-    elif _is_simulation_paused(sim_info):
-        _resume_simulation(sim_info)
-        await _notify_simulation_resumed(websocket, sim_id)
-    else:
-        await _notify_connection_established(websocket, sim_id)
+    thread_not_started = sim_info["thread"] is None
+    is_paused = _is_simulation_paused(sim_info)
+
+    # Case 1: Restored simulation (thread was closed, restarted from DB)
+    if thread_not_started:
+        await _handle_restored_simulation(
+            sim_info, sim_id, websocket, requesting_user, is_paused
+        )
+        return
+
+    # Case 2: Existing paused simulation (reconnecting before auto-shutdown)
+    if is_paused:
+        await _handle_paused_simulation(sim_info, sim_id, websocket)
+        return
+
+    # Case 3: Running simulation
+    logger.info(f"Reconnecting to running sim {sim_id}")
+    await _notify_connection_established(websocket, sim_id)
 
 
 def _pause_simulation(sim_info: RunInfo) -> None:
@@ -645,13 +739,40 @@ async def cleanup_simulation(
     lock = SimulationLockManager.get_lock(sim_id)
 
     async with lock:
+        # Check if simulation was running BEFORE any cleanup to avoid race conditions
+        sim_controller = sim_info["simController"]
+        driver = sim_controller.realTimeDriver
+        was_running_before_disconnect = driver.running
+
         # Clean up subscriber
         _close_subscriber(subscriber)
         _detach_subscriber_from_emitter(subscriber, sim_info)
         _remove_subscriber_from_sim_data(sim_data)
 
-        # Pause simulation execution
+        # Pause simulation execution (no-op if already paused)
         _pause_simulation(sim_info)
+
+        # Mark if user had NOT paused it (so we can auto-resume on reconnect)
+        # If was_running_before_disconnect is True, then paused_by_user should be False
+        paused_by_user = not was_running_before_disconnect
+        sim_data["paused_by_user"] = paused_by_user
+
+        # Always emit a keyframe on disconnect with the correct paused_by_user state.
+        # This ensures the last keyframe in the database reflects whether the user
+        # paused the sim or if it was auto-paused on disconnect. Without this,
+        # the shutdown process may persist a regular frame (with pausedByUser=False)
+        # as the final keyframe, incorrectly overwriting user pause state.
+        keyframe = sim_controller.create_frame(
+            is_key=True, paused_by_user=paused_by_user
+        )
+        sim_controller.emit_frame(keyframe)
+
+        # Force immediate persistence of disconnect state
+        sim_data_for_keyframe = simulation_service.active_simulations.get(sim_id)
+        if sim_data_for_keyframe:
+            keyframe_subscriber = sim_data_for_keyframe.get("keyframe_subscriber")
+            if keyframe_subscriber:
+                keyframe_subscriber.force_persist_keyframe(keyframe)
 
         # Schedule shutdown after idle timeout
         user_id = sim_data["user_id"]

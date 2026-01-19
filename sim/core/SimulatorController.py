@@ -153,6 +153,10 @@ class SimulatorController:
         Returns:
             None
         """
+        # Capture running state before stopping - if already paused, the correct
+        # keyframe was already emitted (by user pause or cleanup_simulation)
+        was_running = self.realTimeDriver.running
+
         self.realTimeDriver.stop()
         if hasattr(self, "sim_thread") and self.sim_thread.is_alive():
             self.sim_thread.join()
@@ -161,8 +165,12 @@ class SimulatorController:
         if hasattr(self, "map_controller") and self.map_controller:
             self.map_controller.close()
 
-        final_frame = self.create_frame(is_key=True)
-        self.emit_frame(final_frame)
+        # Only emit final keyframe if sim was still running (natural completion).
+        # If already paused, the correct keyframe was already emitted with the
+        # proper paused_by_user flag by either user pause or cleanup_simulation.
+        if was_running:
+            final_frame = self.create_frame(is_key=True, paused_by_user=False)
+            self.emit_frame(final_frame)
 
     def pause(self) -> None:
         """Pause the running simulation.
@@ -426,11 +434,12 @@ class SimulatorController:
         for vehicle in self.vehicle_entities.values():
             vehicle.clear_update()
 
-    def create_frame(self, is_key: bool = False) -> Frame:
+    def create_frame(self, is_key: bool = False, paused_by_user: bool = False) -> Frame:
         """Create a frame containing entity data.
 
         Args:
             is_key: Whether to create a key frame (True) or diff frame (False).
+            paused_by_user: Whether this keyframe represents a user-initiated pause.
 
         Returns:
             A Frame object with the current entity states.
@@ -554,6 +563,9 @@ class SimulatorController:
                 "simSecondsPassed": self.clock.sim_time_seconds,
                 "simMinutesPassed": self.clock.sim_time_minutes,
                 "startTime": self.start_time,
+                "running": self.realTimeDriver.running,
+                "realTimeFactor": self.realTimeDriver.real_time_factor,
+                "pausedByUser": paused_by_user,
             },
         }
         frame = Frame(seq_numb=self.frameCounter, payload=payload, is_key=is_key)

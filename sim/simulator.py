@@ -69,6 +69,8 @@ class Simulator:
         run_id: str | None = None,
         map_controller: MapController | None = None,
         env: SimulationEnvironment | None = None,
+        initial_running: bool = True,
+        real_time_factor: float | None = None,
     ) -> str:
         """Initialize a simulation instance without starting the simulation loop.
 
@@ -117,6 +119,13 @@ class Simulator:
             strict=True,
             map_controller=map_controller,
         )
+
+        # Apply playback state for restored simulations
+        if real_time_factor is not None:
+            simController.realTimeDriver.set_real_time_factor(real_time_factor)
+
+        if not initial_running:
+            simController.realTimeDriver.pause()
 
         with self.thread_pool_lock:
             if run_id in self.thread_pool:

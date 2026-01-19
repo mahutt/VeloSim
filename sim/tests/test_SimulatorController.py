@@ -860,3 +860,118 @@ def test_reorder_driver_tasks_bottom_mode(
     # Expected: [2] (unspecified), [1] (specified, at bottom)
     assert new_order == [2, 1]
     assert driver.task_list == [task2, task1]
+
+
+def test_create_frame_with_paused_by_user_true(
+    simulator_controller: SimulatorController,
+) -> None:
+    """Test that create_frame includes pausedByUser=True in clock when specified."""
+    frame = simulator_controller.create_frame(is_key=True, paused_by_user=True)
+
+    payload = frame.payload_dict
+    assert "clock" in payload
+    clock = payload["clock"]
+    assert "pausedByUser" in clock
+    assert clock["pausedByUser"] is True
+
+
+def test_create_frame_with_paused_by_user_false(
+    simulator_controller: SimulatorController,
+) -> None:
+    """Test that create_frame includes pausedByUser=False in clock when specified."""
+    frame = simulator_controller.create_frame(is_key=True, paused_by_user=False)
+
+    payload = frame.payload_dict
+    assert "clock" in payload
+    clock = payload["clock"]
+    assert "pausedByUser" in clock
+    assert clock["pausedByUser"] is False
+
+
+def test_create_frame_includes_running_state(
+    simulator_controller: SimulatorController,
+) -> None:
+    """Test that create_frame includes running state from realTimeDriver."""
+    # Driver should be running by default
+    frame = simulator_controller.create_frame(is_key=True)
+
+    payload = frame.payload_dict
+    assert "clock" in payload
+    clock = payload["clock"]
+    assert "running" in clock
+    assert clock["running"] is True
+
+    # Pause and check again
+    simulator_controller.realTimeDriver.pause()
+    frame_paused = simulator_controller.create_frame(is_key=True)
+    clock_paused = frame_paused.payload_dict["clock"]
+    assert "running" in clock_paused
+    assert clock_paused["running"] is False
+
+
+def test_create_frame_includes_real_time_factor(
+    simulator_controller: SimulatorController,
+) -> None:
+    """Test that create_frame includes realTimeFactor from realTimeDriver."""
+    # Default factor should be 1.0
+    frame = simulator_controller.create_frame(is_key=True)
+
+    payload = frame.payload_dict
+    assert "clock" in payload
+    clock = payload["clock"]
+    assert "realTimeFactor" in clock
+    assert clock["realTimeFactor"] == 1.0
+
+    # Change factor and check again
+    simulator_controller.realTimeDriver.set_real_time_factor(0.5)  # 2x speed
+    frame_fast = simulator_controller.create_frame(is_key=True)
+    clock_fast = frame_fast.payload_dict["clock"]
+    assert "realTimeFactor" in clock_fast
+    assert clock_fast["realTimeFactor"] == 0.5
+
+
+def test_stop_does_not_emit_keyframe_when_already_paused(
+    simulator_controller: SimulatorController, frame_emitter: FrameEmitter
+) -> None:
+    """Test that stop() does NOT emit a keyframe when driver was already paused.
+
+    This ensures that the correct keyframe emitted by user pause or cleanup_simulation
+    is preserved and not overwritten by stop().
+    """
+    subscriber = FakeSubscriber()
+    frame_emitter.attach(subscriber)
+
+    # Pause the driver first (simulates user pausing or cleanup)
+    simulator_controller.realTimeDriver.pause()
+    assert simulator_controller.realTimeDriver.running is False
+
+    # Now call stop
+    simulator_controller.stop()
+
+    # No keyframes should be emitted - the correct one was already emitted
+    keyframes = [f for f in subscriber.received if f.is_key]
+    assert len(keyframes) == 0
+
+
+def test_stop_emits_keyframe_when_running(
+    simulator_controller: SimulatorController, frame_emitter: FrameEmitter
+) -> None:
+    """Test that stop() emits final keyframe with pausedByUser=False when driver was
+    running."""
+    subscriber = FakeSubscriber()
+    frame_emitter.attach(subscriber)
+
+    # Driver should be running by default
+    assert simulator_controller.realTimeDriver.running is True
+
+    # Call stop
+    simulator_controller.stop()
+
+    # A final keyframe should be emitted for naturally completing sims
+    keyframes = [f for f in subscriber.received if f.is_key]
+    assert len(keyframes) == 1
+    final_keyframe = keyframes[-1]
+    clock = final_keyframe.payload_dict["clock"]
+
+    # The final frame should have pausedByUser=False since sim completed naturally
+    assert clock["pausedByUser"] is False

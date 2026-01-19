@@ -36,3 +36,19 @@ class SimulationRuntimeState:
     input_parameters: InputParameter
     map_controller: MapController
     current_time_seconds: int
+    was_running: bool = True
+    real_time_factor: float = 1.0
+    paused_by_user: bool = False
+
+    @property
+    def should_auto_resume(self) -> bool:
+        """
+        Determine if simulation should auto-resume on restore.
+
+        Auto-resumes unless the user explicitly paused the simulation.
+        This respects user intent while providing good UX for disconnects.
+
+        Returns:
+            True if simulation should auto-resume, False to stay paused.
+        """
+        return not self.paused_by_user

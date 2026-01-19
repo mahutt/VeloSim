@@ -950,6 +950,71 @@ class TestSimulationService:
         assert response.playback_speed == 0.0
         assert response.status == SimulationPlaybackStatus.PAUSED
 
+    def test_set_playback_speed_pause_emits_keyframe(
+        self,
+        mock_user_crud: Mock,
+        mock_sim_crud: Mock,
+        mock_db: Mock,
+        test_user: User,
+        simulation_service: SimulationService,
+    ) -> None:
+        """Test setting playback speed to 0 emits keyframe with paused_by_user=True."""
+        mock_user_crud.get.side_effect = [test_user, test_user, test_user]
+        mock_sim = Mock(id=1, user_id=test_user.id)
+        mock_sim_crud.create.return_value = mock_sim
+        mock_sim_crud.get.side_effect = [mock_sim, mock_sim, mock_sim]
+
+        params = InputParameter()
+        init_resp = simulation_service.initialize_simulation(
+            mock_db, test_user.id, params
+        )
+        sim_id = init_resp.sim_id
+        simulation_service.start_simulation(mock_db, sim_id, test_user.id)
+
+        # Get the sim_info and mock the controller
+        sim_info = simulation_service.simulator.get_sim_by_id(sim_id)
+        assert sim_info is not None
+        mock_controller = Mock()
+        mock_frame = Mock()
+        mock_controller.create_frame.return_value = mock_frame
+
+        # Mock the driver to update running state when paused
+        mock_driver = Mock()
+        mock_driver.running = True  # Initially running
+
+        def pause_side_effect() -> None:
+            mock_driver.running = False
+
+        mock_driver.pause.side_effect = pause_side_effect
+        mock_controller.realTimeDriver = mock_driver
+
+        sim_info["simController"] = mock_controller
+
+        # Mock the keyframe subscriber
+        mock_keyframe_subscriber = Mock()
+        simulation_service.active_simulations[sim_id][
+            "keyframe_subscriber"
+        ] = mock_keyframe_subscriber
+
+        playback_speed = PlaybackSpeedBase(playback_speed=0.0)
+        response = simulation_service.set_playback_speed(
+            mock_db, sim_id, playback_speed, test_user.id
+        )
+
+        assert response.playback_speed == 0.0
+        assert response.status == SimulationPlaybackStatus.PAUSED
+
+        # Should create keyframe with paused_by_user=True
+        mock_controller.create_frame.assert_called_with(
+            is_key=True, paused_by_user=True
+        )
+        mock_controller.emit_frame.assert_called_once_with(mock_frame)
+
+        # Should force-persist the keyframe
+        mock_keyframe_subscriber.force_persist_keyframe.assert_called_once_with(
+            mock_frame
+        )
+
     def test_set_playback_speed_missing_simulator(
         self,
         mock_user_crud: Mock,
@@ -1118,3 +1183,63 @@ class TestSimulationService:
         )
 
         assert result is existing_sim_data
+
+    def test_restore_user_paused_simulation_preserves_paused_by_user_flag(
+        self: "TestSimulationService",
+        mock_user_crud: Mock,
+        mock_sim_crud: Mock,
+        mock_db: Mock,
+        test_user: User,
+        simulation_service: SimulationService,
+    ) -> None:
+        """Test that restoring a user-paused simulation preserves paused_by_user
+        flag."""
+        mock_user_crud.get.return_value = test_user
+        mock_sim = Mock(
+            id=1,
+            user_id=test_user.id,
+            scenario_payload='{"start_time": "08:00", "end_time": "10:00"}',
+        )
+        mock_sim_crud.get_by_uuid.return_value = mock_sim
+
+        # Mock keyframe with pausedByUser=True
+        keyframe_with_user_pause = {
+            "clock": {
+                "simSecondsPassed": 1800,
+                "startTime": 0,
+                "running": False,
+                "realTimeFactor": 1.0,
+                "pausedByUser": True,  # User had paused it
+            },
+            "stations": [],
+            "vehicles": [],
+            "drivers": [],
+            "tasks": [],
+        }
+
+        scenario_data = {"start_time": "08:00", "end_time": "10:00"}
+
+        # Mock simulation_data_service
+        mock_data_service = Mock()
+        mock_data_service.get_scenario.return_value = scenario_data
+        mock_data_service.get_last_persisted_keyframe.return_value = (
+            keyframe_with_user_pause
+        )
+        simulation_service.simulation_data_service = mock_data_service
+
+        # Restore simulation
+        restored = simulation_service.ensure_active_simulation(
+            sim_id="test-sim-id", db=mock_db, requesting_user=test_user.id
+        )
+
+        # Verify paused_by_user flag is preserved in active_simulations
+        assert restored.get("paused_by_user") is True
+        assert (
+            simulation_service.active_simulations["test-sim-id"].get("paused_by_user")
+            is True
+        )
+
+        # Verify simulator was initialized with correct params by checking driver state
+        sim_info = simulation_service.simulator.get_sim_by_id("test-sim-id")
+        assert sim_info is not None
+        assert sim_info["simController"].realTimeDriver.running is False  # Paused

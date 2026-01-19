@@ -103,6 +103,10 @@ class ActiveSimulationData(TypedDict):
     keyframe_subscriber: NotRequired[
         KeyframePersistenceSubscriber
     ]  # Keyframe persistence
+    restored_keyframe: NotRequired[dict]  # Persisted keyframe used for restoration
+    paused_by_user: NotRequired[
+        bool
+    ]  # True if paused by user (vs auto-paused on disconnect)
 
 
 class SimulationService:
@@ -225,6 +229,8 @@ class SimulationService:
         input_params = resume_state.input_parameters
         map_controller = resume_state.map_controller
         current_sim_time = resume_state.current_time_seconds
+        real_time_factor = resume_state.real_time_factor
+        should_auto_resume = resume_state.should_auto_resume
 
         sim = self.simulator
 
@@ -241,6 +247,8 @@ class SimulationService:
             run_id=sim_id,
             map_controller=map_controller,
             env=env,
+            initial_running=should_auto_resume,
+            real_time_factor=real_time_factor,
         )
 
         self.active_simulations[restore_sim_id] = ActiveSimulationData(
@@ -249,6 +257,8 @@ class SimulationService:
             sim_time=input_params.sim_time,
             user_id=db_sim.user_id,
             keyframe_subscriber=keyframe_subscriber,
+            restored_keyframe=keyframe,
+            paused_by_user=resume_state.paused_by_user,
         )
 
         return self.active_simulations[restore_sim_id]
@@ -635,17 +645,42 @@ class SimulationService:
         sim_info = sim.get_sim_by_id(sim_id)
         if sim_info is None:
             raise RuntimeError(f"Simulation {sim_id} not found in simulator")
-        driver = sim_info["simController"].realTimeDriver
+        sim_controller = sim_info["simController"]
+        driver = sim_controller.realTimeDriver
 
         # Adjust playback based on requested speed
         speed_value = playback_speed.playback_speed
 
         if speed_value == 0:  # the requested value is equivalent to pausing
+            # Check if sim was already paused (e.g., by cleanup_simulation)
+            # If already paused and paused_by_user is False (auto-pause), don't
+            # override it with paused_by_user=True - that would break auto-resume
+            already_paused = not driver.running
+            was_auto_paused = already_paused and not sim_data.get(
+                "paused_by_user", False
+            )
+
             driver.pause()
+
+            if was_auto_paused:
+                # Sim was auto-paused, don't emit a user-pause keyframe
+                # This prevents late playbackSpeed=0 calls from breaking auto-resume
+                pass
+            else:
+                # This is a genuine user pause action
+                sim_data["paused_by_user"] = True
+                # Emit and force-persist a keyframe on pause to capture current state
+                keyframe = sim_controller.create_frame(is_key=True, paused_by_user=True)
+                sim_controller.emit_frame(keyframe)
+                # Also force immediate persistence, bypassing interval filtering
+                keyframe_subscriber = sim_data.get("keyframe_subscriber")
+                if keyframe_subscriber:
+                    keyframe_subscriber.force_persist_keyframe(keyframe)
         else:  # handle any other valid playback speed properly
-            driver.resume()
+            # Set speed first, then resume if needed
             inverted_factor = 1.0 / speed_value
             driver.set_real_time_factor(inverted_factor)
+            driver.resume()
 
         status = (
             SimulationPlaybackStatus.RUNNING

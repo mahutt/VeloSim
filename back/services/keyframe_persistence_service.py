@@ -292,6 +292,44 @@ class KeyframePersistenceSubscriber(Subscriber):
                 f"Dropped random frame. Total drops: {self.queue_drop_count}"
             )
 
+    def force_persist_keyframe(self, frame: Frame) -> None:
+        """Force immediate persistence of a keyframe, bypassing interval filtering.
+
+        Used for critical state changes like pausing or manual saves.
+
+        Args:
+            frame: The keyframe to persist immediately.
+
+        Returns:
+            None
+        """
+        if self.closed:
+            return
+
+        # Must be a keyframe
+        if not frame.is_key:
+            logger.warning(
+                f"force_persist_keyframe called with non-keyframe "
+                f"(seq={frame.seq_number}) for sim_instance_id={self.sim_instance_id}"
+            )
+            return
+
+        # Track as last keyframe
+        self.last_keyframe = frame
+
+        # Queue immediately without interval check
+        try:
+            self.frame_queue.put_nowait(frame)
+            logger.info(
+                f"Force-queued keyframe for immediate persistence: "
+                f"sim_instance_id={self.sim_instance_id}, seq={frame.seq_number}"
+            )
+        except asyncio.QueueFull:
+            logger.error(
+                f"Could not force-queue keyframe (queue full) for "
+                f"sim_instance_id={self.sim_instance_id}, seq={frame.seq_number}"
+            )
+
     async def shutdown(self) -> None:
         """Gracefully shutdown the persistence subscriber.
 
