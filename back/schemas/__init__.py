@@ -65,6 +65,13 @@ from .scenario import (
     ScenarioResponse,
     ScenarioListResponse,
 )
+from .sim_frame import (
+    SimFrameBase,
+    SimFrameCreate,
+    SimFrameResponse,
+    SimFrameListResponse,
+    SeekResponse,
+)
 
 __all__ = [
     "DriverTaskAssignRequest",
@@ -96,4 +103,9 @@ __all__ = [
     "ScenarioUpdate",
     "ScenarioResponse",
     "ScenarioListResponse",
+    "SimFrameBase",
+    "SimFrameCreate",
+    "SimFrameResponse",
+    "SimFrameListResponse",
+    "SeekResponse",
 ]

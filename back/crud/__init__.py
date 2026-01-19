@@ -24,11 +24,13 @@ SOFTWARE.
 
 # Import all CRUD classes here for easy access
 from .sim_instance import sim_instance_crud
+from .sim_frame import sim_frame_crud
 from .user import user_crud
 from .scenario import scenario_crud
 
 __all__ = [
     "sim_instance_crud",
+    "sim_frame_crud",
     "user_crud",
     "scenario_crud",
 ]
