@@ -210,5 +210,15 @@ class Station:
 
         # TODO: replace with periodic operations
         while True:
-            self.check_for_new_task()
+            # TODO: Consolidate pop up task handling with scheduled task handling.
+            #
+            # Here, we comment out the pop-up task code because, so far, all
+            # tasks are supposed to be "scheduled" in the scenario and the current
+            # task pop-up mechanism conflicts with that idea.
+            #
+            # However, we don't delete the task pop-up code because scheduled tasks
+            # should be refactored to use a (queue-based) TaskPopupStrategy
+            # implementation.
+            #
+            # self.check_for_new_task()
             yield self.env.timeout(1)
