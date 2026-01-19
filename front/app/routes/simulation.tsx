@@ -79,14 +79,18 @@ function SimulationContent() {
       {!isLoading && (
         <>
           <SelectedItemBar />
-          {/* max-h-[calc(100vh-2.5rem) is set so that the Mapbox & OSM copyright notices aren't blocked. */}
-          <div className="w-60 absolute top-4 right-4 flex flex-col gap-2 items-end max-h-[calc(100vh-2.5rem)]">
+          {/* h-[calc(100vh-2.5rem) is set so that the Mapbox & OSM copyright notices aren't blocked. */}
+          <div className="w-60 absolute top-4 right-4 flex flex-col gap-2 items-end h-[calc(100vh-2.5rem)]">
             <div className="w-full flex justify-between items-center gap-2">
               <SimulationClock />
               <PlaybackControls />
             </div>
-            <ResourceBar />
-            <HQWidget />
+            <div className="w-full flex flex-col gap-2 min-h-0">
+              <ResourceBar />
+              <div className="shrink-0">
+                <HQWidget />
+              </div>
+            </div>
           </div>
         </>
       )}

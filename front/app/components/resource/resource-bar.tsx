@@ -65,8 +65,8 @@ export default function ResourceBar() {
   }, [resourceBarElement, searchQuery]);
 
   return (
-    <div className="w-full flex-1">
-      <Card className="bg-gray-50 gap-0 h-full">
+    <div className="w-full min-h-0 flex-1 overflow-hidden">
+      <Card className="bg-gray-50 gap-0 flex flex-col h-full overflow-hidden">
         <CardHeader>
           <SearchBar
             placeholder="Search Resource"
@@ -75,8 +75,8 @@ export default function ResourceBar() {
             onClear={() => setSearchQuery('')}
           />
         </CardHeader>
-        <CardContent className="pt-0">
-          <div className="space-y-2 max-h-[calc(100vh-12rem)] overflow-y-auto pr-3 -mr-3">
+        <CardContent className="pt-0 flex-1 overflow-y-auto min-h-0">
+          <div className="space-y-2">
             {resourceBarElement.length === 0 ? (
               <div className="text-center text-muted-foreground py-8 select-none">
                 No resources currently available
