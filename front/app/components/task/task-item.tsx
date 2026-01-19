@@ -50,7 +50,7 @@ export function TaskItem({
       draggable={dragEnabled}
       onDragStart={handleDragStart}
       className={`rounded-lg px-3 py-2 bg-white border border-gray-200
-        hover:border-gray-300 transition-all duration-200 ${
+        hover:border-gray-300 transition-all duration-200 h-10 ${
           dragEnabled
             ? 'cursor-grab hover:shadow-sm active:cursor-grabbing active:opacity-50'
             : 'cursor-default'

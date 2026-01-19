@@ -122,7 +122,7 @@ export enum DriverState {
   ServicingStation = 'servicing_station',
   OnBreak = 'on_break',
   HeadingToHQ = 'heading_to_hq',
-  RestockingBatteries = 'restocking_batteries',
+  RestockingBatteries = 'restocking',
 }
 
 export interface Driver {

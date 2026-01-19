@@ -25,10 +25,12 @@
 import { useState } from 'react';
 import { X } from 'lucide-react';
 import { useSimulation } from '~/providers/simulation-provider';
-import { type Position, type StationTask } from '~/types';
+import { DriverState, type Position, type StationTask } from '~/types';
 import { TaskItem } from '../task/task-item';
 import { useTaskAssignment } from '~/providers/task-assignment-provider';
 import { ScrollArea } from '~/components/ui/scroll-area';
+import { Button } from '../ui/button';
+import DriverStateBadge from './driver-state-badge';
 
 export enum SelectedItemType {
   Station = 'station',
@@ -50,6 +52,7 @@ export interface PopulatedDriver {
   route?: {
     coordinates: Position[];
   };
+  state: DriverState;
   inProgressTask: StationTask | null;
 }
 
@@ -67,21 +70,32 @@ export default function SelectedItemBar() {
   };
 
   return (
-    <div className="bg-gray-50 relative flex flex-col gap-2 rounded-lg border py-4 shadow-sm">
-      <button
-        className="absolute top-3 right-3 translate-y-[-50%] translate-x-[50%] rounded-full p-2 bg-white shadow-md hover:bg-gray-100 border border-gray-200"
-        onClick={handleClose}
-      >
-        <X className="w-6 h-6" />
-      </button>
-      <div className="flex flex-col px-5">
-        <span className="text-xl font-bold truncate">
-          {selectedItem.value.name}
-        </span>
-        <span className="text-muted-foreground text-sm font-normal">
-          {selectedItem.type === SelectedItemType.Driver ? 'Driver' : 'Station'}{' '}
-          #{selectedItem.value.id}
-        </span>
+    <div className="bg-gray-50 flex flex-col gap-2 rounded-lg border py-4 shadow-sm">
+      <div className="px-5 flex flex-row justify-between items-start gap-1">
+        <div className="flex flex-col">
+          <span className="text-xl font-bold">{selectedItem.value.name}</span>
+          {selectedItem.type === SelectedItemType.Driver && (
+            <div className="flex flex row gap-2">
+              <span className="text-muted-foreground text-sm font-normal">
+                Driver #{selectedItem.value.id}
+              </span>
+              <DriverStateBadge state={selectedItem.value.state} />
+            </div>
+          )}
+          {selectedItem.type === SelectedItemType.Station && (
+            <span className="text-muted-foreground text-sm font-normal">
+              Station #{selectedItem.value.id}
+            </span>
+          )}
+        </div>
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={handleClose}
+          className="h-7 w-7"
+        >
+          <X className="h-4 w-4" />
+        </Button>
       </div>
       <p className="text-sm text-muted-foreground px-5">
         {selectedItem.value.tasks.length === 0

@@ -79,6 +79,7 @@ export function makePopulatedDriver(
     position: overrides.position ?? [0, 0],
     tasks: overrides.tasks ?? [],
     route: overrides.route,
+    state: overrides.state ?? DriverState.OffShift,
     inProgressTask: overrides.inProgressTask ?? null,
   };
 }

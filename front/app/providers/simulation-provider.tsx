@@ -528,6 +528,7 @@ export const SimulationProvider = ({
             (taskId: number) => tasksRef.current.get(taskId)!
           ),
           route: targetResource.route,
+          state: targetResource.state,
           inProgressTask: targetResource.inProgressTaskId
             ? tasksRef.current.get(targetResource.inProgressTaskId)!
             : null,
