@@ -86,9 +86,10 @@ export function DataTable<TData, TValue>({
     getPaginationRowModel: getPaginationRowModel(),
     getFilteredRowModel: getFilteredRowModel(),
     getRowId,
-    state: { pagination },
+    state: {
+      pagination,
+    },
     onPaginationChange: setPagination,
-    autoResetPageIndex: false,
     meta: {
       setResetPasswordUser,
       setShowResetPasswordDialog,
