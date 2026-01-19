@@ -73,8 +73,8 @@ def test_station_uses_tpu_strategy_in_run_loop() -> None:
     # Run long enough for the station to call check_for_new_task once
     env.run(until=2)
 
-    # The TPU strategy should have been invoked
-    assert tpu.calls >= 1
-    # If it returned True, station should have created a pop-up task
-    assert len(station.pop_up_tasks) == 1
-    assert station.get_task_count() >= 1
+    # The TPU strategy should *not* have been invoked
+    # (for now, since pop-up tasks are disabled until #581 is resolved)
+    assert tpu.calls == 0
+    assert len(station.pop_up_tasks) == 0
+    assert station.get_task_count() == 0
