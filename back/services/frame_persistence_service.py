@@ -186,12 +186,26 @@ class FramePersistenceSubscriber(Subscriber):
             # Create database session (run in executor to avoid blocking)
             db = SessionLocal()
             try:
+                # Validate is_key is set
+                # None indicates a possible problem with the simulation
+                if frame.is_key is None:
+                    error_msg = (
+                        f"Frame seq={frame.seq_number} has is_key=None. "
+                        "This indicates a potential problem in the simulation "
+                        "frame generation."
+                    )
+                    logger.error(
+                        f"Invalid frame for sim_instance_id="
+                        f"{self.sim_instance_id}: {error_msg}"
+                    )
+                    raise ValueError(error_msg)
+
                 frame_data = SimFrameCreate(
                     sim_instance_id=self.sim_instance_id,
                     seq_number=frame.seq_number,
                     sim_seconds_elapsed=sim_seconds_elapsed,
                     frame_data=frame.payload_dict,
-                    is_key=frame.is_key if frame.is_key is not None else False,
+                    is_key=frame.is_key,
                 )
 
                 # Run DB operation in thread pool executor
