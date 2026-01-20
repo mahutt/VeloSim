@@ -617,6 +617,11 @@ class TestSimulationAPI:
         mock_sim = MagicMock()
         mock_sim.id = 1
         mock_sim.user_id = 1
+        mock_sim.uuid = "test-uuid-123"
+        mock_sim.name = None
+        mock_sim.playback_capable = False
+        mock_sim.parent_sim_instance_id = None
+        mock_sim.branch_keyframe_seq = None
         mock_sim.date_created = "2025-01-01T00:00:00"
         mock_sim.date_updated = "2025-01-01T00:00:00"
         mock_sim.drivers = []
@@ -656,6 +661,11 @@ class TestSimulationAPI:
         mock_sim1 = MagicMock()
         mock_sim1.id = 1
         mock_sim1.user_id = 1
+        mock_sim1.uuid = "test-uuid-1"
+        mock_sim1.name = None
+        mock_sim1.playback_capable = False
+        mock_sim1.parent_sim_instance_id = None
+        mock_sim1.branch_keyframe_seq = None
         mock_sim1.date_created = "2025-01-01T00:00:00"
         mock_sim1.date_updated = "2025-01-01T00:00:00"
         mock_sim1.drivers = []
@@ -665,6 +675,11 @@ class TestSimulationAPI:
         mock_sim2 = MagicMock()
         mock_sim2.id = 2
         mock_sim2.user_id = 1
+        mock_sim2.uuid = "test-uuid-2"
+        mock_sim2.name = None
+        mock_sim2.playback_capable = False
+        mock_sim2.parent_sim_instance_id = None
+        mock_sim2.branch_keyframe_seq = None
         mock_sim2.date_created = "2025-01-01T00:00:00"
         mock_sim2.date_updated = "2025-01-01T00:00:00"
         mock_sim2.drivers = []

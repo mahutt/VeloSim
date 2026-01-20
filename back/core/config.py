@@ -25,7 +25,7 @@ SOFTWARE.
 import os
 import json
 from typing import Any, List
-from pydantic import field_validator, Field
+from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from dotenv import load_dotenv
 
@@ -139,24 +139,14 @@ class Settings(BaseSettings):
         os.getenv("SIMULATION_IDLE_TIMEOUT_SECONDS", "15")
     )
 
-    # Keyframe persistence settings
-    # Controls the interval for persisting keyframes to the database.
-    # For example, a value of 5 means every 5th keyframe is persisted.
-    # Defaults to 5 (persist every 5th keyframe).
-    # Must be between 1 and 1000 to prevent system issues.
-    KEYFRAME_PERSIST_INTERVAL: int = Field(
-        default=int(os.getenv("KEYFRAME_PERSIST_INTERVAL", "5")),
-        ge=1,
-        le=1000,
-    )
-
-    # Maximum size of the keyframe persistence queue.
+    # Frame persistence settings
+    # Maximum size of the frame persistence queue.
     # If the queue fills up, random frames will be dropped with a warning.
     # Defaults to 1000 frames.
     KEYFRAME_QUEUE_MAX_SIZE: int = int(os.getenv("KEYFRAME_QUEUE_MAX_SIZE", "1000"))
 
-    # Maximum time to wait for keyframe queue to drain during shutdown (seconds).
-    # This allows pending keyframes to be persisted before simulation deletion.
+    # Maximum time to wait for frame queue to drain during shutdown (seconds).
+    # This allows pending frames to be persisted before simulation deletion.
     # Defaults to 5 seconds.
     KEYFRAME_DRAIN_TIMEOUT: float = float(os.getenv("KEYFRAME_DRAIN_TIMEOUT", "5.0"))
 

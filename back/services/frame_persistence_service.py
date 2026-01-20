@@ -31,31 +31,29 @@ from typing import Optional
 from sim.entities.frame import Frame
 from sim.utils.subscriber import Subscriber
 from back.database.session import SessionLocal
-from back.crud.sim_keyframe import sim_keyframe_crud
-from back.schemas.sim_keyframe import SimKeyframeCreate
+from back.crud.sim_frame import sim_frame_crud
+from back.schemas.sim_frame import SimFrameCreate
 from back.core.config import settings
 from grafana_logging.logger import get_logger
 
 logger = get_logger(__name__)
 
 
-class KeyframePersistenceSubscriber(Subscriber):
-    """Async subscriber that persists simulation keyframes to the database.
+class FramePersistenceSubscriber(Subscriber):
+    """Async subscriber that persists all simulation frames to the database.
 
-    This subscriber receives frames from the simulation, filters for keyframes
-    based on the configured interval, and asynchronously persists them to the
-    database using a queue-based worker pattern.
+    This subscriber receives all frames from the simulation (both keyframes
+    and diff frames) and asynchronously persists them to the database using
+    a queue-based worker pattern with idempotent upsert operations.
     """
 
     def __init__(self, sim_instance_id: int):
-        """Initialize the keyframe persistence subscriber.
+        """Initialize the frame persistence subscriber.
 
         Args:
             sim_instance_id: Database ID of the simulation instance.
         """
         self.sim_instance_id = sim_instance_id
-        self.keyframe_counter = 0
-        self.persist_interval = settings.KEYFRAME_PERSIST_INTERVAL
         self.queue_max_size = settings.KEYFRAME_QUEUE_MAX_SIZE
 
         # Async queue for frame data
@@ -78,9 +76,8 @@ class KeyframePersistenceSubscriber(Subscriber):
         self.last_keyframe: Optional[Frame] = None
 
         logger.info(
-            "KeyframePersistenceSubscriber initialized for"
+            "FramePersistenceSubscriber initialized for "
             + f"sim_instance_id={sim_instance_id}, "
-            + f"persist_interval={self.persist_interval}, "
             + f"queue_max_size={self.queue_max_size}"
         )
 
@@ -121,7 +118,7 @@ class KeyframePersistenceSubscriber(Subscriber):
             )
             self.loop_thread.start()
             logger.info(
-                "Created background event loop for keyframe persistence "
+                "Created background event loop for frame persistence "
                 + f"sim_instance_id={self.sim_instance_id}"
             )
 
@@ -133,14 +130,14 @@ class KeyframePersistenceSubscriber(Subscriber):
             # Store as a task-like object we can cancel later
             self.worker_task = future
             logger.info(
-                "KeyframePersistenceSubscriber worker started for "
+                "FramePersistenceSubscriber worker started for "
                 + f"sim_instance_id={self.sim_instance_id}"
             )
 
     async def _persistence_worker(self) -> None:
         """Async worker that processes frames from the queue and persists them."""
         logger.info(
-            "Keyframe persistence worker running for "
+            "Frame persistence worker running for "
             f"sim_instance_id={self.sim_instance_id}"
         )
 
@@ -165,7 +162,7 @@ class KeyframePersistenceSubscriber(Subscriber):
                 )
 
         logger.info(
-            "Keyframe persistence worker stopped for "
+            "Frame persistence worker stopped for "
             f"sim_instance_id={self.sim_instance_id}. Stats: "
             f"success={self.persist_success_count}, "
             f"failures={self.persist_failure_count}, "
@@ -189,23 +186,40 @@ class KeyframePersistenceSubscriber(Subscriber):
             # Create database session (run in executor to avoid blocking)
             db = SessionLocal()
             try:
-                keyframe_data = SimKeyframeCreate(
+                # Validate is_key is set
+                # None indicates a possible problem with the simulation
+                if frame.is_key is None:
+                    error_msg = (
+                        f"Frame seq={frame.seq_number} has is_key=None. "
+                        "This indicates a potential problem in the simulation "
+                        "frame generation."
+                    )
+                    logger.error(
+                        f"Invalid frame for sim_instance_id="
+                        f"{self.sim_instance_id}: {error_msg}"
+                    )
+                    raise ValueError(error_msg)
+
+                frame_data = SimFrameCreate(
                     sim_instance_id=self.sim_instance_id,
+                    seq_number=frame.seq_number,
                     sim_seconds_elapsed=sim_seconds_elapsed,
                     frame_data=frame.payload_dict,
+                    is_key=frame.is_key,
                 )
 
                 # Run DB operation in thread pool executor
                 # Use self.loop if available, otherwise get the running loop
                 loop = self.loop if self.loop else asyncio.get_running_loop()
-                await loop.run_in_executor(
-                    None, sim_keyframe_crud.create, db, keyframe_data
-                )
+                await loop.run_in_executor(None, sim_frame_crud.upsert, db, frame_data)
 
                 self.persist_success_count += 1
 
+                frame_type = "keyframe" if frame.is_key else "diff"
                 logger.info(
-                    f"Persisted keyframe for sim_instance_id={self.sim_instance_id}, "
+                    f"Persisted {frame_type} for "
+                    f"sim_instance_id={self.sim_instance_id}, "
+                    f"seq={frame.seq_number}, "
                     f"sim_seconds={sim_seconds_elapsed:.2f}, "
                     f"total_success={self.persist_success_count}"
                 )
@@ -216,13 +230,15 @@ class KeyframePersistenceSubscriber(Subscriber):
         except Exception as e:
             self.persist_failure_count += 1
             logger.error(
-                "Failed to persist keyframe for "
+                "Failed to persist frame for "
                 f"sim_instance_id={self.sim_instance_id}: {e}. "
                 f"Total failures: {self.persist_failure_count}"
             )
 
     def on_frame(self, frame: Frame) -> None:
         """Handle incoming frame from simulation (called from simulation thread).
+
+        Persists ALL frames (both keyframes and diffs) for full replay capability.
 
         Args:
             frame: The frame received from the simulation.
@@ -233,22 +249,11 @@ class KeyframePersistenceSubscriber(Subscriber):
         if self.closed:
             return
 
-        # Only process keyframes
-        if not frame.is_key:
-            return
-
         # Track last keyframe for final persistence on shutdown
-        self.last_keyframe = frame
+        if frame.is_key:
+            self.last_keyframe = frame
 
-        # Apply interval filtering: persist frame 0, then every Nth frame
-        # (0, N, 2N, 3N, ...)
-        if self.keyframe_counter % self.persist_interval != 0:
-            self.keyframe_counter += 1
-            return
-
-        self.keyframe_counter += 1
-
-        # Try to queue the frame
+        # Try to queue the frame (no interval filtering - persist all frames)
         try:
             self.frame_queue.put_nowait(frame)
         except asyncio.QueueFull:
@@ -287,7 +292,7 @@ class KeyframePersistenceSubscriber(Subscriber):
                 )
 
             logger.warning(
-                "Keyframe persistence queue full for "
+                "Frame persistence queue full for "
                 f"sim_instance_id={self.sim_instance_id}. "
                 f"Dropped random frame. Total drops: {self.queue_drop_count}"
             )
@@ -341,7 +346,7 @@ class KeyframePersistenceSubscriber(Subscriber):
 
         self.closed = True
         logger.info(
-            "Shutting down KeyframePersistenceSubscriber for "
+            "Shutting down FramePersistenceSubscriber for "
             f"sim_instance_id={self.sim_instance_id}"
         )
 
@@ -368,7 +373,7 @@ class KeyframePersistenceSubscriber(Subscriber):
             if elapsed >= drain_timeout:
                 queue_size = self.frame_queue.qsize()
                 logger.warning(
-                    f"Keyframe queue drain timeout ({drain_timeout}s) "
+                    f"Frame queue drain timeout ({drain_timeout}s) "
                     f"for sim_instance_id={self.sim_instance_id}. "
                     f"Remaining queue size: {queue_size}"
                 )
@@ -408,7 +413,7 @@ class KeyframePersistenceSubscriber(Subscriber):
                     self.worker_task.cancel()
 
         logger.info(
-            "KeyframePersistenceSubscriber shutdown complete for "
+            "FramePersistenceSubscriber shutdown complete for "
             f"sim_instance_id={self.sim_instance_id}. "
             f"Final stats: success={self.persist_success_count}, "
             f"failures={self.persist_failure_count}, "

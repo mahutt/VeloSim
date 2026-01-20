@@ -42,7 +42,7 @@ from back.schemas.sim_instance import (
 )
 from back.exceptions import VelosimPermissionError, ItemNotFoundError
 from grafana_logging.logger import get_logger
-from back.services.keyframe_persistence_service import KeyframePersistenceSubscriber
+from back.services.frame_persistence_service import FramePersistenceSubscriber
 from back.services.simulation_data_service import SimulationDataService
 
 
@@ -100,9 +100,7 @@ class ActiveSimulationData(TypedDict):
     initialization_start_time: NotRequired[
         float
     ]  # Records start time of initialization, used for startup metrics
-    keyframe_subscriber: NotRequired[
-        KeyframePersistenceSubscriber
-    ]  # Keyframe persistence
+    keyframe_subscriber: NotRequired[FramePersistenceSubscriber]  # Keyframe persistence
     restored_keyframe: NotRequired[dict]  # Persisted keyframe used for restoration
     paused_by_user: NotRequired[
         bool
@@ -234,8 +232,8 @@ class SimulationService:
 
         sim = self.simulator
 
-        keyframe_subscriber = KeyframePersistenceSubscriber(db_sim.id)
-        keyframe_subscriber.start()
+        frame_subscriber = FramePersistenceSubscriber(db_sim.id)
+        frame_subscriber.start()
 
         env = SimulationEnvironment()
 
@@ -243,7 +241,7 @@ class SimulationService:
 
         restore_sim_id = sim.initialize(
             input_params,
-            subscribers=[keyframe_subscriber],
+            subscribers=[frame_subscriber],
             run_id=sim_id,
             map_controller=map_controller,
             env=env,
@@ -256,7 +254,7 @@ class SimulationService:
             status="resumed",
             sim_time=input_params.sim_time,
             user_id=db_sim.user_id,
-            keyframe_subscriber=keyframe_subscriber,
+            keyframe_subscriber=frame_subscriber,
             restored_keyframe=keyframe,
             paused_by_user=resume_state.paused_by_user,
         )
@@ -293,12 +291,12 @@ class SimulationService:
         # Create a fresh Simulator for this simulation
         sim = self.simulator
 
-        # Create keyframe persistence subscriber
-        keyframe_subscriber = KeyframePersistenceSubscriber(db_sim_instance.id)
-        keyframe_subscriber.start()
+        # Create frame persistence subscriber
+        frame_subscriber = FramePersistenceSubscriber(db_sim_instance.id)
+        frame_subscriber.start()
 
         # Initialize simulation with InputParameter and persistence subscriber
-        sim_id = sim.initialize(params, subscribers=[keyframe_subscriber])
+        sim_id = sim.initialize(params, subscribers=[frame_subscriber])
 
         # Update the database record with the simulator's UUID
         db_sim_instance.uuid = sim_id
@@ -310,7 +308,7 @@ class SimulationService:
             status="initialized",
             sim_time=params.sim_time,
             user_id=user.id,
-            keyframe_subscriber=keyframe_subscriber,
+            keyframe_subscriber=frame_subscriber,
         )
 
         return SimulationResponse(

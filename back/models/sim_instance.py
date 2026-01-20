@@ -23,14 +23,14 @@ SOFTWARE.
 """
 
 from typing import TYPE_CHECKING, Any, List, Optional
-from sqlalchemy import DateTime, ForeignKey, String, func
+from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from back.database.session import Base
 from back.models.scenario import JSONBCompatible
 
 if TYPE_CHECKING:
     from .user import User
-    from .sim_keyframe import SimKeyframe
+    from .sim_frame import SimFrame
 
 
 class SimInstance(Base):
@@ -63,9 +63,40 @@ class SimInstance(Base):
         JSONBCompatible, nullable=True
     )
 
-    keyframes: Mapped[List["SimKeyframe"]] = relationship(
-        "SimKeyframe", back_populates="sim_instance", cascade="all, delete-orphan"
+    # User-provided name for the simulation instance
+    name: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+
+    # True for all new instances with full frame persistence, False for legacy instances
+    playback_capable: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=True, server_default="true"
+    )
+
+    # For branched simulations: FK to parent sim instance
+    parent_sim_instance_id: Mapped[Optional[int]] = mapped_column(
+        ForeignKey("sim_instances.id", ondelete="SET NULL"), nullable=True
+    )
+
+    # For branched simulations: seq_number of keyframe this sim branched from
+    branch_keyframe_seq: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+
+    # Relationships
+    frames: Mapped[List["SimFrame"]] = relationship(
+        "SimFrame", back_populates="sim_instance", cascade="all, delete-orphan"
+    )
+
+    # Self-referential relationships for branching
+    parent_sim_instance: Mapped[Optional["SimInstance"]] = relationship(
+        "SimInstance",
+        remote_side="SimInstance.id",
+        foreign_keys=[parent_sim_instance_id],
+        back_populates="child_sim_instances",
+    )
+
+    child_sim_instances: Mapped[List["SimInstance"]] = relationship(
+        "SimInstance",
+        foreign_keys=[parent_sim_instance_id],
+        back_populates="parent_sim_instance",
     )
 
     def __repr__(self) -> str:
-        return f"<SimInstance(id={self.id}, user_id={self.user_id})>"
+        return f"<SimInstance(id={self.id}, user_id={self.user_id}, name={self.name})>"

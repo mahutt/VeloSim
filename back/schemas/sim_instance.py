@@ -37,12 +37,20 @@ class SimInstanceCreate(SimInstanceBase):
     """Schema for creating a new SimInstance."""
 
     scenario_payload: Optional[Dict[str, Any]] = None
+    name: Optional[str] = None
+    parent_sim_instance_id: Optional[int] = None
+    branch_keyframe_seq: Optional[int] = None
 
 
 class SimInstanceResponse(SimInstanceBase):
     """Schema for SimInstance response."""
 
     id: int
+    uuid: Optional[str] = None
+    name: Optional[str] = None
+    playback_capable: bool = False
+    parent_sim_instance_id: Optional[int] = None
+    branch_keyframe_seq: Optional[int] = None
     date_created: datetime
     date_updated: datetime
 

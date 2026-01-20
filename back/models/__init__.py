@@ -28,7 +28,11 @@ from .station_task_type import StationTaskType
 from .user import User
 from .sim_instance import SimInstance
 from .scenario import Scenario
-from .sim_keyframe import SimKeyframe
+from .sim_frame import SimFrame
+
+# Note: SimKeyframe model has been replaced by SimFrame.
+# The sim_keyframes table will be migrated to sim_frames.
+# Do not import SimKeyframe - it causes relationship conflicts.
 
 __all__ = [
     "TaskStatus",
@@ -36,5 +40,5 @@ __all__ = [
     "User",
     "SimInstance",
     "Scenario",
-    "SimKeyframe",
+    "SimFrame",
 ]
