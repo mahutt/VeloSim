@@ -374,28 +374,46 @@ export const SimulationProvider = ({
       });
     }
 
-    // Update drivers that appear in the payload
-    payload.drivers.forEach((updatedResource: Driver) => {
-      // If the resource doesn't exist, or does exist but has different task count, we need to update the reactive resources list
-      const existingResource = driversRef.current.get(updatedResource.id);
-      shouldUpdateReactiveResources =
-        !existingResource ||
-        existingResource.taskIds.length !== updatedResource.taskIds.length;
+    payload.vehicles.forEach((updatedVehicle: Vehicle) => {
+      const existingVehicle = vehiclesRef.current.get(updatedVehicle.id);
+      if (
+        // If vehicle didn't exist before but is part of a resource
+        (!existingVehicle && updatedVehicle.driverId !== null) ||
+        // If vehicle did exist but driver assignment changed
+        (existingVehicle &&
+          existingVehicle.driverId !== updatedVehicle.driverId) ||
+        // If vehicle did exist and is part of a resource, but battery count changed
+        (existingVehicle &&
+          existingVehicle.driverId !== null &&
+          existingVehicle.batteryCount !== updatedVehicle.batteryCount)
+      ) {
+        shouldUpdateReactiveResources = true;
+      }
+      vehiclesRef.current.set(updatedVehicle.id, updatedVehicle);
+    });
 
-      driversRef.current.set(updatedResource.id, updatedResource);
+    // Update drivers that appear in the payload
+    payload.drivers.forEach((updatedDriver: Driver) => {
+      const existingDriver = driversRef.current.get(updatedDriver.id);
+      if (
+        // If driver is part of a resource and task count changed
+        existingDriver &&
+        existingDriver.vehicleId !== null &&
+        existingDriver.taskIds.length !== updatedDriver.taskIds.length
+      ) {
+        shouldUpdateReactiveResources = true;
+      }
+
+      driversRef.current.set(updatedDriver.id, updatedDriver);
 
       // Update reactive selectedItem if this resource is that item
       if (
         selectedItem?.type === SelectedItemType.Driver &&
-        selectedItem.value.id === updatedResource.id
+        selectedItem.value.id === updatedDriver.id
       ) {
-        updateSelectedItem(updatedResource.id, SelectedItemType.Driver);
+        updateSelectedItem(updatedDriver.id, SelectedItemType.Driver);
       }
       renderOnNextFrameRef.current = true;
-    });
-
-    payload.vehicles.forEach((updatedVehicle: Vehicle) => {
-      vehiclesRef.current.set(updatedVehicle.id, updatedVehicle);
     });
 
     // Conditionally updating reactive resources list for resource bar
