@@ -504,6 +504,10 @@ export default function ScenarioEditor() {
 
   const handleSelectScenario = useCallback(
     (scenario: Scenario) => {
+      if (selectedScenarioId === scenario.id) {
+        return;
+      }
+
       // Check for unsaved changes
       if (hasUnsavedChanges) {
         setPendingScenario(scenario);
@@ -513,7 +517,7 @@ export default function ScenarioEditor() {
 
       loadScenario(scenario);
     },
-    [hasUnsavedChanges, loadScenario]
+    [selectedScenarioId, hasUnsavedChanges, loadScenario]
   );
 
   const handleDeleteScenario = useCallback(
