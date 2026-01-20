@@ -84,12 +84,18 @@ class SimInstance(Base):
         "SimFrame", back_populates="sim_instance", cascade="all, delete-orphan"
     )
 
-    # Self-referential relationship for branching
+    # Self-referential relationships for branching
     parent_sim_instance: Mapped[Optional["SimInstance"]] = relationship(
         "SimInstance",
         remote_side="SimInstance.id",
         foreign_keys=[parent_sim_instance_id],
-        backref="child_sim_instances",
+        back_populates="child_sim_instances",
+    )
+
+    child_sim_instances: Mapped[List["SimInstance"]] = relationship(
+        "SimInstance",
+        foreign_keys=[parent_sim_instance_id],
+        back_populates="parent_sim_instance",
     )
 
     def __repr__(self) -> str:
