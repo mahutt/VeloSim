@@ -22,7 +22,8 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 """
 
-from typing import TYPE_CHECKING, Dict, List, Optional
+import math
+from typing import TYPE_CHECKING
 from sim.entities.position import Position
 from sim.entities.road import Road
 from sim.map.routing_provider import RoutingProvider, RouteResult
@@ -33,6 +34,36 @@ logger = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
     from sim.map.route_controller import RouteController
+
+
+def map_index_forward(current_idx: int, old_count: int, new_count: int) -> int:
+    """Map index from old collection to new, ensuring forward-only progress.
+
+    When traffic changes reduce the number of points mid-traversal, this function
+    maps the current index to the new collection such that the driver is placed
+    at or ahead of their current progress - never behind.
+
+    Uses ceil() to guarantee forward-only mapping.
+
+    Args:
+        current_idx: Current index in the old collection
+        old_count: Number of points in the old (original) collection
+        new_count: Number of points in the new (active) collection
+
+    Returns:
+        Mapped index in the new collection, guaranteed to represent
+        progress >= current progress. O(1) time complexity.
+
+    Example:
+        >>> map_index_forward(7, 10, 4)  # 78% through, maps to index 3 (100%)
+        3
+        >>> map_index_forward(3, 10, 4)  # 33% through, maps to index 1 (33%)
+        1
+    """
+    if old_count <= 1 or new_count <= 1:
+        return min(current_idx, new_count - 1)
+    progress = current_idx / (old_count - 1)
+    return min(math.ceil(progress * (new_count - 1)), new_count - 1)
 
 
 class Route:
@@ -50,9 +81,9 @@ class Route:
         self,
         route_data: RouteResult,
         routing_provider: RoutingProvider,
-        config: Dict,
-        roads: List[Road],
-        route_controller: Optional["RouteController"] = None,
+        config: dict,
+        roads: list[Road],
+        route_controller: "RouteController | None" = None,
     ) -> None:
         """
         Initialize a Route from routing result.
@@ -78,6 +109,12 @@ class Route:
         self.is_finished: bool = False
         self._last_returned_position: Position | None = None
 
+        # Track point count of current road to detect traffic changes.
+        # When count changes (traffic applied/cleared/modified), we remap the index
+        # using ratio-based mapping to preserve progress percentage.
+        # Reset to None when transitioning to a new road.
+        self._last_point_count: int | None = None
+
         # Store routing provider for recalculation
         self.routing_provider = routing_provider
 
@@ -85,7 +122,7 @@ class Route:
         self.config = config
 
         # Store RouteController reference for road management
-        self.route_controller: Optional["RouteController"] = route_controller
+        self.route_controller: "RouteController | None" = route_controller
 
         # Extract route data from RouteResult
         self.coordinates = route_data.coordinates
@@ -173,6 +210,17 @@ class Route:
 
         return success
 
+    def _handle_traffic_point_change(self, active_count: int) -> None:
+        """Detect and remap index when traffic changes point count."""
+        if (
+            self._last_point_count is not None
+            and self._last_point_count != active_count
+        ):
+            self.current_point_index = map_index_forward(
+                self.current_point_index, self._last_point_count, active_count
+            )
+        self._last_point_count = active_count
+
     def _get_current_position(self) -> Position | None:
         """
         Get the current position from the route traversal state.
@@ -184,10 +232,10 @@ class Route:
             return None
 
         current_road = self.roads[self.current_road_index]
-        if self.current_point_index >= len(current_road.pointcollection):
+        if self.current_point_index >= len(current_road.active_pointcollection):
             return None
 
-        return current_road.pointcollection[self.current_point_index]
+        return current_road.active_pointcollection[self.current_point_index]
 
     def _get_all_points(self) -> list[Position]:
         """
@@ -199,7 +247,7 @@ class Route:
 
         for i, road_segment in enumerate(self.roads):
             points = (
-                road_segment.pointcollection
+                road_segment.active_pointcollection
             )  # access the list of positions in the road segment.
             if i < len(self.roads) - 1:
                 # Include all points besides last one,
@@ -250,38 +298,53 @@ class Route:
         return [pos.get_position() for pos in self.coordinates]
 
     def next(self) -> Position | None:
-        """
-        Returns the next Position object in the traversal sequence.
+        """Return the next position in the route traversal.
 
-        Automatically handles moving from the end of one road segment to the
-        beginning of the next. Returns None when the end of the route is reached.
-        Skips consecutive duplicate positions.
+        Call once per simulation tick to advance the driver along the route.
+
+        Traffic Handling:
+            When traffic changes point count mid-traversal, the index is remapped
+            using ratio-based mapping to preserve progress percentage.
+            Formula: new_idx = ceil(current_idx / (old_count-1) * (new_count-1))
 
         Returns:
-            Position object or None when finished.
+            Position: Next position in traversal, or None if route is finished.
         """
         if self.is_finished:
             return None
 
-        # Find next non-duplicate position
         point_to_return: Position | None = None
-        while point_to_return is None and not self.is_finished:
-            # Determine the max index for this road
-            # (exclude last point if not the final road)
-            is_last_road = self.current_road_index >= len(self.roads) - 1
-            current_road = self.roads[self.current_road_index]
-            max_index = (
-                len(current_road.pointcollection)
-                if is_last_road
-                else len(current_road.pointcollection) - 1
-            )
 
-            # Check if we need to move to the next road
+        while point_to_return is None and not self.is_finished:
+            current_road = self.roads[self.current_road_index]
+            active_points = current_road.active_pointcollection
+
+            # Skip roads with no points (edge case)
+            if not active_points:
+                self.unsubscribe_from_road(current_road.id)
+                self.current_road_index += 1
+                self.current_point_index = 0
+                self._last_point_count = None  # Reset for new road
+                if self.current_road_index >= len(self.roads):
+                    self.is_finished = True
+                    break
+                continue
+
+            # Remap index if traffic changed point count
+            self._handle_traffic_point_change(len(active_points))
+
+            # Max index: last index to visit before transitioning.
+            # Non-final roads exclude last point (overlaps with next road's first).
+            is_last_road = self.current_road_index >= len(self.roads) - 1
+            max_index = len(active_points) if is_last_road else len(active_points) - 1
+
+            # Road transition check
+            # If we've reached max_index, transition to the next road segment.
             if self.current_point_index >= max_index:
-                # Unsubscribe from the road we just finished traversing
                 self.unsubscribe_from_road(current_road.id)
 
                 self.current_point_index = 0
+                self._last_point_count = None  # Reset for new road
                 self.current_road_index += 1
                 if self.current_road_index >= len(self.roads):
                     # All roads traversed. Before marking as finished, ensure
@@ -298,13 +361,12 @@ class Route:
                     # if there are no roads left, we are done.
                     self.is_finished = True
                     break
-                # Update current_road after moving to next road
-                current_road = self.roads[self.current_road_index]
+                continue
 
-            # Get the current position.
-            candidate_point = current_road.pointcollection[self.current_point_index]
+            # --- Normal Position Return ---
+            # Return the current point (skip if duplicate of last returned).
+            candidate_point = active_points[self.current_point_index]
 
-            # Check if this is a duplicate of the last returned position
             if (
                 self._last_returned_position is None
                 or candidate_point != self._last_returned_position
@@ -312,7 +374,7 @@ class Route:
                 point_to_return = candidate_point
                 self._last_returned_position = candidate_point
 
-            # Move to next position (whether it was duplicate or not)
+            # Advance index for next call
             self.current_point_index += 1
 
         return point_to_return

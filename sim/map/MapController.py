@@ -27,6 +27,7 @@ from sim.entities.route import Route
 from sim.map.routing_provider import RoutingProvider
 from sim.osm.osrm_adapter import OSRMAdapter
 from sim.map.route_controller import RouteController
+from sim.traffic.traffic_controller import TrafficController
 from typing import Optional
 import json
 from pathlib import Path
@@ -59,6 +60,9 @@ class MapController:
 
         # Initialize RouteController for road/route management
         self.route_controller = RouteController(self)
+
+        # Initialize TrafficController for traffic layer management
+        self.traffic_controller = TrafficController(self.route_controller)
 
     def get_route(self, a: Position, b: Position) -> Route:
         """

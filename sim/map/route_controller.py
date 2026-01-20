@@ -22,7 +22,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 """
 
-from typing import Any, Dict, List, Optional, Set, TYPE_CHECKING
+from typing import Any, Callable, Dict, List, Optional, Set, TYPE_CHECKING
 import logging
 
 from shapely.geometry import LineString
@@ -73,6 +73,9 @@ class RouteController:
 
         # All active routes
         self.routes: Set["Route"] = set()
+
+        # Callbacks for road deallocation events
+        self._on_road_deallocated_callbacks: List[Callable[[SegmentKey], None]] = []
 
     def get_route_from_positions(
         self,
@@ -132,9 +135,7 @@ class RouteController:
         from sim.entities.route import Route
 
         # Create roads from steps (logical road segments with proper turn penalties)
-        roads = (
-            self._create_roads_from_steps(route_result) if route_result.steps else []
-        )
+        roads = self.create_roads_from_steps(route_result) if route_result.steps else []
 
         # Create the route with the prepared roads
         route = Route(
@@ -154,18 +155,26 @@ class RouteController:
 
         return route
 
-    def _generate_point_collection(
+    def generate_point_collection(
         self,
         geometry: List[Position],
         length: float,
         maxspeed: float,
         is_final_segment: bool = False,
     ) -> List[Position]:
-        """
-        Generate evenly-spaced positions along a road segment (1 point per second).
+        """Generate evenly-spaced positions along a road segment (1 point per second).
 
         Uses Shapely LineString for interpolation. To avoid corner snapping (#447),
         endpoint is only included if is_final_segment=True.
+
+        Args:
+            geometry: List of Position objects defining the road segment
+            length: Length of the road segment in meters
+            maxspeed: Maximum speed in meters per second
+            is_final_segment: If True, include the endpoint in the result
+
+        Returns:
+            List of interpolated Position objects along the segment
         """
         if not geometry:
             return []
@@ -206,7 +215,7 @@ class RouteController:
 
         return points if points else [geometry[0]]
 
-    def _create_roads_from_steps(
+    def create_roads_from_steps(
         self,
         route_result: RouteResult,
     ) -> List[Road]:
@@ -238,7 +247,7 @@ class RouteController:
                 maxspeed = step.distance / step.duration
 
             # Generate interpolated positions along the step
-            positions = self._generate_point_collection(
+            positions = self.generate_point_collection(
                 step.geometry, step.distance, maxspeed
             )
 
@@ -353,9 +362,7 @@ class RouteController:
 
             # Build new roads from steps
             new_roads = (
-                self._create_roads_from_steps(route_result)
-                if route_result.steps
-                else []
+                self.create_roads_from_steps(route_result) if route_result.steps else []
             )
 
             if not new_roads:
@@ -390,10 +397,47 @@ class RouteController:
 
     def _deallocate_road(self, road: Road) -> None:
         """Remove a road from all tracking structures when no routes reference it."""
+        segment_key = road.segment_key
+
+        # Notify callbacks before removing
+        for callback in self._on_road_deallocated_callbacks:
+            callback(segment_key)
+
         self.roads_to_routes.pop(road, None)
-        self.segment_key_to_road.pop(road.segment_key, None)
+        self.segment_key_to_road.pop(segment_key, None)
         self.road_id_to_road.pop(road.id, None)
-        logger.debug(f"Deallocated road {road.id} (segment_key={road.segment_key})")
+        logger.debug(f"Deallocated road {road.id} (segment_key={segment_key})")
+
+    def register_on_road_deallocated(
+        self, callback: Callable[[SegmentKey], None]
+    ) -> None:
+        """Register a callback to be notified when a road is deallocated.
+
+        Args:
+            callback: Function that takes a SegmentKey and is called when
+                     a road with that segment_key is deallocated.
+
+        Returns:
+            None
+        """
+        self._on_road_deallocated_callbacks.append(callback)
+
+    def unregister_on_road_deallocated(
+        self, callback: Callable[[SegmentKey], None]
+    ) -> bool:
+        """Unregister a previously registered road deallocation callback.
+
+        Args:
+            callback: The callback function to remove.
+
+        Returns:
+            True if callback was found and removed, False otherwise.
+        """
+        try:
+            self._on_road_deallocated_callbacks.remove(callback)
+            return True
+        except ValueError:
+            return False
 
     def get_routes_for_road(self, road: Road) -> Set["Route"]:
         """Get all routes using a specific road (returns a copy).
@@ -474,3 +518,4 @@ class RouteController:
         self.segment_key_to_road.clear()
         self.road_id_to_road.clear()
         self.routes.clear()
+        self._on_road_deallocated_callbacks.clear()

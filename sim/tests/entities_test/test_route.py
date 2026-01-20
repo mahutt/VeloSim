@@ -29,7 +29,7 @@ from typing import List
 from unittest.mock import Mock
 from shapely.geometry import LineString
 
-from sim.entities.route import Route
+from sim.entities.route import Route, map_index_forward
 from sim.entities.road import Road
 from sim.entities.position import Position
 from sim.map.routing_provider import RoutingProvider, RouteResult, RouteStep
@@ -1496,3 +1496,832 @@ class TestRouteFinalDestination:
         assert route.is_finished is True
         # Next call should return None
         assert route.next() is None
+
+
+class TestRouteIndexClampingOnTrafficChange:
+    """Tests for Route.next() index clamping when traffic changes mid-traversal.
+
+    When traffic changes reduce the point count on a road while the route is
+    being traversed, the index must be clamped to prevent IndexError. The route
+    should return the last valid point and then transition to the next road.
+    """
+
+    def test_index_clamped_when_traffic_reduces_points(
+        self, mock_routing_provider: Mock, test_config: dict
+    ) -> None:
+        """Test that index is clamped when traffic reduces point count."""
+        from sim.entities.traffic_data import RoadTrafficState, CongestionLevel
+
+        # Create a road with 10 points
+        original_points = [Position([0.0, i * 0.001]) for i in range(10)]
+        step = RouteStep(
+            name="Test Road",
+            distance=100.0,
+            duration=10.0,
+            geometry=original_points,
+            speed=10.0,
+        )
+
+        route_result = RouteResult(
+            coordinates=original_points,
+            distance=100.0,
+            duration=10.0,
+            steps=[step],
+            segments=[],
+        )
+
+        roads = build_roads_from_route_result(route_result)
+        route = Route(route_result, mock_routing_provider, test_config, roads=roads)
+
+        # Advance route to index 5
+        for _ in range(5):
+            route.next()
+
+        assert route.current_point_index == 5
+
+        # Now simulate traffic change that reduces points to 3
+        traffic_points = [Position([0.0, i * 0.001]) for i in range(3)]
+        traffic_state = RoadTrafficState(
+            multiplier=0.5,
+            congestion_level=CongestionLevel.MODERATE,
+            traffic_pointcollection=traffic_points,
+        )
+        roads[0].set_traffic_state(traffic_state)
+
+        # Call next() - should clamp index to 2 (max valid) and return that point
+        point = route.next()
+
+        # Should return the last valid point (index 2)
+        assert point is not None
+        assert point.get_position() == traffic_points[2].get_position()
+
+    def test_route_transitions_after_clamping(
+        self, mock_routing_provider: Mock, test_config: dict
+    ) -> None:
+        """Test that route transitions to next road after clamping."""
+        from sim.entities.traffic_data import RoadTrafficState, CongestionLevel
+
+        # Create two roads
+        road1_points = [Position([0.0, i * 0.001]) for i in range(10)]
+        road2_points = [Position([0.0, 0.009 + i * 0.001]) for i in range(5)]
+
+        step1 = RouteStep(
+            name="First Road",
+            distance=100.0,
+            duration=10.0,
+            geometry=road1_points,
+            speed=10.0,
+        )
+        step2 = RouteStep(
+            name="Second Road",
+            distance=50.0,
+            duration=5.0,
+            geometry=road2_points,
+            speed=10.0,
+        )
+
+        route_result = RouteResult(
+            coordinates=road1_points + road2_points[1:],
+            distance=150.0,
+            duration=15.0,
+            steps=[step1, step2],
+            segments=[],
+        )
+
+        roads = build_roads_from_route_result(route_result)
+        route = Route(route_result, mock_routing_provider, test_config, roads=roads)
+
+        # Advance to index 7 on first road
+        for _ in range(7):
+            route.next()
+
+        assert route.current_road_index == 0
+        assert route.current_point_index == 7
+
+        # Traffic change reduces first road to 3 points
+        traffic_points = [Position([0.0, i * 0.001]) for i in range(3)]
+        traffic_state = RoadTrafficState(
+            multiplier=0.3,
+            congestion_level=CongestionLevel.SEVERE,
+            traffic_pointcollection=traffic_points,
+        )
+        roads[0].set_traffic_state(traffic_state)
+
+        # Call next() - should clamp and return last point
+        point1 = route.next()
+        assert point1 is not None
+
+        # Next call should be on second road
+        point2 = route.next()
+        assert route.current_road_index == 1
+        assert point2 is not None
+
+    def test_route_finishes_when_clamped_on_last_road(
+        self, mock_routing_provider: Mock, test_config: dict
+    ) -> None:
+        """Test that route finishes correctly when clamped on the last road."""
+        from sim.entities.traffic_data import RoadTrafficState, CongestionLevel
+
+        # Single road with 10 points
+        original_points = [Position([0.0, i * 0.001]) for i in range(10)]
+        step = RouteStep(
+            name="Only Road",
+            distance=100.0,
+            duration=10.0,
+            geometry=original_points,
+            speed=10.0,
+        )
+
+        route_result = RouteResult(
+            coordinates=original_points,
+            distance=100.0,
+            duration=10.0,
+            steps=[step],
+            segments=[],
+        )
+
+        roads = build_roads_from_route_result(route_result)
+        route = Route(route_result, mock_routing_provider, test_config, roads=roads)
+
+        # Advance to index 8
+        for _ in range(8):
+            route.next()
+
+        # Traffic reduces to 2 points
+        traffic_points = [Position([0.0, 0.0]), Position([0.0, 0.001])]
+        traffic_state = RoadTrafficState(
+            multiplier=0.2,
+            congestion_level=CongestionLevel.SEVERE,
+            traffic_pointcollection=traffic_points,
+        )
+        roads[0].set_traffic_state(traffic_state)
+
+        # Call next() - should clamp index and return a valid point
+        point = route.next()
+        assert point is not None
+
+        # One more call finishes the route (normal transition at max_index)
+        route.next()
+        assert route.is_finished is True
+
+    def test_no_infinite_loop_on_repeated_clamping(
+        self, mock_routing_provider: Mock, test_config: dict
+    ) -> None:
+        """Test that repeated clamping doesn't cause infinite loop."""
+        from sim.entities.traffic_data import RoadTrafficState, CongestionLevel
+
+        # Single road with 5 points
+        original_points = [Position([0.0, i * 0.001]) for i in range(5)]
+        step = RouteStep(
+            name="Test Road",
+            distance=50.0,
+            duration=5.0,
+            geometry=original_points,
+            speed=10.0,
+        )
+
+        route_result = RouteResult(
+            coordinates=original_points,
+            distance=50.0,
+            duration=5.0,
+            steps=[step],
+            segments=[],
+        )
+
+        roads = build_roads_from_route_result(route_result)
+        route = Route(route_result, mock_routing_provider, test_config, roads=roads)
+
+        # Advance to index 4
+        for _ in range(4):
+            route.next()
+
+        # Traffic reduces to 2 points
+        traffic_points = [Position([0.0, 0.0]), Position([0.0, 0.001])]
+        traffic_state = RoadTrafficState(
+            multiplier=0.5,
+            congestion_level=CongestionLevel.MODERATE,
+            traffic_pointcollection=traffic_points,
+        )
+        roads[0].set_traffic_state(traffic_state)
+
+        # Should complete without infinite loop (timeout would catch this)
+        call_count = 0
+        max_calls = 100  # Safety limit
+        while not route.is_finished and call_count < max_calls:
+            route.next()
+            call_count += 1
+
+        assert route.is_finished is True
+        assert call_count < max_calls  # Should finish well before limit
+
+    def test_clamping_transitions_to_next_road(
+        self, mock_routing_provider: Mock, test_config: dict
+    ) -> None:
+        """Test that clamping transitions to next road without duplicates."""
+        from sim.entities.traffic_data import RoadTrafficState, CongestionLevel
+
+        # Two roads
+        road1_points = [Position([0.0, i * 0.001]) for i in range(8)]
+        road2_points = [Position([0.0, 0.007 + i * 0.001]) for i in range(4)]
+
+        step1 = RouteStep(
+            name="First Road",
+            distance=80.0,
+            duration=8.0,
+            geometry=road1_points,
+            speed=10.0,
+        )
+        step2 = RouteStep(
+            name="Second Road",
+            distance=40.0,
+            duration=4.0,
+            geometry=road2_points,
+            speed=10.0,
+        )
+
+        route_result = RouteResult(
+            coordinates=road1_points + road2_points[1:],
+            distance=120.0,
+            duration=12.0,
+            steps=[step1, step2],
+            segments=[],
+        )
+
+        roads = build_roads_from_route_result(route_result)
+        route = Route(route_result, mock_routing_provider, test_config, roads=roads)
+
+        # Advance to index 6 on first road
+        returned_positions = []
+        for _ in range(6):
+            p = route.next()
+            if p:
+                returned_positions.append(p.get_position())
+
+        # Traffic reduces first road to 3 points (indices 0,1,2)
+        # At index 6, driver maps to index 2 (max), triggering transition
+        traffic_points = [Position([0.0, i * 0.001]) for i in range(3)]
+        traffic_state = RoadTrafficState(
+            multiplier=0.4,
+            congestion_level=CongestionLevel.MODERATE,
+            traffic_pointcollection=traffic_points,
+        )
+        roads[0].set_traffic_state(traffic_state)
+
+        # Next call should transition to road2 and return its first point
+        next_point = route.next()
+        assert next_point is not None
+        returned_positions.append(next_point.get_position())
+
+        # Continue traversal to completion
+        while not route.is_finished:
+            p = route.next()
+            if p:
+                returned_positions.append(p.get_position())
+
+        # Verify route finished and no infinite loops
+        assert route.is_finished
+        # Verify no consecutive duplicates in returned positions
+        for i in range(1, len(returned_positions)):
+            assert returned_positions[i] != returned_positions[i - 1]
+
+    def test_empty_traffic_points_falls_back_to_original(
+        self, mock_routing_provider: Mock, test_config: dict
+    ) -> None:
+        """Test that empty traffic_pointcollection falls back to original points.
+
+        When traffic_pointcollection is empty, active_pointcollection returns
+        the original pointcollection (empty list is falsy).
+        """
+        from sim.entities.traffic_data import RoadTrafficState, CongestionLevel
+
+        # Single road with 5 points
+        original_points = [Position([0.0, i * 0.001]) for i in range(5)]
+
+        step = RouteStep(
+            name="Test Road",
+            distance=50.0,
+            duration=5.0,
+            geometry=original_points,
+            speed=10.0,
+        )
+
+        route_result = RouteResult(
+            coordinates=original_points,
+            distance=50.0,
+            duration=5.0,
+            steps=[step],
+            segments=[],
+        )
+
+        roads = build_roads_from_route_result(route_result)
+        route = Route(route_result, mock_routing_provider, test_config, roads=roads)
+
+        # Start traversal - get first point
+        p1 = route.next()
+        assert p1 is not None
+
+        # Set traffic with empty points (should fall back to original)
+        traffic_state = RoadTrafficState(
+            multiplier=0.1,
+            congestion_level=CongestionLevel.SEVERE,
+            traffic_pointcollection=[],  # Empty falls back to original
+        )
+        roads[0].set_traffic_state(traffic_state)
+
+        # active_pointcollection should still return original points
+        assert len(roads[0].active_pointcollection) == 5
+
+        # Route should continue traversing original points
+        p2 = route.next()
+        assert p2 is not None
+        # Should be the second original point
+        assert p2.get_position() == original_points[1].get_position()
+
+    def test_clamping_preserves_original_pointcollection(
+        self, mock_routing_provider: Mock, test_config: dict
+    ) -> None:
+        """Test that original pointcollection is preserved after traffic change."""
+        from sim.entities.traffic_data import RoadTrafficState, CongestionLevel
+
+        original_points = [Position([0.0, i * 0.001]) for i in range(10)]
+        step = RouteStep(
+            name="Test Road",
+            distance=100.0,
+            duration=10.0,
+            geometry=original_points,
+            speed=10.0,
+        )
+
+        route_result = RouteResult(
+            coordinates=original_points,
+            distance=100.0,
+            duration=10.0,
+            steps=[step],
+            segments=[],
+        )
+
+        roads = build_roads_from_route_result(route_result)
+        route = Route(route_result, mock_routing_provider, test_config, roads=roads)
+
+        # Apply traffic
+        traffic_points = [Position([0.0, i * 0.001]) for i in range(3)]
+        traffic_state = RoadTrafficState(
+            multiplier=0.5,
+            congestion_level=CongestionLevel.MODERATE,
+            traffic_pointcollection=traffic_points,
+        )
+        roads[0].set_traffic_state(traffic_state)
+
+        # Traverse and finish
+        while route.next() is not None:
+            pass
+
+        # Original pointcollection should still have 10 points
+        assert len(roads[0].pointcollection) == 10
+        # Traffic points should have 3
+        assert len(roads[0].active_pointcollection) == 3
+
+    def test_ratio_mapping_never_goes_backward(
+        self, mock_routing_provider: Mock, test_config: dict
+    ) -> None:
+        """Test that ratio mapping places driver at or ahead, never behind.
+
+        Uses ceil() to ensure the mapped position is always at or ahead of
+        the driver's current progress percentage, never behind.
+        """
+        import math
+        from sim.entities.traffic_data import RoadTrafficState, CongestionLevel
+
+        # Create road with 10 points
+        original_points = [Position([0.0, i * 0.001]) for i in range(10)]
+        step = RouteStep(
+            name="Test Road",
+            distance=100.0,
+            duration=10.0,
+            geometry=original_points,
+            speed=10.0,
+        )
+
+        route_result = RouteResult(
+            coordinates=original_points,
+            distance=100.0,
+            duration=10.0,
+            steps=[step],
+            segments=[],
+        )
+
+        roads = build_roads_from_route_result(route_result)
+        route = Route(route_result, mock_routing_provider, test_config, roads=roads)
+
+        # Advance to index 7 (78% through: 7/9 = 0.778)
+        for _ in range(7):
+            route.next()
+
+        assert route.current_point_index == 7
+
+        # Traffic reduces to 4 points
+        traffic_points = [Position([0.0, i * 0.003]) for i in range(4)]
+        traffic_state = RoadTrafficState(
+            multiplier=0.4,
+            congestion_level=CongestionLevel.MODERATE,
+            traffic_pointcollection=traffic_points,
+        )
+        roads[0].set_traffic_state(traffic_state)
+
+        # Expected mapping with ceil():
+        # progress = 7 / (10-1) = 0.778
+        # new_index = ceil(0.778 * (4-1)) = ceil(2.33) = 3
+        # NOT round(2.33) = 2 which would be 67% (behind 78%)
+        expected_index = math.ceil((7 / 9) * 3)
+        assert expected_index == 3  # Sanity check
+
+        # Call next() to trigger the mapping
+        point = route.next()
+
+        # Should map to index 3 (100%), not index 2 (67%)
+        assert point is not None
+        assert point.get_position() == traffic_points[3].get_position()
+
+    def test_ratio_mapping_at_various_positions(
+        self, mock_routing_provider: Mock, test_config: dict
+    ) -> None:
+        """Test ratio mapping at various progress percentages."""
+        import math
+        from sim.entities.traffic_data import RoadTrafficState, CongestionLevel
+
+        test_cases = [
+            # (original_count, traffic_count, current_idx, expected_idx)
+            (10, 4, 4, math.ceil((4 / 9) * 3)),  # 44% -> ceil(1.33) = 2
+            (10, 4, 6, math.ceil((6 / 9) * 3)),  # 67% -> ceil(2.0) = 2
+            (10, 4, 8, math.ceil((8 / 9) * 3)),  # 89% -> ceil(2.67) = 3
+            (10, 2, 5, math.ceil((5 / 9) * 1)),  # 56% -> ceil(0.56) = 1
+        ]
+
+        for orig_count, traffic_count, curr_idx, expected_idx in test_cases:
+            # Create road
+            original_points = [Position([0.0, i * 0.001]) for i in range(orig_count)]
+            step = RouteStep(
+                name="Test Road",
+                distance=100.0,
+                duration=10.0,
+                geometry=original_points,
+                speed=10.0,
+            )
+
+            route_result = RouteResult(
+                coordinates=original_points,
+                distance=100.0,
+                duration=10.0,
+                steps=[step],
+                segments=[],
+            )
+
+            roads = build_roads_from_route_result(route_result)
+            route = Route(route_result, mock_routing_provider, test_config, roads=roads)
+
+            # Advance to target index
+            for _ in range(curr_idx):
+                route.next()
+
+            # Apply traffic
+            traffic_points = [Position([0.0, i * 0.001]) for i in range(traffic_count)]
+            traffic_state = RoadTrafficState(
+                multiplier=0.5,
+                congestion_level=CongestionLevel.MODERATE,
+                traffic_pointcollection=traffic_points,
+            )
+            roads[0].set_traffic_state(traffic_state)
+
+            # Get mapped point
+            point = route.next()
+
+            assert (
+                point is not None
+            ), f"Failed for {orig_count}->{traffic_count} at {curr_idx}"
+            assert (
+                point.get_position() == traffic_points[expected_idx].get_position()
+            ), f"Expected index {expected_idx} for {orig_count}->{traffic_count}"
+
+    def test_ratio_mapping_single_point_fallback(
+        self, mock_routing_provider: Mock, test_config: dict
+    ) -> None:
+        """Test that single-point edge cases fall back to simple clamping."""
+        from sim.entities.traffic_data import RoadTrafficState, CongestionLevel
+
+        # Create road with 10 points
+        original_points = [Position([0.0, i * 0.001]) for i in range(10)]
+        step = RouteStep(
+            name="Test Road",
+            distance=100.0,
+            duration=10.0,
+            geometry=original_points,
+            speed=10.0,
+        )
+
+        route_result = RouteResult(
+            coordinates=original_points,
+            distance=100.0,
+            duration=10.0,
+            steps=[step],
+            segments=[],
+        )
+
+        roads = build_roads_from_route_result(route_result)
+        route = Route(route_result, mock_routing_provider, test_config, roads=roads)
+
+        # Advance to index 5
+        for _ in range(5):
+            route.next()
+
+        # Traffic reduces to 1 point (edge case)
+        traffic_points = [Position([0.0, 0.0])]
+        traffic_state = RoadTrafficState(
+            multiplier=0.1,
+            congestion_level=CongestionLevel.SEVERE,
+            traffic_pointcollection=traffic_points,
+        )
+        roads[0].set_traffic_state(traffic_state)
+
+        # Should fallback to clamping (index 0, the only valid index)
+        point = route.next()
+
+        assert point is not None
+        assert point.get_position() == traffic_points[0].get_position()
+
+    def test_ratio_mapping_when_traffic_increases_points(
+        self, mock_routing_provider: Mock, test_config: dict
+    ) -> None:
+        """Test that ratio mapping works when traffic INCREASES point count.
+
+        When traffic gives MORE points than default, the driver's progress
+        percentage should be preserved. Without this fix, the driver would
+        stay at the same index (going backward in progress).
+        """
+        import math
+        from sim.entities.traffic_data import RoadTrafficState, CongestionLevel
+
+        # Create road with 5 points
+        original_points = [Position([0.0, i * 0.001]) for i in range(5)]
+        step = RouteStep(
+            name="Test Road",
+            distance=50.0,
+            duration=5.0,
+            geometry=original_points,
+            speed=10.0,
+        )
+
+        route_result = RouteResult(
+            coordinates=original_points,
+            distance=50.0,
+            duration=5.0,
+            steps=[step],
+            segments=[],
+        )
+
+        roads = build_roads_from_route_result(route_result)
+        route = Route(route_result, mock_routing_provider, test_config, roads=roads)
+
+        # Advance to index 2 (50% through: 2/4 = 0.5)
+        for _ in range(2):
+            route.next()
+
+        assert route.current_point_index == 2
+
+        # Traffic INCREASES to 10 points
+        traffic_points = [Position([0.0, i * 0.001]) for i in range(10)]
+        traffic_state = RoadTrafficState(
+            multiplier=0.5,
+            congestion_level=CongestionLevel.MODERATE,
+            traffic_pointcollection=traffic_points,
+        )
+        roads[0].set_traffic_state(traffic_state)
+
+        # Expected mapping with ceil():
+        # progress = 2 / (5-1) = 0.5
+        # new_index = ceil(0.5 * (10-1)) = ceil(4.5) = 5
+        expected_index = math.ceil((2 / 4) * 9)
+        assert expected_index == 5  # Sanity check
+
+        # Call next() to trigger the mapping
+        point = route.next()
+
+        # Should map to index 5 (50% - ceil gives 56%), not stay at index 2 (22%)
+        assert point is not None
+        assert point.get_position() == traffic_points[5].get_position()
+
+    def test_ratio_mapping_when_traffic_clears(
+        self, mock_routing_provider: Mock, test_config: dict
+    ) -> None:
+        """Test that ratio mapping works when traffic is cleared.
+
+        When traffic is cleared, the point count changes back to original.
+        The driver's progress should be preserved using ratio mapping.
+        """
+        import math
+        from sim.entities.traffic_data import RoadTrafficState, CongestionLevel
+
+        # Create road with 10 original points
+        original_points = [Position([0.0, i * 0.001]) for i in range(10)]
+        step = RouteStep(
+            name="Test Road",
+            distance=100.0,
+            duration=10.0,
+            geometry=original_points,
+            speed=10.0,
+        )
+
+        route_result = RouteResult(
+            coordinates=original_points,
+            distance=100.0,
+            duration=10.0,
+            steps=[step],
+            segments=[],
+        )
+
+        roads = build_roads_from_route_result(route_result)
+        route = Route(route_result, mock_routing_provider, test_config, roads=roads)
+
+        # Start traversal (establishes initial point count tracking)
+        route.next()  # Returns point 0, index becomes 1, stores count 10
+
+        # Apply traffic with 4 points
+        traffic_points = [Position([0.0, i * 0.003]) for i in range(4)]
+        traffic_state = RoadTrafficState(
+            multiplier=0.5,
+            congestion_level=CongestionLevel.MODERATE,
+            traffic_pointcollection=traffic_points,
+        )
+        roads[0].set_traffic_state(traffic_state)
+
+        # This next() call detects traffic change (10 -> 4)
+        # Maps index 1 -> ceil(1/9 * 3) = ceil(0.33) = 1
+        # Returns point 1, index becomes 2, stores count 4
+        route.next()
+
+        # Now current_point_index = 2 in a 4-point collection (2/3 = 67% progress)
+
+        # Clear traffic (back to 10 points)
+        roads[0].clear_traffic()
+
+        # Expected mapping with ceil():
+        # progress = 2 / (4-1) = 0.67
+        # new_index = ceil(0.67 * (10-1)) = ceil(6.0) = 6
+        expected_index = math.ceil((2 / 3) * 9)
+        assert expected_index == 6  # Sanity check
+
+        # Call next() to trigger the mapping
+        point = route.next()
+
+        # Should map to index 6 (67%), not stay at index 2 (22%)
+        assert point is not None
+        assert point.get_position() == original_points[6].get_position()
+
+    def test_no_mapping_on_first_call(
+        self, mock_routing_provider: Mock, test_config: dict
+    ) -> None:
+        """Test that no ratio mapping occurs on first next() call.
+
+        The first call should just return the first point without any
+        mapping, as there's no previous count to compare against.
+        """
+        # Create road with 10 points
+        original_points = [Position([0.0, i * 0.001]) for i in range(10)]
+        step = RouteStep(
+            name="Test Road",
+            distance=100.0,
+            duration=10.0,
+            geometry=original_points,
+            speed=10.0,
+        )
+
+        route_result = RouteResult(
+            coordinates=original_points,
+            distance=100.0,
+            duration=10.0,
+            steps=[step],
+            segments=[],
+        )
+
+        roads = build_roads_from_route_result(route_result)
+        route = Route(route_result, mock_routing_provider, test_config, roads=roads)
+
+        # First call should return first point, no mapping
+        point = route.next()
+
+        assert point is not None
+        assert point.get_position() == original_points[0].get_position()
+        assert route.current_point_index == 1  # Incremented after returning
+
+    def test_point_count_resets_on_road_transition(
+        self, mock_routing_provider: Mock, test_config: dict
+    ) -> None:
+        """Test that _last_point_count resets when transitioning roads."""
+        # Create two roads
+        road1_points = [Position([0.0, i * 0.001]) for i in range(5)]
+        road2_points = [Position([0.0, 0.004 + i * 0.001]) for i in range(5)]
+
+        step1 = RouteStep(
+            name="First Road",
+            distance=50.0,
+            duration=5.0,
+            geometry=road1_points,
+            speed=10.0,
+        )
+        step2 = RouteStep(
+            name="Second Road",
+            distance=50.0,
+            duration=5.0,
+            geometry=road2_points,
+            speed=10.0,
+        )
+
+        route_result = RouteResult(
+            coordinates=road1_points + road2_points[1:],
+            distance=100.0,
+            duration=10.0,
+            steps=[step1, step2],
+            segments=[],
+        )
+
+        roads = build_roads_from_route_result(route_result)
+        route = Route(route_result, mock_routing_provider, test_config, roads=roads)
+
+        # Initially None
+        assert route._last_point_count is None
+
+        # Start traversing first road
+        route.next()
+
+        # Should have count for first road (5 points, but max_index excludes last)
+        assert route._last_point_count == 5
+
+        # Traverse to second road
+        while route.current_road_index == 0:
+            route.next()
+
+        # After transition, count resets then gets set for new road
+        # The next() call that transitions also calls _handle_traffic_point_change
+        # on the new road, so it should have the new road's count
+        assert route._last_point_count == 5  # Second road also has 5 points
+
+
+class TestMapIndexForward:
+    """Tests for the map_index_forward helper function."""
+
+    def test_basic_forward_mapping(self):
+        """Test basic ratio-based mapping."""
+        # 78% through (index 7 of 10), maps to index 3 of 4 (100% - ceil)
+        assert map_index_forward(7, 10, 4) == 3
+
+    def test_exact_progress_mapping(self):
+        """Test mapping when progress is exactly representable."""
+        # 50% through (index 4 of 9), maps to index 2 of 5 (50% exactly)
+        # progress = 4/8 = 0.5, ceil(0.5 * 4) = ceil(2.0) = 2
+        assert map_index_forward(4, 9, 5) == 2
+
+    def test_uses_ceil_for_forward_only(self):
+        """Test that ceil() is used to ensure forward-only progress."""
+        # 33% through (index 3 of 10), would round to 1 but ceil gives 2
+        # progress = 3/9 = 0.333, ceil(0.333 * 3) = ceil(1.0) = 1
+        assert map_index_forward(3, 10, 4) == 1
+
+        # 44% through (index 4 of 10), round would give 1, ceil gives 2
+        # progress = 4/9 = 0.444, ceil(0.444 * 3) = ceil(1.33) = 2
+        assert map_index_forward(4, 10, 4) == 2
+
+    def test_at_start(self):
+        """Test mapping at the start of the route."""
+        assert map_index_forward(0, 10, 4) == 0
+
+    def test_at_end(self):
+        """Test mapping at the end of the route."""
+        assert map_index_forward(9, 10, 4) == 3
+
+    def test_beyond_bounds_clamps_to_max(self):
+        """Test that index beyond bounds is clamped to max."""
+        # Index 15 in a 10-point collection, mapping to 4 points
+        # progress = 15/9 = 1.67, ceil(1.67 * 3) = ceil(5.0) = 5
+        # But clamped to max valid index 3
+        assert map_index_forward(15, 10, 4) == 3
+
+    def test_single_point_old_collection(self):
+        """Test fallback when old collection has single point."""
+        assert map_index_forward(0, 1, 4) == 0
+        assert map_index_forward(5, 1, 4) == 3  # Clamps to max
+
+    def test_single_point_new_collection(self):
+        """Test fallback when new collection has single point."""
+        assert map_index_forward(5, 10, 1) == 0
+        assert map_index_forward(0, 10, 1) == 0
+
+    def test_same_size_collections(self):
+        """Test mapping between same-sized collections."""
+        assert map_index_forward(5, 10, 10) == 5
+        assert map_index_forward(0, 10, 10) == 0
+        assert map_index_forward(9, 10, 10) == 9
+
+    def test_larger_new_collection(self):
+        """Test mapping to a larger collection."""
+        # 50% through (index 2 of 5), maps to 50% of 10 = index 5
+        # progress = 2/4 = 0.5, ceil(0.5 * 9) = ceil(4.5) = 5
+        assert map_index_forward(2, 5, 10) == 5

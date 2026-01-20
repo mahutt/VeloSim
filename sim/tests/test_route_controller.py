@@ -26,6 +26,7 @@ from unittest.mock import Mock
 import pytest
 
 from sim.map.route_controller import RouteController
+from sim.map.routing_provider import SegmentKey
 from sim.entities.road import Road
 from sim.entities.position import Position
 from sim.map.routing_provider import RouteSegment, RouteResult, RouteStep
@@ -441,14 +442,14 @@ class TestRouteSegment:
 
 
 class TestRouteControllerPointGeneration:
-    """Tests for _generate_point_collection method."""
+    """Tests for generate_point_collection method."""
 
     def test_generate_point_collection_empty_geometry(self) -> None:
         """Test point generation with empty geometry."""
         mock_map_controller = Mock()
         controller = RouteController(mock_map_controller)
 
-        result = controller._generate_point_collection([], 100.0, 10.0)
+        result = controller.generate_point_collection([], 100.0, 10.0)
 
         assert result == []
 
@@ -460,7 +461,7 @@ class TestRouteControllerPointGeneration:
         geometry = [Position([0.0, 0.0]), Position([1.0, 1.0])]
 
         # Zero speed should return edge points
-        result = controller._generate_point_collection(geometry, 100.0, 0.0)
+        result = controller.generate_point_collection(geometry, 100.0, 0.0)
 
         assert len(result) == 2
         assert result[0].get_position() == [0.0, 0.0]
@@ -474,7 +475,7 @@ class TestRouteControllerPointGeneration:
         geometry = [Position([0.0, 0.0]), Position([1.0, 1.0])]
 
         # Zero length should return edge points
-        result = controller._generate_point_collection(geometry, 0.0, 10.0)
+        result = controller.generate_point_collection(geometry, 0.0, 10.0)
 
         assert len(result) == 2
         assert result[0].get_position() == [0.0, 0.0]
@@ -488,7 +489,7 @@ class TestRouteControllerPointGeneration:
         geometry = [Position([0.0, 0.0]), Position([100.0, 0.0])]
 
         # 100m length at 10m/s = 10 seconds
-        result = controller._generate_point_collection(geometry, 100.0, 10.0)
+        result = controller.generate_point_collection(geometry, 100.0, 10.0)
 
         # Should have multiple interpolated points
         assert len(result) > 1
@@ -500,7 +501,7 @@ class TestRouteControllerPointGeneration:
 
         geometry = [Position([0.0, 0.0]), Position([100.0, 0.0])]
 
-        result = controller._generate_point_collection(
+        result = controller.generate_point_collection(
             geometry, 100.0, 10.0, is_final_segment=True
         )
 
@@ -608,3 +609,126 @@ class TestRoadEquality:
         # Hash is based on segment_key
         expected_key = ((0.0, 0.0), (1.0, 1.0))
         assert hash(road) == hash(expected_key)
+
+
+class TestRoadDeallocationCallbacks:
+    """Tests for road deallocation callback mechanism."""
+
+    def test_register_on_road_deallocated_callback(self) -> None:
+        """Test that callbacks are registered and called on deallocation."""
+        mock_map_controller = Mock()
+        controller = RouteController(mock_map_controller)
+
+        # Track callback invocations
+        callback_calls = []
+
+        def on_dealloc(segment_key: SegmentKey) -> None:
+            callback_calls.append(segment_key)
+
+        controller.register_on_road_deallocated(on_dealloc)
+
+        # Create and register a road
+        mock_road = Mock()
+        mock_road.id = 123
+        mock_road.segment_key = ((0.0, 0.0), (1.0, 1.0))
+        mock_route = Mock()
+
+        controller._register_road_to_route(mock_road, mock_route)
+        controller.segment_key_to_road[mock_road.segment_key] = mock_road
+        controller.road_id_to_road[mock_road.id] = mock_road
+
+        # Unregister to trigger deallocation
+        controller.unregister_road_from_route(mock_road, mock_route)
+
+        # Callback should have been called with the segment_key
+        assert len(callback_calls) == 1
+        assert callback_calls[0] == ((0.0, 0.0), (1.0, 1.0))
+
+    def test_multiple_callbacks_called_on_deallocation(self) -> None:
+        """Test that multiple registered callbacks are all called."""
+        mock_map_controller = Mock()
+        controller = RouteController(mock_map_controller)
+
+        callback1_calls = []
+        callback2_calls = []
+
+        controller.register_on_road_deallocated(lambda sk: callback1_calls.append(sk))
+        controller.register_on_road_deallocated(lambda sk: callback2_calls.append(sk))
+
+        mock_road = Mock()
+        mock_road.id = 1
+        mock_road.segment_key = ((0.0, 0.0), (1.0, 1.0))
+        mock_route = Mock()
+
+        controller._register_road_to_route(mock_road, mock_route)
+        controller.segment_key_to_road[mock_road.segment_key] = mock_road
+        controller.road_id_to_road[mock_road.id] = mock_road
+
+        controller.unregister_road_from_route(mock_road, mock_route)
+
+        assert len(callback1_calls) == 1
+        assert len(callback2_calls) == 1
+
+    def test_unregister_on_road_deallocated_success(self) -> None:
+        """Test that unregister_on_road_deallocated removes a callback."""
+        mock_map_controller = Mock()
+        controller = RouteController(mock_map_controller)
+
+        callback_calls = []
+
+        def on_dealloc(segment_key: SegmentKey) -> None:
+            callback_calls.append(segment_key)
+
+        controller.register_on_road_deallocated(on_dealloc)
+
+        # Unregister the callback
+        result = controller.unregister_on_road_deallocated(on_dealloc)
+
+        assert result is True
+
+        # Create and deallocate a road - callback should NOT be called
+        mock_road = Mock()
+        mock_road.id = 123
+        mock_road.segment_key = ((0.0, 0.0), (1.0, 1.0))
+        mock_route = Mock()
+
+        controller._register_road_to_route(mock_road, mock_route)
+        controller.segment_key_to_road[mock_road.segment_key] = mock_road
+        controller.road_id_to_road[mock_road.id] = mock_road
+
+        controller.unregister_road_from_route(mock_road, mock_route)
+
+        # Callback should NOT have been called since it was unregistered
+        assert len(callback_calls) == 0
+
+    def test_unregister_on_road_deallocated_not_found(self) -> None:
+        """Test that unregister returns False for non-existent callback."""
+        mock_map_controller = Mock()
+        controller = RouteController(mock_map_controller)
+
+        def some_callback(segment_key: SegmentKey) -> None:
+            pass
+
+        # Try to unregister a callback that was never registered
+        result = controller.unregister_on_road_deallocated(some_callback)
+
+        assert result is False
+
+    def test_clear_removes_all_callbacks(self) -> None:
+        """Test that clear() removes all registered callbacks."""
+        mock_map_controller = Mock()
+        controller = RouteController(mock_map_controller)
+
+        callback_calls = []
+
+        def on_dealloc(segment_key: SegmentKey) -> None:
+            callback_calls.append(segment_key)
+
+        controller.register_on_road_deallocated(on_dealloc)
+
+        # Clear the controller
+        controller.clear()
+
+        # Verify callbacks list is empty by trying to unregister
+        result = controller.unregister_on_road_deallocated(on_dealloc)
+        assert result is False  # Callback no longer exists

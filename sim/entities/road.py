@@ -25,6 +25,7 @@ SOFTWARE.
 from typing import List, Optional, TYPE_CHECKING
 
 from sim.map.routing_provider import SegmentKey
+from sim.entities.traffic_data import CongestionLevel, RoadTrafficState
 
 if TYPE_CHECKING:
     from .position import Position
@@ -37,10 +38,14 @@ class Road:
     Provides id, name, pointcollection, length, and maxspeed attributes
     needed for route traversal and road subscription management.
 
+    Traffic state can be applied via RoadTrafficState to modify effective
+    speed and duration. The original pointcollection is preserved; when
+    traffic is applied, active_pointcollection returns traffic-adjusted
+    points if available.
+
     Road segments are identified by segment_key: a tuple of start/end coordinates,
     enabling consistent identification across different routes that share the
-    same road infrastructure. This approach is provider-neutral and works with
-    any routing engine.
+    same road infrastructure.
     """
 
     def __init__(
@@ -66,6 +71,10 @@ class Road:
         self.pointcollection = pointcollection
         self.length = length
         self.maxspeed = maxspeed
+
+        # Traffic state
+        self._base_duration = length / maxspeed if maxspeed > 0 else 0.0
+        self._traffic_state: Optional[RoadTrafficState] = None
 
     @property
     def segment_key(self) -> SegmentKey:
@@ -99,3 +108,106 @@ class Road:
         if not isinstance(other, Road):
             return NotImplemented
         return self.segment_key == other.segment_key
+
+    @property
+    def duration(self) -> float:
+        """Get effective duration considering traffic.
+
+        Computed as base_duration / traffic_state.multiplier.
+        Lower multiplier = higher duration = slower travel.
+        Returns base_duration if no traffic state.
+
+        Returns:
+            Effective duration in seconds
+        """
+        if self._traffic_state is None:
+            return self._base_duration
+        effective_multiplier = max(self._traffic_state.multiplier, 0.01)
+        return self._base_duration / effective_multiplier
+
+    @property
+    def base_duration(self) -> float:
+        """Get the original duration (free flow).
+
+        This value is never modified by traffic events.
+
+        Returns:
+            Base duration in seconds at free flow speed
+        """
+        return self._base_duration
+
+    @property
+    def current_speed(self) -> float:
+        """Get current effective speed based on traffic multiplier.
+
+        Returns:
+            Current speed in m/s (maxspeed * traffic_state.multiplier)
+            Returns maxspeed if no traffic state.
+        """
+        if self._traffic_state is None:
+            return self.maxspeed
+        return self.maxspeed * self._traffic_state.multiplier
+
+    @property
+    def traffic_multiplier(self) -> float:
+        """Get current traffic speed multiplier for this road.
+
+        Returns:
+            Speed multiplier (0.0 to 1.0), 1.0 means free flow (or no traffic)
+        """
+        if self._traffic_state is None:
+            return 1.0
+        return self._traffic_state.multiplier
+
+    @property
+    def traffic_state(self) -> Optional[RoadTrafficState]:
+        """Get the traffic state object, or None if no traffic.
+
+        Returns:
+            RoadTrafficState if traffic exists, None otherwise
+        """
+        return self._traffic_state
+
+    @property
+    def congestion_level(self) -> CongestionLevel:
+        """Get current congestion level for this road.
+
+        Returns:
+            CongestionLevel enum value (FREE_FLOW if no traffic)
+        """
+        if self._traffic_state is None:
+            return CongestionLevel.FREE_FLOW
+        return self._traffic_state.congestion_level
+
+    @property
+    def active_pointcollection(self) -> List["Position"]:
+        """Get the active point collection (traffic or default).
+
+        Returns:
+            Traffic-adjusted points if available, otherwise default pointcollection
+        """
+        if (
+            self._traffic_state is not None
+            and self._traffic_state.traffic_pointcollection
+        ):
+            return self._traffic_state.traffic_pointcollection
+        return self.pointcollection
+
+    def set_traffic_state(self, state: RoadTrafficState) -> None:
+        """Set traffic state.
+
+        Args:
+            state: RoadTrafficState to apply
+
+        Returns:
+            None
+        """
+        self._traffic_state = state
+
+    def clear_traffic(self) -> None:
+        """Clear traffic state, reverting to default pointcollection.
+
+        Returns:
+            None
+        """
+        self._traffic_state = None
