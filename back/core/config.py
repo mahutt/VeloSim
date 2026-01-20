@@ -150,6 +150,29 @@ class Settings(BaseSettings):
     # Defaults to 5 seconds.
     KEYFRAME_DRAIN_TIMEOUT: float = float(os.getenv("KEYFRAME_DRAIN_TIMEOUT", "5.0"))
 
+    # Seek endpoint settings
+    # Default number of simulation seconds worth of future frames to return
+    # when seeking to a position. This provides a smooth playback experience.
+    # Defaults to 5.0 seconds.
+    SEEK_DEFAULT_FRAME_WINDOW_SECONDS: float = float(
+        os.getenv("SEEK_DEFAULT_FRAME_WINDOW_SECONDS", "5.0")
+    )
+
+    # Maximum allowed frame window that can be requested via the seek endpoint.
+    # This prevents excessive data transfer and memory usage.
+    # Defaults to 30.0 seconds.
+    SEEK_MAX_FRAME_WINDOW_SECONDS: float = float(
+        os.getenv("SEEK_MAX_FRAME_WINDOW_SECONDS", "30.0")
+    )
+
+    # Threshold (in seconds) for determining if the client is at the "live edge"
+    # of a running simulation. If the last frame is within this threshold of the
+    # current simulation time, the client is considered at the live edge.
+    # Defaults to 1.0 second.
+    LIVE_EDGE_THRESHOLD_SECONDS: float = float(
+        os.getenv("LIVE_EDGE_THRESHOLD_SECONDS", "1.0")
+    )
+
     model_config = SettingsConfigDict(case_sensitive=True)
 
 

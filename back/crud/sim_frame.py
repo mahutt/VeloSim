@@ -24,6 +24,8 @@ SOFTWARE.
 
 from sqlalchemy.orm import Session
 from sqlalchemy.dialects.postgresql import insert
+from sqlalchemy import desc
+from typing import List, Optional
 from back.models.sim_frame import SimFrame
 from back.schemas.sim_frame import SimFrameCreate
 
@@ -76,6 +78,92 @@ class SimFrameCRUD:
         if frame is None:
             raise RuntimeError(f"Frame with id {frame_id} not found after upsert")
         return frame
+
+    def get_keyframe_at_or_before(
+        self, db: Session, sim_instance_id: int, position: float
+    ) -> Optional[SimFrame]:
+        """Get the most recent keyframe at or before the specified position.
+
+        Args:
+            db: Database session.
+            sim_instance_id: The simulation instance ID.
+            position: The simulation time (in seconds) to find a keyframe at or before.
+
+        Returns:
+            SimFrame: The keyframe, or None if no keyframe exists before position.
+        """
+        return (
+            db.query(SimFrame)
+            .filter(
+                SimFrame.sim_instance_id == sim_instance_id,
+                SimFrame.is_key == True,  # noqa: E712
+                SimFrame.sim_seconds_elapsed <= position,
+            )
+            .order_by(desc(SimFrame.sim_seconds_elapsed))
+            .first()
+        )
+
+    def get_frames_in_range(
+        self,
+        db: Session,
+        sim_instance_id: int,
+        start_time: float,
+        end_time: float,
+        include_start: bool = True,
+    ) -> List[SimFrame]:
+        """Get all frames within a time range, ordered by sim_seconds_elapsed.
+
+        Args:
+            db: Database session.
+            sim_instance_id: The simulation instance ID.
+            start_time: Start of the time range (inclusive or exclusive based on
+                include_start).
+            end_time: End of the time range (exclusive).
+            include_start: If True, include frames at exactly start_time. Default True.
+
+        Returns:
+            List[SimFrame]: List of frames in the range, ordered by time.
+                Returns empty list if no frames match the criteria or if
+                start_time >= end_time.
+        """
+        query = db.query(SimFrame).filter(
+            SimFrame.sim_instance_id == sim_instance_id,
+            SimFrame.sim_seconds_elapsed < end_time,
+        )
+
+        if include_start:
+            query = query.filter(SimFrame.sim_seconds_elapsed >= start_time)
+        else:
+            query = query.filter(SimFrame.sim_seconds_elapsed > start_time)
+
+        return query.order_by(SimFrame.sim_seconds_elapsed).all()
+
+    def has_frames_after(
+        self, db: Session, sim_instance_id: int, after_time: float
+    ) -> bool:
+        """Check if any frames exist after the specified time.
+
+        Uses an efficient LIMIT 1 query to check existence without fetching
+        all matching frames.
+
+        Args:
+            db: Database session.
+            sim_instance_id: The simulation instance ID.
+            after_time: The simulation time (in seconds) to check after.
+
+        Returns:
+            bool: True if at least one frame exists after the specified time.
+        """
+        return (
+            db.query(SimFrame)
+            .filter(
+                SimFrame.sim_instance_id == sim_instance_id,
+                SimFrame.sim_seconds_elapsed > after_time,
+            )
+            .limit(1)
+            .first()
+            is not None
+        )
 
 
 sim_frame_crud = SimFrameCRUD()
