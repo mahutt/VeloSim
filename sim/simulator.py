@@ -26,6 +26,7 @@ import threading
 from typing import Dict, List, TypedDict, Optional
 import uuid
 
+from back.core.simulation_callbacks import on_simulation_completed
 from sim.core.simulation_environment import SimulationEnvironment
 from sim.entities.inputParameters import InputParameter
 from sim.entities.request_type import RequestType
@@ -118,6 +119,7 @@ class Simulator:
             sim_behaviour=sim_behaviour,
             strict=True,
             map_controller=map_controller,
+            on_completed_callback=on_simulation_completed,
         )
 
         # Apply playback state for restored simulations

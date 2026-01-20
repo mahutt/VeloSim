@@ -54,6 +54,7 @@ class SimInstanceResponse(SimInstanceBase):
     date_created: datetime
     date_updated: datetime
     uuid: str
+    completed: bool = False
 
     model_config = ConfigDict(from_attributes=True)
 
