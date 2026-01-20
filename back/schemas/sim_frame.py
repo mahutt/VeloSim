@@ -70,14 +70,18 @@ class SimFrameListResponse(BaseModel):
     )
 
 
-class SeekResponse(BaseModel):
-    """Response for seek endpoint.
-
-    Contains the frames needed to reach a target position and frames
-    to play forward from that position.
-    """
+class SeekPosition(BaseModel):
+    """Describes the target position of a seek operation."""
 
     sim_id: str = Field(..., description="UUID of the simulation")
+    target_sim_seconds: float = Field(
+        ..., ge=0, description="The simulation time (in seconds) that was seeked to"
+    )
+
+
+class FrameWindow(BaseModel):
+    """A window of frames to render, supporting both instant apply and playback."""
+
     initial_frames: List[SimFrameResponse] = Field(
         ...,
         description=(
@@ -93,15 +97,26 @@ class SeekResponse(BaseModel):
         ...,
         description="True if there are more frames beyond the returned window",
     )
+
+
+class SimulationState(BaseModel):
+    """Current status of a running or completed simulation."""
+
     current_sim_seconds: float = Field(
-        ...,
-        description="The current live simulation time (if sim is running)",
+        ..., ge=0, description="The current live simulation time (if sim is running)"
     )
     is_at_live_edge: bool = Field(
         ...,
         description="True if the returned frames reach the current execution point",
     )
     playback_speed: float = Field(
-        ...,
-        description="Current playback speed of the simulation",
+        ..., ge=0, description="Current playback speed of the simulation"
     )
+
+
+class SeekResponse(BaseModel):
+    """Complete response for seek endpoint, composed of focused sub-schemas."""
+
+    position: SeekPosition = Field(..., description="Where the seek operation landed")
+    frames: FrameWindow = Field(..., description="Frames to render")
+    state: SimulationState = Field(..., description="Current simulation status")

@@ -70,6 +70,9 @@ from .sim_frame import (
     SimFrameCreate,
     SimFrameResponse,
     SimFrameListResponse,
+    SeekPosition,
+    FrameWindow,
+    SimulationState,
     SeekResponse,
 )
 
@@ -107,5 +110,8 @@ __all__ = [
     "SimFrameCreate",
     "SimFrameResponse",
     "SimFrameListResponse",
+    "SeekPosition",
+    "FrameWindow",
+    "SimulationState",
     "SeekResponse",
 ]
