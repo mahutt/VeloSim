@@ -59,7 +59,9 @@ export function TaskItem({
       <ItemContent>
         <ItemTitle>Task #{task.id}</ItemTitle>
       </ItemContent>
-      {onUnassign ? (
+      {taskIsInService ? (
+        <span className="text-sm text-gray-500 italic">In Service</span>
+      ) : onUnassign ? (
         <>
           {taskIsInProgress && (
             <span className="text-sm text-gray-500 italic">In Progress</span>
@@ -73,8 +75,6 @@ export function TaskItem({
             <X className="h-4 w-4" />
           </Button>
         </>
-      ) : taskIsInService ? (
-        <span className="text-sm text-gray-500 italic">In Service</span>
       ) : null}
     </Item>
   );

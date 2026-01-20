@@ -64,8 +64,14 @@ def resource(env: simpy.Environment) -> Driver:
             sim_lunch_break=None,
         ),
     )
+    vehicle = Vehicle(vehicle_id=1, battery_count=10)
+    vehicle.set_driver(res)
+    res.set_vehicle(vehicle)
     # Mock the sim_behaviour and map_controller to avoid AttributeError
     res.sim_behaviour = Mock()
+    # ensure TST strategy exists and returns a small/default value for tests
+    res.sim_behaviour.TST_strategy = Mock()
+    res.sim_behaviour.TST_strategy.get_task_servicing_time.return_value = 0
     res.map_controller = Mock()
     return res
 
@@ -90,6 +96,9 @@ def driver(env: simpy.Environment) -> Driver:
     res.set_vehicle(vehicle)
     # Mock the sim_behaviour and map_controller to avoid AttributeError
     res.sim_behaviour = Mock()
+    # ensure TST strategy exists and returns a small/default value for tests
+    res.sim_behaviour.TST_strategy = Mock()
+    res.sim_behaviour.TST_strategy.get_task_servicing_time.return_value = 0
     res.map_controller = Mock()
     return res
 
@@ -224,7 +233,9 @@ def test_full_lifecycle_with_scheduling(
     env.run(until=assign_time + 2.0)
     assert task.get_state() == State.IN_PROGRESS
 
-    driver.service_task(task)
+    # run servicing process so the task is closed (service_task is a SimPy generator)
+    env.process(driver.service_task(task))
+    env.run()
     assert task.get_state() == State.CLOSED
 
 
@@ -277,6 +288,21 @@ def test_resource_get_in_progress_task(
     vehicle = Vehicle(vehicle_id=1, battery_count=10)
     vehicle.set_driver(resource)
     resource.set_vehicle(vehicle)
+    # ensure local driver has sim_behaviour and TST strategy for service_task
+    resource.sim_behaviour = Mock()
+    resource.sim_behaviour.TST_strategy = Mock()
+    resource.sim_behaviour.TST_strategy.get_task_servicing_time.return_value = 0
+    resource.map_controller = Mock()
+    # ensure local driver has sim_behaviour and TST strategy for service_task
+    resource.sim_behaviour = Mock()
+    resource.sim_behaviour.TST_strategy = Mock()
+    resource.sim_behaviour.TST_strategy.get_task_servicing_time.return_value = 0
+    resource.map_controller = Mock()
+    # Local resource may be used in tests; set minimal sim_behaviour/map_controller
+    resource.sim_behaviour = Mock()
+    resource.sim_behaviour.TST_strategy = Mock()
+    resource.sim_behaviour.TST_strategy.get_task_servicing_time.return_value = 0
+    resource.map_controller = Mock()
     task1 = BatterySwapTask(task_id=1, station=station)
     task2 = BatterySwapTask(task_id=2, station=station)
 
@@ -288,7 +314,9 @@ def test_resource_get_in_progress_task(
     resource.dispatch_task(task1)
     assert resource.get_in_progress_task() == task1
 
-    resource.service_task(task1)
+    # run servicing process to complete the in-progress task
+    env.process(resource.service_task(task1))
+    env.run()
     assert resource.get_in_progress_task() is None
 
 
@@ -462,6 +490,11 @@ def test_task_state_string_conversions(
     vehicle = Vehicle(vehicle_id=1, battery_count=10)
     vehicle.set_driver(resource)
     resource.set_vehicle(vehicle)
+    # ensure local driver has sim_behaviour and TST strategy for service_task
+    resource.sim_behaviour = Mock()
+    resource.sim_behaviour.TST_strategy = Mock()
+    resource.sim_behaviour.TST_strategy.get_task_servicing_time.return_value = 0
+    resource.map_controller = Mock()
     resource.assign_task(task)
     assert str(task.get_state()) == "assigned"
 
@@ -470,5 +503,7 @@ def test_task_state_string_conversions(
     assert str(task.get_state()) == "inprogress"
 
     # Test CLOSED state
-    resource.service_task(task)
+    # service the task as a SimPy process so it completes
+    env.process(resource.service_task(task))
+    env.run()
     assert str(task.get_state()) == "closed"
