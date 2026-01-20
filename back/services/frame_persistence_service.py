@@ -39,7 +39,7 @@ from grafana_logging.logger import get_logger
 logger = get_logger(__name__)
 
 
-class KeyframePersistenceSubscriber(Subscriber):
+class FramePersistenceSubscriber(Subscriber):
     """Async subscriber that persists all simulation frames to the database.
 
     This subscriber receives all frames from the simulation (both keyframes
@@ -76,7 +76,7 @@ class KeyframePersistenceSubscriber(Subscriber):
         self.last_keyframe: Optional[Frame] = None
 
         logger.info(
-            "KeyframePersistenceSubscriber initialized for"
+            "FramePersistenceSubscriber initialized for "
             + f"sim_instance_id={sim_instance_id}, "
             + f"queue_max_size={self.queue_max_size}"
         )
@@ -118,7 +118,7 @@ class KeyframePersistenceSubscriber(Subscriber):
             )
             self.loop_thread.start()
             logger.info(
-                "Created background event loop for keyframe persistence "
+                "Created background event loop for frame persistence "
                 + f"sim_instance_id={self.sim_instance_id}"
             )
 
@@ -130,14 +130,14 @@ class KeyframePersistenceSubscriber(Subscriber):
             # Store as a task-like object we can cancel later
             self.worker_task = future
             logger.info(
-                "KeyframePersistenceSubscriber worker started for "
+                "FramePersistenceSubscriber worker started for "
                 + f"sim_instance_id={self.sim_instance_id}"
             )
 
     async def _persistence_worker(self) -> None:
         """Async worker that processes frames from the queue and persists them."""
         logger.info(
-            "Keyframe persistence worker running for "
+            "Frame persistence worker running for "
             f"sim_instance_id={self.sim_instance_id}"
         )
 
@@ -162,7 +162,7 @@ class KeyframePersistenceSubscriber(Subscriber):
                 )
 
         logger.info(
-            "Keyframe persistence worker stopped for "
+            "Frame persistence worker stopped for "
             f"sim_instance_id={self.sim_instance_id}. Stats: "
             f"success={self.persist_success_count}, "
             f"failures={self.persist_failure_count}, "
@@ -278,7 +278,7 @@ class KeyframePersistenceSubscriber(Subscriber):
                 )
 
             logger.warning(
-                "Keyframe persistence queue full for "
+                "Frame persistence queue full for "
                 f"sim_instance_id={self.sim_instance_id}. "
                 f"Dropped random frame. Total drops: {self.queue_drop_count}"
             )
@@ -332,7 +332,7 @@ class KeyframePersistenceSubscriber(Subscriber):
 
         self.closed = True
         logger.info(
-            "Shutting down KeyframePersistenceSubscriber for "
+            "Shutting down FramePersistenceSubscriber for "
             f"sim_instance_id={self.sim_instance_id}"
         )
 
@@ -359,7 +359,7 @@ class KeyframePersistenceSubscriber(Subscriber):
             if elapsed >= drain_timeout:
                 queue_size = self.frame_queue.qsize()
                 logger.warning(
-                    f"Keyframe queue drain timeout ({drain_timeout}s) "
+                    f"Frame queue drain timeout ({drain_timeout}s) "
                     f"for sim_instance_id={self.sim_instance_id}. "
                     f"Remaining queue size: {queue_size}"
                 )
@@ -399,7 +399,7 @@ class KeyframePersistenceSubscriber(Subscriber):
                     self.worker_task.cancel()
 
         logger.info(
-            "KeyframePersistenceSubscriber shutdown complete for "
+            "FramePersistenceSubscriber shutdown complete for "
             f"sim_instance_id={self.sim_instance_id}. "
             f"Final stats: success={self.persist_success_count}, "
             f"failures={self.persist_failure_count}, "

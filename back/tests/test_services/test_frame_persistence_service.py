@@ -24,23 +24,23 @@ SOFTWARE.
 
 import pytest
 from unittest.mock import MagicMock, patch
-from back.services.keyframe_persistence_service import KeyframePersistenceSubscriber
+from back.services.frame_persistence_service import FramePersistenceSubscriber
 from sim.entities.frame import Frame
 
 
-class TestKeyframePersistenceSubscriber:
-    """Tests for the KeyframePersistenceSubscriber service."""
+class TestFramePersistenceSubscriber:
+    """Tests for the FramePersistenceSubscriber service."""
 
     def test_init(self) -> None:
         """Test that subscriber initializes correctly."""
-        subscriber = KeyframePersistenceSubscriber(sim_instance_id=123)
+        subscriber = FramePersistenceSubscriber(sim_instance_id=123)
         assert subscriber.sim_instance_id == 123
         assert subscriber.worker_task is None
         assert subscriber.closed is False
 
     def test_start_creates_worker_task(self) -> None:
         """Test that start() creates async worker task."""
-        subscriber = KeyframePersistenceSubscriber(sim_instance_id=123)
+        subscriber = FramePersistenceSubscriber(sim_instance_id=123)
 
         mock_loop = MagicMock()
         mock_loop.is_closed.return_value = False
@@ -65,7 +65,7 @@ class TestKeyframePersistenceSubscriber:
 
     def test_on_frame_queues_all_frames(self) -> None:
         """Test that all frames (keyframes and diffs) are queued."""
-        subscriber = KeyframePersistenceSubscriber(sim_instance_id=123)
+        subscriber = FramePersistenceSubscriber(sim_instance_id=123)
         # Don't start the worker - we just want to test the queueing logic
 
         # Create mix of keyframes and diff frames
@@ -89,11 +89,11 @@ class TestKeyframePersistenceSubscriber:
     def test_queue_overflow_drops_random_frames(self) -> None:
         """Test that queue overflow drops frames randomly."""
         with patch(
-            "back.services.keyframe_persistence_service.settings."
+            "back.services.frame_persistence_service.settings."
             + "KEYFRAME_QUEUE_MAX_SIZE",
             5,
         ):
-            subscriber = KeyframePersistenceSubscriber(sim_instance_id=123)
+            subscriber = FramePersistenceSubscriber(sim_instance_id=123)
 
             # Fill queue beyond max size
             for i in range(10):
@@ -110,12 +110,12 @@ class TestKeyframePersistenceSubscriber:
     async def test_shutdown_stops_worker(self) -> None:
         """Test that shutdown() stops the worker gracefully."""
         with patch(
-            "back.services.keyframe_persistence_service.concurrent.futures.wait"
+            "back.services.frame_persistence_service.concurrent.futures.wait"
         ) as mock_wait:
             # Mock wait to return immediately as if task completed
             mock_wait.return_value = ({MagicMock()}, set())
 
-            subscriber = KeyframePersistenceSubscriber(sim_instance_id=123)
+            subscriber = FramePersistenceSubscriber(sim_instance_id=123)
 
             # Mock the worker task
             mock_task = MagicMock()
@@ -135,15 +135,15 @@ class TestKeyframePersistenceSubscriber:
     async def test_persistence_worker_persists_frames(self) -> None:
         """Test that worker processes frames from queue and persists them."""
         with patch(
-            "back.services.keyframe_persistence_service.sim_frame_crud.upsert"
+            "back.services.frame_persistence_service.sim_frame_crud.upsert"
         ) as mock_upsert:
             with patch(
-                "back.services.keyframe_persistence_service.SessionLocal"
+                "back.services.frame_persistence_service.SessionLocal"
             ) as mock_session:
                 mock_db = MagicMock()
                 mock_session.return_value = mock_db
 
-                subscriber = KeyframePersistenceSubscriber(sim_instance_id=123)
+                subscriber = FramePersistenceSubscriber(sim_instance_id=123)
 
                 # Manually call _persist_frame instead of running the full worker
                 frame = MagicMock(spec=Frame)
@@ -164,13 +164,13 @@ class TestKeyframePersistenceSubscriber:
     async def test_persistence_failure_logged(self) -> None:
         """Test that persistence failures are logged and increment failure counter."""
         with patch(
-            "back.services.keyframe_persistence_service.sim_frame_crud.upsert"
+            "back.services.frame_persistence_service.sim_frame_crud.upsert"
         ) as mock_upsert:
             with patch(
-                "back.services.keyframe_persistence_service.SessionLocal"
+                "back.services.frame_persistence_service.SessionLocal"
             ) as mock_session:
                 with patch(
-                    "back.services.keyframe_persistence_service.logger"
+                    "back.services.frame_persistence_service.logger"
                 ) as mock_logger:
                     # Make upsert() raise an exception
                     mock_upsert.side_effect = Exception("DB error")
@@ -178,7 +178,7 @@ class TestKeyframePersistenceSubscriber:
                     mock_db = MagicMock()
                     mock_session.return_value = mock_db
 
-                    subscriber = KeyframePersistenceSubscriber(sim_instance_id=123)
+                    subscriber = FramePersistenceSubscriber(sim_instance_id=123)
 
                     # Manually call _persist_frame to test error handling
                     frame = MagicMock(spec=Frame)
@@ -200,14 +200,14 @@ class TestKeyframePersistenceSubscriber:
     def test_background_event_loop_created_when_no_loop_exists(self) -> None:
         """Test that start() creates a background event loop when none exists.
 
-        This tests the bug fix where keyframes weren't being persisted because
+        This tests the bug fix where frames weren't being persisted because
         the service was initialized from a sync endpoint with no running event loop.
 
         Note: RuntimeWarnings about pending tasks are expected since we forcefully
         stop the event loop for quick cleanup in this test.
         """
         # Create subscriber (no event loop should be running)
-        subscriber = KeyframePersistenceSubscriber(sim_instance_id=456)
+        subscriber = FramePersistenceSubscriber(sim_instance_id=456)
 
         # Before start(), loop should be None
         assert subscriber.loop is None
@@ -252,16 +252,16 @@ class TestKeyframePersistenceSubscriber:
         from unittest.mock import patch, MagicMock
 
         with patch(
-            "back.services.keyframe_persistence_service.sim_frame_crud.upsert"
+            "back.services.frame_persistence_service.sim_frame_crud.upsert"
         ) as mock_upsert:
             with patch(
-                "back.services.keyframe_persistence_service.SessionLocal"
+                "back.services.frame_persistence_service.SessionLocal"
             ) as mock_session:
                 mock_db = MagicMock()
                 mock_session.return_value = mock_db
 
                 # Create subscriber - this will create background event loop
-                subscriber = KeyframePersistenceSubscriber(sim_instance_id=789)
+                subscriber = FramePersistenceSubscriber(sim_instance_id=789)
                 subscriber.start()
 
                 # Give the background thread time to start
@@ -319,12 +319,12 @@ class TestKeyframePersistenceSubscriber:
     async def test_shutdown_queues_final_keyframe(self) -> None:
         """Test that shutdown() force-queues the last keyframe for persistence."""
         with patch(
-            "back.services.keyframe_persistence_service.concurrent.futures.wait"
+            "back.services.frame_persistence_service.concurrent.futures.wait"
         ) as mock_wait:
             # Mock wait to return immediately as if task completed
             mock_wait.return_value = ({MagicMock()}, set())
 
-            subscriber = KeyframePersistenceSubscriber(sim_instance_id=123)
+            subscriber = FramePersistenceSubscriber(sim_instance_id=123)
 
             # Mock the worker task
             mock_task = MagicMock()

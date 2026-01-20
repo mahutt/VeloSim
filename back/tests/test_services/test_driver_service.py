@@ -95,7 +95,7 @@ class TestDriverService:
         """Test successful task assignment.
 
         Note: Warnings suppressed because mocking the simulator can trigger
-        unawaited coroutines in KeyframePersistenceSubscriber._persistence_worker,
+        unawaited coroutines in FramePersistenceSubscriber._persistence_worker,
         and event loop cleanup from other tests can cause unraisable exceptions.
         """
         payload = DriverTaskAssignRequest(driver_id=1, task_id=100)
