@@ -65,39 +65,37 @@ export default function ResourceBar() {
   }, [resourceBarElement, searchQuery]);
 
   return (
-    <div className="w-full min-h-0 flex-1 overflow-hidden">
-      <Card className="bg-gray-50 gap-0 flex flex-col h-full overflow-hidden">
-        <CardHeader>
-          <SearchBar
-            placeholder="Search Resource"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            onClear={() => setSearchQuery('')}
-          />
-        </CardHeader>
-        <CardContent className="pt-0 flex-1 overflow-y-auto min-h-0">
-          <div className="space-y-2">
-            {resourceBarElement.length === 0 ? (
-              <div className="text-center text-muted-foreground py-8 select-none">
-                No resources currently available
-              </div>
-            ) : filteredResources.length === 0 ? (
-              <div className="text-center text-muted-foreground py-8 select-none">
-                No resources match your search
-              </div>
-            ) : (
-              filteredResources.map((resource) => (
-                <ResourceItem
-                  key={resource.id}
-                  resource={resource}
-                  onSelect={() => handleSelect(resource.id)}
-                  isSelected={isResourceSelected(resource.id)}
-                />
-              ))
-            )}
-          </div>
-        </CardContent>
-      </Card>
-    </div>
+    <Card className="min-h-0 bg-gray-50 gap-0 flex flex-col">
+      <CardHeader>
+        <SearchBar
+          placeholder="Search Resource"
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          onClear={() => setSearchQuery('')}
+        />
+      </CardHeader>
+      <CardContent className="pt-0 flex-1 overflow-y-auto min-h-0">
+        <div className="space-y-2">
+          {resourceBarElement.length === 0 ? (
+            <div className="text-center text-muted-foreground py-8 select-none">
+              No resources currently available
+            </div>
+          ) : filteredResources.length === 0 ? (
+            <div className="text-center text-muted-foreground py-8 select-none">
+              No resources match your search
+            </div>
+          ) : (
+            filteredResources.map((resource) => (
+              <ResourceItem
+                key={resource.id}
+                resource={resource}
+                onSelect={() => handleSelect(resource.id)}
+                isSelected={isResourceSelected(resource.id)}
+              />
+            ))
+          )}
+        </div>
+      </CardContent>
+    </Card>
   );
 }
