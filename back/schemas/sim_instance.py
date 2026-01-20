@@ -53,6 +53,7 @@ class SimInstanceResponse(SimInstanceBase):
     branch_keyframe_seq: Optional[int] = None
     date_created: datetime
     date_updated: datetime
+    uuid: str
 
     model_config = ConfigDict(from_attributes=True)
 

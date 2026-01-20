@@ -509,6 +509,48 @@ class SimulationService:
 
         return paginated, total
 
+    def get_all_simulations(
+        self,
+        db: Session,
+        requesting_user: int,
+        skip: int = 0,
+        limit: int = 10,
+    ) -> tuple[List[SimInstance], int]:
+        """
+        Retrieve all simulations (active and inactive) with pagination.
+
+        Admins see all simulations.
+        Non-admin users see only their own simulations.
+
+        Args:
+            db: Database session
+            requesting_user: Requesting user's ID
+            skip: Number of records to skip
+            limit: Maximum number of records to return
+
+        Returns:
+            Tuple of (list of SimInstance objects, total count)
+        """
+
+        user = self._get_requesting_user(db, requesting_user)
+
+        query = db.query(SimInstance)
+
+        # Queries user-specific simulations.
+        query = query.filter(SimInstance.user_id == user.id)
+
+        total = query.count()
+
+        simulations = (
+            query.order_by(
+                SimInstance.date_created.desc()
+            )  # Returning by most recent sims.
+            .offset(skip)
+            .limit(limit)
+            .all()
+        )
+        return simulations, total
+
     def get_simulation_status(
         self, db: Session, sim_id: str, requesting_user: int
     ) -> str:
