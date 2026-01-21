@@ -75,6 +75,10 @@ import {
   createHQWidgetState,
 } from '~/lib/hq-widget-helpers';
 import { positionsEqual } from '~/lib/utils';
+import {
+  driverResourceHasUpdated,
+  vehicleResourceHasUpdated,
+} from '~/lib/simulation-helpers';
 
 export const SPEED_OPTIONS = [0, 0.5, 1, 2, 4, 8] as const;
 export type Speed = (typeof SPEED_OPTIONS)[number];
@@ -374,28 +378,31 @@ export const SimulationProvider = ({
       });
     }
 
-    // Update drivers that appear in the payload
-    payload.drivers.forEach((updatedResource: Driver) => {
-      // If the resource doesn't exist, or does exist but has different task count, we need to update the reactive resources list
-      const existingResource = driversRef.current.get(updatedResource.id);
-      shouldUpdateReactiveResources =
-        !existingResource ||
-        existingResource.taskIds.length !== updatedResource.taskIds.length;
+    payload.vehicles.forEach((updatedVehicle: Vehicle) => {
+      const existingVehicle = vehiclesRef.current.get(updatedVehicle.id);
+      if (vehicleResourceHasUpdated(existingVehicle, updatedVehicle)) {
+        shouldUpdateReactiveResources = true;
+      }
+      vehiclesRef.current.set(updatedVehicle.id, updatedVehicle);
+    });
 
-      driversRef.current.set(updatedResource.id, updatedResource);
+    // Update drivers that appear in the payload
+    payload.drivers.forEach((updatedDriver: Driver) => {
+      const existingDriver = driversRef.current.get(updatedDriver.id);
+      if (driverResourceHasUpdated(existingDriver, updatedDriver)) {
+        shouldUpdateReactiveResources = true;
+      }
+
+      driversRef.current.set(updatedDriver.id, updatedDriver);
 
       // Update reactive selectedItem if this resource is that item
       if (
         selectedItem?.type === SelectedItemType.Driver &&
-        selectedItem.value.id === updatedResource.id
+        selectedItem.value.id === updatedDriver.id
       ) {
-        updateSelectedItem(updatedResource.id, SelectedItemType.Driver);
+        updateSelectedItem(updatedDriver.id, SelectedItemType.Driver);
       }
       renderOnNextFrameRef.current = true;
-    });
-
-    payload.vehicles.forEach((updatedVehicle: Vehicle) => {
-      vehiclesRef.current.set(updatedVehicle.id, updatedVehicle);
     });
 
     // Conditionally updating reactive resources list for resource bar
