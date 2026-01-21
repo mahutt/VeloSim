@@ -24,6 +24,9 @@ SOFTWARE.
 
 from back.database.session import SessionLocal
 from back.crud.sim_instance import sim_instance_crud
+from grafana_logging.logger import get_logger
+
+logger = get_logger(__name__)
 
 
 def on_simulation_completed(sim_id: str) -> None:
@@ -35,8 +38,27 @@ def on_simulation_completed(sim_id: str) -> None:
     Returns:
         None
     """
-    with SessionLocal() as db:
-        sim_instance = sim_instance_crud.get_by_uuid(db, sim_id)
-        if sim_instance:
+
+    try:
+        with SessionLocal() as db:
+            sim_instance = sim_instance_crud.get_by_uuid(db, sim_id)
+
+            if not sim_instance:
+                logger.warning(
+                    "Simulation completion callback: no simulation found (uuid=%s)",
+                    sim_id,
+                )
+                return
             sim_instance.completed = True
             db.commit()
+
+            logger.info(
+                "Simulation marked as completed (uuid=%s, id=%s)",
+                sim_id,
+                sim_instance.id,
+            )
+    except Exception:
+        logger.exception(
+            "Simulation completion callback failed (uuid=%s)",
+            sim_id,
+        )

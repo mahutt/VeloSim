@@ -56,21 +56,23 @@ export const columns: ColumnDef<Simulation>[] = [
     id: 'resume',
     header: 'Action',
     cell: ({ row }) => {
-      const simulationUUID = row.original.uuid;
+      const sim_id = row.original.uuid;
       const isCompleted = row.original.completed;
 
       const navigate = useNavigate();
 
       const handleSimulationClick = () => {
-        if (!isCompleted) {
-          navigate(`/simulation/${simulationUUID}`);
-        } else {
-          console.log('Resource Count: ', row.original.resource_count);
-          console.log('REPLAY');
+        if (isCompleted) {
+          return;
         }
+        navigate(`/simulation/${sim_id}`);
       };
       return (
-        <Button size="sm" onClick={handleSimulationClick}>
+        <Button
+          size="sm"
+          onClick={handleSimulationClick}
+          disabled={isCompleted}
+        >
           Resume
         </Button>
       );

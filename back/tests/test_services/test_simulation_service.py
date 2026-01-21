@@ -1243,3 +1243,62 @@ class TestSimulationService:
         sim_info = simulation_service.simulator.get_sim_by_id("test-sim-id")
         assert sim_info is not None
         assert sim_info["simController"].realTimeDriver.running is False  # Paused
+
+    def test_get_all_simulations_success(
+        self,
+        mock_user_crud: Mock,
+        mock_sim_crud: Mock,
+        mock_db: Mock,
+        test_user: User,
+        simulation_service: SimulationService,
+    ) -> None:
+        """User retrieves all their simulations with pagination."""
+
+        # User exists
+        mock_user_crud.get.return_value = test_user
+
+        # Fake simulations
+        sim1 = Mock(id=1, user_id=test_user.id)
+        sim2 = Mock(id=2, user_id=test_user.id)
+
+        # Mock SQLAlchemy query chain
+        mock_query = Mock()
+        (
+            mock_query.filter.return_value.order_by.return_value.offset.return_value.limit.return_value.all.return_value  # noqa: E501
+        ) = [sim1, sim2]
+
+        mock_query.filter.return_value.count.return_value = 2
+        mock_db.query.return_value = mock_query
+
+        sims, total = simulation_service.get_all_user_simulations(mock_db, test_user.id)
+
+        assert total == 2
+        assert sims == [sim1, sim2]
+
+        mock_db.query.assert_called_once()
+        mock_query.filter.assert_called_once()
+
+    def test_get_all_simulations_empty(
+        self,
+        mock_user_crud: Mock,
+        mock_sim_crud: Mock,
+        mock_db: Mock,
+        test_user: User,
+        simulation_service: SimulationService,
+    ) -> None:
+        """User with no simulations gets empty list."""
+
+        mock_user_crud.get.return_value = test_user
+
+        mock_query = Mock()
+        (
+            mock_query.filter.return_value.order_by.return_value.offset.return_value.limit.return_value.all.return_value  # noqa: E501
+        ) = []
+
+        mock_query.filter.return_value.count.return_value = 0
+        mock_db.query.return_value = mock_query
+
+        sims, total = simulation_service.get_all_user_simulations(mock_db, test_user.id)
+
+        assert sims == []
+        assert total == 0

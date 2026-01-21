@@ -25,6 +25,7 @@ SOFTWARE.
 from typing import TYPE_CHECKING, Dict, List, NotRequired, TypedDict
 import asyncio
 from sqlalchemy.orm import Session
+from back.core.simulation_callbacks import on_simulation_completed
 from back.models import User
 from back.models.sim_instance import SimInstance
 from back.schemas import (
@@ -255,6 +256,7 @@ class SimulationService:
             env=env,
             initial_running=should_auto_resume,
             real_time_factor=real_time_factor,
+            on_completed_callback=on_simulation_completed,
         )
 
         self.active_simulations[restore_sim_id] = ActiveSimulationData(
@@ -303,7 +305,11 @@ class SimulationService:
         frame_subscriber.start()
 
         # Initialize simulation with InputParameter and persistence subscriber
-        sim_id = sim.initialize(params, subscribers=[frame_subscriber])
+        sim_id = sim.initialize(
+            params,
+            subscribers=[frame_subscriber],
+            on_completed_callback=on_simulation_completed,
+        )
 
         # Update the database record with the simulator's UUID
         db_sim_instance.uuid = sim_id
@@ -509,7 +515,7 @@ class SimulationService:
 
         return paginated, total
 
-    def get_all_simulations(
+    def get_all_user_simulations(
         self,
         db: Session,
         requesting_user: int,

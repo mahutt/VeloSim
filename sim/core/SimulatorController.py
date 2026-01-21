@@ -158,8 +158,11 @@ class SimulatorController:
                     step_callback=self.emit_frame,
                 )
             finally:
+
+                running_at_completion = self.realTimeDriver.running
+
                 # Emit final keyframe only if sim ended naturally
-                if self.realTimeDriver.running:
+                if running_at_completion:
                     final_frame = self.create_frame(
                         is_key=True,
                         paused_by_user=False,
@@ -168,12 +171,11 @@ class SimulatorController:
 
                 # If the sim reaches end_time, realTimeDriver.running = true
                 # If diconnected/paused, realTimeDriver.running = false
-                if self.realTimeDriver.running and self.on_completed_callback:
+                if running_at_completion and self.on_completed_callback:
                     self.on_completed_callback(self.frameEmitter.sim_id)
 
         self.sim_thread = threading.Thread(
             target=run,
-            daemon=True,
         )
         self.sim_thread.start()
 
