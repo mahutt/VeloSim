@@ -286,7 +286,6 @@ class SimulationService:
             user_id=user.id, scenario_payload=scenario_payload
         )
         db_sim_instance = sim_instance_crud.create(db, sim_instance_data)
-        db.commit()
 
         # Create a fresh Simulator for this simulation
         sim = self.simulator
