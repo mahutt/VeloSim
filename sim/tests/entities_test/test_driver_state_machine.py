@@ -27,9 +27,12 @@ import pytest
 from unittest.mock import Mock
 
 from sim.core.simulation_environment import SimulationEnvironment
+from sim.entities.BatterySwapTask import BatterySwapTask
 from sim.entities.driver import Driver, DriverState
 from sim.entities.position import Position
 from sim.entities.shift import Shift
+from sim.entities.station import Station
+from sim.entities.task_state import State
 from sim.entities.vehicle import Vehicle
 
 
@@ -93,6 +96,26 @@ def test_off_shift_transitions_to_pending_when_within_two_hours(
     env.run(until=2)
 
     assert driver.get_state() == DriverState.PENDING_SHIFT
+
+
+def test_idle_transitions_to_restock_at_start_of_shift(
+    fake_time: MockClock,
+) -> None:
+    """Driver transitions from idle to restocking at the start of their shift
+    if their vehicle is not full of batteries
+    """
+    env = SimulationEnvironment()
+    Driver.env = env
+
+    shift = make_shift(sim_start=5, sim_end=50000)
+    driver = Driver(driver_id=4, position=Position([0.0, 0.0]), shift=shift)
+    driver.state = DriverState.OFF_SHIFT
+
+    vehicle = Vehicle(vehicle_id=2, battery_count=10, max_battery_count=11)
+    env.hq.push_vehicle(vehicle)
+    env.process(driver.run())
+    env.run(until=7)
+    assert driver.get_state() == DriverState.RESTOCKING_BATTERIES
 
 
 def test_off_shift_stays_off_when_start_far_away(
@@ -186,3 +209,32 @@ def test_idle_enters_seeking_hq_when_inventory_empty(fake_time: MockClock) -> No
     env.process(driver.run())
     env.run(until=2)
     assert driver.get_state() == DriverState.SEEKING_HQ_FOR_INVENTORY
+
+
+def test_driver_unassignments_at_end_of_shift(fake_time: MockClock) -> None:
+    env = SimulationEnvironment()
+    Driver.env = env
+
+    shift = make_shift(sim_start=0, sim_end=50000)
+
+    station1 = Station(1, "Station 1", Position([-73.5, 45.5]))
+    station2 = Station(2, "Station 2", Position([-73.6, 45.6]))
+    task1 = BatterySwapTask(1, station=station1)
+    task2 = BatterySwapTask(2, station=station2)
+
+    task1.state = State.ASSIGNED
+    task2.state = State.ASSIGNED
+    driver = Driver(driver_id=4, position=env.hq.position, shift=shift)
+
+    vehicle = Vehicle(vehicle_id=2, battery_count=0)
+    vehicle.set_driver(driver)
+    driver.set_vehicle(vehicle)
+
+    driver.assign_task(task1)
+    driver.assign_task(task2)
+    driver.set_state(DriverState.ENDING_SHIFT)
+
+    env.process(driver.run())
+    env.run(until=2)
+    assert len(driver.task_list) == 0
+    assert driver.get_vehicle() is None

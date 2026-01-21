@@ -63,10 +63,16 @@ describe('DriverStateBadge', () => {
     expect(screen.getByText('On break')).toBeInTheDocument();
   });
 
-  it('renders heading to HQ state correctly', () => {
-    render(<DriverStateBadge state={DriverState.HeadingToHQ} />);
+  it('renders ending shift state correctly', () => {
+    render(<DriverStateBadge state={DriverState.EndingShift} />);
 
-    expect(screen.getByText('Heading to hq')).toBeInTheDocument();
+    expect(screen.getByText('Ending shift')).toBeInTheDocument();
+  });
+
+  it('renders seeking HQ state correctly', () => {
+    render(<DriverStateBadge state={DriverState.SeekingHQForInventory} />);
+
+    expect(screen.getByText('Returning for restock')).toBeInTheDocument();
   });
 
   it('renders restocking batteries state correctly', () => {

@@ -57,9 +57,13 @@ export default function DriverStateBadge({ state }: DriverStateBadgeProps) {
       className = 'bg-orange-200';
       label = 'On break';
       break;
-    case DriverState.HeadingToHQ:
+    case DriverState.EndingShift:
       className = 'bg-red-200';
-      label = 'Heading to hq';
+      label = 'Ending shift';
+      break;
+    case DriverState.SeekingHQForInventory:
+      className = 'bg-red-200';
+      label = 'Returning for restock';
       break;
     case DriverState.RestockingBatteries:
       className = 'bg-teal-200';

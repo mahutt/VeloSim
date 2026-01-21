@@ -857,7 +857,14 @@ class Driver:
         if self.vehicle is None and self.env.hq.has_vehicles():
             vehicle_to_assign = self.env.hq.pop_vehicle()
             if vehicle_to_assign is not None:
+                # assign vehicle and use the local reference to satisfy type checkers
                 self.set_vehicle(vehicle_to_assign)
+                if (
+                    vehicle_to_assign.get_battery_count()
+                    < vehicle_to_assign.get_max_battery_count()
+                ):
+                    self.set_state(DriverState.RESTOCKING_BATTERIES)
+                    return
 
         if time_to_shift_end <= SHIFT_END_BUFFER_TIME:
             self.set_state(DriverState.ENDING_SHIFT)
