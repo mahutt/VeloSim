@@ -23,6 +23,7 @@
  */
 
 import { vi } from 'vitest';
+import type { PopulatedDriver } from '~/components/map/selected-item-bar';
 import type { SimulationContextType } from '~/providers/simulation-provider';
 import {
   DriverState,
@@ -66,6 +67,21 @@ export function makeDriver(overrides: Partial<Driver> = {}): Driver {
     vehicleId: overrides.vehicleId ?? null,
     route: overrides.route,
   } as Driver;
+}
+
+export function makePopulatedDriver(
+  overrides: Partial<PopulatedDriver> = {}
+): PopulatedDriver {
+  const id = overrides.id ?? Math.floor(Math.random() * 10000);
+  return {
+    id,
+    name: overrides.name ?? `Driver ${id}`,
+    position: overrides.position ?? [0, 0],
+    tasks: overrides.tasks ?? [],
+    route: overrides.route,
+    state: overrides.state ?? DriverState.OffShift,
+    inProgressTask: overrides.inProgressTask ?? null,
+  };
 }
 
 export function makeVehicle(overrides: Partial<Vehicle> = {}): Vehicle {
