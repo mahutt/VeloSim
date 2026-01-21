@@ -199,7 +199,9 @@ export interface ScenarioContentStation {
 // Simulation types
 export interface Simulation {
   id: number;
+  uuid: string;
   user_id: number;
+  completed: boolean;
   date_created: string;
   date_updated: string;
   resource_count: number;

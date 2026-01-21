@@ -166,7 +166,9 @@ class SimulatorController:
                     )
                     self.emit_frame(final_frame)
 
-                if self.on_completed_callback:
+                # If the sim reaches end_time, realTimeDriver.running = true
+                # If diconnected/paused, realTimeDriver.running = false
+                if self.realTimeDriver.running and self.on_completed_callback:
                     self.on_completed_callback(self.frameEmitter.sim_id)
 
         self.sim_thread = threading.Thread(

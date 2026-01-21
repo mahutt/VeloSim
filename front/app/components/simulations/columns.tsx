@@ -53,30 +53,24 @@ export const columns: ColumnDef<Simulation>[] = [
     },
   },
   {
-    accessorKey: 'resource_count',
-    header: 'Resources',
-  },
-  {
-    accessorKey: 'station_count',
-    header: 'Stations',
-  },
-  {
-    accessorKey: 'task_count',
-    header: 'Tasks',
-  },
-  {
     id: 'resume',
     header: 'Action',
     cell: ({ row }) => {
-      const simulationId = row.original.id;
+      const simulationUUID = row.original.uuid;
+      const isCompleted = row.original.completed;
+
       const navigate = useNavigate();
+
+      const handleSimulationClick = () => {
+        if (!isCompleted) {
+          navigate(`/simulation/${simulationUUID}`);
+        } else {
+          console.log('Resource Count: ', row.original.resource_count);
+          console.log('REPLAY');
+        }
+      };
       return (
-        <Button
-          size="sm"
-          onClick={() => {
-            navigate(`/simulation/${simulationId}`);
-          }}
-        >
+        <Button size="sm" onClick={handleSimulationClick}>
           Resume
         </Button>
       );
