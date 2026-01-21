@@ -75,6 +75,10 @@ import {
   createHQWidgetState,
 } from '~/lib/hq-widget-helpers';
 import { positionsEqual } from '~/lib/utils';
+import {
+  driverResourceHasUpdated,
+  vehicleResourceHasUpdated,
+} from '~/lib/simulation-helpers';
 
 export const SPEED_OPTIONS = [0, 0.5, 1, 2, 4, 8] as const;
 export type Speed = (typeof SPEED_OPTIONS)[number];
@@ -376,17 +380,7 @@ export const SimulationProvider = ({
 
     payload.vehicles.forEach((updatedVehicle: Vehicle) => {
       const existingVehicle = vehiclesRef.current.get(updatedVehicle.id);
-      if (
-        // If vehicle didn't exist before but is part of a resource
-        (!existingVehicle && updatedVehicle.driverId !== null) ||
-        // If vehicle did exist but driver assignment changed
-        (existingVehicle &&
-          existingVehicle.driverId !== updatedVehicle.driverId) ||
-        // If vehicle did exist and is part of a resource, but battery count changed
-        (existingVehicle &&
-          existingVehicle.driverId !== null &&
-          existingVehicle.batteryCount !== updatedVehicle.batteryCount)
-      ) {
+      if (vehicleResourceHasUpdated(existingVehicle, updatedVehicle)) {
         shouldUpdateReactiveResources = true;
       }
       vehiclesRef.current.set(updatedVehicle.id, updatedVehicle);
@@ -395,12 +389,7 @@ export const SimulationProvider = ({
     // Update drivers that appear in the payload
     payload.drivers.forEach((updatedDriver: Driver) => {
       const existingDriver = driversRef.current.get(updatedDriver.id);
-      if (
-        // If driver is part of a resource and task count changed
-        existingDriver &&
-        existingDriver.vehicleId !== null &&
-        existingDriver.taskIds.length !== updatedDriver.taskIds.length
-      ) {
+      if (driverResourceHasUpdated(existingDriver, updatedDriver)) {
         shouldUpdateReactiveResources = true;
       }
 
