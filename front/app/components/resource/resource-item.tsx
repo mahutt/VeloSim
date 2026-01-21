@@ -95,6 +95,8 @@ export function ResourceItem({
 
   const handleDropOnResource = (e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault();
+    e.stopPropagation();
+
     setIsDragOver(false);
 
     const taskId = Number(e.dataTransfer.getData('taskId'));
@@ -109,7 +111,8 @@ export function ResourceItem({
   };
 
   const handleDragLeave = (e: React.DragEvent<HTMLDivElement>) => {
-    if (!e.relatedTarget || e.currentTarget.contains(e.relatedTarget as Node)) {
+    const target = e.relatedTarget as Node | null;
+    if (target && e.currentTarget.contains(target)) {
       return;
     }
     setIsDragOver(false);

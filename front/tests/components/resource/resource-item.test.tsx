@@ -205,3 +205,213 @@ test('resource item displays battery status indicator', () => {
 
   expect(screen.getByText('2')).toBeDefined();
 });
+
+test('resource item handles dragOver event correctly', () => {
+  const mockResource: ResourceItemElement = {
+    id: 5,
+    name: 'Test Driver',
+    taskCount: 0,
+    batteryCount: 1,
+    batteryCapacity: 100,
+  };
+
+  const mockOnSelect = vi.fn();
+
+  render(
+    <MapProvider>
+      <SimulationProvider>
+        <TaskAssignmentProvider>
+          <ResourceItem resource={mockResource} onSelect={mockOnSelect} />
+        </TaskAssignmentProvider>
+      </SimulationProvider>
+    </MapProvider>
+  );
+
+  const container = screen
+    .getByText('Test Driver')
+    .closest('[data-slot="item"]') as HTMLElement;
+
+  const dragOverEvent = new DragEvent('dragover', {
+    bubbles: true,
+    cancelable: true,
+    dataTransfer: new DataTransfer(),
+  });
+
+  fireEvent(container, dragOverEvent);
+
+  expect(dragOverEvent.defaultPrevented).toBe(true);
+});
+
+test('resource item handles drop event and stops propagation (#583)', () => {
+  const mockResource: ResourceItemElement = {
+    id: 6,
+    name: 'Drop Test Driver',
+    taskCount: 0,
+    batteryCount: 1,
+    batteryCapacity: 100,
+  };
+
+  const mockOnSelect = vi.fn();
+
+  render(
+    <MapProvider>
+      <SimulationProvider>
+        <TaskAssignmentProvider>
+          <ResourceItem resource={mockResource} onSelect={mockOnSelect} />
+        </TaskAssignmentProvider>
+      </SimulationProvider>
+    </MapProvider>
+  );
+
+  const container = screen
+    .getByText('Drop Test Driver')
+    .closest('[data-slot="item"]') as HTMLElement;
+
+  const dataTransfer = new DataTransfer();
+  dataTransfer.setData('taskId', '123');
+
+  const dropEvent = new DragEvent('drop', {
+    bubbles: true,
+    cancelable: true,
+    dataTransfer,
+  });
+
+  const stopPropagationSpy = vi.spyOn(dropEvent, 'stopPropagation');
+
+  fireEvent(container, dropEvent);
+
+  expect(dropEvent.defaultPrevented).toBe(true);
+  expect(stopPropagationSpy).toHaveBeenCalled();
+});
+
+test('resource item handles dragEnter and applies hover state', () => {
+  const mockResource: ResourceItemElement = {
+    id: 7,
+    name: 'Hover Test Driver',
+    taskCount: 0,
+    batteryCount: 1,
+    batteryCapacity: 100,
+  };
+
+  const mockOnSelect = vi.fn();
+
+  render(
+    <MapProvider>
+      <SimulationProvider>
+        <TaskAssignmentProvider>
+          <ResourceItem resource={mockResource} onSelect={mockOnSelect} />
+        </TaskAssignmentProvider>
+      </SimulationProvider>
+    </MapProvider>
+  );
+
+  const container = screen
+    .getByText('Hover Test Driver')
+    .closest('[data-slot="item"]') as HTMLElement;
+
+  const dragEnterEvent = new DragEvent('dragenter', {
+    bubbles: true,
+    cancelable: true,
+  });
+
+  fireEvent(container, dragEnterEvent);
+
+  // After dragEnter, should have yellow hover styling
+  expect(container.className).toContain('bg-yellow-50');
+  expect(container.className).toContain('ring-yellow-300');
+});
+
+test('resource item handles dragLeave with relatedTarget outside element (#583)', () => {
+  const mockResource: ResourceItemElement = {
+    id: 8,
+    name: 'Leave Test Driver',
+    taskCount: 0,
+    batteryCount: 1,
+    batteryCapacity: 100,
+  };
+
+  const mockOnSelect = vi.fn();
+
+  render(
+    <MapProvider>
+      <SimulationProvider>
+        <TaskAssignmentProvider>
+          <ResourceItem resource={mockResource} onSelect={mockOnSelect} />
+        </TaskAssignmentProvider>
+      </SimulationProvider>
+    </MapProvider>
+  );
+
+  const container = screen
+    .getByText('Leave Test Driver')
+    .closest('[data-slot="item"]') as HTMLElement;
+
+  // First trigger dragEnter to set hover state
+  fireEvent(
+    container,
+    new DragEvent('dragenter', { bubbles: true, cancelable: true })
+  );
+
+  expect(container.className).toContain('bg-yellow-50');
+
+  // Then trigger dragLeave with relatedTarget outside the element
+  const outsideElement = document.createElement('div');
+  const dragLeaveEvent = new DragEvent('dragleave', {
+    bubbles: true,
+    cancelable: true,
+    relatedTarget: outsideElement,
+  });
+
+  fireEvent(container, dragLeaveEvent);
+
+  // Hover state should be cleared
+  expect(container.className).not.toContain('bg-yellow-50');
+  expect(container.className).not.toContain('ring-yellow-300');
+});
+
+test('resource item handles dragLeave with null relatedTarget (#583 Safari fix)', () => {
+  const mockResource: ResourceItemElement = {
+    id: 9,
+    name: 'Null Leave Test Driver',
+    taskCount: 0,
+    batteryCount: 1,
+    batteryCapacity: 100,
+  };
+
+  const mockOnSelect = vi.fn();
+
+  render(
+    <MapProvider>
+      <SimulationProvider>
+        <TaskAssignmentProvider>
+          <ResourceItem resource={mockResource} onSelect={mockOnSelect} />
+        </TaskAssignmentProvider>
+      </SimulationProvider>
+    </MapProvider>
+  );
+
+  const container = screen
+    .getByText('Null Leave Test Driver')
+    .closest('[data-slot="item"]') as HTMLElement;
+
+  // First trigger dragEnter to set hover state
+  fireEvent(
+    container,
+    new DragEvent('dragenter', { bubbles: true, cancelable: true })
+  );
+
+  expect(container.className).toContain('bg-yellow-50');
+
+  // Then trigger dragLeave with null relatedTarget (Safari behavior)
+  const dragLeaveEvent = new DragEvent('dragleave', {
+    bubbles: true,
+    cancelable: true,
+    relatedTarget: null,
+  });
+
+  fireEvent(container, dragLeaveEvent);
+
+  // Hover state should be cleared because relatedTarget is null
+  expect(container.className).not.toContain('bg-yellow-50');
+  expect(container.className).not.toContain('ring-yellow-300');
+});
