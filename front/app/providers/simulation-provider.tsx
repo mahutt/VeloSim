@@ -66,7 +66,6 @@ import {
 import type { ResourceBarElement } from '~/components/resource/resource-bar';
 import {
   SelectedItemType,
-  type PopulatedDriver,
   type SelectedItemBarElement,
 } from '~/components/map/selected-item-bar';
 import { updateDriverPositions } from '~/lib/animation-helpers';
@@ -179,7 +178,9 @@ export const SimulationProvider = ({
 
       driversRef.current.set(driverId, updatedResource);
       updateResourceBarElement();
-      updateSelectedItem(driverId, SelectedItemType.Driver);
+      if (selectedItem) {
+        updateSelectedItem(selectedItem.value.id, selectedItem.type);
+      }
     } catch (error) {
       displayError(
         'Assignment failed',
@@ -205,7 +206,9 @@ export const SimulationProvider = ({
       };
       driversRef.current.set(driverId, updatedResource);
       updateResourceBarElement();
-      updateSelectedItem(driverId, SelectedItemType.Driver);
+      if (selectedItem) {
+        updateSelectedItem(selectedItem.value.id, selectedItem.type);
+      }
     } catch (error) {
       displayError(
         'Unassignment failed',
@@ -251,16 +254,8 @@ export const SimulationProvider = ({
 
       driversRef.current.set(newDriverId, updatedNewResource);
       updateResourceBarElement();
-
-      if (selectedItem?.type === SelectedItemType.Driver) {
-        if ((selectedItem.value as PopulatedDriver).id === prevDriverId) {
-          const updated = driversRef.current.get(prevDriverId);
-          if (updated) {
-            updateSelectedItem(prevDriverId, SelectedItemType.Driver);
-          }
-        } else if ((selectedItem.value as PopulatedDriver).id === newDriverId) {
-          updateSelectedItem(newDriverId, SelectedItemType.Driver);
-        }
+      if (selectedItem) {
+        updateSelectedItem(selectedItem.value.id, selectedItem.type);
       }
     } catch (error) {
       displayError(
@@ -301,7 +296,9 @@ export const SimulationProvider = ({
       };
       driversRef.current.set(driverId, updatedResource);
       updateResourceBarElement();
-      updateSelectedItem(driverId, SelectedItemType.Driver);
+      if (selectedItem) {
+        updateSelectedItem(selectedItem.value.id, selectedItem.type);
+      }
     } catch (error) {
       displayError(
         'Reorder failed',
