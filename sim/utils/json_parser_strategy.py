@@ -37,7 +37,7 @@ from pydantic import (
 from sim.entities.headquarters import Headquarters
 from sim.entities.inputParameters import InputParameter
 from sim.entities.station import Station
-from sim.entities.driver import Driver
+from sim.entities.driver import Driver, LUNCH_BREAK_DURATION
 from sim.entities.vehicle import Vehicle
 from sim.entities.BatterySwapTask import BatterySwapTask
 from sim.entities.shift import Shift
@@ -1028,6 +1028,38 @@ class JsonParseStrategy(BaseParseStrategy):
         t = datetime.strptime(time, "%H:%M")
         return (day_int * 24) * 3600 + t.hour * 3600 + t.minute * 60
 
+    def _assign_lunch_break(
+        self, sim_start: int, sim_end: int, shift_start: int, shift_end: int
+    ) -> Optional[int]:
+        """
+        Assigns a lunch break time in the middle of the driver's shift as long
+        as the sim duration is longer than 2 times the lunch break duration
+        such that driver's are not on break for half of the sim time and its
+        shift length is longer than 5 hours.
+
+        Args:
+            sim_start: Time in seconds when simulation starts.
+            sim_end: Time in seconds when simulation ends.
+            shift_start: Time in seconds when driver's shift starts.
+            shift_end: Time in seconds when driver's shift ends.
+
+        Returns:
+            Time in seconds of assigned lunch break if any. Otherwise, None
+        """
+        # minimum shift length to get lunch break is 5h -> 18000sec
+        min_shift_duration = 18000
+
+        sim_duration = sim_end - sim_start
+        shift_duration = shift_end - shift_start
+        if (
+            sim_duration <= (LUNCH_BREAK_DURATION * 2)
+            or shift_duration < min_shift_duration
+        ):
+            return None  # no lunch break
+        else:
+            lunch_break = round((shift_start + shift_end) / 2)
+            return lunch_break
+
     def parse(self, scenario_json: Optional[dict] = None) -> InputParameter:
         """Parse and validate scenario JSON, returning InputParameter.
 
@@ -1125,7 +1157,11 @@ class JsonParseStrategy(BaseParseStrategy):
                 lt = self._time_to_seconds(str(lt))
                 sim_lt = lt - start_time
             else:
-                sim_lt = None
+                lt = self._assign_lunch_break(start_time, end_time, st, et)
+                if lt is not None:
+                    sim_lt = lt - start_time
+                else:
+                    sim_lt = None
             driver_shift = Shift(
                 start_time=st,
                 end_time=et,
