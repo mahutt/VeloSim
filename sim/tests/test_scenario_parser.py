@@ -265,6 +265,67 @@ def test_json_parse_with_no_lunch_break_and_long_shift() -> None:
     assert sim_lunch_break == calculated_lunch - sim_start
 
 
+def test_json_parse_with_lunch_break_assigned_before_sim_time() -> None:
+    scenario_json = {
+        "id": 1,
+        "name": "Test Scenario",
+        "content": {
+            "start_time": "day1:12:00",
+            "end_time": "day1:16:00",
+            "vehicle_battery_capacity": 50,
+            "stations": [
+                {
+                    "name": "Station 1",
+                    "initial_task_count": 2,
+                    "scheduled_tasks": ["day1:09:30"],
+                    "position": [-73.5, 45.5],
+                },
+                {
+                    "name": "Station 2",
+                    "initial_task_count": 0,
+                    "scheduled_tasks": ["day1:09:30"],
+                    "position": [-73.55, 45.501],
+                },
+                {
+                    "name": "Station 3",
+                    "initial_task_count": 0,
+                    "scheduled_tasks": [],
+                    "position": [-73.56, 45.511],
+                },
+            ],
+            "drivers": [
+                {
+                    "name": "Driver 1",
+                    "shift": {"start_time": "day1:08:00", "end_time": "day1:14:00"},
+                }
+            ],
+            "vehicles": [
+                {
+                    "name": "Vehicle 1",
+                    "position": [-73.5610, 45.5070],
+                    "battery_count": 20,
+                }
+            ],
+        },
+    }
+
+    strategy = JsonParseStrategy(scenario_json=scenario_json)
+    sim_start = strategy._time_to_seconds("day1:12:00")
+    st_sec = strategy._time_to_seconds("day1:08:00")
+    et_sec = strategy._time_to_seconds("day1:14:00")
+    params: InputParameter = strategy.parse()
+
+    assert isinstance(params, InputParameter)
+    drivers = params.get_driver_entities()
+    first_driver_key = next(iter(drivers))
+    driver = drivers[first_driver_key]
+
+    lunch_break = driver.get_driver_shift().get_lunch_break()
+    calculated_lunch = round((st_sec + et_sec) / 2)
+    assert lunch_break == calculated_lunch
+    assert calculated_lunch < sim_start
+
+
 def test_json_parse_with_no_lunch_break_and_short_shift() -> None:
     scenario_json = {
         "id": 1,
