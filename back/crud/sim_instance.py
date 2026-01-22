@@ -23,6 +23,7 @@ SOFTWARE.
 """
 
 from typing import List, Optional
+from uuid import uuid4
 from sqlalchemy.orm import Session
 from back.exceptions import VelosimPermissionError
 from back.models import SimInstance
@@ -42,9 +43,31 @@ class SimInstanceCRUD:
         Returns:
             SimInstance: The newly created simulation instance.
         """
+        # UUID generation strategy differs between regular and branched simulations:
+        #
+        # For non-branched simulations, the simulator package generates and assigns a
+        # UUID during initialization.
+        #
+        # For branchedsimulations (parent_sim_instance_id is set):
+        #   - UUID is generated HERE, upfront, before simulator initialization
+        #   - This allows the branch endpoint to return the UUID immediately in the API
+        #     response
+        #   - The simulator initialization uses this pre-generated UUID (via run_id
+        #     parameter)
+        #   - This is necessary because branching is synchronous and needs to return the
+        #     new simulation's identifier so the client can redirect to the new sim
+        #     page.
+        initial_uuid = None
+        if sim_instance_data.parent_sim_instance_id is not None:
+            initial_uuid = str(uuid4())
+
         db_sim_instance = SimInstance(
             user_id=sim_instance_data.user_id,
             scenario_payload=sim_instance_data.scenario_payload,
+            name=sim_instance_data.name,
+            parent_sim_instance_id=sim_instance_data.parent_sim_instance_id,
+            branch_keyframe_seq=sim_instance_data.branch_keyframe_seq,
+            uuid=initial_uuid,
         )
         db.add(db_sim_instance)
         db.flush()

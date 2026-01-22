@@ -28,6 +28,7 @@ from sqlalchemy.orm import Session
 from back.core.simulation_callbacks import on_simulation_completed
 from back.models import User
 from back.models.sim_instance import SimInstance
+from back.models.sim_frame import SimFrame
 from back.schemas import (
     PlaybackSpeedBase,
     PlaybackSpeedResponse,
@@ -47,6 +48,7 @@ from back.crud import sim_instance_crud, user_crud, sim_frame_crud
 from back.schemas.sim_instance import (
     SimInstanceCreate,
     SimulationResponse,
+    BranchResponse,
 )
 from back.exceptions import VelosimPermissionError, ItemNotFoundError
 from back.core.config import settings
@@ -1010,6 +1012,177 @@ class SimulationService:
                 is_at_live_edge=is_at_live_edge,
                 playback_speed=current_playback_speed,
             ),
+        )
+
+    def branch_simulation(
+        self,
+        db: Session,
+        sim_id: str,
+        keyframe_seq: int,
+        name: str | None,
+        requesting_user: int,
+    ) -> BranchResponse:
+        """Branch a simulation from a specific keyframe.
+
+        Creates a new simulation instance with frames copied from the source
+        simulation up to and including the specified keyframe. If the provided
+        seq_number is not a keyframe, the most recent prior keyframe is used.
+
+        Args:
+            db: Database session.
+            sim_id: UUID of the source simulation to branch from.
+            keyframe_seq: The seq_number to branch from (will use prior keyframe
+                if not a keyframe).
+            name: Optional name for the new simulation.
+            requesting_user: User ID making the request.
+
+        Returns:
+            BranchResponse: Details of the newly created branched simulation.
+
+        Raises:
+            ItemNotFoundError: If source simulation not found or has no frames.
+            VelosimPermissionError: If user lacks permission to access source sim.
+            ValueError: If no keyframes exist in the source simulation.
+        """
+        # 1. Validate source simulation exists and user has access
+        source_sim = sim_instance_crud.get_by_uuid(db, sim_id)
+        if not source_sim:
+            raise ItemNotFoundError(f"Simulation {sim_id} not found")
+
+        # Verify user has permission to access the source simulation
+        if not self.verify_access(db, sim_id, requesting_user):
+            raise VelosimPermissionError(
+                f"User {requesting_user} does not have permission to access "
+                f"simulation {sim_id}"
+            )
+
+        # 2. Find the actual keyframe to branch from
+        # If keyframe_seq doesn't point to a keyframe, find the prior one
+        actual_keyframe = (
+            db.query(SimFrame)
+            .filter(
+                SimFrame.sim_instance_id == source_sim.id,
+                SimFrame.seq_number <= keyframe_seq,
+                SimFrame.is_key == True,  # noqa: E712
+            )
+            .order_by(SimFrame.seq_number.desc())
+            .first()
+        )
+
+        if not actual_keyframe:
+            raise ValueError(
+                f"No keyframes found in simulation {sim_id} at or before "
+                f"seq_number {keyframe_seq}"
+            )
+
+        actual_keyframe_seq = actual_keyframe.seq_number
+        keyframe_data = actual_keyframe.frame_data
+
+        # 3. Validate keyframe can be parsed before creating DB entry
+        # Use scenario from source_sim to avoid redundant DB call
+        scenario = source_sim.scenario_payload
+        if scenario is None:
+            raise ValueError(f"Source simulation {sim_id} has no scenario payload")
+
+        try:
+            resume_state = ReplayParser.parse(
+                scenario_json=scenario,
+                keyframe_json=keyframe_data,
+            )
+        except Exception as e:
+            raise ValueError(
+                f"Failed to parse keyframe {actual_keyframe_seq} from "
+                f"simulation {sim_id}: {str(e)}"
+            )
+
+        input_params = resume_state.input_parameters
+        map_controller = resume_state.map_controller
+        current_sim_time = resume_state.current_time_seconds
+
+        # 4. Create new SimInstance with branching metadata
+        new_sim_data = SimInstanceCreate(
+            user_id=requesting_user,
+            scenario_payload=source_sim.scenario_payload,
+            name=name,
+            parent_sim_instance_id=source_sim.id,
+            branch_keyframe_seq=actual_keyframe_seq,
+        )
+
+        new_sim = sim_instance_crud.create(db, new_sim_data)
+        db.flush()  # Get ID without committing transaction
+
+        # 5. Copy frames from source to new simulation
+        frames_copied = sim_frame_crud.copy_frames_to_new_instance(
+            db,
+            source_sim_instance_id=source_sim.id,
+            target_sim_instance_id=new_sim.id,
+            max_seq=actual_keyframe_seq,
+        )
+
+        logger.info(
+            f"Branched simulation {new_sim.id} from {sim_id} at keyframe "
+            f"seq {actual_keyframe_seq}. Copied {frames_copied} frames."
+        )
+
+        # 6. Initialize simulator with the branched keyframe state (paused)
+        # Wrap in try/except to ensure cleanup on failure
+        try:
+            # Create simulation environment and advance to branch point
+            env = SimulationEnvironment()
+            env.run(until=current_sim_time + input_params.start_time)
+
+            # Create frame persistence subscriber AFTER successful environment creation
+            frame_subscriber = FramePersistenceSubscriber(new_sim.id)
+            frame_subscriber.start()
+
+            # Initialize simulator in paused state
+            sim = self.simulator
+            branch_sim_id = sim.initialize(
+                input_params,
+                subscribers=[frame_subscriber],
+                run_id=new_sim.uuid,
+                map_controller=map_controller,
+                env=env,
+                initial_running=False,
+                real_time_factor=0.0,
+            )
+
+            # Store in active simulations only after successful initialization
+            self.active_simulations[branch_sim_id] = ActiveSimulationData(
+                db_id=new_sim.id,
+                status="initialized",  # Initialized but paused
+                sim_time=input_params.sim_time,
+                user_id=requesting_user,
+                keyframe_subscriber=frame_subscriber,
+                restored_keyframe=keyframe_data,
+                paused_by_user=True,  # Explicitly paused
+            )
+
+            # Commit transaction only after successful initialization
+            db.commit()
+            db.refresh(new_sim)
+
+            logger.info(
+                f"Initialized branched simulation {branch_sim_id} in paused state"
+            )
+        except Exception as e:
+            # Rollback database changes if initialization fails
+            db.rollback()
+            logger.error(
+                f"Failed to initialize branched simulation from {sim_id}: {str(e)}"
+            )
+            raise
+
+        # 6. Return BranchResponse with the generated UUID
+        # Assertion for type check
+        assert new_sim.uuid is not None, "branched sim does not have an ID"
+        return BranchResponse(
+            sim_id=new_sim.uuid,
+            db_id=new_sim.id,
+            name=new_sim.name,
+            branched_from_sim_id=source_sim.uuid or f"sim-{source_sim.id}",
+            branched_from_keyframe_seq=actual_keyframe_seq,
+            status="initialized",  # Changed from "created" to "initialized"
         )
 
 

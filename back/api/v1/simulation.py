@@ -77,6 +77,8 @@ from back.schemas.sim_instance import (
     SimInstanceResponse,
     SimulationListResponse,
     SimulationResponse,
+    BranchRequest,
+    BranchResponse,
 )
 from back.services import simulation_service
 from back.database.session import get_db
@@ -487,6 +489,77 @@ def seek_to_position(
         raise HTTPException(status_code=403, detail=str(err))
     except HTTPException:
         raise
+    except Exception as err:
+        raise HTTPException(status_code=500, detail=str(err))
+
+
+@router.post("/{sim_id}/branch", response_model=BranchResponse)
+def branch_simulation(
+    sim_id: str,
+    request: BranchRequest,
+    db: Session = Depends(get_db),
+    requesting_user: int = Depends(get_user_id),
+) -> BranchResponse:
+    """Branch a simulation from a specific keyframe.
+
+    Creates a new simulation instance that starts from a keyframe of an existing
+    simulation. All frames from the beginning up to and including the specified
+    keyframe are copied to the new simulation. The new simulation can then be
+    started independently via the WebSocket stream endpoint.
+
+    If the provided keyframe_seq does not point to an actual keyframe (is_key=True),
+    the branch will occur from the most recent prior keyframe, and the actual
+    keyframe sequence number used will be returned in the response.
+
+    Args:
+        sim_id: UUID of the source simulation to branch from
+        request: BranchRequest containing:
+            - keyframe_seq: Sequence number to branch from (will use prior keyframe
+                if not a keyframe)
+            - name: Optional name for the new simulation
+        db: Database session dependency
+        requesting_user: ID of the authenticated user
+
+    Returns:
+        BranchResponse containing:
+        - sim_id: UUID or temporary ID of the new simulation
+        - db_id: Database ID of the new simulation
+        - name: Name of the new simulation (if provided)
+        - branched_from_sim_id: UUID of the source simulation
+        - branched_from_keyframe_seq: Actual keyframe seq used for branching
+        - status: "initialized" (simulation initialized but paused)
+
+    Raises:
+        HTTPException:
+            - 400: If no keyframes exist in the source simulation
+            - 403: If user lacks permission to access source simulation
+            - 404: If source simulation not found
+            - 500: For unexpected server errors
+
+    Example:
+        ```
+        POST /simulation/abc-123/branch
+        {
+            "keyframe_seq": 240,
+            "name": "Experimental branch"
+        }
+        ```
+    """
+    try:
+        return simulation_service.branch_simulation(
+            db=db,
+            sim_id=sim_id,
+            keyframe_seq=request.keyframe_seq,
+            name=request.name,
+            requesting_user=requesting_user,
+        )
+    except VelosimPermissionError as err:
+        raise HTTPException(status_code=403, detail=str(err))
+    except ItemNotFoundError as err:
+        raise HTTPException(status_code=404, detail=str(err))
+    except ValueError as err:
+        # No keyframes found - return 400 client error
+        raise HTTPException(status_code=400, detail=str(err))
     except Exception as err:
         raise HTTPException(status_code=500, detail=str(err))
 

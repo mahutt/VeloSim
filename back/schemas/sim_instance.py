@@ -104,3 +104,25 @@ class SimulationListResponse(BaseModel):
     page: int
     per_page: int
     total_pages: int
+
+
+class BranchRequest(BaseModel):
+    """Request schema for branching a simulation from a keyframe.
+
+    If keyframe_seq does not point to an actual keyframe (is_key=True),
+    the branch will occur from the most recent prior keyframe.
+    """
+
+    keyframe_seq: int
+    name: Optional[str] = None
+
+
+class BranchResponse(BaseModel):
+    """Response schema for branch operation."""
+
+    sim_id: str  # UUID of the new simulation
+    db_id: int  # Database ID of the new simulation
+    name: Optional[str]  # Name of the new simulation
+    branched_from_sim_id: str  # Original simulation UUID
+    branched_from_keyframe_seq: int  # The actual keyframe seq used for branching
+    status: str  # "created" - sim not yet running
