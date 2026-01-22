@@ -63,7 +63,7 @@ docs = [
 ]
 
 [tool.setuptools]
-packages = ["back", "sim"]
+packages = ["back", "sim", "grafana_logging"]
 
 [tool.pytest.ini_options]
 testpaths = ["back/tests", "sim/tests"]
