@@ -22,7 +22,13 @@
  * SOFTWARE.
  */
 
-import { useState, useEffect, useCallback, useRef } from 'react';
+import {
+  useState,
+  useEffect,
+  useCallback,
+  useRef,
+  type DragEvent,
+} from 'react';
 import { useNavigate, useBlocker } from 'react-router';
 import type {
   Scenario,
@@ -64,6 +70,8 @@ export default function ScenarioEditor() {
   const [pendingScenario, setPendingScenario] = useState<Scenario | null>(null);
   const [pendingNewScenario, setPendingNewScenario] = useState(false);
   const [pendingImport, setPendingImport] = useState(false);
+  const [pendingImportFile, setPendingImportFile] = useState<File | null>(null);
+  const [isDraggingFile, setIsDraggingFile] = useState(false);
 
   // Hooks
   const navigate = useNavigate();
@@ -170,58 +178,72 @@ export default function ScenarioEditor() {
     []
   );
 
+  /**
+   * Process and import scenario file
+   * @param file Scenario file (JSON) to import
+   * @param source Source of the import ('button' or 'drag')
+   */
+  const processImportedScenario = useCallback(
+    async (file: File, source: 'button' | 'drag'): Promise<void> => {
+      log({
+        message: 'Scenario import via ' + source,
+        level: LogLevel.INFO,
+        context:
+          source === 'drag' ? 'scenario_import_drag' : 'scenario_import_button',
+      });
+
+      try {
+        const text = await file.text();
+        const parsed = JSON.parse(text);
+        const contentToSave = JSON.stringify(parsed, null, 2);
+
+        const fileName = file.name.replace(/\.[^/.]+$/, '');
+        const name = fileName || 'Imported Scenario';
+
+        setScenarioContent(contentToSave);
+        setScenarioName(name);
+        setScenarioDescription(parsed.description || '');
+        // Save to backend - backend will validate
+        const newId = await saveScenario(
+          contentToSave,
+          name,
+          parsed.description || ''
+        );
+
+        if (newId) {
+          setSelectedScenarioId(newId);
+          // Clear unsaved changes after successful import
+          setInitialContent(contentToSave);
+          log({
+            message: 'Scenario saved after import',
+            level: LogLevel.INFO,
+            context: 'scenario_save_imported',
+          });
+          // Refresh sidebar after successful import
+          const scenarios = await loadSavedScenarios();
+          setSavedScenarios(scenarios);
+        }
+      } catch {
+        displayError('Import Failed', 'The file is not a valid JSON scenario.');
+      } finally {
+        setPendingImport(false);
+        setPendingImportFile(null);
+      }
+    },
+    [displayError, loadSavedScenarios, saveScenario]
+  );
+
   // Import scenario handler
   const handleImportScenario = useCallback(
     async (event: React.ChangeEvent<HTMLInputElement>): Promise<void> => {
       const file = event.target.files?.[0];
       if (!file) return;
 
-      const reader = new FileReader();
-      reader.onload = async (e) => {
-        try {
-          const text = e.target?.result as string;
-          const parsed = JSON.parse(text);
-          const contentToSave = JSON.stringify(parsed, null, 2);
-
-          const fileName = file.name.replace(/\.[^/.]+$/, '');
-          const name = fileName || 'Imported Scenario';
-
-          setScenarioContent(contentToSave);
-          setScenarioName(name);
-          setScenarioDescription(parsed.description || '');
-
-          // Save to backend - backend will validate
-          const newId = await saveScenario(
-            contentToSave,
-            name,
-            parsed.description || ''
-          );
-
-          if (newId) {
-            setSelectedScenarioId(newId);
-            // Clear unsaved changes after successful import
-            setInitialContent(contentToSave);
-            log({
-              message: 'Scenario saved after import',
-              level: LogLevel.INFO,
-              context: 'scenario_save_imported',
-            });
-            // Refresh sidebar after successful import
-            const scenarios = await loadSavedScenarios();
-            setSavedScenarios(scenarios);
-          }
-        } catch {
-          displayError(
-            'Import Failed',
-            'The file is not a valid JSON scenario.'
-          );
-        }
-      };
-      reader.readAsText(file);
+      await processImportedScenario(file, 'button');
       // Reset input value so same file can be imported again if needed
       event.target.value = '';
     },
-    [saveScenario, displayError, loadSavedScenarios]
+    [processImportedScenario]
   );
 
   const handleImport = useCallback(() => {
@@ -233,6 +255,53 @@ export default function ScenarioEditor() {
 
     fileInputRef.current?.click();
   }, [hasUnsavedChanges]);
+
+  const handleDragOver = useCallback(
+    (event: DragEvent<HTMLDivElement>) => {
+      if (!event.dataTransfer.types.includes('Files')) return;
+
+      event.preventDefault();
+      event.dataTransfer.dropEffect = 'copy';
+      // Only set if not already true
+      if (!isDraggingFile) {
+        setIsDraggingFile(true);
+      }
+    },
+    [isDraggingFile]
+  );
+
+  const handleDragLeave = useCallback((event: DragEvent<HTMLDivElement>) => {
+    if (!event.dataTransfer.types.includes('Files')) return;
+
+    const relatedTarget = event.relatedTarget as Node | null;
+    const isLeavingContainer =
+      !relatedTarget || !event.currentTarget.contains(relatedTarget);
+
+    if (isLeavingContainer) {
+      event.preventDefault();
+      setIsDraggingFile(false);
+    }
+  }, []);
+
+  const handleDrop = useCallback(
+    (event: DragEvent<HTMLDivElement>) => {
+      if (!event.dataTransfer.files?.length) return;
+
+      event.preventDefault();
+      setIsDraggingFile(false);
+
+      const file = event.dataTransfer.files[0];
+
+      if (hasUnsavedChanges) {
+        setPendingImportFile(file);
+        setShowUnsavedDialog(true);
+        return;
+      }
+
+      processImportedScenario(file, 'drag');
+    },
+    [hasUnsavedChanges, processImportedScenario]
+  );
 
   const handleStartScenario = async () => {
     try {
@@ -543,7 +612,17 @@ export default function ScenarioEditor() {
   );
 
   return (
-    <div className="container mx-auto max-w-6xl py-8 px-4">
+    <div
+      className="container mx-auto max-w-6xl py-8 px-4"
+      onDragOver={handleDragOver}
+      onDragLeave={handleDragLeave}
+      onDrop={handleDrop}
+    >
+      {isDraggingFile && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm pointer-events-none">
+          <p className="text-2xl font-bold">Drop to import scenario</p>
+        </div>
+      )}
       <h1 className="text-2xl font-bold mb-6">Scenario Editor</h1>
 
       {/* Hidden file input for import */}
@@ -609,6 +688,7 @@ export default function ScenarioEditor() {
             setPendingScenario(null);
             setPendingNewScenario(false);
             setPendingImport(false);
+            setPendingImportFile(null);
             blocker.reset?.();
           }
         }}
@@ -622,6 +702,7 @@ export default function ScenarioEditor() {
           setPendingScenario(null);
           setPendingNewScenario(false);
           setPendingImport(false);
+          setPendingImportFile(null);
           blocker.reset?.();
         }}
         onLeave={() => {
@@ -637,6 +718,9 @@ export default function ScenarioEditor() {
           } else if (pendingNewScenario) {
             loadNewScenario();
             setPendingNewScenario(false);
+          } else if (pendingImportFile) {
+            processImportedScenario(pendingImportFile, 'drag');
+            setPendingImportFile(null);
           } else if (pendingImport) {
             fileInputRef.current?.click();
             setPendingImport(false);
