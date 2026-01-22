@@ -28,13 +28,12 @@ import userEvent from '@testing-library/user-event';
 import { useSimulation } from '~/providers/simulation-provider';
 import SelectedItemBar, {
   SelectedItemType,
-  type PopulatedDriver,
   type PopulatedStation,
 } from '~/components/map/selected-item-bar';
 import { FeatureToggleProvider } from '~/providers/feature-toggle-provider';
 import { TaskAssignmentProvider } from '~/providers/task-assignment-provider';
 import type { Position, StationTask } from '~/types';
-import { makeSimulationContext } from 'tests/test-helpers';
+import { makePopulatedDriver, makeSimulationContext } from 'tests/test-helpers';
 
 // Mock the useSimulation hook
 vi.mock('~/providers/simulation-provider', () => ({
@@ -85,16 +84,13 @@ describe('SelectedItemBar', () => {
       </FeatureToggleProvider>
     );
 
-    expect(screen.getByText('Station')).toBeInTheDocument();
-    expect(screen.getByText('#1')).toBeInTheDocument();
+    expect(screen.getByText('Station #1')).toBeInTheDocument();
     expect(screen.getByText('Test Station')).toBeInTheDocument();
-    expect(screen.getByText('Name')).toBeInTheDocument();
-    expect(screen.getByText('Position')).toBeInTheDocument();
-    expect(screen.getByText('Tasks (0)')).toBeInTheDocument();
+    expect(screen.getByText('No tasks')).toBeInTheDocument();
   });
 
   it('should render driver information when driver is selected', () => {
-    const mockDriver: PopulatedDriver = {
+    const mockDriver = makePopulatedDriver({
       id: 5,
       position: [-73.58, 45.49] as Position,
       tasks: [
@@ -102,14 +98,7 @@ describe('SelectedItemBar', () => {
         { id: 2, stationId: 2, state: 'open', assignedDriverId: null },
         { id: 3, stationId: 3, state: 'open', assignedDriverId: null },
       ],
-      route: {
-        coordinates: [
-          [-73.58, 45.49],
-          [-73.57, 45.5],
-        ] as Position[],
-      },
-      inProgressTask: null,
-    };
+    });
 
     (useSimulation as unknown as ReturnType<typeof vi.fn>).mockReturnValue(
       makeSimulationContext({
@@ -128,9 +117,7 @@ describe('SelectedItemBar', () => {
       </FeatureToggleProvider>
     );
 
-    expect(screen.getByText('Driver')).toBeInTheDocument();
-    expect(screen.getByText('#5')).toBeInTheDocument();
-    expect(screen.getByText('Position')).toBeInTheDocument();
+    expect(screen.getByText('Driver 5')).toBeInTheDocument();
     expect(screen.getByText('Tasks (3)')).toBeInTheDocument();
     expect(screen.getByText('Task #1')).toBeInTheDocument();
     expect(screen.getByText('Task #2')).toBeInTheDocument();
@@ -144,7 +131,7 @@ describe('SelectedItemBar', () => {
       state: 'inprogress',
       assignedDriverId: null,
     };
-    const mockDriver: PopulatedDriver = {
+    const mockDriver = makePopulatedDriver({
       id: 5,
       position: [-73.58, 45.49] as Position,
       tasks: [
@@ -159,7 +146,7 @@ describe('SelectedItemBar', () => {
         ] as Position[],
       },
       inProgressTask: inProgressTask,
-    };
+    });
 
     (useSimulation as unknown as ReturnType<typeof vi.fn>).mockReturnValue(
       makeSimulationContext({
@@ -178,9 +165,7 @@ describe('SelectedItemBar', () => {
       </FeatureToggleProvider>
     );
 
-    expect(screen.getByText('Driver')).toBeInTheDocument();
-    expect(screen.getByText('#5')).toBeInTheDocument();
-    expect(screen.getByText('Position')).toBeInTheDocument();
+    expect(screen.getByText('Driver 5')).toBeInTheDocument();
     expect(screen.getByText('Tasks (3)')).toBeInTheDocument();
     expect(screen.getByText('Task #1')).toBeInTheDocument();
     expect(screen.getByText(/in progress/i)).toBeInTheDocument();
@@ -257,17 +242,14 @@ describe('SelectedItemBar', () => {
   describe('Task Reordering', () => {
     it('should call reorderTasks when task is dropped at a valid position', async () => {
       const reorderTasksMock = vi.fn().mockResolvedValue(undefined);
-      const mockDriver: PopulatedDriver = {
+      const mockDriver = makePopulatedDriver({
         id: 1,
-        position: [-73.58, 45.49] as Position,
         tasks: [
           { id: 1, stationId: 1, state: 'open', assignedDriverId: 1 },
           { id: 2, stationId: 2, state: 'open', assignedDriverId: 1 },
           { id: 3, stationId: 3, state: 'open', assignedDriverId: 1 },
         ],
-        route: { coordinates: [] as Position[] },
-        inProgressTask: null,
-      };
+      });
 
       (useSimulation as unknown as ReturnType<typeof vi.fn>).mockReturnValue(
         makeSimulationContext({
@@ -305,17 +287,14 @@ describe('SelectedItemBar', () => {
 
     it('should call reorderTasks when dropping at index 0', async () => {
       const reorderTasksMock = vi.fn().mockResolvedValue(undefined);
-      const mockDriver: PopulatedDriver = {
+      const mockDriver = makePopulatedDriver({
         id: 1,
-        position: [-73.58, 45.49] as Position,
         tasks: [
           { id: 1, stationId: 1, state: 'open', assignedDriverId: 1 },
           { id: 2, stationId: 2, state: 'open', assignedDriverId: 1 },
           { id: 3, stationId: 3, state: 'open', assignedDriverId: 1 },
         ],
-        route: { coordinates: [] as Position[] },
-        inProgressTask: null,
-      };
+      });
 
       (useSimulation as unknown as ReturnType<typeof vi.fn>).mockReturnValue(
         makeSimulationContext({
@@ -349,16 +328,13 @@ describe('SelectedItemBar', () => {
     });
 
     it('should set dropEffect to none when draggedTaskId is null', () => {
-      const mockDriver: PopulatedDriver = {
+      const mockDriver = makePopulatedDriver({
         id: 1,
-        position: [-73.58, 45.49] as Position,
         tasks: [
           { id: 1, stationId: 1, state: 'open', assignedDriverId: 1 },
           { id: 2, stationId: 2, state: 'open', assignedDriverId: 1 },
         ],
-        route: { coordinates: [] as Position[] },
-        inProgressTask: null,
-      };
+      });
 
       (useSimulation as unknown as ReturnType<typeof vi.fn>).mockReturnValue(
         makeSimulationContext({
@@ -389,17 +365,14 @@ describe('SelectedItemBar', () => {
     });
 
     it('should set dropEffect to none when target index is 0', () => {
-      const mockDriver: PopulatedDriver = {
+      const mockDriver = makePopulatedDriver({
         id: 1,
-        position: [-73.58, 45.49] as Position,
         tasks: [
           { id: 1, stationId: 1, state: 'open', assignedDriverId: 1 },
           { id: 2, stationId: 2, state: 'open', assignedDriverId: 1 },
           { id: 3, stationId: 3, state: 'open', assignedDriverId: 1 },
         ],
-        route: { coordinates: [] as Position[] },
-        inProgressTask: null,
-      };
+      });
 
       (useSimulation as unknown as ReturnType<typeof vi.fn>).mockReturnValue(
         makeSimulationContext({
@@ -434,16 +407,13 @@ describe('SelectedItemBar', () => {
 
     it('should not reorder when dragged task is not found in list', async () => {
       const reorderTasksMock = vi.fn().mockResolvedValue(undefined);
-      const mockDriver: PopulatedDriver = {
+      const mockDriver = makePopulatedDriver({
         id: 1,
-        position: [-73.58, 45.49] as Position,
         tasks: [
           { id: 1, stationId: 1, state: 'open', assignedDriverId: 1 },
           { id: 2, stationId: 2, state: 'open', assignedDriverId: 1 },
         ],
-        route: { coordinates: [] as Position[] },
-        inProgressTask: null,
-      };
+      });
 
       (useSimulation as unknown as ReturnType<typeof vi.fn>).mockReturnValue(
         makeSimulationContext({
@@ -481,17 +451,14 @@ describe('SelectedItemBar', () => {
 
     it('should not reorder when dropping at same index', async () => {
       const reorderTasksMock = vi.fn().mockResolvedValue(undefined);
-      const mockDriver: PopulatedDriver = {
+      const mockDriver = makePopulatedDriver({
         id: 1,
-        position: [-73.58, 45.49] as Position,
         tasks: [
           { id: 1, stationId: 1, state: 'open', assignedDriverId: 1 },
           { id: 2, stationId: 2, state: 'open', assignedDriverId: 1 },
           { id: 3, stationId: 3, state: 'open', assignedDriverId: 1 },
         ],
-        route: { coordinates: [] as Position[] },
-        inProgressTask: null,
-      };
+      });
 
       (useSimulation as unknown as ReturnType<typeof vi.fn>).mockReturnValue(
         makeSimulationContext({

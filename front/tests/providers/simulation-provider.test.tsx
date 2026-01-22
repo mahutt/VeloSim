@@ -429,10 +429,14 @@ test('selectItem selects a resource when it exists', async () => {
 
 test('assignTask posts to API and updates resource taskIds', async () => {
   const TestAssignComponent = () => {
-    const { assignTask, driversRef, vehiclesRef, resourceBarElement } = useSimulation();
+    const { assignTask, driversRef, vehiclesRef, resourceBarElement } =
+      useSimulation();
 
     useEffect(() => {
-      vehiclesRef.current.set(1, makeVehicle({ id: 1, batteryCount: 100, batteryCapacity: 500 }));
+      vehiclesRef.current.set(
+        1,
+        makeVehicle({ id: 1, batteryCount: 100, batteryCapacity: 500 })
+      );
       driversRef.current.set(
         1,
         makeDriver({ id: 1, taskIds: [], vehicleId: 1 })
@@ -485,6 +489,251 @@ test('assignTask posts to API and updates resource taskIds', async () => {
 
   await waitFor(() => {
     expect(getByTestId('task-count')).toHaveTextContent('1');
+  });
+});
+
+test('assignTask preserves station selection when assigning from station', async () => {
+  const TestAssignFromStationComponent = () => {
+    const {
+      assignTask,
+      driversRef,
+      vehiclesRef,
+      stationsRef,
+      selectItem,
+      selectedItem,
+    } = useSimulation();
+
+    useEffect(() => {
+      vehiclesRef.current.set(
+        1,
+        makeVehicle({ id: 1, batteryCount: 100, batteryCapacity: 500 })
+      );
+      driversRef.current.set(
+        1,
+        makeDriver({ id: 1, taskIds: [], vehicleId: 1 })
+      );
+      stationsRef.current.set(1, {
+        id: 1,
+        name: 'Test Station',
+        position: [0, 0],
+        taskIds: [42],
+      });
+    }, []);
+
+    return (
+      <div>
+        <div data-testid="selected-type">{selectedItem?.type ?? 'none'}</div>
+        <div data-testid="selected-id">{selectedItem?.value?.id ?? 'none'}</div>
+        <button
+          data-testid="select-station-btn"
+          onClick={() => selectItem(SelectedItemType.Station, 1)}
+        >
+          Select Station
+        </button>
+        <button data-testid="assign-btn" onClick={() => assignTask(1, 42)}>
+          Assign
+        </button>
+      </div>
+    );
+  };
+
+  const { getByTestId } = render(
+    <MapProvider>
+      <SimulationProvider simId="test-sim-123">
+        <TaskAssignmentProvider>
+          <MapContainer />
+          <TestAssignFromStationComponent />
+        </TaskAssignmentProvider>
+      </SimulationProvider>
+    </MapProvider>
+  );
+
+  await waitFor(() => {
+    expect(MockMap.instance).toBeDefined();
+  });
+
+  await act(async () => {
+    MockMap.instance?.callBacks['load']();
+  });
+
+  // First select the station
+  const selectStationBtn = getByTestId('select-station-btn');
+  await act(async () => {
+    selectStationBtn.click();
+    await new Promise((r) => setTimeout(r, 50));
+  });
+
+  await waitFor(() => {
+    expect(getByTestId('selected-type')).toHaveTextContent('station');
+    expect(getByTestId('selected-id')).toHaveTextContent('1');
+  });
+
+  // Now assign task - station should remain selected
+  const assignBtn = getByTestId('assign-btn');
+  await act(async () => {
+    assignBtn.click();
+    await new Promise((r) => setTimeout(r, 50));
+  });
+
+  // Verify station is still selected (not switched to driver)
+  await waitFor(() => {
+    expect(getByTestId('selected-type')).toHaveTextContent('station');
+    expect(getByTestId('selected-id')).toHaveTextContent('1');
+  });
+});
+
+test('assignTask updates driver selection when driver is already selected', async () => {
+  const TestAssignWithDriverSelectedComponent = () => {
+    const { assignTask, driversRef, vehiclesRef, selectItem, selectedItem } =
+      useSimulation();
+
+    useEffect(() => {
+      vehiclesRef.current.set(
+        1,
+        makeVehicle({ id: 1, batteryCount: 100, batteryCapacity: 500 })
+      );
+      driversRef.current.set(
+        1,
+        makeDriver({ id: 1, taskIds: [], vehicleId: 1 })
+      );
+    }, []);
+
+    return (
+      <div>
+        <div data-testid="selected-type">{selectedItem?.type ?? 'none'}</div>
+        <div data-testid="selected-id">{selectedItem?.value?.id ?? 'none'}</div>
+        <button
+          data-testid="select-driver-btn"
+          onClick={() => selectItem(SelectedItemType.Driver, 1)}
+        >
+          Select Driver
+        </button>
+        <button data-testid="assign-btn" onClick={() => assignTask(1, 42)}>
+          Assign
+        </button>
+      </div>
+    );
+  };
+
+  const { getByTestId } = render(
+    <MapProvider>
+      <SimulationProvider simId="test-sim-123">
+        <TaskAssignmentProvider>
+          <MapContainer />
+          <TestAssignWithDriverSelectedComponent />
+        </TaskAssignmentProvider>
+      </SimulationProvider>
+    </MapProvider>
+  );
+
+  await waitFor(() => {
+    expect(MockMap.instance).toBeDefined();
+  });
+
+  await act(async () => {
+    MockMap.instance?.callBacks['load']();
+  });
+
+  // First select the driver
+  const selectDriverBtn = getByTestId('select-driver-btn');
+  await act(async () => {
+    selectDriverBtn.click();
+    await new Promise((r) => setTimeout(r, 50));
+  });
+
+  await waitFor(() => {
+    expect(getByTestId('selected-type')).toHaveTextContent('driver');
+    expect(getByTestId('selected-id')).toHaveTextContent('1');
+  });
+
+  // Now assign task - driver should remain selected
+  const assignBtn = getByTestId('assign-btn');
+  await act(async () => {
+    assignBtn.click();
+    await new Promise((r) => setTimeout(r, 50));
+  });
+
+  // Verify driver is still selected
+  await waitFor(() => {
+    expect(getByTestId('selected-type')).toHaveTextContent('driver');
+    expect(getByTestId('selected-id')).toHaveTextContent('1');
+  });
+});
+
+test('unassignTask preserves station selection when unassigning from station dialog', async () => {
+  const TestUnassignFromStationComponent = () => {
+    const { unassignTask, driversRef, stationsRef, selectItem, selectedItem } =
+      useSimulation();
+
+    useEffect(() => {
+      driversRef.current.set(1, makeDriver({ id: 1, taskIds: [99] }));
+      stationsRef.current.set(1, {
+        id: 1,
+        name: 'Test Station',
+        position: [0, 0],
+        taskIds: [99],
+      });
+    }, []);
+
+    return (
+      <div>
+        <div data-testid="selected-type">{selectedItem?.type ?? 'none'}</div>
+        <div data-testid="selected-id">{selectedItem?.value?.id ?? 'none'}</div>
+        <button
+          data-testid="select-station-btn"
+          onClick={() => selectItem(SelectedItemType.Station, 1)}
+        >
+          Select Station
+        </button>
+        <button data-testid="unassign-btn" onClick={() => unassignTask(1, 99)}>
+          Unassign
+        </button>
+      </div>
+    );
+  };
+
+  const { getByTestId } = render(
+    <MapProvider>
+      <SimulationProvider simId="test-sim-123">
+        <TaskAssignmentProvider>
+          <MapContainer />
+          <TestUnassignFromStationComponent />
+        </TaskAssignmentProvider>
+      </SimulationProvider>
+    </MapProvider>
+  );
+
+  await waitFor(() => {
+    expect(MockMap.instance).toBeDefined();
+  });
+
+  await act(async () => {
+    MockMap.instance?.callBacks['load']();
+  });
+
+  // First select the station
+  const selectStationBtn = getByTestId('select-station-btn');
+  await act(async () => {
+    selectStationBtn.click();
+    await new Promise((r) => setTimeout(r, 50));
+  });
+
+  await waitFor(() => {
+    expect(getByTestId('selected-type')).toHaveTextContent('station');
+    expect(getByTestId('selected-id')).toHaveTextContent('1');
+  });
+
+  // Now unassign task - station should remain selected
+  const unassignBtn = getByTestId('unassign-btn');
+  await act(async () => {
+    unassignBtn.click();
+    await new Promise((r) => setTimeout(r, 50));
+  });
+
+  // Verify station is still selected (not switched to driver)
+  await waitFor(() => {
+    expect(getByTestId('selected-type')).toHaveTextContent('station');
+    expect(getByTestId('selected-id')).toHaveTextContent('1');
   });
 });
 
@@ -545,13 +794,384 @@ test('unassignTask posts to API and removes task from resource', async () => {
   });
 });
 
-test('reassignTask posts to API and moves task between resources', async () => {
-  const TestReassignComponent = () => {
-    const { reassignTask, driversRef, vehiclesRef, resourceBarElement } = useSimulation();
+test('unassignTask updates driver selection when driver is already selected', async () => {
+  const TestUnassignWithDriverSelectedComponent = () => {
+    const { unassignTask, driversRef, vehiclesRef, selectItem, selectedItem } =
+      useSimulation();
 
     useEffect(() => {
-      vehiclesRef.current.set(1, makeVehicle({ id: 1, batteryCount: 100, batteryCapacity: 500 }));
-      vehiclesRef.current.set(2, makeVehicle({ id: 2, batteryCount: 80, batteryCapacity: 500 }));
+      vehiclesRef.current.set(
+        1,
+        makeVehicle({ id: 1, batteryCount: 100, batteryCapacity: 500 })
+      );
+      driversRef.current.set(
+        1,
+        makeDriver({ id: 1, taskIds: [99], vehicleId: 1 })
+      );
+    }, []);
+
+    return (
+      <div>
+        <div data-testid="selected-type">{selectedItem?.type ?? 'none'}</div>
+        <div data-testid="selected-id">{selectedItem?.value?.id ?? 'none'}</div>
+        <div data-testid="selected-task-count">
+          {selectedItem?.type === 'driver'
+            ? (selectedItem.value.tasks?.length ?? 0)
+            : 'n/a'}
+        </div>
+        <button
+          data-testid="select-driver-btn"
+          onClick={() => selectItem(SelectedItemType.Driver, 1)}
+        >
+          Select Driver
+        </button>
+        <button data-testid="unassign-btn" onClick={() => unassignTask(1, 99)}>
+          Unassign
+        </button>
+      </div>
+    );
+  };
+
+  const { getByTestId } = render(
+    <MapProvider>
+      <SimulationProvider simId="test-sim-123">
+        <TaskAssignmentProvider>
+          <MapContainer />
+          <TestUnassignWithDriverSelectedComponent />
+        </TaskAssignmentProvider>
+      </SimulationProvider>
+    </MapProvider>
+  );
+
+  await waitFor(() => {
+    expect(MockMap.instance).toBeDefined();
+  });
+
+  await act(async () => {
+    MockMap.instance?.callBacks['load']();
+  });
+
+  // First select the driver
+  const selectDriverBtn = getByTestId('select-driver-btn');
+  await act(async () => {
+    selectDriverBtn.click();
+    await new Promise((r) => setTimeout(r, 50));
+  });
+
+  await waitFor(() => {
+    expect(getByTestId('selected-type')).toHaveTextContent('driver');
+    expect(getByTestId('selected-id')).toHaveTextContent('1');
+    expect(getByTestId('selected-task-count')).toHaveTextContent('1');
+  });
+
+  // Unassign task - driver should remain selected with updated task list
+  const unassignBtn = getByTestId('unassign-btn');
+  await act(async () => {
+    unassignBtn.click();
+    await new Promise((r) => setTimeout(r, 50));
+  });
+
+  // Verify driver is still selected and task count updated
+  await waitFor(() => {
+    expect(getByTestId('selected-type')).toHaveTextContent('driver');
+    expect(getByTestId('selected-id')).toHaveTextContent('1');
+    expect(getByTestId('selected-task-count')).toHaveTextContent('0');
+  });
+});
+
+test('reassignTask preserves source driver selection when reassigning task', async () => {
+  const TestReassignWithSourceSelectedComponent = () => {
+    const { reassignTask, driversRef, vehiclesRef, selectItem, selectedItem } =
+      useSimulation();
+
+    useEffect(() => {
+      vehiclesRef.current.set(
+        1,
+        makeVehicle({ id: 1, batteryCount: 100, batteryCapacity: 500 })
+      );
+      vehiclesRef.current.set(
+        2,
+        makeVehicle({ id: 2, batteryCount: 80, batteryCapacity: 500 })
+      );
+      driversRef.current.set(
+        1,
+        makeDriver({ id: 1, taskIds: [123], vehicleId: 1 })
+      );
+      driversRef.current.set(
+        2,
+        makeDriver({ id: 2, taskIds: [], vehicleId: 2 })
+      );
+    }, []);
+
+    return (
+      <div>
+        <div data-testid="selected-type">{selectedItem?.type ?? 'none'}</div>
+        <div data-testid="selected-id">{selectedItem?.value?.id ?? 'none'}</div>
+        <button
+          data-testid="select-driver1-btn"
+          onClick={() => selectItem(SelectedItemType.Driver, 1)}
+        >
+          Select Driver 1
+        </button>
+        <button
+          data-testid="reassign-btn"
+          onClick={() => reassignTask(1, 2, 123)}
+        >
+          Reassign
+        </button>
+      </div>
+    );
+  };
+
+  const { getByTestId } = render(
+    <MapProvider>
+      <SimulationProvider simId="test-sim-123">
+        <TaskAssignmentProvider>
+          <MapContainer />
+          <TestReassignWithSourceSelectedComponent />
+        </TaskAssignmentProvider>
+      </SimulationProvider>
+    </MapProvider>
+  );
+
+  await waitFor(() => {
+    expect(MockMap.instance).toBeDefined();
+  });
+
+  await act(async () => {
+    MockMap.instance?.callBacks['load']();
+  });
+
+  // Select driver 1 (source driver)
+  const selectDriver1Btn = getByTestId('select-driver1-btn');
+  await act(async () => {
+    selectDriver1Btn.click();
+    await new Promise((r) => setTimeout(r, 50));
+  });
+
+  await waitFor(() => {
+    expect(getByTestId('selected-type')).toHaveTextContent('driver');
+    expect(getByTestId('selected-id')).toHaveTextContent('1');
+  });
+
+  // Reassign task from driver 1 to driver 2
+  const reassignBtn = getByTestId('reassign-btn');
+  await act(async () => {
+    reassignBtn.click();
+    await new Promise((r) => setTimeout(r, 50));
+  });
+
+  // Verify driver 1 is still selected
+  await waitFor(() => {
+    expect(getByTestId('selected-type')).toHaveTextContent('driver');
+    expect(getByTestId('selected-id')).toHaveTextContent('1');
+  });
+});
+
+test('reassignTask updates selection when target driver is selected', async () => {
+  const TestReassignWithTargetSelectedComponent = () => {
+    const { reassignTask, driversRef, vehiclesRef, selectItem, selectedItem } =
+      useSimulation();
+
+    useEffect(() => {
+      vehiclesRef.current.set(
+        1,
+        makeVehicle({ id: 1, batteryCount: 100, batteryCapacity: 500 })
+      );
+      vehiclesRef.current.set(
+        2,
+        makeVehicle({ id: 2, batteryCount: 80, batteryCapacity: 500 })
+      );
+      driversRef.current.set(
+        1,
+        makeDriver({ id: 1, taskIds: [123], vehicleId: 1 })
+      );
+      driversRef.current.set(
+        2,
+        makeDriver({ id: 2, taskIds: [], vehicleId: 2 })
+      );
+    }, []);
+
+    return (
+      <div>
+        <div data-testid="selected-type">{selectedItem?.type ?? 'none'}</div>
+        <div data-testid="selected-id">{selectedItem?.value?.id ?? 'none'}</div>
+        <button
+          data-testid="select-driver2-btn"
+          onClick={() => selectItem(SelectedItemType.Driver, 2)}
+        >
+          Select Driver 2
+        </button>
+        <button
+          data-testid="reassign-btn"
+          onClick={() => reassignTask(1, 2, 123)}
+        >
+          Reassign
+        </button>
+      </div>
+    );
+  };
+
+  const { getByTestId } = render(
+    <MapProvider>
+      <SimulationProvider simId="test-sim-123">
+        <TaskAssignmentProvider>
+          <MapContainer />
+          <TestReassignWithTargetSelectedComponent />
+        </TaskAssignmentProvider>
+      </SimulationProvider>
+    </MapProvider>
+  );
+
+  await waitFor(() => {
+    expect(MockMap.instance).toBeDefined();
+  });
+
+  await act(async () => {
+    MockMap.instance?.callBacks['load']();
+  });
+
+  // Select driver 2 (target driver)
+  const selectDriver2Btn = getByTestId('select-driver2-btn');
+  await act(async () => {
+    selectDriver2Btn.click();
+    await new Promise((r) => setTimeout(r, 50));
+  });
+
+  await waitFor(() => {
+    expect(getByTestId('selected-type')).toHaveTextContent('driver');
+    expect(getByTestId('selected-id')).toHaveTextContent('2');
+  });
+
+  // Reassign task from driver 1 to driver 2
+  const reassignBtn = getByTestId('reassign-btn');
+  await act(async () => {
+    reassignBtn.click();
+    await new Promise((r) => setTimeout(r, 50));
+  });
+
+  // Verify driver 2 is still selected
+  await waitFor(() => {
+    expect(getByTestId('selected-type')).toHaveTextContent('driver');
+    expect(getByTestId('selected-id')).toHaveTextContent('2');
+  });
+});
+
+test('reassignTask preserves station selection when reassigning task', async () => {
+  const TestReassignWithStationSelectedComponent = () => {
+    const {
+      reassignTask,
+      driversRef,
+      vehiclesRef,
+      stationsRef,
+      selectItem,
+      selectedItem,
+    } = useSimulation();
+
+    useEffect(() => {
+      vehiclesRef.current.set(
+        1,
+        makeVehicle({ id: 1, batteryCount: 100, batteryCapacity: 500 })
+      );
+      vehiclesRef.current.set(
+        2,
+        makeVehicle({ id: 2, batteryCount: 80, batteryCapacity: 500 })
+      );
+      driversRef.current.set(
+        1,
+        makeDriver({ id: 1, taskIds: [123], vehicleId: 1 })
+      );
+      driversRef.current.set(
+        2,
+        makeDriver({ id: 2, taskIds: [], vehicleId: 2 })
+      );
+      stationsRef.current.set(1, {
+        id: 1,
+        name: 'Test Station',
+        position: [0, 0],
+        taskIds: [123],
+      });
+    }, []);
+
+    return (
+      <div>
+        <div data-testid="selected-type">{selectedItem?.type ?? 'none'}</div>
+        <div data-testid="selected-id">{selectedItem?.value?.id ?? 'none'}</div>
+        <button
+          data-testid="select-station-btn"
+          onClick={() => selectItem(SelectedItemType.Station, 1)}
+        >
+          Select Station
+        </button>
+        <button
+          data-testid="reassign-btn"
+          onClick={() => reassignTask(1, 2, 123)}
+        >
+          Reassign
+        </button>
+      </div>
+    );
+  };
+
+  const { getByTestId } = render(
+    <MapProvider>
+      <SimulationProvider simId="test-sim-123">
+        <TaskAssignmentProvider>
+          <MapContainer />
+          <TestReassignWithStationSelectedComponent />
+        </TaskAssignmentProvider>
+      </SimulationProvider>
+    </MapProvider>
+  );
+
+  await waitFor(() => {
+    expect(MockMap.instance).toBeDefined();
+  });
+
+  await act(async () => {
+    MockMap.instance?.callBacks['load']();
+  });
+
+  // Select the station
+  const selectStationBtn = getByTestId('select-station-btn');
+  await act(async () => {
+    selectStationBtn.click();
+    await new Promise((r) => setTimeout(r, 50));
+  });
+
+  await waitFor(() => {
+    expect(getByTestId('selected-type')).toHaveTextContent('station');
+    expect(getByTestId('selected-id')).toHaveTextContent('1');
+  });
+
+  // Reassign task from driver 1 to driver 2
+  const reassignBtn = getByTestId('reassign-btn');
+  await act(async () => {
+    reassignBtn.click();
+    await new Promise((r) => setTimeout(r, 50));
+  });
+
+  // Verify station is still selected (not switched to either driver)
+  await waitFor(() => {
+    expect(getByTestId('selected-type')).toHaveTextContent('station');
+    expect(getByTestId('selected-id')).toHaveTextContent('1');
+  });
+});
+
+test('reassignTask posts to API and moves task between resources', async () => {
+  const TestReassignComponent = () => {
+    const { reassignTask, driversRef, vehiclesRef, resourceBarElement } =
+      useSimulation();
+
+    useEffect(() => {
+      vehiclesRef.current.set(
+        1,
+        makeVehicle({ id: 1, batteryCount: 100, batteryCapacity: 500 })
+      );
+      vehiclesRef.current.set(
+        2,
+        makeVehicle({ id: 2, batteryCount: 80, batteryCapacity: 500 })
+      );
       driversRef.current.set(
         1,
         makeDriver({ id: 1, taskIds: [123], vehicleId: 1 })
@@ -1151,10 +1771,14 @@ test('reorderTasks posts to API and updates resource task order', async () => {
   });
 
   const TestReorderComponent = () => {
-    const { reorderTasks, driversRef, vehiclesRef, resourceBarElement } = useSimulation();
+    const { reorderTasks, driversRef, vehiclesRef, resourceBarElement } =
+      useSimulation();
 
     useEffect(() => {
-      vehiclesRef.current.set(1, makeVehicle({ id: 1, batteryCount: 100, batteryCapacity: 500 }));
+      vehiclesRef.current.set(
+        1,
+        makeVehicle({ id: 1, batteryCount: 100, batteryCapacity: 500 })
+      );
       driversRef.current.set(
         1,
         makeDriver({ id: 1, taskIds: [10, 20, 30], vehicleId: 1 })
@@ -1358,10 +1982,14 @@ test('reorderTasks updates resourceBarElement and triggers map updates', async (
   (setMapSourceMock as Mock).mockClear();
 
   const TestReorderMapUpdateComponent = () => {
-    const { reorderTasks, driversRef, vehiclesRef, resourceBarElement } = useSimulation();
+    const { reorderTasks, driversRef, vehiclesRef, resourceBarElement } =
+      useSimulation();
 
     useEffect(() => {
-      vehiclesRef.current.set(1, makeVehicle({ id: 1, batteryCount: 100, batteryCapacity: 500 }));
+      vehiclesRef.current.set(
+        1,
+        makeVehicle({ id: 1, batteryCount: 100, batteryCapacity: 500 })
+      );
       driversRef.current.set(
         1,
         makeDriver({ id: 1, taskIds: [10, 20, 30], vehicleId: 1 })

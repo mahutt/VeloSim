@@ -32,15 +32,23 @@ from back.schemas import (
     PlaybackSpeedResponse,
     SimulationPlaybackStatus,
 )
+from back.schemas.sim_frame import (
+    SeekResponse,
+    SeekPosition,
+    FrameWindow,
+    SimulationState,
+    SimFrameResponse,
+)
 from sim.core.simulation_environment import SimulationEnvironment
 from sim.simulator import Simulator
 from sim.entities.inputParameters import InputParameter
-from back.crud import sim_instance_crud, user_crud
+from back.crud import sim_instance_crud, user_crud, sim_frame_crud
 from back.schemas.sim_instance import (
     SimInstanceCreate,
     SimulationResponse,
 )
 from back.exceptions import VelosimPermissionError, ItemNotFoundError
+from back.core.config import settings
 from grafana_logging.logger import get_logger
 from back.services.frame_persistence_service import FramePersistenceSubscriber
 from back.services.simulation_data_service import SimulationDataService
@@ -286,7 +294,6 @@ class SimulationService:
             user_id=user.id, scenario_payload=scenario_payload
         )
         db_sim_instance = sim_instance_crud.create(db, sim_instance_data)
-        db.commit()
 
         # Create a fresh Simulator for this simulation
         sim = self.simulator
@@ -742,6 +749,219 @@ class SimulationService:
             simulation_id=sim_id,
             playback_speed=float(driver.real_time_factor),
             status=status,
+        )
+
+    def seek_to_position(
+        self,
+        db: Session,
+        sim_id: str,
+        position: float,
+        frame_window_seconds: float,
+        playback_speed: float | None,
+        requesting_user: int,
+    ) -> SeekResponse:
+        """Seek to a specific position in a simulation's timeline.
+
+        This method handles the business logic for seeking in both running and
+        stopped simulations, retrieving appropriate frames from the database.
+
+        Args:
+            db: Database session.
+            sim_id: The UUID of the simulation.
+            position: Target simulation time in seconds (>= 0).
+            frame_window_seconds: Number of simulation seconds of future frames
+                to return.
+            playback_speed: Optional playback speed to set (>= 0). If provided,
+                updates the simulation's playback speed (only for running sims).
+            requesting_user: The ID of the user making the request.
+
+        Returns:
+            SeekResponse containing position info, frames, and simulation state.
+
+        Raises:
+            ItemNotFoundError: If simulation or user not found.
+            VelosimPermissionError: If user not authorized to access simulation.
+        """
+        user = self._get_requesting_user(db, requesting_user)
+
+        # Determine if simulation is running and get database ID
+        db_id: int
+        current_sim_seconds: float
+        is_running = False
+
+        sim_instance: SimInstance | None = None
+        try:
+            if sim_id in self.active_simulations:
+                sim_data = self.active_simulations[sim_id]
+                db_id = sim_data["db_id"]
+                is_running = True
+
+                # Get current simulation time from running simulation
+                sim_info = self.simulator.get_sim_by_id(sim_id)
+                if sim_info:
+                    current_sim_seconds = sim_info[
+                        "simController"
+                    ].clock.sim_time_seconds
+                else:
+                    # Fallback if sim not found in simulator
+                    current_sim_seconds = position
+        except (KeyError, AttributeError):
+            # Simulation was deleted/stopped between check and access
+            is_running = False
+
+        if not is_running:
+            # Fallback to database for historical simulations
+            sim_instance = sim_instance_crud.get_by_uuid(db, sim_id)
+            if not sim_instance:
+                raise ItemNotFoundError("Simulation not found")
+            db_id = sim_instance.id
+            # For stopped simulations, compute from latest frame
+            current_sim_seconds = position
+
+        logger.debug(
+            f"initial state - sim_id={sim_id}, is_running={is_running}, "
+            f"db_id={db_id}, current_sim_seconds={current_sim_seconds}"
+        )
+
+        # Verify simulation exists and check authorization (reuse if already fetched)
+        if sim_instance is None:
+            sim_instance = sim_instance_crud.get(db, db_id)
+        if not sim_instance:
+            raise ItemNotFoundError("Simulation not found")
+
+        if sim_instance.user_id != user.id and not user.is_admin:
+            raise VelosimPermissionError(
+                "Unauthorized to access this simulation's frames"
+            )
+
+        # Update playback speed if requested (only for running simulations)
+        current_playback_speed = 0.0  # Default, not running
+        if playback_speed is not None and is_running:
+            playback_response = self.set_playback_speed(
+                db=db,
+                sim_id=sim_id,
+                playback_speed=PlaybackSpeedBase(playback_speed=playback_speed),
+                requesting_user=requesting_user,
+            )
+            current_playback_speed = playback_response.playback_speed
+        elif is_running:
+            # Get current playback speed from running simulation
+            playback_response = self.get_playback_speed(
+                db=db, sim_id=sim_id, requesting_user=requesting_user
+            )
+            # Extract just the float value, don't use the response object directly
+            # since it may contain values outside the validation range
+            current_playback_speed = float(playback_response.playback_speed)
+
+        # Find the keyframe at or before the requested position
+        keyframe = sim_frame_crud.get_keyframe_at_or_before(db, db_id, position)
+
+        if keyframe is None:
+            # No keyframe found - return empty response
+            # For running sims: never at live edge (sim is generating new frames)
+            # For stopped sims: at live edge if no frames exist in DB
+            return SeekResponse(
+                position=SeekPosition(sim_id=sim_id, target_sim_seconds=position),
+                frames=FrameWindow(
+                    initial_frames=[],
+                    future_frames=[],
+                    has_more_frames=False,
+                ),
+                state=SimulationState(
+                    current_sim_seconds=current_sim_seconds,
+                    is_at_live_edge=not is_running,
+                    playback_speed=current_playback_speed,
+                ),
+            )
+
+        # Get diff frames between keyframe and position (exclusive start)
+        keyframe_time = keyframe.sim_seconds_elapsed
+        diff_frames_to_position = sim_frame_crud.get_frames_in_range(
+            db=db,
+            sim_instance_id=db_id,
+            start_time=keyframe_time,
+            end_time=position,
+            include_start=False,  # Don't include the keyframe again
+        )
+
+        # Build initial_frames: keyframe first, then diffs in order
+        initial_frames = [SimFrameResponse.model_validate(keyframe)]
+        initial_frames.extend(
+            [SimFrameResponse.model_validate(f) for f in diff_frames_to_position]
+        )
+
+        # Get future frames from position to position + window (inclusive start)
+        frame_window_end = position + frame_window_seconds
+        logger.debug(
+            f"sim_id={sim_id}, position={position}, window={frame_window_seconds}, "
+            f"frame_window_end={frame_window_end}, is_running={is_running}, "
+            f"initial_current_sim_seconds={current_sim_seconds}"
+        )
+
+        future_frames_list = sim_frame_crud.get_frames_in_range(
+            db=db,
+            sim_instance_id=db_id,
+            start_time=position,
+            end_time=frame_window_end,
+            include_start=True,  # Include frames at exactly position
+        )
+        logger.debug(
+            f"sim_id={sim_id}, Got {len(future_frames_list)} future frames "
+            f"from {position} to {frame_window_end}"
+        )
+
+        future_frames = [SimFrameResponse.model_validate(f) for f in future_frames_list]
+
+        # Check if there are more frames beyond the window using efficient LIMIT 1 query
+        has_more_frames = sim_frame_crud.has_frames_after(
+            db=db,
+            sim_instance_id=db_id,
+            after_time=frame_window_end,
+        )
+        logger.debug(
+            f"sim_id={sim_id}, has_more_frames={has_more_frames} "
+            f"(checked beyond {frame_window_end})"
+        )
+
+        # Determine if we're at the live edge
+        # For stopped sims: at live edge if no more frames exist in DB
+        # For running sims: at live edge if no frames beyond window AND last future
+        # frame is at or near current sim time
+        is_at_live_edge = False
+
+        if not is_running:
+            # Stopped sim: simply check if no more frames
+            is_at_live_edge = not has_more_frames
+        else:
+            # Running sim: at live edge if no frames beyond window AND
+            # we have future frames that extend to/near current sim time
+            if not has_more_frames and future_frames_list:
+                last_frame_time = future_frames_list[-1].sim_seconds_elapsed
+                # At live edge if last frame is within threshold of current time
+                threshold = settings.LIVE_EDGE_THRESHOLD_SECONDS
+                is_at_live_edge = (
+                    abs(last_frame_time - current_sim_seconds) <= threshold
+                )
+
+        if not is_running:
+            # Update current_sim_seconds based on the latest frame we have
+            if future_frames_list:
+                current_sim_seconds = max(
+                    current_sim_seconds, future_frames_list[-1].sim_seconds_elapsed
+                )
+
+        return SeekResponse(
+            position=SeekPosition(sim_id=sim_id, target_sim_seconds=position),
+            frames=FrameWindow(
+                initial_frames=initial_frames,
+                future_frames=future_frames,
+                has_more_frames=has_more_frames,
+            ),
+            state=SimulationState(
+                current_sim_seconds=current_sim_seconds,
+                is_at_live_edge=is_at_live_edge,
+                playback_speed=current_playback_speed,
+            ),
         )
 
 

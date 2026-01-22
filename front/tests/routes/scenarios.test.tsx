@@ -2017,5 +2017,47 @@ describe('ScenarioEditor', () => {
         expect(screen.queryByText('Unsaved Changes')).not.toBeInTheDocument();
       });
     });
+
+    it('does not show dialog when clicking on currently active scenario with unsaved changes', async () => {
+      render(
+        <BrowserRouter>
+          <ScenarioEditor />
+        </BrowserRouter>
+      );
+
+      await waitFor(() => {
+        expect(screen.getByText('Test Scenario 1')).toBeInTheDocument();
+      });
+
+      // Select a scenario first
+      fireEvent.click(screen.getByText('Test Scenario 1'));
+
+      await waitFor(() => {
+        const textarea = screen.getByPlaceholderText(
+          'Paste or type your JSON scenario here...'
+        ) as HTMLTextAreaElement;
+        expect(textarea.value).toBeTruthy();
+      });
+
+      // Make changes to the editor
+      const textarea = screen.getByPlaceholderText(
+        'Paste or type your JSON scenario here...'
+      ) as HTMLTextAreaElement;
+      const originalValue = textarea.value;
+      fireEvent.change(textarea, {
+        target: { value: originalValue + '\n// modified' },
+      });
+
+      // Click on the same scenario again
+      fireEvent.click(screen.getByText('Test Scenario 1'));
+
+      // Dialog should NOT appear since we're clicking on the currently active scenario
+      await waitFor(
+        () => {
+          expect(screen.queryByText('Unsaved Changes')).not.toBeInTheDocument();
+        },
+        { timeout: 1000 }
+      );
+    });
   });
 });
