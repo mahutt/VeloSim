@@ -61,6 +61,9 @@ from back.schemas.sim_keyframe import (
     SimKeyframeListResponse,
     SimKeyframeResponse,
 )
+from back.schemas.sim_frame import (
+    SeekResponse,
+)
 from sqlalchemy.orm import Session
 
 from back.auth.dependency import get_user_id, get_user_id_over_websocket
@@ -77,6 +80,7 @@ from back.schemas.sim_instance import (
 )
 from back.services import simulation_service
 from back.database.session import get_db
+from back.core.config import settings
 from sim.utils.json_parser_strategy import JsonParseStrategy, ScenarioParseError
 from pydantic import BaseModel
 from typing import Any
@@ -396,6 +400,93 @@ def set_playback_speed(
         raise HTTPException(status_code=404, detail=str(err))
     except VelosimPermissionError as err:
         raise HTTPException(status_code=403, detail=str(err))
+    except Exception as err:
+        raise HTTPException(status_code=500, detail=str(err))
+
+
+@router.get("/{sim_id}/seek", response_model=SeekResponse)
+def seek_to_position(
+    sim_id: str,
+    position: float = Query(
+        ..., ge=0, description="Target simulation time in seconds to seek to"
+    ),
+    frame_window_seconds: float | None = Query(
+        None,
+        ge=0,
+        description=(
+            "Number of simulation seconds worth of future frames to return. "
+            f"Default: {settings.SEEK_DEFAULT_FRAME_WINDOW_SECONDS}s, "
+            f"Max: {settings.SEEK_MAX_FRAME_WINDOW_SECONDS}s"
+        ),
+    ),
+    playback_speed: float | None = Query(
+        None,
+        ge=0,
+        description=(
+            "Desired playback speed to set on the simulation "
+            "(e.g., 1.0 for normal, 0.5 for half speed, 0 to pause). "
+            "If provided, the simulation's playback speed will be updated."
+        ),
+    ),
+    db: Session = Depends(get_db),
+    requesting_user: int = Depends(get_user_id),
+) -> SeekResponse:
+    """Seek to a specific position in a simulation's timeline.
+
+    This endpoint enables both seeking to historical frames and playback of
+    persisted simulations. It returns a keyframe at or before the requested
+    position, along with diff frames to reach the exact position and future
+    frames for smooth playback.
+
+    Args:
+        sim_id: ID of the simulation to seek in
+        position: Target simulation time in seconds (>= 0)
+        frame_window_seconds: Number of simulation seconds of future frames to
+            return. Defaults to SEEK_DEFAULT_FRAME_WINDOW_SECONDS.
+        playback_speed: Optional playback speed to set (>= 0). If provided,
+            updates the simulation's playback speed.
+        db: Database session dependency
+        requesting_user: ID of the authenticated user
+
+    Returns:
+        SeekResponse containing:
+        - position: Information about where the seek landed
+        - frames: Initial frames (keyframe + diffs to reach position) and
+            future frames for playback
+        - state: Current simulation state including playback speed and live edge status
+
+    Raises:
+        HTTPException: 400 for invalid parameters, 403 for unauthorized access,
+            404 if simulation not found, 500 for server errors
+    """
+    try:
+        # Validate and apply frame window limit
+        if frame_window_seconds is None:
+            frame_window_seconds = settings.SEEK_DEFAULT_FRAME_WINDOW_SECONDS
+        elif frame_window_seconds > settings.SEEK_MAX_FRAME_WINDOW_SECONDS:
+            raise HTTPException(
+                status_code=400,
+                detail=(
+                    f"frame_window_seconds exceeds maximum allowed value of "
+                    f"{settings.SEEK_MAX_FRAME_WINDOW_SECONDS} seconds"
+                ),
+            )
+
+        return simulation_service.seek_to_position(
+            db=db,
+            sim_id=sim_id,
+            position=position,
+            frame_window_seconds=frame_window_seconds,
+            playback_speed=playback_speed,
+            requesting_user=requesting_user,
+        )
+
+    except ItemNotFoundError as err:
+        raise HTTPException(status_code=404, detail=str(err))
+    except VelosimPermissionError as err:
+        raise HTTPException(status_code=403, detail=str(err))
+    except HTTPException:
+        raise
     except Exception as err:
         raise HTTPException(status_code=500, detail=str(err))
 

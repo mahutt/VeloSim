@@ -323,3 +323,195 @@ class TestSimFrameCRUD:
 
         # Should return same ID (update, not insert)
         assert result2.id == 333
+
+    def test_get_keyframe_at_or_before_returns_latest_keyframe(
+        self, mock_db: MagicMock
+    ) -> None:
+        """Test that get_keyframe_at_or_before returns the most recent keyframe."""
+        # Mock keyframes at 0, 5, 10 seconds
+        keyframe = SimFrame(
+            id=2,
+            sim_instance_id=100,
+            seq_number=10,
+            sim_seconds_elapsed=5.0,
+            frame_data={"time": 5.0},
+            is_key=True,
+        )
+
+        mock_query = MagicMock()
+        mock_query.first.return_value = keyframe
+        mock_db.query.return_value.filter.return_value.order_by.return_value = (
+            mock_query
+        )
+
+        result = sim_frame_crud.get_keyframe_at_or_before(
+            mock_db, sim_instance_id=100, position=7.5
+        )
+
+        assert result is not None
+        assert result.sim_seconds_elapsed == 5.0
+        assert result.is_key is True
+
+    def test_get_keyframe_at_or_before_returns_none_when_no_keyframe(
+        self, mock_db: MagicMock
+    ) -> None:
+        """Test that get_keyframe_at_or_before returns None when no keyframe exists."""
+        mock_query = MagicMock()
+        mock_query.first.return_value = None
+        mock_db.query.return_value.filter.return_value.order_by.return_value = (
+            mock_query
+        )
+
+        result = sim_frame_crud.get_keyframe_at_or_before(
+            mock_db, sim_instance_id=100, position=0.5
+        )
+
+        assert result is None
+
+    def test_get_keyframe_at_or_before_exact_match(self, mock_db: MagicMock) -> None:
+        """Test get_keyframe_at_or_before when position exactly matches a keyframe."""
+        keyframe = SimFrame(
+            id=1,
+            sim_instance_id=100,
+            seq_number=0,
+            sim_seconds_elapsed=10.0,
+            frame_data={"time": 10.0},
+            is_key=True,
+        )
+
+        mock_query = MagicMock()
+        mock_query.first.return_value = keyframe
+        mock_db.query.return_value.filter.return_value.order_by.return_value = (
+            mock_query
+        )
+
+        result = sim_frame_crud.get_keyframe_at_or_before(
+            mock_db, sim_instance_id=100, position=10.0
+        )
+
+        assert result is not None
+        assert result.sim_seconds_elapsed == 10.0
+
+    def test_get_frames_in_range_returns_frames_in_order(
+        self, mock_db: MagicMock
+    ) -> None:
+        """Test that get_frames_in_range returns frames in chronological order."""
+        frames = [
+            SimFrame(
+                id=1,
+                sim_instance_id=100,
+                seq_number=1,
+                sim_seconds_elapsed=1.0,
+                frame_data={},
+                is_key=False,
+            ),
+            SimFrame(
+                id=2,
+                sim_instance_id=100,
+                seq_number=2,
+                sim_seconds_elapsed=2.0,
+                frame_data={},
+                is_key=False,
+            ),
+            SimFrame(
+                id=3,
+                sim_instance_id=100,
+                seq_number=3,
+                sim_seconds_elapsed=3.0,
+                frame_data={},
+                is_key=False,
+            ),
+        ]
+
+        mock_query_chain = (
+            mock_db.query.return_value.filter.return_value.filter.return_value
+        )
+        mock_query_chain.order_by.return_value.all.return_value = frames
+
+        result = sim_frame_crud.get_frames_in_range(
+            mock_db, sim_instance_id=100, start_time=0.5, end_time=3.5
+        )
+
+        assert len(result) == 3
+        assert result[0].sim_seconds_elapsed == 1.0
+        assert result[2].sim_seconds_elapsed == 3.0
+
+    def test_get_frames_in_range_exclude_start(self, mock_db: MagicMock) -> None:
+        """Test that get_frames_in_range excludes start when include_start=False."""
+        frames = [
+            SimFrame(
+                id=2,
+                sim_instance_id=100,
+                seq_number=2,
+                sim_seconds_elapsed=2.0,
+                frame_data={},
+                is_key=False,
+            ),
+        ]
+
+        mock_query_chain = (
+            mock_db.query.return_value.filter.return_value.filter.return_value
+        )
+        mock_query_chain.order_by.return_value.all.return_value = frames
+
+        result = sim_frame_crud.get_frames_in_range(
+            mock_db,
+            sim_instance_id=100,
+            start_time=1.0,
+            end_time=3.0,
+            include_start=False,
+        )
+
+        # Should not include frame at exactly 1.0 seconds
+        assert len(result) == 1
+        assert result[0].sim_seconds_elapsed == 2.0
+
+    def test_get_frames_in_range_empty_range(self, mock_db: MagicMock) -> None:
+        """Test that get_frames_in_range returns empty list when no frames in range."""
+        mock_query_chain = (
+            mock_db.query.return_value.filter.return_value.filter.return_value
+        )
+        mock_query_chain.order_by.return_value.all.return_value = []
+
+        result = sim_frame_crud.get_frames_in_range(
+            mock_db, sim_instance_id=100, start_time=100.0, end_time=200.0
+        )
+
+        assert result == []
+
+    def test_has_frames_after_returns_true_when_frames_exist(
+        self, mock_db: MagicMock
+    ) -> None:
+        """Test has_frames_after returns True when frames exist after the time."""
+        frame = SimFrame(
+            id=1,
+            sim_instance_id=100,
+            seq_number=10,
+            sim_seconds_elapsed=15.0,
+            frame_data={},
+            is_key=False,
+        )
+
+        mock_query = MagicMock()
+        mock_query.first.return_value = frame
+        mock_db.query.return_value.filter.return_value.limit.return_value = mock_query
+
+        result = sim_frame_crud.has_frames_after(
+            mock_db, sim_instance_id=100, after_time=10.0
+        )
+
+        assert result is True
+
+    def test_has_frames_after_returns_false_when_no_frames(
+        self, mock_db: MagicMock
+    ) -> None:
+        """Test has_frames_after returns False when no frames exist after the time."""
+        mock_query = MagicMock()
+        mock_query.first.return_value = None
+        mock_db.query.return_value.filter.return_value.limit.return_value = mock_query
+
+        result = sim_frame_crud.has_frames_after(
+            mock_db, sim_instance_id=100, after_time=100.0
+        )
+
+        assert result is False

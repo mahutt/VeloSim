@@ -3273,3 +3273,441 @@ class TestWebSocketIntegration:
         mock_cleanup.assert_called_once_with(
             "test-sim-123", sim_data, sim_info, mock_subscriber, mock_ws
         )
+
+
+class TestSeekEndpoint:
+    """Tests for the seek endpoint."""
+
+    @patch("back.services.simulation_service.sim_frame_crud")
+    @patch("back.services.simulation_service.sim_instance_crud")
+    @patch("back.services.simulation_service.user_crud")
+    def test_seek_endpoint_basic_success(
+        self,
+        mock_user_crud: MagicMock,
+        mock_instance_crud: MagicMock,
+        mock_frame_crud: MagicMock,
+        authenticated_client: TestClient,
+    ) -> None:
+        """Test seek endpoint returns correct frames for basic case."""
+        from back.models.sim_frame import SimFrame
+        from back.models.sim_instance import SimInstance
+        from back.models.user import User
+        from datetime import datetime
+
+        # Setup mocks
+        mock_sim_instance = MagicMock(spec=SimInstance)
+        mock_sim_instance.id = 123
+        mock_sim_instance.user_id = 1
+
+        mock_user = MagicMock(spec=User)
+        mock_user.id = 1
+        mock_user.is_admin = False
+
+        mock_instance_crud.get_by_uuid.return_value = mock_sim_instance
+        mock_instance_crud.get.return_value = mock_sim_instance
+        mock_user_crud.get.return_value = mock_user
+
+        # Mock keyframe at 5.0 seconds
+        keyframe = SimFrame(
+            id=1,
+            sim_instance_id=123,
+            seq_number=10,
+            sim_seconds_elapsed=5.0,
+            frame_data={"state": "keyframe"},
+            is_key=True,
+            created_at=datetime.now(),
+        )
+
+        # Mock diff frames between keyframe and position
+        diff_frames = [
+            SimFrame(
+                id=2,
+                sim_instance_id=123,
+                seq_number=11,
+                sim_seconds_elapsed=6.0,
+                frame_data={"diff": "1"},
+                is_key=False,
+                created_at=datetime.now(),
+            ),
+        ]
+
+        # Mock future frames
+        future_frames = [
+            SimFrame(
+                id=3,
+                sim_instance_id=123,
+                seq_number=12,
+                sim_seconds_elapsed=7.0,
+                frame_data={"diff": "2"},
+                is_key=False,
+                created_at=datetime.now(),
+            ),
+        ]
+
+        mock_frame_crud.get_keyframe_at_or_before.return_value = keyframe
+        mock_frame_crud.get_frames_in_range.side_effect = [
+            diff_frames,  # Frames between keyframe and position
+            future_frames,  # Future frames
+        ]
+        mock_frame_crud.has_frames_after.return_value = False  # No frames beyond window
+
+        # Ensure simulation is not running (use real service instance)
+        from back.services import simulation_service
+
+        simulation_service.active_simulations = {}
+
+        response = authenticated_client.get(
+            "/api/v1/simulation/test-sim-123/seek?position=6.5&frame_window_seconds=2.0"
+        )
+
+        assert response.status_code == 200
+        data = response.json()
+
+        # Verify response structure
+        assert "position" in data
+        assert "frames" in data
+        assert "state" in data
+
+        # Verify position
+        assert data["position"]["sim_id"] == "test-sim-123"
+        assert data["position"]["target_sim_seconds"] == 6.5
+
+        # Verify frames
+        assert len(data["frames"]["initial_frames"]) == 2  # Keyframe + 1 diff
+        assert data["frames"]["initial_frames"][0]["is_key"] is True
+        assert data["frames"]["initial_frames"][1]["is_key"] is False
+        assert len(data["frames"]["future_frames"]) == 1
+        assert data["frames"]["has_more_frames"] is False
+
+        # Verify state - stopped sim with no more frames = at live edge
+        assert data["state"]["is_at_live_edge"] is True
+
+    @patch("back.services.simulation_service.sim_frame_crud")
+    @patch("back.services.simulation_service.sim_instance_crud")
+    @patch("back.services.simulation_service.user_crud")
+    def test_seek_endpoint_no_keyframe_found(
+        self,
+        mock_user_crud: MagicMock,
+        mock_instance_crud: MagicMock,
+        mock_frame_crud: MagicMock,
+        authenticated_client: TestClient,
+    ) -> None:
+        """Test seek endpoint when no keyframe exists before position."""
+        from back.models.sim_instance import SimInstance
+        from back.models.user import User
+
+        # Setup mocks
+        mock_sim_instance = MagicMock(spec=SimInstance)
+        mock_sim_instance.id = 123
+        mock_sim_instance.user_id = 1
+
+        mock_user = MagicMock(spec=User)
+        mock_user.id = 1
+        mock_user.is_admin = False
+
+        mock_instance_crud.get_by_uuid.return_value = mock_sim_instance
+        mock_instance_crud.get.return_value = mock_sim_instance
+        mock_user_crud.get.return_value = mock_user
+
+        # No keyframe found
+        mock_frame_crud.get_keyframe_at_or_before.return_value = None
+
+        # Ensure simulation is not running (use real service instance)
+        from back.services import simulation_service
+
+        simulation_service.active_simulations = {}
+
+        response = authenticated_client.get(
+            "/api/v1/simulation/test-sim-123/seek?position=0.5"
+        )
+
+        assert response.status_code == 200
+        data = response.json()
+
+        # Should return empty frames
+        assert len(data["frames"]["initial_frames"]) == 0
+        assert len(data["frames"]["future_frames"]) == 0
+        assert data["frames"]["has_more_frames"] is False
+
+    @patch("back.services.simulation_service.sim_frame_crud")
+    @patch("back.services.simulation_service.sim_instance_crud")
+    @patch("back.services.simulation_service.user_crud")
+    def test_seek_endpoint_running_simulation(
+        self,
+        mock_user_crud: MagicMock,
+        mock_instance_crud: MagicMock,
+        mock_frame_crud: MagicMock,
+        authenticated_client: TestClient,
+    ) -> None:
+        """Test seek endpoint with a running simulation."""
+        from back.models.sim_frame import SimFrame
+        from back.models.sim_instance import SimInstance
+        from back.models.user import User
+        from datetime import datetime
+
+        # Setup mocks
+        mock_sim_instance = MagicMock(spec=SimInstance)
+        mock_sim_instance.id = 123
+        mock_sim_instance.user_id = 1
+
+        mock_user = MagicMock(spec=User)
+        mock_user.id = 1
+        mock_user.is_admin = False
+
+        mock_instance_crud.get.return_value = mock_sim_instance
+        mock_user_crud.get.return_value = mock_user
+
+        # Mock keyframe
+        keyframe = SimFrame(
+            id=1,
+            sim_instance_id=123,
+            seq_number=0,
+            sim_seconds_elapsed=0.0,
+            frame_data={"state": "keyframe"},
+            is_key=True,
+            created_at=datetime.now(),
+        )
+
+        mock_frame_crud.get_keyframe_at_or_before.return_value = keyframe
+        mock_frame_crud.get_frames_in_range.side_effect = [
+            [],  # No diff frames to position
+            [],  # No future frames
+        ]
+        mock_frame_crud.has_frames_after.return_value = False  # No frames beyond window
+
+        # Mock running simulation
+        mock_clock = MagicMock()
+        mock_clock.sim_time_seconds = 100.0
+        mock_sim_controller = MagicMock()
+        mock_sim_controller.clock = mock_clock
+        mock_sim_info = {"simController": mock_sim_controller}
+
+        from back.services import simulation_service
+        from typing import cast, Any
+        from unittest.mock import patch
+
+        # Patch the active_simulations dictionary
+        simulation_service.active_simulations = cast(
+            Any, {"test-sim-123": {"db_id": 123}}
+        )
+
+        # Use patch.object for method mocking
+        with (
+            patch.object(
+                simulation_service.simulator,
+                "get_sim_by_id",
+                return_value=mock_sim_info,
+            ),
+            patch.object(
+                simulation_service,
+                "get_playback_speed",
+                return_value=MagicMock(playback_speed=1.5),
+            ),
+        ):
+            response = authenticated_client.get(
+                "/api/v1/simulation/test-sim-123/seek?position=5.0"
+            )
+
+            assert response.status_code == 200
+            data = response.json()
+
+            # For running simulation with no frames in DB beyond window,
+            # has_more_frames should be False (based on DB state)
+            assert data["frames"]["has_more_frames"] is False
+            assert data["state"]["current_sim_seconds"] == 100.0
+            assert data["state"]["playback_speed"] == 1.5
+
+            # Running sim with no future frames and no frames beyond window
+            # is_at_live_edge=False because we don't have future frames to check
+            assert data["state"]["is_at_live_edge"] is False
+
+    @patch("back.services.simulation_service.sim_instance_crud")
+    @patch("back.services.simulation_service.user_crud")
+    def test_seek_endpoint_unauthorized(
+        self,
+        mock_user_crud: MagicMock,
+        mock_instance_crud: MagicMock,
+        authenticated_client: TestClient,
+    ) -> None:
+        """Test seek endpoint returns 403 for unauthorized user."""
+        from back.models.sim_instance import SimInstance
+        from back.models.user import User
+
+        # Setup mocks - user doesn't own the sim
+        mock_sim_instance = MagicMock(spec=SimInstance)
+        mock_sim_instance.id = 123
+        mock_sim_instance.user_id = 999  # Different user
+
+        mock_user = MagicMock(spec=User)
+        mock_user.id = 1
+        mock_user.is_admin = False
+
+        mock_instance_crud.get_by_uuid.return_value = mock_sim_instance
+        mock_instance_crud.get.return_value = mock_sim_instance
+        mock_user_crud.get.return_value = mock_user
+
+        response = authenticated_client.get(
+            "/api/v1/simulation/test-sim-123/seek?position=5.0"
+        )
+
+        assert response.status_code == 403
+
+    @patch("back.services.simulation_service.user_crud")
+    @patch("back.services.simulation_service.sim_instance_crud")
+    def test_seek_endpoint_simulation_not_found(
+        self,
+        mock_instance_crud: MagicMock,
+        mock_user_crud: MagicMock,
+        authenticated_client: TestClient,
+    ) -> None:
+        """Test seek endpoint returns 404 when simulation not found."""
+        mock_instance_crud.get_by_uuid.return_value = None
+
+        # Mock the user
+        from back.models.user import User
+
+        mock_user = MagicMock(spec=User)
+        mock_user.id = 1
+        mock_user.is_admin = False
+        mock_user_crud.get.return_value = mock_user
+
+        # Ensure simulation is not running (use real service instance)
+        from back.services import simulation_service
+        from typing import cast, Any
+
+        simulation_service.active_simulations = cast(Any, {})
+
+        response = authenticated_client.get(
+            "/api/v1/simulation/nonexistent/seek?position=5.0"
+        )
+
+        assert response.status_code == 404
+
+    @patch("back.services.simulation_service.sim_frame_crud")
+    @patch("back.services.simulation_service.sim_instance_crud")
+    @patch("back.services.simulation_service.user_crud")
+    def test_seek_endpoint_validates_frame_window_max(
+        self,
+        mock_user_crud: MagicMock,
+        mock_instance_crud: MagicMock,
+        mock_frame_crud: MagicMock,
+        authenticated_client: TestClient,
+    ) -> None:
+        """Test seek endpoint rejects frame_window_seconds exceeding max."""
+        from back.models.sim_instance import SimInstance
+        from back.models.user import User
+
+        # Setup minimal mocks
+        mock_sim_instance = MagicMock(spec=SimInstance)
+        mock_sim_instance.id = 123
+        mock_sim_instance.user_id = 1
+
+        mock_user = MagicMock(spec=User)
+        mock_user.id = 1
+
+        mock_instance_crud.get_by_uuid.return_value = mock_sim_instance
+        mock_user_crud.get.return_value = mock_user
+
+        # Ensure simulation is not running (use real service instance)
+        from back.services import simulation_service
+        from typing import cast, Any
+
+        simulation_service.active_simulations = cast(Any, {})
+
+        # Request window larger than max (30.0 seconds)
+        response = authenticated_client.get(
+            "/api/v1/simulation/test-sim-123/seek?position=5.0"
+            + "&frame_window_seconds=100.0"
+        )
+
+        assert response.status_code == 400
+        assert "exceeds maximum" in response.json()["detail"]
+
+    @patch("back.services.simulation_service.sim_frame_crud")
+    @patch("back.services.simulation_service.sim_instance_crud")
+    @patch("back.services.simulation_service.user_crud")
+    def test_seek_endpoint_with_playback_speed_update(
+        self,
+        mock_user_crud: MagicMock,
+        mock_instance_crud: MagicMock,
+        mock_frame_crud: MagicMock,
+        authenticated_client: TestClient,
+    ) -> None:
+        """Test seek endpoint updates playback speed when requested."""
+        from back.models.sim_frame import SimFrame
+        from back.models.sim_instance import SimInstance
+        from back.models.user import User
+        from datetime import datetime
+
+        # Setup mocks
+        mock_sim_instance = MagicMock(spec=SimInstance)
+        mock_sim_instance.id = 123
+        mock_sim_instance.user_id = 1
+
+        mock_user = MagicMock(spec=User)
+        mock_user.id = 1
+        mock_user.is_admin = False
+
+        mock_instance_crud.get.return_value = mock_sim_instance
+        mock_user_crud.get.return_value = mock_user
+
+        # Mock keyframe
+        keyframe = SimFrame(
+            id=1,
+            sim_instance_id=123,
+            seq_number=0,
+            sim_seconds_elapsed=0.0,
+            frame_data={"state": "keyframe"},
+            is_key=True,
+            created_at=datetime.now(),
+        )
+
+        mock_frame_crud.get_keyframe_at_or_before.return_value = keyframe
+        mock_frame_crud.get_frames_in_range.side_effect = [
+            [],  # No diff frames to position
+            [],  # No future frames
+        ]
+        mock_frame_crud.has_frames_after.return_value = False  # No frames beyond window
+
+        # Mock running simulation
+        mock_clock = MagicMock()
+        mock_clock.sim_time_seconds = 10.0
+        mock_sim_controller = MagicMock()
+        mock_sim_controller.clock = mock_clock
+        mock_sim_info = {"simController": mock_sim_controller}
+
+        from back.services import simulation_service
+        from typing import cast, Any
+        from unittest.mock import patch
+
+        # Patch the active_simulations dictionary
+        simulation_service.active_simulations = cast(
+            Any, {"test-sim-123": {"db_id": 123}}
+        )
+
+        # Use patch.object for method mocking
+        with (
+            patch.object(
+                simulation_service.simulator,
+                "get_sim_by_id",
+                return_value=mock_sim_info,
+            ),
+            patch.object(
+                simulation_service,
+                "set_playback_speed",
+                return_value=MagicMock(playback_speed=0.5),
+            ) as mock_set_speed,
+        ):
+            response = authenticated_client.get(
+                "/api/v1/simulation/test-sim-123/seek?position=5.0&playback_speed=0.5"
+            )
+
+            assert response.status_code == 200
+            data = response.json()
+
+            # Verify playback speed was updated
+            mock_set_speed.assert_called_once()
+            assert data["state"]["playback_speed"] == 0.5
+
+            # Running simulation is never at live edge
+            assert data["state"]["is_at_live_edge"] is False
