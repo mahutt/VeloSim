@@ -55,6 +55,75 @@ def frame_data() -> SimFrameCreate:
 class TestSimFrameCRUD:
     """Tests for SimFrame CRUD operations."""
 
+    def test_upsert_many_deduplication_and_on_conflict(
+        self, mock_db: MagicMock
+    ) -> None:
+        """
+        Test upsert_many deduplicates by (sim_instance_id, seq_number)
+        and uses ON CONFLICT.
+        """
+        frames = [
+            SimFrameCreate(
+                sim_instance_id=1,
+                seq_number=1,
+                sim_seconds_elapsed=1.0,
+                frame_data={"a": 1},
+                is_key=True,
+            ),
+            SimFrameCreate(
+                sim_instance_id=1,
+                seq_number=1,
+                sim_seconds_elapsed=2.0,
+                frame_data={"a": 2},
+                is_key=False,
+            ),  # duplicate, should overwrite previous
+            SimFrameCreate(
+                sim_instance_id=1,
+                seq_number=2,
+                sim_seconds_elapsed=3.0,
+                frame_data={"b": 3},
+                is_key=True,
+            ),
+            SimFrameCreate(
+                sim_instance_id=2,
+                seq_number=1,
+                sim_seconds_elapsed=4.0,
+                frame_data={"c": 4},
+                is_key=False,
+            ),
+        ]
+        mock_db.execute.return_value = None
+        mock_db.commit.return_value = None
+        count = sim_frame_crud.upsert_many(mock_db, frames)
+        assert count == 3
+        assert mock_db.execute.call_count == 1
+        assert mock_db.commit.call_count == 1
+
+    def test_upsert_many_empty_list(self, mock_db: MagicMock) -> None:
+        """Test upsert_many returns 0 and does not call db for empty input."""
+        count = sim_frame_crud.upsert_many(mock_db, [])
+        assert count == 0
+        mock_db.execute.assert_not_called()
+        mock_db.commit.assert_not_called()
+
+    def test_upsert_many_sqlalchemy_error(self, mock_db: MagicMock) -> None:
+        """Test upsert_many propagates SQLAlchemyError on DB failure."""
+        from sqlalchemy.exc import SQLAlchemyError
+
+        frames = [
+            SimFrameCreate(
+                sim_instance_id=1,
+                seq_number=1,
+                sim_seconds_elapsed=1.0,
+                frame_data={"a": 1},
+                is_key=True,
+            )
+        ]
+        mock_db.execute.side_effect = SQLAlchemyError("DB error")
+        with pytest.raises(SQLAlchemyError):
+            sim_frame_crud.upsert_many(mock_db, frames)
+        mock_db.commit.assert_not_called()
+
     def test_upsert_creates_new_frame(
         self, mock_db: MagicMock, frame_data: SimFrameCreate
     ) -> None:
