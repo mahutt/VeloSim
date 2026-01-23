@@ -141,10 +141,10 @@ export function updateDriverPositions(
       // animate driver position along route geometry
       // constrain interpolation segment to next task segment only
       let constrainedRoute = route.coordinates;
-      const nextTaskEndIndex = route.nextTaskEndIndex;
-      if (nextTaskEndIndex < constrainedRoute.length) {
+      const nextStopIndex = route.nextStopIndex;
+      if (nextStopIndex < constrainedRoute.length) {
         // animate only up to where the next task ends in the route
-        constrainedRoute = constrainedRoute.slice(0, nextTaskEndIndex + 1);
+        constrainedRoute = constrainedRoute.slice(0, nextStopIndex + 1);
       }
       currentPos = interpolateAlongRoute(
         constrainedRoute,

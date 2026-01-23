@@ -159,7 +159,7 @@ describe('updateDriverPositions', () => {
             [0, 1],
             [1, 1],
           ],
-          nextTaskEndIndex: 3,
+          nextStopIndex: 3,
         },
       ],
     ]);

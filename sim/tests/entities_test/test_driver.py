@@ -679,7 +679,7 @@ class TestDriver:
     def test_get_full_route_with_hq_next_stop(
         self, simpy_env: simpy.Environment, default_position: Position
     ) -> None:
-        """Test that nextTaskEndIndex points to HQ when driver is heading to HQ."""
+        """Test that nextStopIndex points to HQ when driver is heading to HQ."""
         station1 = Station(1, "Station 1", Position([-73.5, 45.5]))
         station2 = Station(2, "Station 2", Position([-73.6, 45.6]))
         task1 = BatterySwapTask(1, station=station1)
@@ -718,16 +718,17 @@ class TestDriver:
         driver.state = DriverState.SEEKING_HQ_FOR_INVENTORY
 
         # Get full route
-        result = driver.get_full_route()
+        driver.compute_routes()
+        result = driver.get_route_json()
 
         assert result is not None
         assert "coordinates" in result
-        assert "nextTaskEndIndex" in result
+        assert "nextStopIndex" in result
 
-        # nextTaskEndIndex should point to HQ endpoint (index 2 in the combined route)
+        # nextStopIndex should point to HQ endpoint (index 2 in the combined route)
         # Route: [start, waypoint, HQ, waypoint, task1, waypoint, task2]
         # HQ is at index 2
-        assert result["nextTaskEndIndex"] == 2
+        assert result["nextStopIndex"] == 2
         assert result["coordinates"][2] == [
             -73.60175631192361,
             45.52975346053039,
@@ -736,7 +737,7 @@ class TestDriver:
     def test_get_full_route_without_hq(
         self, simpy_env: simpy.Environment, default_position: Position
     ) -> None:
-        """Test that nextTaskEndIndex points to first task when not heading to HQ."""
+        """Test that nextStopIndex points to first task when not heading to HQ."""
         station1 = Station(1, "Station 1", Position([-73.5, 45.5]))
         station2 = Station(2, "Station 2", Position([-73.6, 45.6]))
         task1 = BatterySwapTask(1, station=station1)
@@ -769,16 +770,17 @@ class TestDriver:
         driver.state = DriverState.ON_ROUTE
 
         # Get full route
-        result = driver.get_full_route()
+        driver.compute_routes()
+        result = driver.get_route_json()
 
         assert result is not None
         assert "coordinates" in result
-        assert "nextTaskEndIndex" in result
+        assert "nextStopIndex" in result
 
-        # nextTaskEndIndex should point to first task endpoint (index 2)
+        # nextStopIndex should point to first task endpoint (index 2)
         # Route: [start, waypoint, task1, waypoint, task2]
         # Task1 is at index 2
-        assert result["nextTaskEndIndex"] == 2
+        assert result["nextStopIndex"] == 2
         assert result["coordinates"][2] == [-73.5, 45.5]  # Task 1
 
     def test_set_state_sets_update_flag(self, driver: Driver) -> None:

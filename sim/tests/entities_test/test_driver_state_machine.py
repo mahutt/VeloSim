@@ -230,6 +230,15 @@ def test_driver_unassignments_at_end_of_shift(fake_time: MockClock) -> None:
     vehicle.set_driver(driver)
     driver.set_vehicle(vehicle)
 
+    # Set up map map with mock route
+    mock_route = Mock()
+    mock_route.next.side_effect = [None]
+    mock_route.get_current_traffic_multiplier.return_value = 1.0
+
+    mock_map = Mock()
+    mock_map.get_route.return_value = mock_route
+    driver.set_map_controller(mock_map)
+
     driver.assign_task(task1)
     driver.assign_task(task2)
     driver.set_state(DriverState.ENDING_SHIFT)

@@ -529,7 +529,7 @@ class SimulatorController:
                 # - Key frames: always include (coordinates or null)
                 # - Diff frames: only include if route_changed
                 if is_key or driver.route_changed:
-                    driver_data["route"] = driver.get_full_route()
+                    driver_data["route"] = driver.get_route_json()
 
                 drivers.append(driver_data)
 

@@ -92,30 +92,8 @@ class FakeTask(Task):
 DEFAULT_SHIFT = Shift(0.0, 24.0 * 60 * 60, None, 0.0, 24.0 * 60 * 60, None)
 
 
-def test_travel_to_returns_immediately_when_already_at_position() -> None:
-    """Test that travel_to returns early if already at destination"""
-    env = SimulationEnvironment()
-    # Ensure Driver.env is set before instantiation
-    Driver.env = env
-    start_pos = Position([0.0, 0.0])
-    driver = Driver(driver_id=1, position=start_pos, shift=DEFAULT_SHIFT)
-
-    # Mock map map (shouldn't be called)
-    mock_map = Mock()
-    driver.set_map_controller(mock_map)
-
-    # Travel to same position - process completes immediately
-    env.process(driver.travel_to(start_pos))
-    env.run(until=1)
-
-    # Should return immediately without calling map map
-    mock_map.get_route.assert_not_called()
-    # Resource should still be at same position
-    assert driver.position == start_pos
-
-
-def test_travel_to_handles_tuple_return_from_route_next() -> None:
-    """Test that travel_to correctly unpacks tuple from first route.next() call"""
+def test_travel_to_next_stop_handles_tuple_return_from_route_next() -> None:
+    """Test that travel_to_next_stop correctly unpacks tuple from route.next() call"""
     env = SimulationEnvironment()
     Driver.env = env
     start_pos = Position([0.0, 0.0])
@@ -138,17 +116,11 @@ def test_travel_to_handles_tuple_return_from_route_next() -> None:
     # Mock traffic multiplier (needed for traffic-aware travel logic)
     mock_route.get_current_traffic_multiplier.return_value = 1.0
 
-    # Mock map map
-    mock_map = Mock()
-    mock_map.get_route.return_value = mock_route
-    driver.set_map_controller(mock_map)
+    driver.routes = [mock_route]
 
     # Execute travel
-    env.process(driver.travel_to(dest_pos))
+    env.process(driver.travel_to_next_stop())
     env.run(until=10)
-
-    # Verify route was obtained
-    mock_map.get_route.assert_called_once_with(start_pos, dest_pos)
 
     # Verify resource moved through positions
     assert driver.position == dest_pos
@@ -156,8 +128,8 @@ def test_travel_to_handles_tuple_return_from_route_next() -> None:
     assert driver.current_route is None
 
 
-def test_travel_to_handles_single_position_return_from_route_next() -> None:
-    """Test that travel_to handles when route.next() returns just a position"""
+def test_travel_to_next_stop_handles_single_position_return_from_route_next() -> None:
+    """Test that travel_to_next_stop handles when route.next() returns a position"""
     env = SimulationEnvironment()
     Driver.env = env
     start_pos = Position([0.0, 0.0])
@@ -179,20 +151,18 @@ def test_travel_to_handles_single_position_return_from_route_next() -> None:
     mock_route.get_current_traffic_multiplier.return_value = 1.0
 
     # Mock map map
-    mock_map = Mock()
-    mock_map.get_route.return_value = mock_route
-    driver.set_map_controller(mock_map)
+    driver.routes = [mock_route]
 
     # Execute travel
-    env.process(driver.travel_to(dest_pos))
+    env.process(driver.travel_to_next_stop())
     env.run(until=10)
 
     # Verify resource moved
     assert driver.position == dest_pos
 
 
-def test_travel_to_can_be_interrupted() -> None:
-    """Test that travel_to handles simpy.Interrupt correctly"""
+def test_travel_to_next_stop_can_be_interrupted() -> None:
+    """Test that travel_to_next_stop handles simpy.Interrupt correctly"""
     env = SimulationEnvironment()
     Driver.env = env
     start_pos = Position([0.0, 0.0])
@@ -208,13 +178,10 @@ def test_travel_to_can_be_interrupted() -> None:
     # Mock traffic multiplier (needed for traffic-aware travel logic)
     mock_route.get_current_traffic_multiplier.return_value = 1.0
 
-    # Mock map controller
-    mock_map = Mock()
-    mock_map.get_route.return_value = mock_route
-    driver.set_map_controller(mock_map)
+    driver.routes = [mock_route]
 
     # Start travel process
-    travel_process = env.process(driver.travel_to(dest_pos))
+    travel_process = env.process(driver.travel_to_next_stop())
 
     # Interrupt after 2 time units
     def interrupter():  # type: ignore[no-untyped-def]
@@ -228,7 +195,7 @@ def test_travel_to_can_be_interrupted() -> None:
     assert driver.position != dest_pos
 
 
-def test_travel_to_stops_immediately_when_on_route_without_tasks() -> None:
+def test_travel_to_next_stop_stops_immediately_when_on_route_without_tasks() -> None:
     env = SimulationEnvironment()
     Driver.env = env
     start_position = Position([0.0, 0.0])
@@ -249,14 +216,11 @@ def test_travel_to_stops_immediately_when_on_route_without_tasks() -> None:
     # Mock traffic multiplier (needed for traffic-aware travel logic)
     mock_route.get_current_traffic_multiplier.return_value = 1.0
 
-    # Mock map map
-    mock_map = Mock()
-    mock_map.get_route.return_value = mock_route
-    driver.set_map_controller(mock_map)
+    driver.routes = [mock_route]
 
     # Start travel process
     with patch.object(driver, "get_in_progress_task", return_value=None):
-        env.process(driver.travel_to(target_position))
+        env.process(driver.travel_to_next_stop())
         env.run(until=10)
 
         # It should be called exactly once: before the while loop starts.
@@ -310,15 +274,6 @@ def test_driver_run_selects_and_dispatches_task() -> None:
     station_pos = Position([1.0, 1.0])
     station = Station(station_id=1, name="Station1", position=station_pos)
     station.env = env
-    task = FakeTask(task_id=1, station=station)
-    driver.assign_task(task)
-
-    # Set up behaviour
-    mock_behaviour = Mock(spec=SimBehaviour)
-    mock_behaviour.RCNT_strategy = Mock()
-    mock_behaviour.RCNT_strategy.select_next_task.return_value = task
-
-    driver.set_behaviour(mock_behaviour)
 
     # Set up map map with mock route
     mock_route = Mock()
@@ -330,6 +285,18 @@ def test_driver_run_selects_and_dispatches_task() -> None:
     driver.set_map_controller(mock_map)
     # Stub initial state to avoid AttributeError before run loop
     driver.state = DriverState.IDLE
+
+    # Assign the task to the driver after setting map controller
+    # so that routes can be computed
+    task = FakeTask(task_id=1, station=station)
+    driver.assign_task(task)
+
+    # Set up behaviour
+    mock_behaviour = Mock(spec=SimBehaviour)
+    mock_behaviour.RCNT_strategy = Mock()
+    mock_behaviour.RCNT_strategy.select_next_task.return_value = task
+
+    driver.set_behaviour(mock_behaviour)
 
     # Run simulation for just enough time to dispatch but not complete
     env.process(driver.run())

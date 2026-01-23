@@ -267,19 +267,19 @@ export function setMapSource(
  * Update route visualization for a selected resource
  * @param routeGeometry - Full route coordinates (raw OSRM linestring)
  * @param progress - Current progress through route (0-1 fractional)
- * @param nextTaskEndIndex - Index where first task in task queue ends within route
+ * @param nextStopIndex - Index where first task in task queue ends within route
  * @param map - Mapbox map instance
  */
 export function updateRouteDisplay(
   routeGeometry: Position[] | null,
   position: Position,
-  nextTaskEndIndex: number,
+  nextStopIndex: number,
   map: mapboxgl.Map
 ) {
   const { nextTask, futureTasks } = adaptRouteToGeoJSON(
     routeGeometry,
     position,
-    nextTaskEndIndex
+    nextStopIndex
   );
 
   setMapSource(MapSource.RouteNextTask, nextTask, map);
