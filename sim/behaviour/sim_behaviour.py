@@ -30,9 +30,15 @@ from sim.behaviour.station_behaviour.strategies.task_popup_strategy import (
     TaskPopupStrategy,
 )
 
+from sim.behaviour.resource_behaviour.task_servicing_time_strategy import (
+    TaskServicingTimeStrategy,
+)
+
 from sim.behaviour.default.default_TPU_strategy import DefaultTPUStrategy
 
 from sim.behaviour.default.default_RCNT_strategy import DefaultRCNTStrategy
+
+from sim.behaviour.default.default_TST_strategy import DefaultTSTStrategy
 
 
 class SimBehaviour:
@@ -42,9 +48,12 @@ class SimBehaviour:
 
     TPU_strategy: TaskPopupStrategy
 
+    TST_strategy: TaskServicingTimeStrategy
+
     def __init__(self) -> None:
         self.RCNT_strategy = DefaultRCNTStrategy()
         self.TPU_strategy = DefaultTPUStrategy()
+        self.TST_strategy = DefaultTSTStrategy()
 
     def set_RCNT_strategy(self, strategy: DriverChooseNextTaskStrategy) -> None:
         """Set the driver choose next task strategy.
@@ -67,3 +76,14 @@ class SimBehaviour:
             None
         """
         self.TPU_strategy = strategy
+
+    def set_TST_strategy(self, strategy: TaskServicingTimeStrategy) -> None:
+        """Set the task service time strategy.
+
+        Args:
+            strategy: The strategy to determine task servicing time.
+
+        Returns:
+            None
+        """
+        self.TST_strategy = strategy

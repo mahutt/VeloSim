@@ -30,6 +30,10 @@ from sim.behaviour.resource_behaviour.resource_choose_next_task_strategy import 
 from sim.behaviour.station_behaviour.strategies.task_popup_strategy import (
     TaskPopupStrategy,
 )
+
+from sim.behaviour.resource_behaviour.task_servicing_time_strategy import (
+    TaskServicingTimeStrategy,
+)
 from typing import Self
 
 
@@ -63,6 +67,18 @@ class SimBehaviourBuilder:
             Self for method chaining.
         """
         self.sim_behaviour.set_TPU_strategy(strategy)
+        return self
+
+    def set_TST_strategy(self, strategy: TaskServicingTimeStrategy) -> Self:
+        """Set the task service time strategy.
+
+        Args:
+            strategy: The strategy to use for task servicing time.
+
+        Returns:
+            Self for method chaining.
+        """
+        self.sim_behaviour.set_TST_strategy(strategy)
         return self
 
     def reset(self) -> None:

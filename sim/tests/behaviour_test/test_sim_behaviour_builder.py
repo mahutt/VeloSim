@@ -30,8 +30,12 @@ from sim.behaviour.resource_behaviour.resource_choose_next_task_strategy import 
 from sim.behaviour.station_behaviour.strategies.task_popup_strategy import (
     TaskPopupStrategy,
 )
+from sim.behaviour.resource_behaviour.task_servicing_time_strategy import (
+    TaskServicingTimeStrategy,
+)
 from sim.behaviour.default.default_TPU_strategy import DefaultTPUStrategy
 from sim.behaviour.default.default_RCNT_strategy import DefaultRCNTStrategy
+from sim.behaviour.default.default_TST_strategy import DefaultTSTStrategy
 
 
 # Stub strategies for testing
@@ -43,6 +47,11 @@ class StubRCNTStrategy(DriverChooseNextTaskStrategy):
 class StubTPUStrategy(TaskPopupStrategy):
     def check_for_new_task(self, station):  # type: ignore[no-untyped-def]
         return False
+
+
+class StubTSTStrategy(TaskServicingTimeStrategy):
+    def get_task_servicing_time(self):  # type: ignore[no-untyped-def]
+        return 240
 
 
 def test_builder_initializes_with_default_behaviour() -> None:
@@ -84,6 +93,22 @@ def test_set_TPU_strategy_assigns_strategy() -> None:
     assert builder.sim_behaviour.TPU_strategy is strategy
 
 
+def test_set_TST_strategy_returns_self() -> None:
+    """Test that set_TST_strategy returns the builder for method chaining"""
+    builder = SimBehaviourBuilder()
+    strategy = StubTSTStrategy()
+    result = builder.set_TST_strategy(strategy)
+    assert result is builder
+
+
+def test_set_TST_strategy_assigns_strategy() -> None:
+    """Test that TST strategy is properly assigned to SimBehaviour"""
+    builder = SimBehaviourBuilder()
+    strategy = StubTSTStrategy()
+    builder.set_TST_strategy(strategy)
+    assert builder.sim_behaviour.TST_strategy is strategy
+
+
 def test_method_chaining() -> None:
     """Test that methods can be chained together"""
     builder = SimBehaviourBuilder()
@@ -102,16 +127,19 @@ def test_get_sim_behaviour_returns_configured_behaviour() -> None:
     builder = SimBehaviourBuilder()
     rcnt_strategy = StubRCNTStrategy()
     tpu_strategy = StubTPUStrategy()
+    tst_strategy = StubTSTStrategy()
 
     behaviour = (
         builder.set_RCNT_strategy(rcnt_strategy)
         .set_TPU_strategy(tpu_strategy)
+        .set_TST_strategy(tst_strategy)
         .get_sim_behaviour()
     )
 
     assert isinstance(behaviour, SimBehaviour)
     assert behaviour.RCNT_strategy is rcnt_strategy
     assert behaviour.TPU_strategy is tpu_strategy
+    assert behaviour.TST_strategy is tst_strategy
 
 
 def test_get_sim_behaviour_resets_builder() -> None:
@@ -149,6 +177,7 @@ def test_reset_uses_default_strategies() -> None:
     # After reset, should have default strategies
     assert isinstance(builder.sim_behaviour.RCNT_strategy, DefaultRCNTStrategy)
     assert isinstance(builder.sim_behaviour.TPU_strategy, DefaultTPUStrategy)
+    assert isinstance(builder.sim_behaviour.TST_strategy, DefaultTSTStrategy)
 
 
 def test_builder_reuse_after_get() -> None:
@@ -189,3 +218,4 @@ def test_empty_configuration() -> None:
     # Should have default strategies
     assert isinstance(behaviour.RCNT_strategy, DefaultRCNTStrategy)
     assert isinstance(behaviour.TPU_strategy, DefaultTPUStrategy)
+    assert isinstance(behaviour.TST_strategy, DefaultTSTStrategy)

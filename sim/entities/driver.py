@@ -402,7 +402,7 @@ class Driver:
                     "one already in-progress"
                 )
 
-    def service_task(self, task: "Task") -> None:
+    def service_task(self, task: "Task") -> Generator[Any, Any, None]:
         """Complete a task and remove it from the driver's task list.
 
         Marks the task as CLOSED and removes it from the driver's task list.
@@ -421,6 +421,10 @@ class Driver:
             and self.vehicle is not None
             and self.vehicle.get_battery_count() != 0
         ):
+            task_servicing_time = (
+                self.sim_behaviour.TST_strategy.get_task_servicing_time()
+            )
+            yield self.env.timeout(task_servicing_time)
             self.task_list.remove(task)
             battery_count = self.vehicle.use_battery()
             task.set_state(State.CLOSED)
@@ -911,11 +915,11 @@ class Driver:
                 # else sets state to IDLE
         self.set_state(DriverState.IDLE)
 
-    def _servicing_station(self) -> None:
+    def _servicing_station(self) -> Generator[Any, None, None]:
         """Handle SERVICING_STATION transitions."""
         in_service = self.get_in_service_task()
         if in_service is not None:
-            self.service_task(in_service)
+            yield self.env.process(self.service_task(in_service))
         self.set_state(DriverState.IDLE)
 
     def _on_break(self) -> Generator[Any, None, None]:
@@ -998,7 +1002,7 @@ class Driver:
                     yield from self._on_route()
 
                 case DriverState.SERVICING_STATION:
-                    self._servicing_station()
+                    yield from self._servicing_station()
 
                 case DriverState.ON_BREAK:
                     yield from self._on_break()

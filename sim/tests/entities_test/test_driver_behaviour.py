@@ -366,6 +366,9 @@ def test_driver_run_services_task_when_at_station() -> None:
     # Set up behaviour
     mock_behaviour = Mock(spec=SimBehaviour)
     mock_behaviour.RCNT_strategy = Mock()
+    # ensure servicing time is available and short for the test
+    mock_behaviour.TST_strategy = Mock()
+    mock_behaviour.TST_strategy.get_task_servicing_time.return_value = 0
     driver.set_behaviour(mock_behaviour)
 
     mock_map = Mock()

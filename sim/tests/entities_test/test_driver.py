@@ -25,7 +25,7 @@ SOFTWARE.
 import pytest
 import simpy
 from typing import Any
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch, MagicMock, Mock
 
 from sim.core.simulation_environment import SimulationEnvironment
 from sim.entities.driver import Driver, DriverState
@@ -313,8 +313,16 @@ class TestDriver:
         task_to_service = task2
 
         assert task_to_service in driver.get_task_list()
+        # make service instantaneous for test by mocking TST strategy
+        from unittest.mock import Mock
 
-        driver.service_task(task_to_service)
+        driver.sim_behaviour = Mock()
+        driver.sim_behaviour.TST_strategy = Mock()
+        driver.sim_behaviour.TST_strategy.get_task_servicing_time.return_value = 0
+
+        # run the servicing process in the simpy env
+        simpy_env.process(driver.service_task(task_to_service))
+        simpy_env.run()
 
         assert vehicle.get_battery_count() == 9
         assert driver.get_task_count() == initial_count - 1
@@ -350,8 +358,14 @@ class TestDriver:
         vehicle.set_driver(driver)
         driver.set_vehicle(vehicle)
 
+        # ensure TST returns 0 so service_task completes immediately
+        driver.sim_behaviour = Mock()
+        driver.sim_behaviour.TST_strategy = Mock()
+        driver.sim_behaviour.TST_strategy.get_task_servicing_time.return_value = 0
+
         with patch.object(Driver, "return_to_HQ") as mock_hq:
-            driver.service_task(task2)
+            simpy_env.process(driver.service_task(task2))
+            simpy_env.run()
             mock_hq.assert_called_once()
             assert vehicle.battery_count == 0
 
@@ -415,8 +429,14 @@ class TestDriver:
         assert driver.get_task_count() == 3
         assert set(driver.get_task_list()) == {task, task2, task3}
 
-        # service a task
-        driver.service_task(task2)
+        # service a task - make service time instantaneous for test
+        from unittest.mock import Mock
+
+        driver.sim_behaviour = Mock()
+        driver.sim_behaviour.TST_strategy = Mock()
+        driver.sim_behaviour.TST_strategy.get_task_servicing_time.return_value = 0
+        simpy_env.process(driver.service_task(task2))
+        simpy_env.run()
         assert driver.get_task_count() == 2
         assert vehicle.get_battery_count() == 9
         assert task2 not in driver.get_task_list()
