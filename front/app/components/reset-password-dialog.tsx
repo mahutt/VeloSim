@@ -126,8 +126,8 @@ export default function ResetPasswordDialog({
         onOpenChange(newOpen);
       }}
     >
-      <form id={formId} onSubmit={updatePasswordForm.handleSubmit(onSubmit)}>
-        <DialogContent className="sm:max-w-[425px]">
+      <DialogContent className="sm:max-w-[425px]">
+        <form id={formId} onSubmit={updatePasswordForm.handleSubmit(onSubmit)}>
           <DialogHeader>
             <DialogTitle>{title}</DialogTitle>
             <DialogDescription>
@@ -137,7 +137,7 @@ export default function ResetPasswordDialog({
             </DialogDescription>
           </DialogHeader>
           {message && <UpdatePasswordFormAlert message={message} />}
-          <FieldGroup>
+          <FieldGroup className="py-4">
             <Controller
               name="password"
               control={updatePasswordForm.control}
@@ -194,8 +194,8 @@ export default function ResetPasswordDialog({
               {loading && <Loader2 className="ml-2 h-4 w-4 animate-spin" />}
             </Button>
           </DialogFooter>
-        </DialogContent>
-      </form>
+        </form>
+      </DialogContent>
     </Dialog>
   );
 }

@@ -490,6 +490,9 @@ class TestUserCRUD:
         ]
         mock_offset = Mock()
         mock_offset.limit.return_value = mock_limit
+        mock_order_by = Mock()
+        mock_order_by.offset.return_value = mock_offset
+        mock_query.order_by.return_value = mock_order_by
         mock_query.offset.return_value = mock_offset
 
         mock_db.query.side_effect = [mock_get_query, mock_query]
@@ -520,7 +523,7 @@ class TestUserCRUD:
         mock_get_filter.first.return_value = admin_user
         mock_get_query.filter.return_value = mock_get_filter
 
-        # Mock query that supports filter().count() and filter().offset().limit().all()
+        # Mock query with filter().count() and filter().order_by().offset()
         mock_query = Mock()
         mock_filtered = Mock()
         mock_filtered.count.return_value = 2
@@ -528,6 +531,9 @@ class TestUserCRUD:
         mock_limit.all.return_value = [admin_user, user2]
         mock_offset = Mock()
         mock_offset.limit.return_value = mock_limit
+        mock_order_by = Mock()
+        mock_order_by.offset.return_value = mock_offset
+        mock_filtered.order_by.return_value = mock_order_by
         mock_filtered.offset.return_value = mock_offset
         mock_query.filter.return_value = mock_filtered
 
@@ -567,6 +573,9 @@ class TestUserCRUD:
         mock_limit.all.return_value = users_list[2:5]
         mock_offset = Mock()
         mock_offset.limit.return_value = mock_limit
+        mock_order_by = Mock()
+        mock_order_by.offset.return_value = mock_offset
+        mock_query.order_by.return_value = mock_order_by
         mock_query.offset.return_value = mock_offset
 
         mock_db.query.side_effect = [mock_get_query, mock_query]
@@ -649,6 +658,9 @@ class TestUserCRUD:
         mock_limit.all.return_value = [admin_user, user1]
         mock_offset = Mock()
         mock_offset.limit.return_value = mock_limit
+        mock_order_by = Mock()
+        mock_order_by.offset.return_value = mock_offset
+        mock_filtered.order_by.return_value = mock_order_by
         mock_filtered.offset.return_value = mock_offset
         mock_query.filter.return_value = mock_filtered
 
@@ -673,6 +685,9 @@ class TestUserCRUD:
         mock_limit2.all.return_value = [user2, user3]
         mock_offset2 = Mock()
         mock_offset2.limit.return_value = mock_limit2
+        mock_order_by2 = Mock()
+        mock_order_by2.offset.return_value = mock_offset2
+        mock_filtered2.order_by.return_value = mock_order_by2
         mock_filtered2.offset.return_value = mock_offset2
         mock_query2.filter.return_value = mock_filtered2
 

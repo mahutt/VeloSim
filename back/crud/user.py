@@ -127,8 +127,8 @@ class UserCRUD:
         # Get total count for pagination
         total = query.count()
 
-        # Apply pagination
-        users = query.offset(skip).limit(limit).all()
+        # Apply pagination with consistent ordering by ID
+        users = query.order_by(User.id).offset(skip).limit(limit).all()
 
         return users, total
 
