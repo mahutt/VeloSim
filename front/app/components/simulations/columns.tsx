@@ -67,12 +67,13 @@ export const columns: ColumnDef<Simulation>[] = [
         }
         navigate(`/simulation/${sim_id}`);
       };
+
+      if (isCompleted) {
+        return <span>N/A</span>;
+      }
+
       return (
-        <Button
-          size="sm"
-          onClick={handleSimulationClick}
-          disabled={isCompleted}
-        >
+        <Button size="sm" onClick={handleSimulationClick}>
           Resume
         </Button>
       );

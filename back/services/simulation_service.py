@@ -246,7 +246,7 @@ class SimulationService:
 
         env = SimulationEnvironment()
 
-        env.run(until=current_sim_time + input_params.start_time)
+        env.run(until=current_sim_time)
 
         restore_sim_id = sim.initialize(
             input_params,

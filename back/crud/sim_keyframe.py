@@ -206,7 +206,7 @@ class SimKeyframeCRUD:
         keyframe = (
             db.query(SimFrame)
             .filter(
-                SimFrame.sim_instance_id == sim_instance_id and SimFrame.is_key == True
+                SimFrame.sim_instance_id == sim_instance_id, SimFrame.is_key == True
             )
             .order_by(SimFrame.sim_seconds_elapsed.desc())
             .first()
