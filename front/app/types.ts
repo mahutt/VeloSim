@@ -121,8 +121,9 @@ export enum DriverState {
   OnRoute = 'on_route',
   ServicingStation = 'servicing_station',
   OnBreak = 'on_break',
-  HeadingToHQ = 'heading_to_hq',
+  SeekingHQForInventory = 'seeking_hq_for_inventory',
   RestockingBatteries = 'restocking',
+  EndingShift = 'ending_shift',
 }
 
 export interface Driver {
