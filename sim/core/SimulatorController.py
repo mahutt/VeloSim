@@ -24,7 +24,7 @@ SOFTWARE.
 
 from sim.core.RealTimeDriver import RealTimeDriver
 import threading
-from typing import Optional, Dict
+from typing import Callable, Optional, Dict
 from sim.core.simulation_environment import SimulationEnvironment
 from sim.entities.station import Station
 from sim.core.frame_emitter import FrameEmitter
@@ -51,6 +51,7 @@ class SimulatorController:
         sim_behaviour: SimBehaviour,
         strict: bool = False,
         map_controller: MapController | None = None,
+        on_completed_callback: Optional[Callable[[str], None]] = None,
     ) -> None:
         self.simEnv = simEnv
 
@@ -69,6 +70,7 @@ class SimulatorController:
         self.sim_behaviour = sim_behaviour
         self.frameCounter: int = 0
         self.start_time: int = inputParameters.get_start_time()
+        self.on_completed_callback = on_completed_callback
 
         # Unpack InputParameter object to populate entity lists
         self.station_entities: Dict[int, Station] = (
@@ -131,10 +133,10 @@ class SimulatorController:
                 self.simEnv.hq.push_vehicle(vehicle)
 
     def start(self, sim_time: int) -> None:
-        """Start the simulation for specified time.
+        """Start the simulation.
 
         Args:
-            sim_time: Duration to run the simulation in sim seconds.
+            sim_time (int): Total simulation time to run.
 
         Returns:
             None
@@ -142,8 +144,38 @@ class SimulatorController:
         # start sim clock
         self.clock.run()
         self.sim_time = sim_time
+
+        def run() -> None:
+            """Run the simulation loop until the configured simulation time.
+
+            Returns:
+                None
+            """
+
+            try:
+                self.realTimeDriver.run_until(
+                    until=sim_time,
+                    step_callback=self.emit_frame,
+                )
+            finally:
+
+                running_at_completion = self.realTimeDriver.running
+
+                # Emit final keyframe only if sim ended naturally
+                if running_at_completion:
+                    final_frame = self.create_frame(
+                        is_key=True,
+                        paused_by_user=False,
+                    )
+                    self.emit_frame(final_frame)
+
+                # If the sim reaches end_time, realTimeDriver.running = true
+                # If diconnected/paused, realTimeDriver.running = false
+                if running_at_completion and self.on_completed_callback:
+                    self.on_completed_callback(self.frameEmitter.sim_id)
+
         self.sim_thread = threading.Thread(
-            target=self.realTimeDriver.run_until, args=(sim_time, self.emit_frame)
+            target=run,
         )
         self.sim_thread.start()
 

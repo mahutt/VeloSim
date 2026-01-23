@@ -25,6 +25,7 @@ SOFTWARE.
 from typing import List, Optional, Tuple
 from sqlalchemy.orm import Session
 from back.exceptions import BadRequestError, ItemNotFoundError
+from back.models.sim_frame import SimFrame
 from back.models.sim_keyframe import SimKeyframe
 from back.schemas.sim_keyframe import SimKeyframeCreate
 
@@ -189,7 +190,7 @@ class SimKeyframeCRUD:
 
     def get_last_keyframe(
         self, db: Session, sim_instance_id: str
-    ) -> Optional[SimKeyframe]:
+    ) -> Optional[SimFrame]:
         """
         Retrieve the most recently persisted keyframe for a simulation instance.
 
@@ -203,9 +204,11 @@ class SimKeyframeCRUD:
         """
 
         keyframe = (
-            db.query(SimKeyframe)
-            .filter(SimKeyframe.sim_instance_id == sim_instance_id)
-            .order_by(SimKeyframe.sim_seconds_elapsed.desc())
+            db.query(SimFrame)
+            .filter(
+                SimFrame.sim_instance_id == sim_instance_id, SimFrame.is_key == True
+            )
+            .order_by(SimFrame.sim_seconds_elapsed.desc())
             .first()
         )
 

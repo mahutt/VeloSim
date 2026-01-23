@@ -23,7 +23,7 @@ SOFTWARE.
 """
 
 import threading
-from typing import Dict, List, TypedDict, Optional
+from typing import Callable, Dict, List, TypedDict, Optional
 import uuid
 
 from sim.core.simulation_environment import SimulationEnvironment
@@ -71,6 +71,7 @@ class Simulator:
         env: SimulationEnvironment | None = None,
         initial_running: bool = True,
         real_time_factor: float | None = None,
+        on_completed_callback: Optional[Callable[[str], None]] = None,
     ) -> str:
         """Initialize a simulation instance without starting the simulation loop.
 
@@ -118,6 +119,7 @@ class Simulator:
             sim_behaviour=sim_behaviour,
             strict=True,
             map_controller=map_controller,
+            on_completed_callback=on_completed_callback,
         )
 
         # Apply playback state for restored simulations

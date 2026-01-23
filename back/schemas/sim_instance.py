@@ -24,7 +24,7 @@ SOFTWARE.
 
 from datetime import datetime
 from typing import Any, Dict, List, Optional
-from pydantic import BaseModel, ConfigDict, computed_field
+from pydantic import UUID4, BaseModel, ConfigDict, Field, computed_field
 
 
 class SimInstanceBase(BaseModel):
@@ -46,13 +46,14 @@ class SimInstanceResponse(SimInstanceBase):
     """Schema for SimInstance response."""
 
     id: int
-    uuid: Optional[str] = None
     name: Optional[str] = None
     playback_capable: bool = False
     parent_sim_instance_id: Optional[int] = None
     branch_keyframe_seq: Optional[int] = None
     date_created: datetime
     date_updated: datetime
+    uuid: UUID4
+    completed: bool = Field(default=False)
 
     model_config = ConfigDict(from_attributes=True)
 

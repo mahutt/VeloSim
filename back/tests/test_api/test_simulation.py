@@ -54,6 +54,9 @@ from back.services.simulation_service import simulation_service
 
 from back.models.user import User
 
+from datetime import datetime
+from uuid import uuid4
+
 SCENARIO_CONTENT = {
     "start_time": "day1:06:00",
     "end_time": "day1:12:00",
@@ -107,6 +110,34 @@ SCENARIO_PAYLOAD = {"content": SCENARIO_CONTENT}
 
 # Apply patches before any simulator code is imported
 pytestmark = pytest.mark.usefixtures("mock_heavy_sim_operations")
+
+
+def make_sim_instance(
+    *,
+    id: int,
+    user_id: int = 1,
+    completed: bool = False,
+) -> MagicMock:
+    sim = MagicMock()
+
+    # Required DB fields
+    sim.id = id
+    sim.user_id = user_id
+    sim.uuid = str(uuid4())
+    sim.completed = completed
+    sim.date_created = datetime.utcnow()
+    sim.date_updated = datetime.utcnow()
+
+    # REQUIRED FOR RESPONSE SCHEMA
+    sim.name = f"Simulation {id}"
+    sim.scenario_payload = None
+
+    # Used by computed fields
+    sim.drivers = []
+    sim.stations = []
+    sim.tasks = []
+
+    return sim
 
 
 @pytest.fixture(scope="session", autouse=True)
@@ -607,26 +638,13 @@ class TestSimulationAPI:
         assert response.status_code == 500
 
     @patch(
-        "back.services.simulation_service.simulation_service."
-        "get_active_user_simulations"
+        "back.services.simulation_service.simulation_service.get_all_user_simulations"
     )
     def test_list_my_simulations_success(
         self, mock_list: MagicMock, authenticated_client: TestClient, db: Session
     ) -> None:
         # Create a mock SimInstance object
-        mock_sim = MagicMock()
-        mock_sim.id = 1
-        mock_sim.user_id = 1
-        mock_sim.uuid = "test-uuid-123"
-        mock_sim.name = None
-        mock_sim.playback_capable = False
-        mock_sim.parent_sim_instance_id = None
-        mock_sim.branch_keyframe_seq = None
-        mock_sim.date_created = "2025-01-01T00:00:00"
-        mock_sim.date_updated = "2025-01-01T00:00:00"
-        mock_sim.drivers = []
-        mock_sim.stations = []
-        mock_sim.tasks = []
+        mock_sim = make_sim_instance(id=1)
 
         mock_list.return_value = ([mock_sim], 1)
         response = authenticated_client.get("/api/v1/simulation/my")
@@ -640,14 +658,21 @@ class TestSimulationAPI:
         mock_list.assert_called_once_with(ANY, 1, 0, 10)
 
     @patch(
-        "back.services.simulation_service.simulation_service."
-        "get_active_user_simulations"
+        "back.services.simulation_service.simulation_service.get_all_user_simulations"
     )
+    @patch("back.services.simulation_service.simulation_service._get_requesting_user")
     def test_list_my_simulations_permission_error(
-        self, mock_list: MagicMock, non_admin_client: TestClient, db: Session
+        self,
+        mock_get_user: MagicMock,
+        mock_get_all: MagicMock,
+        non_admin_client: TestClient,
+        db: Session,
     ) -> None:
-        mock_list.side_effect = VelosimPermissionError("No permission")
+        mock_get_user.return_value = MagicMock(id=2, enabled=True)
+        mock_get_all.side_effect = VelosimPermissionError("No permission")
+
         response = non_admin_client.get("/api/v1/simulation/my")
+
         assert response.status_code == 403
         assert "No permission" in response.json()["detail"]
 
@@ -658,33 +683,8 @@ class TestSimulationAPI:
         self, mock_list: MagicMock, authenticated_client: TestClient, db: Session
     ) -> None:
         # Create mock SimInstance objects
-        mock_sim1 = MagicMock()
-        mock_sim1.id = 1
-        mock_sim1.user_id = 1
-        mock_sim1.uuid = "test-uuid-1"
-        mock_sim1.name = None
-        mock_sim1.playback_capable = False
-        mock_sim1.parent_sim_instance_id = None
-        mock_sim1.branch_keyframe_seq = None
-        mock_sim1.date_created = "2025-01-01T00:00:00"
-        mock_sim1.date_updated = "2025-01-01T00:00:00"
-        mock_sim1.drivers = []
-        mock_sim1.stations = []
-        mock_sim1.tasks = []
-
-        mock_sim2 = MagicMock()
-        mock_sim2.id = 2
-        mock_sim2.user_id = 1
-        mock_sim2.uuid = "test-uuid-2"
-        mock_sim2.name = None
-        mock_sim2.playback_capable = False
-        mock_sim2.parent_sim_instance_id = None
-        mock_sim2.branch_keyframe_seq = None
-        mock_sim2.date_created = "2025-01-01T00:00:00"
-        mock_sim2.date_updated = "2025-01-01T00:00:00"
-        mock_sim2.drivers = []
-        mock_sim2.stations = []
-        mock_sim2.tasks = []
+        mock_sim1 = make_sim_instance(id=1)
+        mock_sim2 = make_sim_instance(id=2)
 
         mock_list.return_value = ([mock_sim1, mock_sim2], 2)
         response = authenticated_client.get("/api/v1/simulation/list")

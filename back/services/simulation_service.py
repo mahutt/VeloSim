@@ -25,6 +25,7 @@ SOFTWARE.
 from typing import TYPE_CHECKING, Dict, List, NotRequired, TypedDict
 import asyncio
 from sqlalchemy.orm import Session
+from back.core.simulation_callbacks import on_simulation_completed
 from back.models import User
 from back.models.sim_instance import SimInstance
 from back.schemas import (
@@ -245,7 +246,7 @@ class SimulationService:
 
         env = SimulationEnvironment()
 
-        env.run(until=current_sim_time + input_params.start_time)
+        env.run(until=current_sim_time)
 
         restore_sim_id = sim.initialize(
             input_params,
@@ -255,6 +256,7 @@ class SimulationService:
             env=env,
             initial_running=should_auto_resume,
             real_time_factor=real_time_factor,
+            on_completed_callback=on_simulation_completed,
         )
 
         self.active_simulations[restore_sim_id] = ActiveSimulationData(
@@ -303,7 +305,11 @@ class SimulationService:
         frame_subscriber.start()
 
         # Initialize simulation with InputParameter and persistence subscriber
-        sim_id = sim.initialize(params, subscribers=[frame_subscriber])
+        sim_id = sim.initialize(
+            params,
+            subscribers=[frame_subscriber],
+            on_completed_callback=on_simulation_completed,
+        )
 
         # Update the database record with the simulator's UUID
         db_sim_instance.uuid = sim_id
@@ -508,6 +514,48 @@ class SimulationService:
         paginated = all_instances[skip : skip + limit]
 
         return paginated, total
+
+    def get_all_user_simulations(
+        self,
+        db: Session,
+        requesting_user: int,
+        skip: int = 0,
+        limit: int = 10,
+    ) -> tuple[List[SimInstance], int]:
+        """
+        Retrieve all simulations (active and inactive) with pagination.
+
+        Admins see all simulations.
+        Non-admin users see only their own simulations.
+
+        Args:
+            db: Database session
+            requesting_user: Requesting user's ID
+            skip: Number of records to skip
+            limit: Maximum number of records to return
+
+        Returns:
+            Tuple of (list of SimInstance objects, total count)
+        """
+
+        user = self._get_requesting_user(db, requesting_user)
+
+        query = db.query(SimInstance)
+
+        # Queries user-specific simulations.
+        query = query.filter(SimInstance.user_id == user.id)
+
+        total = query.count()
+
+        simulations = (
+            query.order_by(
+                SimInstance.date_created.desc()
+            )  # Returning by most recent sims.
+            .offset(skip)
+            .limit(limit)
+            .all()
+        )
+        return simulations, total
 
     def get_simulation_status(
         self, db: Session, sim_id: str, requesting_user: int

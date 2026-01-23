@@ -150,6 +150,24 @@ class SimInstanceCRUD:
         db.flush()
         return True
 
+    def mark_as_completed(self, db: Session, sim_instance_id: int) -> bool:
+        """Mark a simulation instance as completed by ID.
+
+        Args:
+            db: Database session.
+            sim_instance_id: The ID of the simulation instance to mark as completed.
+
+        Returns:
+            bool: True if the instance was updated, False if not found.
+        """
+        sim_instance = self.get(db, sim_instance_id)
+        if not sim_instance:
+            return False
+
+        sim_instance.completed = True
+        db.commit()
+        return True
+
 
 # Create a singleton instance
 sim_instance_crud = SimInstanceCRUD()

@@ -48,6 +48,10 @@ class SimInstance(Base):
         String(36), nullable=True, unique=True, index=True
     )
 
+    completed: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, server_default="false"
+    )
+
     date_created: Mapped[DateTime] = mapped_column(
         DateTime, nullable=False, server_default=func.now()
     )

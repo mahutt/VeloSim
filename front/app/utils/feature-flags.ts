@@ -33,7 +33,7 @@ export type FeatureFlags = {
 export const DEFAULT_FLAGS: FeatureFlags = {
   sidebar: true,
   taskDragAndDrop: true,
-  simulationsPage: false,
+  simulationsPage: true,
 };
 
 export function parseFlags(input: string | null): Partial<FeatureFlags> {

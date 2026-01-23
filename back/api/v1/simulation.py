@@ -228,7 +228,7 @@ def list_my_simulations(
         SimulationListResponse containing paginated list of user's simulations
     """
     try:
-        sims, total = simulation_service.get_active_user_simulations(
+        sims, total = simulation_service.get_all_user_simulations(
             db, requesting_user, skip, limit
         )
 

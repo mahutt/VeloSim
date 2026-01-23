@@ -31,32 +31,6 @@ FROM users;
 \echo 'Total users inserted:'
 SELECT COUNT(*) FROM users;
 
--- VeloSim Simulation Instance seed data
-
--- Clear existing data (if any)
-TRUNCATE TABLE sim_instances RESTART IDENTITY CASCADE;
-
--- Insert initial simulation instance data
-INSERT INTO sim_instances (user_id) VALUES
-(1);
-
--- Verify the data was inserted
-SELECT
-    id,
-    user_id
-FROM sim_instances
-ORDER BY id;
-
--- Display summary
-SELECT
-    COUNT(*) as total_sim_instances
-FROM sim_instances;
-
-\echo 'Simulation instance seed data loaded successfully!'
-\echo 'Total simulation instances inserted:'
-SELECT COUNT(*) FROM sim_instances;
-
-
 -- VeloSim Scenario Seed Data
 -- Contains initial simulation scenarios for testing and development
 
