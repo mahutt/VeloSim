@@ -20,7 +20,7 @@ COPY grafana_logging/ ./grafana_logging
 
 # Install the package with all dependencies
 RUN python -m pip install --upgrade pip setuptools wheel \
-    && python -m pip install --no-cache-dir -e .
+    && python -m pip install --no-cache-dir .
 
 # Copy remaining files into container.
 COPY scripts/ ./scripts
