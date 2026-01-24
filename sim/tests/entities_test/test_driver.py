@@ -763,6 +763,8 @@ class TestDriver:
         mock_map_controller.get_route.side_effect = [
             mock_route_to_task1,
             mock_route_to_task2,
+            mock_route_to_task1,
+            mock_route_to_task2,
         ]
         driver.set_map_controller(mock_map_controller)
 
@@ -800,3 +802,112 @@ class TestDriver:
         assert vehicle.driver is None
         assert len(driver.env.hq.vehicles) == (hq_vehicle_quant + 1)
         assert driver.has_updated == True
+
+    def test_hq_route_prediction_with_battery_depletion(
+        self, simpy_env: SimulationEnvironment, default_position: Position
+    ) -> None:
+        """Test that HQ is added to route when battery count is 0 after tasks."""
+        # Create driver with 2 batteries
+        vehicle = Vehicle(vehicle_id=1, battery_count=2, max_battery_count=2)
+        station1 = Station(1, "Station 1", Position([-73.5, 45.5]))
+        station2 = Station(2, "Station 2", Position([-73.6, 45.6]))
+        task1 = BatterySwapTask(1, station=station1)
+        task2 = BatterySwapTask(2, station=station2)
+        shift = Shift(0.0, 24.0, None, 0.0, 24.0, None)
+
+        driver = Driver(1, default_position, shift, [task1, task2])
+        driver.set_vehicle(vehicle)
+        vehicle.set_driver(driver)
+        driver.state = DriverState.ON_ROUTE
+
+        # Mock the map controller
+        mock_map_controller = MagicMock()
+        mock_route_to_task1 = MagicMock()
+        mock_route_to_task1.get_raw_coordinates.return_value = [
+            [-73.5673, 45.5017],  # Driver position
+            [-73.55, 45.51],
+            [-73.5, 45.5],  # Task 1 position
+        ]
+        mock_route_to_task2 = MagicMock()
+        mock_route_to_task2.get_raw_coordinates.return_value = [
+            [-73.5, 45.5],  # Task 1 position
+            [-73.55, 45.55],
+            [-73.6, 45.6],  # Task 2 position
+        ]
+        mock_route_to_hq = MagicMock()
+        mock_route_to_hq.get_raw_coordinates.return_value = [
+            [-73.6, 45.6],  # Task 2 position
+            [-73.59, 45.52],
+            [-73.60175631192361, 45.52975346053039],  # HQ position
+        ]
+
+        # First call for task1, second for task2, third for HQ
+        mock_map_controller.get_route.side_effect = [
+            mock_route_to_task1,
+            mock_route_to_task2,
+            mock_route_to_hq,
+        ]
+        driver.set_map_controller(mock_map_controller)
+
+        # Compute routes - should include HQ stop after task2
+        driver.compute_routes()
+
+        # Verify that 3 routes were created (task1, task2, and HQ)
+        assert len(driver.routes) == 3
+        assert mock_map_controller.get_route.call_count == 3
+
+        # Verify the stops include HQ position after the tasks
+        result = driver.get_route_json()
+        assert result is not None
+        assert "coordinates" in result
+        # The route should have: driver start -> task1 -> task2 -> HQ
+        # So HQ should be in the coordinates
+        assert any(
+            coord == [-73.60175631192361, 45.52975346053039]
+            for coord in result["coordinates"]
+        )
+
+    def test_hq_route_not_added_if_battery_sufficient(
+        self, simpy_env: SimulationEnvironment, default_position: Position
+    ) -> None:
+        """Test that HQ is NOT added to route when battery count is sufficient."""
+        # Create driver with 3 batteries (more than tasks)
+        vehicle = Vehicle(vehicle_id=1, battery_count=3, max_battery_count=3)
+        station1 = Station(1, "Station 1", Position([-73.5, 45.5]))
+        station2 = Station(2, "Station 2", Position([-73.6, 45.6]))
+        task1 = BatterySwapTask(1, station=station1)
+        task2 = BatterySwapTask(2, station=station2)
+        shift = Shift(0.0, 24.0, None, 0.0, 24.0, None)
+
+        driver = Driver(1, default_position, shift, [task1, task2])
+        driver.set_vehicle(vehicle)
+        vehicle.set_driver(driver)
+        driver.state = DriverState.ON_ROUTE
+
+        # Mock the map controller
+        mock_map_controller = MagicMock()
+        mock_route_to_task1 = MagicMock()
+        mock_route_to_task1.get_raw_coordinates.return_value = [
+            [-73.5673, 45.5017],
+            [-73.55, 45.51],
+            [-73.5, 45.5],
+        ]
+        mock_route_to_task2 = MagicMock()
+        mock_route_to_task2.get_raw_coordinates.return_value = [
+            [-73.5, 45.5],
+            [-73.55, 45.55],
+            [-73.6, 45.6],
+        ]
+
+        mock_map_controller.get_route.side_effect = [
+            mock_route_to_task1,
+            mock_route_to_task2,
+        ]
+        driver.set_map_controller(mock_map_controller)
+
+        # Compute routes - should NOT include HQ stop
+        driver.compute_routes()
+
+        # Verify that only 2 routes were created (task1 and task2, no HQ)
+        assert len(driver.routes) == 2
+        assert mock_map_controller.get_route.call_count == 2
