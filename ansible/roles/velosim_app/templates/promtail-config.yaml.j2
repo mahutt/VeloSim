@@ -1,0 +1,39 @@
+server:
+  http_listen_port: 9080
+  grpc_listen_port: 0
+  log_level: info
+
+positions:
+  filename: /var/lib/promtail/positions.yaml
+
+clients:
+  - url: http://velosim-loki:3100/loki/api/v1/push
+
+scrape_configs:
+  # VeloSim application logs from logs.txt
+  - job_name: velosim-app
+    pipeline_stages:
+      - regex:
+          expression: '^(?P<logger>\S+)\s+-\s+(?P<level>\S+)\s+-\s+(?P<message>.*)$'
+      - labels:
+          logger:
+          level:
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: velosim_app
+          environment: production
+          __path__: /logs/logs.txt
+
+  # Docker container logs (optional - captures all container logs)
+  - job_name: docker-containers
+    docker_sd_configs:
+      - host: unix:///var/run/docker.sock
+        refresh_interval: 5s
+    relabel_configs:
+      - source_labels: ['__meta_docker_container_name']
+        regex: '/(.*)'
+        target_label: 'container'
+      - source_labels: ['__meta_docker_container_log_stream']
+        target_label: 'stream'

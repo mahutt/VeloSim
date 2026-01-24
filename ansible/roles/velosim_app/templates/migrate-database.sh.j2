@@ -21,7 +21,7 @@ find "$APP_DIR/source" -name ".DS_Store" -type f -delete 2>/dev/null || true
 
 # Stop any existing containers to ensure clean state
 echo "Stopping any existing containers..."
-docker compose -f "$COMPOSE_FILE" down 2>/dev/null || true
+docker compose -f "$COMPOSE_FILE" down --remove-orphans 2>/dev/null || true
 
 # Start only PostgreSQL first
 echo "Starting PostgreSQL container..."
@@ -56,27 +56,27 @@ echo "Found $TABLES_COUNT tables in database"
 
 if [ "$TABLES_COUNT" = "0" ]; then
     echo "=== FIRST DEPLOYMENT: Creating database schema with Alembic ==="
-    
+
     # Start backend container for Alembic operations
     echo "Starting backend container for database operations..."
     docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" up -d backend
-    
+
     # Wait for backend to be ready
     echo "Waiting for backend container to be ready..."
     sleep 15
-    
+
     # Run basic database setup (extensions only)
     echo "Setting up database extensions..."
     docker compose -f "$COMPOSE_FILE" exec -T postgres psql -U {{ postgres_user }} -d {{ postgres_db }} -f /docker-entrypoint-initdb.d/init.sql >/dev/null 2>&1 || echo "Extensions setup completed"
-    
+
     # Clean up any remaining resource fork files inside container
     echo "Cleaning resource fork files in backend container..."
     docker compose -f "$COMPOSE_FILE" exec -T backend sh -c "find /app -name '._*' -delete 2>/dev/null || true"
-    
+
     # Verify Alembic environment
     echo "Verifying Alembic configuration..."
     docker compose -f "$COMPOSE_FILE" exec -T backend sh -c "cd /app/back && ls -la alembic.ini alembic/" || echo "Alembic files check completed"
-    
+
     # Create all tables using Alembic upgrade
     echo "Creating database schema using Alembic upgrade head..."
     if docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" exec -T backend sh -c "cd /app/back && alembic upgrade head"; then
@@ -87,7 +87,7 @@ if [ "$TABLES_COUNT" = "0" ]; then
         docker compose -f "$COMPOSE_FILE" logs --tail 20 backend
         exit 1
     fi
-    
+
     # Seed database if seeding script exists
     if [ -f "$APP_DIR/source/back/alembic/seeds/seed.sql" ]; then
         echo "Seeding database with initial data..."
@@ -99,22 +99,22 @@ if [ "$TABLES_COUNT" = "0" ]; then
     else
         echo "No seed file found, skipping database seeding"
     fi
-    
+
 else
     echo "=== UPDATING DEPLOYMENT: Running database migrations ==="
-    
+
     # Start backend container for Alembic operations
     echo "Starting backend container for migration operations..."
     docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" up -d backend
-    
+
     # Wait for backend to be ready
     echo "Waiting for backend container to be ready..."
     sleep 15
-    
+
     # Clean up any resource fork files
     echo "Cleaning resource fork files in backend container..."
     docker compose -f "$COMPOSE_FILE" exec -T backend sh -c "find /app -name '._*' -delete 2>/dev/null || true"
-    
+
     # Run Alembic migrations for schema updates
     echo "Running Alembic migrations..."
     if docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" exec -T backend sh -c "cd /app/back && alembic upgrade head"; then

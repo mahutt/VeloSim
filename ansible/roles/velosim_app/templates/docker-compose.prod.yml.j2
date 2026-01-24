@@ -69,10 +69,12 @@ services:
       - "127.0.0.1:8000:8000"
     volumes:
       - {{ app_dir }}/logs:/app/logs
+      - {{ app_dir }}/grafana_logging:/app/grafana_logging
       - {{ app_dir }}/.env.prod:/app/.env:ro
     environment:
       - DATABASE_URL=postgresql://{{ postgres_user }}:{{ postgres_password }}@postgres:5432/{{ postgres_db }}
       - OSRM_URL=http://osrm:5000
+      - LOG_FILE_PATH=/app/grafana_logging/logs.txt
     env_file:
       - {{ app_dir }}/.env.prod
     depends_on:
@@ -119,6 +121,56 @@ services:
         max-size: "10m"
         max-file: "3"
 
+  # Loki for log aggregation
+  loki:
+    image: grafana/loki:2.9.0
+    container_name: velosim-loki
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:3100:3100"
+    volumes:
+      - {{ app_dir }}/loki-config.yaml:/etc/loki/local-config.yaml:ro
+      - {{ app_dir }}/loki/chunks:/loki/chunks
+      - {{ app_dir }}/loki/index:/loki/index
+      - {{ app_dir }}/loki/cache:/loki/cache
+      - {{ app_dir }}/loki/wal:/loki/wal
+      - {{ app_dir }}/loki/compactor:/loki/compactor
+    command: -config.file=/etc/loki/local-config.yaml
+    networks:
+      - velosim-net
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:3100/ready || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # Promtail for log collection
+  promtail:
+    image: grafana/promtail:2.9.0
+    container_name: velosim-promtail
+    restart: unless-stopped
+    volumes:
+      - {{ app_dir }}/promtail-config.yaml:/etc/promtail/promtail-config.yaml:ro
+      - {{ app_dir }}/grafana_logging:/logs:ro
+      - {{ app_dir }}/promtail/positions:/var/lib/promtail
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    command: -config.file=/etc/promtail/promtail-config.yaml
+    depends_on:
+      loki:
+        condition: service_healthy
+    networks:
+      - velosim-net
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
   # Grafana for monitoring (optional)
   # Access via SSH tunnel only: ssh -L 3001:localhost:3001 user@server
   grafana:
@@ -132,6 +184,9 @@ services:
       - GF_SECURITY_ADMIN_PASSWORD={{ grafana_password | default('admin') }}
     volumes:
       - {{ app_dir }}/source/grafana_logging/grafana/provisioning:/etc/grafana/provisioning:ro
+    depends_on:
+      loki:
+        condition: service_healthy
     networks:
       - velosim-net
     logging:
