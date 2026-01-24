@@ -45,14 +45,14 @@ VeloSim uses PostgreSQL with Alembic for database migrations. These commands can
 
 **Prerequisites:**
 
-- PostgreSQL running on port 5433 (via Docker: `npm run dev:db`)
+- PostgreSQL running on port 5433 (via Docker: `npm run dev:services`)
 - Python environment with Alembic installed
 
 #### Quick Start
 
 ```bash
-# From project root - Start PostgreSQL database
-npm run dev:db
+# From project root - Start development services (PostgreSQL, OSRM)
+npm run dev:services
 
 # Check current migration status
 npm run db:current

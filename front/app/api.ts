@@ -28,7 +28,9 @@ import { TOKEN_STORAGE_KEY } from './constants';
 const API_VERSION = 'v1';
 
 const api = axios.create({
-  baseURL: `${import.meta.env.VITE_BACKEND_URL}/api/${API_VERSION}`,
+  baseURL: import.meta.env.VITE_BACKEND_URL
+    ? `${import.meta.env.VITE_BACKEND_URL}/api/${API_VERSION}`
+    : `/api/${API_VERSION}`,
   headers: {
     'Content-Type': 'application/json',
   },

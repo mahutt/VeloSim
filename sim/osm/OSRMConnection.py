@@ -71,20 +71,15 @@ class OSRMConnection:
         Raises:
             ValueError: If no OSRM URL is provided or configured via environment
         """
-        # Priority: explicit parameter > OSRM_URL > OSRM_LOCAL_URL > OSRM_PUBLIC_URL
+        # Priority: explicit parameter > env vars (OSRM_URL, OSRM_LOCAL_URL,
+        # OSRM_PUBLIC_URL) > default localhost:5001
         self.osrm_base_url = (
             osrm_url
             or os.getenv("OSRM_URL")
             or os.getenv("OSRM_LOCAL_URL")
             or os.getenv("OSRM_PUBLIC_URL")
+            or "http://localhost:5001"  # Default for local development
         )
-
-        if not self.osrm_base_url:
-            raise ValueError(
-                "No OSRM server URL configured. Please provide "
-                "osrm_url parameter or set one of these environment "
-                "variables: OSRM_URL, OSRM_LOCAL_URL, or OSRM_PUBLIC_URL"
-            )
 
         self._session = requests.Session()
 

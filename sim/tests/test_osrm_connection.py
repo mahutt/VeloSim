@@ -163,14 +163,18 @@ class TestOSRMConnectionInitialization:
 
                 assert osrm.osrm_base_url == "http://explicit:5000"
 
-    def test_initialization_no_url_raises_error(self) -> None:
-        """Test that initialization without URL raises ValueError."""
-        with patch.dict("os.environ", {}, clear=True):
-            with pytest.raises(
-                ValueError,
-                match="No OSRM server URL configured",
-            ):
-                OSRMConnection()
+    def test_initialization_no_url_raises_error(self, mock_session: Mock) -> None:
+        """Test that initialization without URL uses default localhost:5001."""
+        with patch(
+            "sim.osm.OSRMConnection.requests.Session", return_value=mock_session
+        ):
+            with patch.dict("os.environ", {}, clear=True):
+                mock_session.get.return_value = Mock(status_code=200)
+
+                osrm = OSRMConnection()
+
+                # Should use default localhost:5001
+                assert osrm.osrm_base_url == "http://localhost:5001"
 
     def test_initialization_connection_failure_raises_error(
         self, mock_session: Mock
