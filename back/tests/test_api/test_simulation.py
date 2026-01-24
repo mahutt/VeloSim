@@ -3711,3 +3711,173 @@ class TestSeekEndpoint:
 
             # Running simulation is never at live edge
             assert data["state"]["is_at_live_edge"] is False
+
+
+class TestBranchEndpoint:
+    """Tests for POST /simulation/{sim_id}/branch endpoint."""
+
+    def test_branch_from_keyframe_success(
+        self, authenticated_client: TestClient, mock_db: MagicMock
+    ) -> None:
+        """Test successful branching from a keyframe."""
+        from back.schemas.sim_instance import BranchResponse
+
+        mock_branch_response = BranchResponse(
+            sim_id="new-sim-456",
+            db_id=456,
+            name="Test Branch",
+            branched_from_sim_id="source-sim-123",
+            branched_from_keyframe_seq=100,
+            status="initialized",
+        )
+
+        with patch.object(
+            simulation_service,
+            "branch_simulation",
+            return_value=mock_branch_response,
+        ) as mock_branch:
+            response = authenticated_client.post(
+                "/api/v1/simulation/source-sim-123/branch",
+                json={"keyframe_seq": 100, "name": "Test Branch"},
+            )
+
+            assert response.status_code == 200
+            data = response.json()
+
+            # Verify service was called with correct args
+            mock_branch.assert_called_once_with(
+                db=ANY,
+                sim_id="source-sim-123",
+                keyframe_seq=100,
+                name="Test Branch",
+                requesting_user=1,
+            )
+
+            # Verify response
+            assert data["sim_id"] == "new-sim-456"
+            assert data["db_id"] == 456
+            assert data["name"] == "Test Branch"
+            assert data["branched_from_sim_id"] == "source-sim-123"
+            assert data["branched_from_keyframe_seq"] == 100
+            assert data["status"] == "initialized"
+
+    def test_branch_from_non_keyframe_uses_prior_keyframe(
+        self, authenticated_client: TestClient, mock_db: MagicMock
+    ) -> None:
+        """Test branching from non-keyframe uses prior keyframe."""
+        from back.schemas.sim_instance import BranchResponse
+
+        # User requests seq 105, but actual keyframe is at seq 100
+        mock_branch_response = BranchResponse(
+            sim_id="new-sim-457",
+            db_id=457,
+            name="Test Branch 2",
+            branched_from_sim_id="source-sim-123",
+            branched_from_keyframe_seq=100,  # Actual keyframe used
+            status="initialized",
+        )
+
+        with patch.object(
+            simulation_service,
+            "branch_simulation",
+            return_value=mock_branch_response,
+        ):
+            response = authenticated_client.post(
+                "/api/v1/simulation/source-sim-123/branch",
+                json={"keyframe_seq": 105, "name": "Test Branch 2"},
+            )
+
+            assert response.status_code == 200
+            data = response.json()
+
+            # Response should indicate actual keyframe seq used
+            assert data["branched_from_keyframe_seq"] == 100
+
+    def test_branch_without_name(
+        self, authenticated_client: TestClient, mock_db: MagicMock
+    ) -> None:
+        """Test branching without providing a name."""
+        from back.schemas.sim_instance import BranchResponse
+
+        mock_branch_response = BranchResponse(
+            sim_id="new-sim-458",
+            db_id=458,
+            name=None,
+            branched_from_sim_id="source-sim-123",
+            branched_from_keyframe_seq=50,
+            status="initialized",
+        )
+
+        with patch.object(
+            simulation_service,
+            "branch_simulation",
+            return_value=mock_branch_response,
+        ):
+            response = authenticated_client.post(
+                "/api/v1/simulation/source-sim-123/branch",
+                json={"keyframe_seq": 50},
+            )
+
+            assert response.status_code == 200
+            data = response.json()
+            assert data["name"] is None
+
+    def test_branch_simulation_not_found(
+        self, authenticated_client: TestClient, mock_db: MagicMock
+    ) -> None:
+        """Test branching from non-existent simulation returns 404."""
+        with patch.object(
+            simulation_service,
+            "branch_simulation",
+            side_effect=ItemNotFoundError("Simulation not-found-123 not found"),
+        ):
+            response = authenticated_client.post(
+                "/api/v1/simulation/not-found-123/branch",
+                json={"keyframe_seq": 10},
+            )
+
+            assert response.status_code == 404
+            assert "not found" in response.json()["detail"].lower()
+
+    def test_branch_permission_denied(
+        self, authenticated_client: TestClient, mock_db: MagicMock
+    ) -> None:
+        """Test branching without permission returns 403."""
+        with patch.object(
+            simulation_service,
+            "branch_simulation",
+            side_effect=VelosimPermissionError("Permission denied"),
+        ):
+            response = authenticated_client.post(
+                "/api/v1/simulation/other-user-sim/branch",
+                json={"keyframe_seq": 10},
+            )
+
+            assert response.status_code == 403
+            assert "permission" in response.json()["detail"].lower()
+
+    def test_branch_no_keyframes_returns_400(
+        self, authenticated_client: TestClient, mock_db: MagicMock
+    ) -> None:
+        """Test branching from simulation with no keyframes returns 400."""
+        with patch.object(
+            simulation_service,
+            "branch_simulation",
+            side_effect=ValueError("No keyframes found in simulation"),
+        ):
+            response = authenticated_client.post(
+                "/api/v1/simulation/no-keyframes-sim/branch",
+                json={"keyframe_seq": 10},
+            )
+
+            assert response.status_code == 400
+            assert "no keyframes" in response.json()["detail"].lower()
+
+    def test_branch_unauthenticated(self, client: TestClient) -> None:
+        """Test branching without authentication returns 401."""
+        response = client.post(
+            "/api/v1/simulation/some-sim/branch",
+            json={"keyframe_seq": 10},
+        )
+
+        assert response.status_code == 401

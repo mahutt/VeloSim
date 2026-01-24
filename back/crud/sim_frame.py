@@ -24,7 +24,7 @@ SOFTWARE.
 
 from sqlalchemy.orm import Session
 from sqlalchemy.dialects.postgresql import insert
-from sqlalchemy import desc
+from sqlalchemy import desc, select, literal, func
 from typing import List, Optional
 from back.models.sim_frame import SimFrame
 from back.schemas.sim_frame import SimFrameCreate
@@ -164,6 +164,87 @@ class SimFrameCRUD:
             .first()
             is not None
         )
+
+    def get_frames_up_to_seq(
+        self, db: Session, sim_instance_id: int, max_seq: int
+    ) -> List[SimFrame]:
+        """Get all frames from seq 0 up to and including max_seq.
+
+        Used for branching to retrieve all frames that should be copied.
+
+        Args:
+            db: Database session.
+            sim_instance_id: The simulation instance ID.
+            max_seq: The maximum sequence number to retrieve (inclusive).
+
+        Returns:
+            List[SimFrame]: List of frames ordered by seq_number.
+        """
+        return (
+            db.query(SimFrame)
+            .filter(
+                SimFrame.sim_instance_id == sim_instance_id,
+                SimFrame.seq_number <= max_seq,
+            )
+            .order_by(SimFrame.seq_number)
+            .all()
+        )
+
+    def copy_frames_to_new_instance(
+        self,
+        db: Session,
+        source_sim_instance_id: int,
+        target_sim_instance_id: int,
+        max_seq: int,
+    ) -> int:
+        """Copy all frames from source to target simulation up to max_seq.
+
+        Uses efficient SQLAlchemy INSERT ... SELECT for bulk copying.
+        Frames are copied with the same seq_number, sim_seconds_elapsed,
+        frame_data, and is_key values, but with the new sim_instance_id.
+
+        Args:
+            db: Database session.
+            source_sim_instance_id: The source simulation instance ID.
+            target_sim_instance_id: The target simulation instance ID.
+            max_seq: Maximum sequence number to copy (inclusive).
+
+        Returns:
+            int: Number of frames copied.
+        """
+        # Build SELECT query for source frames
+        source_select = (
+            select(
+                literal(target_sim_instance_id).label("sim_instance_id"),
+                SimFrame.seq_number,
+                SimFrame.sim_seconds_elapsed,
+                SimFrame.frame_data,
+                SimFrame.is_key,
+                func.now().label("created_at"),
+            )
+            .where(SimFrame.sim_instance_id == source_sim_instance_id)
+            .where(SimFrame.seq_number <= max_seq)
+            .order_by(SimFrame.seq_number)
+        )
+
+        # Use INSERT ... FROM SELECT for efficient bulk copy
+        insert_stmt = insert(SimFrame).from_select(
+            [
+                "sim_instance_id",
+                "seq_number",
+                "sim_seconds_elapsed",
+                "frame_data",
+                "is_key",
+                "created_at",
+            ],
+            source_select,
+        )
+
+        result = db.execute(insert_stmt)
+        db.commit()
+
+        # rowcount is available but not in typing stubs
+        return result.rowcount  # type: ignore[attr-defined,no-any-return]
 
 
 sim_frame_crud = SimFrameCRUD()

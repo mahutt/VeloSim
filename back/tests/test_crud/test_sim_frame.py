@@ -515,3 +515,98 @@ class TestSimFrameCRUD:
         )
 
         assert result is False
+
+    def test_get_frames_up_to_seq(self, mock_db: MagicMock) -> None:
+        """Test get_frames_up_to_seq retrieves all frames up to max_seq."""
+        mock_frames = [
+            SimFrame(
+                id=1,
+                sim_instance_id=100,
+                seq_number=0,
+                sim_seconds_elapsed=0.0,
+                frame_data={"test": "data0"},
+                is_key=True,
+            ),
+            SimFrame(
+                id=2,
+                sim_instance_id=100,
+                seq_number=1,
+                sim_seconds_elapsed=0.5,
+                frame_data={"test": "data1"},
+                is_key=False,
+            ),
+            SimFrame(
+                id=3,
+                sim_instance_id=100,
+                seq_number=2,
+                sim_seconds_elapsed=1.0,
+                frame_data={"test": "data2"},
+                is_key=False,
+            ),
+        ]
+
+        mock_query = MagicMock()
+        mock_query.all.return_value = mock_frames
+        (mock_db.query.return_value.filter.return_value.order_by.return_value) = (
+            mock_query
+        )
+
+        result = sim_frame_crud.get_frames_up_to_seq(
+            mock_db, sim_instance_id=100, max_seq=2
+        )
+
+        assert len(result) == 3
+        assert all(f.sim_instance_id == 100 for f in result)
+        assert all(f.seq_number <= 2 for f in result)
+
+    def test_get_frames_up_to_seq_empty_result(self, mock_db: MagicMock) -> None:
+        """Test get_frames_up_to_seq returns empty list when no frames match."""
+        mock_query = MagicMock()
+        mock_query.all.return_value = []
+        (mock_db.query.return_value.filter.return_value.order_by.return_value) = (
+            mock_query
+        )
+
+        result = sim_frame_crud.get_frames_up_to_seq(
+            mock_db, sim_instance_id=999, max_seq=10
+        )
+
+        assert result == []
+
+    def test_copy_frames_to_new_instance(self, mock_db: MagicMock) -> None:
+        """Test copy_frames_to_new_instance executes SQL and returns rowcount."""
+        mock_result = MagicMock()
+        mock_result.rowcount = 5
+        mock_db.execute.return_value = mock_result
+
+        frames_copied = sim_frame_crud.copy_frames_to_new_instance(
+            mock_db,
+            source_sim_instance_id=100,
+            target_sim_instance_id=200,
+            max_seq=4,
+        )
+
+        # Verify SQL was executed (now using SQLAlchemy constructs)
+        assert mock_db.execute.call_count == 1
+
+        # Verify commit was called
+        assert mock_db.commit.call_count == 1
+
+        # Verify rowcount was returned
+        assert frames_copied == 5
+
+    def test_copy_frames_to_new_instance_no_frames(self, mock_db: MagicMock) -> None:
+        """Test copy_frames_to_new_instance returns 0 when no frames to copy."""
+        mock_result = MagicMock()
+        mock_result.rowcount = 0
+        mock_db.execute.return_value = mock_result
+
+        frames_copied = sim_frame_crud.copy_frames_to_new_instance(
+            mock_db,
+            source_sim_instance_id=100,
+            target_sim_instance_id=200,
+            max_seq=10,
+        )
+
+        assert frames_copied == 0
+        assert mock_db.commit.call_count == 1
