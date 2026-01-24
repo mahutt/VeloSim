@@ -74,6 +74,7 @@ services:
     environment:
       - DATABASE_URL=postgresql://{{ postgres_user }}:{{ postgres_password }}@postgres:5432/{{ postgres_db }}
       - OSRM_URL=http://osrm:5000
+      - LOG_FILE_PATH=/app/grafana_logging/logs.txt
     env_file:
       - {{ app_dir }}/.env.prod
     depends_on:
