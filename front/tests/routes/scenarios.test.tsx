@@ -2060,4 +2060,135 @@ describe('ScenarioEditor', () => {
       );
     });
   });
+
+  describe('Drag and Drop to Import', () => {
+    it('shows drag overlay when files are dragged over container', async () => {
+      render(
+        <BrowserRouter>
+          <ScenarioEditor />
+        </BrowserRouter>
+      );
+
+      const container = screen.getByText('Scenario Editor').closest('div');
+
+      fireEvent.dragOver(container!, {
+        dataTransfer: { types: ['Files'], dropEffect: 'copy' },
+      });
+
+      await waitFor(() => {
+        expect(screen.getByText('Drop to import scenario')).toBeInTheDocument();
+      });
+    });
+
+    it('hides drag overlay when dragging leaves container', async () => {
+      render(
+        <BrowserRouter>
+          <ScenarioEditor />
+        </BrowserRouter>
+      );
+
+      const container = screen.getByText('Scenario Editor').closest('div');
+
+      fireEvent.dragOver(container!, {
+        dataTransfer: { types: ['Files'], dropEffect: 'copy' },
+      });
+
+      fireEvent.dragLeave(container!, {
+        dataTransfer: { types: ['Files'] },
+        relatedTarget: null,
+      });
+
+      await waitFor(() => {
+        expect(
+          screen.queryByText('Drop to import scenario')
+        ).not.toBeInTheDocument();
+      });
+    });
+
+    it('imports scenario file when dropped', async () => {
+      vi.mocked(api.post)
+        .mockResolvedValueOnce({
+          data: { valid: true, errors: [], warnings: [] },
+        })
+        .mockResolvedValueOnce({ data: { id: 99 } });
+
+      vi.mocked(api.get).mockResolvedValue({
+        data: {
+          scenarios: mockScenarios,
+          total: mockScenarios.length,
+          page: 1,
+          per_page: 10,
+          total_pages: 1,
+        },
+      });
+
+      render(
+        <BrowserRouter>
+          <ScenarioEditor />
+        </BrowserRouter>
+      );
+
+      const container = screen.getByText('Scenario Editor').closest('div')!;
+      const jsonFile = new File(
+        ['{"stations": [], "resources": []}'],
+        'test.json',
+        { type: 'application/json' }
+      );
+
+      fireEvent.drop(container, {
+        dataTransfer: { files: [jsonFile], types: ['Files'] },
+      });
+
+      await waitFor(() => {
+        expect(screen.getByPlaceholderText('Scenario name')).toHaveValue(
+          'test'
+        );
+      });
+    });
+
+    it('shows unsaved changes dialog when dropping with pending changes', async () => {
+      render(
+        <BrowserRouter>
+          <ScenarioEditor />
+        </BrowserRouter>
+      );
+
+      // create unsaved changes
+      const textarea = screen.getByPlaceholderText(
+        'Paste or type your JSON scenario here...'
+      );
+      fireEvent.change(textarea, { target: { value: '{"test": "data"}' } });
+
+      const container = screen.getByText('Scenario Editor').closest('div')!;
+      const jsonFile = new File(['{"stations": []}'], 'test.json', {
+        type: 'application/json',
+      });
+
+      fireEvent.drop(container, {
+        dataTransfer: { files: [jsonFile], types: ['Files'] },
+      });
+
+      await waitFor(() => {
+        expect(screen.getByText('Unsaved Changes')).toBeInTheDocument();
+      });
+    });
+
+    it('ignores drag events that are not files', async () => {
+      render(
+        <BrowserRouter>
+          <ScenarioEditor />
+        </BrowserRouter>
+      );
+
+      const container = screen.getByText('Scenario Editor').closest('div')!;
+
+      fireEvent.dragOver(container, {
+        dataTransfer: { types: ['text/html'], dropEffect: 'copy' },
+      });
+
+      expect(
+        screen.queryByText('Drop to import scenario')
+      ).not.toBeInTheDocument();
+    });
+  });
 });
