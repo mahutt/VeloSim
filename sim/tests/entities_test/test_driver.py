@@ -763,6 +763,8 @@ class TestDriver:
         mock_map_controller.get_route.side_effect = [
             mock_route_to_task1,
             mock_route_to_task2,
+            mock_route_to_task1,
+            mock_route_to_task2,
         ]
         driver.set_map_controller(mock_map_controller)
 

@@ -54,7 +54,7 @@ SHIFT_END_BUFFER_TIME = 1200  # Start Heading back to HQ 20 min before shifts
 
 
 class DriverState(Enum):
-    """Enumaration of driver states."""
+    """Enumeration of driver states."""
 
     OFF_SHIFT = 0  # Off shift
     PENDING_SHIFT = 1  # Shift Starting soon
@@ -62,7 +62,6 @@ class DriverState(Enum):
     ON_ROUTE = 3  # Traveling, specifically to a task.
     SERVICING_STATION = 4  # Servicing a station
     ON_BREAK = 5  # Taking a break
-
     SEEKING_HQ_FOR_INVENTORY = 6  # Is returning back to HQ to refill batteries
     RESTOCKING_BATTERIES = 7  # Is in the process of restocking on batteries at HQ
     ENDING_SHIFT = 8  # Heading to hq to end shift for the day
@@ -647,7 +646,7 @@ class Driver:
             pass
         finally:
             # Clear current route when travel completes or is interrupted
-            self.current_route = None
+            # self.current_route = None
             self.compute_routes()
 
     def get_route_json(self) -> dict | None:
@@ -705,10 +704,25 @@ class Driver:
 
         # Don't add task stops if ending shift
         if self.state != DriverState.ENDING_SHIFT:
+            local_battery_count = (
+                self.vehicle.get_battery_count() if self.vehicle else 0
+            )
+
             for task in self.get_visible_task_list():
                 station = task.get_station()
                 if station is not None:
                     stops.append(station.get_position())
+                    local_battery_count -= 1
+                    # add HQ to route if battery will deplete
+                    if local_battery_count == 0 and self.state not in [
+                        DriverState.SEEKING_HQ_FOR_INVENTORY,
+                        DriverState.ON_BREAK,
+                        DriverState.ENDING_SHIFT,
+                    ]:
+                        stops.append(self.env.hq.position)
+                        local_battery_count = (
+                            self.vehicle.max_battery_count if self.vehicle else 0
+                        )
 
         new_routes: list[Route] = []
 
