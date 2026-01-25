@@ -22,7 +22,7 @@
  * SOFTWARE.
  */
 
-import type { Position } from '~/types';
+import type { Position, Route } from '~/types';
 import { adaptRouteToGeoJSON } from './geojson-adapters';
 
 export enum MapSource {
@@ -324,7 +324,7 @@ export function clearRouteDisplay(map: mapboxgl.Map) {
  * @param map - Mapbox map instance
  */
 export function updateAllRoutesDisplay(
-  routes: Map<number, { coordinates: Position[]; nextTaskEndIndex: number }>,
+  routes: Map<number, Route>,
   positions: Map<number, Position>,
   selectedDriverId: number | undefined,
   map: mapboxgl.Map
@@ -344,7 +344,7 @@ export function updateAllRoutesDisplay(
     const { nextTask } = adaptRouteToGeoJSON(
       route.coordinates,
       position,
-      route.nextTaskEndIndex
+      route.nextStopIndex
     );
 
     // Only show next task for background routes (reduces visual clutter)

@@ -31,7 +31,7 @@ export default function Clock() {
   const time = formattedSimTime ?? '--:--';
 
   return (
-    <div className="bg-background border shadow-sm rounded-md h-10 px-2 flex items-center">
+    <div className="bg-background border shadow-sm rounded-md h-10 px-3 flex items-center">
       <div className="flex items-center gap-1 font-mo text-sm">
         <span className="font-medium text-foreground">Day {currentDay}</span>
         <span className="text-foreground/50">—</span>

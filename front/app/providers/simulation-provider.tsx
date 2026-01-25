@@ -514,13 +514,12 @@ export const SimulationProvider = ({
         selectedResourceId,
         map
       );
-      // Show selected route prominently if one is selected
-      updateSelectedRouteDisplay(selectedResourceId, map);
     } else {
-      // Toggle off - only show route for selected resource
+      // Toggle off - clear background routes
       clearAllRoutesDisplay(map);
-      updateSelectedRouteDisplay(selectedResourceId, map);
     }
+    // Always show selected route prominently if one is selected
+    updateSelectedRouteDisplay(selectedResourceId, map);
   };
 
   // Flush batched map updates using current selection state

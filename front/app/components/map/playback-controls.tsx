@@ -111,7 +111,7 @@ export default function PlaybackControls() {
         className="grid h-full"
         style={{ gridTemplateColumns: '1fr 1px 1fr' }}
       >
-        <div className="px-2 flex items-center justify-center">
+        <div className="px-1 flex items-center justify-center">
           <DropdownMenu>
             <DropdownMenuTrigger className="cursor-pointer" asChild>
               <button className="select-none text-center text-sm w-7 hover:text-foreground/80">
@@ -139,7 +139,7 @@ export default function PlaybackControls() {
           <Separator orientation="vertical" className="h-6" />
         </div>
         <button
-          className="group px-2 flex items-center justify-center disabled:opacity-50 disabled:pointer-events-none hover:bg-accent"
+          className="group px-1 flex items-center justify-center disabled:opacity-50 disabled:pointer-events-none hover:bg-accent"
           onClick={handlePausePlayToggle}
           disabled={loading}
           aria-label={paused ? 'Play simulation' : 'Pause simulation'}

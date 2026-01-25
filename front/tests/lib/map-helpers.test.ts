@@ -476,27 +476,27 @@ test('updateAllRoutesDisplay displays next task for all routes except selected',
 
   const routes = new Map<
     number,
-    { coordinates: Position[]; nextTaskEndIndex: number }
+    { coordinates: Position[]; nextStopIndex: number }
   >([
     [
       1,
       {
         coordinates: [[-73.5, 45.5] as Position, [-73.6, 45.6] as Position],
-        nextTaskEndIndex: 1,
+        nextStopIndex: 1,
       },
     ],
     [
       2,
       {
         coordinates: [[-73.7, 45.7] as Position, [-73.8, 45.8] as Position],
-        nextTaskEndIndex: 1,
+        nextStopIndex: 1,
       },
     ],
     [
       3,
       {
         coordinates: [[-73.9, 45.9] as Position, [-74.0, 46.0] as Position],
-        nextTaskEndIndex: 1,
+        nextStopIndex: 1,
       },
     ],
   ]);
@@ -533,20 +533,20 @@ test('updateAllRoutesDisplay skips routes without positions', () => {
 
   const routes = new Map<
     number,
-    { coordinates: Position[]; nextTaskEndIndex: number }
+    { coordinates: Position[]; nextStopIndex: number }
   >([
     [
       1,
       {
         coordinates: [[-73.5, 45.5] as Position, [-73.6, 45.6] as Position],
-        nextTaskEndIndex: 1,
+        nextStopIndex: 1,
       },
     ],
     [
       2,
       {
         coordinates: [[-73.7, 45.7] as Position, [-73.8, 45.8] as Position],
-        nextTaskEndIndex: 1,
+        nextStopIndex: 1,
       },
     ],
   ]);
@@ -576,14 +576,14 @@ test('updateAllRoutesDisplay handles empty coordinates gracefully', () => {
 
   const routes = new Map<
     number,
-    { coordinates: Position[]; nextTaskEndIndex: number }
+    { coordinates: Position[]; nextStopIndex: number }
   >([
-    [1, { coordinates: [], nextTaskEndIndex: 0 }],
+    [1, { coordinates: [], nextStopIndex: 0 }],
     [
       2,
       {
         coordinates: [[-73.7, 45.7] as Position, [-73.8, 45.8] as Position],
-        nextTaskEndIndex: 1,
+        nextStopIndex: 1,
       },
     ],
   ]);
@@ -613,20 +613,20 @@ test('updateAllRoutesDisplay displays all routes when no driver is selected', ()
 
   const routes = new Map<
     number,
-    { coordinates: Position[]; nextTaskEndIndex: number }
+    { coordinates: Position[]; nextStopIndex: number }
   >([
     [
       1,
       {
         coordinates: [[-73.5, 45.5] as Position, [-73.6, 45.6] as Position],
-        nextTaskEndIndex: 1,
+        nextStopIndex: 1,
       },
     ],
     [
       2,
       {
         coordinates: [[-73.7, 45.7] as Position, [-73.8, 45.8] as Position],
-        nextTaskEndIndex: 1,
+        nextStopIndex: 1,
       },
     ],
   ]);
