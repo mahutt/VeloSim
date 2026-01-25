@@ -21,6 +21,7 @@
     - "{{ app_dir }}/loki/wal"
     - "{{ app_dir }}/loki/compactor"
     - "{{ app_dir }}/promtail/positions"
+    - "{{ app_dir }}/prometheus"
 
 - name: Set ownership for Loki and Promtail directories
   ansible.builtin.file:
@@ -32,6 +33,14 @@
   loop:
     - "{{ app_dir }}/loki"
     - "{{ app_dir }}/promtail"
+
+- name: Set ownership for Prometheus directory
+  ansible.builtin.file:
+    path: "{{ app_dir }}/prometheus"
+    owner: "65534"
+    group: "65534"
+    recurse: true
+    state: directory
 
 - name: Copy archive creation script
   delegate_to: localhost
@@ -182,6 +191,15 @@
   ansible.builtin.template:
     src: promtail-config.yaml.j2
     dest: "{{ app_dir }}/promtail-config.yaml"
+    owner: "{{ app_user }}"
+    group: "{{ app_user }}"
+    mode: '0644'
+  notify: restart velosim
+
+- name: Create Prometheus configuration file
+  ansible.builtin.template:
+    src: prometheus.yml.j2
+    dest: "{{ app_dir }}/prometheus.yml"
     owner: "{{ app_user }}"
     group: "{{ app_user }}"
     mode: '0644'
