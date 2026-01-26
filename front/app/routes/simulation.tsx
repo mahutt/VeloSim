@@ -83,8 +83,8 @@ function SimulationContent() {
             <SelectedItemBar />
           </div>
           {/* max-h-[calc(100vh-2.5rem) is set so that the Mapbox & OSM copyright notices aren't blocked. */}
-          <div className="w-60 absolute top-4 right-4 flex flex-col gap-2 max-h-[calc(100vh-2.5rem)]">
-            <div className="w-full flex justify-between items-center">
+          <div className="w-[257px] absolute top-4 right-4 flex flex-col gap-2 max-h-[calc(100vh-2.5rem)]">
+            <div className="w-full flex justify-between gap-2 items-center">
               <SimulationClock />
               <PlaybackControls />
               <RouteToggle />

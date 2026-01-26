@@ -32,9 +32,9 @@ export default function Clock() {
 
   return (
     <div className="bg-background border shadow-sm rounded-md h-10 px-3 flex items-center">
-      <div className="flex items-center gap-1 font-mo text-sm">
+      <div className="flex items-center gap-1 font-mono text-sm">
         <span className="font-medium text-foreground">Day {currentDay}</span>
-        <span className="text-foreground/50">—</span>
+        <span className="text-xs font-bold text-foreground/50">—</span>
         <span className="font-medium text-foreground">{time}</span>
       </div>
     </div>
