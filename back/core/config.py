@@ -29,8 +29,8 @@ from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from dotenv import load_dotenv
 
-# Load environment variables from .env file
-load_dotenv()
+# Load environment variables from .env file if it exists
+load_dotenv(verbose=False, override=False)
 
 
 def env_flag(name: str) -> bool:

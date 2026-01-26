@@ -21,8 +21,16 @@ export default defineConfig(({ mode }) => {
         env.VITE_MAPBOX_ACCESS_TOKEN || env.MAPBOX_ACCESS_TOKEN || ''
       ),
       'import.meta.env.VITE_BACKEND_URL': JSON.stringify(
-        env.VITE_BACKEND_URL || env.BACKEND_URL || ''
+        env.VITE_BACKEND_URL || env.BACKEND_URL || 'http://localhost:8000'
       ),
+    },
+    server: {
+      proxy: {
+        '/api': {
+          target: env.BACKEND_URL || 'http://localhost:8000',
+          changeOrigin: true,
+        },
+      },
     },
     resolve: {
       alias: {
