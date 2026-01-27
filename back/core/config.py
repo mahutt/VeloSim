@@ -150,6 +150,38 @@ class Settings(BaseSettings):
     # Defaults to 5 seconds.
     KEYFRAME_DRAIN_TIMEOUT: float = float(os.getenv("KEYFRAME_DRAIN_TIMEOUT", "5.0"))
 
+    # Frame persistence batching settings
+    # Maximum number of frames to write in a single batch operation.
+    # Defaults to 32 frames.
+    FRAME_PERSIST_BATCH_SIZE: int = int(os.getenv("FRAME_PERSIST_BATCH_SIZE", "32"))
+
+    # Maximum time to wait (seconds) while collecting frames for a batch
+    # before flushing to the database.
+    # Defaults to 1 second.
+    FRAME_PERSIST_BATCH_TIMEOUT: float = float(
+        os.getenv("FRAME_PERSIST_BATCH_TIMEOUT", "1")
+    )
+    # Timeout for immediate keyframe persistence (seconds)
+    PERSIST_IMMEDIATE_TIMEOUT: float = float(
+        os.getenv("PERSIST_IMMEDIATE_TIMEOUT", "2.0")
+    )
+    # Timeout for final keyframe persistence (seconds)
+    PERSIST_FINAL_KEYFRAME_TIMEOUT: float = float(
+        os.getenv("PERSIST_FINAL_KEYFRAME_TIMEOUT", "2.0")
+    )
+    # Timeout for putting shutdown sentinel in queue (seconds)
+    PERSIST_SHUTDOWN_SENTINEL_TIMEOUT: float = float(
+        os.getenv("PERSIST_SHUTDOWN_SENTINEL_TIMEOUT", "5.0")
+    )
+    # Timeout for waiting for worker task to finish (seconds)
+    PERSIST_WORKER_TASK_TIMEOUT: float = float(
+        os.getenv("PERSIST_WORKER_TASK_TIMEOUT", "10.0")
+    )
+    # Timeout for joining the event loop thread (seconds)
+    PERSIST_LOOP_THREAD_JOIN_TIMEOUT: float = float(
+        os.getenv("PERSIST_LOOP_THREAD_JOIN_TIMEOUT", "5.0")
+    )
+
     # Seek endpoint settings
     # Default number of simulation seconds worth of future frames to return
     # when seeking to a position. This provides a smooth playback experience.

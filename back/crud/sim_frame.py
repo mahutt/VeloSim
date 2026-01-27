@@ -138,6 +138,59 @@ class SimFrameCRUD:
 
         return query.order_by(SimFrame.sim_seconds_elapsed).all()
 
+    def upsert_many(self, db: Session, frames: List[SimFrameCreate]) -> int:
+        """
+        Bulk upsert multiple frames in a single DB statement.
+
+        Uses PostgreSQL INSERT ... ON CONFLICT to upsert multiple rows.
+
+        Important: If the input contains duplicate (sim_instance_id, seq_number)
+        pairs, only the last occurrence is retained. This prevents PostgreSQL
+        unique constraint violations (IntegrityError) while ensuring the most
+        recent data is persisted.
+
+        Args:
+            db: Database session.
+            frames: List of SimFrameCreate objects (may contain duplicates).
+
+        Returns:
+            int: Number of unique frames submitted for upsert (after deduplication).
+
+        Raises:
+            SQLAlchemyError: If the database operation fails.
+        """
+        if not frames:
+            return 0
+
+        # Deduplicate and build values in a single pass
+        unique = {}
+        for f in frames:
+            key = (f.sim_instance_id, f.seq_number)
+            unique[key] = {
+                "sim_instance_id": f.sim_instance_id,
+                "seq_number": f.seq_number,
+                "sim_seconds_elapsed": f.sim_seconds_elapsed,
+                "frame_data": f.frame_data,
+                "is_key": f.is_key,
+            }
+
+        values = list(unique.values())
+
+        stmt = insert(SimFrame).values(values)
+        stmt = stmt.on_conflict_do_update(
+            index_elements=["sim_instance_id", "seq_number"],
+            set_={
+                "sim_seconds_elapsed": stmt.excluded.sim_seconds_elapsed,
+                "frame_data": stmt.excluded.frame_data,
+                "is_key": stmt.excluded.is_key,
+            },
+        )
+
+        db.execute(stmt)
+        db.commit()
+
+        return len(values)
+
     def has_frames_after(
         self, db: Session, sim_instance_id: int, after_time: float
     ) -> bool:
