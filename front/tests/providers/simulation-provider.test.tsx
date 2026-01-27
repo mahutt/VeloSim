@@ -100,6 +100,8 @@ vi.mock('~/lib/map-helpers.ts', async (importOriginal) => {
     setMapSource: vi.fn(),
     clearRouteDisplay: vi.fn(),
     updateRouteDisplay: vi.fn(),
+    clearAllRoutesDisplay: vi.fn(),
+    updateAllRoutesDisplay: vi.fn(),
   };
 });
 
@@ -2055,4 +2057,216 @@ test('reorderTasks updates resourceBarElement and triggers map updates', async (
 
   // Verify task count remains the same
   expect(getByTestId('task-count')).toHaveTextContent('3');
+});
+
+test('showAllRoutes defaults to false', () => {
+  const TestShowAllRoutesComponent = () => {
+    const { showAllRoutes } = useSimulation();
+    return (
+      <div>
+        <div data-testid="show-all-routes">{String(showAllRoutes)}</div>
+      </div>
+    );
+  };
+
+  const { getByTestId } = render(
+    <MapProvider>
+      <SimulationProvider simId="test-sim-123">
+        <TaskAssignmentProvider>
+          <MapContainer />
+          <TestShowAllRoutesComponent />
+        </TaskAssignmentProvider>
+      </SimulationProvider>
+    </MapProvider>
+  );
+
+  expect(getByTestId('show-all-routes')).toHaveTextContent('false');
+});
+
+test('toggleShowAllRoutes changes showAllRoutes state', async () => {
+  const TestToggleComponent = () => {
+    const { showAllRoutes, toggleShowAllRoutes } = useSimulation();
+    return (
+      <div>
+        <div data-testid="show-all-routes">{String(showAllRoutes)}</div>
+        <button data-testid="toggle-btn" onClick={toggleShowAllRoutes}>
+          Toggle
+        </button>
+      </div>
+    );
+  };
+
+  const { getByTestId } = render(
+    <MapProvider>
+      <SimulationProvider simId="test-sim-123">
+        <TaskAssignmentProvider>
+          <MapContainer />
+          <TestToggleComponent />
+        </TaskAssignmentProvider>
+      </SimulationProvider>
+    </MapProvider>
+  );
+
+  expect(getByTestId('show-all-routes')).toHaveTextContent('false');
+
+  await act(async () => {
+    getByTestId('toggle-btn').click();
+  });
+
+  expect(getByTestId('show-all-routes')).toHaveTextContent('true');
+
+  await act(async () => {
+    getByTestId('toggle-btn').click();
+  });
+
+  expect(getByTestId('show-all-routes')).toHaveTextContent('false');
+});
+
+test('toggleShowAllRoutes calls updateAllRoutesDisplay when enabled', async () => {
+  const { updateAllRoutesDisplay } = await import('~/lib/map-helpers');
+  (updateAllRoutesDisplay as Mock).mockClear();
+
+  const TestToggleWithDataComponent = () => {
+    const { toggleShowAllRoutes } = useSimulation();
+
+    useEffect(() => {
+      if (wsOptions?.onInitialFrame) {
+        const payload = makePayload({
+          simId: 'test-sim-123',
+          drivers: [
+            makeDriver({
+              id: 1,
+              taskIds: [10],
+              position: [-73.5, 45.5],
+              route: {
+                coordinates: [
+                  [-73.5, 45.5],
+                  [-73.6, 45.6],
+                ],
+                nextStopIndex: 1,
+              },
+            }),
+          ],
+        });
+        wsOptions.onInitialFrame(payload);
+      }
+    }, []);
+
+    return (
+      <div>
+        <button data-testid="toggle-btn" onClick={toggleShowAllRoutes}>
+          Toggle
+        </button>
+      </div>
+    );
+  };
+
+  const { getByTestId } = render(
+    <MapProvider>
+      <SimulationProvider simId="test-sim-123">
+        <TaskAssignmentProvider>
+          <MapContainer />
+          <TestToggleWithDataComponent />
+        </TaskAssignmentProvider>
+      </SimulationProvider>
+    </MapProvider>
+  );
+
+  await waitFor(() => {
+    expect(MockMap.instance).toBeDefined();
+  });
+
+  await act(async () => {
+    MockMap.instance?.callBacks['load']();
+  });
+
+  await act(async () => {
+    getByTestId('toggle-btn').click();
+  });
+
+  // Should call updateAllRoutesDisplay when toggling on
+  await waitFor(() => {
+    expect(updateAllRoutesDisplay).toHaveBeenCalled();
+  });
+});
+
+test('toggleShowAllRoutes calls clearAllRoutesDisplay when disabled', async () => {
+  const { clearAllRoutesDisplay } = await import('~/lib/map-helpers');
+  (clearAllRoutesDisplay as Mock).mockClear();
+
+  const TestToggleOffComponent = () => {
+    const { showAllRoutes, toggleShowAllRoutes } = useSimulation();
+
+    useEffect(() => {
+      if (wsOptions?.onInitialFrame) {
+        const payload = makePayload({
+          simId: 'test-sim-123',
+          drivers: [
+            makeDriver({
+              id: 1,
+              taskIds: [10],
+              position: [-73.5, 45.5],
+              route: {
+                coordinates: [
+                  [-73.5, 45.5],
+                  [-73.6, 45.6],
+                ],
+                nextStopIndex: 1,
+              },
+            }),
+          ],
+        });
+        wsOptions.onInitialFrame(payload);
+      }
+    }, []);
+
+    return (
+      <div>
+        <div data-testid="show-all-routes">{String(showAllRoutes)}</div>
+        <button data-testid="toggle-btn" onClick={toggleShowAllRoutes}>
+          Toggle
+        </button>
+      </div>
+    );
+  };
+
+  const { getByTestId } = render(
+    <MapProvider>
+      <SimulationProvider simId="test-sim-123">
+        <TaskAssignmentProvider>
+          <MapContainer />
+          <TestToggleOffComponent />
+        </TaskAssignmentProvider>
+      </SimulationProvider>
+    </MapProvider>
+  );
+
+  await waitFor(() => {
+    expect(MockMap.instance).toBeDefined();
+  });
+
+  await act(async () => {
+    MockMap.instance?.callBacks['load']();
+  });
+
+  // Toggle on first
+  await act(async () => {
+    getByTestId('toggle-btn').click();
+  });
+
+  expect(getByTestId('show-all-routes')).toHaveTextContent('true');
+
+  (clearAllRoutesDisplay as Mock).mockClear();
+
+  // Toggle off
+  await act(async () => {
+    getByTestId('toggle-btn').click();
+  });
+
+  expect(getByTestId('show-all-routes')).toHaveTextContent('false');
+
+  // Should call clearAllRoutesDisplay when toggling off
+  await waitFor(() => {
+    expect(clearAllRoutesDisplay).toHaveBeenCalled();
+  });
 });

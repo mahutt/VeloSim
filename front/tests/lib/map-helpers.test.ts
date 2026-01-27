@@ -30,6 +30,8 @@ import {
   setMapSource,
   updateRouteDisplay,
   clearRouteDisplay,
+  updateAllRoutesDisplay,
+  clearAllRoutesDisplay,
   MapSource,
 } from '~/lib/map-helpers';
 import { MockMap } from 'tests/mocks';
@@ -81,7 +83,7 @@ test('setMapLayers adds stations layer with correct configuration', () => {
   MockMap.createRandomInstance();
   setMapLayers(MockMap.instance! as unknown as mapboxgl.Map);
 
-  expect(MockMap.instance?.addLayer).toHaveBeenCalledTimes(7);
+  expect(MockMap.instance?.addLayer).toHaveBeenCalledTimes(8);
   expect(MockMap.instance?.addLayer).toHaveBeenCalledWith({
     id: 'stations',
     type: 'symbol',
@@ -464,4 +466,201 @@ test('initializeMapSources adds route sources', () => {
       },
     }
   );
+});
+
+test('updateAllRoutesDisplay displays next task for all routes except selected', () => {
+  MockMap.createRandomInstance();
+
+  const mockGeoJSONSource = { setData: vi.fn() };
+  MockMap.instance!.getSource = vi.fn().mockReturnValue(mockGeoJSONSource);
+
+  const routes = new Map<
+    number,
+    { coordinates: Position[]; nextStopIndex: number }
+  >([
+    [
+      1,
+      {
+        coordinates: [[-73.5, 45.5] as Position, [-73.6, 45.6] as Position],
+        nextStopIndex: 1,
+      },
+    ],
+    [
+      2,
+      {
+        coordinates: [[-73.7, 45.7] as Position, [-73.8, 45.8] as Position],
+        nextStopIndex: 1,
+      },
+    ],
+    [
+      3,
+      {
+        coordinates: [[-73.9, 45.9] as Position, [-74.0, 46.0] as Position],
+        nextStopIndex: 1,
+      },
+    ],
+  ]);
+
+  const positions = new Map<number, Position>([
+    [1, [-73.5, 45.5]],
+    [2, [-73.7, 45.7]],
+    [3, [-73.9, 45.9]],
+  ]);
+
+  updateAllRoutesDisplay(
+    routes,
+    positions,
+    2,
+    MockMap.instance! as unknown as mapboxgl.Map
+  );
+
+  expect(MockMap.instance?.getSource).toHaveBeenCalledWith(
+    'all-routes-next-task'
+  );
+  expect(mockGeoJSONSource.setData).toHaveBeenCalled();
+
+  const call = mockGeoJSONSource.setData.mock.calls[0][0];
+  expect(call.type).toBe('FeatureCollection');
+  // Should have 2 features (drivers 1 and 3, excluding selected driver 2)
+  expect(call.features).toHaveLength(2);
+});
+
+test('updateAllRoutesDisplay skips routes without positions', () => {
+  MockMap.createRandomInstance();
+
+  const mockGeoJSONSource = { setData: vi.fn() };
+  MockMap.instance!.getSource = vi.fn().mockReturnValue(mockGeoJSONSource);
+
+  const routes = new Map<
+    number,
+    { coordinates: Position[]; nextStopIndex: number }
+  >([
+    [
+      1,
+      {
+        coordinates: [[-73.5, 45.5] as Position, [-73.6, 45.6] as Position],
+        nextStopIndex: 1,
+      },
+    ],
+    [
+      2,
+      {
+        coordinates: [[-73.7, 45.7] as Position, [-73.8, 45.8] as Position],
+        nextStopIndex: 1,
+      },
+    ],
+  ]);
+
+  const positions = new Map<number, Position>([
+    [1, [-73.5, 45.5]],
+    // Driver 2 has no position
+  ]);
+
+  updateAllRoutesDisplay(
+    routes,
+    positions,
+    undefined,
+    MockMap.instance! as unknown as mapboxgl.Map
+  );
+
+  const call = mockGeoJSONSource.setData.mock.calls[0][0];
+  // Should only have 1 feature (driver 1, driver 2 skipped)
+  expect(call.features).toHaveLength(1);
+});
+
+test('updateAllRoutesDisplay handles empty coordinates gracefully', () => {
+  MockMap.createRandomInstance();
+
+  const mockGeoJSONSource = { setData: vi.fn() };
+  MockMap.instance!.getSource = vi.fn().mockReturnValue(mockGeoJSONSource);
+
+  const routes = new Map<
+    number,
+    { coordinates: Position[]; nextStopIndex: number }
+  >([
+    [1, { coordinates: [], nextStopIndex: 0 }],
+    [
+      2,
+      {
+        coordinates: [[-73.7, 45.7] as Position, [-73.8, 45.8] as Position],
+        nextStopIndex: 1,
+      },
+    ],
+  ]);
+
+  const positions = new Map<number, Position>([
+    [1, [-73.5, 45.5]],
+    [2, [-73.7, 45.7]],
+  ]);
+
+  updateAllRoutesDisplay(
+    routes,
+    positions,
+    undefined,
+    MockMap.instance! as unknown as mapboxgl.Map
+  );
+
+  const call = mockGeoJSONSource.setData.mock.calls[0][0];
+  // Should only have 1 feature (driver 2, driver 1 has empty coordinates)
+  expect(call.features).toHaveLength(1);
+});
+
+test('updateAllRoutesDisplay displays all routes when no driver is selected', () => {
+  MockMap.createRandomInstance();
+
+  const mockGeoJSONSource = { setData: vi.fn() };
+  MockMap.instance!.getSource = vi.fn().mockReturnValue(mockGeoJSONSource);
+
+  const routes = new Map<
+    number,
+    { coordinates: Position[]; nextStopIndex: number }
+  >([
+    [
+      1,
+      {
+        coordinates: [[-73.5, 45.5] as Position, [-73.6, 45.6] as Position],
+        nextStopIndex: 1,
+      },
+    ],
+    [
+      2,
+      {
+        coordinates: [[-73.7, 45.7] as Position, [-73.8, 45.8] as Position],
+        nextStopIndex: 1,
+      },
+    ],
+  ]);
+
+  const positions = new Map<number, Position>([
+    [1, [-73.5, 45.5]],
+    [2, [-73.7, 45.7]],
+  ]);
+
+  updateAllRoutesDisplay(
+    routes,
+    positions,
+    undefined,
+    MockMap.instance! as unknown as mapboxgl.Map
+  );
+
+  const call = mockGeoJSONSource.setData.mock.calls[0][0];
+  // Should have all 2 features
+  expect(call.features).toHaveLength(2);
+});
+
+test('clearAllRoutesDisplay clears the all-routes layer', () => {
+  MockMap.createRandomInstance();
+
+  const mockGeoJSONSource = { setData: vi.fn() };
+  MockMap.instance!.getSource = vi.fn().mockReturnValue(mockGeoJSONSource);
+
+  clearAllRoutesDisplay(MockMap.instance! as unknown as mapboxgl.Map);
+
+  expect(MockMap.instance?.getSource).toHaveBeenCalledWith(
+    'all-routes-next-task'
+  );
+  expect(mockGeoJSONSource.setData).toHaveBeenCalledWith({
+    type: 'FeatureCollection',
+    features: [],
+  });
 });

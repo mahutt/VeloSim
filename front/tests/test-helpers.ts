@@ -120,5 +120,7 @@ export function makeSimulationContext(
       driversAtHQ: [],
       driversPendingShift: [],
     },
+    showAllRoutes: overrides.showAllRoutes ?? false,
+    toggleShowAllRoutes: overrides.toggleShowAllRoutes ?? vi.fn(),
   };
 }

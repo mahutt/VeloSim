@@ -33,7 +33,13 @@ import {
 } from 'react';
 
 import { useMap } from './map-provider';
-import { MapSource, setMapSource, updateRouteDisplay } from '~/lib/map-helpers';
+import {
+  MapSource,
+  setMapSource,
+  updateRouteDisplay,
+  updateAllRoutesDisplay,
+  clearAllRoutesDisplay,
+} from '~/lib/map-helpers';
 import {
   type BackendPayload,
   type StationTask,
@@ -111,6 +117,8 @@ export type SimulationContextType = {
   formattedSimTime: string | null;
   currentDay: number;
   HQWidgetState: HQWidgetProps;
+  showAllRoutes: boolean;
+  toggleShowAllRoutes: () => void;
 };
 
 const SimulationContext = createContext<SimulationContextType | undefined>(
@@ -163,6 +171,18 @@ export const SimulationProvider = ({
     driversAtHQ: [],
     driversPendingShift: [],
   });
+
+  // Route visualization toggle - using ref to avoid stale closures
+  const showAllRoutesRef = useRef<boolean>(false);
+  const [showAllRoutes, setShowAllRoutes] = useState<boolean>(false);
+
+  const toggleShowAllRoutes = useCallback(() => {
+    const newValue = !showAllRoutesRef.current;
+    showAllRoutesRef.current = newValue;
+    setShowAllRoutes(newValue);
+    // Trigger map update on next frame
+    renderOnNextFrameRef.current = true;
+  }, []);
 
   const assignTask = async (driverId: number, taskId: number) => {
     const resource = driversRef.current.get(driverId);
@@ -412,6 +432,29 @@ export const SimulationProvider = ({
     updateHQWidgetState();
   };
 
+  // Helper function to update selected resource route display
+  const updateSelectedRouteDisplay = (
+    selectedResourceId: number | undefined,
+    map: mapboxgl.Map
+  ) => {
+    if (selectedResourceId !== undefined) {
+      const route = routesRef.current.get(selectedResourceId);
+      const position = currentPositionsRef.current.get(selectedResourceId);
+      if (route && position) {
+        updateRouteDisplay(
+          route.coordinates,
+          position,
+          route.nextStopIndex,
+          map
+        );
+      } else {
+        updateRouteDisplay(null, [0, 0], 0, map);
+      }
+    } else {
+      updateRouteDisplay(null, [0, 0], 0, map);
+    }
+  };
+
   // Helper function to update all map sources (hq, stations, resources, and routes)
   const updateMapSources = (
     selectedStationId?: number,
@@ -462,23 +505,21 @@ export const SimulationProvider = ({
       setMapSource(MapSource.Resources, geojson, map);
     }
 
-    // Update route display for selected resource (or clear if none selected)
-    if (selectedResourceId !== undefined) {
-      const route = routesRef.current.get(selectedResourceId);
-      const position = currentPositionsRef.current.get(selectedResourceId);
-      if (route && position) {
-        updateRouteDisplay(
-          route.coordinates,
-          position,
-          route.nextStopIndex,
-          map
-        );
-      } else {
-        updateRouteDisplay(null, [0, 0], 0, map);
-      }
+    // Route visualization logic
+    if (showAllRoutesRef.current) {
+      // Show all routes when toggle is on
+      updateAllRoutesDisplay(
+        routesRef.current,
+        currentPositionsRef.current,
+        selectedResourceId,
+        map
+      );
     } else {
-      updateRouteDisplay(null, [0, 0], 0, map);
+      // Toggle off - clear background routes
+      clearAllRoutesDisplay(map);
     }
+    // Always show selected route prominently if one is selected
+    updateSelectedRouteDisplay(selectedResourceId, map);
   };
 
   // Flush batched map updates using current selection state
@@ -833,6 +874,8 @@ export const SimulationProvider = ({
         formattedSimTime,
         currentDay,
         HQWidgetState,
+        showAllRoutes,
+        toggleShowAllRoutes,
       }}
     >
       {children}

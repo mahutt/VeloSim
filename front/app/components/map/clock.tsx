@@ -31,15 +31,11 @@ export default function Clock() {
   const time = formattedSimTime ?? '--:--';
 
   return (
-    <div className="bg-gray-50 border shadow rounded-md">
-      <div className="px-2 py-1 flex items-center gap-2 font-mono">
-        <div className="flex items-center gap-1">
-          <span className="text-sm font-medium text-gray-700">
-            Day {currentDay}
-          </span>
-          <span className="text-gray-400">—</span>
-          <span className="text-sm font-medium text-gray-900">{time}</span>
-        </div>
+    <div className="bg-background border shadow-sm rounded-md h-10 px-3 flex items-center">
+      <div className="flex items-center gap-1 font-mono text-sm">
+        <span className="font-medium text-foreground">Day {currentDay}</span>
+        <span className="text-xs font-bold text-foreground/50">—</span>
+        <span className="font-medium text-foreground">{time}</span>
       </div>
     </div>
   );

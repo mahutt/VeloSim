@@ -22,7 +22,7 @@
  * SOFTWARE.
  */
 
-import type { Position } from '~/types';
+import type { Position, Route } from '~/types';
 import { adaptRouteToGeoJSON } from './geojson-adapters';
 
 export enum MapSource {
@@ -31,6 +31,7 @@ export enum MapSource {
   Resources = 'resources',
   RouteNextTask = 'route-next-task',
   RouteFutureTasks = 'route-future-tasks',
+  AllRoutesNextTask = 'all-routes-next-task',
 }
 
 export enum MapLayer {
@@ -41,6 +42,7 @@ export enum MapLayer {
   Resources = 'resources',
   RouteNextTask = 'route-next-task',
   RouteFutureTasks = 'route-future-tasks',
+  AllRoutesNextTask = 'all-routes-next-task',
 }
 
 export function isMapLayer(value: string): value is MapLayer {
@@ -132,6 +134,24 @@ export function initializeMapSources(map: mapboxgl.Map) {
 
 export function setMapLayers(map: mapboxgl.Map) {
   // Add route layers first (so they render below markers)
+  // All routes layers (faded background routes when toggle is on)
+  // Background routes layer (only next task shown for clarity)
+  map.addLayer({
+    id: MapLayer.AllRoutesNextTask,
+    type: 'line',
+    source: MapSource.AllRoutesNextTask,
+    layout: {
+      'line-join': 'round',
+      'line-cap': 'round',
+    },
+    paint: {
+      'line-color': '#3b82f6',
+      'line-width': 3,
+      'line-opacity': 0.35,
+    },
+  });
+
+  // Selected route layers (prominent on top)
   map.addLayer({
     id: MapLayer.RouteNextTask,
     type: 'line',
@@ -291,4 +311,66 @@ export function updateRouteDisplay(
  */
 export function clearRouteDisplay(map: mapboxgl.Map) {
   updateRouteDisplay(null, [0, 0], 0, map);
+}
+
+/**
+ * Update all routes visualization (for background display when toggle is on)
+ * Shows only the next task route for each vehicle to reduce visual clutter.
+ * The selected vehicle's full route is displayed on a separate, more prominent layer.
+ *
+ * @param routes - Map of driver IDs to their routes
+ * @param positions - Map of driver IDs to their current positions
+ * @param selectedDriverId - ID of selected driver (to exclude from all-routes layer)
+ * @param map - Mapbox map instance
+ */
+export function updateAllRoutesDisplay(
+  routes: Map<number, Route>,
+  positions: Map<number, Position>,
+  selectedDriverId: number | undefined,
+  map: mapboxgl.Map
+) {
+  const allNextTaskFeatures: GeoJSON.Feature[] = [];
+
+  routes.forEach((route, driverId) => {
+    // Skip selected driver's route (it's shown prominently on separate layer)
+    if (driverId === selectedDriverId) return;
+
+    const position = positions.get(driverId);
+    if (!position) return;
+
+    // Validate route data
+    if (!route.coordinates || route.coordinates.length === 0) return;
+
+    const { nextTask } = adaptRouteToGeoJSON(
+      route.coordinates,
+      position,
+      route.nextStopIndex
+    );
+
+    // Only show next task for background routes (reduces visual clutter)
+    allNextTaskFeatures.push(...nextTask.features);
+  });
+
+  setMapSource(
+    MapSource.AllRoutesNextTask,
+    {
+      type: 'FeatureCollection',
+      features: allNextTaskFeatures,
+    },
+    map
+  );
+}
+
+/**
+ * Clear all routes visualization
+ * Removes all background route displays from the map
+ *
+ * @param map - Mapbox map instance
+ */
+export function clearAllRoutesDisplay(map: mapboxgl.Map) {
+  setMapSource(
+    MapSource.AllRoutesNextTask,
+    { type: 'FeatureCollection', features: [] },
+    map
+  );
 }
