@@ -46,7 +46,7 @@ logger.critical("Critical issue!")
 
 ### 3. View Logs in Grafana
 
-1. Open http://localhost:3000 (username: `admin`, password: `admin`)
+1. Open http://localhost:3001 (username: `admin`, password: `admin`)
 2. Navigate to **Explore** (compass icon)
 3. Select **Loki** datasource
 4. Query: `{job="python_app"}`
@@ -91,7 +91,7 @@ def run_simulation(config):
 
 ### Frontend Logging (via API)
 
-Create a logging endpoint in rhe FastAPI backend:
+Create a logging endpoint in the FastAPI backend:
 
 ```python
 from fastapi import APIRouter, Body
@@ -100,13 +100,13 @@ from grafana_logging.logger import get_logger
 router = APIRouter()
 frontend_logger = get_logger("frontend")
 
-@router.post("/api/v1/logs")
+@router.post("/api/v1/logs/frontend")
 async def log_from_frontend(
     level: str = Body(...),
     message: str = Body(...),
     context: dict = Body(None)
 ):
-    """Receive logs from frontend and log them server-side."""
+    """Receive a log from frontend and log them server-side."""
     log_func = getattr(frontend_logger, level.lower(), frontend_logger.info)
 
     if context:
@@ -115,6 +115,8 @@ async def log_from_frontend(
         log_func(f"[Frontend] {message}")
 
     return {"status": "logged"}
+
+# Batch endpoint: POST /api/v1/logs/frontend/batch
 ```
 
 Frontend usage (JavaScript/TypeScript):
@@ -123,14 +125,14 @@ Frontend usage (JavaScript/TypeScript):
 // utils/logger.ts
 export const logger = {
   info: (message: string, context?: any) => {
-    fetch("/api/v1/logs", {
+    fetch("/api/v1/logs/frontend", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ level: "info", message, context }),
     });
   },
   error: (message: string, context?: any) => {
-    fetch("/api/v1/logs", {
+    fetch("/api/v1/logs/frontend", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ level: "error", message, context }),
@@ -150,7 +152,7 @@ logger.error("Failed to load data", { endpoint: "/api/stations" });
 The logger uses **different formats** for file vs console output:
 
 - **File format**: `module - LEVEL - message`
-  _(No timestamp - Loki adds it automatically to avoid duplication in Grafana)_
+  _(No timestamp - Loki assigns the ingestion timestamp. Note: this means logs cannot be re-ingested with their original timestamps)_
 - **Console format**: `YYYY-MM-DD HH:MM:SS - module - LEVEL - message`
   _(With timestamp for local debugging)_
 
@@ -240,7 +242,7 @@ curl 'http://localhost:9090/api/v1/query?query=process_resident_memory_bytes{job
 ### File Structure
 
 ```
-back/grafana_logging/
+grafana_logging/
 ├── grafana/
 │   └── provisioning/
 │       ├── datasources/           # Datasource configurations
@@ -303,7 +305,7 @@ docker logs -f velosim-prometheus
 **Reset Grafana (clear all changes)**:
 ```bash
 docker-compose down
-rm -rf back/grafana_logging/grafana_data
+rm -rf grafana_logging/grafana_data
 docker-compose up -d
 ```
 
