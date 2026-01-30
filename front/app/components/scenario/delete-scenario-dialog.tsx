@@ -40,15 +40,17 @@ interface DeleteScenarioDialogProps {
   scenarioName: string;
   onConfirm: () => void;
   trigger?: ReactNode;
+  onOpenChange?: (open: boolean) => void;
 }
 
 export default function DeleteScenarioDialog({
   scenarioName,
   onConfirm,
   trigger,
+  onOpenChange,
 }: DeleteScenarioDialogProps) {
   return (
-    <Dialog>
+    <Dialog onOpenChange={onOpenChange}>
       <DialogTrigger asChild>
         {trigger || (
           <Button
