@@ -33,6 +33,7 @@ interface ScenarioSidebarProps {
   selectedScenarioId: number | null;
   onSelect: (scenario: Scenario) => void;
   onDelete: (scenarioId: number) => void;
+  onDeleteDialogChange?: (open: boolean) => void;
 }
 
 export default function ScenarioSidebar({
@@ -40,6 +41,7 @@ export default function ScenarioSidebar({
   selectedScenarioId,
   onSelect,
   onDelete,
+  onDeleteDialogChange,
 }: ScenarioSidebarProps) {
   return (
     <div className="w-full lg:w-64">
@@ -77,6 +79,7 @@ export default function ScenarioSidebar({
                     <DeleteScenarioDialog
                       scenarioName={scenario.name}
                       onConfirm={() => onDelete(scenario.id)}
+                      onOpenChange={onDeleteDialogChange}
                       trigger={
                         <Button
                           variant="ghost"

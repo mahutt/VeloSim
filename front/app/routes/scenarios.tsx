@@ -72,6 +72,7 @@ export default function ScenarioEditor() {
   const [pendingImport, setPendingImport] = useState(false);
   const [pendingImportFile, setPendingImportFile] = useState<File | null>(null);
   const [isDraggingFile, setIsDraggingFile] = useState(false);
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
 
   // Hooks
   const navigate = useNavigate();
@@ -136,8 +137,13 @@ export default function ScenarioEditor() {
   }, []); // Only run once on mount
 
   // Detect unsaved changes by comparing current content with initial content
+  // Treat empty content as "no changes" since there's nothing to save
   useEffect(() => {
-    const hasChanges = scenarioContent.trim() !== initialContent.trim();
+    const currentTrimmed = scenarioContent.trim();
+    const initialTrimmed = initialContent.trim();
+
+    const hasChanges =
+      currentTrimmed !== '' && currentTrimmed !== initialTrimmed;
     setHasUnsavedChanges(hasChanges);
   }, [scenarioContent, initialContent]);
 
@@ -577,6 +583,10 @@ export default function ScenarioEditor() {
         return;
       }
 
+      if (isDeleteDialogOpen) {
+        return;
+      }
+
       // Check for unsaved changes
       if (hasUnsavedChanges) {
         setPendingScenario(scenario);
@@ -586,7 +596,7 @@ export default function ScenarioEditor() {
 
       loadScenario(scenario);
     },
-    [selectedScenarioId, hasUnsavedChanges, loadScenario]
+    [selectedScenarioId, hasUnsavedChanges, isDeleteDialogOpen, loadScenario]
   );
 
   const handleDeleteScenario = useCallback(
@@ -662,6 +672,7 @@ export default function ScenarioEditor() {
           selectedScenarioId={selectedScenarioId}
           onSelect={handleSelectScenario}
           onDelete={handleDeleteScenario}
+          onDeleteDialogChange={setIsDeleteDialogOpen}
         />
       </div>
 
