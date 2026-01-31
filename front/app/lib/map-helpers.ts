@@ -200,9 +200,10 @@ export function setMapLayers(map: mapboxgl.Map) {
       'circle-color': '#EE3124',
     },
     maxzoom: 13,
+    filter: ['>', ['get', 'taskCount'], 0],
   });
 
-  // Add layers for stations
+  // Add layers for stations (filtered to only show stations with taskCount > 0)
   map.addLayer({
     id: MapLayer.Stations,
     type: 'symbol',
@@ -220,9 +221,10 @@ export function setMapLayers(map: mapboxgl.Map) {
       'icon-size': ['interpolate', ['linear'], ['zoom'], 10, 0.4, 15, 1.0],
     },
     minzoom: 13,
+    filter: ['>', ['get', 'taskCount'], 0],
   });
 
-  // Add task count labels above stations
+  // Add task count labels above stations (filtered to only show stations with taskCount > 0)
   map.addLayer({
     id: MapLayer.StationTaskCounts,
     type: 'symbol',
@@ -239,6 +241,7 @@ export function setMapLayers(map: mapboxgl.Map) {
       'text-color': '#000000',
     },
     minzoom: 13,
+    filter: ['>', ['get', 'taskCount'], 0],
   });
 
   // Add layer for headquarters

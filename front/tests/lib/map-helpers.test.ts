@@ -101,6 +101,7 @@ test('setMapLayers adds stations layer with correct configuration', () => {
       'icon-size': ['interpolate', ['linear'], ['zoom'], 10, 0.4, 15, 1.0],
     },
     minzoom: 13,
+    filter: ['>', ['get', 'taskCount'], 0],
   });
 
   expect(MockMap.instance?.addLayer).toHaveBeenCalledWith({
