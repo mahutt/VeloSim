@@ -25,6 +25,7 @@ SOFTWARE.
 from sim.core.RealTimeDriver import RealTimeDriver
 import threading
 from typing import Callable, Optional, Dict
+from sim.core.types import BatchAssignResult
 from sim.core.simulation_environment import SimulationEnvironment
 from sim.entities.station import Station
 from sim.core.frame_emitter import FrameEmitter
@@ -38,6 +39,9 @@ from sim.entities.task import Task
 from sim.entities.inputParameters import InputParameter
 from sim.behaviour.sim_behaviour import SimBehaviour
 from sim.map.MapController import MapController
+from grafana_logging.logger import get_logger
+
+logger = get_logger(__name__)
 
 
 class SimulatorController:
@@ -320,6 +324,51 @@ class SimulatorController:
             raise Exception(f"Could not find task in sim with id: {task_id}")
         else:
             raise Exception(f"Could not find driver in sim with id: {driver_id}")
+
+    def batch_assign_tasks_to_driver(
+        self, driver_id: int, task_ids: list[int]
+    ) -> list[BatchAssignResult]:
+        """Best-effort assign many tasks to a single driver.
+
+        Attempts to assign each task in ``task_ids`` to ``driver_id``. Each
+        assignment is attempted independently; no rollback is performed.
+
+        Args:
+            driver_id: The driver to assign tasks to.
+            task_ids: List of task IDs to assign to the driver.
+
+        Returns:
+            list[dict]: Per-item result dicts with keys ``task_id``,
+            ``driver_id``, ``success`` (bool) and ``error`` (str|None).
+        """
+        results: list[BatchAssignResult] = []
+        for task_id in task_ids:
+            try:
+                self.assign_task_to_driver(task_id, driver_id)
+                results.append(
+                    {
+                        "task_id": task_id,
+                        "driver_id": driver_id,
+                        "success": True,
+                        "error": None,
+                    }
+                )
+            except Exception as e:
+                logger.warning(
+                    "Batch assign failed for task %s (driver %s): %s",
+                    task_id,
+                    driver_id,
+                    e,
+                )
+                results.append(
+                    {
+                        "task_id": task_id,
+                        "driver_id": driver_id,
+                        "success": False,
+                        "error": str(e),
+                    }
+                )
+        return results
 
     def unassign_task_from_driver(self, task_id: int, driver_id: int) -> None:
         """Unassign a task from a driver.

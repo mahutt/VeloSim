@@ -23,7 +23,8 @@ SOFTWARE.
 """
 
 from typing import List
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
+from back.schemas.utils import validate_unique_task_ids
 
 
 class DriverTaskAssignRequest(BaseModel):
@@ -108,3 +109,51 @@ class DriverTaskReorderResponse(BaseModel):
     task_order: List[int] = Field(
         ..., description="Complete list of task IDs in new order"
     )
+
+
+class DriverTaskBatchAssignRequest(BaseModel):
+    """Request schema for batch assigning many tasks to a single driver.
+
+    The API expects a single `driver_id` and a list of `task_ids` to assign
+    to that driver. This matches frontend usage where bulk-assign targets one
+    driver at a time.
+    """
+
+    driver_id: int = Field(..., description="ID of the driver to assign tasks to")
+    task_ids: List[int] = Field(
+        ...,
+        min_length=1,
+        max_length=50,
+        description="List of 1 or more task IDs to assign",
+    )
+
+    @model_validator(mode="after")
+    def _validate_unique_task_ids(self) -> "DriverTaskBatchAssignRequest":
+        """Delegate uniqueness check to shared validator utilities."""
+        validate_unique_task_ids(self.task_ids)
+        return self
+
+
+class DriverTaskBatchAssignItem(BaseModel):
+    """Single result item for a batch assign operation.
+
+    `success` is True on success; `error` contains a human-readable message
+    when the operation failed.
+    """
+
+    driver_id: int
+    task_id: int
+    success: bool = Field(
+        ..., description="True when assignment succeeded, false otherwise"
+    )
+    error: str | None = Field(None, description="Optional error message for failures")
+
+
+class DriverTaskBatchAssignResponse(BaseModel):
+    """Response containing per-item results for a batch assign operation.
+
+    The `items` field contains a list of `DriverTaskBatchAssignItem` instances,
+    one per attempted assignment, indicating success and optional error text.
+    """
+
+    items: List[DriverTaskBatchAssignItem]

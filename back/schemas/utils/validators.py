@@ -51,3 +51,28 @@ def validate_latitude(v: Any) -> float:
     if not -90 <= v <= 90:
         raise ValueError("Latitude must be between -90 and 90")
     return float(v)
+
+
+def validate_unique_task_ids(task_ids: Any) -> list[int]:
+    """Validate that a sequence of task IDs contains no duplicates.
+
+    Args:
+        task_ids: Sequence of task IDs to validate.
+
+    Returns:
+        The same list of task IDs (as list[int]) when valid.
+
+    Raises:
+        ValueError: If duplicate IDs are found.
+    """
+    if task_ids is None:
+        return []
+    try:
+        lst = list(task_ids)
+    except TypeError:
+        raise ValueError("task_ids must be a list of integers")
+
+    if len(set(lst)) != len(lst):
+        raise ValueError("Duplicate task_id in request")
+
+    return lst

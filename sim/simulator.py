@@ -24,6 +24,7 @@ SOFTWARE.
 
 import threading
 from typing import Callable, Dict, List, TypedDict, Optional
+from sim.core.types import BatchAssignResult
 import uuid
 
 from sim.core.simulation_environment import SimulationEnvironment
@@ -352,6 +353,34 @@ class Simulator:
                 sim_info["simController"].assign_task_to_driver(task_id, driver_id)
         except Exception as e:
             print(f"Could not assign task due to: {e}")
+
+    def batch_assign_tasks_to_driver(
+        self, sim_id: str, driver_id: int, task_ids: list[int]
+    ) -> list[BatchAssignResult]:
+        """Assign a batch of tasks to a single driver.
+
+        Args:
+            sim_id: Unique simulation ID.
+            driver_id: ID of the driver to assign tasks to.
+            task_ids: List of task IDs to assign to the driver.
+
+        Returns:
+            list[BatchAssignResult]: Per-item result dicts with keys 'task_id',
+            'driver_id', 'success' (bool) and 'error' (str|None).
+
+        Raises:
+            Exception: If the simulation is not found or an error occurs while
+                delegating to the controller.
+        """
+        sim_info = self.get_sim_by_id(sim_id)
+        if sim_info is None:
+            raise Exception(f"Simulation {sim_id} not found")
+        try:
+            return sim_info["simController"].batch_assign_tasks_to_driver(
+                driver_id, task_ids
+            )
+        except Exception as e:
+            raise Exception(f"Error occurred: {e}")
 
     def unassign_task_from_driver(
         self, sim_id: str, task_id: int, driver_id: int

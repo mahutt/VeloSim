@@ -22,7 +22,23 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 """
 
-# Import all validators here for easy access
-from .validators import validate_longitude, validate_latitude, validate_unique_task_ids
+from typing import TypedDict, Optional
 
-__all__ = ["validate_longitude", "validate_latitude", "validate_unique_task_ids"]
+
+class BatchAssignResult(TypedDict):
+    """Result schema for a single item in a batch task assignment.
+
+    Fields:
+        task_id: The task identifier that was (attempted) assigned.
+        driver_id: The driver identifier the task was assigned to.
+        success: True when assignment succeeded, False otherwise.
+        error: Optional error message when ``success`` is False.
+    """
+
+    task_id: int
+    driver_id: int
+    success: bool
+    error: Optional[str]
+
+
+__all__ = ["BatchAssignResult"]

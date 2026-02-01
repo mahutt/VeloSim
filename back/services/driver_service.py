@@ -25,6 +25,7 @@ SOFTWARE.
 from back.exceptions.item_not_found_error import ItemNotFoundError
 from back.exceptions.velosim_permission_error import VelosimPermissionError
 from back.services.simulation_service import simulation_service
+import logging
 
 from back.schemas import (
     DriverTaskAssignRequest,
@@ -35,8 +36,13 @@ from back.schemas import (
     DriverTaskUnassignResponse,
     DriverTaskReorderRequest,
     DriverTaskReorderResponse,
+    DriverTaskBatchAssignResponse,
+    DriverTaskBatchAssignItem,
+    DriverTaskBatchAssignRequest,
 )
 from sqlalchemy.orm import Session
+
+logger = logging.getLogger(__name__)
 
 
 class DriverService:
@@ -254,6 +260,89 @@ class DriverService:
             old_driver_id=task_reassign_data.old_driver_id,
             new_driver_id=task_reassign_data.new_driver_id,
         )
+
+    def batch_assign(
+        self,
+        db: Session,
+        sim_id: str,
+        requesting_user: int,
+        batch_request: DriverTaskBatchAssignRequest,
+    ) -> DriverTaskBatchAssignResponse:
+        """Batch assign tasks to drivers within a running simulation.
+
+        Note:
+            This method performs best-effort assignment: each item is
+            attempted independently and the response contains per-item
+            success/failure details. No rollback is performed.
+
+        Args:
+            db: Database session
+            sim_id: UUID of the active in-memory simulation
+            requesting_user: Database ID of the user performing the action
+            batch_request: List of `DriverTaskAssignRequest` items to apply
+
+        Returns:
+            DriverTaskBatchAssignResponse: Per-item assignment results.
+
+        Raises:
+            VelosimPermissionError: If the user cannot access this simulation.
+            ItemNotFoundError: If the simulation is not found.
+            RuntimeError: If simulator batch call fails entirely.
+        """
+
+        # Verify that the requesting user has permission to access the sim
+        if not simulation_service.verify_access(db, sim_id, requesting_user):
+            raise VelosimPermissionError("Unauthorized to access this simulation")
+
+        # Get the simulator manager that tracks all active simulations
+        sim_data = simulation_service.active_simulations.get(sim_id)
+        if not sim_data:
+            raise ItemNotFoundError(sim_id, "Simulation not found")
+
+        simulator = simulation_service.simulator
+        if simulator is None:
+            raise RuntimeError(f"Simulator for simulation {sim_id} not found")
+
+        items: list[DriverTaskBatchAssignItem] = []
+
+        # Use simulator batch API for efficiency; service accepts a single
+        # DriverTaskBatchAssignRequest containing a `driver_id` and a
+        # list of `task_ids`.
+        if not batch_request or not batch_request.task_ids:
+            return DriverTaskBatchAssignResponse(items=[])
+
+        driver_id = batch_request.driver_id
+        task_ids = list(batch_request.task_ids)
+
+        try:
+            batch_results = simulator.batch_assign_tasks_to_driver(
+                sim_id=sim_id, driver_id=driver_id, task_ids=task_ids
+            )
+        except Exception as err:
+            # If simulator-level call fails entirely, propagate as runtime error
+            raise RuntimeError(f"Simulator batch assign failed: {err}") from err
+
+        # Convert simulator results to schema items. Validate presence
+        # of required fields before casting to avoid passing None to int().
+        for r in batch_results:
+            drv_val = r.get("driver_id")
+            tsk_val = r.get("task_id")
+            if drv_val is None or tsk_val is None:
+                raise RuntimeError("Simulator returned malformed batch item")
+            driver_id_int = int(drv_val)
+            task_id_int = int(tsk_val)
+            success_bool = bool(r.get("success"))
+            err_val = r.get("error")
+            items.append(
+                DriverTaskBatchAssignItem(
+                    driver_id=driver_id_int,
+                    task_id=task_id_int,
+                    success=success_bool,
+                    error=(err_val if err_val is not None else None),
+                )
+            )
+
+        return DriverTaskBatchAssignResponse(items=items)
 
     def reorder_tasks(
         self,
