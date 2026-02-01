@@ -43,13 +43,13 @@ from back.schemas import (
     DriverTaskAssignResponse,
     DriverTaskUnassignResponse,
     DriverTaskReassignResponse,
-)
-from back.schemas.playback_speed import PlaybackSpeedResponse, SimulationPlaybackStatus
-from back.schemas.driver import (
     DriverTaskAssignRequest,
     DriverTaskReassignRequest,
     DriverTaskUnassignRequest,
+    DriverTaskBatchAssignResponse,
+    DriverTaskBatchAssignItem,
 )
+from back.schemas.playback_speed import PlaybackSpeedResponse, SimulationPlaybackStatus
 from back.services.simulation_service import simulation_service
 
 from back.models.user import User
@@ -892,6 +892,31 @@ class TestSimulationAPI:
             json={"playback_speed": 3.14159},  # invalid speed not in ALLOWED_SPEEDS
         )
         assert response.status_code == 422
+
+    @patch("back.api.v1.simulation.driver_service.batch_assign")
+    def test_batch_assign_endpoint(
+        self,
+        mock_batch_assign: MagicMock,
+        authenticated_client: TestClient,
+        active_sim_id: str,
+    ) -> None:
+        """POST /simulation/{sim_id}/drivers/assign/batch returns per-item results."""
+        mock_batch_assign.return_value = DriverTaskBatchAssignResponse(
+            items=[
+                DriverTaskBatchAssignItem(
+                    driver_id=1, task_id=10, success=True, error=None
+                )
+            ]
+        )
+
+        payload = {"driver_id": 1, "task_ids": [10, 20]}
+
+        resp = authenticated_client.post(
+            f"/api/v1/simulation/{active_sim_id}/drivers/assign/batch", json=payload
+        )
+        assert resp.status_code == 200
+        data = resp.json()
+        assert "items" in data
 
     def test_websocket_subscriber_on_frame(self) -> None:
         """Test that WebSocketSubscriber schedules frames correctly."""

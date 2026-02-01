@@ -593,6 +593,33 @@ def test_assign_task_to_driver_success(
         assert driver.id == 1
 
 
+def test_simulator_wrapper_delegates_and_returns(sim: Simulator) -> None:
+    """Simulator.batch_assign_tasks_to_driver delegates to controller and
+    returns per-item dicts.
+
+    Use mocking for `get_sim_by_id` so this remains a fast unit test.
+    """
+    from unittest.mock import Mock
+
+    # Create a fake controller that returns a quick deterministic result
+    mock_controller = Mock()
+    mock_controller.batch_assign_tasks_to_driver.return_value = [
+        {"task_id": 1, "driver_id": 1, "success": True, "error": None},
+        {"task_id": 2, "driver_id": 1, "success": True, "error": None},
+    ]
+
+    # Patch the simulator instance to return our fake controller for any sim_id
+    with patch.object(
+        sim, "get_sim_by_id", return_value={"simController": mock_controller}
+    ):
+        results = sim.batch_assign_tasks_to_driver("fake-sim", 1, [1, 2])
+
+    mock_controller.batch_assign_tasks_to_driver.assert_called_once_with(1, [1, 2])
+    assert isinstance(results, list)
+    assert len(results) == 2
+    assert all("task_id" in r and "driver_id" in r and "success" in r for r in results)
+
+
 @patch("builtins.print")
 def test_assign_task_to_driver_fail(
     mock_print: MagicMock, sim: Simulator, input_params: InputParameter

@@ -395,6 +395,41 @@ def test_emit_frame_clears_update_flags(
     assert simulator_controller.driver_entities[1].has_updated is False
 
 
+def test_controller_batch_assign_success(
+    simulator_controller: SimulatorController,
+) -> None:
+    """All tasks exist and are assigned successfully via controller batch helper."""
+    # Patch the low-level assign so this unit test runs instantly
+    with patch.object(
+        simulator_controller, "assign_task_to_driver", return_value=None
+    ) as mock_assign:
+        results = simulator_controller.batch_assign_tasks_to_driver(1, [1, 2])
+        mock_assign.assert_any_call(1, 1)
+        mock_assign.assert_any_call(2, 1)
+
+    assert isinstance(results, list)
+    assert len(results) == 2
+    assert all(r.get("success") is True for r in results)
+
+
+def test_controller_batch_assign_partial_failure(
+    simulator_controller: SimulatorController,
+) -> None:
+    """Missing tasks return success=False and include an error string."""
+    # Simulate first assignment succeeding and second failing quickly
+    side_effects = [None, Exception("Could not find task in sim with id: 999")]
+    with patch.object(
+        simulator_controller, "assign_task_to_driver", side_effect=side_effects
+    ) as mock_assign:
+        results = simulator_controller.batch_assign_tasks_to_driver(1, [1, 999])
+        assert mock_assign.call_count == 2
+
+    assert len(results) == 2
+    assert results[0]["success"] is True
+    assert results[1]["success"] is False
+    assert "Could not find task" in (results[1]["error"] or "")
+
+
 def test_key_frame_includes_new_tasks_and_clears_popups(
     env: simpy.Environment,
     simulator_controller: SimulatorController,

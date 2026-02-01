@@ -37,6 +37,8 @@ from back.schemas import (
     DriverTaskReassignResponse,
     DriverTaskReorderRequest,
     DriverTaskReorderResponse,
+    DriverTaskBatchAssignResponse,
+    DriverTaskBatchAssignRequest,
 )
 from back.exceptions import VelosimPermissionError, ItemNotFoundError
 from sim.simulator import Simulator
@@ -416,3 +418,116 @@ class TestDriverService:
             sim_id=sim_id, driver_id=1, task_ids_to_reorder=[1], apply_from_top=False
         )
         assert response.task_order == [2, 3, 1]
+
+    def test_batch_assign_success(
+        self,
+        db_session: Session,
+        sim_id: str,
+        requesting_user: int,
+        patch_active_simulations: Dict[str, Any],
+    ) -> None:
+        """All assignments succeed and response contains successes."""
+        bulk = DriverTaskBatchAssignRequest(driver_id=1, task_ids=[10, 20])
+        # simulator batch returns per-item success
+        patch_active_simulations[
+            "simulator"
+        ].batch_assign_tasks_to_driver.return_value = [
+            {"task_id": 10, "driver_id": 1, "success": True, "error": None},
+            {"task_id": 20, "driver_id": 2, "success": True, "error": None},
+        ]
+        resp = driver_service.batch_assign(db_session, sim_id, requesting_user, bulk)
+        # Accept either 'task_ids' or legacy 'tasks_to_assign' keyword
+        call_kwargs = patch_active_simulations[
+            "simulator"
+        ].batch_assign_tasks_to_driver.call_args.kwargs
+        assert call_kwargs.get("sim_id") == sim_id
+        assert call_kwargs.get("driver_id") == 1
+        assert call_kwargs.get("task_ids", call_kwargs.get("tasks_to_assign")) == [
+            10,
+            20,
+        ]
+        assert isinstance(resp, DriverTaskBatchAssignResponse)
+        assert len(resp.items) == 2
+        assert all(item.success is True for item in resp.items)
+
+    def test_batch_assign_partial_failure(
+        self,
+        db_session: Session,
+        sim_id: str,
+        requesting_user: int,
+        patch_active_simulations: Dict[str, Any],
+    ) -> None:
+        """If one assignment fails, previous assigns are rolled back."""
+        simulator = patch_active_simulations["simulator"]
+        # batch returns first success, second failure
+        simulator.batch_assign_tasks_to_driver.return_value = [
+            {"task_id": 10, "driver_id": 1, "success": True, "error": None},
+            {
+                "task_id": 20,
+                "driver_id": 1,
+                "success": False,
+                "error": "Could not find task",
+            },
+        ]
+
+        bulk = DriverTaskBatchAssignRequest(driver_id=1, task_ids=[10, 20])
+
+        resp = driver_service.batch_assign(db_session, sim_id, requesting_user, bulk)
+
+        assert len(resp.items) == 2
+        assert resp.items[0].success is True
+        assert resp.items[1].success is False
+        assert "Could not find task" in (resp.items[1].error or "")
+        call_kwargs = patch_active_simulations[
+            "simulator"
+        ].batch_assign_tasks_to_driver.call_args.kwargs
+        assert call_kwargs.get("sim_id") == sim_id
+        assert call_kwargs.get("driver_id") == 1
+        assert call_kwargs.get("task_ids", call_kwargs.get("tasks_to_assign")) == [
+            10,
+            20,
+        ]
+
+    def test_batch_assign_best_effort_partial(
+        self,
+        db_session: Session,
+        sim_id: str,
+        requesting_user: int,
+        patch_active_simulations: Dict[str, Any],
+    ) -> None:
+        """Best-effort mode returns per-item failures without raising."""
+        simulator = patch_active_simulations["simulator"]
+        # return a mixed result via the simulator batch API
+        simulator.batch_assign_tasks_to_driver.return_value = [
+            {"task_id": 10, "driver_id": 1, "success": True, "error": None},
+            {
+                "task_id": 20,
+                "driver_id": 999,
+                "success": False,
+                "error": "Could not find driver",
+            },
+        ]
+
+        bulk = DriverTaskBatchAssignRequest(driver_id=1, task_ids=[10, 20])
+        resp = driver_service.batch_assign(db_session, sim_id, requesting_user, bulk)
+
+        assert isinstance(resp, DriverTaskBatchAssignResponse)
+        assert len(resp.items) == 2
+        assert resp.items[0].success is True
+        assert resp.items[1].success is False
+
+    def test_batch_assign_permission_denied(
+        self, db_session: Session, sim_id: str, requesting_user: int
+    ) -> None:
+        bulk = DriverTaskBatchAssignRequest(driver_id=1, task_ids=[10])
+        with patch.object(simulation_service, "verify_access", return_value=False):
+            with pytest.raises(VelosimPermissionError):
+                driver_service.batch_assign(db_session, sim_id, requesting_user, bulk)
+
+    def test_batch_assign_simulation_not_found(
+        self, db_session: Session, sim_id: str, requesting_user: int
+    ) -> None:
+        bulk = DriverTaskBatchAssignRequest(driver_id=1, task_ids=[10])
+        with patch.object(simulation_service, "active_simulations", {}):
+            with pytest.raises(ItemNotFoundError):
+                driver_service.batch_assign(db_session, sim_id, requesting_user, bulk)

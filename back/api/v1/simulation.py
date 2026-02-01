@@ -56,6 +56,8 @@ from back.schemas import (
     DriverTaskUnassignResponse,
     DriverTaskReassignResponse,
     DriverTaskReorderResponse,
+    DriverTaskBatchAssignRequest,
+    DriverTaskBatchAssignResponse,
 )
 from back.schemas.sim_keyframe import (
     SimKeyframeListResponse,
@@ -593,6 +595,52 @@ def assign_task_to_driver(
             requesting_user=requesting_user,
             task_assign_data=task_assign_data,
         )
+    except ItemNotFoundError as err:
+        raise HTTPException(status_code=404, detail=str(err))
+    except VelosimPermissionError as err:
+        raise HTTPException(status_code=403, detail=str(err))
+    except RuntimeError as err:
+        raise HTTPException(status_code=500, detail=str(err))
+
+
+@router.post(
+    "/{sim_id}/drivers/assign/batch",
+    status_code=200,
+    response_model=DriverTaskBatchAssignResponse,
+)
+def batch_assign_tasks_to_driver(
+    sim_id: str,
+    bulk_request: DriverTaskBatchAssignRequest,
+    requesting_user: int = Depends(get_user_id),
+    db: Session = Depends(get_db),
+) -> DriverTaskBatchAssignResponse:
+    """
+    Assign many tasks to a driver in a running simulation.
+
+    Attempts to assign many tasks to a Driver. Each assignment is attempted
+    independently and the response indicates per-item success or failure. No
+    rollback is performed.
+
+    Args:
+        sim_id: ID of the simulation
+        bulk_request: Batch assignment request containing `driver_id` and `task_ids`
+        requesting_user: ID of the authenticated user
+        db: Database session dependency
+
+    Returns:
+        DriverTaskBatchAssignResponse: Per-item assignment results.
+
+    Raises:
+        HTTPException: 400 for duplicate task_ids, 403/404/500 for other errors
+    """
+    try:
+        result = driver_service.batch_assign(
+            db=db,
+            sim_id=sim_id,
+            requesting_user=requesting_user,
+            batch_request=bulk_request,
+        )
+        return result
     except ItemNotFoundError as err:
         raise HTTPException(status_code=404, detail=str(err))
     except VelosimPermissionError as err:
