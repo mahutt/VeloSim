@@ -1302,3 +1302,208 @@ class TestSimulationService:
 
         assert sims == []
         assert total == 0
+
+
+class TestBranchSimulation:
+    """Tests for branch_simulation service method."""
+
+    @pytest.fixture
+    def mock_sim_instance_crud(self) -> Generator[Mock, None, None]:
+        """Mock sim_instance_crud."""
+        with patch("back.services.simulation_service.sim_instance_crud") as mock:
+            yield mock
+
+    @pytest.fixture
+    def mock_sim_frame_crud(self) -> Generator[Mock, None, None]:
+        """Mock sim_frame_crud."""
+        with patch("back.services.simulation_service.sim_frame_crud") as mock:
+            yield mock
+
+    @pytest.fixture
+    def mock_replay_parser(self) -> Generator[Mock, None, None]:
+        """Mock ReplayParser."""
+        with patch("back.services.simulation_service.ReplayParser") as mock:
+            yield mock
+
+    @pytest.fixture
+    def mock_simulation_environment(self) -> Generator[Mock, None, None]:
+        """Mock SimulationEnvironment."""
+        with patch("back.services.simulation_service.SimulationEnvironment") as mock:
+            yield mock
+
+    @pytest.fixture
+    def mock_frame_subscriber(self) -> Generator[Mock, None, None]:
+        """Mock FramePersistenceSubscriber."""
+        with patch(
+            "back.services.simulation_service.FramePersistenceSubscriber"
+        ) as mock:
+            yield mock
+
+    def test_branch_simulation_no_scenario_payload(
+        self,
+        simulation_service: SimulationService,
+        mock_db: Mock,
+        mock_sim_instance_crud: Mock,
+        test_user: User,
+    ) -> None:
+        """Test branching when source simulation has no scenario payload."""
+        # Setup: source sim exists but has no scenario
+        source_sim = Mock(
+            id=100,
+            uuid="source-sim-123",
+            user_id=test_user.id,
+            scenario_payload=None,  # Missing scenario
+        )
+        mock_sim_instance_crud.get_by_uuid.return_value = source_sim
+
+        # Mock verify_access to pass
+        with patch.object(simulation_service, "verify_access", return_value=True):
+            # Mock finding a keyframe
+            mock_keyframe = Mock(
+                seq_number=50,
+                frame_data={"test": "data"},
+                is_key=True,
+            )
+            query_chain = mock_db.query.return_value.filter.return_value
+            query_chain.order_by.return_value.first.return_value = mock_keyframe
+
+            # Should raise ValueError for missing scenario
+            with pytest.raises(ValueError, match="has no scenario payload"):
+                simulation_service.branch_simulation(
+                    db=mock_db,
+                    sim_id="source-sim-123",
+                    keyframe_seq=50,
+                    name="Test Branch",
+                    requesting_user=test_user.id,
+                )
+
+    def test_branch_simulation_keyframe_parse_failure(
+        self,
+        simulation_service: SimulationService,
+        mock_db: Mock,
+        mock_sim_instance_crud: Mock,
+        mock_replay_parser: Mock,
+        test_user: User,
+    ) -> None:
+        """Test branching when keyframe parsing fails."""
+        # Setup: source sim with valid scenario
+        source_sim = Mock(
+            id=100,
+            uuid="source-sim-123",
+            user_id=test_user.id,
+            scenario_payload={"valid": "scenario"},
+        )
+        mock_sim_instance_crud.get_by_uuid.return_value = source_sim
+
+        # Mock verify_access to pass
+        with patch.object(simulation_service, "verify_access", return_value=True):
+            # Mock finding a keyframe
+            mock_keyframe = Mock(
+                seq_number=50,
+                frame_data={"corrupted": "data"},
+                is_key=True,
+            )
+            query_chain = mock_db.query.return_value.filter.return_value
+            query_chain.order_by.return_value.first.return_value = mock_keyframe
+
+            # Mock ReplayParser.parse to raise exception
+            mock_replay_parser.parse.side_effect = Exception("Invalid keyframe format")
+
+            # Should raise ValueError wrapping parse exception
+            with pytest.raises(
+                ValueError, match="Failed to parse keyframe 50.*Invalid keyframe format"
+            ):
+                simulation_service.branch_simulation(
+                    db=mock_db,
+                    sim_id="source-sim-123",
+                    keyframe_seq=50,
+                    name="Test Branch",
+                    requesting_user=test_user.id,
+                )
+
+    def test_branch_simulation_initialization_failure_triggers_rollback(
+        self,
+        simulation_service: SimulationService,
+        mock_db: Mock,
+        mock_sim_instance_crud: Mock,
+        mock_sim_frame_crud: Mock,
+        mock_replay_parser: Mock,
+        mock_simulation_environment: Mock,
+        mock_frame_subscriber: Mock,
+        test_user: User,
+    ) -> None:
+        """Test that DB rollback occurs when simulator initialization fails."""
+        # Setup: source sim with valid scenario
+        source_sim = Mock(
+            id=100,
+            uuid="source-sim-123",
+            user_id=test_user.id,
+            scenario_payload={"valid": "scenario"},
+        )
+        mock_sim_instance_crud.get_by_uuid.return_value = source_sim
+
+        # Mock verify_access to pass
+        with patch.object(simulation_service, "verify_access", return_value=True):
+            # Mock finding a keyframe
+            mock_keyframe = Mock(
+                seq_number=50,
+                frame_data={"test": "data"},
+                is_key=True,
+            )
+            query_chain = mock_db.query.return_value.filter.return_value
+            query_chain.order_by.return_value.first.return_value = mock_keyframe
+
+            # Mock successful keyframe parsing
+            mock_resume_state = Mock(
+                input_parameters=Mock(start_time=0, sim_time=100),
+                map_controller=Mock(),
+                current_time_seconds=50.0,
+            )
+            mock_replay_parser.parse.return_value = mock_resume_state
+
+            # Mock new sim creation
+            new_sim = Mock(
+                id=200,
+                uuid="new-sim-456",
+                name="Test Branch",
+            )
+            mock_sim_instance_crud.create.return_value = new_sim
+
+            # Mock frame copying
+            mock_sim_frame_crud.copy_frames_to_new_instance.return_value = 10
+
+            # Mock SimulationEnvironment creation
+            mock_env_instance = Mock()
+            mock_simulation_environment.return_value = mock_env_instance
+
+            # Mock FramePersistenceSubscriber
+            mock_subscriber_instance = Mock()
+            mock_frame_subscriber.return_value = mock_subscriber_instance
+
+            # Mock simulator to raise exception during initialize
+            mock_simulator = Mock()
+            mock_simulator.initialize.side_effect = Exception(
+                "Simulator initialization failed"
+            )
+            simulation_service.simulator = mock_simulator
+
+            # Should raise exception and trigger rollback
+            with pytest.raises(Exception, match="Simulator initialization failed"):
+                simulation_service.branch_simulation(
+                    db=mock_db,
+                    sim_id="source-sim-123",
+                    keyframe_seq=50,
+                    name="Test Branch",
+                    requesting_user=test_user.id,
+                )
+
+            # Verify rollback was called
+            mock_db.rollback.assert_called_once()
+
+            # Verify commit was NOT called after rollback
+            # (initialization failed)
+            # Note: copy_frames_to_new_instance is mocked
+            mock_db.commit.assert_not_called()
+
+            # Verify refresh was NOT called
+            mock_db.refresh.assert_not_called()
