@@ -36,8 +36,8 @@ LOG_TO_FILE = os.getenv("LOG_TO_FILE", "true").lower() == "true"
 LOG_TO_CONSOLE = os.getenv("LOG_TO_CONSOLE", "true").lower() == "true"
 
 # Log formats
-# File format: No timestamp (Loki adds it automatically)
-FILE_LOG_FORMAT = "%(name)s - %(levelname)s - %(message)s"
+# File format: With timestamp for production reliability
+FILE_LOG_FORMAT = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 # Console format: With timestamp for local debugging
 CONSOLE_LOG_FORMAT = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 DATE_FORMAT = "%Y-%m-%d %H:%M:%S"
@@ -77,14 +77,14 @@ class VeloSimLogger:
         """Set up logging handlers for file and console output."""
         handlers: List[Union[logging.FileHandler, logging.StreamHandler]] = []
 
-        # File handler - no timestamp (Loki adds it)
+        # File handler - with timestamp for production reliability
         if LOG_TO_FILE:
             cls._ensure_log_file_exists()
             file_handler = logging.FileHandler(
                 DEFAULT_LOG_FILE, mode="a", encoding="utf-8"
             )
             file_handler.setLevel(logging.DEBUG)
-            file_formatter = logging.Formatter(FILE_LOG_FORMAT)
+            file_formatter = logging.Formatter(FILE_LOG_FORMAT, DATE_FORMAT)
             file_handler.setFormatter(file_formatter)
             handlers.append(file_handler)
 

@@ -56,7 +56,9 @@ def test_get_logger_returns_same_instance() -> None:
 
 
 def test_logger_logs_to_file(temp_log_file: Path) -> None:
-    """Test that logger writes to file."""
+    """Test that logger writes to file with timestamps."""
+    import re
+
     with patch("grafana_logging.logger.DEFAULT_LOG_FILE", str(temp_log_file)):
         with patch("grafana_logging.logger.LOG_TO_FILE", True):
             with patch("grafana_logging.logger.LOG_TO_CONSOLE", False):
@@ -72,6 +74,12 @@ def test_logger_logs_to_file(temp_log_file: Path) -> None:
                 assert "Test message" in content
                 assert "test_file_logging" in content
                 assert "INFO" in content
+
+                # Verify timestamp is included
+                timestamp_pattern = r"\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}"
+                assert re.search(
+                    timestamp_pattern, content
+                ), "Timestamp should be present in file logs"
 
 
 def test_logger_different_levels(temp_log_file: Path) -> None:
@@ -165,3 +173,29 @@ def test_logger_no_propagation() -> None:
     logger = get_logger("test_no_propagate")
 
     assert logger.propagate is False
+
+
+def test_logger_includes_timestamp_in_file(temp_log_file: Path) -> None:
+    """Test that file logs include timestamps."""
+    import re
+
+    with patch("grafana_logging.logger.DEFAULT_LOG_FILE", str(temp_log_file)):
+        with patch("grafana_logging.logger.LOG_TO_FILE", True):
+            with patch("grafana_logging.logger.LOG_TO_CONSOLE", False):
+                VeloSimLogger._loggers.clear()
+
+                logger = get_logger("test_timestamp")
+                logger.info("Timestamp test message")
+
+                content = temp_log_file.read_text()
+
+                # Verify timestamp is present (format: YYYY-MM-DD HH:MM:SS)
+                timestamp_pattern = r"\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}"
+                assert re.search(timestamp_pattern, content), (
+                    "Timestamp not found in log file. " f"Content: {content}"
+                )
+
+                # Verify full log format
+                assert "test_timestamp" in content
+                assert "INFO" in content
+                assert "Timestamp test message" in content

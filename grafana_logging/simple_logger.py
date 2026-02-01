@@ -22,5 +22,8 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 """
 
+from datetime import datetime
+
+timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 with open("logs.txt", "a") as f:
-    f.write("Hello from Postman!\n")
+    f.write(f"{timestamp} - simple_logger - INFO - Hello from Postman!\n")
