@@ -22,7 +22,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 """
 
-from typing import Dict, List, Optional
+from typing import Dict, Optional, Set
 
 from sim.entities.position import Position
 from sim.entities.road import Road
@@ -35,9 +35,8 @@ from sim.traffic.traffic_state_factory import TrafficStateFactory
 class TrafficController:
     """Manages traffic state for road segments.
 
-    TrafficController owns RoadTrafficState instances and uses RouteController
-    to look up roads. Road objects hold references to traffic state but
-    do not own them.
+    TrafficController owns RoadTrafficState instances and maintains a reverse
+    index from Position objects to Roads for O(1) traffic lookups.
     """
 
     def __init__(self, route_controller: RouteController) -> None:
@@ -47,53 +46,84 @@ class TrafficController:
             route_controller: RouteController for road lookups
         """
         self._route_controller = route_controller
-        self._segment_key_to_traffic: Dict[SegmentKey, RoadTrafficState] = {}
+        self._active_traffic: Dict[SegmentKey, RoadTrafficState] = {}
 
-        # Register for road deallocation events to clean up traffic state
+        # Reverse index: Position -> set of roads containing that node
+        self._node_to_roads: Dict[Position, Set[Road]] = {}
+
+        # Register for road lifecycle events
+        self._route_controller.register_on_road_created(self._on_road_created)
         self._route_controller.register_on_road_deallocated(self._on_road_deallocated)
 
-    def _on_road_deallocated(self, segment_key: SegmentKey) -> None:
-        """Clean up traffic state when a road is deallocated.
+    def _on_road_created(self, road: Road) -> None:
+        """Register road's nodes in reverse index and apply existing traffic.
+
+        When a new road is created, it needs to:
+        1. Register its nodes in the reverse index
+        2. Check if any existing active traffic affects this road
 
         Args:
-            segment_key: The segment key of the deallocated road
+            road: The newly created road
         """
-        self._segment_key_to_traffic.pop(segment_key, None)
+        # Register nodes in reverse index
+        for node in road.nodes:
+            if node not in self._node_to_roads:
+                self._node_to_roads[node] = set()
+            self._node_to_roads[node].add(road)
 
-    def _generate_traffic_points(
-        self,
-        road: Road,
-        multiplier: float,
-    ) -> List[Position]:
-        """Generate traffic-adjusted point collection for a road.
+        # Apply any existing active traffic to this new road
+        self._apply_existing_traffic_to_road(road)
+
+    def _apply_existing_traffic_to_road(self, road: Road) -> None:
+        """Apply all existing active traffic states to a road if applicable.
+
+        Checks each active traffic segment_key and applies it to the road
+        if the road contains matching nodes.
 
         Args:
-            road: Road to generate points for
-            multiplier: Speed multiplier (0.01-1.0)
+            road: The road to apply traffic to
+        """
+        for segment_key, state in self._active_traffic.items():
+            road.add_traffic_range(segment_key, state.multiplier)
+
+    def _on_road_deallocated(self, road: Road) -> None:
+        """Unregister road's nodes from reverse index and clean up traffic state.
+
+        Args:
+            road: The road being deallocated
+        """
+        # Remove from node index
+        for node in road.nodes:
+            if node in self._node_to_roads:
+                self._node_to_roads[node].discard(road)
+                if not self._node_to_roads[node]:
+                    del self._node_to_roads[node]
+
+        # Clean up traffic state
+        self._active_traffic.pop(road.segment_key, None)
+
+    def _find_affected_roads(self, segment_key: SegmentKey) -> Set[Road]:
+        """Find all roads that contain nodes from the segment_key.
+
+        Args:
+            segment_key: ((start_lon, start_lat), (end_lon, end_lat))
 
         Returns:
-            List of Position objects spaced for traffic-adjusted speed
-
-        Raises:
-            ValueError: If road has no pointcollection or effective speed is <= 0
+            Set of roads containing at least one of the segment's nodes
         """
-        if not road.pointcollection:
-            raise ValueError(
-                f"Road '{road.name}' (id={road.id}) has no pointcollection"
-            )
+        start_coords, end_coords = segment_key
 
-        effective_speed = road.maxspeed * multiplier
-        if effective_speed <= 0:
-            raise ValueError(
-                f"Effective speed must be > 0, got {effective_speed} "
-                f"(maxspeed={road.maxspeed}, multiplier={multiplier})"
-            )
+        # Convert tuple coordinates to Position for lookup
+        start_pos = Position([start_coords[0], start_coords[1]])
+        end_pos = Position([end_coords[0], end_coords[1]])
 
-        return self._route_controller.generate_point_collection(
-            geometry=road.pointcollection,
-            length=road.length,
-            maxspeed=effective_speed,
-        )
+        affected: Set[Road] = set()
+        if start_pos in self._node_to_roads:
+            affected |= self._node_to_roads[start_pos]
+        if end_pos in self._node_to_roads:
+            affected |= self._node_to_roads[end_pos]
+
+        return affected
 
     def set_traffic(
         self,
@@ -103,46 +133,61 @@ class TrafficController:
     ) -> bool:
         """Set traffic state for a road segment.
 
+        Uses reverse index to find affected roads and applies traffic ranges.
+        Traffic state is always stored so it can be applied to roads created later.
+
         Args:
             segment_key: Geometry-based segment identifier
             multiplier: Speed factor (0.01-1.0), 1.0 = free flow
             source: Optional source identifier for tracking
 
         Returns:
-            True if road found and updated, False otherwise
+            True if traffic was applied to at least one active road, False if
+            traffic was only stored in memory (no active roads affected).
         """
-        road = self._route_controller.get_road_by_segment_key(segment_key)
-        if road is None:
-            return False
-
-        # Clamp multiplier for point generation (same as factory)
         clamped = max(0.01, min(1.0, multiplier))
-        traffic_points = self._generate_traffic_points(road, clamped)
 
         state = TrafficStateFactory.create(
-            multiplier=multiplier,
-            traffic_points=traffic_points,
+            multiplier=clamped,
+            traffic_points=[],
             source=source,
         )
-        self._segment_key_to_traffic[segment_key] = state
-        road.set_traffic_state(state)
-        return True
+
+        # Always store traffic state (for current and future roads)
+        self._active_traffic[segment_key] = state
+
+        # Find affected roads via reverse index
+        affected_roads = self._find_affected_roads(segment_key)
+
+        # Apply traffic to each affected road
+        for road in affected_roads:
+            road.add_traffic_range(segment_key, clamped)
+
+        return bool(affected_roads)
 
     def clear_traffic(self, segment_key: SegmentKey) -> bool:
         """Clear traffic state for a road segment.
+
+        Removes the traffic from the internal state and from any matching roads.
 
         Args:
             segment_key: Geometry-based segment identifier
 
         Returns:
-            True if road found and cleared, False otherwise
+            True if traffic was cleared from at least one road, False if no roads
+            were affected (traffic state is still removed from internal tracking).
         """
-        road = self._route_controller.get_road_by_segment_key(segment_key)
-        if road is None:
-            return False
-        self._segment_key_to_traffic.pop(segment_key, None)
-        road.clear_traffic()
-        return True
+        # Find affected roads via reverse index
+        affected_roads = self._find_affected_roads(segment_key)
+
+        # Remove traffic from each affected road
+        updated: Set[Road] = set()
+        for road in affected_roads:
+            if road.remove_traffic(segment_key):
+                updated.add(road)
+
+        self._active_traffic.pop(segment_key, None)
+        return bool(updated)
 
     def clear_all_traffic(self) -> None:
         """Clear traffic state from all active roads.
@@ -152,7 +197,7 @@ class TrafficController:
         """
         for road in self._route_controller.get_all_active_roads():
             road.clear_traffic()
-        self._segment_key_to_traffic.clear()
+        self._active_traffic.clear()
 
     def get_traffic_state(self, segment_key: SegmentKey) -> Optional[RoadTrafficState]:
         """Get traffic state for a segment.
@@ -163,7 +208,7 @@ class TrafficController:
         Returns:
             RoadTrafficState if found, None otherwise
         """
-        return self._segment_key_to_traffic.get(segment_key)
+        return self._active_traffic.get(segment_key)
 
     def cleanup(self) -> None:
         """Clean up TrafficController resources.
@@ -174,5 +219,7 @@ class TrafficController:
         Returns:
             None
         """
+        self._route_controller.unregister_on_road_created(self._on_road_created)
         self._route_controller.unregister_on_road_deallocated(self._on_road_deallocated)
-        self._segment_key_to_traffic.clear()
+        self._active_traffic.clear()
+        self._node_to_roads.clear()

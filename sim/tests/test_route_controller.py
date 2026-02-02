@@ -26,7 +26,6 @@ from unittest.mock import Mock
 import pytest
 
 from sim.map.route_controller import RouteController
-from sim.map.routing_provider import SegmentKey
 from sim.entities.road import Road
 from sim.entities.position import Position
 from sim.map.routing_provider import RouteSegment, RouteResult, RouteStep
@@ -144,6 +143,7 @@ class TestRouteControllerRouteRegistration:
         mock_road = Mock()
         mock_road.id = 123
         mock_road.segment_key = ((0.0, 0.0), (1.0, 1.0))
+        mock_road.nodes = []  # Empty list for mock road
         mock_route = Mock()
 
         # Register the road first
@@ -167,9 +167,11 @@ class TestRouteControllerRouteRegistration:
         mock_road1 = Mock()
         mock_road1.id = 1
         mock_road1.segment_key = ((0.0, 0.0), (1.0, 1.0))
+        mock_road1.nodes = []  # Empty list for mock road
         mock_road2 = Mock()
         mock_road2.id = 2
         mock_road2.segment_key = ((1.0, 1.0), (2.0, 2.0))
+        mock_road2.nodes = []  # Empty list for mock road
         mock_route = Mock()
 
         controller.routes.add(mock_route)
@@ -620,10 +622,10 @@ class TestRoadDeallocationCallbacks:
         controller = RouteController(mock_map_controller)
 
         # Track callback invocations
-        callback_calls = []
+        callback_calls: list[Road] = []
 
-        def on_dealloc(segment_key: SegmentKey) -> None:
-            callback_calls.append(segment_key)
+        def on_dealloc(road: Road) -> None:
+            callback_calls.append(road)
 
         controller.register_on_road_deallocated(on_dealloc)
 
@@ -631,6 +633,7 @@ class TestRoadDeallocationCallbacks:
         mock_road = Mock()
         mock_road.id = 123
         mock_road.segment_key = ((0.0, 0.0), (1.0, 1.0))
+        mock_road.nodes = []  # Empty list for mock road
         mock_route = Mock()
 
         controller._register_road_to_route(mock_road, mock_route)
@@ -640,24 +643,25 @@ class TestRoadDeallocationCallbacks:
         # Unregister to trigger deallocation
         controller.unregister_road_from_route(mock_road, mock_route)
 
-        # Callback should have been called with the segment_key
+        # Callback should have been called with the road
         assert len(callback_calls) == 1
-        assert callback_calls[0] == ((0.0, 0.0), (1.0, 1.0))
+        assert callback_calls[0] is mock_road
 
     def test_multiple_callbacks_called_on_deallocation(self) -> None:
         """Test that multiple registered callbacks are all called."""
         mock_map_controller = Mock()
         controller = RouteController(mock_map_controller)
 
-        callback1_calls = []
-        callback2_calls = []
+        callback1_calls: list[Road] = []
+        callback2_calls: list[Road] = []
 
-        controller.register_on_road_deallocated(lambda sk: callback1_calls.append(sk))
-        controller.register_on_road_deallocated(lambda sk: callback2_calls.append(sk))
+        controller.register_on_road_deallocated(lambda r: callback1_calls.append(r))
+        controller.register_on_road_deallocated(lambda r: callback2_calls.append(r))
 
         mock_road = Mock()
         mock_road.id = 1
         mock_road.segment_key = ((0.0, 0.0), (1.0, 1.0))
+        mock_road.nodes = []  # Empty list for mock road
         mock_route = Mock()
 
         controller._register_road_to_route(mock_road, mock_route)
@@ -674,10 +678,10 @@ class TestRoadDeallocationCallbacks:
         mock_map_controller = Mock()
         controller = RouteController(mock_map_controller)
 
-        callback_calls = []
+        callback_calls: list[Road] = []
 
-        def on_dealloc(segment_key: SegmentKey) -> None:
-            callback_calls.append(segment_key)
+        def on_dealloc(road: Road) -> None:
+            callback_calls.append(road)
 
         controller.register_on_road_deallocated(on_dealloc)
 
@@ -690,6 +694,7 @@ class TestRoadDeallocationCallbacks:
         mock_road = Mock()
         mock_road.id = 123
         mock_road.segment_key = ((0.0, 0.0), (1.0, 1.0))
+        mock_road.nodes = []  # Empty list for mock road
         mock_route = Mock()
 
         controller._register_road_to_route(mock_road, mock_route)
@@ -706,7 +711,7 @@ class TestRoadDeallocationCallbacks:
         mock_map_controller = Mock()
         controller = RouteController(mock_map_controller)
 
-        def some_callback(segment_key: SegmentKey) -> None:
+        def some_callback(road: Road) -> None:
             pass
 
         # Try to unregister a callback that was never registered
@@ -719,10 +724,10 @@ class TestRoadDeallocationCallbacks:
         mock_map_controller = Mock()
         controller = RouteController(mock_map_controller)
 
-        callback_calls = []
+        callback_calls: list[Road] = []
 
-        def on_dealloc(segment_key: SegmentKey) -> None:
-            callback_calls.append(segment_key)
+        def on_dealloc(road: Road) -> None:
+            callback_calls.append(road)
 
         controller.register_on_road_deallocated(on_dealloc)
 

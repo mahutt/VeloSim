@@ -118,6 +118,18 @@ def setup_test_environment(tmp_path: Path) -> Generator[None, None, None]:
     os.chdir(original_cwd)
 
 
+def test_road_empty_pointcollection_raises_error() -> None:
+    """Test that Road raises ValueError when initialized with empty pointcollection."""
+    with pytest.raises(ValueError, match="Road 123 requires non-empty pointcollection"):
+        Road(
+            road_id=123,
+            name="Empty Road",
+            pointcollection=[],
+            length=100.0,
+            maxspeed=10.0,
+        )
+
+
 def test_road_initialization_with_valid_maxspeed(setup_test_environment: None) -> None:
     # Arrange: Create a sample road edge
     edge_data = Series(
@@ -450,3 +462,326 @@ def test_road_multi_vertex_no_duplicate_last_point(
 
     # The last position should be at the end
     assert positions[-1] == pytest.approx([50.0, 0.0])
+
+
+class TestRoadPerSegmentTraffic:
+    """Tests demonstrating per-segment traffic differentiation.
+
+    These tests show that traffic can be applied to specific segments within
+    a road, resulting in different point densities for different segments.
+    """
+
+    def _create_multi_segment_road(self) -> Road:
+        """Create a road with 5 distinct nodes (4 segments).
+
+        Road layout:
+            [N0]----[N1]----[N2]----[N3]----[N4]
+            idx0    idx1    idx2    idx3    idx4
+
+        Each segment is 100m, total length = 400m
+        Speed = 10 m/s → ~10 points per 100m segment at free flow
+        """
+        # Create 5 nodes with equal spacing
+        nodes = [
+            Position([0.0, 0.0]),  # N0 - idx 0
+            Position([1.0, 0.0]),  # N1 - idx 1
+            Position([2.0, 0.0]),  # N2 - idx 2
+            Position([3.0, 0.0]),  # N3 - idx 3
+            Position([4.0, 0.0]),  # N4 - idx 4
+        ]
+
+        return Road(
+            road_id=1,
+            name="Test Multi-Segment Road",
+            pointcollection=nodes,
+            length=400.0,  # 4 segments × 100m each
+            maxspeed=10.0,  # 10 m/s
+        )
+
+    def test_free_flow_uniform_point_density(self) -> None:
+        """Test that free flow produces uniform point density across all segments."""
+        road = self._create_multi_segment_road()
+
+        # No traffic applied - should use base pointcollection
+        active_points = road.active_pointcollection
+
+        # At free flow, should return the original pointcollection
+        assert active_points == road.pointcollection
+        assert len(active_points) == 5  # Original 5 nodes
+
+        # All multipliers should be 1.0 (free flow)
+        for i in range(4):  # 4 segments
+            assert road.get_multiplier_at_index(i) == 1.0
+
+    def test_traffic_on_middle_segment_increases_density(self) -> None:
+        """Test that traffic on middle segment produces more points there.
+
+        Apply traffic to segment [N1, N3] (indices 1-3) with multiplier 0.25.
+        Traffic range is INCLUSIVE: affects segments whose start index is in [1, 3].
+
+        Visual:
+            [N0]·····[N1]···················[N2]···················[N3]···················[N4]
+              1.0x      0.25x (4x denser)      0.25x (4x denser)      0.25x (4x denser)
+        """
+        road = self._create_multi_segment_road()
+
+        # Apply traffic to middle segments (N1 to N3)
+        segment_key = ((1.0, 0.0), (3.0, 0.0))  # From N1 to N3
+        result = road.add_traffic_range(segment_key, multiplier=0.25)
+
+        assert result is True, "Traffic range should be added successfully"
+
+        # Check multipliers per segment
+        # Traffic range [1, 3] is INCLUSIVE - affects segments 1, 2, AND 3
+        assert road.get_multiplier_at_index(0) == 1.0, "Segment 0 should be free flow"
+        assert road.get_multiplier_at_index(1) == 0.25, "Segment 1 should have traffic"
+        assert road.get_multiplier_at_index(2) == 0.25, "Segment 2 should have traffic"
+        assert (
+            road.get_multiplier_at_index(3) == 0.25
+        ), "Segment 3 should have traffic (inclusive)"
+
+        # Get traffic-adjusted points
+        traffic_points = road.active_pointcollection
+
+        # Traffic points should be MORE than free flow points
+        # Free flow: 5 nodes
+        # With traffic: segments with 0.25 multiplier have 4x density
+        assert len(traffic_points) > len(road.pointcollection)
+
+        print(f"\n{'='*60}")
+        print("TEST: Traffic on middle segments [N1, N3]")
+        print(f"{'='*60}")
+        print(f"Free flow points: {len(road.pointcollection)}")
+        print(f"Traffic points:   {len(traffic_points)}")
+        increase = len(traffic_points) - len(road.pointcollection)
+        print(f"Increase:         {increase} more points")
+        print("\nMultipliers per segment:")
+        for i in range(4):
+            mult = road.get_multiplier_at_index(i)
+            density = "DENSE" if mult < 1.0 else "sparse"
+            print(f"  Segment {i} (N{i}→N{i+1}): mult={mult}, {density}")
+
+    def test_traffic_on_single_segment(self) -> None:
+        """Test traffic applied to two adjacent segments.
+
+        Apply traffic to segment [N2, N3] (indices 2-3).
+        Traffic range is INCLUSIVE: affects segments 2 AND 3.
+
+        Visual:
+            [N0]·····[N1]·····[N2]···················[N3]···················[N4]
+              1.0x     1.0x      0.2x (5x denser)      0.2x (5x denser)
+        """
+        road = self._create_multi_segment_road()
+
+        # Apply traffic to segments (N2 to N3)
+        segment_key = ((2.0, 0.0), (3.0, 0.0))
+        result = road.add_traffic_range(segment_key, multiplier=0.2)
+
+        assert result is True
+
+        # Check multipliers - range [2, 3] is INCLUSIVE
+        assert road.get_multiplier_at_index(0) == 1.0
+        assert road.get_multiplier_at_index(1) == 1.0
+        assert road.get_multiplier_at_index(2) == 0.2  # Traffic
+        assert road.get_multiplier_at_index(3) == 0.2  # Traffic (inclusive)
+
+        traffic_points = road.active_pointcollection
+
+        print(f"\n{'='*60}")
+        print("TEST: Traffic on single segment [N2, N3]")
+        print(f"{'='*60}")
+        print(f"Free flow points: {len(road.pointcollection)}")
+        print(f"Traffic points:   {len(traffic_points)}")
+        print("\nMultipliers per segment:")
+        for i in range(4):
+            mult = road.get_multiplier_at_index(i)
+            density = "DENSE" if mult < 1.0 else "sparse"
+            print(f"  Segment {i} (N{i}→N{i+1}): mult={mult}, {density}")
+
+    def test_overlapping_traffic_ranges_minimum_wins(self) -> None:
+        """Test that overlapping traffic ranges use minimum multiplier.
+
+        Apply two traffic ranges:
+        - Range 1: [N1, N3] with multiplier 0.5
+        - Range 2: [N2, N4] with multiplier 0.3
+
+        Visual:
+            [N0]·····[N1]·········[N2]···············[N3]···············[N4]
+              1.0x     0.5x         0.3x (overlap)     0.3x              0.3x
+
+        At N2-N3: both ranges overlap, min(0.5, 0.3) = 0.3 wins
+        """
+        road = self._create_multi_segment_road()
+
+        # Apply first traffic range
+        segment_key_1 = ((1.0, 0.0), (3.0, 0.0))  # N1 to N3
+        road.add_traffic_range(segment_key_1, multiplier=0.5)
+
+        # Apply second overlapping traffic range
+        segment_key_2 = ((2.0, 0.0), (4.0, 0.0))  # N2 to N4
+        road.add_traffic_range(segment_key_2, multiplier=0.3)
+
+        # Check multipliers - minimum should win at overlaps
+        assert road.get_multiplier_at_index(0) == 1.0, "No traffic"
+        assert road.get_multiplier_at_index(1) == 0.5, "Only range 1"
+        assert road.get_multiplier_at_index(2) == 0.3, "Overlap: min(0.5, 0.3) = 0.3"
+        assert road.get_multiplier_at_index(3) == 0.3, "Only range 2"
+
+        print(f"\n{'='*60}")
+        print("TEST: Overlapping traffic ranges (minimum wins)")
+        print(f"{'='*60}")
+        print("Range 1: [N1, N3] mult=0.5")
+        print("Range 2: [N2, N4] mult=0.3")
+        print("\nMultipliers per segment (min wins at overlap):")
+        for i in range(4):
+            mult = road.get_multiplier_at_index(i)
+            print(f"  Segment {i} (N{i}→N{i+1}): mult={mult}")
+
+    def test_clear_traffic_restores_free_flow(self) -> None:
+        """Test that clearing traffic restores free flow multipliers."""
+        road = self._create_multi_segment_road()
+
+        # Apply traffic
+        segment_key = ((1.0, 0.0), (3.0, 0.0))
+        road.add_traffic_range(segment_key, multiplier=0.25)
+
+        # Verify traffic is applied
+        assert road.get_multiplier_at_index(1) == 0.25
+
+        # Clear all traffic
+        road.clear_traffic()
+
+        # All multipliers should return to 1.0
+        for i in range(4):
+            assert road.get_multiplier_at_index(i) == 1.0
+
+        # Active pointcollection should be base pointcollection again
+        assert road.active_pointcollection == road.pointcollection
+
+    def test_duplicate_segment_key_replaces_existing(self) -> None:
+        """Test that adding same segment_key twice replaces the previous range.
+
+        This ensures:
+        - No duplicate ranges for the same segment_key
+        - Last-added multiplier takes effect (not min of old and new)
+        - No memory bloat from accumulated ranges
+        """
+        road = self._create_multi_segment_road()
+
+        segment_key = ((1.0, 0.0), (3.0, 0.0))
+
+        # Apply traffic with multiplier 0.3
+        road.add_traffic_range(segment_key, multiplier=0.3)
+        assert road.get_multiplier_at_index(1) == 0.3
+
+        # Apply traffic with SAME segment_key but HIGHER multiplier (0.7)
+        # This should REPLACE, not accumulate
+        road.add_traffic_range(segment_key, multiplier=0.7)
+
+        # Multiplier should be 0.7 (the new value), NOT 0.3 (min of old and new)
+        assert (
+            road.get_multiplier_at_index(1) == 0.7
+        ), "Duplicate segment_key should replace, not accumulate"
+
+        # Verify only one range exists (no duplicates)
+        assert (
+            len(road._traffic_ranges) == 1
+        ), "Should have exactly one range, not duplicates"
+
+    def test_partial_segment_overlap(self) -> None:
+        """Test traffic segment that only partially overlaps with road.
+
+        Road has nodes at: (0,0), (1,0), (2,0), (3,0), (4,0)
+        Traffic segment: (1.5,0) to (3,0) - start node doesn't exist in road
+
+        Expected: Traffic applies from road start (idx 0) to N3 (idx 3) INCLUSIVE
+        """
+        road = self._create_multi_segment_road()
+
+        # Apply traffic with start node NOT in road
+        segment_key = ((1.5, 0.0), (3.0, 0.0))  # 1.5 doesn't exist
+        result = road.add_traffic_range(segment_key, multiplier=0.4)
+
+        assert result is True, "Partial overlap should still apply"
+
+        # Since start (1.5, 0) isn't found, it defaults to 0
+        # End (3.0, 0) is found at index 3
+        # Range becomes [0, 3] INCLUSIVE - affects segments 0, 1, 2, 3
+        assert road.get_multiplier_at_index(0) == 0.4
+        assert road.get_multiplier_at_index(1) == 0.4
+        assert road.get_multiplier_at_index(2) == 0.4
+        assert road.get_multiplier_at_index(3) == 0.4  # Inclusive!
+
+        print(f"\n{'='*60}")
+        print("TEST: Partial segment overlap")
+        print(f"{'='*60}")
+        print("Traffic segment: (1.5, 0) to (3.0, 0)")
+        print("  - Start (1.5, 0) NOT in road → defaults to idx 0")
+        print("  - End (3.0, 0) found at idx 3")
+        print("  - Range [0, 3] is INCLUSIVE")
+        print("\nMultipliers per segment:")
+        for i in range(4):
+            mult = road.get_multiplier_at_index(i)
+            print(f"  Segment {i}: mult={mult}")
+
+    def test_segment_not_in_road_returns_false(self) -> None:
+        """Test that traffic segment completely outside road returns False."""
+        road = self._create_multi_segment_road()
+
+        # Apply traffic with both nodes NOT in road
+        segment_key = ((10.0, 10.0), (20.0, 20.0))  # Completely outside
+        result = road.add_traffic_range(segment_key, multiplier=0.5)
+
+        assert result is False, "Segment not in road should return False"
+
+        # All multipliers should remain 1.0
+        for i in range(4):
+            assert road.get_multiplier_at_index(i) == 1.0
+
+    def test_visual_point_density_comparison(self) -> None:
+        """Visual test showing point density differences.
+
+        Creates output showing how points are distributed differently
+        based on traffic multipliers.
+        """
+        road = self._create_multi_segment_road()
+
+        # Apply traffic to middle segment only
+        segment_key = ((1.0, 0.0), (3.0, 0.0))
+        road.add_traffic_range(segment_key, multiplier=0.1)  # Very slow = very dense
+
+        traffic_points = road.active_pointcollection
+
+        print(f"\n{'='*70}")
+        print("VISUAL: Point Density Comparison")
+        print(f"{'='*70}")
+        print("\nRoad: [N0]----[N1]----[N2]----[N3]----[N4]")
+        print("       0      1      2      3      4   (x-coordinate)")
+        print("\nTraffic applied to [N1, N3] with multiplier 0.1")
+        print("  → Segments 1, 2, and 3 should be ~10x denser (inclusive range)")
+        print(f"\nTotal points generated: {len(traffic_points)}")
+        print("\nPoint distribution by x-coordinate:")
+
+        # Group points by which segment they're in
+        segment_counts = [0, 0, 0, 0]  # 4 segments
+        for point in traffic_points:
+            x = point.get_position()[0]
+            if x < 1.0:
+                segment_counts[0] += 1
+            elif x < 2.0:
+                segment_counts[1] += 1
+            elif x < 3.0:
+                segment_counts[2] += 1
+            else:
+                segment_counts[3] += 1
+
+        for i in range(4):
+            mult = road.get_multiplier_at_index(i)
+            density_bar = "█" * min(segment_counts[i], 50)
+            density_label = "DENSE" if mult < 1.0 else "sparse"
+            print(
+                f"  Seg {i} (mult={mult:0.1f}, {density_label:6}): "
+                f"{segment_counts[i]:3} pts {density_bar}"
+            )
+
+        print(f"\n{'='*70}")

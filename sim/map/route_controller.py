@@ -74,8 +74,9 @@ class RouteController:
         # All active routes
         self.routes: Set["Route"] = set()
 
-        # Callbacks for road deallocation events
-        self._on_road_deallocated_callbacks: List[Callable[[SegmentKey], None]] = []
+        # Callbacks for road lifecycle events
+        self._on_road_created_callbacks: List[Callable[[Road], None]] = []
+        self._on_road_deallocated_callbacks: List[Callable[[Road], None]] = []
 
     def get_route_from_positions(
         self,
@@ -286,6 +287,10 @@ class RouteController:
             self.segment_key_to_road[segment_key] = road
             self.road_id_to_road[road_id] = road
 
+            # Notify road creation callbacks
+            for callback in self._on_road_created_callbacks:
+                callback(road)
+
             roads.append(road)
 
         return roads
@@ -401,30 +406,53 @@ class RouteController:
 
         # Notify callbacks before removing
         for callback in self._on_road_deallocated_callbacks:
-            callback(segment_key)
+            callback(road)
 
         self.roads_to_routes.pop(road, None)
         self.segment_key_to_road.pop(segment_key, None)
         self.road_id_to_road.pop(road.id, None)
         logger.debug(f"Deallocated road {road.id} (segment_key={segment_key})")
 
-    def register_on_road_deallocated(
-        self, callback: Callable[[SegmentKey], None]
-    ) -> None:
+    def register_on_road_created(self, callback: Callable[[Road], None]) -> None:
+        """Register a callback to be notified when a road is created.
+
+        Args:
+            callback: Function that takes a Road and is called when
+                     a new road is created.
+
+        Returns:
+            None
+        """
+        self._on_road_created_callbacks.append(callback)
+
+    def unregister_on_road_created(self, callback: Callable[[Road], None]) -> bool:
+        """Unregister a previously registered road creation callback.
+
+        Args:
+            callback: The callback function to remove.
+
+        Returns:
+            True if callback was found and removed, False otherwise.
+        """
+        try:
+            self._on_road_created_callbacks.remove(callback)
+            return True
+        except ValueError:
+            return False
+
+    def register_on_road_deallocated(self, callback: Callable[[Road], None]) -> None:
         """Register a callback to be notified when a road is deallocated.
 
         Args:
-            callback: Function that takes a SegmentKey and is called when
-                     a road with that segment_key is deallocated.
+            callback: Function that takes a Road and is called when
+                     the road is deallocated.
 
         Returns:
             None
         """
         self._on_road_deallocated_callbacks.append(callback)
 
-    def unregister_on_road_deallocated(
-        self, callback: Callable[[SegmentKey], None]
-    ) -> bool:
+    def unregister_on_road_deallocated(self, callback: Callable[[Road], None]) -> bool:
         """Unregister a previously registered road deallocation callback.
 
         Args:
@@ -518,4 +546,5 @@ class RouteController:
         self.segment_key_to_road.clear()
         self.road_id_to_road.clear()
         self.routes.clear()
+        self._on_road_created_callbacks.clear()
         self._on_road_deallocated_callbacks.clear()

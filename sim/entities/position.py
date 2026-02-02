@@ -37,17 +37,6 @@ class Position:
         """
         return self.position
 
-    def set_position(self, position: list[float]) -> None:
-        """Set the position coordinates.
-
-        Args:
-            position: List of [longitude, latitude].
-
-        Returns:
-            None
-        """
-        self.position = position
-
     def __eq__(self, other: object) -> bool:
         if not isinstance(other, Position):
             return False
@@ -55,6 +44,14 @@ class Position:
             other.position[0] == self.position[0]
             and other.position[1] == self.position[1]
         )
+
+    def __hash__(self) -> int:
+        """Hash based on coordinates for use as dict key or in sets.
+
+        Returns:
+            Hash value based on (longitude, latitude) coordinates.
+        """
+        return hash((self.position[0], self.position[1]))
 
     def close_enough(self, other: object) -> bool:
         """Check if this position is within a certain distance of another position.

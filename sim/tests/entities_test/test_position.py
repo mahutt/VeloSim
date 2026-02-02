@@ -33,8 +33,3 @@ class TestPosition:
 
     def test_position_creation(self, default_position: Position) -> None:
         assert default_position.get_position() == [-73.5673, 45.5017]
-
-    def test_set_position(self, default_position: Position) -> None:
-        new_position = [-74.0000, 40.7128]
-        default_position.set_position(new_position)
-        assert default_position.get_position() == new_position

@@ -32,7 +32,8 @@ from shapely.geometry import LineString
 from sim.entities.route import Route, map_index_forward
 from sim.entities.road import Road
 from sim.entities.position import Position
-from sim.map.routing_provider import RoutingProvider, RouteResult, RouteStep
+from sim.entities.traffic_data import TrafficRange
+from sim.map.routing_provider import RoutingProvider, RouteResult, RouteStep, SegmentKey
 
 
 def build_roads_from_route_result(route_result: RouteResult) -> List[Road]:
@@ -85,6 +86,34 @@ def build_roads_from_route_result(route_result: RouteResult) -> List[Road]:
         roads.append(road)
 
     return roads
+
+
+def apply_test_traffic(road: Road, traffic_points: List[Position]) -> None:
+    """
+    Apply traffic with specific points to a road for testing purposes.
+
+    This directly sets the road's internal traffic state to simulate traffic
+    with a specific point collection. Used for testing Route's index clamping
+    behavior without depending on the actual point generation logic.
+
+    Args:
+        road: The road to apply traffic to
+        traffic_points: The specific points to use as the traffic pointcollection
+    """
+    # Create a segment key from the road
+    segment_key: SegmentKey = road.segment_key
+
+    # Create a traffic range covering the entire road
+    traffic_range = TrafficRange(
+        start_index=0,
+        end_index=len(road.nodes) - 1 if road.nodes else 0,
+        multiplier=0.5,
+        segment_key=segment_key,
+    )
+
+    # Apply traffic directly to internal state
+    road._traffic_ranges = [traffic_range]
+    road._traffic_pointcollection = traffic_points
 
 
 @pytest.fixture
@@ -1510,7 +1539,6 @@ class TestRouteIndexClampingOnTrafficChange:
         self, mock_routing_provider: Mock, test_config: dict
     ) -> None:
         """Test that index is clamped when traffic reduces point count."""
-        from sim.entities.traffic_data import RoadTrafficState, CongestionLevel
 
         # Create a road with 10 points
         original_points = [Position([0.0, i * 0.001]) for i in range(10)]
@@ -1541,12 +1569,7 @@ class TestRouteIndexClampingOnTrafficChange:
 
         # Now simulate traffic change that reduces points to 3
         traffic_points = [Position([0.0, i * 0.001]) for i in range(3)]
-        traffic_state = RoadTrafficState(
-            multiplier=0.5,
-            congestion_level=CongestionLevel.MODERATE,
-            traffic_pointcollection=traffic_points,
-        )
-        roads[0].set_traffic_state(traffic_state)
+        apply_test_traffic(roads[0], traffic_points)
 
         # Call next() - should clamp index to 2 (max valid) and return that point
         point = route.next()
@@ -1559,7 +1582,6 @@ class TestRouteIndexClampingOnTrafficChange:
         self, mock_routing_provider: Mock, test_config: dict
     ) -> None:
         """Test that route transitions to next road after clamping."""
-        from sim.entities.traffic_data import RoadTrafficState, CongestionLevel
 
         # Create two roads
         road1_points = [Position([0.0, i * 0.001]) for i in range(10)]
@@ -1600,12 +1622,7 @@ class TestRouteIndexClampingOnTrafficChange:
 
         # Traffic change reduces first road to 3 points
         traffic_points = [Position([0.0, i * 0.001]) for i in range(3)]
-        traffic_state = RoadTrafficState(
-            multiplier=0.3,
-            congestion_level=CongestionLevel.SEVERE,
-            traffic_pointcollection=traffic_points,
-        )
-        roads[0].set_traffic_state(traffic_state)
+        apply_test_traffic(roads[0], traffic_points)
 
         # Call next() - should clamp and return last point
         point1 = route.next()
@@ -1620,7 +1637,6 @@ class TestRouteIndexClampingOnTrafficChange:
         self, mock_routing_provider: Mock, test_config: dict
     ) -> None:
         """Test that route finishes correctly when clamped on the last road."""
-        from sim.entities.traffic_data import RoadTrafficState, CongestionLevel
 
         # Single road with 10 points
         original_points = [Position([0.0, i * 0.001]) for i in range(10)]
@@ -1649,12 +1665,7 @@ class TestRouteIndexClampingOnTrafficChange:
 
         # Traffic reduces to 2 points
         traffic_points = [Position([0.0, 0.0]), Position([0.0, 0.001])]
-        traffic_state = RoadTrafficState(
-            multiplier=0.2,
-            congestion_level=CongestionLevel.SEVERE,
-            traffic_pointcollection=traffic_points,
-        )
-        roads[0].set_traffic_state(traffic_state)
+        apply_test_traffic(roads[0], traffic_points)
 
         # Call next() - should clamp index and return a valid point
         point = route.next()
@@ -1668,7 +1679,6 @@ class TestRouteIndexClampingOnTrafficChange:
         self, mock_routing_provider: Mock, test_config: dict
     ) -> None:
         """Test that repeated clamping doesn't cause infinite loop."""
-        from sim.entities.traffic_data import RoadTrafficState, CongestionLevel
 
         # Single road with 5 points
         original_points = [Position([0.0, i * 0.001]) for i in range(5)]
@@ -1697,12 +1707,7 @@ class TestRouteIndexClampingOnTrafficChange:
 
         # Traffic reduces to 2 points
         traffic_points = [Position([0.0, 0.0]), Position([0.0, 0.001])]
-        traffic_state = RoadTrafficState(
-            multiplier=0.5,
-            congestion_level=CongestionLevel.MODERATE,
-            traffic_pointcollection=traffic_points,
-        )
-        roads[0].set_traffic_state(traffic_state)
+        apply_test_traffic(roads[0], traffic_points)
 
         # Should complete without infinite loop (timeout would catch this)
         call_count = 0
@@ -1718,8 +1723,6 @@ class TestRouteIndexClampingOnTrafficChange:
         self, mock_routing_provider: Mock, test_config: dict
     ) -> None:
         """Test that clamping transitions to next road without duplicates."""
-        from sim.entities.traffic_data import RoadTrafficState, CongestionLevel
-
         # Two roads
         road1_points = [Position([0.0, i * 0.001]) for i in range(8)]
         road2_points = [Position([0.0, 0.007 + i * 0.001]) for i in range(4)]
@@ -1760,12 +1763,7 @@ class TestRouteIndexClampingOnTrafficChange:
         # Traffic reduces first road to 3 points (indices 0,1,2)
         # At index 6, driver maps to index 2 (max), triggering transition
         traffic_points = [Position([0.0, i * 0.001]) for i in range(3)]
-        traffic_state = RoadTrafficState(
-            multiplier=0.4,
-            congestion_level=CongestionLevel.MODERATE,
-            traffic_pointcollection=traffic_points,
-        )
-        roads[0].set_traffic_state(traffic_state)
+        apply_test_traffic(roads[0], traffic_points)
 
         # Next call should transition to road2 and return its first point
         next_point = route.next()
@@ -1784,16 +1782,14 @@ class TestRouteIndexClampingOnTrafficChange:
         for i in range(1, len(returned_positions)):
             assert returned_positions[i] != returned_positions[i - 1]
 
-    def test_empty_traffic_points_falls_back_to_original(
+    def test_cleared_traffic_falls_back_to_original(
         self, mock_routing_provider: Mock, test_config: dict
     ) -> None:
-        """Test that empty traffic_pointcollection falls back to original points.
+        """Test that cleared traffic falls back to original points.
 
-        When traffic_pointcollection is empty, active_pointcollection returns
-        the original pointcollection (empty list is falsy).
+        When traffic is cleared, active_pointcollection returns
+        the original pointcollection.
         """
-        from sim.entities.traffic_data import RoadTrafficState, CongestionLevel
-
         # Single road with 5 points
         original_points = [Position([0.0, i * 0.001]) for i in range(5)]
 
@@ -1820,15 +1816,12 @@ class TestRouteIndexClampingOnTrafficChange:
         p1 = route.next()
         assert p1 is not None
 
-        # Set traffic with empty points (should fall back to original)
-        traffic_state = RoadTrafficState(
-            multiplier=0.1,
-            congestion_level=CongestionLevel.SEVERE,
-            traffic_pointcollection=[],  # Empty falls back to original
-        )
-        roads[0].set_traffic_state(traffic_state)
+        # Apply traffic, then clear it
+        traffic_points = [Position([0.0, i * 0.001]) for i in range(3)]
+        apply_test_traffic(roads[0], traffic_points)
+        roads[0].clear_traffic()
 
-        # active_pointcollection should still return original points
+        # active_pointcollection should return original points after clearing
         assert len(roads[0].active_pointcollection) == 5
 
         # Route should continue traversing original points
@@ -1841,8 +1834,6 @@ class TestRouteIndexClampingOnTrafficChange:
         self, mock_routing_provider: Mock, test_config: dict
     ) -> None:
         """Test that original pointcollection is preserved after traffic change."""
-        from sim.entities.traffic_data import RoadTrafficState, CongestionLevel
-
         original_points = [Position([0.0, i * 0.001]) for i in range(10)]
         step = RouteStep(
             name="Test Road",
@@ -1865,12 +1856,7 @@ class TestRouteIndexClampingOnTrafficChange:
 
         # Apply traffic
         traffic_points = [Position([0.0, i * 0.001]) for i in range(3)]
-        traffic_state = RoadTrafficState(
-            multiplier=0.5,
-            congestion_level=CongestionLevel.MODERATE,
-            traffic_pointcollection=traffic_points,
-        )
-        roads[0].set_traffic_state(traffic_state)
+        apply_test_traffic(roads[0], traffic_points)
 
         # Traverse and finish
         while route.next() is not None:
@@ -1890,7 +1876,6 @@ class TestRouteIndexClampingOnTrafficChange:
         the driver's current progress percentage, never behind.
         """
         import math
-        from sim.entities.traffic_data import RoadTrafficState, CongestionLevel
 
         # Create road with 10 points
         original_points = [Position([0.0, i * 0.001]) for i in range(10)]
@@ -1921,12 +1906,7 @@ class TestRouteIndexClampingOnTrafficChange:
 
         # Traffic reduces to 4 points
         traffic_points = [Position([0.0, i * 0.003]) for i in range(4)]
-        traffic_state = RoadTrafficState(
-            multiplier=0.4,
-            congestion_level=CongestionLevel.MODERATE,
-            traffic_pointcollection=traffic_points,
-        )
-        roads[0].set_traffic_state(traffic_state)
+        apply_test_traffic(roads[0], traffic_points)
 
         # Expected mapping with ceil():
         # progress = 7 / (10-1) = 0.778
@@ -1947,7 +1927,6 @@ class TestRouteIndexClampingOnTrafficChange:
     ) -> None:
         """Test ratio mapping at various progress percentages."""
         import math
-        from sim.entities.traffic_data import RoadTrafficState, CongestionLevel
 
         test_cases = [
             # (original_count, traffic_count, current_idx, expected_idx)
@@ -1985,12 +1964,7 @@ class TestRouteIndexClampingOnTrafficChange:
 
             # Apply traffic
             traffic_points = [Position([0.0, i * 0.001]) for i in range(traffic_count)]
-            traffic_state = RoadTrafficState(
-                multiplier=0.5,
-                congestion_level=CongestionLevel.MODERATE,
-                traffic_pointcollection=traffic_points,
-            )
-            roads[0].set_traffic_state(traffic_state)
+            apply_test_traffic(roads[0], traffic_points)
 
             # Get mapped point
             point = route.next()
@@ -2006,8 +1980,6 @@ class TestRouteIndexClampingOnTrafficChange:
         self, mock_routing_provider: Mock, test_config: dict
     ) -> None:
         """Test that single-point edge cases fall back to simple clamping."""
-        from sim.entities.traffic_data import RoadTrafficState, CongestionLevel
-
         # Create road with 10 points
         original_points = [Position([0.0, i * 0.001]) for i in range(10)]
         step = RouteStep(
@@ -2035,12 +2007,7 @@ class TestRouteIndexClampingOnTrafficChange:
 
         # Traffic reduces to 1 point (edge case)
         traffic_points = [Position([0.0, 0.0])]
-        traffic_state = RoadTrafficState(
-            multiplier=0.1,
-            congestion_level=CongestionLevel.SEVERE,
-            traffic_pointcollection=traffic_points,
-        )
-        roads[0].set_traffic_state(traffic_state)
+        apply_test_traffic(roads[0], traffic_points)
 
         # Should fallback to clamping (index 0, the only valid index)
         point = route.next()
@@ -2058,7 +2025,6 @@ class TestRouteIndexClampingOnTrafficChange:
         stay at the same index (going backward in progress).
         """
         import math
-        from sim.entities.traffic_data import RoadTrafficState, CongestionLevel
 
         # Create road with 5 points
         original_points = [Position([0.0, i * 0.001]) for i in range(5)]
@@ -2089,12 +2055,7 @@ class TestRouteIndexClampingOnTrafficChange:
 
         # Traffic INCREASES to 10 points
         traffic_points = [Position([0.0, i * 0.001]) for i in range(10)]
-        traffic_state = RoadTrafficState(
-            multiplier=0.5,
-            congestion_level=CongestionLevel.MODERATE,
-            traffic_pointcollection=traffic_points,
-        )
-        roads[0].set_traffic_state(traffic_state)
+        apply_test_traffic(roads[0], traffic_points)
 
         # Expected mapping with ceil():
         # progress = 2 / (5-1) = 0.5
@@ -2118,7 +2079,6 @@ class TestRouteIndexClampingOnTrafficChange:
         The driver's progress should be preserved using ratio mapping.
         """
         import math
-        from sim.entities.traffic_data import RoadTrafficState, CongestionLevel
 
         # Create road with 10 original points
         original_points = [Position([0.0, i * 0.001]) for i in range(10)]
@@ -2146,12 +2106,7 @@ class TestRouteIndexClampingOnTrafficChange:
 
         # Apply traffic with 4 points
         traffic_points = [Position([0.0, i * 0.003]) for i in range(4)]
-        traffic_state = RoadTrafficState(
-            multiplier=0.5,
-            congestion_level=CongestionLevel.MODERATE,
-            traffic_pointcollection=traffic_points,
-        )
-        roads[0].set_traffic_state(traffic_state)
+        apply_test_traffic(roads[0], traffic_points)
 
         # This next() call detects traffic change (10 -> 4)
         # Maps index 1 -> ceil(1/9 * 3) = ceil(0.33) = 1

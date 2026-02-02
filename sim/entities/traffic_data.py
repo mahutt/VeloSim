@@ -28,6 +28,7 @@ from enum import Enum
 
 if TYPE_CHECKING:
     from sim.entities.position import Position
+    from sim.map.routing_provider import SegmentKey
 
 
 class CongestionLevel(Enum):
@@ -78,3 +79,18 @@ class RoadTrafficState:
     def __post_init__(self) -> None:
         """Validate multiplier is in valid range."""
         self.multiplier = max(0.0, min(1.0, self.multiplier))
+
+
+@dataclass
+class TrafficRange:
+    """Traffic range for a subset of road nodes.
+
+    Represents traffic affecting nodes from start_index to end_index (inclusive).
+    Multiple TrafficRanges can exist on a single Road for granular per-segment
+    traffic control.
+    """
+
+    start_index: int  # First affected node index (inclusive)
+    end_index: int  # Last affected node index (inclusive)
+    multiplier: float  # Speed multiplier (0.01-1.0), 1.0 = free flow
+    segment_key: "SegmentKey"  # Original segment_key that created this range
