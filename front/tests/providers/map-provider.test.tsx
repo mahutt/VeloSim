@@ -77,10 +77,21 @@ vi.mock('~/hooks/use-error', () => ({
   default: () => ({ displayError: mockDisplayError }),
 }));
 
+vi.mock('~/lib/frame-sources/server-frame-source', () => {
+  return {
+    ServerFrameSource: class {
+      constructor() {}
+      async start() {
+        return true;
+      }
+    },
+  };
+});
+
 test('map provider instantiates mapboxgl Map instance in presence of map container', async () => {
   render(
     <MapProvider>
-      <SimulationProvider>
+      <SimulationProvider simId="test-sim-123">
         <TaskAssignmentProvider>
           <MapContainer />
         </TaskAssignmentProvider>

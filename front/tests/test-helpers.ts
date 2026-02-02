@@ -110,8 +110,6 @@ export function makeSimulationContext(
     reassignTask: overrides.reassignTask ?? vi.fn(),
     reorderTasks: overrides.reorderTasks ?? vi.fn(),
     simId: overrides.simId ?? null,
-    isConnected: overrides.isConnected ?? false,
-    simulationStatus: overrides.simulationStatus ?? 'idle',
     isLoading: overrides.isLoading ?? false,
     formattedSimTime: overrides.formattedSimTime ?? null,
     currentDay: overrides.currentDay ?? 1,

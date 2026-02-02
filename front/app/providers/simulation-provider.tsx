@@ -43,7 +43,6 @@ import {
 import {
   type BackendPayload,
   type StationTask,
-  type SimulationStatus,
   type Station,
   type Position,
   type Driver,
@@ -61,10 +60,8 @@ import {
   setupMapHoverHandlers,
 } from '~/lib/map-interactions';
 import useError from '~/hooks/use-error';
-import useAuth from '~/hooks/use-auth';
 import { logMissingEntityError } from '~/utils/simulation-error-utils';
 import api from '~/api';
-import { useSimulationWebSocket } from '~/hooks/use-simulation-websocket';
 import {
   formatSecondsToHHMM,
   calculateDayFromSeconds,
@@ -85,6 +82,7 @@ import {
   driverResourceHasUpdated,
   vehicleResourceHasUpdated,
 } from '~/lib/simulation-helpers';
+import { ServerFrameSource } from '~/lib/frame-sources/server-frame-source';
 
 export const SPEED_OPTIONS = [0, 0.5, 1, 2, 4, 8] as const;
 export type Speed = (typeof SPEED_OPTIONS)[number];
@@ -111,9 +109,7 @@ export type SimulationContextType = {
     applyFromTop: boolean
   ) => Promise<void>;
   simId: string | null;
-  isConnected: boolean;
-  simulationStatus: SimulationStatus;
-  isLoading: boolean; // Convenience flag for UI
+  isLoading: boolean;
   formattedSimTime: string | null;
   currentDay: number;
   HQWidgetState: HQWidgetProps;
@@ -127,7 +123,7 @@ const SimulationContext = createContext<SimulationContextType | undefined>(
 
 interface SimulationProviderProps {
   children: ReactNode;
-  simId?: string;
+  simId: string;
 }
 
 export const SimulationProvider = ({
@@ -135,11 +131,10 @@ export const SimulationProvider = ({
   simId: initialSimId,
 }: SimulationProviderProps) => {
   const { displayError } = useError();
-  const { user } = useAuth();
   const { mapRef, mapLoaded } = useMap();
   const speedRef = useRef<Speed>(1);
 
-  const [simId] = useState<string | null>(initialSimId || null);
+  const [simId] = useState<string>(initialSimId);
 
   // Flag to trigger map render on next animation frame
   const renderOnNextFrameRef = useRef<boolean>(false);
@@ -193,7 +188,7 @@ export const SimulationProvider = ({
 
     try {
       const payload = { task_id: taskId, driver_id: driverId };
-      await api.post(`/simulation/${simId!}/drivers/assign`, payload);
+      await api.post(`/simulation/${simId}/drivers/assign`, payload);
 
       const updatedResource = resource;
       if (!updatedResource.taskIds.includes(taskId)) {
@@ -222,7 +217,7 @@ export const SimulationProvider = ({
 
     try {
       const payload = { task_id: taskId, driver_id: driverId };
-      await api.post(`/simulation/${simId!}/drivers/unassign`, payload);
+      await api.post(`/simulation/${simId}/drivers/unassign`, payload);
 
       const updatedResource: Driver = {
         ...resource,
@@ -263,7 +258,7 @@ export const SimulationProvider = ({
         new_driver_id: newDriverId,
       };
 
-      await api.post(`/simulation/${simId!}/drivers/reassign`, payload);
+      await api.post(`/simulation/${simId}/drivers/reassign`, payload);
 
       const updatedPrevResource: Driver = {
         ...prevResource,
@@ -312,7 +307,7 @@ export const SimulationProvider = ({
       const response = await api.post<{
         driver_id: number;
         task_order: number[];
-      }>(`/simulation/${simId!}/drivers/reorder-tasks`, payload);
+      }>(`/simulation/${simId}/drivers/reorder-tasks`, payload);
 
       const updatedResource: Driver = {
         ...resource,
@@ -774,22 +769,20 @@ export const SimulationProvider = ({
     animationFrameRef.current = requestAnimationFrame(animateResources);
   };
 
-  // ============================================================================
-  // WEBSOCKET CONNECTION
-  // WebSocket connection is managed by useSimulationWebSocket hook
-  // ============================================================================
-
-  const { isConnected, simulationStatus } = useSimulationWebSocket({
-    simId,
-    enabled: mapLoaded && !!user,
-    onInitialFrame: handleFrame,
-    onFrameUpdate: handleFrame,
-    onError: displayError,
-  });
+  const serverFrameSourceRef = useRef<ServerFrameSource | null>(null);
 
   // Derived loading state for convenience
-  const isLoading =
-    simulationStatus === 'connecting' || simulationStatus === 'loading';
+  const [isLoading, setIsLoading] = useState<boolean>(true);
+  useEffect(() => {
+    serverFrameSourceRef.current = new ServerFrameSource(
+      simId,
+      handleFrame,
+      displayError
+    );
+    serverFrameSourceRef.current.start().then(() => {
+      setIsLoading(false);
+    });
+  }, [serverFrameSourceRef.current]);
 
   // ============================================================================
   // MAP INTERACTIONS SETUP
@@ -868,8 +861,6 @@ export const SimulationProvider = ({
         reassignTask,
         reorderTasks,
         simId,
-        isConnected,
-        simulationStatus,
         isLoading,
         formattedSimTime,
         currentDay,

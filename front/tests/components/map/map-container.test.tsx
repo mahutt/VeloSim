@@ -42,6 +42,17 @@ vi.mock('~/hooks/use-auth', () => ({
   }),
 }));
 
+vi.mock('~/lib/frame-sources/server-frame-source', () => {
+  return {
+    ServerFrameSource: class {
+      constructor() {}
+      async start() {
+        return true;
+      }
+    },
+  };
+});
+
 test('map container render should fail without a map provider', async () => {
   expect(() => {
     render(<MapContainer />);
@@ -51,7 +62,7 @@ test('map container render should fail without a map provider', async () => {
 test('map container render should succeed with a map provider', async () => {
   const { getByTestId } = render(
     <MapProvider>
-      <SimulationProvider>
+      <SimulationProvider simId="test-sim-123">
         <TaskAssignmentProvider>
           <MapContainer />
         </TaskAssignmentProvider>

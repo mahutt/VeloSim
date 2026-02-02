@@ -46,6 +46,8 @@ export function meta() {
 export default function Simulation() {
   const { sim_id } = useParams<{ sim_id: string }>();
 
+  if (!sim_id) return null; // Should never happen due to routing
+
   return (
     <>
       <MapProvider>
@@ -60,7 +62,7 @@ export default function Simulation() {
 }
 
 function SimulationContent() {
-  const { isLoading, simulationStatus, currentDay } = useSimulation();
+  const { isLoading, currentDay } = useSimulation();
 
   // Dynamic width based on day digit count
   const getContainerWidth = () => {
@@ -76,11 +78,7 @@ function SimulationContent() {
         <div className="absolute inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm">
           <div className="flex flex-col items-center gap-4">
             <Loader2 className="h-12 w-12 animate-spin text-primary" />
-            <p className="text-lg text-muted-foreground">
-              {simulationStatus === 'connecting'
-                ? 'Connecting to simulation...'
-                : 'Loading initial data...'}
-            </p>
+            <p className="text-lg text-muted-foreground">Loading</p>
           </div>
         </div>
       )}

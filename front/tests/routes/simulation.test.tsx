@@ -59,9 +59,7 @@ vi.mock('~/providers/simulation-provider', () => ({
   ),
   useSimulation: () =>
     makeSimulationContext({
-      simulationStatus: 'ready',
       simId: 'test-sim-id',
-      isConnected: true,
     }),
 }));
 
@@ -83,11 +81,11 @@ test('meta function sets all fields', () => {
 test('simulation page loads the map container', async () => {
   const Stub = createRoutesStub([
     {
-      path: '/simulation',
+      path: '/simulation/:sim_id',
       Component: Simulation,
     },
   ]);
 
-  render(<Stub initialEntries={['/simulation']} />);
+  render(<Stub initialEntries={['/simulation/sim-id']} />);
   expect(screen.getByTestId('map-container')).toBeInTheDocument();
 });

@@ -45,6 +45,17 @@ vi.mock('~/hooks/use-auth', () => ({
   }),
 }));
 
+vi.mock('~/lib/frame-sources/server-frame-source', () => {
+  return {
+    ServerFrameSource: class {
+      constructor() {}
+      async start() {
+        return true;
+      }
+    },
+  };
+});
+
 test('resource item renders with resource data', () => {
   const mockResource: ResourceItemElement = {
     id: 1,
@@ -58,7 +69,7 @@ test('resource item renders with resource data', () => {
 
   render(
     <MapProvider>
-      <SimulationProvider>
+      <SimulationProvider simId="test-sim-123">
         <TaskAssignmentProvider>
           <ResourceItem resource={mockResource} onSelect={mockOnSelect} />
         </TaskAssignmentProvider>
@@ -83,7 +94,7 @@ test('resource item renders with selection state', () => {
 
   const { rerender } = render(
     <MapProvider>
-      <SimulationProvider>
+      <SimulationProvider simId="test-sim-123">
         <TaskAssignmentProvider>
           <ResourceItem
             resource={mockResource}
@@ -107,7 +118,7 @@ test('resource item renders with selection state', () => {
   // Rerender with selected state
   rerender(
     <MapProvider>
-      <SimulationProvider>
+      <SimulationProvider simId="test-sim-123">
         <TaskAssignmentProvider>
           <ResourceItem
             resource={mockResource}
@@ -141,7 +152,7 @@ test('resource item calls onSelect when clicked', () => {
 
   render(
     <MapProvider>
-      <SimulationProvider>
+      <SimulationProvider simId="test-sim-123">
         <TaskAssignmentProvider>
           <ResourceItem resource={mockResource} onSelect={mockOnSelect} />
         </TaskAssignmentProvider>
@@ -170,7 +181,7 @@ test('resource item displays driver name and ID', () => {
 
   render(
     <MapProvider>
-      <SimulationProvider>
+      <SimulationProvider simId="test-sim-123">
         <TaskAssignmentProvider>
           <ResourceItem resource={mockResource} onSelect={mockOnSelect} />
         </TaskAssignmentProvider>
@@ -195,7 +206,7 @@ test('resource item displays battery status indicator', () => {
 
   render(
     <MapProvider>
-      <SimulationProvider>
+      <SimulationProvider simId="test-sim-123">
         <TaskAssignmentProvider>
           <ResourceItem resource={mockResource} onSelect={mockOnSelect} />
         </TaskAssignmentProvider>
@@ -219,7 +230,7 @@ test('resource item handles dragOver event correctly', () => {
 
   render(
     <MapProvider>
-      <SimulationProvider>
+      <SimulationProvider simId="test-sim-123">
         <TaskAssignmentProvider>
           <ResourceItem resource={mockResource} onSelect={mockOnSelect} />
         </TaskAssignmentProvider>
@@ -255,7 +266,7 @@ test('resource item handles drop event and stops propagation (#583)', () => {
 
   render(
     <MapProvider>
-      <SimulationProvider>
+      <SimulationProvider simId="test-sim-123">
         <TaskAssignmentProvider>
           <ResourceItem resource={mockResource} onSelect={mockOnSelect} />
         </TaskAssignmentProvider>
@@ -297,7 +308,7 @@ test('resource item handles dragEnter and applies hover state', () => {
 
   render(
     <MapProvider>
-      <SimulationProvider>
+      <SimulationProvider simId="test-sim-123">
         <TaskAssignmentProvider>
           <ResourceItem resource={mockResource} onSelect={mockOnSelect} />
         </TaskAssignmentProvider>
@@ -334,7 +345,7 @@ test('resource item handles dragLeave with relatedTarget outside element (#583)'
 
   render(
     <MapProvider>
-      <SimulationProvider>
+      <SimulationProvider simId="test-sim-123">
         <TaskAssignmentProvider>
           <ResourceItem resource={mockResource} onSelect={mockOnSelect} />
         </TaskAssignmentProvider>
@@ -382,7 +393,7 @@ test('resource item handles dragLeave with null relatedTarget (#583 Safari fix)'
 
   render(
     <MapProvider>
-      <SimulationProvider>
+      <SimulationProvider simId="test-sim-123">
         <TaskAssignmentProvider>
           <ResourceItem resource={mockResource} onSelect={mockOnSelect} />
         </TaskAssignmentProvider>
