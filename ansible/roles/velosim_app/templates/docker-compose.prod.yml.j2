@@ -26,12 +26,12 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - {{ app_dir }}/source/back/database/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
-      - {{ app_dir }}/source/back/alembic/seeds/seed.sql:/docker-entrypoint-initdb.d/seed.sql:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U {{ postgres_user }}"]
       interval: 10s
       timeout: 5s
-      retries: 5
+      retries: 10
+      start_period: 30s
     networks:
       - velosim-net
     logging:
@@ -74,7 +74,6 @@ services:
     environment:
       - DATABASE_URL=postgresql://{{ postgres_user }}:{{ postgres_password }}@postgres:5432/{{ postgres_db }}
       - OSRM_URL=http://osrm:5000
-      - LOG_FILE_PATH=/app/grafana_logging/logs.txt
     env_file:
       - {{ app_dir }}/.env.prod
     depends_on:

@@ -1,16 +1,21 @@
 #!/bin/bash
 # VeloSim Database Migration Script
 # {{ ansible_managed }}
+# Usage:
+#   ./migrate-database.sh          - Run full migration
+#   ./migrate-database.sh prepare  - Only start postgres, skip migration (for manual restore)
 
 set -euo pipefail
 
 APP_DIR="{{ app_dir }}"
 COMPOSE_FILE="{{ app_dir }}/docker-compose.prod.yml"
 ENV_FILE="{{ app_dir }}/.env.prod"
+MODE="${1:-full}"
 
 echo "=== VeloSim Database Migration ==="
 echo "Working directory: $APP_DIR"
 echo "Environment file: $ENV_FILE"
+echo "Mode: $MODE"
 
 cd "$APP_DIR"
 
@@ -19,12 +24,8 @@ echo "Cleaning up any macOS resource fork files..."
 find "$APP_DIR/source" -name "._*" -type f -delete 2>/dev/null || true
 find "$APP_DIR/source" -name ".DS_Store" -type f -delete 2>/dev/null || true
 
-# Stop any existing containers to ensure clean state
-echo "Stopping any existing containers..."
-docker compose -f "$COMPOSE_FILE" down --remove-orphans 2>/dev/null || true
-
-# Start only PostgreSQL first
-echo "Starting PostgreSQL container..."
+# Ensure PostgreSQL is running (does not stop existing containers)
+echo "Ensuring PostgreSQL container is running..."
 docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" up -d postgres
 
 # Check if containers are running
@@ -48,6 +49,17 @@ for i in {1..30}; do
     echo "Waiting... ($i/30)"
     sleep 2
 done
+
+# If prepare-only mode, exit here to allow manual restore
+if [ "$MODE" = "prepare" ]; then
+    echo ""
+    echo "=== Prepare mode: PostgreSQL is ready ==="
+    echo "You can now:"
+    echo "  1. Restore your backup: /opt/velosim/scripts/database-restore.sh <backup-file.sql.gz>"
+    echo "  2. Run migrations: /opt/velosim/scripts/migrate-database.sh"
+    echo ""
+    exit 0
+fi
 
 # Check if this is the first deployment (database is empty)
 TABLES_COUNT=$(docker compose -f "$COMPOSE_FILE" exec -T postgres psql -U {{ postgres_user }} -d {{ postgres_db }} -t -c "SELECT count(*) FROM information_schema.tables WHERE table_schema = 'public';" 2>/dev/null | xargs || echo "0")

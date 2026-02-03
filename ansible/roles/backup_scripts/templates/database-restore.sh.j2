@@ -35,7 +35,7 @@ fi
 # Stop application containers to prevent data corruption during restore
 echo "Stopping application services..."
 cd "$APP_DIR"
-docker-compose -f docker-compose.prod.yml stop backend frontend
+docker compose -f docker-compose.prod.yml stop backend frontend
 
 # Restore database from compressed backup
 echo "Restoring database..."
@@ -43,7 +43,7 @@ gunzip -c "$BACKUP_PATH" | docker exec -i velosim-postgres psql -U {{ postgres_u
 
 # Restart application containers
 echo "Restarting application services..."
-docker-compose -f docker-compose.prod.yml start backend frontend
+docker compose -f docker-compose.prod.yml start backend frontend
 
 echo "Database restore completed successfully"
 echo "$(date): Database restored from $BACKUP_FILE" >> /var/log/velosim/backup.log

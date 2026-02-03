@@ -12,18 +12,55 @@ cd "$APP_DIR"
 case "$1" in
     start)
         echo "Starting VeloSim application..."
-        echo "Stopping and removing any existing containers..."
-        docker compose -f "$COMPOSE_FILE" down --remove-orphans || true
         echo "Pulling latest images..."
         docker compose -f "$COMPOSE_FILE" pull
         echo "Building application containers..."
         # Force rebuild frontend to pick up environment changes
         docker compose -f "$COMPOSE_FILE" build --no-cache frontend
         docker compose -f "$COMPOSE_FILE" build backend
-        echo "Starting containers..."
-        docker compose -f "$COMPOSE_FILE" up -d
-        echo "Waiting for services to be ready..."
+
+        echo "Starting all services (will recreate changed containers)..."
+        docker compose -f "$COMPOSE_FILE" up -d --remove-orphans
+
+        echo "Waiting for PostgreSQL to be healthy..."
+        for i in $(seq 1 60); do
+            if docker compose -f "$COMPOSE_FILE" ps postgres | grep -q "healthy"; then
+                echo "PostgreSQL is healthy!"
+                break
+            fi
+            if [ $i -eq 60 ]; then
+                echo "ERROR: PostgreSQL failed to become healthy"
+                docker compose -f "$COMPOSE_FILE" logs postgres
+                exit 1
+            fi
+            echo "Waiting for PostgreSQL... ($i/60)"
+            sleep 2
+        done
+
+        echo "Waiting for backend to be healthy..."
+        for i in $(seq 1 90); do
+            if docker compose -f "$COMPOSE_FILE" ps backend | grep -q "healthy"; then
+                echo "Backend is healthy!"
+                break
+            fi
+            if docker compose -f "$COMPOSE_FILE" ps backend | grep -q "unhealthy"; then
+                echo "ERROR: Backend is unhealthy"
+                docker compose -f "$COMPOSE_FILE" logs backend
+                exit 1
+            fi
+            if [ $i -eq 90 ]; then
+                echo "ERROR: Backend failed to become healthy within 3 minutes"
+                docker compose -f "$COMPOSE_FILE" logs backend
+                exit 1
+            fi
+            echo "Waiting for backend... ($i/90)"
+            sleep 2
+        done
+
+        echo "Waiting for all services to stabilize..."
         sleep 10
+        echo ""
+        echo "=== Container Status ==="
         docker compose -f "$COMPOSE_FILE" ps
         ;;
     stop)
