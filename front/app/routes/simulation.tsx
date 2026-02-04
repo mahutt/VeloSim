@@ -60,7 +60,14 @@ export default function Simulation() {
 }
 
 function SimulationContent() {
-  const { isLoading, simulationStatus } = useSimulation();
+  const { isLoading, simulationStatus, currentDay } = useSimulation();
+
+  // Dynamic width based on day digit count
+  const getContainerWidth = () => {
+    if (currentDay >= 100) return 'w-[277px]';
+    if (currentDay >= 10) return 'w-[268px]';
+    return 'w-[260px]';
+  };
 
   return (
     <>
@@ -83,7 +90,9 @@ function SimulationContent() {
             <SelectedItemBar />
           </div>
           {/* max-h-[calc(100vh-2.5rem) is set so that the Mapbox & OSM copyright notices aren't blocked. */}
-          <div className="w-[257px] absolute top-4 right-4 flex flex-col gap-2 max-h-[calc(100vh-2.5rem)]">
+          <div
+            className={`${getContainerWidth()} absolute top-4 right-4 flex flex-col gap-2 max-h-[calc(100vh-2.5rem)]`}
+          >
             <div className="w-full flex justify-between gap-2 items-center">
               <SimulationClock />
               <PlaybackControls />

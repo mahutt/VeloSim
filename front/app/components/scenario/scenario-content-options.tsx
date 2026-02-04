@@ -32,6 +32,7 @@ import {
 import UseGbfsStationsButton from './use-gbfs-stations-button';
 import AddStationButton from './add-station-button';
 import AddVehicleButton from './add-vehicle-button';
+import AddDriverButton from './add-driver-button';
 
 interface ScenarioContentOptionsProps {
   scenarioContent: string;
@@ -56,6 +57,10 @@ export default function ScenarioContentOptions({
         />
         <AddVehicleButton
           scenarioContent={scenarioContent}
+          setScenarioContent={setScenarioContent}
+          onEdit={onEdit}
+        />
+        <AddDriverButton
           setScenarioContent={setScenarioContent}
           onEdit={onEdit}
         />
