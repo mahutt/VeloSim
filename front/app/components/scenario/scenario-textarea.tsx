@@ -94,6 +94,7 @@ export default function ScenarioTextArea({
         <div className="flex items-center justify-between">
           <FieldLabel htmlFor="scenario-json">Scenario JSON</FieldLabel>
           <ScenarioContentOptions
+            scenarioContent={scenarioData}
             setScenarioContent={onChange}
             onEdit={onEdit}
           />

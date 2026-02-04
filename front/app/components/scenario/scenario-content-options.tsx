@@ -31,13 +31,16 @@ import {
 } from '~/components/ui/dropdown-menu';
 import UseGbfsStationsButton from './use-gbfs-stations-button';
 import AddStationButton from './add-station-button';
+import AddVehicleButton from './add-vehicle-button';
 
 interface ScenarioContentOptionsProps {
+  scenarioContent: string;
   setScenarioContent: Dispatch<SetStateAction<string>>;
   onEdit: () => void;
 }
 
 export default function ScenarioContentOptions({
+  scenarioContent,
   setScenarioContent,
   onEdit,
 }: ScenarioContentOptionsProps) {
@@ -48,6 +51,11 @@ export default function ScenarioContentOptions({
       </DropdownMenuTrigger>
       <DropdownMenuContent className="w-56" align="end">
         <AddStationButton
+          setScenarioContent={setScenarioContent}
+          onEdit={onEdit}
+        />
+        <AddVehicleButton
+          scenarioContent={scenarioContent}
           setScenarioContent={setScenarioContent}
           onEdit={onEdit}
         />
