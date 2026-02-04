@@ -30,6 +30,7 @@ import {
   DropdownMenuTrigger,
 } from '~/components/ui/dropdown-menu';
 import UseGbfsStationsButton from './use-gbfs-stations-button';
+import AddStationButton from './add-station-button';
 
 interface ScenarioContentOptionsProps {
   setScenarioContent: Dispatch<SetStateAction<string>>;
@@ -46,6 +47,10 @@ export default function ScenarioContentOptions({
         <Ellipsis />
       </DropdownMenuTrigger>
       <DropdownMenuContent className="w-56" align="end">
+        <AddStationButton
+          setScenarioContent={setScenarioContent}
+          onEdit={onEdit}
+        />
         <UseGbfsStationsButton
           setScenarioContent={setScenarioContent}
           onEdit={onEdit}
