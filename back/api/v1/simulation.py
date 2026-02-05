@@ -63,6 +63,9 @@ from back.schemas.sim_keyframe import (
     SimKeyframeListResponse,
     SimKeyframeResponse,
 )
+from back.schemas.sim_state import (
+    SimStateResponse,
+)
 from back.schemas.sim_frame import (
     SeekResponse,
 )
@@ -969,4 +972,86 @@ def get_simulation_keyframe_at_time(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Error retrieving keyframe: {str(e)}",
+        )
+
+
+@router.get(
+    "/{sim_id}/state", response_model=SimStateResponse, response_model_exclude_none=True
+)
+def get_simulation_state(
+    sim_id: str,
+    db: Session = Depends(get_db),
+    requesting_user: int = Depends(get_user_id),
+) -> SimStateResponse:
+    """Get the current simulation state.
+
+    Convenience endpoint that returns the latest simulation state.
+
+    Args:
+        sim_id: ID of the simulation instance (UUID string).
+        db: Database session.
+        requesting_user: ID of the authenticated user.
+
+    Returns:
+        SimStateResponse with sim_id, sim_seconds, clock, and all entities.
+
+    Raises:
+        HTTPException: 404 if simulation or keyframe not found,
+                      403 if unauthorized.
+    """
+    try:
+        # Get simulation data to retrieve db_id
+        # First try active simulations (fast path)
+        if sim_id in simulation_service.active_simulations:
+            sim_data = simulation_service.active_simulations[sim_id]
+            db_id: int = sim_data["db_id"]
+        else:
+            # Fallback to database for historical simulations
+            sim_instance = sim_instance_crud.get_by_uuid(db, sim_id)
+            if not sim_instance:
+                raise ItemNotFoundError("Simulation not found")
+            db_id = sim_instance.id
+
+        # Verify simulation exists and get ownership
+        sim_instance = sim_instance_crud.get(db, db_id)
+        if not sim_instance:
+            raise ItemNotFoundError("Simulation instance not found")
+
+        # Check authorization
+        user = user_crud.get(db, requesting_user)
+        if not user:
+            raise ItemNotFoundError("User not found")
+
+        if sim_instance.user_id != user.id and not user.is_admin:
+            raise VelosimPermissionError(
+                "Unauthorized to access this simulation's state"
+            )
+
+        # Get the latest keyframe (most recent by sim_seconds_elapsed)
+        # Raises ItemNotFoundError if no keyframe exists
+        latest_keyframe = sim_keyframe_crud.get_last_keyframe(db, db_id)
+
+        # Build response
+        frame_data = latest_keyframe.frame_data
+        response_data = {
+            "sim_id": frame_data.get("simId", sim_id),
+            "sim_seconds": latest_keyframe.sim_seconds_elapsed,
+            "clock": frame_data.get("clock", {}),
+            "tasks": frame_data.get("tasks"),
+            "drivers": frame_data.get("drivers"),
+            "stations": frame_data.get("stations"),
+            "vehicles": frame_data.get("vehicles"),
+            "headquarters": frame_data.get("headquarters"),
+        }
+
+        return SimStateResponse(**response_data)
+
+    except ItemNotFoundError as e:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+    except VelosimPermissionError as e:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(e))
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error retrieving simulation state: {str(e)}",
         )

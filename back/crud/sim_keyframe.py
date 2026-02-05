@@ -188,18 +188,19 @@ class SimKeyframeCRUD:
         db.delete(keyframe)
         db.commit()
 
-    def get_last_keyframe(
-        self, db: Session, sim_instance_id: str
-    ) -> Optional[SimFrame]:
+    def get_last_keyframe(self, db: Session, sim_instance_id: int) -> SimFrame:
         """
         Retrieve the most recently persisted keyframe for a simulation instance.
 
         Args:
             db: Active database session.
-            sim_instance_id: UUID of the simulation instance.
+            sim_instance_id: Database ID of the simulation instance.
 
         Returns:
-            The most recent keyframe if one exists, otherwise None.
+            The most recent keyframe.
+
+        Raises:
+            ItemNotFoundError: If no keyframe exists for the simulation.
 
         """
 

@@ -3546,6 +3546,9 @@ class TestSeekEndpoint:
             # is_at_live_edge=False because we don't have future frames to check
             assert data["state"]["is_at_live_edge"] is False
 
+        # Cleanup: Reset active_simulations to avoid test pollution
+        simulation_service.active_simulations = {}
+
     @patch("back.services.simulation_service.sim_instance_crud")
     @patch("back.services.simulation_service.user_crud")
     def test_seek_endpoint_unauthorized(
