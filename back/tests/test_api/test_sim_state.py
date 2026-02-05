@@ -30,7 +30,7 @@ from typing import Generator
 
 from back.main import app
 from back.auth.dependency import get_user_id
-from back.models.sim_keyframe import SimKeyframe
+from back.models.sim_frame import SimFrame
 from back.exceptions import ItemNotFoundError
 
 
@@ -67,7 +67,6 @@ class TestSimStateAPI:
         mock_sim = MagicMock()
         mock_sim.user_id = 1
         mock_sim.uuid = "100"
-        mock_sim.uuid = "100"
         mock_sim_get.return_value = mock_sim
 
         mock_user = MagicMock()
@@ -76,9 +75,10 @@ class TestSimStateAPI:
         mock_user_get.return_value = mock_user
 
         # Mock the latest keyframe
-        mock_keyframe = SimKeyframe(
+        mock_keyframe = SimFrame(
             id=1,
             sim_instance_id=100,
+            seq_number=1,
             sim_seconds_elapsed=3600.5,
             frame_data={
                 "simId": "test-sim-123",
@@ -94,6 +94,7 @@ class TestSimStateAPI:
                 "vehicles": [{"id": 1, "batteryCount": 85}],
                 "headquarters": {"position": [45.5, -73.6]},
             },
+            is_key=True,
             created_at=datetime.now(),
         )
         mock_get_last_keyframe.return_value = mock_keyframe
@@ -171,7 +172,6 @@ class TestSimStateAPI:
         mock_sim = MagicMock()
         mock_sim.user_id = 1
         mock_sim.uuid = "100"
-        mock_sim.uuid = "100"
         mock_sim_get.return_value = mock_sim
 
         mock_user = MagicMock()
@@ -204,7 +204,6 @@ class TestSimStateAPI:
         mock_sim = MagicMock()
         mock_sim.user_id = 999  # Different user
         mock_sim.uuid = "100"
-        mock_sim.uuid = "100"
         mock_sim_get.return_value = mock_sim
 
         mock_user = MagicMock()
@@ -212,9 +211,10 @@ class TestSimStateAPI:
         mock_user.is_admin = True  # Admin user
         mock_user_get.return_value = mock_user
 
-        mock_keyframe = SimKeyframe(
+        mock_keyframe = SimFrame(
             id=1,
             sim_instance_id=100,
+            seq_number=1,
             sim_seconds_elapsed=100.0,
             frame_data={
                 "simId": "test-123",
@@ -224,6 +224,7 @@ class TestSimStateAPI:
                 "stations": [],
                 "vehicles": [],
             },
+            is_key=True,
             created_at=datetime.now(),
         )
         mock_get_last_keyframe.return_value = mock_keyframe

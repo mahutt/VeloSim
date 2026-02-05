@@ -287,6 +287,13 @@ def mocked_simulator(monkeypatch: pytest.MonkeyPatch) -> Generator[None, None, N
     yield
 
 
+@pytest.fixture(autouse=True)
+def cleanup_active_simulations() -> Generator[None, None, None]:
+    """Clean up active_simulations after each test to avoid pollution."""
+    yield
+    simulation_service.active_simulations = {}
+
+
 class FrameData(TypedDict):
     seq: int
     timestamp: int
@@ -3545,9 +3552,6 @@ class TestSeekEndpoint:
             # Running sim with no future frames and no frames beyond window
             # is_at_live_edge=False because we don't have future frames to check
             assert data["state"]["is_at_live_edge"] is False
-
-        # Cleanup: Reset active_simulations to avoid test pollution
-        simulation_service.active_simulations = {}
 
     @patch("back.services.simulation_service.sim_instance_crud")
     @patch("back.services.simulation_service.user_crud")

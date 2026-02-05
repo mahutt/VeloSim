@@ -124,4 +124,11 @@ __all__ = [
     "SimulationState",
     "SeekResponse",
     "SimStateResponse",
+    "TaskItem",
+    "TaskStation",
+    "TaskListResponse",
+    "DriverItem",
+    "DriverTask",
+    "DriverVehicle",
+    "DriverListResponse",
 ]

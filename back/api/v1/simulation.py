@@ -66,6 +66,15 @@ from back.schemas.sim_keyframe import (
 from back.schemas.sim_state import (
     SimStateResponse,
 )
+from back.schemas.task_list import (
+    TaskListResponse,
+    TaskItem,
+    TaskStation,
+)
+from back.schemas.driver_list import (
+    DriverListResponse,
+    DriverItem,
+)
 from back.schemas.sim_frame import (
     SeekResponse,
 )
@@ -89,8 +98,46 @@ from back.services import simulation_service
 from back.database.session import get_db
 from back.core.config import settings
 from sim.utils.json_parser_strategy import JsonParseStrategy, ScenarioParseError
+from sim.entities.task_state import State
+from sim.entities.driver import DriverState
+from back.schemas.driver_list import DriverTask, DriverVehicle
 from pydantic import BaseModel
 from typing import Any
+
+# Constants
+MAX_PAGE_SIZE = 500
+
+# Allowed sortable fields for task and driver endpoints
+ALLOWED_TASK_SORT_FIELDS = {
+    "id",
+    "state",
+    "priority",
+    "station_id",
+    "driver_id",
+    "task_type",
+    "created_at",
+}
+ALLOWED_DRIVER_SORT_FIELDS = {
+    "id",
+    "state",
+    "vehicle_id",
+    "current_task",
+    "battery_level",
+}
+
+# Valid state constants based on simulation entity enums
+# Task states for API filtering (excludes SCHEDULED/CLOSED)
+VALID_TASK_STATES = {
+    str(s).upper() for s in State if s not in [State.SCHEDULED, State.CLOSED]
+}
+
+# Driver states for API filtering (excludes shift transitions)
+VALID_DRIVER_STATES = {
+    state.name
+    for state in DriverState
+    if state
+    not in [DriverState.OFF_SHIFT, DriverState.PENDING_SHIFT, DriverState.ENDING_SHIFT]
+}
 
 router = APIRouter(prefix="/simulation", tags=["simulation"])
 
@@ -1005,15 +1052,14 @@ def get_simulation_state(
         if sim_id in simulation_service.active_simulations:
             sim_data = simulation_service.active_simulations[sim_id]
             db_id: int = sim_data["db_id"]
+            # Verify simulation exists and get ownership
+            sim_instance = sim_instance_crud.get(db, db_id)
         else:
             # Fallback to database for historical simulations
             sim_instance = sim_instance_crud.get_by_uuid(db, sim_id)
             if not sim_instance:
                 raise ItemNotFoundError("Simulation not found")
             db_id = sim_instance.id
-
-        # Verify simulation exists and get ownership
-        sim_instance = sim_instance_crud.get(db, db_id)
         if not sim_instance:
             raise ItemNotFoundError("Simulation instance not found")
 
@@ -1054,4 +1100,380 @@ def get_simulation_state(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Error retrieving simulation state: {str(e)}",
+        )
+
+
+@router.get("/{sim_id}/tasks", response_model=TaskListResponse)
+def get_simulation_tasks(
+    sim_id: str,
+    max_results: int = Query(
+        default=MAX_PAGE_SIZE, ge=1, le=MAX_PAGE_SIZE, alias="maxResults"
+    ),
+    start_result: int = Query(default=0, ge=0, alias="startResult"),
+    state: str = Query(default=None),
+    station: int = Query(default=None),
+    driver: int = Query(default=None),
+    order: str = Query(default="id ASC"),
+    db: Session = Depends(get_db),
+    requesting_user: int = Depends(get_user_id),
+) -> TaskListResponse:
+    """Get paginated list of tasks for a simulation.
+
+    ProgressionLIVE-compatible endpoint for listing tasks with filtering,
+    sorting, and pagination.
+
+    Args:
+        sim_id: ID of the simulation instance (UUID string).
+        max_results: Maximum results per page (1-500, default 500).
+        start_result: Pagination offset (default 0).
+        state: Filter by task state(s), comma-separated
+               (OPEN, ASSIGNED, IN_PROGRESS, COMPLETED).
+        station: Filter by station ID.
+        driver: Filter by assigned driver ID.
+        order: Sort order (e.g., "id ASC", "priority DESC").
+        db: Database session.
+        requesting_user: ID of the authenticated user.
+
+    Returns:
+        TaskListResponse with filtered tasks and pagination info.
+
+    Raises:
+        HTTPException: 404 if simulation not found, 403 if unauthorized.
+    """
+    try:
+        # Get simulation and check authorization
+        if sim_id in simulation_service.active_simulations:
+            sim_data = simulation_service.active_simulations[sim_id]
+            db_id: int = sim_data["db_id"]
+        else:
+            sim_instance = sim_instance_crud.get_by_uuid(db, sim_id)
+            if not sim_instance:
+                raise ItemNotFoundError("Simulation not found")
+            db_id = sim_instance.id
+
+        sim_instance = sim_instance_crud.get(db, db_id)
+        if not sim_instance:
+            raise ItemNotFoundError("Simulation instance not found")
+
+        user = user_crud.get(db, requesting_user)
+        if not user:
+            raise ItemNotFoundError("User not found")
+
+        if sim_instance.user_id != user.id and not user.is_admin:
+            raise VelosimPermissionError(
+                "Unauthorized to access this simulation's tasks"
+            )
+
+        # Get latest keyframe
+        latest_keyframe = sim_keyframe_crud.get_last_keyframe(db, db_id)
+        frame_data = latest_keyframe.frame_data
+
+        # Extract tasks from frame data
+        tasks_data = frame_data.get("tasks", [])
+        stations_data = {s.get("id"): s for s in frame_data.get("stations", [])}
+
+        # Apply filtering BEFORE building full objects to reduce overhead
+        if state:
+            states = [s.strip().upper() for s in state.split(",")]
+            # Validate states against allowed values
+            invalid_states = set(states) - VALID_TASK_STATES
+            if invalid_states:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"Invalid task states: {', '.join(invalid_states)}. "
+                    f"Valid states: {', '.join(sorted(VALID_TASK_STATES))}",
+                )
+            tasks_data = [
+                t for t in tasks_data if t.get("state", "OPEN").upper() in states
+            ]
+
+        if station is not None:
+            tasks_data = [t for t in tasks_data if t.get("stationId") == station]
+
+        if driver is not None:
+            tasks_data = [t for t in tasks_data if t.get("driverId") == driver]
+
+        # Build task items from filtered data
+        task_items = []
+        for task in tasks_data:
+            station_id = task.get("stationId")
+            station_info = stations_data.get(station_id)
+
+            task_item = TaskItem(
+                id=task.get("id"),
+                state=task.get("state", "OPEN"),
+                station_id=station_id,
+                driver_id=task.get("driverId"),
+                task_type=task.get("taskType", "PICKUP"),
+                priority=task.get("priority", 0),
+                created_at=task.get("createdAt"),
+                station=(
+                    TaskStation(
+                        id=station_info.get("id"),
+                        name=station_info.get("name", f"Station {station_id}"),
+                        position=station_info.get("position", [0.0, 0.0]),
+                    )
+                    if station_info
+                    else None
+                ),
+            )
+            task_items.append(task_item)
+
+        # Apply sorting
+        if order:
+            sort_parts = order.split()
+            if len(sort_parts) >= 2:
+                field_name = sort_parts[0]
+                direction = sort_parts[1].upper()
+                reverse = direction == "DESC"
+
+                # Validate sort field
+                if field_name not in ALLOWED_TASK_SORT_FIELDS:
+                    allowed = ", ".join(sorted(ALLOWED_TASK_SORT_FIELDS))
+                    raise HTTPException(
+                        status_code=status.HTTP_400_BAD_REQUEST,
+                        detail=f"Invalid sort field '{field_name}'. "
+                        f"Allowed fields: {allowed}",
+                    )
+
+                # Sort by field - handle None values properly
+                task_items.sort(
+                    key=lambda x: (
+                        getattr(x, field_name) is None,
+                        getattr(x, field_name) or 0,
+                    ),
+                    reverse=reverse,
+                )
+
+        # Calculate pagination
+        total = len(task_items)
+
+        # Validate pagination parameters
+        if start_result >= total and total > 0:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"start_result {start_result} exceeds total results {total}",
+            )
+
+        total_pages = math.ceil(total / max_results) if max_results > 0 else 0
+        page = (start_result // max_results) + 1 if max_results > 0 else 1
+
+        # Apply pagination
+        end_result = start_result + max_results
+        paginated_tasks = task_items[start_result:end_result]
+
+        return TaskListResponse(
+            tasks=paginated_tasks,
+            total=total,
+            page=page,
+            per_page=max_results,
+            total_pages=total_pages,
+        )
+
+    except ItemNotFoundError as e:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+    except VelosimPermissionError as e:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(e))
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error retrieving tasks: {str(e)}",
+        )
+
+
+@router.get("/{sim_id}/drivers", response_model=DriverListResponse)
+def get_simulation_drivers(
+    sim_id: str,
+    max_results: int = Query(
+        default=MAX_PAGE_SIZE, ge=1, le=MAX_PAGE_SIZE, alias="maxResults"
+    ),
+    start_result: int = Query(default=0, ge=0, alias="startResult"),
+    state: str = Query(default=None),
+    expand: str = Query(default=None),
+    order: str = Query(default="id ASC"),
+    db: Session = Depends(get_db),
+    requesting_user: int = Depends(get_user_id),
+) -> DriverListResponse:
+    """Get paginated list of drivers for a simulation.
+
+    ProgressionLIVE-compatible endpoint for listing drivers with filtering,
+    expansion, sorting, and pagination.
+
+    Args:
+        sim_id: ID of the simulation instance (UUID string).
+        max_results: Maximum results per page (1-500, default 500).
+        start_result: Pagination offset (default 0).
+        state: Filter by driver state(s), comma-separated
+               (IDLE, ON_ROUTE, EXECUTING_TASK, CHARGING).
+        expand: Expand related entities, comma-separated (tasks, vehicle).
+        order: Sort order (e.g., "id ASC").
+        db: Database session.
+        requesting_user: ID of the authenticated user.
+
+    Returns:
+        DriverListResponse with filtered drivers and pagination info.
+
+    Raises:
+        HTTPException: 404 if simulation not found, 403 if unauthorized.
+    """
+    try:
+        # Get simulation and check authorization
+        if sim_id in simulation_service.active_simulations:
+            sim_data = simulation_service.active_simulations[sim_id]
+            db_id: int = sim_data["db_id"]
+        else:
+            sim_instance = sim_instance_crud.get_by_uuid(db, sim_id)
+            if not sim_instance:
+                raise ItemNotFoundError("Simulation not found")
+            db_id = sim_instance.id
+
+        sim_instance = sim_instance_crud.get(db, db_id)
+        if not sim_instance:
+            raise ItemNotFoundError("Simulation instance not found")
+
+        user = user_crud.get(db, requesting_user)
+        if not user:
+            raise ItemNotFoundError("User not found")
+
+        if sim_instance.user_id != user.id and not user.is_admin:
+            raise VelosimPermissionError(
+                "Unauthorized to access this simulation's drivers"
+            )
+
+        # Get latest keyframe
+        latest_keyframe = sim_keyframe_crud.get_last_keyframe(db, db_id)
+        frame_data = latest_keyframe.frame_data
+
+        # Extract drivers, tasks, and vehicles from frame data
+        drivers_data = frame_data.get("drivers", [])
+        tasks_data = {t.get("id"): t for t in frame_data.get("tasks", [])}
+        vehicles_data = {v.get("id"): v for v in frame_data.get("vehicles", [])}
+
+        # Parse expand parameter
+        expand_set = set()
+        if expand:
+            expand_set = {e.strip() for e in expand.split(",")}
+
+        # Apply filtering BEFORE building full objects to reduce overhead
+        if state:
+            states = [s.strip().upper() for s in state.split(",")]
+            # Validate states against allowed values
+            invalid_states = set(states) - VALID_DRIVER_STATES
+            if invalid_states:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"Invalid driver states: {', '.join(invalid_states)}. "
+                    f"Valid states: {', '.join(sorted(VALID_DRIVER_STATES))}",
+                )
+            drivers_data = [
+                d for d in drivers_data if d.get("state", "IDLE").upper() in states
+            ]
+
+        # Build driver items from filtered data
+        driver_items = []
+        for driver in drivers_data:
+            # Get driver's task IDs
+            driver_tasks = driver.get("tasks", [])
+            current_task = driver.get("currentTask")
+
+            # Expand tasks if requested
+            if "tasks" in expand_set:
+                tasks_expanded = []
+                for task_id in driver_tasks:
+                    task_info = tasks_data.get(task_id)
+                    if task_info:
+                        tasks_expanded.append(
+                            DriverTask(
+                                id=task_info.get("id"),
+                                state=task_info.get("state", "OPEN"),
+                                station_id=task_info.get("stationId"),
+                            )
+                        )
+                driver_task_list = tasks_expanded
+            else:
+                driver_task_list = driver_tasks
+
+            # Expand vehicle if requested
+            vehicle_expanded = None
+            vehicle_id = driver.get("vehicleId")
+            if "vehicle" in expand_set and vehicle_id:
+                vehicle_info = vehicles_data.get(vehicle_id)
+                if vehicle_info:
+                    vehicle_expanded = DriverVehicle(
+                        id=vehicle_info.get("id"),
+                        battery_count=vehicle_info.get("batteryCount", 0),
+                        battery_capacity=vehicle_info.get("batteryCapacity", 100),
+                    )
+
+            driver_item = DriverItem(
+                id=driver.get("id"),
+                state=driver.get("state", "IDLE"),
+                position=driver.get("position", [0.0, 0.0]),
+                vehicle_id=vehicle_id,
+                tasks=driver_task_list,
+                current_task=current_task,
+                battery_level=driver.get("batteryLevel"),
+                vehicle=vehicle_expanded,
+            )
+            driver_items.append(driver_item)
+
+        # Apply sorting
+        if order:
+            sort_parts = order.split()
+            if len(sort_parts) >= 2:
+                field_name = sort_parts[0]
+                direction = sort_parts[1].upper()
+                reverse = direction == "DESC"
+
+                # Validate sort field
+                if field_name not in ALLOWED_DRIVER_SORT_FIELDS:
+                    allowed = ", ".join(sorted(ALLOWED_DRIVER_SORT_FIELDS))
+                    raise HTTPException(
+                        status_code=status.HTTP_400_BAD_REQUEST,
+                        detail=f"Invalid sort field '{field_name}'. "
+                        f"Allowed fields: {allowed}",
+                    )
+
+                # Sort by field - handle None values properly
+                driver_items.sort(
+                    key=lambda x: (
+                        getattr(x, field_name) is None,
+                        getattr(x, field_name) or 0,
+                    ),
+                    reverse=reverse,
+                )
+
+        # Calculate pagination
+        total = len(driver_items)
+
+        # Validate pagination parameters
+        if start_result >= total and total > 0:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"start_result {start_result} exceeds total results {total}",
+            )
+
+        total_pages = math.ceil(total / max_results) if max_results > 0 else 0
+        page = (start_result // max_results) + 1 if max_results > 0 else 1
+
+        # Apply pagination
+        end_result = start_result + max_results
+        paginated_drivers = driver_items[start_result:end_result]
+
+        return DriverListResponse(
+            drivers=paginated_drivers,
+            total=total,
+            page=page,
+            per_page=max_results,
+            total_pages=total_pages,
+        )
+
+    except ItemNotFoundError as e:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+    except VelosimPermissionError as e:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(e))
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error retrieving drivers: {str(e)}",
         )
