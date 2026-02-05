@@ -42,14 +42,10 @@ vi.mock('~/hooks/use-auth', () => ({
   }),
 }));
 
+const { mockServerFrameSource } = await vi.hoisted(() => import('tests/mocks'));
 vi.mock('~/lib/frame-sources/server-frame-source', () => {
   return {
-    ServerFrameSource: class {
-      constructor() {}
-      async start() {
-        return true;
-      }
-    },
+    ServerFrameSource: mockServerFrameSource,
   };
 });
 

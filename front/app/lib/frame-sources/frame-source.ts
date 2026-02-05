@@ -22,39 +22,6 @@
  * SOFTWARE.
  */
 
-const APP_NAME = 'VeloSim';
-const GBFS_STATION_INFORMATION_URL = `https://gbfs.velobixi.com/gbfs/2-2/en/station_information.json`;
-const GBFS_STATION_INFORMATION_STORAGE_KEY = 'gbfs_station_information';
-const TOKEN_STORAGE_KEY = 'access_token';
-
-/**
- * Greater Montreal Area geographical bounds for validation
- */
-const MONTREAL_BOUNDS = {
-  LAT_MIN: 45.24,
-  LAT_MAX: 45.86,
-  LON_MIN: -74.26,
-  LON_MAX: -73.22,
-} as const;
-
-/**
- * Regex pattern for validating scheduled task format: dayN:HH:MM
- * Examples: day1:09:30, day2:14:00, day10:08:15
- */
-const SCHEDULED_TASK_PATTERN = /^day\d+:\d{2}:\d{2}$/;
-
-/**
- * Number of frames between key frames emitted by the backend.
- * This is used to determine how often to save frames to the LocalFrameSource
- */
-const SIMULATION_FRAMES_PER_KEY_FRAME = 20;
-
-export {
-  APP_NAME,
-  GBFS_STATION_INFORMATION_URL,
-  GBFS_STATION_INFORMATION_STORAGE_KEY,
-  TOKEN_STORAGE_KEY,
-  MONTREAL_BOUNDS,
-  SCHEDULED_TASK_PATTERN,
-  SIMULATION_FRAMES_PER_KEY_FRAME,
-};
+export default interface FrameSource {
+  setSpeed(speed: number): Promise<void>;
+}

@@ -23,22 +23,25 @@
  */
 
 import api from '~/api';
+import type { Speed } from '~/providers/simulation-provider';
 import type { BackendPayload } from '~/types';
 import {
   logFrameProcessingError,
   logSimulationError,
 } from '~/utils/simulation-error-utils';
+import type FrameSource from './frame-source';
 
-export class ServerFrameSource {
+export class ServerFrameSource implements FrameSource {
   private simulationId: string;
   private onFrame: (frame: BackendPayload) => void;
   private onError: (title: string, message: string) => void;
 
-  private wsUrl: string;
-  private ws: WebSocket;
+  private wsUrl: string | null;
+  private ws: WebSocket | null;
   private isRunning: Promise<boolean>;
   private resolveIsRunning!: (value: boolean) => void;
   private rejectIsRunning!: (reason?: Error) => void;
+  private speed: Speed;
 
   constructor(
     simulationId: string,
@@ -49,13 +52,32 @@ export class ServerFrameSource {
     this.onFrame = onFrame;
     this.onError = onError;
 
-    //
-    this.wsUrl = ServerFrameSource.buildWebSocketUrl(this.simulationId);
-    this.ws = new WebSocket(this.wsUrl);
+    this.wsUrl = null;
+    this.ws = null;
     this.isRunning = new Promise<boolean>((resolve, reject) => {
       this.resolveIsRunning = resolve;
       this.rejectIsRunning = reject;
     });
+
+    this.speed = 1;
+  }
+
+  private static buildWebSocketUrl(simulationId: string): string {
+    const apiBaseUrl = import.meta.env.VITE_BACKEND_URL;
+    const url = apiBaseUrl ? new URL(apiBaseUrl) : null;
+    const wsProtocol =
+      url?.protocol === 'https:' || window.location.protocol === 'https:'
+        ? 'wss:'
+        : 'ws:';
+    const wsHost = url?.host || window.location.host;
+    const wsUrl = `${wsProtocol}//${wsHost}/api/v1/simulation/stream/${simulationId}`;
+    return wsUrl;
+  }
+
+  public async start(): Promise<boolean> {
+    //
+    this.wsUrl = ServerFrameSource.buildWebSocketUrl(this.simulationId);
+    this.ws = new WebSocket(this.wsUrl);
 
     this.ws.onopen = () => {
       console.log('[WS] ✅ Connection opened');
@@ -183,7 +205,7 @@ export class ServerFrameSource {
           'WebSocket closed due to authentication failure',
           {
             errorType: 'WEBSOCKET_AUTH_FAILURE',
-            simId: simulationId,
+            simId: this.simulationId,
             closeCode: event.code,
             closeReason: event.reason,
           }
@@ -195,34 +217,21 @@ export class ServerFrameSource {
         );
         return;
       }
-
-      // Retry logic for network errors
-      // if (connectionAttempts < MAX_RETRIES && event.code === 1006) {
-      //   const delay = INITIAL_DELAY * Math.pow(2, connectionAttempts);
-      //   console.log(
-      //     `[WS] 🔄 Retry ${connectionAttempts + 1}/${MAX_RETRIES} in ${delay}ms`
-      //   );
-
-      //   setTimeout(() => {
-      //     setConnectionAttempts((prev) => prev + 1);
-      //   }, delay);
-      // }
     };
-  }
-
-  private static buildWebSocketUrl(simulationId: string): string {
-    const apiBaseUrl = import.meta.env.VITE_BACKEND_URL;
-    const url = apiBaseUrl ? new URL(apiBaseUrl) : null;
-    const wsProtocol =
-      url?.protocol === 'https:' || window.location.protocol === 'https:'
-        ? 'wss:'
-        : 'ws:';
-    const wsHost = url?.host || window.location.host;
-    const wsUrl = `${wsProtocol}//${wsHost}/api/v1/simulation/stream/${simulationId}`;
-    return wsUrl;
-  }
-
-  public async start(): Promise<boolean> {
     return this.isRunning;
+  }
+
+  public stop() {
+    if (this.ws?.readyState === WebSocket.OPEN) {
+      this.ws.close();
+    }
+  }
+
+  public async setSpeed(speed: Speed): Promise<void> {
+    if (this.speed === speed) return;
+    await api.post(`/simulation/${this.simulationId}/playbackSpeed`, {
+      playback_speed: speed,
+    });
+    this.speed = speed;
   }
 }

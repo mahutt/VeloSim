@@ -23,7 +23,7 @@
  */
 
 import { expect, test, vi } from 'vitest';
-import { render, act } from '@testing-library/react';
+import { render, act, renderHook } from '@testing-library/react';
 import {
   INITIAL_CENTER,
   INITIAL_ZOOM,
@@ -77,14 +77,10 @@ vi.mock('~/hooks/use-error', () => ({
   default: () => ({ displayError: mockDisplayError }),
 }));
 
+const { mockServerFrameSource } = await vi.hoisted(() => import('tests/mocks'));
 vi.mock('~/lib/frame-sources/server-frame-source', () => {
   return {
-    ServerFrameSource: class {
-      constructor() {}
-      async start() {
-        return true;
-      }
-    },
+    ServerFrameSource: mockServerFrameSource,
   };
 });
 
@@ -210,4 +206,10 @@ test('on-error callback logs error, calls logSimulationError and displayError, a
   consoleErrorSpy.mockRestore();
   window.location.reload = originalReload;
   mockDisplayError.mockClear();
+});
+
+test('useMap throws error when used outside MapProvider', () => {
+  expect(() => {
+    renderHook(() => useMap());
+  }).toThrow('useMap must be used within a MapProvider');
 });

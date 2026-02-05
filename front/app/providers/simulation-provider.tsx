@@ -49,6 +49,7 @@ import {
   type Route,
   type Headquarters,
   type Vehicle,
+  SimulationMode,
 } from '~/types';
 import {
   adaptStationsToGeoJSON,
@@ -83,9 +84,11 @@ import {
   vehicleResourceHasUpdated,
 } from '~/lib/simulation-helpers';
 import { ServerFrameSource } from '~/lib/frame-sources/server-frame-source';
+import { LocalFrameSource } from '~/lib/frame-sources/local-frame-source';
 
 export const SPEED_OPTIONS = [0, 0.5, 1, 2, 4, 8] as const;
 export type Speed = (typeof SPEED_OPTIONS)[number];
+export type NonZeroSpeed = Exclude<Speed, 0>;
 
 export type SimulationContextType = {
   speedRef: React.RefObject<Speed>;
@@ -115,6 +118,15 @@ export type SimulationContextType = {
   HQWidgetState: HQWidgetProps;
   showAllRoutes: boolean;
   toggleShowAllRoutes: () => void;
+  speed: NonZeroSpeed;
+  setSpeed: (speed: NonZeroSpeed) => Promise<void>;
+  paused: boolean;
+  setPaused: (paused: boolean) => Promise<void>;
+  scrub: (seconds: number) => void;
+  commitScrub: (seconds: number) => void;
+  startTime: number;
+  simulationSecondsPassed: number;
+  scrubSimulationSecond: number;
 };
 
 const SimulationContext = createContext<SimulationContextType | undefined>(
@@ -132,7 +144,104 @@ export const SimulationProvider = ({
 }: SimulationProviderProps) => {
   const { displayError } = useError();
   const { mapRef, mapLoaded } = useMap();
+
+  const [startTime, setStartTime] = useState<number>(0);
   const speedRef = useRef<Speed>(1);
+  const [nonZeroSpeed, _setSpeed] = useState<NonZeroSpeed>(1);
+  const [paused, _setPaused] = useState<boolean>(false);
+  const [mode, setMode] = useState<SimulationMode>(SimulationMode.Server);
+  const modeRef = useRef<SimulationMode>(SimulationMode.Server);
+  useEffect(() => {
+    modeRef.current = mode;
+  }, [mode]);
+  const [scrubSimulationSecond, setScrubSimulationSecond] = useState<number>(0);
+
+  const setSpeed = async (speed: NonZeroSpeed) => {
+    const prevSpeed = speedRef.current;
+    try {
+      speedRef.current = speed;
+      _setSpeed(speed);
+      if (paused) return;
+
+      if (mode === SimulationMode.Local) {
+        await localFrameSourceRef.current.setSpeed(speed);
+      } else if (mode === SimulationMode.Server) {
+        await serverFrameSourceRef.current?.setSpeed(speed);
+      }
+    } catch {
+      // Revert to previous speed
+      speedRef.current = prevSpeed;
+      if (prevSpeed !== 0) {
+        _setSpeed(prevSpeed);
+      }
+    }
+  };
+
+  const setPaused = async (paused: boolean) => {
+    const prevSpeed = speedRef.current;
+    try {
+      speedRef.current = paused ? 0 : nonZeroSpeed;
+      _setPaused(paused);
+      if (mode === SimulationMode.Local) {
+        await localFrameSourceRef.current.setSpeed(paused ? 0 : nonZeroSpeed);
+      } else if (mode === SimulationMode.Server) {
+        await serverFrameSourceRef.current?.setSpeed(paused ? 0 : nonZeroSpeed);
+      }
+    } catch {
+      // Revert to previous paused state
+      speedRef.current = prevSpeed;
+      _setPaused(prevSpeed === 0);
+    }
+  };
+
+  const scrub = (seconds: number) => {
+    // stop sources until scrub is committed
+    setMode(SimulationMode.Scrubbing);
+    localFrameSourceRef.current.setSpeed(0);
+    serverFrameSourceRef.current?.setSpeed(0);
+    setScrubSimulationSecond(seconds);
+
+    let targetFrame: BackendPayload | undefined;
+    if (seconds === simulationSecondsPassedRef.current) {
+      targetFrame = localFrameSourceRef.current.getMaxFrame();
+    } else {
+      targetFrame = localFrameSourceRef.current.getFrame(seconds);
+    }
+    if (targetFrame) handleFrame(targetFrame, false);
+  };
+
+  const commitScrub = (seconds: number) => {
+    // Commit scrub is practically always called from scrubbing state.
+    // Under particular circumstances, the simulation provider is not
+    // in scrubbing state when commitScrub is called.
+    // To account for that case, we force the mode to scrubbing first.
+    if (mode !== SimulationMode.Scrubbing) {
+      console.warn(
+        '[Scrub] commitScrub called outside scrubbing mode, forcing scrubbing mode'
+      );
+      scrub(seconds);
+    } else {
+      // Have to set it here cuz if paused, it wont be emitted from frame source
+      setScrubSimulationSecond(seconds);
+    }
+
+    const scrubToPast = seconds !== simulationSecondsPassedRef.current;
+
+    if (scrubToPast) {
+      // Unpause local source to play from scrubbed position
+      const frame = localFrameSourceRef.current.getFrame(seconds);
+      if (frame) handleFrame(frame, false);
+      localFrameSourceRef.current.setPosition(seconds);
+      localFrameSourceRef.current.setSpeed(paused ? 0 : nonZeroSpeed);
+      setMode(SimulationMode.Local);
+    } else if (!scrubToPast) {
+      // Unpause server source to play from live position
+      const frame = localFrameSourceRef.current.getMaxFrame();
+      if (frame) handleFrame(frame, false);
+      serverFrameSourceRef.current?.setSpeed(paused ? 0 : nonZeroSpeed);
+      setMode(SimulationMode.Server);
+    }
+  };
 
   const [simId] = useState<string>(initialSimId);
 
@@ -144,7 +253,11 @@ export const SimulationProvider = ({
   const mapUpdateRafIdRef = useRef<number | null>(null);
 
   // (TOTAL) NON-REACTIVE SIMULATION ENTITY STATE
-  const simulationSecondsRef = useRef<number>(0);
+  const simulationSecondsRef = useRef<number>(0); // scrub position in seconds
+  const simulationSecondsPassedRef = useRef<number>(0); // latest received frame's sim seconds passed
+  const [simulationSecondsPassed, setSimulationSecondsPassed] =
+    useState<number>(0);
+
   const startTimeRef = useRef<number>(0);
   const headquartersRef = useRef<Headquarters | null>(null);
   const stationsRef = useRef<Map<number, Station>>(new Map());
@@ -157,6 +270,12 @@ export const SimulationProvider = ({
     useState<ResourceBarElement>([]);
   const [selectedItem, setSelectedItem] =
     useState<SelectedItemBarElement | null>(null);
+
+  // Since I'm passing the callback to non-reactive classes, need to use a ref instead in handleFrame
+  const selectedItemRef = useRef<SelectedItemBarElement | null>(null);
+  useEffect(() => {
+    selectedItemRef.current = selectedItem;
+  }, [selectedItem]);
 
   const [formattedSimTime, setFormattedSimTime] = useState<string | null>(null);
   const [currentDay, setCurrentDay] = useState<number>(1);
@@ -671,60 +790,64 @@ export const SimulationProvider = ({
   };
 
   // Handle frame updates from WebSocket
-  const handleFrame = useCallback(
-    (payload: BackendPayload) => {
-      console.log('[WS] Handling frame update:', payload);
+  const handleFrame = (payload: BackendPayload, animate = true) => {
+    setScrubSimulationSecond(payload.clock.simSecondsPassed);
+    setFormattedSimTime(
+      formatSecondsToHHMM(
+        payload.clock.simSecondsPassed,
+        payload.clock.startTime
+      )
+    );
+    setCurrentDay(
+      calculateDayFromSeconds(
+        payload.clock.simSecondsPassed,
+        payload.clock.startTime
+      )
+    );
 
-      setFormattedSimTime(
-        formatSecondsToHHMM(
-          payload.clock.simSecondsPassed,
-          payload.clock.startTime
-        )
-      );
-      setCurrentDay(
-        calculateDayFromSeconds(
-          payload.clock.simSecondsPassed,
-          payload.clock.startTime
-        )
-      );
+    handlePayload(payload, selectedItemRef.current);
 
-      handlePayload(payload, selectedItem);
+    // For each driver, update the frame start position and target positions
+    payload.drivers.forEach((resource: Driver) => {
+      const newPosition = resource.position;
 
-      // For each driver, update the frame start position and target positions
-      payload.drivers.forEach((resource: Driver) => {
-        const newPosition = resource.position;
-        const currentPosition = currentPositionsRef.current.get(resource.id);
+      // If we don't wish to animate, set currentPosition directly to newPosition
+      if (!animate) {
+        currentPositionsRef.current.set(resource.id, newPosition);
+        frameStartPositionsRef.current.delete(resource.id);
+        targetPositionsRef.current.delete(resource.id);
+      }
 
-        // If currentPosition isn't set, initialize it to newPosition
-        if (!currentPosition) {
-          currentPositionsRef.current.set(resource.id, newPosition);
-        }
-        // If currentPosition is set and isn't equal to newPosition, we must trigger
-        // animation to the new position by setting frame start and target positions
-        else if (!positionsEqual(currentPosition, newPosition)) {
-          frameStartPositionsRef.current.set(resource.id, currentPosition);
-          targetPositionsRef.current.set(resource.id, newPosition);
-        }
+      const currentPosition = currentPositionsRef.current.get(resource.id);
 
-        // Store route geometry if provided (sent in key frames or when route changes)
-        // This is the raw OSRM linestring, not the interpolated points
-        if (resource.route?.coordinates) {
-          routesRef.current.set(resource.id, {
-            coordinates: resource.route.coordinates,
-            nextStopIndex: resource.route.nextStopIndex,
-          });
-        } else if (resource.route === null) {
-          // Backend explicitly signals route completion - clear route data
-          routesRef.current.delete(resource.id);
-        }
-        lastDriverUpdatesRef.current.set(resource.id, performance.now());
-      });
+      // If currentPosition isn't set, initialize it to newPosition
+      if (!currentPosition) {
+        currentPositionsRef.current.set(resource.id, newPosition);
+      }
+      // If currentPosition is set and isn't equal to newPosition, we must trigger
+      // animation to the new position by setting frame start and target positions
+      else if (!positionsEqual(currentPosition, newPosition)) {
+        frameStartPositionsRef.current.set(resource.id, currentPosition);
+        targetPositionsRef.current.set(resource.id, newPosition);
+      }
 
-      // Ensure animation loop is running (in case it stopped)
-      ensureAnimationRunning();
-    },
-    [selectedItem]
-  );
+      // Store route geometry if provided (sent in key frames or when route changes)
+      // This is the raw OSRM linestring, not the interpolated points
+      if (resource.route?.coordinates) {
+        routesRef.current.set(resource.id, {
+          coordinates: resource.route.coordinates,
+          nextStopIndex: resource.route.nextStopIndex,
+        });
+      } else if (resource.route === null) {
+        // Backend explicitly signals route completion - clear route data
+        routesRef.current.delete(resource.id);
+      }
+      lastDriverUpdatesRef.current.set(resource.id, performance.now());
+    });
+
+    // Ensure animation loop is running (in case it stopped)
+    ensureAnimationRunning();
+  };
 
   // Track if animation loop is running
   const isAnimatingRef = useRef<boolean>(false);
@@ -770,19 +893,47 @@ export const SimulationProvider = ({
   };
 
   const serverFrameSourceRef = useRef<ServerFrameSource | null>(null);
+  const localFrameSourceRef = useRef<LocalFrameSource>(
+    new LocalFrameSource(
+      simId,
+      (frame) => {
+        handleFrame(frame);
+        if (
+          frame.clock.simSecondsPassed === simulationSecondsPassedRef.current
+        ) {
+          // Reached live simulation point, switch to server mode
+          localFrameSourceRef.current.setSpeed(0);
+          serverFrameSourceRef.current?.setSpeed(speedRef.current);
+          setMode(SimulationMode.Server);
+        }
+      },
+      displayError
+    )
+  );
 
   // Derived loading state for convenience
   const [isLoading, setIsLoading] = useState<boolean>(true);
   useEffect(() => {
-    serverFrameSourceRef.current = new ServerFrameSource(
-      simId,
-      handleFrame,
-      displayError
-    );
+    if (!serverFrameSourceRef.current)
+      serverFrameSourceRef.current = new ServerFrameSource(
+        simId,
+        (frame) => {
+          setStartTime(frame.clock.startTime);
+          simulationSecondsPassedRef.current = frame.clock.simSecondsPassed;
+          setSimulationSecondsPassed(frame.clock.simSecondsPassed);
+          localFrameSourceRef.current.saveFrame(frame);
+          if (modeRef.current === SimulationMode.Server) handleFrame(frame);
+        },
+        displayError
+      );
     serverFrameSourceRef.current.start().then(() => {
       setIsLoading(false);
     });
-  }, [serverFrameSourceRef.current]);
+    return () => {
+      serverFrameSourceRef.current?.stop();
+      localFrameSourceRef.current.setSpeed(0);
+    };
+  }, []);
 
   // ============================================================================
   // MAP INTERACTIONS SETUP
@@ -867,6 +1018,15 @@ export const SimulationProvider = ({
         HQWidgetState,
         showAllRoutes,
         toggleShowAllRoutes,
+        speed: nonZeroSpeed,
+        setSpeed,
+        paused,
+        setPaused,
+        scrub,
+        commitScrub,
+        startTime,
+        simulationSecondsPassed,
+        scrubSimulationSecond,
       }}
     >
       {children}

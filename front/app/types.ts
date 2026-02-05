@@ -22,6 +22,12 @@
  * SOFTWARE.
  */
 
+export enum SimulationMode {
+  Local = 'local',
+  Server = 'server',
+  Scrubbing = 'scrubbing',
+}
+
 // Basic types
 export interface User {
   id: number;

@@ -31,79 +31,11 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '~/components/ui/dropdown-menu';
-import {
-  SPEED_OPTIONS,
-  useSimulation,
-  type Speed,
-} from '~/providers/simulation-provider';
-import api from '~/api';
-import useError from '~/hooks/use-error';
-
-type NonZeroSpeed = Exclude<Speed, 0>;
+import { SPEED_OPTIONS, useSimulation } from '~/providers/simulation-provider';
 
 export default function PlaybackControls() {
-  const { displayError } = useError();
-  const { speedRef, simId } = useSimulation();
-  const [speed, setSpeed] = useState<NonZeroSpeed>(
-    speedRef.current === 0 ? 1 : speedRef.current
-  );
-  const [paused, setPaused] = useState<boolean>(speedRef.current === 0);
+  const { speed, setSpeed, paused, setPaused } = useSimulation();
   const [loading, setLoading] = useState<boolean>(false);
-
-  const handleSpeedChange = async (newSpeed: NonZeroSpeed) => {
-    const previousSpeed = speed;
-    setSpeed(newSpeed); // Optimistic UI update
-
-    // If the simulation is paused, do not send speed update to server
-    if (paused) return;
-
-    setLoading(true); // Block speed changes while updating speed
-
-    try {
-      await api.post(`/simulation/${simId!}/playbackSpeed`, {
-        playback_speed: newSpeed,
-      });
-    } catch (error) {
-      console.error('Failed to update speed:', error);
-      displayError(
-        'Speed Update Error',
-        'Failed to update speed. Please try again.'
-      );
-      setSpeed(previousSpeed); // Revert to previous speed on error
-      setLoading(false);
-      return;
-    }
-
-    setLoading(false);
-    speedRef.current = newSpeed;
-  };
-
-  const handlePausePlayToggle = async () => {
-    const previousPaused = paused;
-    setPaused(!paused); // Optimistic UI update
-    setLoading(true); // Block speed changes while updating speed
-
-    try {
-      await api.post(`/simulation/${simId!}/playbackSpeed`, {
-        // If resuming, use the last speed; if pausing, set speed to 0
-        playback_speed: previousPaused ? speed : 0,
-      });
-    } catch (error) {
-      console.error('Failed to toggle pause / play simulation:', error);
-      displayError(
-        'Playback Toggle Error',
-        'Failed to toggle pause / play simulation. Please try again.'
-      );
-      setPaused(previousPaused); // Revert to previous paused state on error
-      setLoading(false);
-      return;
-    }
-
-    setLoading(false);
-    speedRef.current = previousPaused ? speed : 0;
-  };
-
-  if (!simId) return null;
 
   return (
     <div className="bg-background border rounded-md shadow-sm overflow-hidden h-10">
@@ -125,7 +57,11 @@ export default function PlaybackControls() {
               {SPEED_OPTIONS.filter((option) => option !== 0).map((option) => (
                 <DropdownMenuItem
                   key={option}
-                  onSelect={() => handleSpeedChange(option)}
+                  onSelect={async () => {
+                    setLoading(true);
+                    await setSpeed(option);
+                    setLoading(false);
+                  }}
                   className="flex justify-center items-center"
                   disabled={loading}
                 >
@@ -140,7 +76,11 @@ export default function PlaybackControls() {
         </div>
         <button
           className="group px-1 flex items-center justify-center disabled:opacity-50 disabled:pointer-events-none hover:bg-accent"
-          onClick={handlePausePlayToggle}
+          onClick={async () => {
+            setLoading(true);
+            await setPaused(!paused);
+            setLoading(false);
+          }}
           disabled={loading}
           aria-label={paused ? 'Play simulation' : 'Pause simulation'}
           data-testid="simulation-pause-play-button"

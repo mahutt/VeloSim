@@ -69,6 +69,14 @@ vi.mock('~/providers/task-assignment-provider', () => ({
   ),
 }));
 
+// Temporary mock to activate the scrubber for testing purposes:
+vi.mock('~/hooks/use-feature', () => ({
+  default: (flag: string) => {
+    if (flag === 'simulationScrubber') return true;
+    return false;
+  },
+}));
+
 beforeEach(() => {
   vi.clearAllMocks();
 });

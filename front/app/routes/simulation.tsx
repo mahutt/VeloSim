@@ -38,6 +38,8 @@ import PlaybackControls from '~/components/map/playback-controls';
 import RouteToggle from '~/components/map/route-toggle';
 import SimulationClock from '~/components/map/clock';
 import HQWidget from '~/components/simulation/hq-widget';
+import Scrubber from '~/components/map/scrubber';
+import useFeature from '~/hooks/use-feature';
 
 export function meta() {
   return [{ title: 'Simulation' }];
@@ -99,6 +101,11 @@ function SimulationContent() {
             <ResourceBar />
             <HQWidget />
           </div>
+          {useFeature('simulationScrubber') && (
+            <div className="absolute bottom-10 left-1/2 -translate-x-1/2 w-2xl max-w-full px-2">
+              <Scrubber />
+            </div>
+          )}
         </>
       )}
     </>
