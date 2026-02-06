@@ -25,8 +25,9 @@ SOFTWARE.
 from sim.behaviour.station_behaviour.strategies.task_popup_strategy import (
     TaskPopupStrategy,
 )
-from typing import TYPE_CHECKING
-import random
+from sim.entities.BatterySwapTask import BatterySwapTask
+from sim.entities.task_state import State
+from typing import Dict, List, TYPE_CHECKING, Optional
 
 if TYPE_CHECKING:
     from sim.entities.station import Station
@@ -35,15 +36,41 @@ if TYPE_CHECKING:
 class DefaultTPUStrategy(TaskPopupStrategy):
     """Default strategy for task popup at stations."""
 
-    def check_for_new_task(self, station: "Station") -> bool:
+    # {station_id: {time:[task_id, ...], ...}, ...}
+    station_scheduled_tasks: Optional[Dict[int, Dict[int, List[int]]]] = None
+
+    def check_for_new_task(self, station: "Station") -> List[BatterySwapTask]:
         """Check if a new task should popup at the station.
 
         Args:
             station: The station to check for new task popup.
 
         Returns:
-            True if new task should popup (0.001% chance), False otherwise.
+            List of BatterySwapTask that have popped up.
         """
-        # 0.001% chance of a new task popping up per station per second
-        hit = random.randrange(100000) == 0
-        return hit
+
+        # `env.now` can be int or float; cast to int to match scheduled keys
+        sim_time = int(station.env.now)
+        if self.station_scheduled_tasks is None:
+            return []
+        scheduled_times = self.station_scheduled_tasks.get(station.id, {})
+
+        if not scheduled_times:
+            return []
+
+        tasks_at_current_time = scheduled_times.get(sim_time, [])
+
+        if not tasks_at_current_time:
+            return []
+
+        pop_up_tasks: List[BatterySwapTask] = []
+
+        for task_id in tasks_at_current_time:
+            task = BatterySwapTask(
+                task_id=task_id,
+                station=station,
+            )
+            task.set_state(State.OPEN)
+            task.has_updated = True
+            pop_up_tasks.append(task)
+        return pop_up_tasks

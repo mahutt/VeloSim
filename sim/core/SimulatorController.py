@@ -39,6 +39,7 @@ from sim.entities.task import Task
 from sim.entities.inputParameters import InputParameter
 from sim.entities.map_payload import MapPayload
 from sim.behaviour.sim_behaviour import SimBehaviour
+from sim.behaviour.default.default_TPU_strategy import DefaultTPUStrategy
 from sim.map.MapController import MapController
 from grafana_logging.logger import get_logger
 
@@ -96,6 +97,10 @@ class SimulatorController:
             inputParameters.get_vehicle_entities()
         )
 
+        if isinstance(sim_behaviour.TPU_strategy, DefaultTPUStrategy):
+            sim_behaviour.TPU_strategy.station_scheduled_tasks = (
+                inputParameters.get_station_scheduled_tasks()
+            )
         self.task_entities = inputParameters.get_task_entities()
         self.prep_entities()
 

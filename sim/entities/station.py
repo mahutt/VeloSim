@@ -23,10 +23,8 @@ SOFTWARE.
 """
 
 import simpy
-import uuid
 from sim.behaviour.sim_behaviour import SimBehaviour
 from sim.entities.task_state import State
-from .BatterySwapTask import BatterySwapTask
 from typing import TYPE_CHECKING
 
 # to avoid circular imports
@@ -165,20 +163,12 @@ class Station:
         Returns:
             None
         """
-        # Use the behaviour reference set via set_behaviour
-        has_new_task = False
         if hasattr(self, "behaviour") and hasattr(self.behaviour, "TPU_strategy"):
-            has_new_task = self.behaviour.TPU_strategy.check_for_new_task(self)
+            pop_up_tasks = self.behaviour.TPU_strategy.check_for_new_task(self)
 
-        if has_new_task:
-
-            # TEMPORARY ID SOLUTION FOR TESTING
-            task_id = uuid.uuid4().int % 1_000_000_000
-            # Create BatterySwapTask and set its env attribute
-            task = BatterySwapTask(task_id=task_id, station=self)
-            task.env = self.env
-            self.add_task(task)
-            self.add_pop_up_task(task)
+            for task in pop_up_tasks:
+                self.add_task(task)
+                self.add_pop_up_task(task)
 
     def clear_update(self) -> None:
         """Clear the update flag for this station.
@@ -220,5 +210,5 @@ class Station:
             # should be refactored to use a (queue-based) TaskPopupStrategy
             # implementation.
             #
-            # self.check_for_new_task()
+            self.check_for_new_task()
             yield self.env.timeout(1)

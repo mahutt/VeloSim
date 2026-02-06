@@ -1152,6 +1152,10 @@ class JsonParseStrategy(BaseParseStrategy):
         # Build stations and tasks
         stations: Dict[int, Station] = {}
         tasks: Dict[int, BatterySwapTask] = {}
+
+        # {station_id: {time:[task_id, ...], ...}, ...}
+        station_scheduled_tasks: Dict[int, Dict[int, List[int]]] = {}
+
         for s in content.get("stations", []):
             station_id = station_id_counter
             station_id_counter += 1
@@ -1176,6 +1180,11 @@ class JsonParseStrategy(BaseParseStrategy):
                 tid = task_id_counter
                 task_id_counter += 1
                 delay = self._time_to_seconds(t) - start_time
+                if station_id not in station_scheduled_tasks:
+                    station_scheduled_tasks[station_id] = {}
+                if delay not in station_scheduled_tasks[station_id]:
+                    station_scheduled_tasks[station_id][delay] = []
+                station_scheduled_tasks[station_id][delay].append(tid)
                 tasks[tid] = BatterySwapTask(
                     task_id=tid, station=stations[station_id], spawn_delay=delay
                 )
@@ -1281,6 +1290,7 @@ class JsonParseStrategy(BaseParseStrategy):
             task_entities=tasks,
             real_time_factor=content.get("real_time_factor", 1.0),
             key_frame_freq=content.get("key_frame_freq", 20),
+            station_scheduled_tasks=station_scheduled_tasks,
             sim_time=sim_time,
             start_time=start_time,
             map_payload=map_payload,

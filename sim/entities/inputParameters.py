@@ -23,9 +23,8 @@ SOFTWARE.
 """
 
 # This class is a placeholder for when we define input params later down in the project.
-import json
-from typing import Dict, Mapping, Optional
 from sim.entities.map_payload import MapPayload
+from typing import Dict, Mapping, Optional, List
 from sim.entities.station import Station
 from sim.entities.task import Task
 from sim.entities.driver import Driver
@@ -43,6 +42,7 @@ class InputParameter:
         task_entities: Optional[Mapping[int, Task]] = None,
         real_time_factor: Optional[float] = None,
         key_frame_freq: Optional[int] = None,
+        station_scheduled_tasks: Optional[Dict[int, Dict[int, List[int]]]] = None,
         sim_time: Optional[int] = 0,
         start_time: Optional[int] = 0,
         map_payload: Optional[MapPayload] = None,
@@ -60,7 +60,9 @@ class InputParameter:
         )
 
         self.task_entities: Dict[int, Task] = dict(task_entities or {})
-
+        self.station_scheduled_tasks: Optional[Dict[int, Dict[int, List[int]]]] = (
+            station_scheduled_tasks
+        )
         self.realTimeFactor: Optional[float] = real_time_factor
         self.keyFrameFreq: Optional[int] = key_frame_freq
         self.sim_time: int = sim_time if sim_time is not None else 0
@@ -131,6 +133,27 @@ class InputParameter:
             MapPayload with map configuration, or None.
         """
         return self.map_payload
+    def get_station_scheduled_tasks(self) -> Optional[Dict[int, Dict[int, List[int]]]]:
+        """Get the station scheduled tasks.
+
+        Returns:
+        A Dict mapping station IDs to a Dict of times mapping to task IDs, or None.
+        """
+        return self.station_scheduled_tasks
+
+    def set_station_scheduled_tasks(
+        self, station_scheduled_tasks: Dict[int, Dict[int, List[int]]]
+    ) -> None:
+        """Set the station scheduled tasks.
+
+        Args:
+        station_scheduled_tasks: A Dict mapping station IDs to a Dict of times
+        mapping to task IDs.
+
+        Returns:
+            None
+        """
+        self.station_scheduled_tasks = station_scheduled_tasks
 
     def set_sim_time(self, sim_time: int) -> None:
         """Set the simulation time.
