@@ -287,6 +287,13 @@ def mocked_simulator(monkeypatch: pytest.MonkeyPatch) -> Generator[None, None, N
     yield
 
 
+@pytest.fixture(autouse=True)
+def cleanup_active_simulations() -> Generator[None, None, None]:
+    """Clean up active_simulations after each test to avoid pollution."""
+    yield
+    simulation_service.active_simulations = {}
+
+
 class FrameData(TypedDict):
     seq: int
     timestamp: int

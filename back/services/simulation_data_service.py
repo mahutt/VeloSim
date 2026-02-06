@@ -123,11 +123,9 @@ class SimulationDataService:
         if not sim_instance:
             raise ItemNotFoundError(f"Simulation instance with UUID {sim_id} not found")
 
-        current_id = str(sim_instance.id)
-
         keyframe = sim_keyframe_crud.get_last_keyframe(
             db,
-            sim_instance_id=current_id,
+            sim_instance_id=sim_instance.id,
         )
 
         if not keyframe:

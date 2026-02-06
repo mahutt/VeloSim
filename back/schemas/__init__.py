@@ -78,6 +78,9 @@ from .sim_frame import (
     SimulationState,
     SeekResponse,
 )
+from .sim_state import (
+    SimStateResponse,
+)
 
 __all__ = [
     "DriverTaskAssignRequest",
@@ -120,4 +123,12 @@ __all__ = [
     "FrameWindow",
     "SimulationState",
     "SeekResponse",
+    "SimStateResponse",
+    "TaskItem",
+    "TaskStation",
+    "TaskListResponse",
+    "DriverItem",
+    "DriverTask",
+    "DriverVehicle",
+    "DriverListResponse",
 ]
