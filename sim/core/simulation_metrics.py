@@ -22,39 +22,42 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 """
 
-import simpy
 
-from sim.core.simulation_metrics import SimulationMetrics
-from sim.entities.headquarters import Headquarters
-
-
-class SimulationEnvironment(simpy.Environment):
-    """Custom simulation environment for VeloSim."""
-
-    hq: Headquarters
-    metrics: SimulationMetrics
+class SimulationMetrics:
+    """
+    Tracks simulation-wide metrics such as driving time and servicing time.
+    """
 
     def __init__(self) -> None:
-        """Initialize the simulation environment."""
-        super().__init__()
-        self.hq = Headquarters()
-        self.metrics = SimulationMetrics()
+        self.total_driving_time = 0
+        self.total_servicing_time = 0
 
-    def set_headquarters(self, hq: Headquarters) -> None:
-        """Set the headquarters for the simulation.
-
-        Args:
-            hq (Headquarters): The headquarters to set.
+    def increment_driving_time(self) -> None:
+        """
+        Increment the total driving time.
 
         Returns:
             None
         """
-        self.hq = hq
+        self.total_driving_time += 1
 
-    def get_headquarters(self) -> Headquarters:
-        """Get the headquarters of the simulation.
+    def increment_servicing_time(self) -> None:
+        """
+        Increment the total servicing time.
 
         Returns:
-            Headquarters: The headquarters of the simulation.
+            None
         """
-        return self.hq
+        self.total_servicing_time += 1
+
+    def get_driving_to_servicing_ratio(self) -> float:
+        """
+        Compute the ratio of servicing time to driving time.
+
+        Returns:
+            float: The servicing-to-driving ratio, or 0 if driving time is zero.
+        """
+        if self.total_driving_time == 0:
+            return 0
+
+        return self.total_servicing_time / self.total_driving_time

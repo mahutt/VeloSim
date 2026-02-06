@@ -75,6 +75,7 @@ class SimulatorController:
         self.frameCounter: int = 0
         self.start_time: int = inputParameters.get_start_time()
         self.on_completed_callback = on_completed_callback
+        self.last_reporting: dict | None = None
 
         # Unpack InputParameter object to populate entity lists
         self.station_entities: Dict[int, Station] = (
@@ -648,6 +649,19 @@ class SimulatorController:
                 "realTimeFactor": self.realTimeDriver.real_time_factor,
                 "pausedByUser": paused_by_user,
             },
+            "reporting": {},
         }
+
+        current_reporting = {
+            "servicingToDrivingRatio": round(
+                self.simEnv.metrics.get_driving_to_servicing_ratio(), 4
+            )
+        }
+
+        # Only include metrics on keyframe and on change.
+        if is_key or current_reporting != self.last_reporting:
+            payload["reporting"] = current_reporting
+            self.last_reporting = current_reporting
+
         frame = Frame(seq_numb=self.frameCounter, payload=payload, is_key=is_key)
         return frame

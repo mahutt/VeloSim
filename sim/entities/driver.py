@@ -425,7 +425,11 @@ class Driver:
             task_servicing_time = (
                 self.sim_behaviour.TST_strategy.get_task_servicing_time()
             )
-            yield self.env.timeout(task_servicing_time)
+
+            for _ in range(int(task_servicing_time)):
+                self.env.metrics.increment_servicing_time()
+                yield self.env.timeout(1)
+
             self.task_list.remove(task)
             battery_count = self.vehicle.use_battery()
             task.set_state(State.CLOSED)
@@ -626,6 +630,7 @@ class Driver:
             while next_position:
                 # Handle case where driver is on_route but in_progress task
                 # got unassigned or reordered
+                self.env.metrics.increment_driving_time()
                 if (
                     self.state == DriverState.ON_ROUTE
                     and not self.get_in_progress_task()

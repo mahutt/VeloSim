@@ -265,12 +265,6 @@ class FramePersistenceSubscriber(Subscriber):
                                 f"sim_instance_id={self.sim_instance_id}: {e}"
                             )
 
-                        logger.info(
-                            f"Persisted batch of {len(frame_datas)} frames for "
-                            f"sim_instance_id={self.sim_instance_id}, "
-                            f"total_success={self.persist_success_count}"
-                        )
-
             except asyncio.TimeoutError:
                 # No frame available, continue loop to check closed flag
                 continue
