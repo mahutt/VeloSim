@@ -177,4 +177,49 @@ describe('ScenarioTextArea', () => {
       expect(onChange).toHaveBeenCalledWith('{  \n  "key": "value"\n}');
     });
   });
+
+  describe('Line numbers', () => {
+    it('displays line numbers for each line of content', () => {
+      setup({ scenarioData: 'line1\nline2\nline3' });
+
+      expect(screen.getByText('1')).toBeInTheDocument();
+      expect(screen.getByText('2')).toBeInTheDocument();
+      expect(screen.getByText('3')).toBeInTheDocument();
+    });
+
+    it('synchronizes line numbers scroll with textarea scroll', () => {
+      const { container } = render(
+        <ScenarioTextArea
+          scenarioData="line1\nline2\nline3\nline4\nline5"
+          scenarioDescription=""
+          onChange={vi.fn()}
+          onDescriptionChange={vi.fn()}
+          onSave={vi.fn()}
+          onExport={vi.fn()}
+          onStart={vi.fn()}
+          isEditMode={false}
+          isExistingScenario={false}
+          onEdit={vi.fn()}
+        />
+      );
+
+      const textarea = screen.getByLabelText('Scenario JSON');
+      const lineNumbersDiv = container.querySelector(
+        '.select-none.overflow-hidden'
+      );
+
+      expect(lineNumbersDiv).toBeInTheDocument();
+
+      // Simulate scroll
+      Object.defineProperty(textarea, 'scrollTop', {
+        writable: true,
+        value: 100,
+      });
+
+      fireEvent.scroll(textarea);
+
+      // Line numbers should scroll to match
+      expect(lineNumbersDiv?.scrollTop).toBe(100);
+    });
+  });
 });

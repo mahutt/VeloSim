@@ -27,6 +27,7 @@ import { Textarea } from '~/components/ui/textarea';
 import { Field, FieldLabel } from '~/components/ui/field';
 import ScenarioContentOptions from './scenario-content-options';
 import type { Dispatch, SetStateAction } from 'react';
+import { useRef } from 'react';
 
 interface ScenarioTextAreaProps {
   scenarioData: string;
@@ -54,6 +55,17 @@ export default function ScenarioTextArea({
   onEdit,
 }: ScenarioTextAreaProps) {
   const isDisabled = isExistingScenario && !isEditMode;
+  const lineNumbersRef = useRef<HTMLDivElement>(null);
+
+  // Calculate line numbers based on content
+  const lineCount = scenarioData.split('\n').length;
+  const lineNumbers = Array.from({ length: lineCount }, (_, i) => i + 1);
+
+  const handleScroll = (e: React.UIEvent<HTMLTextAreaElement>) => {
+    if (lineNumbersRef.current) {
+      lineNumbersRef.current.scrollTop = e.currentTarget.scrollTop;
+    }
+  };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     // Allow Tab key to insert spaces for indentation
@@ -99,15 +111,30 @@ export default function ScenarioTextArea({
             onEdit={onEdit}
           />
         </div>
-        <Textarea
-          id="scenario-json"
-          className="h-[28rem] resize-none font-mono"
-          placeholder="Paste or type your JSON scenario here..."
-          value={scenarioData}
-          onChange={(e) => onChange(e.target.value)}
-          onKeyDown={handleKeyDown}
-          disabled={isDisabled}
-        />
+        <div className="flex h-[28rem] border rounded-md overflow-hidden bg-background">
+          {/* Line numbers */}
+          <div
+            ref={lineNumbersRef}
+            className="select-none overflow-hidden bg-muted/50 px-2 py-2 font-mono text-sm text-muted-foreground border-r leading-6 min-w-12 text-right"
+          >
+            {lineNumbers.map((num) => (
+              <div key={num} className="h-6">
+                {num}
+              </div>
+            ))}
+          </div>
+          {/* Textarea */}
+          <Textarea
+            id="scenario-json"
+            className="flex-1 h-full resize-none font-mono border-0 focus-visible:ring-0 focus-visible:ring-offset-0 rounded-none overflow-y-auto"
+            placeholder="Paste or type your JSON scenario here..."
+            value={scenarioData}
+            onChange={(e) => onChange(e.target.value)}
+            onKeyDown={handleKeyDown}
+            onScroll={handleScroll}
+            disabled={isDisabled}
+          />
+        </div>
       </Field>
 
       <div className="flex flex-col gap-2 mt-4 sm:flex-row sm:justify-between sm:items-center">
