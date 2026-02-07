@@ -37,6 +37,7 @@ from sim.entities.shift import Shift
 from sim.entities.clock import Clock
 from sim.entities.task import Task
 from sim.entities.inputParameters import InputParameter
+from sim.entities.map_payload import MapPayload
 from sim.behaviour.sim_behaviour import SimBehaviour
 from sim.map.MapController import MapController
 from grafana_logging.logger import get_logger
@@ -59,7 +60,13 @@ class SimulatorController:
     ) -> None:
         self.simEnv = simEnv
 
-        self.map_controller = map_controller or MapController()
+        # Build map_payload with simpy env for time-based operations
+        existing_payload = inputParameters.get_map_payload()
+        map_payload = MapPayload(
+            traffic=existing_payload.traffic if existing_payload else None,
+            env=simEnv,
+        )
+        self.map_controller = map_controller or MapController(map_payload=map_payload)
 
         # Get parameters directly from InputParameter object
         real_time_factor = inputParameters.get_real_time_factor()

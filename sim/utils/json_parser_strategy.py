@@ -23,6 +23,7 @@ SOFTWARE.
 """
 
 from datetime import datetime
+from pathlib import Path
 from typing import Dict, List, Any, Set, Optional
 import re
 from pydantic import (
@@ -42,6 +43,7 @@ from sim.entities.vehicle import Vehicle
 from sim.entities.BatterySwapTask import BatterySwapTask
 from sim.entities.shift import Shift
 from sim.entities.position import Position
+from sim.entities.map_payload import MapPayload, TrafficConfig
 from sim.utils.base_parse_strategy import BaseParseStrategy
 
 
@@ -908,6 +910,37 @@ class _ScenarioValidator:
 
         return errors
 
+    def validate_traffic(self, content: Dict[str, Any]) -> List[Dict[str, Any]]:
+        """Validate traffic configuration if provided.
+
+        Args:
+            content: Complete scenario dictionary.
+
+        Returns:
+            List of validation errors related to traffic configuration.
+        """
+        errors: List[Dict[str, Any]] = []
+        traffic_raw = content.get("traffic", None)
+        if traffic_raw is not None and isinstance(traffic_raw, dict):
+            traffic_path = traffic_raw.get("traffic_path", "")
+            if traffic_path:
+                path_obj = Path(traffic_path)
+                if not path_obj.exists():
+                    errors.append(
+                        {
+                            "field": "traffic.traffic_path",
+                            "message": f"Traffic file not found: {traffic_path}",
+                        }
+                    )
+                elif not path_obj.is_file():
+                    errors.append(
+                        {
+                            "field": "traffic.traffic_path",
+                            "message": f"Traffic path is not a file: {traffic_path}",
+                        }
+                    )
+        return errors
+
     def validate_all(self, scenario_content: Dict[str, Any]) -> List[Dict[str, Any]]:
         """Validate all aspects of scenario content.
 
@@ -929,6 +962,7 @@ class _ScenarioValidator:
 
         errors.extend(self.validate_simulation_params(scenario_content))
         errors.extend(self.validate_logical_constraints(scenario_content))
+        errors.extend(self.validate_traffic(scenario_content))
         return errors
 
 
@@ -1096,6 +1130,13 @@ class JsonParseStrategy(BaseParseStrategy):
         if validation_errors:
             raise ScenarioParseError(validation_errors)
 
+        # Extract traffic configuration (optional param)
+        map_payload = None
+        traffic_raw = content.get("traffic", None)
+        if traffic_raw is not None and isinstance(traffic_raw, dict):
+            traffic_path = traffic_raw.get("traffic_path", "")
+            map_payload = MapPayload(traffic=TrafficConfig(traffic_path=traffic_path))
+
         # Parse times (validation ensures these are valid)
         start_time = self._time_to_seconds(str(content.get("start_time", "day1:00:00")))
         end_time = self._time_to_seconds(str(content.get("end_time", "day1:00:00")))
@@ -1242,6 +1283,7 @@ class JsonParseStrategy(BaseParseStrategy):
             key_frame_freq=content.get("key_frame_freq", 20),
             sim_time=sim_time,
             start_time=start_time,
+            map_payload=map_payload,
         )
 
         return params

@@ -22,6 +22,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 """
 
+from sim.entities.map_payload import MapPayload
 from sim.entities.position import Position
 from sim.entities.route import Route
 from sim.map.routing_provider import RoutingProvider
@@ -40,18 +41,21 @@ class MapController:
     allowing different routing backends to be used.
     """
 
-    def __init__(self, osrm_url: Optional[str] = None) -> None:
+    def __init__(
+        self,
+        map_payload: Optional[MapPayload] = None,
+    ) -> None:
         """Initialize the MapController with a routing provider.
 
         Sets up the routing provider for routing operations and initializes
         the RouteController for road/route management.
 
         Args:
-            osrm_url: Optional URL for the routing server. If not provided,
-                will use environment variables to determine the server.
+            map_payload: Optional MapPayload containing traffic
+                configuration and other map-related settings.
         """
         # Initialize the routing provider (using OSRM adapter by default)
-        self.routing_provider: RoutingProvider = OSRMAdapter(osrm_url=osrm_url)
+        self.routing_provider: RoutingProvider = OSRMAdapter()
 
         # Load config once for all routes
         config_path = Path(__file__).parent.parent / "config.json"
@@ -62,7 +66,10 @@ class MapController:
         self.route_controller = RouteController(self)
 
         # Initialize TrafficController for traffic layer management
-        self.traffic_controller = TrafficController(self.route_controller)
+        traffic_config = map_payload.traffic if map_payload else None
+        self.traffic_controller = TrafficController(
+            self.route_controller, traffic_config=traffic_config
+        )
 
     def get_route(self, a: Position, b: Position) -> Route:
         """

@@ -62,20 +62,9 @@ class TestMapControllerInitialization:
 
             mc = MapController()
 
-            mock_adapter_class.assert_called_once_with(osrm_url=None)
+            mock_adapter_class.assert_called_once_with()
             assert hasattr(mc, "routing_provider")
             assert hasattr(mc, "route_controller")
-
-    def test_initialization_with_custom_url(self) -> None:
-        """Test initialization with custom URL."""
-        with patch("sim.map.MapController.OSRMAdapter") as mock_adapter_class:
-            mock_adapter_class.return_value = Mock()
-
-            MapController(osrm_url="http://custom-server:5000")
-
-            mock_adapter_class.assert_called_once_with(
-                osrm_url="http://custom-server:5000"
-            )
 
 
 class TestMapControllerGetRoute:

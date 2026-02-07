@@ -25,6 +25,7 @@ SOFTWARE.
 # This class is a placeholder for when we define input params later down in the project.
 import json
 from typing import Dict, Mapping, Optional
+from sim.entities.map_payload import MapPayload
 from sim.entities.station import Station
 from sim.entities.task import Task
 from sim.entities.driver import Driver
@@ -44,6 +45,7 @@ class InputParameter:
         key_frame_freq: Optional[int] = None,
         sim_time: Optional[int] = 0,
         start_time: Optional[int] = 0,
+        map_payload: Optional[MapPayload] = None,
     ) -> None:
         self.station_entities: Dict[int, Station] = (
             station_entities if station_entities is not None else {}
@@ -63,6 +65,7 @@ class InputParameter:
         self.keyFrameFreq: Optional[int] = key_frame_freq
         self.sim_time: int = sim_time if sim_time is not None else 0
         self.start_time: int = start_time if start_time is not None else 0
+        self.map_payload: Optional[MapPayload] = map_payload
 
     # Getter methods
     def get_station_entities(self) -> Dict[int, Station]:
@@ -120,6 +123,14 @@ class InputParameter:
             The simulation start time.
         """
         return self.start_time
+
+    def get_map_payload(self) -> Optional[MapPayload]:
+        """Get the map payload configuration.
+
+        Returns:
+            MapPayload with map configuration, or None.
+        """
+        return self.map_payload
 
     def set_sim_time(self, sim_time: int) -> None:
         """Set the simulation time.

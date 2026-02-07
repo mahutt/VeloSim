@@ -22,14 +22,20 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 """
 
-from typing import Dict, Optional, Set
+import logging
+from typing import Dict, List, Optional, Set
 
+from sim.entities.map_payload import TrafficConfig
 from sim.entities.position import Position
 from sim.entities.road import Road
 from sim.entities.traffic_data import RoadTrafficState
+from sim.entities.traffic_event import TrafficEvent
 from sim.map.route_controller import RouteController
 from sim.map.routing_provider import SegmentKey
+from sim.traffic.traffic_parser import TrafficParser
 from sim.traffic.traffic_state_factory import TrafficStateFactory
+
+logger = logging.getLogger(__name__)
 
 
 class TrafficController:
@@ -39,14 +45,20 @@ class TrafficController:
     index from Position objects to Roads for O(1) traffic lookups.
     """
 
-    def __init__(self, route_controller: RouteController) -> None:
+    def __init__(
+        self,
+        route_controller: RouteController,
+        traffic_config: Optional[TrafficConfig] = None,
+    ) -> None:
         """Initialize TrafficController.
 
         Args:
             route_controller: RouteController for road lookups
+            traffic_config: Optional TrafficConfig with traffic settings.
         """
         self._route_controller = route_controller
         self._active_traffic: Dict[SegmentKey, RoadTrafficState] = {}
+        self._traffic_events: List[TrafficEvent] = []
 
         # Reverse index: Position -> set of roads containing that node
         self._node_to_roads: Dict[Position, Set[Road]] = {}
@@ -54,6 +66,14 @@ class TrafficController:
         # Register for road lifecycle events
         self._route_controller.register_on_road_created(self._on_road_created)
         self._route_controller.register_on_road_deallocated(self._on_road_deallocated)
+
+        # Parse traffic events from CSV if config provided
+        if traffic_config and traffic_config.traffic_path:
+            parser = TrafficParser(traffic_config.traffic_path)
+            self._traffic_events = parser.parse()
+            logger.info(f"Loaded {len(self._traffic_events)} traffic event(s)")
+            for i, event in enumerate(self._traffic_events):
+                logger.debug(f"  [{i}] {event}")
 
     def _on_road_created(self, road: Road) -> None:
         """Register road's nodes in reverse index and apply existing traffic.
@@ -209,6 +229,14 @@ class TrafficController:
             RoadTrafficState if found, None otherwise
         """
         return self._active_traffic.get(segment_key)
+
+    def get_traffic_events(self) -> List[TrafficEvent]:
+        """Get the list of parsed traffic events.
+
+        Returns:
+            List of TrafficEvent objects parsed from the traffic CSV.
+        """
+        return self._traffic_events
 
     def cleanup(self) -> None:
         """Clean up TrafficController resources.
