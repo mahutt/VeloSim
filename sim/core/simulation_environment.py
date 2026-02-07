@@ -24,7 +24,7 @@ SOFTWARE.
 
 import simpy
 
-from sim.core.simulation_metrics import SimulationMetrics
+from sim.core.simulation_report import SimulationReport
 from sim.entities.headquarters import Headquarters
 
 
@@ -32,13 +32,13 @@ class SimulationEnvironment(simpy.Environment):
     """Custom simulation environment for VeloSim."""
 
     hq: Headquarters
-    metrics: SimulationMetrics
+    metrics: SimulationReport
 
     def __init__(self) -> None:
         """Initialize the simulation environment."""
         super().__init__()
         self.hq = Headquarters()
-        self.metrics = SimulationMetrics()
+        self.metrics = SimulationReport()
 
     def set_headquarters(self, hq: Headquarters) -> None:
         """Set the headquarters for the simulation.

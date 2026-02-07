@@ -24,14 +24,14 @@ SOFTWARE.
 
 import pytest
 
-from sim.core.simulation_metrics import SimulationMetrics
+from sim.core.simulation_report import SimulationReport
 
 
 def test_initial_state() -> None:
     """
     SimulationMetrics should initialize with zero driving and servicing time.
     """
-    metrics = SimulationMetrics()
+    metrics = SimulationReport()
 
     assert metrics.total_driving_time == 0
     assert metrics.total_servicing_time == 0
@@ -41,7 +41,7 @@ def test_increment_driving_time() -> None:
     """
     increment_driving_time should increase total_driving_time by one.
     """
-    metrics = SimulationMetrics()
+    metrics = SimulationReport()
 
     metrics.increment_driving_time()
     metrics.increment_driving_time()
@@ -54,7 +54,7 @@ def test_increment_servicing_time() -> None:
     """
     increment_servicing_time should increase total_servicing_time by one.
     """
-    metrics = SimulationMetrics()
+    metrics = SimulationReport()
 
     metrics.increment_servicing_time()
     metrics.increment_servicing_time()
@@ -68,7 +68,7 @@ def test_driving_to_servicing_ratio_normal_case() -> None:
     """
     get_driving_to_servicing_ratio should return servicing / driving.
     """
-    metrics = SimulationMetrics()
+    metrics = SimulationReport()
 
     for _ in range(4):
         metrics.increment_driving_time()
@@ -85,7 +85,7 @@ def test_driving_to_servicing_ratio_zero_driving_time() -> None:
     """
     get_driving_to_servicing_ratio should return 0 when driving time is zero.
     """
-    metrics = SimulationMetrics()
+    metrics = SimulationReport()
 
     metrics.increment_servicing_time()
     metrics.increment_servicing_time()

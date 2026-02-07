@@ -23,12 +23,21 @@ SOFTWARE.
 """
 
 
-class SimulationMetrics:
+class SimulationReport:
     """
     Tracks simulation-wide metrics such as driving time and servicing time.
     """
 
     def __init__(self) -> None:
+        self.total_driving_time = 0
+        self.total_servicing_time = 0
+
+    def reset(self) -> None:
+        """Reset all metrics to zero.
+
+        Returns:
+            None
+        """
         self.total_driving_time = 0
         self.total_servicing_time = 0
 
@@ -52,10 +61,10 @@ class SimulationMetrics:
 
     def get_driving_to_servicing_ratio(self) -> float:
         """
-        Compute the ratio of servicing time to driving time.
+        Compute the ratio of driving time to servicing time.
 
         Returns:
-            float: The servicing-to-driving ratio, or 0 if driving time is zero.
+            float: The driving-to-servicing ratio, or 0 if servicing time is zero.
         """
         if self.total_driving_time == 0:
             return 0
