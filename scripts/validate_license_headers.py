@@ -135,6 +135,10 @@ EXCLUDED_PATHS = {
 
     # Python package init files
     '__init__.py',  # All __init__.py files
+
+    # Auto-generated API client and demo venv (also git-ignored)
+    'velosim_client',
+    'venv',
 }
 
 def normalize_whitespace(text: str) -> str:
