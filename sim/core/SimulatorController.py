@@ -336,10 +336,14 @@ class SimulatorController:
     def batch_assign_tasks_to_driver(
         self, driver_id: int, task_ids: list[int]
     ) -> list[BatchAssignResult]:
-        """Best-effort assign many tasks to a single driver.
+        """Best-effort assign or reassign many tasks to a single driver.
 
-        Attempts to assign each task in ``task_ids`` to ``driver_id``. Each
-        assignment is attempted independently; no rollback is performed.
+        For each task in ``task_ids``:
+        - If unassigned → assign to ``driver_id``
+        - If already assigned to ``driver_id`` → treat as success (no-op)
+        - If assigned to a different driver → reassign to ``driver_id``
+
+        Each assignment is attempted independently; no rollback is performed.
 
         Args:
             driver_id: The driver to assign tasks to.
@@ -352,7 +356,30 @@ class SimulatorController:
         results: list[BatchAssignResult] = []
         for task_id in task_ids:
             try:
-                self.assign_task_to_driver(task_id, driver_id)
+                found_task = self.get_task_by_id(task_id)
+                if found_task is None:
+                    raise Exception(f"Could not find task in sim with id: {task_id}")
+
+                current_driver = found_task.get_assigned_driver()
+
+                if current_driver is not None:
+                    if current_driver.id == driver_id:
+                        # Already assigned to target driver - no-op success
+                        results.append(
+                            {
+                                "task_id": task_id,
+                                "driver_id": driver_id,
+                                "success": True,
+                                "error": None,
+                            }
+                        )
+                        continue
+                    # Reassign from current driver to new driver
+                    self.reassign_task(task_id, current_driver.id, driver_id)
+                else:
+                    # Fresh assignment
+                    self.assign_task_to_driver(task_id, driver_id)
+
                 results.append(
                     {
                         "task_id": task_id,

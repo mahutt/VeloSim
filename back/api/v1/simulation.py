@@ -665,15 +665,19 @@ def batch_assign_tasks_to_driver(
     db: Session = Depends(get_db),
 ) -> DriverTaskBatchAssignResponse:
     """
-    Assign many tasks to a driver in a running simulation.
+    Assign or reassign many tasks to a driver in a running simulation.
 
-    Attempts to assign many tasks to a Driver. Each assignment is attempted
-    independently and the response indicates per-item success or failure. No
-    rollback is performed.
+    For each task in the request:
+    - If unassigned: assigns to the target driver
+    - If already assigned to target driver: treats as success (no-op)
+    - If assigned to a different driver: reassigns to the target driver
+
+    Each operation is attempted independently and the response indicates
+    per-item success or failure. No rollback is performed.
 
     Args:
         sim_id: ID of the simulation
-        bulk_request: Batch assignment request containing `driver_id` and `task_ids`
+        bulk_request: Batch request containing `driver_id` and `task_ids`
         requesting_user: ID of the authenticated user
         db: Database session dependency
 

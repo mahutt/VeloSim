@@ -268,10 +268,15 @@ class DriverService:
         requesting_user: int,
         batch_request: DriverTaskBatchAssignRequest,
     ) -> DriverTaskBatchAssignResponse:
-        """Batch assign tasks to drivers within a running simulation.
+        """Batch assign or reassign tasks to a driver within a running simulation.
+
+        For each task in the request:
+        - If unassigned: assigns to the target driver
+        - If already assigned to target driver: treats as success (no-op)
+        - If assigned to a different driver: reassigns to the target driver
 
         Note:
-            This method performs best-effort assignment: each item is
+            This method performs best-effort operations: each item is
             attempted independently and the response contains per-item
             success/failure details. No rollback is performed.
 
@@ -279,7 +284,7 @@ class DriverService:
             db: Database session
             sim_id: UUID of the active in-memory simulation
             requesting_user: Database ID of the user performing the action
-            batch_request: List of `DriverTaskAssignRequest` items to apply
+            batch_request: Request containing `driver_id` and `task_ids` to apply
 
         Returns:
             DriverTaskBatchAssignResponse: Per-item assignment results.
