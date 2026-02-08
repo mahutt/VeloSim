@@ -425,7 +425,11 @@ class Driver:
             task_servicing_time = (
                 self.sim_behaviour.TST_strategy.get_task_servicing_time()
             )
-            yield self.env.timeout(task_servicing_time)
+
+            for _ in range(task_servicing_time):
+                yield self.env.timeout(1)
+                self.env.metrics.increment_servicing_time()
+
             self.task_list.remove(task)
             battery_count = self.vehicle.use_battery()
             task.set_state(State.CLOSED)
@@ -639,6 +643,10 @@ class Driver:
                 )  # route.next() returns Position when as_json=False
                 self.set_position(next_position)
                 yield self.env.timeout(1)
+
+                # increment driving time after timeout elapses.
+                self.env.metrics.increment_driving_time()
+
                 next_position = self.current_route.next()
         # Allows a traveling drivers to be interrupted by other simpy entities
         except simpy.Interrupt:

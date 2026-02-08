@@ -22,39 +22,51 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 """
 
-import simpy
 
-from sim.core.simulation_report import SimulationReport
-from sim.entities.headquarters import Headquarters
-
-
-class SimulationEnvironment(simpy.Environment):
-    """Custom simulation environment for VeloSim."""
-
-    hq: Headquarters
-    metrics: SimulationReport
+class SimulationReport:
+    """
+    Tracks simulation-wide metrics such as driving time and servicing time.
+    """
 
     def __init__(self) -> None:
-        """Initialize the simulation environment."""
-        super().__init__()
-        self.hq = Headquarters()
-        self.metrics = SimulationReport()
+        self.total_driving_time = 0
+        self.total_servicing_time = 0
 
-    def set_headquarters(self, hq: Headquarters) -> None:
-        """Set the headquarters for the simulation.
-
-        Args:
-            hq (Headquarters): The headquarters to set.
+    def reset(self) -> None:
+        """Reset all metrics to zero.
 
         Returns:
             None
         """
-        self.hq = hq
+        self.total_driving_time = 0
+        self.total_servicing_time = 0
 
-    def get_headquarters(self) -> Headquarters:
-        """Get the headquarters of the simulation.
+    def increment_driving_time(self) -> None:
+        """
+        Increment the total driving time.
 
         Returns:
-            Headquarters: The headquarters of the simulation.
+            None
         """
-        return self.hq
+        self.total_driving_time += 1
+
+    def increment_servicing_time(self) -> None:
+        """
+        Increment the total servicing time.
+
+        Returns:
+            None
+        """
+        self.total_servicing_time += 1
+
+    def get_servicing_to_driving_ratio(self) -> float:
+        """
+        Compute the ratio of driving time to servicing time.
+
+        Returns:
+            float: The driving-to-servicing ratio, or 0 if servicing time is zero.
+        """
+        if self.total_driving_time == 0:
+            return 0
+
+        return self.total_servicing_time / self.total_driving_time
