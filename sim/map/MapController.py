@@ -55,7 +55,8 @@ class MapController:
                 configuration and other map-related settings.
         """
         # Initialize the routing provider (using OSRM adapter by default)
-        self.routing_provider: RoutingProvider = OSRMAdapter()
+        sim_id = map_payload.sim_id if map_payload else ""
+        self.routing_provider: RoutingProvider = OSRMAdapter(sim_id=sim_id)
 
         # Load config once for all routes
         config_path = Path(__file__).parent.parent / "config.json"

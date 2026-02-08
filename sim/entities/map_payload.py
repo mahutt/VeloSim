@@ -51,3 +51,4 @@ class MapPayload:
 
     traffic: Optional[TrafficConfig] = field(default=None)
     env: Optional["simpy.Environment"] = field(default=None)
+    sim_id: str = field(default="")

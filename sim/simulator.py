@@ -115,6 +115,7 @@ class Simulator:
 
         simController = SimulatorController(
             simEnv=env,
+            sim_id=run_id,
             inputParameters=input_parameters,
             frameEmitter=emitter,
             sim_behaviour=sim_behaviour,

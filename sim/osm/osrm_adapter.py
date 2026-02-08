@@ -23,7 +23,7 @@ SOFTWARE.
 """
 
 import logging
-from typing import Optional
+from typing import List, Optional
 
 from sim.entities.position import Position
 from sim.map.routing_provider import (
@@ -31,9 +31,12 @@ from sim.map.routing_provider import (
     RouteResult,
     RouteStep,
     RouteSegment,
+    EdgeIdentifier,
+    TrafficUpdate,
 )
 from sim.osm.OSRMConnection import OSRMConnection
 from sim.osm.osrm_result import OSRMResult
+from sim.osm.traffic_state_store import traffic_state_store
 
 logger = logging.getLogger(__name__)
 
@@ -53,7 +56,11 @@ class OSRMAdapter(RoutingProvider):
             print(f"Route distance: {route.distance}m")
     """
 
-    def __init__(self, osrm_url: Optional[str] = None) -> None:
+    def __init__(
+        self,
+        osrm_url: Optional[str] = None,
+        sim_id: str = "",
+    ) -> None:
         """
         Initialize the OSRM adapter.
 
@@ -61,12 +68,14 @@ class OSRMAdapter(RoutingProvider):
             osrm_url: Base URL of OSRM server. If not provided, will check
                      OSRM_URL, OSRM_LOCAL_URL, or OSRM_PUBLIC_URL environment
                      variables in that order.
+            sim_id: Simulation identifier for traffic state isolation.
 
         Raises:
             ValueError: If no OSRM URL is provided or configured via environment
             ConnectionError: If OSRM server is not accessible
         """
         self._connection = OSRMConnection(osrm_url=osrm_url)
+        self._sim_id = sim_id
 
     def get_route(
         self,
@@ -143,12 +152,74 @@ class OSRMAdapter(RoutingProvider):
         """
         Clean up resources.
 
-        Closes the underlying HTTP session.
+        Cleans up this simulation's traffic state and closes the HTTP session.
 
         Returns:
             None
         """
+        traffic_state_store.cleanup_sim(self._sim_id)
         self._connection.close()
+
+    # =========================================================================
+    # Traffic CRUD — delegates to module-level TrafficStateStore
+    # =========================================================================
+
+    def set_edge_traffic(self, update: TrafficUpdate) -> bool:
+        """Set traffic speed factor for a single edge.
+
+        Args:
+            update: TrafficUpdate with edge identifier and speed_factor.
+
+        Returns:
+            True on success.
+        """
+        key = update.edge.segment_key
+        traffic_state_store.set(self._sim_id, key, update.speed_factor)
+        return True
+
+    def set_edges_traffic(self, updates: List[TrafficUpdate]) -> bool:
+        """Batch update traffic for multiple edges.
+
+        Args:
+            updates: List of TrafficUpdate objects.
+
+        Returns:
+            True on success.
+        """
+        for update in updates:
+            key = update.edge.segment_key
+            traffic_state_store.set(self._sim_id, key, update.speed_factor)
+        return True
+
+    def get_edge_traffic(self, edge: EdgeIdentifier) -> Optional[float]:
+        """Get current speed_factor for an edge.
+
+        Args:
+            edge: EdgeIdentifier specifying which edge to query.
+
+        Returns:
+            Current speed_factor, or None if not set.
+        """
+        return traffic_state_store.get(self._sim_id, edge.segment_key)
+
+    def clear_edge_traffic(self, edge: EdgeIdentifier) -> bool:
+        """Reset edge to default speed.
+
+        Args:
+            edge: EdgeIdentifier specifying which edge to reset.
+
+        Returns:
+            True if the edge had traffic state, False otherwise.
+        """
+        return traffic_state_store.clear_edge(self._sim_id, edge.segment_key)
+
+    def clear_all_traffic(self) -> bool:
+        """Reset all edges to default speeds for this simulation.
+
+        Returns:
+            True if there was state to clear, False otherwise.
+        """
+        return traffic_state_store.clear_all(self._sim_id)
 
     def _convert_to_route_result(self, osrm_result: OSRMResult) -> RouteResult:
         """

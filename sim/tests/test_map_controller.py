@@ -62,7 +62,7 @@ class TestMapControllerInitialization:
 
             mc = MapController()
 
-            mock_adapter_class.assert_called_once_with()
+            mock_adapter_class.assert_called_once_with(sim_id="")
             assert hasattr(mc, "routing_provider")
             assert hasattr(mc, "route_controller")
 

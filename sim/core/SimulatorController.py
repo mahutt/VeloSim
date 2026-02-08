@@ -57,6 +57,7 @@ class SimulatorController:
         strict: bool = False,
         map_controller: MapController | None = None,
         on_completed_callback: Optional[Callable[[str], None]] = None,
+        sim_id: str = "",
     ) -> None:
         self.simEnv = simEnv
 
@@ -65,6 +66,7 @@ class SimulatorController:
         map_payload = MapPayload(
             traffic=existing_payload.traffic if existing_payload else None,
             env=simEnv,
+            sim_id=sim_id,
         )
         self.map_controller = map_controller or MapController(map_payload=map_payload)
 
