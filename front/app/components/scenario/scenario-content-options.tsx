@@ -22,7 +22,7 @@
  * SOFTWARE.
  */
 
-import { Ellipsis } from 'lucide-react';
+import { Ellipsis, Car, User, MapPin, Cloud } from 'lucide-react';
 import type { Dispatch, SetStateAction } from 'react';
 import {
   DropdownMenu,
@@ -54,19 +54,23 @@ export default function ScenarioContentOptions({
         <AddStationButton
           setScenarioContent={setScenarioContent}
           onEdit={onEdit}
+          icon={<MapPin className="mr-2 h-4 w-4" />}
         />
         <AddVehicleButton
           scenarioContent={scenarioContent}
           setScenarioContent={setScenarioContent}
           onEdit={onEdit}
+          icon={<Car className="mr-2 h-4 w-4" />}
         />
         <AddDriverButton
           setScenarioContent={setScenarioContent}
           onEdit={onEdit}
+          icon={<User className="mr-2 h-4 w-4" />}
         />
         <UseGbfsStationsButton
           setScenarioContent={setScenarioContent}
           onEdit={onEdit}
+          icon={<Cloud className="mr-2 h-4 w-4" />}
         />
       </DropdownMenuContent>
     </DropdownMenu>

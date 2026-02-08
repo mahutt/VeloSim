@@ -26,13 +26,6 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import AddDriverDialog from '~/components/scenario/add-driver-dialog';
 
-// Mock sonner toast
-vi.mock('sonner', () => ({
-  toast: {
-    error: vi.fn(),
-  },
-}));
-
 describe('AddDriverDialog', () => {
   const mockOnOpenChange = vi.fn();
   const mockOnSubmit = vi.fn();

@@ -34,7 +34,6 @@ import {
 import { Button } from '~/components/ui/button';
 import { Input } from '~/components/ui/input';
 import { Label } from '~/components/ui/label';
-import { toast } from 'sonner';
 import { MONTREAL_BOUNDS, SCHEDULED_TASK_PATTERN } from '~/constants';
 
 interface AddStationDialogProps {
@@ -83,19 +82,15 @@ export default function AddStationDialog({
     const lat = parseFloat(latitude);
     if (!latitude || isNaN(lat)) {
       newErrors.latitude = 'Valid latitude is required';
-    } else if (lat < -90 || lat > 90) {
-      newErrors.latitude = 'Latitude must be between -90 and 90';
     } else if (lat < MONTREAL_BOUNDS.LAT_MIN || lat > MONTREAL_BOUNDS.LAT_MAX) {
-      newErrors.latitude = `Latitude is outside Greater Montreal Area bounds (must be between ${MONTREAL_BOUNDS.LAT_MIN} and ${MONTREAL_BOUNDS.LAT_MAX})`;
+      newErrors.latitude = `must be between ${MONTREAL_BOUNDS.LAT_MIN} and ${MONTREAL_BOUNDS.LAT_MAX}`;
     }
 
     const lon = parseFloat(longitude);
     if (!longitude || isNaN(lon)) {
       newErrors.longitude = 'Valid longitude is required';
-    } else if (lon < -180 || lon > 180) {
-      newErrors.longitude = 'Longitude must be between -180 and 180';
     } else if (lon < MONTREAL_BOUNDS.LON_MIN || lon > MONTREAL_BOUNDS.LON_MAX) {
-      newErrors.longitude = `Longitude is outside Greater Montreal Area bounds (must be between ${MONTREAL_BOUNDS.LON_MIN} and ${MONTREAL_BOUNDS.LON_MAX})`;
+      newErrors.longitude = `must be between ${MONTREAL_BOUNDS.LON_MIN} and ${MONTREAL_BOUNDS.LON_MAX}`;
     }
 
     if (initialTaskCount.trim()) {
@@ -127,7 +122,6 @@ export default function AddStationDialog({
     e.preventDefault();
 
     if (!validateForm()) {
-      toast.error('Please fix the validation errors before submitting');
       return;
     }
 
@@ -178,7 +172,7 @@ export default function AddStationDialog({
         <form onSubmit={handleSubmit}>
           <div className="grid gap-4 py-4">
             <div className="grid gap-2">
-              <Label htmlFor="name">Station Name *</Label>
+              <Label htmlFor="name">Station Name</Label>
               <Input
                 id="name"
                 value={name}
@@ -195,7 +189,7 @@ export default function AddStationDialog({
             </div>
 
             <div className="grid gap-2">
-              <Label htmlFor="latitude">Latitude *</Label>
+              <Label htmlFor="latitude">Latitude</Label>
               <Input
                 id="latitude"
                 type="number"
@@ -205,12 +199,9 @@ export default function AddStationDialog({
                 placeholder="e.g., 45.5017"
                 aria-invalid={!!errors.latitude}
                 aria-describedby={
-                  errors.latitude ? 'latitude-error' : 'latitude-hint'
+                  errors.latitude ? 'latitude-error' : undefined
                 }
               />
-              <p id="latitude-hint" className="text-xs text-muted-foreground">
-                Range: {MONTREAL_BOUNDS.LAT_MIN} to {MONTREAL_BOUNDS.LAT_MAX}
-              </p>
               {errors.latitude && (
                 <p id="latitude-error" className="text-sm text-destructive">
                   {errors.latitude}
@@ -219,7 +210,7 @@ export default function AddStationDialog({
             </div>
 
             <div className="grid gap-2">
-              <Label htmlFor="longitude">Longitude *</Label>
+              <Label htmlFor="longitude">Longitude</Label>
               <Input
                 id="longitude"
                 type="number"
@@ -229,12 +220,9 @@ export default function AddStationDialog({
                 placeholder="e.g., -73.5673"
                 aria-invalid={!!errors.longitude}
                 aria-describedby={
-                  errors.longitude ? 'longitude-error' : 'longitude-hint'
+                  errors.longitude ? 'longitude-error' : undefined
                 }
               />
-              <p id="longitude-hint" className="text-xs text-muted-foreground">
-                Range: {MONTREAL_BOUNDS.LON_MIN} to {MONTREAL_BOUNDS.LON_MAX}
-              </p>
               {errors.longitude && (
                 <p id="longitude-error" className="text-sm text-destructive">
                   {errors.longitude}
@@ -256,12 +244,6 @@ export default function AddStationDialog({
                     : 'scheduledTasks-hint'
                 }
               />
-              <p
-                id="scheduledTasks-hint"
-                className="text-xs text-muted-foreground"
-              >
-                Format: dayN:HH:MM (comma-separated)
-              </p>
               {errors.scheduledTasks && (
                 <p
                   id="scheduledTasks-error"

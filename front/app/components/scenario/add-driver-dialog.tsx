@@ -34,7 +34,6 @@ import {
 import { Button } from '~/components/ui/button';
 import { Input } from '~/components/ui/input';
 import { Label } from '~/components/ui/label';
-import { toast } from 'sonner';
 
 interface AddDriverDialogProps {
   open: boolean;
@@ -160,7 +159,6 @@ export default function AddDriverDialog({
     e.preventDefault();
 
     if (!validateForm()) {
-      toast.error('Please fix the validation errors before submitting');
       return;
     }
 
@@ -212,7 +210,7 @@ export default function AddDriverDialog({
         <form onSubmit={handleSubmit}>
           <div className="grid gap-4 py-4">
             <div className="grid gap-2">
-              <Label htmlFor="name">Driver Name *</Label>
+              <Label htmlFor="name">Driver Name</Label>
               <Input
                 id="name"
                 value={name}
@@ -229,7 +227,7 @@ export default function AddDriverDialog({
             </div>
 
             <div className="grid gap-2">
-              <Label htmlFor="startTime">Shift Start Time *</Label>
+              <Label htmlFor="startTime">Shift Start Time</Label>
               <Input
                 id="startTime"
                 value={startTime}
@@ -237,12 +235,9 @@ export default function AddDriverDialog({
                 placeholder="e.g., day1:08:00"
                 aria-invalid={!!errors.startTime}
                 aria-describedby={
-                  errors.startTime ? 'startTime-error' : 'startTime-hint'
+                  errors.startTime ? 'startTime-error' : undefined
                 }
               />
-              <p id="startTime-hint" className="text-xs text-muted-foreground">
-                Format: dayN:HH:MM
-              </p>
               {errors.startTime && (
                 <p id="startTime-error" className="text-sm text-destructive">
                   {errors.startTime}
@@ -251,20 +246,15 @@ export default function AddDriverDialog({
             </div>
 
             <div className="grid gap-2">
-              <Label htmlFor="endTime">Shift End Time *</Label>
+              <Label htmlFor="endTime">Shift End Time</Label>
               <Input
                 id="endTime"
                 value={endTime}
                 onChange={(e) => setEndTime(e.target.value)}
                 placeholder="e.g., day1:17:00"
                 aria-invalid={!!errors.endTime}
-                aria-describedby={
-                  errors.endTime ? 'endTime-error' : 'endTime-hint'
-                }
+                aria-describedby={errors.endTime ? 'endTime-error' : undefined}
               />
-              <p id="endTime-hint" className="text-xs text-muted-foreground">
-                Format: dayN:HH:MM
-              </p>
               {errors.endTime && (
                 <p id="endTime-error" className="text-sm text-destructive">
                   {errors.endTime}
@@ -281,12 +271,9 @@ export default function AddDriverDialog({
                 placeholder="e.g., day1:12:00"
                 aria-invalid={!!errors.lunchBreak}
                 aria-describedby={
-                  errors.lunchBreak ? 'lunchBreak-error' : 'lunchBreak-hint'
+                  errors.lunchBreak ? 'lunchBreak-error' : undefined
                 }
               />
-              <p id="lunchBreak-hint" className="text-xs text-muted-foreground">
-                Format: dayN:HH:MM
-              </p>
               {errors.lunchBreak && (
                 <p id="lunchBreak-error" className="text-sm text-destructive">
                   {errors.lunchBreak}

@@ -34,7 +34,6 @@ import {
 import { Button } from '~/components/ui/button';
 import { Input } from '~/components/ui/input';
 import { Label } from '~/components/ui/label';
-import { toast } from 'sonner';
 import { MONTREAL_BOUNDS } from '~/constants';
 
 interface AddVehicleDialogProps {
@@ -101,8 +100,7 @@ export default function AddVehicleDialog({
           newErrors.longitude = 'Insufficient drivers for positioned vehicle';
         }
       } catch {
-        // If parsing fails, show a warning but allow the form
-        toast.warning('Cannot validate drivers - invalid scenario format');
+        // Ignore JSON parsing errors
       }
 
       if (!hasLat) {
@@ -111,13 +109,11 @@ export default function AddVehicleDialog({
         const lat = parseFloat(latitude);
         if (isNaN(lat)) {
           newErrors.latitude = 'Valid latitude is required';
-        } else if (lat < -90 || lat > 90) {
-          newErrors.latitude = 'Latitude must be between -90 and 90';
         } else if (
           lat < MONTREAL_BOUNDS.LAT_MIN ||
           lat > MONTREAL_BOUNDS.LAT_MAX
         ) {
-          newErrors.latitude = `Latitude is outside Greater Montreal Area bounds (must be between ${MONTREAL_BOUNDS.LAT_MIN} and ${MONTREAL_BOUNDS.LAT_MAX})`;
+          newErrors.latitude = `must be between ${MONTREAL_BOUNDS.LAT_MIN} and ${MONTREAL_BOUNDS.LAT_MAX}`;
         }
       }
 
@@ -127,13 +123,11 @@ export default function AddVehicleDialog({
         const lon = parseFloat(longitude);
         if (isNaN(lon)) {
           newErrors.longitude = 'Valid longitude is required';
-        } else if (lon < -180 || lon > 180) {
-          newErrors.longitude = 'Longitude must be between -180 and 180';
         } else if (
           lon < MONTREAL_BOUNDS.LON_MIN ||
           lon > MONTREAL_BOUNDS.LON_MAX
         ) {
-          newErrors.longitude = `Longitude is outside Greater Montreal Area bounds (must be between ${MONTREAL_BOUNDS.LON_MIN} and ${MONTREAL_BOUNDS.LON_MAX})`;
+          newErrors.longitude = `must be between ${MONTREAL_BOUNDS.LON_MIN} and ${MONTREAL_BOUNDS.LON_MAX}`;
         }
       }
     }
@@ -153,7 +147,6 @@ export default function AddVehicleDialog({
     e.preventDefault();
 
     if (!validateForm()) {
-      toast.error('Please fix the validation errors before submitting');
       return;
     }
 
@@ -208,7 +201,7 @@ export default function AddVehicleDialog({
         <form onSubmit={handleSubmit}>
           <div className="grid gap-4 py-4">
             <div className="grid gap-2">
-              <Label htmlFor="name">Vehicle Name *</Label>
+              <Label htmlFor="name">Vehicle Name</Label>
               <Input
                 id="name"
                 value={name}
@@ -235,12 +228,9 @@ export default function AddVehicleDialog({
                 placeholder="e.g., 45.5017"
                 aria-invalid={!!errors.latitude}
                 aria-describedby={
-                  errors.latitude ? 'latitude-error' : 'latitude-hint'
+                  errors.latitude ? 'latitude-error' : undefined
                 }
               />
-              <p id="latitude-hint" className="text-xs text-muted-foreground">
-                Range: {MONTREAL_BOUNDS.LAT_MIN} to {MONTREAL_BOUNDS.LAT_MAX}
-              </p>
               {errors.latitude && (
                 <p id="latitude-error" className="text-sm text-destructive">
                   {errors.latitude}
@@ -259,12 +249,9 @@ export default function AddVehicleDialog({
                 placeholder="e.g., -73.5673"
                 aria-invalid={!!errors.longitude}
                 aria-describedby={
-                  errors.longitude ? 'longitude-error' : 'longitude-hint'
+                  errors.longitude ? 'longitude-error' : undefined
                 }
               />
-              <p id="longitude-hint" className="text-xs text-muted-foreground">
-                Range: {MONTREAL_BOUNDS.LON_MIN} to {MONTREAL_BOUNDS.LON_MAX}
-              </p>
               {errors.longitude && (
                 <p id="longitude-error" className="text-sm text-destructive">
                   {errors.longitude}

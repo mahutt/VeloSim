@@ -25,13 +25,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import AddStationDialog from '~/components/scenario/add-station-dialog';
-
-// Mock sonner toast
-vi.mock('sonner', () => ({
-  toast: {
-    error: vi.fn(),
-  },
-}));
+import { MONTREAL_BOUNDS } from '~/constants';
 
 describe('AddStationDialog', () => {
   const mockOnOpenChange = vi.fn();
@@ -95,7 +89,12 @@ describe('AddStationDialog', () => {
 
     await waitFor(() => {
       expect(
-        screen.getByText('Latitude must be between -90 and 90')
+        screen.getByText(
+          new RegExp(
+            `must be between ${MONTREAL_BOUNDS.LAT_MIN} and ${MONTREAL_BOUNDS.LAT_MAX}`,
+            'i'
+          )
+        )
       ).toBeInTheDocument();
     });
   });
@@ -111,7 +110,12 @@ describe('AddStationDialog', () => {
 
     await waitFor(() => {
       expect(
-        screen.getByText('Longitude must be between -180 and 180')
+        screen.getByText(
+          new RegExp(
+            `must be between ${MONTREAL_BOUNDS.LON_MIN} and ${MONTREAL_BOUNDS.LON_MAX}`,
+            'i'
+          )
+        )
       ).toBeInTheDocument();
     });
   });

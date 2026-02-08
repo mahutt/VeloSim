@@ -22,7 +22,12 @@
  * SOFTWARE.
  */
 
-import { useState, type Dispatch, type SetStateAction } from 'react';
+import {
+  useState,
+  type Dispatch,
+  type SetStateAction,
+  type ReactNode,
+} from 'react';
 import { DropdownMenuItem } from '../ui/dropdown-menu';
 import { toast } from 'sonner';
 import AddDriverDialog from './add-driver-dialog';
@@ -30,11 +35,13 @@ import AddDriverDialog from './add-driver-dialog';
 interface AddDriverButtonProps {
   setScenarioContent: Dispatch<SetStateAction<string>>;
   onEdit: () => void;
+  icon?: ReactNode;
 }
 
 export default function AddDriverButton({
   setScenarioContent,
   onEdit,
+  icon,
 }: AddDriverButtonProps) {
   const [dialogOpen, setDialogOpen] = useState(false);
 
@@ -74,9 +81,6 @@ export default function AddDriverButton({
         };
       } catch {
         // If parsing fails, create new scenario with just this driver
-        toast.warning(
-          'Failed to parse existing scenario - creating new scenario'
-        );
         jsonNew = {
           drivers: [newDriver],
         };
@@ -97,6 +101,7 @@ export default function AddDriverButton({
           setDialogOpen(true);
         }}
       >
+        {icon}
         Add Driver
       </DropdownMenuItem>
       <AddDriverDialog

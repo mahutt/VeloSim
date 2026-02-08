@@ -22,7 +22,12 @@
  * SOFTWARE.
  */
 
-import { useState, type Dispatch, type SetStateAction } from 'react';
+import {
+  useState,
+  type Dispatch,
+  type SetStateAction,
+  type ReactNode,
+} from 'react';
 import { DropdownMenuItem } from '../ui/dropdown-menu';
 import { toast } from 'sonner';
 import AddStationDialog from './add-station-dialog';
@@ -31,11 +36,13 @@ import type { ScenarioContentStation } from '~/types';
 interface AddStationButtonProps {
   setScenarioContent: Dispatch<SetStateAction<string>>;
   onEdit: () => void;
+  icon?: ReactNode;
 }
 
 export default function AddStationButton({
   setScenarioContent,
   onEdit,
+  icon,
 }: AddStationButtonProps) {
   const [dialogOpen, setDialogOpen] = useState(false);
 
@@ -71,9 +78,6 @@ export default function AddStationButton({
         };
       } catch {
         // If parsing fails, create new scenario with just this station
-        toast.warning(
-          'Failed to parse existing scenario - creating new scenario'
-        );
         jsonNew = {
           stations: [newStation],
         };
@@ -93,6 +97,7 @@ export default function AddStationButton({
           setDialogOpen(true);
         }}
       >
+        {icon}
         Add Station
       </DropdownMenuItem>
       <AddStationDialog

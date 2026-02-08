@@ -22,7 +22,12 @@
  * SOFTWARE.
  */
 
-import { useState, type Dispatch, type SetStateAction } from 'react';
+import {
+  useState,
+  type Dispatch,
+  type SetStateAction,
+  type ReactNode,
+} from 'react';
 import { DropdownMenuItem } from '../ui/dropdown-menu';
 import { toast } from 'sonner';
 import AddVehicleDialog from './add-vehicle-dialog';
@@ -31,12 +36,14 @@ interface AddVehicleButtonProps {
   scenarioContent: string;
   setScenarioContent: Dispatch<SetStateAction<string>>;
   onEdit: () => void;
+  icon?: ReactNode;
 }
 
 export default function AddVehicleButton({
   scenarioContent,
   setScenarioContent,
   onEdit,
+  icon,
 }: AddVehicleButtonProps) {
   const [dialogOpen, setDialogOpen] = useState(false);
 
@@ -82,9 +89,6 @@ export default function AddVehicleButton({
         };
       } catch {
         // If parsing fails, create new scenario with just this vehicle
-        toast.warning(
-          'Failed to parse existing scenario - creating new scenario'
-        );
         jsonNew = {
           vehicles: [newVehicle],
         };
@@ -104,6 +108,7 @@ export default function AddVehicleButton({
           setDialogOpen(true);
         }}
       >
+        {icon}
         Add Vehicle
       </DropdownMenuItem>
       <AddVehicleDialog
