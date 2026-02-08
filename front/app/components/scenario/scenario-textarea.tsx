@@ -115,7 +115,7 @@ export default function ScenarioTextArea({
           {/* Line numbers */}
           <div
             ref={lineNumbersRef}
-            className="select-none overflow-hidden bg-muted/50 px-2 py-2 font-mono text-sm text-muted-foreground border-r leading-6 min-w-12 text-right"
+            className="select-none overflow-hidden bg-muted/50 px-2 py-2 font-mono text-sm text-muted-foreground border-r min-w-12 text-right leading-6"
           >
             {lineNumbers.map((num) => (
               <div key={num} className="h-6">
@@ -126,7 +126,7 @@ export default function ScenarioTextArea({
           {/* Textarea */}
           <Textarea
             id="scenario-json"
-            className="flex-1 h-full resize-none font-mono border-0 focus-visible:ring-0 focus-visible:ring-offset-0 rounded-none overflow-y-auto"
+            className="flex-1 h-full resize-none font-mono border-0 focus-visible:ring-0 focus-visible:ring-offset-0 rounded-none overflow-y-auto leading-6"
             placeholder="Paste or type your JSON scenario here..."
             value={scenarioData}
             onChange={(e) => onChange(e.target.value)}
