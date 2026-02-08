@@ -65,10 +65,16 @@ class MapController:
         # Initialize RouteController for road/route management
         self.route_controller = RouteController(self)
 
-        # Initialize TrafficController for traffic layer management
+        # Extract config from payload
         traffic_config = map_payload.traffic if map_payload else None
+        env = map_payload.env if map_payload else None
+
+        # Initialize TrafficController for traffic layer management
         self.traffic_controller = TrafficController(
-            self.route_controller, traffic_config=traffic_config
+            self.route_controller,
+            traffic_config=traffic_config,
+            env=env,
+            routing_provider=self.routing_provider,
         )
 
     def get_route(self, a: Position, b: Position) -> Route:

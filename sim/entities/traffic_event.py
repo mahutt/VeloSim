@@ -23,19 +23,22 @@ SOFTWARE.
 """
 
 from dataclasses import dataclass, field
-from typing import Optional
+from typing import List, Optional, Set, TYPE_CHECKING
 
 from sim.entities.traffic_event_state import TrafficEventState
 from sim.map.routing_provider import SegmentKey
 
+if TYPE_CHECKING:
+    from sim.entities.position import Position
+    from sim.entities.road import Road
 
-@dataclass
+
+@dataclass(eq=False)
 class TrafficEvent:
-    """Represents a single traffic event parsed from a CSV row.
+    """Represents a single traffic event with lifecycle state tracking.
 
-    This is a data wrapper only -- it does not contain logic for
-    state transitions, point generation, or road linkage. Those
-    responsibilities belong to a future traffic event manager.
+    Contains lifecycle state, resolved geometry, and affected road tracking
+    for the traffic event state machine.
 
     Attributes:
         event_type: The type of traffic event (e.g. "local_traffic").
@@ -47,6 +50,10 @@ class TrafficEvent:
             0.0 = stopped.
         name: Optional human-readable name/label for the event.
         state: Current lifecycle state, initialized to PENDING.
+        route_geometry: Full route geometry resolved via RoutingProvider when
+            the event transitions to TRIGGERED. None while PENDING.
+        affected_roads: Set of Road objects currently affected by this event.
+            Populated during the synchronization subprocess.
     """
 
     event_type: str
@@ -56,3 +63,18 @@ class TrafficEvent:
     weight: float
     name: Optional[str] = None
     state: TrafficEventState = field(default=TrafficEventState.PENDING)
+    route_geometry: Optional[List["Position"]] = field(default=None, repr=False)
+    affected_roads: Set["Road"] = field(default_factory=set, repr=False)
+
+    def __hash__(self) -> int:
+        return hash((self.event_type, self.tick_start, self.segment_key, self.duration))
+
+    def __eq__(self, other: object) -> bool:
+        if not isinstance(other, TrafficEvent):
+            return NotImplemented
+        return (
+            self.event_type == other.event_type
+            and self.tick_start == other.tick_start
+            and self.segment_key == other.segment_key
+            and self.duration == other.duration
+        )
