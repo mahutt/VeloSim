@@ -29,7 +29,7 @@ from sim.core.simulation_report import SimulationReport
 
 def test_initial_state() -> None:
     """
-    SimulationMetrics should initialize with zero driving and servicing time.
+    SimulationReport should initialize with zero driving and servicing time.
     """
     metrics = SimulationReport()
 
@@ -76,7 +76,7 @@ def test_driving_to_servicing_ratio_normal_case() -> None:
     for _ in range(2):
         metrics.increment_servicing_time()
 
-    ratio = metrics.get_driving_to_servicing_ratio()
+    ratio = metrics.get_servicing_to_driving_ratio()
 
     assert ratio == pytest.approx(0.5)
 
@@ -90,4 +90,4 @@ def test_driving_to_servicing_ratio_zero_driving_time() -> None:
     metrics.increment_servicing_time()
     metrics.increment_servicing_time()
 
-    assert metrics.get_driving_to_servicing_ratio() == 0
+    assert metrics.get_servicing_to_driving_ratio() == 0

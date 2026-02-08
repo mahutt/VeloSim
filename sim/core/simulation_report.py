@@ -59,7 +59,7 @@ class SimulationReport:
         """
         self.total_servicing_time += 1
 
-    def get_driving_to_servicing_ratio(self) -> float:
+    def get_servicing_to_driving_ratio(self) -> float:
         """
         Compute the ratio of driving time to servicing time.
 

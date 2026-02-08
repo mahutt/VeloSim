@@ -654,7 +654,7 @@ class SimulatorController:
 
         current_reporting = {
             "servicingToDrivingRatio": round(
-                self.simEnv.metrics.get_driving_to_servicing_ratio(), 4
+                self.simEnv.metrics.get_servicing_to_driving_ratio(), 4
             )
         }
 
