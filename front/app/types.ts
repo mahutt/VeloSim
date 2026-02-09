@@ -196,6 +196,23 @@ export interface ScenarioContentStation {
   scheduled_tasks: string[];
 }
 
+// v2 scenario content vehicle definition
+export interface ScenarioContentVehicle {
+  name: string;
+  position?: Position;
+  batteryCount?: number;
+}
+
+// v2 scenario content driver definition
+export interface ScenarioContentDriver {
+  name: string;
+  shift: {
+    start_time: string;
+    end_time: string;
+    lunch_break?: string;
+  };
+}
+
 // Simulation types
 export interface Simulation {
   id: number;

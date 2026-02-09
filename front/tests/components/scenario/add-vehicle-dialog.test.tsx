@@ -171,8 +171,7 @@ describe('AddVehicleDialog', () => {
     await waitFor(() => {
       expect(mockOnSubmit).toHaveBeenCalledWith({
         name: 'Vehicle 1',
-        latitude: 45.5017,
-        longitude: -73.5673,
+        position: [-73.5673, 45.5017],
       });
     });
   });
@@ -196,8 +195,7 @@ describe('AddVehicleDialog', () => {
     await waitFor(() => {
       expect(mockOnSubmit).toHaveBeenCalledWith({
         name: 'Vehicle 1',
-        latitude: 45.5017,
-        longitude: -73.5673,
+        position: [-73.5673, 45.5017],
         batteryCount: 5,
       });
     });

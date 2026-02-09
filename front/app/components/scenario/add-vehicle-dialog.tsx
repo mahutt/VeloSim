@@ -35,16 +35,12 @@ import { Button } from '~/components/ui/button';
 import { Input } from '~/components/ui/input';
 import { Label } from '~/components/ui/label';
 import { MONTREAL_BOUNDS } from '~/constants';
+import type { ScenarioContentVehicle } from '~/types';
 
 interface AddVehicleDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onSubmit: (vehicle: {
-    name: string;
-    latitude?: number;
-    longitude?: number;
-    batteryCount?: number;
-  }) => void;
+  onSubmit: (vehicle: ScenarioContentVehicle) => void;
   scenarioContent: string;
 }
 
@@ -150,19 +146,13 @@ export default function AddVehicleDialog({
       return;
     }
 
-    const vehicleData: {
-      name: string;
-      latitude?: number;
-      longitude?: number;
-      batteryCount?: number;
-    } = {
+    const vehicleData: ScenarioContentVehicle = {
       name: name.trim(),
     };
 
     // Only include position if both lat and lon are provided
     if (latitude.trim() && longitude.trim()) {
-      vehicleData.latitude = parseFloat(latitude);
-      vehicleData.longitude = parseFloat(longitude);
+      vehicleData.position = [parseFloat(longitude), parseFloat(latitude)];
     }
 
     if (batteryCount.trim()) {

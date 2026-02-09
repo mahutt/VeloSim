@@ -31,6 +31,7 @@ import {
 import { DropdownMenuItem } from '../ui/dropdown-menu';
 import { toast } from 'sonner';
 import AddDriverDialog from './add-driver-dialog';
+import type { ScenarioContentDriver } from '~/types';
 
 interface AddDriverButtonProps {
   setScenarioContent: Dispatch<SetStateAction<string>>;
@@ -45,24 +46,10 @@ export default function AddDriverButton({
 }: AddDriverButtonProps) {
   const [dialogOpen, setDialogOpen] = useState(false);
 
-  const handleAddDriver = (driverData: {
-    name: string;
-    shift: {
-      start_time: string;
-      end_time: string;
-      lunch_break?: string;
-    };
-  }) => {
+  const handleAddDriver = (driverData: ScenarioContentDriver) => {
     onEdit(); // Switch to edit mode
 
-    const newDriver: {
-      name: string;
-      shift: {
-        start_time: string;
-        end_time: string;
-        lunch_break?: string;
-      };
-    } = {
+    const newDriver: ScenarioContentDriver = {
       name: driverData.name,
       shift: driverData.shift,
     };

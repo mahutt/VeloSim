@@ -34,18 +34,12 @@ import {
 import { Button } from '~/components/ui/button';
 import { Input } from '~/components/ui/input';
 import { Label } from '~/components/ui/label';
+import type { ScenarioContentDriver } from '~/types';
 
 interface AddDriverDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onSubmit: (driver: {
-    name: string;
-    shift: {
-      start_time: string;
-      end_time: string;
-      lunch_break?: string;
-    };
-  }) => void;
+  onSubmit: (driver: ScenarioContentDriver) => void;
 }
 
 export default function AddDriverDialog({
@@ -162,11 +156,7 @@ export default function AddDriverDialog({
       return;
     }
 
-    const shift: {
-      start_time: string;
-      end_time: string;
-      lunch_break?: string;
-    } = {
+    const shift: ScenarioContentDriver['shift'] = {
       start_time: startTime.trim(),
       end_time: endTime.trim(),
     };

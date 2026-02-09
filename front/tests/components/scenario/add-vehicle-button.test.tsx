@@ -43,8 +43,7 @@ vi.mock('~/components/scenario/add-vehicle-dialog', () => ({
           onClick={() =>
             onSubmit({
               name: 'Test Vehicle',
-              latitude: 45.5,
-              longitude: -73.5,
+              position: [-73.5, 45.5],
               batteryCount: 3,
             })
           }

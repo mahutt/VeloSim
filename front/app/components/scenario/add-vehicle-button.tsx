@@ -31,6 +31,7 @@ import {
 import { DropdownMenuItem } from '../ui/dropdown-menu';
 import { toast } from 'sonner';
 import AddVehicleDialog from './add-vehicle-dialog';
+import type { ScenarioContentVehicle } from '~/types';
 
 interface AddVehicleButtonProps {
   scenarioContent: string;
@@ -47,12 +48,7 @@ export default function AddVehicleButton({
 }: AddVehicleButtonProps) {
   const [dialogOpen, setDialogOpen] = useState(false);
 
-  const handleAddVehicle = (vehicleData: {
-    name: string;
-    latitude?: number;
-    longitude?: number;
-    batteryCount?: number;
-  }) => {
+  const handleAddVehicle = (vehicleData: ScenarioContentVehicle) => {
     onEdit(); // Switch to edit mode
 
     const newVehicle: {
@@ -64,11 +60,8 @@ export default function AddVehicleButton({
     };
 
     // Only include position if both latitude and longitude are provided
-    if (
-      vehicleData.latitude !== undefined &&
-      vehicleData.longitude !== undefined
-    ) {
-      newVehicle.position = [vehicleData.longitude, vehicleData.latitude];
+    if (vehicleData.position && vehicleData.position.length === 2) {
+      newVehicle.position = vehicleData.position;
     }
 
     if (vehicleData.batteryCount !== undefined) {
