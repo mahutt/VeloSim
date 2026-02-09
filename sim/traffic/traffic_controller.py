@@ -23,7 +23,7 @@ SOFTWARE.
 """
 
 import logging
-from typing import Dict, Generator, List, Optional, Set
+from typing import Dict, Generator, List, Optional, Set, TYPE_CHECKING
 
 import simpy
 
@@ -43,6 +43,9 @@ from sim.map.routing_provider import (
 from sim.traffic.traffic_parser import TrafficParser
 from sim.traffic.traffic_state_factory import TrafficStateFactory
 
+if TYPE_CHECKING:
+    from sim.map.position_registry import PositionRegistry
+
 logger = logging.getLogger(__name__)
 
 # Hardcoded GPS sync delay in ticks between sim and routing provider updates
@@ -55,13 +58,14 @@ class TrafficController:
     Implements the traffic event state machine:
     PENDING -> TRIGGERED -> APPLIED -> EXPIRED -> DONE
 
-    Uses SimPy processes for tick-based scheduling. Road-level traffic
-    application (via PositionRegistry) is added by the traffic mapper layer.
+    Uses a PositionRegistry for bidirectional geometry-based matching between
+    roads and traffic events, and SimPy processes for tick-based scheduling.
     """
 
     def __init__(
         self,
         route_controller: RouteController,
+        registry: "PositionRegistry",
         traffic_config: Optional[TrafficConfig] = None,
         env: Optional[simpy.Environment] = None,
         routing_provider: Optional[RoutingProvider] = None,
@@ -74,16 +78,16 @@ class TrafficController:
             env: Optional SimPy environment for tick-based scheduling.
             routing_provider: Optional RoutingProvider for geometry resolution
                 and traffic weight updates.
+            registry: PositionRegistry for bidirectional geometry
+                matching between roads and traffic events.
         """
         self._route_controller = route_controller
         self._env = env
         self._routing_provider = routing_provider
+        self._registry = registry
 
         self._active_traffic: Dict[SegmentKey, RoadTrafficState] = {}
         self._traffic_events: List[TrafficEvent] = []
-
-        # Reverse index: Position -> set of roads containing that node
-        self._node_to_roads: Dict[Position, Set[Road]] = {}
 
         # Sync resource serializes event processing through synchronization
         # ("WaitUntilServed" from state machine diagram)
@@ -114,46 +118,52 @@ class TrafficController:
     def _on_road_created(self, road: Road) -> None:
         """Handle new road creation.
 
-        Registers the road's nodes in the reverse index and applies any
-        existing active traffic to the new road.
+        If registry exists, checks for active traffic events that intersect
+        the new road and applies their traffic. Otherwise uses legacy path.
 
         Args:
             road: The newly created road.
         """
-        # Register nodes in reverse index
-        for node in road.nodes:
-            if node not in self._node_to_roads:
-                self._node_to_roads[node] = set()
-            self._node_to_roads[node].add(road)
+        self._handle_road_created_for_active_events(road)
 
-        # Apply any existing active traffic to this new road
-        self._apply_existing_traffic_to_road(road)
+    def _handle_road_created_for_active_events(self, road: Road) -> None:
+        """Apply traffic from any active events that intersect this new road.
 
-    def _apply_existing_traffic_to_road(self, road: Road) -> None:
-        """Apply all existing active traffic states to a road if applicable.
+        Handles the [Unallocated -> Allocated] transition from "Listening for
+        Change" state in the state machine.
 
         Args:
-            road: The road to apply traffic to.
+            road: The newly created road.
         """
-        for segment_key, state in self._active_traffic.items():
-            road.add_traffic_range(segment_key, state.multiplier)
+        events = self._registry.find_events_for_road(road)
+        for event in events:
+            if event.state in (
+                TrafficEventState.APPLIED,
+                TrafficEventState.TRIGGERED,
+            ):
+                overlap = self._registry.get_overlap_positions(road, event)
+                if overlap:
+                    road.apply_traffic_for_overlap(
+                        list(overlap), event.weight, event.segment_key
+                    )
+                    strategy = TrafficStateFactory.get_strategy(event.event_type)
+                    road.set_point_strategy(strategy)
+                    event.affected_roads.add(road)
+                    logger.debug(f"Applied event '{event.name}' to new road {road.id}")
 
     def _on_road_deallocated(self, road: Road) -> None:
         """Handle road deallocation.
 
-        Removes the road from the node index and cleans up traffic state.
+        If registry exists, removes road from active events' affected_roads.
+        Handles [Allocated -> Unallocated] transition (clearOrphans).
 
         Args:
             road: The road being deallocated.
         """
-        # Remove from node index
-        for node in road.nodes:
-            if node in self._node_to_roads:
-                self._node_to_roads[node].discard(road)
-                if not self._node_to_roads[node]:
-                    del self._node_to_roads[node]
+        events = self._registry.find_events_for_road(road)
+        for event in events:
+            event.affected_roads.discard(road)
 
-        # Clean up traffic state
         self._active_traffic.pop(road.segment_key, None)
 
     # =========================================================================
@@ -171,7 +181,8 @@ class TrafficController:
     def _process_event(self, event: TrafficEvent) -> Generator[simpy.Event, None, None]:
         """SimPy generator: full lifecycle for one traffic event.
 
-        Follows the state machine:
+        Follows the state machine from the wiki:
+        https://github.com/vinishamanek/VeloSim/wiki/Overall-Architecture-and-Class-Diagrams#traffic-state-machine
         PENDING -> TRIGGERED -> (sync apply) -> APPLIED -> (wait) ->
         EXPIRED -> (sync remove) -> DONE
         """
@@ -181,11 +192,13 @@ class TrafficController:
         if self._env.now < event.tick_start:
             yield self._env.timeout(event.tick_start - self._env.now)
 
-        # -- TRIGGERED: resolve geometry --
+        # -- TRIGGERED: resolve geometry, register in registry --
         event.state = TrafficEventState.TRIGGERED
         logger.info(f"Event '{event.name}' TRIGGERED at tick {int(self._env.now)}")
 
         event.route_geometry = self._resolve_event_geometry(event)
+        if event.route_geometry:
+            self._registry.register_event(event, event.route_geometry)
 
         # -- TRIGGERED: WaitUntilServed (acquire sync resource) --
         with self._sync_resource.request() as req:
@@ -265,12 +278,8 @@ class TrafficController:
     # =========================================================================
 
     def _check_allocation(self, event: TrafficEvent) -> bool:
-        """Check if any roads intersect the event's geometry.
-
-        Without a PositionRegistry, no road-level intersection is possible,
-        so this always returns False. The traffic mapper layer upgrades this.
-        """
-        return False
+        """Check if any roads intersect the event's geometry."""
+        return self._registry.is_event_allocated(event)
 
     def _resolve_event_geometry(self, event: TrafficEvent) -> Optional[List[Position]]:
         """Resolve the full route geometry for a traffic event's segment_key.
@@ -310,15 +319,28 @@ class TrafficController:
         return [start_pos, end_pos]
 
     def _set_traffic_in_simulation(self, event: TrafficEvent) -> None:
-        """Store traffic in the active_traffic dict.
+        """Apply traffic to simulation roads.
 
-        Without a PositionRegistry, road-level application is not possible.
-        This stores the traffic state so the routing provider path and any
-        future road creation callbacks can pick it up.
+        For each road intersecting the event, computes overlap positions and
+        calls road.apply_traffic_for_overlap(). Also injects the appropriate
+        point generation strategy from the factory.
 
         Args:
             event: The traffic event to apply.
         """
+        strategy = TrafficStateFactory.get_strategy(event.event_type)
+
+        affected_roads = self._registry.find_roads_for_event(event)
+        for road in affected_roads:
+            overlap = self._registry.get_overlap_positions(road, event)
+            if overlap:
+                if road.apply_traffic_for_overlap(
+                    list(overlap), event.weight, event.segment_key
+                ):
+                    road.set_point_strategy(strategy)
+                    event.affected_roads.add(road)
+
+        # Store in _active_traffic so future roads also get this traffic
         clamped = max(0.01, event.weight)
         state = TrafficStateFactory.create(
             multiplier=clamped,
@@ -328,18 +350,28 @@ class TrafficController:
         )
         self._active_traffic[event.segment_key] = state
 
-        logger.debug(f"Event '{event.name}': stored in active_traffic dict")
+        logger.debug(
+            f"Event '{event.name}': applied to {len(affected_roads)} road(s) "
+            f"in simulation"
+        )
 
     def _set_traffic_in_routing_provider(self, event: TrafficEvent) -> None:
         """Set speed penalty in the routing provider."""
         self._update_routing_provider(event, apply=True)
 
     def _reset_traffic_in_simulation(self, event: TrafficEvent) -> None:
-        """Remove traffic from the active_traffic dict."""
+        """Remove traffic from simulation roads and clean up."""
+        for road in event.affected_roads:
+            road.remove_traffic(event.segment_key)
+            if not road._traffic_ranges:
+                road.set_point_strategy(None)
+
         self._active_traffic.pop(event.segment_key, None)
         event.affected_roads.clear()
 
-        logger.debug(f"Event '{event.name}': removed from active_traffic dict")
+        self._registry.unregister_event(event)
+
+        logger.debug(f"Event '{event.name}': removed from simulation roads")
 
     def _reset_traffic_in_routing_provider(self, event: TrafficEvent) -> None:
         """Reset speed penalty in the routing provider."""
@@ -405,24 +437,21 @@ class TrafficController:
     def _find_affected_roads(self, segment_key: SegmentKey) -> Set[Road]:
         """Find all roads that contain nodes from the segment_key.
 
+        Uses PositionRegistry for O(1) position-based lookup.
+
         Args:
             segment_key: ((start_lon, start_lat), (end_lon, end_lat))
 
         Returns:
-            Set of roads containing at least one of the segment's nodes.
+            Set of roads containing at least one of the segment's positions.
         """
         start_coords, end_coords = segment_key
-
-        # Convert tuple coordinates to Position for lookup
         start_pos = Position([start_coords[0], start_coords[1]])
         end_pos = Position([end_coords[0], end_coords[1]])
 
         affected: Set[Road] = set()
-        if start_pos in self._node_to_roads:
-            affected |= self._node_to_roads[start_pos]
-        if end_pos in self._node_to_roads:
-            affected |= self._node_to_roads[end_pos]
-
+        affected |= self._registry.find_roads_at_position(start_pos)
+        affected |= self._registry.find_roads_at_position(end_pos)
         return affected
 
     def set_traffic(
@@ -443,8 +472,7 @@ class TrafficController:
             source: Optional source identifier for tracking.
 
         Returns:
-            True if traffic was applied to at least one active road, False if
-            traffic was only stored in memory (no active roads affected).
+            True if traffic was applied to at least one active road.
         """
         clamped = max(0.01, min(1.0, multiplier))
 
@@ -457,12 +485,20 @@ class TrafficController:
         # Always store traffic state (for current and future roads)
         self._active_traffic[segment_key] = state
 
-        # Find affected roads via reverse index
+        # Find affected roads via registry
         affected_roads = self._find_affected_roads(segment_key)
 
-        # Apply traffic to each affected road
+        # Compute overlap positions and apply traffic to each affected road
+        start_coords, end_coords = segment_key
+        start_pos = Position([start_coords[0], start_coords[1]])
+        end_pos = Position([end_coords[0], end_coords[1]])
+        segment_positions = {start_pos, end_pos}
+
         for road in affected_roads:
-            road.add_traffic_range(segment_key, clamped)
+            road_geom_set = set(road.geometry) if road.geometry else set()
+            overlap = list(segment_positions & road_geom_set)
+            if overlap:
+                road.apply_traffic_for_overlap(overlap, clamped, segment_key)
 
         return bool(affected_roads)
 
@@ -473,9 +509,7 @@ class TrafficController:
             segment_key: Geometry-based segment identifier.
 
         Returns:
-            True if traffic was cleared from at least one road, False if no
-            roads were affected (traffic state is still removed from internal
-            tracking).
+            True if traffic was cleared from at least one road.
         """
         affected_roads = self._find_affected_roads(segment_key)
 
@@ -527,4 +561,3 @@ class TrafficController:
         self._route_controller.unregister_on_road_created(self._on_road_created)
         self._route_controller.unregister_on_road_deallocated(self._on_road_deallocated)
         self._active_traffic.clear()
-        self._node_to_roads.clear()

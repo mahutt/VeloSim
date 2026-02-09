@@ -154,5 +154,8 @@ class TestMapControllerRouteController:
 
                 mc = MapController()
 
-                mock_rc_class.assert_called_once_with(mc)
+                mock_rc_class.assert_called_once()
+                call_args = mock_rc_class.call_args
+                assert call_args[0][0] is mc
+                assert "registry" in call_args[1]
                 assert mc.route_controller == mock_rc

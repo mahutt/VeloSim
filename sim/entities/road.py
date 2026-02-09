@@ -31,6 +31,7 @@ from sim.entities.traffic_data import (
     multiplier_to_congestion_level,
 )
 from sim.entities.position import Position
+from sim.entities.point_generation import PointGenerationStrategy, RoadPointContext
 
 if TYPE_CHECKING:
     pass  # Keep for potential future type-only imports
@@ -59,6 +60,7 @@ class Road:
         pointcollection: List[Position],
         length: float,
         maxspeed: float,
+        geometry: Optional[List[Position]] = None,
     ):
         """
         Initialize a road segment.
@@ -69,6 +71,9 @@ class Road:
             pointcollection: List of Position objects along the road
             length: Road length in meters
             maxspeed: Maximum speed in m/s
+            geometry: Raw provider geometry positions (sparse shape).
+                Used by PositionRegistry for intersection matching.
+                Separate from the interpolated pointcollection.
         """
         if not pointcollection:
             raise ValueError(f"Road {road_id} requires non-empty pointcollection")
@@ -78,6 +83,7 @@ class Road:
         self.pointcollection = pointcollection
         self.length = length
         self.maxspeed = maxspeed
+        self.geometry = geometry
 
         # Base duration at free flow speed
         self._base_duration = length / maxspeed if maxspeed > 0 else 0.0
@@ -85,6 +91,9 @@ class Road:
         # Node tracking for granular traffic (using Position objects)
         self._traffic_ranges: Dict[SegmentKey, TrafficRange] = {}
         self._traffic_pointcollection: Optional[List[Position]] = None
+
+        # Pluggable point generation strategy (None = use internal fallback)
+        self._point_strategy: Optional[PointGenerationStrategy] = None
 
         # Build node index
         self._build_node_index()
@@ -206,13 +215,28 @@ class Road:
     def active_pointcollection(self) -> List[Position]:
         """Get the active point collection (traffic or default).
 
+        If a point strategy is set, delegates to it. Otherwise falls
+        back to the internal _generate_traffic_points() method.
+
         Returns:
             Traffic-adjusted points if traffic ranges exist,
             otherwise default pointcollection
         """
         if self._traffic_ranges:
             if self._traffic_pointcollection is None:
-                self._traffic_pointcollection = self._generate_traffic_points()
+                if self._point_strategy is not None:
+                    context = RoadPointContext(
+                        nodes=self._nodes,
+                        maxspeed=self.maxspeed,
+                        length=self.length,
+                        pointcollection=self.pointcollection,
+                        get_multiplier_at_index=self.get_multiplier_at_index,
+                    )
+                    self._traffic_pointcollection = self._point_strategy.generate(
+                        context
+                    )
+                else:
+                    self._traffic_pointcollection = self._generate_traffic_points()
             return self._traffic_pointcollection
 
         return self.pointcollection
@@ -226,76 +250,91 @@ class Road:
         self._traffic_ranges.clear()
         self._traffic_pointcollection = None
 
-    def _project_onto_road_direction(self, coord: tuple[float, float]) -> float:
-        """Project a coordinate onto the road's direction vector.
+    def set_point_strategy(self, strategy: Optional[PointGenerationStrategy]) -> None:
+        """Set or clear the point generation strategy.
+
+        When set, active_pointcollection delegates to the strategy.
+        When None, falls back to the internal _generate_traffic_points().
 
         Args:
-            coord: (lon, lat) coordinate tuple
+            strategy: Strategy instance, or None to clear.
 
         Returns:
-            Scalar projection along road direction (higher = further along road)
+            None.
         """
-        road_start = self._nodes[0].get_position()
-        road_end = self._nodes[-1].get_position()
+        self._point_strategy = strategy
+        self._traffic_pointcollection = None  # Invalidate cache
 
-        # Road direction vector
-        dx = road_end[0] - road_start[0]
-        dy = road_end[1] - road_start[1]
+    def apply_traffic_for_overlap(
+        self,
+        overlap_positions: List[Position],
+        multiplier: float,
+        segment_key: SegmentKey,
+    ) -> bool:
+        """Apply traffic using overlapping geometry positions from PositionRegistry.
 
-        # Vector from road start to coordinate
-        px = coord[0] - road_start[0]
-        py = coord[1] - road_start[1]
-
-        # Dot product gives projection along direction
-        return px * dx + py * dy
-
-    def add_traffic_range(self, segment_key: SegmentKey, multiplier: float) -> bool:
-        """Add or update a traffic range for this road.
-
-        If a range with the same segment_key already exists, it is replaced.
-        This ensures each segment_key has at most one traffic range per road.
+        TC does NOT know the index scheme. Road projects overlap positions onto
+        its geometry, maps to pointcollection indices via fraction mapping, then
+        creates a TrafficRange internally.
 
         Args:
-            segment_key: ((start_lon, start_lat), (end_lon, end_lat))
-            multiplier: Speed multiplier (0.01-1.0), 1.0 = free flow
+            overlap_positions: Shared positions between road geometry and event
+                geometry, as determined by the PositionRegistry.
+            multiplier: Speed multiplier (0.01-1.0), 1.0 = free flow.
+            segment_key: Original segment_key for the traffic event.
 
         Returns:
-            True if traffic range was added/updated, False if segment not in road
+            True if a traffic range was created, False if overlap could not
+            be projected.
         """
-        start_coords, end_coords = segment_key
-
-        # Convert tuple coordinates to Position for lookup
-        start_pos = Position([start_coords[0], start_coords[1]])
-        end_pos = Position([end_coords[0], end_coords[1]])
-
-        start_idx = self._node_index.get(start_pos)
-        end_idx = self._node_index.get(end_pos)
-
-        # Both nodes must be absent for no match
-        if start_idx is None and end_idx is None:
+        if not overlap_positions or not self.geometry or len(self.geometry) < 2:
             return False
 
-        # Reject traffic going opposite to road direction using coordinate projection
-        start_proj = self._project_onto_road_direction(start_coords)
-        end_proj = self._project_onto_road_direction(end_coords)
-        if start_proj > end_proj:
+        # Build a geometry index for fraction computation
+        geom_index: Dict[Position, int] = {}
+        for i, pos in enumerate(self.geometry):
+            if pos not in geom_index:
+                geom_index[pos] = i
+
+        # Find geometry indices of overlap positions
+        overlap_indices = []
+        for pos in overlap_positions:
+            idx = geom_index.get(pos)
+            if idx is not None:
+                overlap_indices.append(idx)
+
+        if not overlap_indices:
             return False
 
-        # Resolve bounds for partial overlaps
-        start_idx = start_idx if start_idx is not None else 0
-        end_idx = end_idx if end_idx is not None else len(self._nodes) - 1
+        # Fraction range within geometry
+        min_geom_idx = min(overlap_indices)
+        max_geom_idx = max(overlap_indices)
+        geom_count = len(self.geometry) - 1
+        if geom_count <= 0:
+            return False
 
-        # Create and store traffic range (O(1) replace if exists)
+        start_frac = min_geom_idx / geom_count
+        end_frac = max_geom_idx / geom_count
+
+        # Map fractions to pointcollection indices
+        pc_count = len(self._nodes) - 1
+        if pc_count <= 0:
+            return False
+
+        start_idx = max(0, int(start_frac * pc_count))
+        end_idx = min(pc_count, int(end_frac * pc_count + 0.5))
+
+        if start_idx > end_idx:
+            start_idx, end_idx = end_idx, start_idx
+
+        # Create traffic range
         self._traffic_ranges[segment_key] = TrafficRange(
             start_index=start_idx,
             end_index=end_idx,
             multiplier=multiplier,
             segment_key=segment_key,
         )
-
-        # Invalidate cached points
         self._traffic_pointcollection = None
-
         return True
 
     def get_multiplier_at_index(self, index: int) -> float:

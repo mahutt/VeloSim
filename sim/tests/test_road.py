@@ -30,7 +30,9 @@ from pathlib import Path
 from pandas import Series
 from shapely.geometry import LineString
 from typing import Generator, List
+from unittest.mock import MagicMock
 
+from sim.entities.point_generation import PointGenerationStrategy, RoadPointContext
 from sim.entities.road import Road
 from sim.entities.position import Position
 
@@ -496,6 +498,7 @@ class TestRoadPerSegmentTraffic:
             pointcollection=nodes,
             length=400.0,  # 4 segments × 100m each
             maxspeed=10.0,  # 10 m/s
+            geometry=nodes,
         )
 
     def test_free_flow_uniform_point_density(self) -> None:
@@ -527,7 +530,8 @@ class TestRoadPerSegmentTraffic:
 
         # Apply traffic to middle segments (N1 to N3)
         segment_key = ((1.0, 0.0), (3.0, 0.0))  # From N1 to N3
-        result = road.add_traffic_range(segment_key, multiplier=0.25)
+        overlap = [Position([1.0, 0.0]), Position([3.0, 0.0])]
+        result = road.apply_traffic_for_overlap(overlap, 0.25, segment_key)
 
         assert result is True, "Traffic range should be added successfully"
 
@@ -575,7 +579,8 @@ class TestRoadPerSegmentTraffic:
 
         # Apply traffic to segments (N2 to N3)
         segment_key = ((2.0, 0.0), (3.0, 0.0))
-        result = road.add_traffic_range(segment_key, multiplier=0.2)
+        overlap = [Position([2.0, 0.0]), Position([3.0, 0.0])]
+        result = road.apply_traffic_for_overlap(overlap, 0.2, segment_key)
 
         assert result is True
 
@@ -615,11 +620,13 @@ class TestRoadPerSegmentTraffic:
 
         # Apply first traffic range
         segment_key_1 = ((1.0, 0.0), (3.0, 0.0))  # N1 to N3
-        road.add_traffic_range(segment_key_1, multiplier=0.5)
+        overlap_1 = [Position([1.0, 0.0]), Position([3.0, 0.0])]
+        road.apply_traffic_for_overlap(overlap_1, 0.5, segment_key_1)
 
         # Apply second overlapping traffic range
         segment_key_2 = ((2.0, 0.0), (4.0, 0.0))  # N2 to N4
-        road.add_traffic_range(segment_key_2, multiplier=0.3)
+        overlap_2 = [Position([2.0, 0.0]), Position([4.0, 0.0])]
+        road.apply_traffic_for_overlap(overlap_2, 0.3, segment_key_2)
 
         # Check multipliers - minimum should win at overlaps
         assert road.get_multiplier_at_index(0) == 1.0, "No traffic"
@@ -643,7 +650,8 @@ class TestRoadPerSegmentTraffic:
 
         # Apply traffic
         segment_key = ((1.0, 0.0), (3.0, 0.0))
-        road.add_traffic_range(segment_key, multiplier=0.25)
+        overlap = [Position([1.0, 0.0]), Position([3.0, 0.0])]
+        road.apply_traffic_for_overlap(overlap, 0.25, segment_key)
 
         # Verify traffic is applied
         assert road.get_multiplier_at_index(1) == 0.25
@@ -669,14 +677,15 @@ class TestRoadPerSegmentTraffic:
         road = self._create_multi_segment_road()
 
         segment_key = ((1.0, 0.0), (3.0, 0.0))
+        overlap = [Position([1.0, 0.0]), Position([3.0, 0.0])]
 
         # Apply traffic with multiplier 0.3
-        road.add_traffic_range(segment_key, multiplier=0.3)
+        road.apply_traffic_for_overlap(overlap, 0.3, segment_key)
         assert road.get_multiplier_at_index(1) == 0.3
 
         # Apply traffic with SAME segment_key but HIGHER multiplier (0.7)
         # This should REPLACE, not accumulate
-        road.add_traffic_range(segment_key, multiplier=0.7)
+        road.apply_traffic_for_overlap(overlap, 0.7, segment_key)
 
         # Multiplier should be 0.7 (the new value), NOT 0.3 (min of old and new)
         assert (
@@ -694,31 +703,29 @@ class TestRoadPerSegmentTraffic:
         Road has nodes at: (0,0), (1,0), (2,0), (3,0), (4,0)
         Traffic segment: (1.5,0) to (3,0) - start node doesn't exist in road
 
-        Expected: Traffic applies from road start (idx 0) to N3 (idx 3) INCLUSIVE
+        With apply_traffic_for_overlap, only the matching endpoint (3,0) is
+        in the overlap, so the range is a single-point range at geometry
+        index 3, which maps to pointcollection index 3.
         """
         road = self._create_multi_segment_road()
 
-        # Apply traffic with start node NOT in road
-        segment_key = ((1.5, 0.0), (3.0, 0.0))  # 1.5 doesn't exist
-        result = road.add_traffic_range(segment_key, multiplier=0.4)
+        # Only (3.0, 0.0) is in the road geometry; (1.5, 0.0) is not
+        segment_key = ((1.5, 0.0), (3.0, 0.0))
+        overlap = [Position([3.0, 0.0])]
+        result = road.apply_traffic_for_overlap(overlap, 0.4, segment_key)
 
         assert result is True, "Partial overlap should still apply"
 
-        # Since start (1.5, 0) isn't found, it defaults to 0
-        # End (3.0, 0) is found at index 3
-        # Range becomes [0, 3] INCLUSIVE - affects segments 0, 1, 2, 3
-        assert road.get_multiplier_at_index(0) == 0.4
-        assert road.get_multiplier_at_index(1) == 0.4
-        assert road.get_multiplier_at_index(2) == 0.4
-        assert road.get_multiplier_at_index(3) == 0.4  # Inclusive!
+        # Single overlap position at geometry index 3 → pc index 3
+        # Range [3, 3] only affects segment 3
+        assert road.get_multiplier_at_index(3) == 0.4
 
         print(f"\n{'='*60}")
         print("TEST: Partial segment overlap")
         print(f"{'='*60}")
         print("Traffic segment: (1.5, 0) to (3.0, 0)")
-        print("  - Start (1.5, 0) NOT in road → defaults to idx 0")
-        print("  - End (3.0, 0) found at idx 3")
-        print("  - Range [0, 3] is INCLUSIVE")
+        print("  - Start (1.5, 0) NOT in road geometry → not in overlap")
+        print("  - End (3.0, 0) found at geometry idx 3")
         print("\nMultipliers per segment:")
         for i in range(4):
             mult = road.get_multiplier_at_index(i)
@@ -728,11 +735,11 @@ class TestRoadPerSegmentTraffic:
         """Test that traffic segment completely outside road returns False."""
         road = self._create_multi_segment_road()
 
-        # Apply traffic with both nodes NOT in road
+        # Apply traffic with both nodes NOT in road — empty overlap
         segment_key = ((10.0, 10.0), (20.0, 20.0))  # Completely outside
-        result = road.add_traffic_range(segment_key, multiplier=0.5)
+        result = road.apply_traffic_for_overlap([], 0.5, segment_key)
 
-        assert result is False, "Segment not in road should return False"
+        assert result is False, "Empty overlap should return False"
 
         # All multipliers should remain 1.0
         for i in range(4):
@@ -748,7 +755,10 @@ class TestRoadPerSegmentTraffic:
 
         # Apply traffic to middle segment only
         segment_key = ((1.0, 0.0), (3.0, 0.0))
-        road.add_traffic_range(segment_key, multiplier=0.1)  # Very slow = very dense
+        overlap = [Position([1.0, 0.0]), Position([3.0, 0.0])]
+        road.apply_traffic_for_overlap(
+            overlap, 0.1, segment_key
+        )  # Very slow = very dense
 
         traffic_points = road.active_pointcollection
 
@@ -785,3 +795,77 @@ class TestRoadPerSegmentTraffic:
             )
 
         print(f"\n{'='*70}")
+
+
+class TestRoadPointStrategy:
+    """Tests for strategy injection on Road."""
+
+    def _create_road(self) -> Road:
+        nodes = [
+            Position([0.0, 0.0]),
+            Position([1.0, 0.0]),
+            Position([2.0, 0.0]),
+        ]
+        return Road(
+            road_id=1,
+            name="Test Road",
+            pointcollection=nodes,
+            length=200.0,
+            maxspeed=10.0,
+            geometry=nodes,
+        )
+
+    def test_active_pointcollection_delegates_to_strategy(self) -> None:
+        road = self._create_road()
+        segment_key = ((0.0, 0.0), (2.0, 0.0))
+        overlap = [Position([0.0, 0.0]), Position([2.0, 0.0])]
+        road.apply_traffic_for_overlap(overlap, 0.5, segment_key)
+
+        mock_strategy = MagicMock(spec=PointGenerationStrategy)
+        expected_points = [Position([0.0, 0.0]), Position([0.5, 0.0])]
+        mock_strategy.generate.return_value = expected_points
+
+        road.set_point_strategy(mock_strategy)
+
+        result = road.active_pointcollection
+
+        assert result == expected_points
+        mock_strategy.generate.assert_called_once()
+        ctx = mock_strategy.generate.call_args[0][0]
+        assert isinstance(ctx, RoadPointContext)
+        assert ctx.maxspeed == 10.0
+        assert ctx.length == 200.0
+
+    def test_set_point_strategy_invalidates_cache(self) -> None:
+        road = self._create_road()
+        segment_key = ((0.0, 0.0), (2.0, 0.0))
+        overlap = [Position([0.0, 0.0]), Position([2.0, 0.0])]
+        road.apply_traffic_for_overlap(overlap, 0.5, segment_key)
+
+        # Generate cached points via fallback
+        points_v1 = road.active_pointcollection
+        assert road._traffic_pointcollection is not None
+
+        # Setting strategy should invalidate cache
+        mock_strategy = MagicMock(spec=PointGenerationStrategy)
+        mock_strategy.generate.return_value = [Position([9.0, 9.0])]
+        road.set_point_strategy(mock_strategy)
+
+        # Cache should be invalidated
+        assert not road._traffic_pointcollection
+
+        # Next access should use the new strategy
+        points_v2 = road.active_pointcollection
+        assert points_v2 == [Position([9.0, 9.0])]
+        assert points_v2 != points_v1
+
+    def test_no_strategy_falls_back_to_internal(self) -> None:
+        road = self._create_road()
+        segment_key = ((0.0, 0.0), (2.0, 0.0))
+        overlap = [Position([0.0, 0.0]), Position([2.0, 0.0])]
+        road.apply_traffic_for_overlap(overlap, 0.5, segment_key)
+
+        # No strategy set — should use _generate_traffic_points() fallback
+        assert road._point_strategy is None
+        points = road.active_pointcollection
+        assert len(points) > len(road.pointcollection)

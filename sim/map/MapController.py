@@ -29,6 +29,7 @@ from sim.map.routing_provider import RoutingProvider
 from sim.osm.osrm_adapter import OSRMAdapter
 from sim.map.route_controller import RouteController
 from sim.traffic.traffic_controller import TrafficController
+from sim.map.position_registry import PositionRegistry
 from typing import Optional
 import json
 from pathlib import Path
@@ -63,8 +64,11 @@ class MapController:
         with open(config_path, "r") as f:
             self.config = json.load(f)
 
+        # Create shared PositionRegistry
+        self.position_registry = PositionRegistry()
+
         # Initialize RouteController for road/route management
-        self.route_controller = RouteController(self)
+        self.route_controller = RouteController(self, registry=self.position_registry)
 
         # Extract config from payload
         traffic_config = map_payload.traffic if map_payload else None
@@ -76,6 +80,7 @@ class MapController:
             traffic_config=traffic_config,
             env=env,
             routing_provider=self.routing_provider,
+            registry=self.position_registry,
         )
 
     def get_route(self, a: Position, b: Position) -> Route:

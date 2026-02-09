@@ -34,6 +34,7 @@ from sim.map.routing_provider import RoutingProvider, RouteResult, SegmentKey
 if TYPE_CHECKING:
     from sim.entities.route import Route
     from sim.map.MapController import MapController
+    from sim.map.position_registry import PositionRegistry
 
 logger = logging.getLogger(__name__)
 
@@ -53,14 +54,20 @@ class RouteController:
     across all routes using the same infrastructure. This approach is provider-neutral.
     """
 
-    def __init__(self, map_controller: "MapController") -> None:
+    def __init__(
+        self,
+        map_controller: "MapController",
+        registry: "PositionRegistry",
+    ) -> None:
         """
         Initialize the RouteController.
 
         Args:
             map_controller: Parent MapController for road management
+            registry: PositionRegistry for geometry indexing
         """
         self.map_controller = map_controller
+        self._registry = registry
 
         # Road -> Set of Routes using that road
         self.roads_to_routes: Dict[Road, Set["Route"]] = {}
@@ -281,11 +288,16 @@ class RouteController:
                 pointcollection=positions,
                 length=step.distance,
                 maxspeed=maxspeed,
+                geometry=step.geometry,
             )
 
             # Register in lookups
             self.segment_key_to_road[segment_key] = road
             self.road_id_to_road[road_id] = road
+
+            # Register geometry in PositionRegistry
+            if step.geometry:
+                self._registry.register_road(road, step.geometry)
 
             # Notify road creation callbacks
             for callback in self._on_road_created_callbacks:
@@ -404,9 +416,14 @@ class RouteController:
         """Remove a road from all tracking structures when no routes reference it."""
         segment_key = road.segment_key
 
-        # Notify callbacks before removing
+        # Notify callbacks before unregistering from registry — callbacks
+        # (e.g. TrafficController) need registry lookups to find events
+        # that intersect this road for cleanup (clearOrphans).
         for callback in self._on_road_deallocated_callbacks:
             callback(road)
+
+        # Unregister from PositionRegistry after callbacks
+        self._registry.unregister_road(road)
 
         self.roads_to_routes.pop(road, None)
         self.segment_key_to_road.pop(segment_key, None)

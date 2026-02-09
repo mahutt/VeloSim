@@ -26,6 +26,7 @@ from unittest.mock import Mock
 import pytest
 
 from sim.map.route_controller import RouteController
+from sim.map.position_registry import PositionRegistry
 from sim.entities.road import Road
 from sim.entities.position import Position
 from sim.map.routing_provider import RouteSegment, RouteResult, RouteStep
@@ -37,7 +38,7 @@ class TestRouteControllerInitialization:
     def test_route_controller_init(self) -> None:
         """Test that RouteController initializes with empty data structures."""
         mock_map_controller = Mock()
-        controller = RouteController(mock_map_controller)
+        controller = RouteController(mock_map_controller, PositionRegistry())
 
         assert controller.map_controller == mock_map_controller
         assert len(controller.roads_to_routes) == 0
@@ -48,7 +49,7 @@ class TestRouteControllerInitialization:
     def test_route_controller_clear(self) -> None:
         """Test that clear() empties all data structures."""
         mock_map_controller = Mock()
-        controller = RouteController(mock_map_controller)
+        controller = RouteController(mock_map_controller, PositionRegistry())
 
         # Add some dummy data
         mock_road = Mock()
@@ -73,7 +74,7 @@ class TestRouteControllerRoadLookup:
     def test_get_road_by_segment_key(self) -> None:
         """Test looking up a road by segment_key (geometry endpoints)."""
         mock_map_controller = Mock()
-        controller = RouteController(mock_map_controller)
+        controller = RouteController(mock_map_controller, PositionRegistry())
 
         # Create a road directly and register it
         road = Road(
@@ -98,7 +99,7 @@ class TestRouteControllerRoadLookup:
     def test_get_road_by_id(self) -> None:
         """Test looking up a road by hash-based ID."""
         mock_map_controller = Mock()
-        controller = RouteController(mock_map_controller)
+        controller = RouteController(mock_map_controller, PositionRegistry())
 
         # Create a road directly and register it
         road = Road(
@@ -122,7 +123,7 @@ class TestRouteControllerRouteRegistration:
         """Test registering a road-to-route mapping."""
         mock_map_controller = Mock()
 
-        controller = RouteController(mock_map_controller)
+        controller = RouteController(mock_map_controller, PositionRegistry())
 
         mock_road = Mock()
         mock_road.id = 123
@@ -137,7 +138,7 @@ class TestRouteControllerRouteRegistration:
         """Test unregistering a road from a route."""
         mock_map_controller = Mock()
 
-        controller = RouteController(mock_map_controller)
+        controller = RouteController(mock_map_controller, PositionRegistry())
 
         # Create a road with specific properties (geometry-based segment_key)
         mock_road = Mock()
@@ -162,7 +163,7 @@ class TestRouteControllerRouteRegistration:
     def test_unregister_route(self) -> None:
         """Test unregistering a route from all its roads."""
         mock_map_controller = Mock()
-        controller = RouteController(mock_map_controller)
+        controller = RouteController(mock_map_controller, PositionRegistry())
 
         mock_road1 = Mock()
         mock_road1.id = 1
@@ -196,7 +197,7 @@ class TestRouteControllerQueryMethods:
     def test_get_routes_for_road(self) -> None:
         """Test getting routes that use a specific road."""
         mock_map_controller = Mock()
-        controller = RouteController(mock_map_controller)
+        controller = RouteController(mock_map_controller, PositionRegistry())
 
         mock_road = Mock()
         mock_road.id = 1
@@ -215,7 +216,7 @@ class TestRouteControllerQueryMethods:
     def test_get_routes_for_segment_key(self) -> None:
         """Test getting routes by segment_key (geometry endpoints)."""
         mock_map_controller = Mock()
-        controller = RouteController(mock_map_controller)
+        controller = RouteController(mock_map_controller, PositionRegistry())
 
         # Create a road directly and register it
         road = Road(
@@ -239,7 +240,7 @@ class TestRouteControllerQueryMethods:
     def test_get_all_active_roads(self) -> None:
         """Test getting all active roads."""
         mock_map_controller = Mock()
-        controller = RouteController(mock_map_controller)
+        controller = RouteController(mock_map_controller, PositionRegistry())
 
         mock_road1 = Mock()
         mock_road1.id = 1
@@ -259,7 +260,7 @@ class TestRouteControllerQueryMethods:
     def test_get_active_counts(self) -> None:
         """Test getting active route and road counts."""
         mock_map_controller = Mock()
-        controller = RouteController(mock_map_controller)
+        controller = RouteController(mock_map_controller, PositionRegistry())
 
         mock_road = Mock()
         mock_road.id = 1
@@ -449,7 +450,7 @@ class TestRouteControllerPointGeneration:
     def test_generate_point_collection_empty_geometry(self) -> None:
         """Test point generation with empty geometry."""
         mock_map_controller = Mock()
-        controller = RouteController(mock_map_controller)
+        controller = RouteController(mock_map_controller, PositionRegistry())
 
         result = controller.generate_point_collection([], 100.0, 10.0)
 
@@ -458,7 +459,7 @@ class TestRouteControllerPointGeneration:
     def test_generate_point_collection_invalid_speed(self) -> None:
         """Test point generation with zero/negative speed."""
         mock_map_controller = Mock()
-        controller = RouteController(mock_map_controller)
+        controller = RouteController(mock_map_controller, PositionRegistry())
 
         geometry = [Position([0.0, 0.0]), Position([1.0, 1.0])]
 
@@ -472,7 +473,7 @@ class TestRouteControllerPointGeneration:
     def test_generate_point_collection_invalid_length(self) -> None:
         """Test point generation with zero/negative length."""
         mock_map_controller = Mock()
-        controller = RouteController(mock_map_controller)
+        controller = RouteController(mock_map_controller, PositionRegistry())
 
         geometry = [Position([0.0, 0.0]), Position([1.0, 1.0])]
 
@@ -486,7 +487,7 @@ class TestRouteControllerPointGeneration:
     def test_generate_point_collection_normal_case(self) -> None:
         """Test normal point generation with valid inputs."""
         mock_map_controller = Mock()
-        controller = RouteController(mock_map_controller)
+        controller = RouteController(mock_map_controller, PositionRegistry())
 
         geometry = [Position([0.0, 0.0]), Position([100.0, 0.0])]
 
@@ -499,7 +500,7 @@ class TestRouteControllerPointGeneration:
     def test_generate_point_collection_final_segment(self) -> None:
         """Test point generation for final segment includes endpoint."""
         mock_map_controller = Mock()
-        controller = RouteController(mock_map_controller)
+        controller = RouteController(mock_map_controller, PositionRegistry())
 
         geometry = [Position([0.0, 0.0]), Position([100.0, 0.0])]
 
@@ -517,7 +518,7 @@ class TestRouteControllerRouteCreation:
     def test_get_route_from_positions_no_route(self) -> None:
         """Test get_route_from_positions when no route is found."""
         mock_map_controller = Mock()
-        controller = RouteController(mock_map_controller)
+        controller = RouteController(mock_map_controller, PositionRegistry())
 
         mock_routing_provider = Mock()
         mock_routing_provider.get_route.return_value = None
@@ -531,7 +532,7 @@ class TestRouteControllerRouteCreation:
     def test_get_route_from_positions_success(self) -> None:
         """Test successful route creation from positions."""
         mock_map_controller = Mock()
-        controller = RouteController(mock_map_controller)
+        controller = RouteController(mock_map_controller, PositionRegistry())
 
         mock_routing_provider = Mock()
         # Return a RouteResult object
@@ -563,7 +564,7 @@ class TestRouteControllerRouteCreation:
     def test_create_route_empty_steps(self) -> None:
         """Test create_route with empty steps."""
         mock_map_controller = Mock()
-        controller = RouteController(mock_map_controller)
+        controller = RouteController(mock_map_controller, PositionRegistry())
 
         mock_routing_provider = Mock()
 
@@ -619,7 +620,7 @@ class TestRoadDeallocationCallbacks:
     def test_register_on_road_deallocated_callback(self) -> None:
         """Test that callbacks are registered and called on deallocation."""
         mock_map_controller = Mock()
-        controller = RouteController(mock_map_controller)
+        controller = RouteController(mock_map_controller, PositionRegistry())
 
         # Track callback invocations
         callback_calls: list[Road] = []
@@ -650,7 +651,7 @@ class TestRoadDeallocationCallbacks:
     def test_multiple_callbacks_called_on_deallocation(self) -> None:
         """Test that multiple registered callbacks are all called."""
         mock_map_controller = Mock()
-        controller = RouteController(mock_map_controller)
+        controller = RouteController(mock_map_controller, PositionRegistry())
 
         callback1_calls: list[Road] = []
         callback2_calls: list[Road] = []
@@ -676,7 +677,7 @@ class TestRoadDeallocationCallbacks:
     def test_unregister_on_road_deallocated_success(self) -> None:
         """Test that unregister_on_road_deallocated removes a callback."""
         mock_map_controller = Mock()
-        controller = RouteController(mock_map_controller)
+        controller = RouteController(mock_map_controller, PositionRegistry())
 
         callback_calls: list[Road] = []
 
@@ -709,7 +710,7 @@ class TestRoadDeallocationCallbacks:
     def test_unregister_on_road_deallocated_not_found(self) -> None:
         """Test that unregister returns False for non-existent callback."""
         mock_map_controller = Mock()
-        controller = RouteController(mock_map_controller)
+        controller = RouteController(mock_map_controller, PositionRegistry())
 
         def some_callback(road: Road) -> None:
             pass
@@ -722,7 +723,7 @@ class TestRoadDeallocationCallbacks:
     def test_clear_removes_all_callbacks(self) -> None:
         """Test that clear() removes all registered callbacks."""
         mock_map_controller = Mock()
-        controller = RouteController(mock_map_controller)
+        controller = RouteController(mock_map_controller, PositionRegistry())
 
         callback_calls: list[Road] = []
 
