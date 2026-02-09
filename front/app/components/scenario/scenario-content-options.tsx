@@ -22,7 +22,7 @@
  * SOFTWARE.
  */
 
-import { Ellipsis } from 'lucide-react';
+import { Ellipsis, Car, User, MapPin, Cloud } from 'lucide-react';
 import type { Dispatch, SetStateAction } from 'react';
 import {
   DropdownMenu,
@@ -30,13 +30,18 @@ import {
   DropdownMenuTrigger,
 } from '~/components/ui/dropdown-menu';
 import UseGbfsStationsButton from './use-gbfs-stations-button';
+import AddStationButton from './add-station-button';
+import AddVehicleButton from './add-vehicle-button';
+import AddDriverButton from './add-driver-button';
 
 interface ScenarioContentOptionsProps {
+  scenarioContent: string;
   setScenarioContent: Dispatch<SetStateAction<string>>;
   onEdit: () => void;
 }
 
 export default function ScenarioContentOptions({
+  scenarioContent,
   setScenarioContent,
   onEdit,
 }: ScenarioContentOptionsProps) {
@@ -46,9 +51,26 @@ export default function ScenarioContentOptions({
         <Ellipsis />
       </DropdownMenuTrigger>
       <DropdownMenuContent className="w-56" align="end">
+        <AddStationButton
+          setScenarioContent={setScenarioContent}
+          onEdit={onEdit}
+          icon={<MapPin className="mr-2 h-4 w-4" />}
+        />
+        <AddVehicleButton
+          scenarioContent={scenarioContent}
+          setScenarioContent={setScenarioContent}
+          onEdit={onEdit}
+          icon={<Car className="mr-2 h-4 w-4" />}
+        />
+        <AddDriverButton
+          setScenarioContent={setScenarioContent}
+          onEdit={onEdit}
+          icon={<User className="mr-2 h-4 w-4" />}
+        />
         <UseGbfsStationsButton
           setScenarioContent={setScenarioContent}
           onEdit={onEdit}
+          icon={<Cloud className="mr-2 h-4 w-4" />}
         />
       </DropdownMenuContent>
     </DropdownMenu>

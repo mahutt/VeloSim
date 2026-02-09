@@ -22,7 +22,12 @@
  * SOFTWARE.
  */
 
-import { useState, type Dispatch, type SetStateAction } from 'react';
+import {
+  useState,
+  type Dispatch,
+  type SetStateAction,
+  type ReactNode,
+} from 'react';
 import type {
   GBFSStationInformationResponse,
   ScenarioContentStation,
@@ -69,11 +74,13 @@ async function getGbfsStations(): Promise<ScenarioContentStation[]> {
 interface UseGbfsStationsButtonProps {
   setScenarioContent: Dispatch<SetStateAction<string>>;
   onEdit: () => void;
+  icon?: ReactNode;
 }
 
 export default function UseGbfsStationsButton({
   setScenarioContent,
   onEdit,
+  icon,
 }: UseGbfsStationsButtonProps) {
   const [loading, setLoading] = useState(false);
   return (
@@ -109,6 +116,7 @@ export default function UseGbfsStationsButton({
         toast.success('GBFS stations loaded successfully');
       }}
     >
+      {icon}
       Use GBFS Stations
     </DropdownMenuItem>
   );

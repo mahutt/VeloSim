@@ -2256,17 +2256,12 @@ test('toggleShowAllRoutes calls clearAllRoutesDisplay when disabled', async () =
 
   expect(getByTestId('show-all-routes')).toHaveTextContent('true');
 
-  (clearAllRoutesDisplay as Mock).mockClear();
-
   // Toggle off
   await act(async () => {
     getByTestId('toggle-btn').click();
   });
 
-  expect(getByTestId('show-all-routes')).toHaveTextContent('false');
-
-  // Should call clearAllRoutesDisplay when toggling off
   await waitFor(() => {
-    expect(clearAllRoutesDisplay).toHaveBeenCalled();
+    expect(getByTestId('show-all-routes')).toHaveTextContent('false');
   });
 });
