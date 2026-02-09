@@ -131,7 +131,7 @@ export function setupMapHoverHandlers(
 
 export function setupMapDropHandlers(
   map: MapboxMap,
-  requestAssignment: (resourceId: number, taskId: number) => void
+  requestAssignment: (resourceId: number, taskIds: number[]) => void
 ) {
   const canvas = map.getCanvas();
 
@@ -146,8 +146,17 @@ export function setupMapDropHandlers(
     e.preventDefault();
     if (!e.dataTransfer) return;
 
-    const taskId = Number(e.dataTransfer.getData('taskId'));
-    if (Number.isNaN(taskId)) return;
+    const taskIdsPayload = e.dataTransfer.getData('taskIds');
+    let taskIds: number[] = [];
+    if (taskIdsPayload) {
+      try {
+        taskIds = JSON.parse(taskIdsPayload || '[]');
+      } catch {
+        return;
+      }
+    }
+
+    if (taskIds.length === 0) return;
 
     // covert drop position from viewport to the canvas' coordinates
     const rect = canvas.getBoundingClientRect();
@@ -164,7 +173,7 @@ export function setupMapDropHandlers(
     const resourceId = Number(feature.properties?.id);
     if (Number.isNaN(resourceId)) return;
 
-    requestAssignment(resourceId, taskId);
+    requestAssignment(resourceId, taskIds);
   };
 
   canvas.addEventListener('dragover', handleDragOver);

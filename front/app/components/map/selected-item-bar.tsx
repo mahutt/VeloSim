@@ -31,6 +31,7 @@ import { useTaskAssignment } from '~/providers/task-assignment-provider';
 import { ScrollArea } from '~/components/ui/scroll-area';
 import { Button } from '../ui/button';
 import DriverStateBadge from './driver-state-badge';
+import { useTaskMassSelect } from '~/hooks/use-task-mass-select';
 
 export enum SelectedItemType {
   Station = 'station',
@@ -120,18 +121,27 @@ export default function SelectedItemBar() {
 function StationTasks({ station }: { station: PopulatedStation }) {
   const { driversRef } = useSimulation();
   const { requestUnassignment } = useTaskAssignment();
+  const taskIds = station.tasks.map((task) => task.id);
+  const { selectedTaskIds, handleTaskSelect, selectForDrag } =
+    useTaskMassSelect(taskIds, station.id);
 
   return (
     <>
-      {station.tasks.map((task) => {
+      {station.tasks.map((task, index) => {
         const assignedResource = Array.from(driversRef.current.values()).find(
-          (r) => r.taskIds && r.taskIds.includes(task.id)
+          (r) => r.taskIds.includes(task.id)
         );
 
         return (
           <TaskItem
             key={task.id}
             task={task}
+            isSelected={selectedTaskIds.includes(task.id)}
+            onSelect={(event) => handleTaskSelect(task.id, index, event)}
+            onDragStart={() => selectForDrag(task.id, index)}
+            getDragTaskIds={() =>
+              selectedTaskIds.includes(task.id) ? selectedTaskIds : [task.id]
+            }
             onUnassign={
               assignedResource
                 ? () => requestUnassignment(assignedResource.id, task.id)
@@ -151,8 +161,14 @@ function DriverTasks({ driver }: { driver: PopulatedDriver }) {
   // Track which task is being dragged to distinguish reordering (within same driver)
   // from reassignment (to different driver). Null when dragging from a station.
   const [draggedTaskId, setDraggedTaskId] = useState<number | null>(null);
+  const taskIds = driver.tasks.map((task) => task.id);
+  const { selectedTaskIds, handleTaskSelect, selectForDrag } =
+    useTaskMassSelect(taskIds, driver.id);
 
-  const handleDragStart = (taskId: number) => setDraggedTaskId(taskId);
+  const handleDragStart = (taskId: number, taskIndex: number) => {
+    selectForDrag(taskId, taskIndex);
+    setDraggedTaskId(taskId);
+  };
 
   const handleDragEnd = () => {
     setDraggedTaskId(null);
@@ -204,7 +220,6 @@ function DriverTasks({ driver }: { driver: PopulatedDriver }) {
             key={task.id}
             onDragOver={(e) => handleDragOver(e, index)}
             onDrop={(e) => handleDrop(e, index)}
-            onDragStart={() => handleDragStart(task.id)}
             onDragEnd={handleDragEnd}
             className={
               showDropIndicator
@@ -216,6 +231,12 @@ function DriverTasks({ driver }: { driver: PopulatedDriver }) {
           >
             <TaskItem
               task={task}
+              isSelected={selectedTaskIds.includes(task.id)}
+              onSelect={(event) => handleTaskSelect(task.id, index, event)}
+              onDragStart={() => handleDragStart(task.id, index)}
+              getDragTaskIds={() =>
+                selectedTaskIds.includes(task.id) ? selectedTaskIds : [task.id]
+              }
               onUnassign={() => requestUnassignment(driver.id, task.id)}
             />
           </div>
