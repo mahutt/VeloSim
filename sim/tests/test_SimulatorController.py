@@ -416,18 +416,123 @@ def test_controller_batch_assign_partial_failure(
     simulator_controller: SimulatorController,
 ) -> None:
     """Missing tasks return success=False and include an error string."""
-    # Simulate first assignment succeeding and second failing quickly
-    side_effects = [None, Exception("Could not find task in sim with id: 999")]
-    with patch.object(
-        simulator_controller, "assign_task_to_driver", side_effect=side_effects
-    ) as mock_assign:
+    # Task 1 exists (unassigned), task 999 does not exist
+    mock_task = Mock()
+    mock_task.get_assigned_driver.return_value = None
+
+    def get_task_side_effect(task_id: int) -> Mock | None:
+        return mock_task if task_id == 1 else None
+
+    with (
+        patch.object(
+            simulator_controller, "get_task_by_id", side_effect=get_task_side_effect
+        ),
+        patch.object(
+            simulator_controller, "assign_task_to_driver", return_value=None
+        ) as mock_assign,
+    ):
         results = simulator_controller.batch_assign_tasks_to_driver(1, [1, 999])
-        assert mock_assign.call_count == 2
+        # Only task 1 should trigger assign (task 999 fails at lookup)
+        mock_assign.assert_called_once_with(1, 1)
 
     assert len(results) == 2
     assert results[0]["success"] is True
     assert results[1]["success"] is False
     assert "Could not find task" in (results[1]["error"] or "")
+
+
+def test_controller_batch_assign_with_reassignment(
+    simulator_controller: SimulatorController,
+) -> None:
+    """Tasks already assigned to different driver are reassigned successfully."""
+    # Simulate task already assigned to driver 2, reassigning to driver 1
+    mock_task = Mock()
+    mock_task.get_assigned_driver.return_value = Mock(id=2)
+
+    with (
+        patch.object(simulator_controller, "get_task_by_id", return_value=mock_task),
+        patch.object(
+            simulator_controller, "reassign_task", return_value=None
+        ) as mock_reassign,
+    ):
+        results = simulator_controller.batch_assign_tasks_to_driver(1, [1])
+        mock_reassign.assert_called_once_with(1, 2, 1)
+
+    assert len(results) == 1
+    assert results[0]["success"] is True
+    assert results[0]["driver_id"] == 1
+    assert results[0]["task_id"] == 1
+
+
+def test_controller_batch_assign_already_assigned_to_same_driver(
+    simulator_controller: SimulatorController,
+) -> None:
+    """Tasks already assigned to target driver are treated as no-op success."""
+    # Task already assigned to driver 1, batch assigning to driver 1 should be no-op
+    mock_task = Mock()
+    mock_task.get_assigned_driver.return_value = Mock(id=1)
+
+    with (
+        patch.object(simulator_controller, "get_task_by_id", return_value=mock_task),
+        patch.object(
+            simulator_controller, "assign_task_to_driver", return_value=None
+        ) as mock_assign,
+        patch.object(
+            simulator_controller, "reassign_task", return_value=None
+        ) as mock_reassign,
+    ):
+        results = simulator_controller.batch_assign_tasks_to_driver(1, [1])
+        # Neither assign nor reassign should be called
+        mock_assign.assert_not_called()
+        mock_reassign.assert_not_called()
+
+    assert len(results) == 1
+    assert results[0]["success"] is True
+
+
+def test_controller_batch_assign_mixed_fresh_and_reassign(
+    simulator_controller: SimulatorController,
+) -> None:
+    """Batch handles mix of unassigned tasks and already-assigned tasks."""
+    # Task 1: unassigned (fresh assign)
+    # Task 2: assigned to driver 2 (reassign to driver 1)
+    # Task 3: assigned to driver 1 (no-op)
+    mock_task_unassigned = Mock()
+    mock_task_unassigned.get_assigned_driver.return_value = None
+
+    mock_task_other_driver = Mock()
+    mock_task_other_driver.get_assigned_driver.return_value = Mock(id=2)
+
+    mock_task_same_driver = Mock()
+    mock_task_same_driver.get_assigned_driver.return_value = Mock(id=1)
+
+    task_map = {
+        1: mock_task_unassigned,
+        2: mock_task_other_driver,
+        3: mock_task_same_driver,
+    }
+
+    with (
+        patch.object(
+            simulator_controller,
+            "get_task_by_id",
+            side_effect=lambda tid: task_map.get(tid),
+        ),
+        patch.object(
+            simulator_controller, "assign_task_to_driver", return_value=None
+        ) as mock_assign,
+        patch.object(
+            simulator_controller, "reassign_task", return_value=None
+        ) as mock_reassign,
+    ):
+        results = simulator_controller.batch_assign_tasks_to_driver(1, [1, 2, 3])
+        # Fresh assign called for task 1
+        mock_assign.assert_called_once_with(1, 1)
+        # Reassign called for task 2 (from driver 2 to driver 1)
+        mock_reassign.assert_called_once_with(2, 2, 1)
+
+    assert len(results) == 3
+    assert all(r["success"] is True for r in results)
 
 
 def test_key_frame_includes_new_tasks_and_clears_popups(
