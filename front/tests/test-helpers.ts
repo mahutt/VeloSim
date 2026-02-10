@@ -110,8 +110,6 @@ export function makeSimulationContext(
     reassignTask: overrides.reassignTask ?? vi.fn(),
     reorderTasks: overrides.reorderTasks ?? vi.fn(),
     simId: overrides.simId ?? null,
-    isConnected: overrides.isConnected ?? false,
-    simulationStatus: overrides.simulationStatus ?? 'idle',
     isLoading: overrides.isLoading ?? false,
     formattedSimTime: overrides.formattedSimTime ?? null,
     currentDay: overrides.currentDay ?? 1,
@@ -122,5 +120,14 @@ export function makeSimulationContext(
     },
     showAllRoutes: overrides.showAllRoutes ?? false,
     toggleShowAllRoutes: overrides.toggleShowAllRoutes ?? vi.fn(),
+    speed: overrides.speed ?? 1,
+    setSpeed: overrides.setSpeed ?? vi.fn(),
+    paused: overrides.paused ?? false,
+    setPaused: overrides.setPaused ?? vi.fn(),
+    scrub: overrides.scrub ?? vi.fn(),
+    commitScrub: overrides.commitScrub ?? vi.fn(),
+    startTime: overrides.startTime ?? 0,
+    simulationSecondsPassed: overrides.simulationSecondsPassed ?? 0,
+    scrubSimulationSecond: overrides.scrubSimulationSecond ?? 0,
   };
 }

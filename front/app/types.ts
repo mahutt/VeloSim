@@ -22,6 +22,12 @@
  * SOFTWARE.
  */
 
+export enum SimulationMode {
+  Local = 'local',
+  Server = 'server',
+  Scrubbing = 'scrubbing',
+}
+
 // Basic types
 export interface User {
   id: number;
@@ -151,29 +157,6 @@ export interface Vehicle {
 
 export interface Headquarters {
   position: Position;
-}
-
-// WebSocket connection types
-export type SimulationStatus =
-  | 'idle' // Not connected
-  | 'connecting' // WebSocket connecting
-  | 'loading' // Connected, waiting for initial frame
-  | 'ready' // Initial frame received, can interact
-  | 'running' // Frames streaming
-  | 'error'; // Error state
-
-export interface UseSimulationWebSocketOptions {
-  simId: string | null;
-  enabled: boolean; // Whether WebSocket should connect (e.g., map loaded && user authenticated)
-  onInitialFrame: (payload: BackendPayload) => void;
-  onFrameUpdate: (payload: BackendPayload) => void;
-  onError: (title: string, message: string) => void;
-}
-
-export interface UseSimulationWebSocketReturn {
-  isConnected: boolean;
-  simulationStatus: SimulationStatus;
-  wsRef: React.RefObject<WebSocket | null>;
 }
 
 // Scenario types

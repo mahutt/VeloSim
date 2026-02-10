@@ -22,13 +22,11 @@
  * SOFTWARE.
  */
 
-import { describe, it, expect, vi, beforeEach, type Mock } from 'vitest';
+import { describe, it, expect, vi, type Mock } from 'vitest';
 import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import PlaybackControls from '~/components/map/playback-controls';
 import { useSimulation } from '~/providers/simulation-provider';
-import api from '~/api';
-import { mockDisplayError } from 'tests/mocks';
 
 vi.mock('~/api', () => ({
   default: {
@@ -36,44 +34,34 @@ vi.mock('~/api', () => ({
   },
 }));
 
+const { mockUseSimulation } = await vi.hoisted(async () => {
+  const { makeSimulationContext } = await import('tests/test-helpers');
+  const mockUseSimulationResult = makeSimulationContext({
+    speed: 1,
+    setSpeed: vi.fn(),
+    paused: false,
+    setPaused: vi.fn(),
+  });
+  const mockUseSimulation = () => mockUseSimulationResult;
+  return { mockUseSimulation };
+});
+
 vi.mock(import('~/providers/simulation-provider'), async (importOriginal) => {
   const actual = await importOriginal();
   return {
     ...actual,
-    useSimulation: vi.fn(),
+    useSimulation: mockUseSimulation,
   };
 });
 
 describe('PlaybackControls', () => {
-  const mockSpeedRef = { current: 1 };
-  const mockSimId = 123;
-
-  beforeEach(() => {
-    vi.clearAllMocks();
-    mockSpeedRef.current = 1;
-    (useSimulation as Mock).mockReturnValue({
-      speedRef: mockSpeedRef,
-      simId: mockSimId,
-    });
-  });
-
-  it('does not render when simId is null', () => {
-    (useSimulation as Mock).mockReturnValue({
-      speedRef: mockSpeedRef,
-      simId: null,
-    });
-
-    const { container } = render(<PlaybackControls />);
-    expect(container.firstChild).toBeNull();
-  });
-
   it('renders playback controls with initial speed', () => {
     render(<PlaybackControls />);
     expect(screen.getByText('1x')).toBeInTheDocument();
   });
 
   it('renders with play button when initially paused', () => {
-    mockSpeedRef.current = 0;
+    useSimulation().paused = true;
     render(<PlaybackControls />);
 
     const playButton = screen.getByRole('button', { name: 'Play simulation' });
@@ -81,7 +69,7 @@ describe('PlaybackControls', () => {
   });
 
   it('renders with pause button when initially playing', () => {
-    mockSpeedRef.current = 1;
+    useSimulation().paused = false;
     render(<PlaybackControls />);
 
     const pauseButton = screen.getByRole('button', {
@@ -124,7 +112,7 @@ describe('PlaybackControls', () => {
 
   it('handles successful speed change when playing', async () => {
     render(<PlaybackControls />);
-    (api.post as Mock).mockResolvedValueOnce({ data: {} });
+    // (api.post as Mock).mockResolvedValueOnce({ data: {} });
 
     const speedButton = screen.getByText('1x');
     await userEvent.click(speedButton);
@@ -132,110 +120,31 @@ describe('PlaybackControls', () => {
     const speed2x = await screen.findByText('2x');
     await userEvent.click(speed2x);
 
-    await waitFor(() => {
-      expect(api.post).toHaveBeenCalledWith(
-        `/simulation/${mockSimId}/playbackSpeed`,
-        {
-          playback_speed: 2,
-        }
-      );
-      expect(mockSpeedRef.current).toBe(2);
-    });
-  });
-
-  it('updates speed locally but does not call API when paused', async () => {
-    mockSpeedRef.current = 0;
-    render(<PlaybackControls />);
-
-    const speedButton = screen.getByText('1x');
-    await userEvent.click(speedButton);
-
-    const speed2x = await screen.findByText('2x');
-    await userEvent.click(speed2x);
-
-    await waitFor(() => {
-      expect(screen.getByText('2x')).toBeInTheDocument();
-    });
-
-    expect(api.post).not.toHaveBeenCalled();
-  });
-
-  it('handles speed change error and reverts to previous speed', async () => {
-    render(<PlaybackControls />);
-    (api.post as Mock).mockRejectedValueOnce(new Error('API Error'));
-
-    const speedButton = screen.getByText('1x');
-    await userEvent.click(speedButton);
-
-    const speed2x = await screen.findByText('2x');
-    await userEvent.click(speed2x);
-
-    await waitFor(() => {
-      expect(mockDisplayError).toHaveBeenCalledWith(
-        'Speed Update Error',
-        'Failed to update speed. Please try again.'
-      );
-      expect(screen.getByText('1x')).toBeInTheDocument();
-    });
+    expect(mockUseSimulation().setSpeed).toHaveBeenCalledWith(2);
   });
 
   it('handles successful pause toggle', async () => {
     render(<PlaybackControls />);
-    (api.post as Mock).mockResolvedValueOnce({ data: {} });
-
     const pauseButton = screen.getByTestId('simulation-pause-play-button');
     await userEvent.click(pauseButton);
-
-    await waitFor(() => {
-      expect(api.post).toHaveBeenCalledWith(
-        `/simulation/${mockSimId}/playbackSpeed`,
-        {
-          playback_speed: 0,
-        }
-      );
-    });
+    expect(mockUseSimulation().setPaused).toHaveBeenCalledWith(true);
   });
 
   it('handles successful play toggle', async () => {
-    mockSpeedRef.current = 0;
+    mockUseSimulation().paused = true;
     render(<PlaybackControls />);
-    (api.post as Mock).mockResolvedValueOnce({ data: {} });
-
     const pauseButton = screen.getByTestId('simulation-pause-play-button');
     await userEvent.click(pauseButton);
-
-    await waitFor(() => {
-      expect(api.post).toHaveBeenCalledWith(
-        `/simulation/${mockSimId}/playbackSpeed`,
-        {
-          playback_speed: 1,
-        }
-      );
-    });
-  });
-
-  it('handles pause/play toggle error and reverts state', async () => {
-    render(<PlaybackControls />);
-    (api.post as Mock).mockRejectedValueOnce(new Error('API Error'));
-
-    const pauseButton = screen.getByTestId('simulation-pause-play-button');
-    await userEvent.click(pauseButton);
-
-    await waitFor(() => {
-      expect(mockDisplayError).toHaveBeenCalledWith(
-        'Playback Toggle Error',
-        'Failed to toggle pause / play simulation. Please try again.'
-      );
-    });
+    expect(mockUseSimulation().setPaused).toHaveBeenCalledWith(false);
   });
 
   it('disables controls while speed update is in progress', async () => {
     render(<PlaybackControls />);
-    let resolvePost: (value: { data: null }) => void;
-    const postPromise = new Promise((resolve) => {
-      resolvePost = resolve;
+    let resolveSetSpeed: (value: { data: null }) => void;
+    const setSpeedPromise = new Promise((resolve) => {
+      resolveSetSpeed = resolve;
     });
-    (api.post as Mock).mockReturnValueOnce(postPromise);
+    (mockUseSimulation().setSpeed as Mock).mockReturnValueOnce(setSpeedPromise);
 
     const speedButton = screen.getByText('1x');
     await userEvent.click(speedButton);
@@ -250,7 +159,7 @@ describe('PlaybackControls', () => {
       expect(dropdownMenu).toHaveAttribute('aria-disabled', 'true');
     });
 
-    resolvePost!({ data: null });
+    resolveSetSpeed!({ data: null });
 
     await waitFor(() => {
       const dropdownMenu = screen.getByRole('menu');

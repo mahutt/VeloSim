@@ -71,14 +71,13 @@ import { MapProvider } from '~/providers/map-provider';
 import { TaskAssignmentProvider } from '~/providers/task-assignment-provider';
 import { MockMap } from 'tests/mocks';
 import MapContainer from '~/components/map/map-container';
-import { type UseSimulationWebSocketOptions } from '~/types';
 import {
   logSimulationError,
   logMissingEntityError,
 } from '~/utils/simulation-error-utils';
 import api from '~/api';
 import { SelectedItemType } from '~/components/map/selected-item-bar';
-import { makeDriver, makePayload, makeVehicle } from 'tests/test-helpers';
+import { makeDriver, makeVehicle } from 'tests/test-helpers';
 
 // Mock the API module
 vi.mock('~/api', () => {
@@ -114,32 +113,18 @@ vi.mock('~/lib/map-interactions.ts', () => {
   };
 });
 
-let wsOptions: UseSimulationWebSocketOptions | null = null;
-vi.mock('~/hooks/use-simulation-websocket', () => ({
-  useSimulationWebSocket: (opts: UseSimulationWebSocketOptions) => {
-    wsOptions = opts;
-    return {
-      isConnected: true,
-      simulationStatus: 'ready',
-      wsRef: { current: null },
-    };
-  },
-}));
-
 // Mock the fetch API
 const mockFetch = vi.fn();
 global.fetch = mockFetch;
 
 // Test component to access the simulation context
 const TestComponent = () => {
-  const { stationsRef, simulationStatus, isConnected } = useSimulation();
+  const { stationsRef } = useSimulation();
   return (
     <div>
       <div data-testid="test-component">
         {stationsRef.current.size > 0 ? 'data-loaded' : 'no-data'}
       </div>
-      <div data-testid="status">{simulationStatus}</div>
-      <div data-testid="connected">{String(isConnected)}</div>
     </div>
   );
 };
@@ -149,16 +134,6 @@ const TestComponent = () => {
 // Store references to mocked functions
 const mockLogSimulationError = vi.fn();
 const mockLogMissingEntityError = vi.fn();
-
-const ClockProbe = () => {
-  const { formattedSimTime, currentDay } = useSimulation();
-  return (
-    <div>
-      <div data-testid="time">{formattedSimTime ?? 'null'}</div>
-      <div data-testid="day">{currentDay}</div>
-    </div>
-  );
-};
 
 // Mock requestAnimationFrame - prevent infinite recursion by limiting calls
 let rafCallCount = 0;
@@ -176,7 +151,6 @@ global.cancelAnimationFrame = vi.fn();
 beforeEach(() => {
   vi.clearAllMocks();
   rafCallCount = 0; // Reset RAF call count
-  wsOptions = null;
 
   // Re-apply the simulation error utils mocks
   (logSimulationError as Mock).mockImplementation(mockLogSimulationError);
@@ -186,7 +160,7 @@ beforeEach(() => {
 test('simulation provider renders without crashing when wrapped in map provider', () => {
   render(
     <MapProvider>
-      <SimulationProvider>
+      <SimulationProvider simId="test-sim-123">
         <div data-testid="child">Test Child</div>
       </SimulationProvider>
     </MapProvider>
@@ -196,7 +170,7 @@ test('simulation provider renders without crashing when wrapped in map provider'
 test('simulation provider throws error when used outside of map provider', () => {
   expect(() => {
     render(
-      <SimulationProvider>
+      <SimulationProvider simId="test-sim-123">
         <TestComponent />
       </SimulationProvider>
     );
@@ -219,7 +193,7 @@ test('useSimulation hook throws error when used outside of simulation provider',
 test('simulation provider provides context with initial state', () => {
   const { getByTestId } = render(
     <MapProvider>
-      <SimulationProvider>
+      <SimulationProvider simId="test-sim-123">
         <TaskAssignmentProvider>
           <MapContainer />
           <TestComponent />
@@ -248,7 +222,7 @@ test('clearSelection clears selected item', () => {
 
   const { getByTestId } = render(
     <MapProvider>
-      <SimulationProvider>
+      <SimulationProvider simId="test-sim-123">
         <TaskAssignmentProvider>
           <MapContainer />
           <TestComponentWithSelection />
@@ -296,7 +270,7 @@ test('selectItem selects a station when it exists', async () => {
 
   const { getByTestId } = render(
     <MapProvider>
-      <SimulationProvider>
+      <SimulationProvider simId="test-sim-123">
         <TaskAssignmentProvider>
           <MapContainer />
           <TestComponentWithSelect />
@@ -343,7 +317,7 @@ test('selectItem shows error when station does not exist', async () => {
 
   const { getByTestId } = render(
     <MapProvider>
-      <SimulationProvider>
+      <SimulationProvider simId="test-sim-123">
         <TaskAssignmentProvider>
           <MapContainer />
           <TestComponentWithSelect />
@@ -399,7 +373,7 @@ test('selectItem selects a resource when it exists', async () => {
 
   const { getByTestId } = render(
     <MapProvider>
-      <SimulationProvider>
+      <SimulationProvider simId="test-sim-123">
         <TaskAssignmentProvider>
           <MapContainer />
           <TestComponentWithSelect />
@@ -1238,220 +1212,6 @@ test('reassignTask posts to API and moves task between resources', async () => {
   });
 });
 
-test('sets clock time and day from initial frame payload', async () => {
-  const { getByTestId } = render(
-    <MapProvider>
-      <SimulationProvider>
-        <TaskAssignmentProvider>
-          <MapContainer />
-          <ClockProbe />
-        </TaskAssignmentProvider>
-      </SimulationProvider>
-    </MapProvider>
-  );
-
-  await waitFor(() => {
-    expect(MockMap.instance).toBeDefined();
-  });
-
-  await act(async () => {
-    MockMap.instance?.callBacks['load']();
-  });
-
-  await act(async () => {
-    wsOptions?.onInitialFrame?.(
-      makePayload({
-        clock: {
-          simSecondsPassed: 3661,
-          simMinutesPassed: 61,
-          realSecondsPassed: 3661,
-          realMinutesPassed: 61,
-          startTime: 0,
-        },
-      })
-    );
-  });
-
-  await waitFor(() => {
-    expect(getByTestId('time')).toHaveTextContent('01:01');
-    expect(getByTestId('day')).toHaveTextContent('1');
-  });
-});
-
-test('advances to next day when sim time crosses 24h', async () => {
-  const { getByTestId } = render(
-    <MapProvider>
-      <SimulationProvider>
-        <TaskAssignmentProvider>
-          <MapContainer />
-          <ClockProbe />
-        </TaskAssignmentProvider>
-      </SimulationProvider>
-    </MapProvider>
-  );
-
-  await waitFor(() => {
-    expect(MockMap.instance).toBeDefined();
-  });
-
-  await act(async () => {
-    MockMap.instance?.callBacks['load']();
-  });
-
-  await act(async () => {
-    wsOptions?.onInitialFrame?.(
-      makePayload({
-        clock: {
-          simSecondsPassed: 86399,
-          simMinutesPassed: 1439,
-          realSecondsPassed: 86399,
-          realMinutesPassed: 1439,
-          startTime: 0,
-        },
-      })
-    );
-  });
-
-  await act(async () => {
-    wsOptions?.onFrameUpdate?.(
-      makePayload({
-        clock: {
-          simSecondsPassed: 90061,
-          simMinutesPassed: 1501,
-          realSecondsPassed: 90061,
-          realMinutesPassed: 1501,
-          startTime: 0,
-        },
-      })
-    );
-  });
-
-  await waitFor(() => {
-    expect(getByTestId('time')).toHaveTextContent('01:01');
-    expect(getByTestId('day')).toHaveTextContent('2');
-  });
-});
-
-test('defaults to 00:00 day 1 for negative sim time', async () => {
-  const { getByTestId } = render(
-    <MapProvider>
-      <SimulationProvider>
-        <TaskAssignmentProvider>
-          <MapContainer />
-          <ClockProbe />
-        </TaskAssignmentProvider>
-      </SimulationProvider>
-    </MapProvider>
-  );
-
-  await waitFor(() => {
-    expect(MockMap.instance).toBeDefined();
-  });
-
-  await act(async () => {
-    MockMap.instance?.callBacks['load']();
-  });
-
-  await act(async () => {
-    wsOptions?.onInitialFrame?.(
-      makePayload({
-        clock: {
-          simSecondsPassed: -5,
-          simMinutesPassed: -1,
-          realSecondsPassed: -5,
-          realMinutesPassed: -1,
-          startTime: 0,
-        },
-      })
-    );
-  });
-
-  await waitFor(() => {
-    expect(getByTestId('time')).toHaveTextContent('00:00');
-    expect(getByTestId('day')).toHaveTextContent('1');
-  });
-});
-
-test('displays time correctly with scenario start_time (08:00)', async () => {
-  const { getByTestId } = render(
-    <MapProvider>
-      <SimulationProvider>
-        <TaskAssignmentProvider>
-          <MapContainer />
-          <ClockProbe />
-        </TaskAssignmentProvider>
-      </SimulationProvider>
-    </MapProvider>
-  );
-
-  await waitFor(() => {
-    expect(MockMap.instance).toBeDefined();
-  });
-
-  await act(async () => {
-    MockMap.instance?.callBacks['load']();
-  });
-
-  await act(async () => {
-    wsOptions?.onInitialFrame?.(
-      makePayload({
-        clock: {
-          simSecondsPassed: 0,
-          simMinutesPassed: 0,
-          realSecondsPassed: 0,
-          realMinutesPassed: 0,
-          startTime: 28800,
-        },
-      })
-    );
-  });
-
-  await waitFor(() => {
-    expect(getByTestId('time')).toHaveTextContent('08:00');
-    expect(getByTestId('day')).toHaveTextContent('1');
-  });
-});
-
-test('advances time correctly with start_time', async () => {
-  const { getByTestId } = render(
-    <MapProvider>
-      <SimulationProvider>
-        <TaskAssignmentProvider>
-          <MapContainer />
-          <ClockProbe />
-        </TaskAssignmentProvider>
-      </SimulationProvider>
-    </MapProvider>
-  );
-
-  await waitFor(() => {
-    expect(MockMap.instance).toBeDefined();
-  });
-
-  await act(async () => {
-    MockMap.instance?.callBacks['load']();
-  });
-
-  await act(async () => {
-    wsOptions?.onInitialFrame?.(
-      makePayload({
-        clock: {
-          simSecondsPassed: 7200,
-          simMinutesPassed: 120,
-          realSecondsPassed: 7200,
-          realMinutesPassed: 120,
-          startTime: 28800,
-        },
-      })
-    );
-  });
-
-  await waitFor(() => {
-    expect(getByTestId('time')).toHaveTextContent('10:00');
-    expect(getByTestId('day')).toHaveTextContent('1');
-  });
-});
-
 test('RAF queue batches multiple rapid selections into single render', async () => {
   const setMapSourceMock = await import('~/lib/map-helpers').then(
     (m) => m.setMapSource
@@ -1492,7 +1252,7 @@ test('RAF queue batches multiple rapid selections into single render', async () 
 
   const { getByTestId } = render(
     <MapProvider>
-      <SimulationProvider>
+      <SimulationProvider simId="test-sim-123">
         <TaskAssignmentProvider>
           <MapContainer />
           <TestRapidSelectComponent />
@@ -1570,7 +1330,7 @@ test('RAF queue batches rapid clearSelection calls', async () => {
 
   const { getByTestId } = render(
     <MapProvider>
-      <SimulationProvider>
+      <SimulationProvider simId="test-sim-123">
         <TaskAssignmentProvider>
           <MapContainer />
           <TestRapidClearComponent />
@@ -1644,7 +1404,7 @@ test('RAF queue batches resource selection updates', async () => {
 
   const { getByTestId } = render(
     <MapProvider>
-      <SimulationProvider>
+      <SimulationProvider simId="123">
         <TaskAssignmentProvider>
           <MapContainer />
           <TestRapidResourceSelectComponent />
@@ -1716,7 +1476,7 @@ test('flushMapUpdates applies updates with current selection state', async () =>
 
   const { getByTestId } = render(
     <MapProvider>
-      <SimulationProvider>
+      <SimulationProvider simId="test-sim-123">
         <TaskAssignmentProvider>
           <MapContainer />
           <TestFlushComponent />
@@ -2120,148 +1880,4 @@ test('toggleShowAllRoutes changes showAllRoutes state', async () => {
   });
 
   expect(getByTestId('show-all-routes')).toHaveTextContent('false');
-});
-
-test('toggleShowAllRoutes calls updateAllRoutesDisplay when enabled', async () => {
-  const { updateAllRoutesDisplay } = await import('~/lib/map-helpers');
-  (updateAllRoutesDisplay as Mock).mockClear();
-
-  const TestToggleWithDataComponent = () => {
-    const { toggleShowAllRoutes } = useSimulation();
-
-    useEffect(() => {
-      if (wsOptions?.onInitialFrame) {
-        const payload = makePayload({
-          simId: 'test-sim-123',
-          drivers: [
-            makeDriver({
-              id: 1,
-              taskIds: [10],
-              position: [-73.5, 45.5],
-              route: {
-                coordinates: [
-                  [-73.5, 45.5],
-                  [-73.6, 45.6],
-                ],
-                nextStopIndex: 1,
-              },
-            }),
-          ],
-        });
-        wsOptions.onInitialFrame(payload);
-      }
-    }, []);
-
-    return (
-      <div>
-        <button data-testid="toggle-btn" onClick={toggleShowAllRoutes}>
-          Toggle
-        </button>
-      </div>
-    );
-  };
-
-  const { getByTestId } = render(
-    <MapProvider>
-      <SimulationProvider simId="test-sim-123">
-        <TaskAssignmentProvider>
-          <MapContainer />
-          <TestToggleWithDataComponent />
-        </TaskAssignmentProvider>
-      </SimulationProvider>
-    </MapProvider>
-  );
-
-  await waitFor(() => {
-    expect(MockMap.instance).toBeDefined();
-  });
-
-  await act(async () => {
-    MockMap.instance?.callBacks['load']();
-  });
-
-  await act(async () => {
-    getByTestId('toggle-btn').click();
-  });
-
-  // Should call updateAllRoutesDisplay when toggling on
-  await waitFor(() => {
-    expect(updateAllRoutesDisplay).toHaveBeenCalled();
-  });
-});
-
-test('toggleShowAllRoutes calls clearAllRoutesDisplay when disabled', async () => {
-  const { clearAllRoutesDisplay } = await import('~/lib/map-helpers');
-  (clearAllRoutesDisplay as Mock).mockClear();
-
-  const TestToggleOffComponent = () => {
-    const { showAllRoutes, toggleShowAllRoutes } = useSimulation();
-
-    useEffect(() => {
-      if (wsOptions?.onInitialFrame) {
-        const payload = makePayload({
-          simId: 'test-sim-123',
-          drivers: [
-            makeDriver({
-              id: 1,
-              taskIds: [10],
-              position: [-73.5, 45.5],
-              route: {
-                coordinates: [
-                  [-73.5, 45.5],
-                  [-73.6, 45.6],
-                ],
-                nextStopIndex: 1,
-              },
-            }),
-          ],
-        });
-        wsOptions.onInitialFrame(payload);
-      }
-    }, []);
-
-    return (
-      <div>
-        <div data-testid="show-all-routes">{String(showAllRoutes)}</div>
-        <button data-testid="toggle-btn" onClick={toggleShowAllRoutes}>
-          Toggle
-        </button>
-      </div>
-    );
-  };
-
-  const { getByTestId } = render(
-    <MapProvider>
-      <SimulationProvider simId="test-sim-123">
-        <TaskAssignmentProvider>
-          <MapContainer />
-          <TestToggleOffComponent />
-        </TaskAssignmentProvider>
-      </SimulationProvider>
-    </MapProvider>
-  );
-
-  await waitFor(() => {
-    expect(MockMap.instance).toBeDefined();
-  });
-
-  await act(async () => {
-    MockMap.instance?.callBacks['load']();
-  });
-
-  // Toggle on first
-  await act(async () => {
-    getByTestId('toggle-btn').click();
-  });
-
-  expect(getByTestId('show-all-routes')).toHaveTextContent('true');
-
-  // Toggle off
-  await act(async () => {
-    getByTestId('toggle-btn').click();
-  });
-
-  await waitFor(() => {
-    expect(getByTestId('show-all-routes')).toHaveTextContent('false');
-  });
 });

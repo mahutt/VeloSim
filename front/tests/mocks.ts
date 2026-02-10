@@ -91,3 +91,11 @@ export const mockDisplayError = vi.fn();
 export const consoleErrorSpy = vi
   .spyOn(console, 'error')
   .mockImplementation(() => {});
+
+export const mockServerFrameSource = class {
+  constructor() {}
+  async start() {
+    return true;
+  }
+  public stop() {}
+};

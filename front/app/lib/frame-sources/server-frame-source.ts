@@ -22,72 +22,47 @@
  * SOFTWARE.
  */
 
-import { useEffect, useRef, useState } from 'react';
-import type {
-  SimulationStatus,
-  UseSimulationWebSocketOptions,
-  UseSimulationWebSocketReturn,
-} from '~/types';
+import api from '~/api';
+import type { Speed } from '~/providers/simulation-provider';
+import type { BackendPayload } from '~/types';
 import {
   logFrameProcessingError,
   logSimulationError,
 } from '~/utils/simulation-error-utils';
-import api from '~/api';
+import type FrameSource from './frame-source';
 
-// WebSocket reconnection settings
-const MAX_RETRIES = 5;
-const INITIAL_DELAY = 1000; // 1 second
+export class ServerFrameSource implements FrameSource {
+  private simulationId: string;
+  private onFrame: (frame: BackendPayload) => void;
+  private onError: (title: string, message: string) => void;
 
-/**
- * Custom hook to manage WebSocket connection for simulation streaming.
- *
- * Handles:
- * - Connection lifecycle (connect, disconnect, reconnect)
- * - Message parsing and routing (initial frame, updates, status, errors)
- * - Reconnection with exponential backoff
- * - Error handling and logging
- *
- * @param options Configuration options for the WebSocket connection
- * @returns Connection state and WebSocket reference
- */
-export const useSimulationWebSocket = ({
-  simId,
-  enabled,
-  onInitialFrame,
-  onFrameUpdate,
-  onError,
-}: UseSimulationWebSocketOptions): UseSimulationWebSocketReturn => {
-  const [isConnected, setIsConnected] = useState(false);
-  const [simulationStatus, setSimulationStatus] =
-    useState<SimulationStatus>('idle');
-  const [connectionAttempts, setConnectionAttempts] = useState(0);
+  private wsUrl: string | null;
+  private ws: WebSocket | null;
+  private isRunning: Promise<boolean>;
+  private resolveIsRunning!: (value: boolean) => void;
+  private rejectIsRunning!: (reason?: Error) => void;
+  private speed: Speed;
 
-  const wsRef = useRef<WebSocket | null>(null);
+  constructor(
+    simulationId: string,
+    onFrame: (frame: BackendPayload) => void,
+    onError: (title: string, message: string) => void
+  ) {
+    this.simulationId = simulationId;
+    this.onFrame = onFrame;
+    this.onError = onError;
 
-  // Store callbacks in refs to avoid recreating WebSocket on callback changes
-  const onInitialFrameRef = useRef(onInitialFrame);
-  const onFrameUpdateRef = useRef(onFrameUpdate);
-  const onErrorRef = useRef(onError);
+    this.wsUrl = null;
+    this.ws = null;
+    this.isRunning = new Promise<boolean>((resolve, reject) => {
+      this.resolveIsRunning = resolve;
+      this.rejectIsRunning = reject;
+    });
 
-  // Update refs when callbacks change
-  useEffect(() => {
-    onInitialFrameRef.current = onInitialFrame;
-    onFrameUpdateRef.current = onFrameUpdate;
-    onErrorRef.current = onError;
-  }, [onInitialFrame, onFrameUpdate, onError]);
+    this.speed = 1;
+  }
 
-  useEffect(() => {
-    if (!enabled || !simId) {
-      console.log('[WS] ⏳ Waiting for prerequisites...', {
-        enabled,
-        simId: !!simId,
-      });
-      return;
-    }
-
-    console.log('[WS] 🚀 Connecting to WebSocket...');
-
-    // Build WebSocket URL
+  private static buildWebSocketUrl(simulationId: string): string {
     const apiBaseUrl = import.meta.env.VITE_BACKEND_URL;
     const url = apiBaseUrl ? new URL(apiBaseUrl) : null;
     const wsProtocol =
@@ -95,28 +70,21 @@ export const useSimulationWebSocket = ({
         ? 'wss:'
         : 'ws:';
     const wsHost = url?.host || window.location.host;
-    const wsUrl = `${wsProtocol}//${wsHost}/api/v1/simulation/stream/${simId}`;
+    const wsUrl = `${wsProtocol}//${wsHost}/api/v1/simulation/stream/${simulationId}`;
+    return wsUrl;
+  }
 
-    console.log('[WS] URL:', wsUrl);
-    console.log('[WS] Cookie will be sent automatically by browser');
+  public async start(): Promise<boolean> {
+    //
+    this.wsUrl = ServerFrameSource.buildWebSocketUrl(this.simulationId);
+    this.ws = new WebSocket(this.wsUrl);
 
-    setSimulationStatus('connecting');
-
-    const ws = new WebSocket(wsUrl);
-    wsRef.current = ws;
-
-    // ============================================================================
-    // WebSocket Event Handlers
-    // ============================================================================
-
-    ws.onopen = () => {
+    this.ws.onopen = () => {
       console.log('[WS] ✅ Connection opened');
-      setIsConnected(true);
-      setConnectionAttempts(0);
-      setSimulationStatus('loading');
+      // setConnectionAttempts(0);
     };
 
-    ws.onmessage = (event) => {
+    this.ws.onmessage = (event) => {
       try {
         const message = JSON.parse(event.data);
 
@@ -129,11 +97,13 @@ export const useSimulationWebSocket = ({
         // Handle error messages
         if (message.type === 'error') {
           console.error('[WS] ❌ Server Error:', message.message);
-          onErrorRef.current(
+          this.rejectIsRunning(
+            new Error(message.message || 'Simulation error')
+          );
+          this.onError(
             'Simulation Error',
             message.message || 'An error occurred'
           );
-          setSimulationStatus('error');
           return;
         }
 
@@ -143,22 +113,24 @@ export const useSimulationWebSocket = ({
           payload = JSON.parse(payload);
         }
 
+        // Assume this message is a frame
+        // Resolve the isRunning promise
+        this.resolveIsRunning(true);
+
         // Handle initial frame (seq === 0)
         if (message.seq === 0) {
           console.log('[WS] 🎬 Initial frame received');
           try {
-            onInitialFrameRef.current(payload);
-            setSimulationStatus('ready');
+            this.onFrame(payload);
           } catch (error) {
             logSimulationError(error, 'Failed to process initial frame', {
               errorType: 'INITIAL_FRAME_ERROR',
               payloadKeys: Object.keys(payload),
             });
-            onErrorRef.current(
+            this.onError(
               'Initialization Error',
               'Failed to initialize simulation. Please refresh and try again.'
             );
-            setSimulationStatus('error');
           }
           return;
         }
@@ -167,10 +139,7 @@ export const useSimulationWebSocket = ({
         if (message.seq > 0) {
           console.log('[WS] 🎞️  Frame', message.seq);
           try {
-            onFrameUpdateRef.current(payload);
-            setSimulationStatus((prev) =>
-              prev !== 'running' ? 'running' : prev
-            );
+            this.onFrame(payload);
           } catch (error) {
             logSimulationError(error, 'Failed to process frame update', {
               errorType: 'FRAME_UPDATE_ERROR',
@@ -186,41 +155,40 @@ export const useSimulationWebSocket = ({
         console.error('[WS] ❌ Parse error:', error);
         console.error('[WS] Raw data:', event.data);
         logFrameProcessingError(error, event.data?.seq || -1);
-        onErrorRef.current(
+        this.onError(
           'Simulation Frame Error',
           'An error occurred while processing simulation data. The simulation may not display correctly.'
         );
       }
     };
 
-    ws.onerror = (error) => {
+    this.ws.onerror = (error) => {
       console.error('[WS] ❌ WebSocket error:', error);
 
       logSimulationError(error, 'WebSocket connection error', {
         errorType: 'WEBSOCKET_ERROR',
-        simId,
-        wsUrl,
+        simId: this.simulationId,
+        wsUrl: this.wsUrl,
       });
 
-      onErrorRef.current(
+      this.onError(
         'Connection Error',
         'Failed to connect to simulation. Check authentication and try again.'
       );
-      setSimulationStatus('error');
     };
 
-    ws.onclose = (event) => {
+    this.ws.onclose = (event) => {
       console.log('[WS] 🔌 Connection closed:', {
         code: event.code,
         reason: event.reason,
         wasClean: event.wasClean,
       });
 
-      setIsConnected(false);
-
       // Pause the simulation by setting playback speed to 0
       api
-        .post(`/simulation/${simId}/playbackSpeed`, { playback_speed: 0 })
+        .post(`/simulation/${this.simulationId}/playbackSpeed`, {
+          playback_speed: 0,
+        })
         .then(() => {
           console.log('[WS] ⏸️  Playback paused on disconnect');
         })
@@ -237,46 +205,33 @@ export const useSimulationWebSocket = ({
           'WebSocket closed due to authentication failure',
           {
             errorType: 'WEBSOCKET_AUTH_FAILURE',
-            simId,
+            simId: this.simulationId,
             closeCode: event.code,
             closeReason: event.reason,
           }
         );
 
-        onErrorRef.current(
+        this.onError(
           'Authentication Failed',
           'WebSocket authentication failed. Please try logging in again.'
         );
-        setSimulationStatus('error');
         return;
       }
-
-      setSimulationStatus((prev) => (prev !== 'error' ? 'idle' : prev));
-
-      // Retry logic for network errors
-      if (connectionAttempts < MAX_RETRIES && event.code === 1006) {
-        const delay = INITIAL_DELAY * Math.pow(2, connectionAttempts);
-        console.log(
-          `[WS] 🔄 Retry ${connectionAttempts + 1}/${MAX_RETRIES} in ${delay}ms`
-        );
-
-        setTimeout(() => {
-          setConnectionAttempts((prev) => prev + 1);
-        }, delay);
-      }
     };
+    return this.isRunning;
+  }
 
-    // Cleanup on unmount
-    return () => {
-      if (wsRef.current) {
-        wsRef.current.close();
-      }
-    };
-  }, [enabled, simId, connectionAttempts]);
+  public stop() {
+    if (this.ws?.readyState === WebSocket.OPEN) {
+      this.ws.close();
+    }
+  }
 
-  return {
-    isConnected,
-    simulationStatus,
-    wsRef,
-  };
-};
+  public async setSpeed(speed: Speed): Promise<void> {
+    if (this.speed === speed) return;
+    await api.post(`/simulation/${this.simulationId}/playbackSpeed`, {
+      playback_speed: speed,
+    });
+    this.speed = speed;
+  }
+}
