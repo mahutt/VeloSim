@@ -80,17 +80,23 @@ services:
     networks:
       - velosim-net
 
-  # --- Promtail ---
-  promtail:
-    image: grafana/promtail:2.9.0
-    container_name: velosim-promtail
+  # --- Alloy (log collector) ---
+  alloy:
+    image: grafana/alloy:latest
+    container_name: velosim-alloy
+    ports:
+      - "12345:12345"
     volumes:
-      - ./grafana_logging/promtail/promtail-config.yaml:/etc/promtail/promtail-config.yaml:ro
+      - ./grafana_logging/alloy/config.alloy:/etc/alloy/config.alloy:ro
       - /var/lib/docker/containers:/var/lib/docker/containers:ro
       - /var/log:/var/log:ro
-      - ./grafana_logging/promtail/positions:/var/lib/promtail
+      - ./grafana_logging/alloy/data:/var/lib/alloy/data
       - ./grafana_logging:/logs:ro
-    command: -config.file=/etc/promtail/promtail-config.yaml
+    command:
+      - run
+      - /etc/alloy/config.alloy
+      - --storage.path=/var/lib/alloy/data
+      - --server.http.listen-addr=0.0.0.0:12345
     restart: unless-stopped
     depends_on:
       loki:
