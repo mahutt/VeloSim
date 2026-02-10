@@ -1,6 +1,6 @@
 # VeloSim Logging System
 
-Centralized logging and monitoring infrastructure using **Grafana**, **Loki**, **Promtail**, and **Prometheus** for the VeloSim project.
+Centralized logging and monitoring infrastructure using **Grafana**, **Loki**, **Alloy**, and **Prometheus** for the VeloSim project.
 
 ## 🏗️ Architecture
 
@@ -9,7 +9,7 @@ Centralized logging and monitoring infrastructure using **Grafana**, **Loki**, *
 **Logging Stack:**
 - **Grafana** (Port 3001): Web UI for log visualization, querying, and metrics dashboards
 - **Loki** (Port 3100): Log aggregation and storage backend
-- **Promtail**: Scrapes logs from files and ships them to Loki
+- **Alloy** (Port 12345): Scrapes logs from files and ships them to Loki (UI at http://localhost:12345)
 - **Logger Module**: Python API for structured logging across all components
 
 **Monitoring Stack:**
@@ -21,7 +21,7 @@ Centralized logging and monitoring infrastructure using **Grafana**, **Loki**, *
 ### 1. Start the Logging Stack
 
 ```bash
-# Start all services (Grafana, Loki, Promtail, PostgreSQL)
+# Start all services (Grafana, Loki, Alloy, PostgreSQL)
 docker-compose up -d
 
 # Verify services are running
@@ -254,8 +254,8 @@ grafana_logging/
 ├── loki/                          # Loki data storage
 ├── prometheus/
 │   └── prometheus.yml             # Prometheus scrape config
-├── promtail/
-│   └── promtail-config.yaml       # Log scraping config
+├── alloy/
+│   └── config.alloy               # Alloy log collection config
 ├── logger.py                      # Python logging module
 └── README.md                      # This file
 ```

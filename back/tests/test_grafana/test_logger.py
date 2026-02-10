@@ -22,20 +22,12 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 """
 
+import json
 import logging
-from pathlib import Path
-from unittest.mock import patch
-
-import pytest
-
-from grafana_logging.logger import VeloSimLogger, get_logger
+from unittest.mock import MagicMock, patch
 
 
-@pytest.fixture
-def temp_log_file(tmp_path: Path) -> Path:
-    """Create a temporary log file for testing."""
-    log_file = tmp_path / "test_logs.txt"
-    return log_file
+from grafana_logging.logger import LokiHandler, VeloSimLogger, get_logger
 
 
 def test_get_logger_creates_logger() -> None:
@@ -55,60 +47,24 @@ def test_get_logger_returns_same_instance() -> None:
     assert logger1 is logger2
 
 
-def test_logger_logs_to_file(temp_log_file: Path) -> None:
-    """Test that logger writes to file with timestamps."""
-    import re
-
-    with patch("grafana_logging.logger.DEFAULT_LOG_FILE", str(temp_log_file)):
-        with patch("grafana_logging.logger.LOG_TO_FILE", True):
-            with patch("grafana_logging.logger.LOG_TO_CONSOLE", False):
-                # Clear cached loggers
+def test_logger_different_levels() -> None:
+    """Test logging at different levels."""
+    with patch("grafana_logging.logger.LOG_TO_LOKI", False):
+        with patch("grafana_logging.logger.LOG_TO_CONSOLE", False):
+            with patch("grafana_logging.logger.DEFAULT_LOG_LEVEL", "DEBUG"):
                 VeloSimLogger._loggers.clear()
 
-                logger = get_logger("test_file_logging")
-                logger.info("Test message")
+                logger = get_logger("test_levels")
 
-                # Read the log file
-                assert temp_log_file.exists()
-                content = temp_log_file.read_text()
-                assert "Test message" in content
-                assert "test_file_logging" in content
-                assert "INFO" in content
-
-                # Verify timestamp is included
-                timestamp_pattern = r"\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}"
-                assert re.search(
-                    timestamp_pattern, content
-                ), "Timestamp should be present in file logs"
+                # These should not raise any exceptions
+                logger.debug("Debug message")
+                logger.info("Info message")
+                logger.warning("Warning message")
+                logger.error("Error message")
+                logger.critical("Critical message")
 
 
-def test_logger_different_levels(temp_log_file: Path) -> None:
-    """Test logging at different levels."""
-    with patch("grafana_logging.logger.DEFAULT_LOG_FILE", str(temp_log_file)):
-        with patch("grafana_logging.logger.LOG_TO_FILE", True):
-            with patch("grafana_logging.logger.LOG_TO_CONSOLE", False):
-                with patch("grafana_logging.logger.DEFAULT_LOG_LEVEL", "DEBUG"):
-                    VeloSimLogger._loggers.clear()
-
-                    logger = get_logger("test_levels")
-
-                    logger.debug("Debug message")
-                    logger.info("Info message")
-                    logger.warning("Warning message")
-                    logger.error("Error message")
-                    logger.critical("Critical message")
-
-                    content = temp_log_file.read_text()
-
-                    # All levels should be in the file
-                    assert "Debug message" in content
-                    assert "Info message" in content
-                    assert "Warning message" in content
-                    assert "Error message" in content
-                    assert "Critical message" in content
-
-
-def test_log_request_function(temp_log_file: Path) -> None:
+def test_log_request_function() -> None:
     """Test the log_request convenience function."""
     # Instead of actually logging to file, just verify the function is called correctly
     with patch("grafana_logging.logger.VeloSimLogger.get_logger") as mock_get_logger:
@@ -128,7 +84,7 @@ def test_log_request_function(temp_log_file: Path) -> None:
         assert "45.20ms" in call_args[0][1]
 
 
-def test_log_simulation_event(temp_log_file: Path) -> None:
+def test_log_simulation_event() -> None:
     """Test the log_simulation_event function."""
     # Instead of actually logging to file, just verify the function is called correctly
     with patch("grafana_logging.logger.VeloSimLogger.get_logger") as mock_get_logger:
@@ -157,17 +113,6 @@ def test_logger_custom_level() -> None:
     assert logger.level == logging.WARNING
 
 
-def test_log_file_creation(tmp_path: Path) -> None:
-    """Test that log file is created if it doesn't exist."""
-    log_file = tmp_path / "new_logs.txt"
-
-    with patch("grafana_logging.logger.DEFAULT_LOG_FILE", str(log_file)):
-        with patch("grafana_logging.logger.LOG_TO_FILE", True):
-            VeloSimLogger._ensure_log_file_exists()
-
-            assert log_file.exists()
-
-
 def test_logger_no_propagation() -> None:
     """Test that logger doesn't propagate to avoid duplicate logs."""
     logger = get_logger("test_no_propagate")
@@ -175,27 +120,167 @@ def test_logger_no_propagation() -> None:
     assert logger.propagate is False
 
 
-def test_logger_includes_timestamp_in_file(temp_log_file: Path) -> None:
-    """Test that file logs include timestamps."""
-    import re
+# =============================================================================
+# LokiHandler Tests
+# =============================================================================
 
-    with patch("grafana_logging.logger.DEFAULT_LOG_FILE", str(temp_log_file)):
-        with patch("grafana_logging.logger.LOG_TO_FILE", True):
-            with patch("grafana_logging.logger.LOG_TO_CONSOLE", False):
-                VeloSimLogger._loggers.clear()
 
-                logger = get_logger("test_timestamp")
-                logger.info("Timestamp test message")
+def test_loki_handler_init_default_values() -> None:
+    """Test LokiHandler initialization with default values."""
+    handler = LokiHandler()
 
-                content = temp_log_file.read_text()
+    assert handler.url == "http://velosim-loki:3100/loki/api/v1/push"
+    assert handler.labels == {"job": "python_app"}
+    assert handler.timeout == 2.0
 
-                # Verify timestamp is present (format: YYYY-MM-DD HH:MM:SS)
-                timestamp_pattern = r"\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}"
-                assert re.search(timestamp_pattern, content), (
-                    "Timestamp not found in log file. " f"Content: {content}"
-                )
 
-                # Verify full log format
-                assert "test_timestamp" in content
-                assert "INFO" in content
-                assert "Timestamp test message" in content
+def test_loki_handler_init_custom_values() -> None:
+    """Test LokiHandler initialization with custom values."""
+    handler = LokiHandler(
+        url="http://custom-loki:3100/loki/api/v1/push",
+        labels={"job": "custom_job", "env": "test"},
+        timeout=5.0,
+    )
+
+    assert handler.url == "http://custom-loki:3100/loki/api/v1/push"
+    assert handler.labels == {"job": "custom_job", "env": "test"}
+    assert handler.timeout == 5.0
+
+
+def test_loki_handler_emit_builds_correct_payload() -> None:
+    """Test that emit builds the correct Loki payload structure."""
+    handler = LokiHandler(url="http://test-loki:3100/loki/api/v1/push")
+    handler.setFormatter(logging.Formatter("%(message)s"))
+
+    with patch.object(handler, "_send_to_loki") as mock_send:
+        record = logging.LogRecord(
+            name="test_logger",
+            level=logging.INFO,
+            pathname="",
+            lineno=0,
+            msg="Test message",
+            args=(),
+            exc_info=None,
+        )
+        handler.emit(record)
+
+        # Verify _send_to_loki was called
+        mock_send.assert_called_once()
+
+        # Get the payload that was sent
+        payload = mock_send.call_args[0][0]
+
+        # Verify payload structure
+        assert "streams" in payload
+        assert len(payload["streams"]) == 1
+
+        stream = payload["streams"][0]
+        assert "stream" in stream
+        assert "values" in stream
+
+        # Verify labels
+        labels = stream["stream"]
+        assert labels["job"] == "python_app"
+        assert labels["logger"] == "test_logger"
+        assert labels["level"] == "INFO"
+
+        # Verify values (timestamp, message)
+        values = stream["values"]
+        assert len(values) == 1
+        assert len(values[0]) == 2  # [timestamp_ns, message]
+        assert values[0][1] == "Test message"
+
+
+def test_loki_handler_emit_includes_extra_labels() -> None:
+    """Test that emit includes extra labels from log record."""
+    handler = LokiHandler()
+    handler.setFormatter(logging.Formatter("%(message)s"))
+
+    with patch.object(handler, "_send_to_loki") as mock_send:
+        record = logging.LogRecord(
+            name="test_logger",
+            level=logging.INFO,
+            pathname="",
+            lineno=0,
+            msg="Test message",
+            args=(),
+            exc_info=None,
+        )
+        # Add extra attributes that LokiHandler looks for
+        record.source = "frontend"
+        record.user_id = 123
+        record.context = "login"
+
+        handler.emit(record)
+
+        payload = mock_send.call_args[0][0]
+        labels = payload["streams"][0]["stream"]
+
+        assert labels["source"] == "frontend"
+        assert labels["user_id"] == "123"
+        assert labels["context"] == "login"
+
+
+def test_loki_handler_emit_handles_errors_gracefully() -> None:
+    """Test that emit doesn't raise exceptions on errors."""
+    handler = LokiHandler()
+    handler.setFormatter(logging.Formatter("%(message)s"))
+
+    with patch.object(handler, "_send_to_loki", side_effect=Exception("Network error")):
+        record = logging.LogRecord(
+            name="test_logger",
+            level=logging.INFO,
+            pathname="",
+            lineno=0,
+            msg="Test message",
+            args=(),
+            exc_info=None,
+        )
+        # This should not raise an exception
+        handler.emit(record)
+
+
+def test_loki_handler_send_makes_http_request() -> None:
+    """Test that _send_to_loki makes correct HTTP request."""
+    handler = LokiHandler(url="http://test-loki:3100/loki/api/v1/push")
+
+    payload = {
+        "streams": [
+            {
+                "stream": {"job": "test"},
+                "values": [["1234567890000000000", "Test message"]],
+            }
+        ]
+    }
+
+    with patch("grafana_logging.logger.urllib.request.urlopen") as mock_urlopen:
+        mock_urlopen.return_value.__enter__ = MagicMock()
+        mock_urlopen.return_value.__exit__ = MagicMock()
+
+        handler._send_to_loki(payload)
+
+        # Verify urlopen was called
+        mock_urlopen.assert_called_once()
+
+        # Get the request object
+        request = mock_urlopen.call_args[0][0]
+
+        assert request.full_url == "http://test-loki:3100/loki/api/v1/push"
+        assert request.get_header("Content-type") == "application/json"
+        assert request.method == "POST"
+
+        # Verify the data
+        data = json.loads(request.data.decode("utf-8"))
+        assert data == payload
+
+
+def test_loki_handler_send_handles_network_errors() -> None:
+    """Test that _send_to_loki handles network errors silently."""
+    handler = LokiHandler()
+
+    with patch(
+        "grafana_logging.logger.urllib.request.urlopen",
+        side_effect=Exception("Connection refused"),
+    ):
+        # This should not raise an exception
+        handler._send_to_loki({"streams": []})
