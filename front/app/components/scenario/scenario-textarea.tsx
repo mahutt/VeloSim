@@ -27,6 +27,9 @@ import { Textarea } from '~/components/ui/textarea';
 import { Field, FieldLabel } from '~/components/ui/field';
 import ScenarioContentOptions from './scenario-content-options';
 import type { Dispatch, SetStateAction } from 'react';
+import CodeMirror from '@uiw/react-codemirror';
+import { json } from '@codemirror/lang-json';
+import { EditorView, placeholder } from '@codemirror/view';
 
 interface ScenarioTextAreaProps {
   scenarioData: string;
@@ -55,26 +58,15 @@ export default function ScenarioTextArea({
 }: ScenarioTextAreaProps) {
   const isDisabled = isExistingScenario && !isEditMode;
 
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    // Allow Tab key to insert spaces for indentation
-    if (e.key === 'Tab') {
-      e.preventDefault();
-      const target = e.currentTarget;
-      const start = target.selectionStart;
-      const end = target.selectionEnd;
-
-      // Insert 2 spaces at cursor position
-      const newValue =
-        scenarioData.substring(0, start) + '  ' + scenarioData.substring(end);
-
-      onChange(newValue);
-
-      // Move cursor after the inserted spaces
-      setTimeout(() => {
-        target.selectionStart = target.selectionEnd = start + 2;
-      }, 0);
-    }
-  };
+  // Custom theme to fix line number gutter width
+  const fixedGutterTheme = EditorView.theme({
+    '.cm-gutters': {
+      minWidth: '3rem',
+    },
+    '.cm-lineNumbers': {
+      minWidth: '2.5rem',
+    },
+  });
 
   return (
     <div className="flex-1 flex flex-col h-[40rem]">
@@ -99,15 +91,49 @@ export default function ScenarioTextArea({
             onEdit={onEdit}
           />
         </div>
-        <Textarea
-          id="scenario-json"
-          className="h-[28rem] resize-none font-mono"
-          placeholder="Paste or type your JSON scenario here..."
-          value={scenarioData}
-          onChange={(e) => onChange(e.target.value)}
-          onKeyDown={handleKeyDown}
-          disabled={isDisabled}
-        />
+        <div
+          className={`border rounded-md overflow-hidden h-[28rem] ${isDisabled ? 'bg-muted/50 opacity-60' : 'bg-background'}`}
+        >
+          <CodeMirror
+            value={scenarioData}
+            onChange={(value) => onChange(value)}
+            extensions={[
+              json(),
+              EditorView.lineWrapping,
+              fixedGutterTheme,
+              placeholder('Paste or type your JSON scenario here...'),
+            ]}
+            editable={!isDisabled}
+            basicSetup={{
+              lineNumbers: true,
+              highlightActiveLineGutter: true,
+              highlightSpecialChars: true,
+              foldGutter: true,
+              drawSelection: true,
+              dropCursor: true,
+              allowMultipleSelections: true,
+              indentOnInput: true,
+              bracketMatching: true,
+              closeBrackets: true,
+              autocompletion: true,
+              rectangularSelection: true,
+              highlightActiveLine: true,
+              highlightSelectionMatches: true,
+              closeBracketsKeymap: true,
+              searchKeymap: true,
+              foldKeymap: true,
+              completionKeymap: true,
+              lintKeymap: true,
+            }}
+            height="100%"
+            className="h-full"
+            style={{
+              fontSize: '14px',
+              height: '100%',
+            }}
+            theme={isDisabled ? 'light' : undefined}
+          />
+        </div>
       </Field>
 
       <div className="flex flex-col gap-2 mt-4 sm:flex-row sm:justify-between sm:items-center">
