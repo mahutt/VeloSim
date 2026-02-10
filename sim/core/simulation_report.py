@@ -61,17 +61,17 @@ class SimulationReport:
         """
         self.total_servicing_time += 1
 
-    def add_task_count_for_shift(self, numb_of_tasks: int) -> None:
+    def add_task_count_for_shift(self, task_count: int) -> None:
         """
         Adds task count for a driver's shift.
 
         Args:
-            numb_of_tasks (int): Number of tasks completed during the shift.
+            task_count (int): Number of tasks completed during the shift.
 
         Returns:
             None
         """
-        self.tasks_completed_per_shift.append(numb_of_tasks)
+        self.tasks_completed_per_shift.append(task_count)
 
     def get_servicing_to_driving_ratio(self) -> float:
         """
@@ -87,7 +87,7 @@ class SimulationReport:
 
     def get_average_tasks_per_shift(self) -> float:
         """
-        Retrives the average task per shift
+        Retrieves the average task per shift
         Returns:
             float: average task per shift.
         """

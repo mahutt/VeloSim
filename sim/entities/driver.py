@@ -434,11 +434,6 @@ class Driver:
             battery_count = self.vehicle.use_battery()
             task.set_state(State.CLOSED)
             self.vehicle.tasks_completed += 1
-            print(
-                "COUNT UPDATED for Vehicle: ",
-                str(self.vehicle.id) + " -  Count: ",
-                str(self.vehicle.tasks_completed),
-            )
             self.has_updated = True
             self.compute_routes()
 
