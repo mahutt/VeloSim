@@ -50,6 +50,7 @@ class Vehicle:
         self.battery_count = battery_count
         self.max_battery_count = max_battery_count
         self.has_updated = False  # flag to track if a vehicle was updated
+        self.tasks_completed = 0
 
     def get_driver(self) -> Optional["Driver"]:
         """Get the vehicle's current driver.

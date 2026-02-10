@@ -428,11 +428,17 @@ class Driver:
 
             for _ in range(task_servicing_time):
                 yield self.env.timeout(1)
-                self.env.metrics.increment_servicing_time()
+                self.env.report.increment_servicing_time()
 
             self.task_list.remove(task)
             battery_count = self.vehicle.use_battery()
             task.set_state(State.CLOSED)
+            self.vehicle.tasks_completed += 1
+            print(
+                "COUNT UPDATED for Vehicle: ",
+                str(self.vehicle.id) + " -  Count: ",
+                str(self.vehicle.tasks_completed),
+            )
             self.has_updated = True
             self.compute_routes()
 
@@ -645,7 +651,7 @@ class Driver:
                 yield self.env.timeout(1)
 
                 # increment driving time after timeout elapses.
-                self.env.metrics.increment_driving_time()
+                self.env.report.increment_driving_time()
 
                 next_position = self.current_route.next()
         # Allows a traveling drivers to be interrupted by other simpy entities
@@ -941,6 +947,10 @@ class Driver:
         if self.position.close_enough(self.env.hq.position):
             for task in self.task_list:
                 self.unassign_task(task)
+
+            if self.vehicle is not None:
+                self.env.report.add_task_count_for_shift(self.vehicle.tasks_completed)
+                self.vehicle.tasks_completed = 0
             self.unassign_vehicle()
             self.set_state(DriverState.OFF_SHIFT)
 
