@@ -27,7 +27,9 @@ import { Textarea } from '~/components/ui/textarea';
 import { Field, FieldLabel } from '~/components/ui/field';
 import ScenarioContentOptions from './scenario-content-options';
 import type { Dispatch, SetStateAction } from 'react';
-import { useRef } from 'react';
+import CodeMirror from '@uiw/react-codemirror';
+import { json } from '@codemirror/lang-json';
+import { EditorView, placeholder } from '@codemirror/view';
 
 interface ScenarioTextAreaProps {
   scenarioData: string;
@@ -55,38 +57,16 @@ export default function ScenarioTextArea({
   onEdit,
 }: ScenarioTextAreaProps) {
   const isDisabled = isExistingScenario && !isEditMode;
-  const lineNumbersRef = useRef<HTMLDivElement>(null);
 
-  // Calculate line numbers based on content
-  const lineCount = scenarioData.split('\n').length;
-  const lineNumbers = Array.from({ length: lineCount }, (_, i) => i + 1);
-
-  const handleScroll = (e: React.UIEvent<HTMLTextAreaElement>) => {
-    if (lineNumbersRef.current) {
-      lineNumbersRef.current.scrollTop = e.currentTarget.scrollTop;
-    }
-  };
-
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    // Allow Tab key to insert spaces for indentation
-    if (e.key === 'Tab') {
-      e.preventDefault();
-      const target = e.currentTarget;
-      const start = target.selectionStart;
-      const end = target.selectionEnd;
-
-      // Insert 2 spaces at cursor position
-      const newValue =
-        scenarioData.substring(0, start) + '  ' + scenarioData.substring(end);
-
-      onChange(newValue);
-
-      // Move cursor after the inserted spaces
-      setTimeout(() => {
-        target.selectionStart = target.selectionEnd = start + 2;
-      }, 0);
-    }
-  };
+  // Custom theme to fix line number gutter width
+  const fixedGutterTheme = EditorView.theme({
+    '.cm-gutters': {
+      minWidth: '3rem',
+    },
+    '.cm-lineNumbers': {
+      minWidth: '2.5rem',
+    },
+  });
 
   return (
     <div className="flex-1 flex flex-col h-[40rem]">
@@ -111,28 +91,47 @@ export default function ScenarioTextArea({
             onEdit={onEdit}
           />
         </div>
-        <div className="flex h-[28rem] border rounded-md overflow-hidden bg-background">
-          {/* Line numbers */}
-          <div
-            ref={lineNumbersRef}
-            className="select-none overflow-hidden bg-muted/50 px-2 py-2 font-mono text-sm text-muted-foreground border-r min-w-12 text-right leading-6"
-          >
-            {lineNumbers.map((num) => (
-              <div key={num} className="h-6">
-                {num}
-              </div>
-            ))}
-          </div>
-          {/* Textarea */}
-          <Textarea
-            id="scenario-json"
-            className="flex-1 h-full resize-none font-mono border-0 focus-visible:ring-0 focus-visible:ring-offset-0 rounded-none overflow-y-auto leading-6"
-            placeholder="Paste or type your JSON scenario here..."
+        <div
+          className={`border rounded-md overflow-hidden h-[28rem] ${isDisabled ? 'bg-muted/50 opacity-60' : 'bg-background'}`}
+        >
+          <CodeMirror
             value={scenarioData}
-            onChange={(e) => onChange(e.target.value)}
-            onKeyDown={handleKeyDown}
-            onScroll={handleScroll}
-            disabled={isDisabled}
+            onChange={(value) => onChange(value)}
+            extensions={[
+              json(),
+              EditorView.lineWrapping,
+              fixedGutterTheme,
+              placeholder('Paste or type your JSON scenario here...'),
+            ]}
+            editable={!isDisabled}
+            basicSetup={{
+              lineNumbers: true,
+              highlightActiveLineGutter: true,
+              highlightSpecialChars: true,
+              foldGutter: true,
+              drawSelection: true,
+              dropCursor: true,
+              allowMultipleSelections: true,
+              indentOnInput: true,
+              bracketMatching: true,
+              closeBrackets: true,
+              autocompletion: true,
+              rectangularSelection: true,
+              highlightActiveLine: true,
+              highlightSelectionMatches: true,
+              closeBracketsKeymap: true,
+              searchKeymap: true,
+              foldKeymap: true,
+              completionKeymap: true,
+              lintKeymap: true,
+            }}
+            height="100%"
+            className="h-full"
+            style={{
+              fontSize: '14px',
+              height: '100%',
+            }}
+            theme={isDisabled ? 'light' : undefined}
           />
         </div>
       </Field>
