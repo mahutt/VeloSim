@@ -1,0 +1,97 @@
+// Grafana Alloy Configuration for VeloSim
+// Collects system logs and Python application logs and sends them to Loki
+
+logging {
+  level = "debug"
+}
+
+// ===== FILE DISCOVERY =====
+
+// System logs - compressed (gz)
+local.file_match "system_gz" {
+  path_targets = [{
+    __path__ = "/var/log/**.gz",
+  }]
+}
+
+// System logs - regular log files
+local.file_match "system_logs" {
+  path_targets = [{
+    __path__ = "/var/log/**/*.log",
+  }]
+}
+
+// Python application logs - DISABLED (now using HTTP push directly to Loki)
+// The Python logger sends logs directly via HTTP, no file collection needed.
+// To re-enable file-based collection, set LOG_TO_FILE=true and LOG_TO_LOKI=false
+// local.file_match "python_logs" {
+//   path_targets = [{
+//     __path__ = "/logs/logs.txt",
+//   }]
+// }
+
+// ===== LOG COLLECTION =====
+
+// System logs (compressed) - with decompression
+loki.source.file "system_gz" {
+  targets    = local.file_match.system_gz.targets
+  forward_to = [loki.process.system_logs.receiver]
+
+  decompression {
+    enabled       = true
+    initial_delay = "10s"
+    format        = "gz"
+  }
+}
+
+// System logs (regular)
+loki.source.file "system_logs" {
+  targets    = local.file_match.system_logs.targets
+  forward_to = [loki.process.system_logs.receiver]
+}
+
+// Python application logs - DISABLED (now using HTTP push directly to Loki)
+// loki.source.file "python_logs" {
+//   targets    = local.file_match.python_logs.targets
+//   forward_to = [loki.process.python_logs.receiver]
+// }
+
+// ===== LOG PROCESSING =====
+
+// System logs - add job label
+loki.process "system_logs" {
+  stage.static_labels {
+    values = {
+      job = "varlogs",
+    }
+  }
+
+  forward_to = [loki.write.loki.receiver]
+}
+
+// Python logs processing - DISABLED (now using HTTP push directly to Loki)
+// Labels are set directly by the Python LokiHandler, no parsing needed.
+// loki.process "python_logs" {
+//   stage.regex {
+//     expression = "^(?P<timestamp>\\d{4}-\\d{2}-\\d{2}\\s+\\d{2}:\\d{2}:\\d{2})\\s+-\\s+(?P<logger>\\S+)\\s+-\\s+(?P<level>\\S+)\\s+-\\s+(?P<message>.*)$"
+//   }
+//   stage.json {
+//     source      = "message"
+//     expressions = { source = "source", user_id = "user_id", context = "context" }
+//   }
+//   stage.labels {
+//     values = { logger = "", source = "", level = "", context = "", user_id = "" }
+//   }
+//   stage.static_labels {
+//     values = { job = "python_app" }
+//   }
+//   forward_to = [loki.write.loki.receiver]
+// }
+
+// ===== LOKI CLIENT =====
+
+loki.write "loki" {
+  endpoint {
+    url = "http://velosim-loki:3100/loki/api/v1/push"
+  }
+}

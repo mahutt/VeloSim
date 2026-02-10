@@ -22,33 +22,127 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 """
 
+import json
 import logging
 import os
 import sys
-from pathlib import Path
-from typing import Dict, List, Optional, Union
+import time
+import urllib.request
+from typing import Any, Dict, List, Optional
 
-# Default log configuration
+# Configuration
 DEFAULT_LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO").upper()
-_LOGGER_DIR = Path(__file__).parent
-DEFAULT_LOG_FILE = os.getenv("LOG_FILE_PATH", str(_LOGGER_DIR / "logs.txt"))
-LOG_TO_FILE = os.getenv("LOG_TO_FILE", "true").lower() == "true"
 LOG_TO_CONSOLE = os.getenv("LOG_TO_CONSOLE", "true").lower() == "true"
+LOG_TO_LOKI = os.getenv("LOG_TO_LOKI", "true").lower() == "true"
+LOKI_URL = os.getenv("LOKI_URL", "http://velosim-loki:3100/loki/api/v1/push")
 
-# Log formats
-# File format: With timestamp for production reliability
-FILE_LOG_FORMAT = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
-# Console format: With timestamp for local debugging
+# Console log format
 CONSOLE_LOG_FORMAT = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 DATE_FORMAT = "%Y-%m-%d %H:%M:%S"
+
+
+class LokiHandler(logging.Handler):
+    """
+    Custom logging handler that sends logs directly to Loki via HTTP.
+
+    This handler pushes logs to Loki's push API endpoint, eliminating the need
+    for file-based log collection via Alloy/Promtail.
+    """
+
+    def __init__(
+        self,
+        url: str = LOKI_URL,
+        labels: Optional[Dict[str, str]] = None,
+        timeout: float = 2.0,
+    ):
+        """
+        Initialize the Loki handler.
+
+        Args:
+            url: Loki push API URL
+            labels: Static labels to add to all log entries
+            timeout: HTTP request timeout in seconds
+        """
+        super().__init__()
+        self.url = url
+        self.labels = labels or {"job": "python_app"}
+        self.timeout = timeout
+
+    def emit(self, record: logging.LogRecord) -> None:
+        """
+        Send a log record to Loki.
+
+        Args:
+            record: The log record to send
+        """
+        try:
+            # Build labels for this log entry
+            labels = {
+                **self.labels,
+                "logger": record.name,
+                "level": record.levelname,
+            }
+
+            # Add extra labels if present on the record
+            if hasattr(record, "source"):
+                labels["source"] = record.source
+            if hasattr(record, "user_id"):
+                labels["user_id"] = str(record.user_id)
+            if hasattr(record, "context"):
+                labels["context"] = record.context
+
+            # Format the log message
+            message = self.format(record)
+
+            # Loki expects timestamps in nanoseconds
+            timestamp_ns = str(int(time.time() * 1_000_000_000))
+
+            # Build the Loki push payload
+            payload = {
+                "streams": [
+                    {
+                        "stream": labels,
+                        "values": [[timestamp_ns, message]],
+                    }
+                ]
+            }
+
+            # Send to Loki
+            self._send_to_loki(payload)
+
+        except Exception:
+            # Don't let logging errors crash the application
+            self.handleError(record)
+
+    def _send_to_loki(self, payload: Dict[str, Any]) -> None:
+        """
+        Send payload to Loki via HTTP POST.
+
+        Args:
+            payload: The JSON payload to send
+        """
+        data = json.dumps(payload).encode("utf-8")
+        request = urllib.request.Request(
+            self.url,
+            data=data,
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+
+        try:
+            with urllib.request.urlopen(request, timeout=self.timeout):
+                pass  # Success - Loki returns 204 No Content
+        except Exception:
+            # Silently ignore errors to avoid disrupting the application
+            pass
 
 
 class VeloSimLogger:
     """
     Centralized logging utility for VeloSim.
 
-    Provides structured logging that can be collected by Promtail
-    and visualized in Grafana via Loki.
+    Provides structured logging that is sent directly to Loki via HTTP
+    and visualized in Grafana.
 
     Usage:
         from grafana_logging.logger import get_logger
@@ -56,37 +150,29 @@ class VeloSimLogger:
         logger = get_logger(__name__)
         logger.info("Application started")
         logger.error("An error occurred", exc_info=True)
+
+    Environment variables:
+        LOG_TO_LOKI: Enable Loki HTTP push (default: true)
+        LOG_TO_CONSOLE: Enable console logging (default: true)
+        LOKI_URL: Loki push API URL (default: http://velosim-loki:3100/loki/api/v1/push)
     """
 
     _loggers: Dict[str, logging.Logger] = {}
-    _initialized = False
 
     @classmethod
-    def _ensure_log_file_exists(cls) -> None:
-        """Ensure the log file and its directory exist."""
-        if LOG_TO_FILE:
-            log_path = Path(DEFAULT_LOG_FILE)
-            log_path.parent.mkdir(parents=True, exist_ok=True)
+    def _setup_handlers(cls) -> List[logging.Handler]:
+        """Set up logging handlers for Loki and console output."""
+        handlers: List[logging.Handler] = []
 
-            # Create file if it doesn't exist
-            if not log_path.exists():
-                log_path.touch()
-
-    @classmethod
-    def _setup_handlers(cls) -> List[Union[logging.FileHandler, logging.StreamHandler]]:
-        """Set up logging handlers for file and console output."""
-        handlers: List[Union[logging.FileHandler, logging.StreamHandler]] = []
-
-        # File handler - with timestamp for production reliability
-        if LOG_TO_FILE:
-            cls._ensure_log_file_exists()
-            file_handler = logging.FileHandler(
-                DEFAULT_LOG_FILE, mode="a", encoding="utf-8"
+        # Loki handler - send logs directly to Loki via HTTP
+        if LOG_TO_LOKI:
+            loki_handler = LokiHandler(url=LOKI_URL)
+            loki_handler.setLevel(logging.DEBUG)
+            loki_formatter = logging.Formatter(
+                "%(asctime)s - %(message)s", DATE_FORMAT
             )
-            file_handler.setLevel(logging.DEBUG)
-            file_formatter = logging.Formatter(FILE_LOG_FORMAT, DATE_FORMAT)
-            file_handler.setFormatter(file_formatter)
-            handlers.append(file_handler)
+            loki_handler.setFormatter(loki_formatter)
+            handlers.append(loki_handler)
 
         # Console handler - with timestamp for local debugging
         if LOG_TO_CONSOLE:
@@ -264,9 +350,3 @@ def log_simulation_event(
         None
     """
     VeloSimLogger.log_simulation_event(event_type, message, data)
-
-
-# Initialize on import
-if __name__ != "__main__":
-    # Ensure log file exists when module is imported
-    VeloSimLogger._ensure_log_file_exists()
