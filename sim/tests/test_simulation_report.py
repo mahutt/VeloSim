@@ -29,17 +29,24 @@ from sim.core.simulation_report import SimulationReport
 
 def test_initial_state() -> None:
     """
-    SimulationReport should initialize with zero driving and servicing time.
+    SimulationReport should initialize with zero metrics and empty task list.
+
+    Returns:
+        None
     """
     metrics = SimulationReport()
 
     assert metrics.total_driving_time == 0
     assert metrics.total_servicing_time == 0
+    assert metrics.tasks_completed_per_shift == []
 
 
 def test_increment_driving_time() -> None:
     """
-    increment_driving_time should increase total_driving_time by one.
+    increment_driving_time should increase total_driving_time.
+
+    Returns:
+        None
     """
     metrics = SimulationReport()
 
@@ -52,7 +59,10 @@ def test_increment_driving_time() -> None:
 
 def test_increment_servicing_time() -> None:
     """
-    increment_servicing_time should increase total_servicing_time by one.
+    increment_servicing_time should increase total_servicing_time.
+
+    Returns:
+        None
     """
     metrics = SimulationReport()
 
@@ -64,9 +74,70 @@ def test_increment_servicing_time() -> None:
     assert metrics.total_driving_time == 0
 
 
-def test_driving_to_servicing_ratio_normal_case() -> None:
+def test_add_task_count_for_shift_single_entry() -> None:
     """
-    get_driving_to_servicing_ratio should return servicing / driving.
+    add_task_count_for_shift should store a single task count.
+
+    Returns:
+        None
+    """
+    metrics = SimulationReport()
+
+    metrics.add_task_count_for_shift(5)
+
+    assert metrics.tasks_completed_per_shift == [5]
+
+
+def test_add_task_count_for_shift_multiple_entries() -> None:
+    """
+    add_task_count_for_shift should store multiple task counts in order.
+
+    Returns:
+        None
+    """
+    metrics = SimulationReport()
+
+    metrics.add_task_count_for_shift(3)
+    metrics.add_task_count_for_shift(7)
+    metrics.add_task_count_for_shift(2)
+
+    assert metrics.tasks_completed_per_shift == [3, 7, 2]
+
+
+def test_get_average_tasks_per_shift_normal_case() -> None:
+    """
+    get_average_tasks_per_shift should return correct average.
+
+    Returns:
+        None
+    """
+    metrics = SimulationReport()
+
+    metrics.add_task_count_for_shift(4)
+    metrics.add_task_count_for_shift(6)
+    metrics.add_task_count_for_shift(10)
+
+    assert metrics.get_average_tasks_per_shift() == pytest.approx(20 / 3)
+
+
+def test_get_average_tasks_per_shift_empty() -> None:
+    """
+    get_average_tasks_per_shift should return 0.0 when list is empty.
+
+    Returns:
+        None
+    """
+    metrics = SimulationReport()
+
+    assert metrics.get_average_tasks_per_shift() == 0.0
+
+
+def test_get_servicing_to_driving_ratio_normal_case() -> None:
+    """
+    get_servicing_to_driving_ratio should return servicing / driving.
+
+    Returns:
+        None
     """
     metrics = SimulationReport()
 
@@ -76,18 +147,56 @@ def test_driving_to_servicing_ratio_normal_case() -> None:
     for _ in range(2):
         metrics.increment_servicing_time()
 
-    ratio = metrics.get_servicing_to_driving_ratio()
-
-    assert ratio == pytest.approx(0.5)
+    assert metrics.get_servicing_to_driving_ratio() == pytest.approx(0.5)
 
 
-def test_driving_to_servicing_ratio_zero_driving_time() -> None:
+def test_get_servicing_to_driving_ratio_zero_driving_time() -> None:
     """
-    get_driving_to_servicing_ratio should return 0 when driving time is zero.
+    get_servicing_to_driving_ratio should return 0.0 when driving time is zero.
+
+    Returns:
+        None
     """
     metrics = SimulationReport()
 
     metrics.increment_servicing_time()
     metrics.increment_servicing_time()
 
-    assert metrics.get_servicing_to_driving_ratio() == 0
+    assert metrics.get_servicing_to_driving_ratio() == 0.0
+
+
+def test_reset_clears_all_metrics() -> None:
+    """
+    reset should clear driving time, servicing time, and task list.
+
+    Returns:
+        None
+    """
+    metrics = SimulationReport()
+
+    metrics.increment_driving_time()
+    metrics.increment_servicing_time()
+    metrics.add_task_count_for_shift(5)
+    metrics.add_task_count_for_shift(8)
+
+    metrics.reset()
+
+    assert metrics.total_driving_time == 0
+    assert metrics.total_servicing_time == 0
+    assert metrics.tasks_completed_per_shift == []
+
+
+def test_reset_on_fresh_instance() -> None:
+    """
+    reset should be safe on a fresh instance with no prior data.
+
+    Returns:
+        None
+    """
+    metrics = SimulationReport()
+
+    metrics.reset()
+
+    assert metrics.total_driving_time == 0
+    assert metrics.total_servicing_time == 0
+    assert metrics.tasks_completed_per_shift == []

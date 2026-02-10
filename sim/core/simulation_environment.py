@@ -32,13 +32,13 @@ class SimulationEnvironment(simpy.Environment):
     """Custom simulation environment for VeloSim."""
 
     hq: Headquarters
-    metrics: SimulationReport
+    report: SimulationReport
 
     def __init__(self) -> None:
         """Initialize the simulation environment."""
         super().__init__()
         self.hq = Headquarters()
-        self.metrics = SimulationReport()
+        self.report = SimulationReport()
 
     def set_headquarters(self, hq: Headquarters) -> None:
         """Set the headquarters for the simulation.

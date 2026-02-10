@@ -690,8 +690,11 @@ class SimulatorController:
 
         current_reporting = {
             "servicingToDrivingRatio": round(
-                self.simEnv.metrics.get_servicing_to_driving_ratio(), 4
-            )
+                self.simEnv.report.get_servicing_to_driving_ratio(), 4
+            ),
+            "averageTasksServicedPerShift": round(
+                self.simEnv.report.get_average_tasks_per_shift(), 4
+            ),
         }
 
         # Only include metrics on keyframe and on change.
