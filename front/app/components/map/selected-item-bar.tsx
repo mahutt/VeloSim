@@ -98,12 +98,7 @@ export default function SelectedItemBar() {
           <X className="h-4 w-4" />
         </Button>
       </div>
-      <p className="text-sm text-muted-foreground px-5">
-        {selectedItem.value.tasks.length === 0
-          ? 'No tasks'
-          : `Tasks (${selectedItem.value.tasks.length})`}
-      </p>
-      {selectedItem.value.tasks.length > 0 && (
+      {selectedItem.value.tasks.length > 0 ? (
         <ScrollArea className="mx-2">
           <div className="max-h-50 px-3 space-y-1">
             {selectedItem.type === SelectedItemType.Station ? (
@@ -113,6 +108,8 @@ export default function SelectedItemBar() {
             )}
           </div>
         </ScrollArea>
+      ) : (
+        <p className="text-sm text-muted-foreground px-5">No tasks</p>
       )}
     </div>
   );
@@ -127,6 +124,11 @@ function StationTasks({ station }: { station: PopulatedStation }) {
 
   return (
     <>
+      <p className="text-sm text-muted-foreground">
+        {selectedTaskIds.length > 0
+          ? `Tasks (${selectedTaskIds.length}/${station.tasks.length} selected)`
+          : `Tasks (${station.tasks.length})`}
+      </p>
       {station.tasks.map((task, index) => {
         const assignedResource = Array.from(driversRef.current.values()).find(
           (r) => r.taskIds.includes(task.id)
@@ -208,6 +210,11 @@ function DriverTasks({ driver }: { driver: PopulatedDriver }) {
 
   return (
     <>
+      <p className="text-sm text-muted-foreground">
+        {selectedTaskIds.length > 0
+          ? `Tasks (${selectedTaskIds.length}/${driver.tasks.length} selected)`
+          : `Tasks (${driver.tasks.length})`}
+      </p>
       {driver.tasks.map((task, index) => {
         const draggedIndex = draggedTaskId
           ? driver.tasks.findIndex((t) => t.id === draggedTaskId)

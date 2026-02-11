@@ -31,6 +31,7 @@ import {
   useCallback,
   type ReactNode,
 } from 'react';
+import { toast } from 'sonner';
 
 import { useMap } from './map-provider';
 import {
@@ -342,11 +343,26 @@ export const SimulationProvider = ({
         items: { driver_id: number; task_id: number; success: boolean }[];
       }>(`/simulation/${simId!}/drivers/assign/batch`, payload);
 
+      const items = response.data.items;
       const successfulTaskIds = new Set(
-        response.data.items
-          .filter((item) => item.success)
-          .map((item) => item.task_id)
+        items.filter((item) => item.success).map((item) => item.task_id)
       );
+      const failedTaskIds = items
+        .filter((item) => !item.success)
+        .map((item) => item.task_id);
+      const totalTaskCount = items.length || taskIds.length;
+
+      if (failedTaskIds.length > 0) {
+        if (successfulTaskIds.size === 0) {
+          toast.error(
+            `Failed to assign ${totalTaskCount} task${totalTaskCount === 1 ? '' : 's'}.`
+          );
+        } else {
+          toast.error(
+            `Assigned ${successfulTaskIds.size} of ${totalTaskCount} tasks. ${failedTaskIds.length} failed.`
+          );
+        }
+      }
 
       if (successfulTaskIds.size === 0) return;
 
