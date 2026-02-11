@@ -695,6 +695,9 @@ class SimulatorController:
             "averageTasksServicedPerShift": round(
                 self.simEnv.report.get_average_tasks_per_shift(), 4
             ),
+            "averageTaskResponseTime": round(
+                self.simEnv.report.get_average_service_time_for_tasks(), 4
+            ),
         }
 
         # Only include metrics on keyframe and on change.
