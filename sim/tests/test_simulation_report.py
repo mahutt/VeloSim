@@ -200,3 +200,75 @@ def test_reset_on_fresh_instance() -> None:
     assert metrics.total_driving_time == 0
     assert metrics.total_servicing_time == 0
     assert metrics.tasks_completed_per_shift == []
+
+
+def test_get_average_service_time_for_tasks_normal_case() -> None:
+    """
+    get_average_service_time_for_tasks should return correct average
+    when service_times contains values.
+
+    Returns:
+        None
+    """
+    metrics = SimulationReport()
+
+    metrics.response_times = [5, 10, 15]
+
+    assert metrics.get_average_service_time_for_tasks() == pytest.approx(10.0)
+
+
+def test_get_average_service_time_for_tasks_single_entry() -> None:
+    """
+    get_average_service_time_for_tasks should return the value itself
+    when only one service time exists.
+
+    Returns:
+        None
+    """
+    metrics = SimulationReport()
+
+    metrics.response_times = [8]
+
+    assert metrics.get_average_service_time_for_tasks() == 8.0
+
+
+def test_get_average_service_time_for_tasks_empty() -> None:
+    """
+    get_average_service_time_for_tasks should return 0.0
+    when there are no recorded service times.
+
+    Returns:
+        None
+    """
+    metrics = SimulationReport()
+
+    assert metrics.get_average_service_time_for_tasks() == 0.0
+
+
+def test_add_task_count_for_shift_allows_zero() -> None:
+    """
+    add_task_count_for_shift should correctly store zero
+    as a valid shift task count.
+
+    Returns:
+        None
+    """
+    metrics = SimulationReport()
+
+    metrics.add_task_count_for_shift(0)
+
+    assert metrics.tasks_completed_per_shift == [0]
+
+
+def test_add_task_count_for_shift_large_value() -> None:
+    """
+    add_task_count_for_shift should handle large task counts.
+
+    Returns:
+        None
+    """
+    metrics = SimulationReport()
+
+    metrics.add_task_count_for_shift(1000)
+
+    assert metrics.tasks_completed_per_shift == [1000]

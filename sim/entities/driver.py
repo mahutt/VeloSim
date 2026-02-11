@@ -439,9 +439,11 @@ class Driver:
 
             # Get service time and add it to reporting.
             spawn_time = task.spawn_delay
-            current_time = self.env.now
-            service_time = current_time - spawn_time
-            self.env.report.add_service_time(service_time)
+
+            if spawn_time is None:
+                spawn_time = 0
+
+            self.env.report.add_service_time(self.env.now - spawn_time)
 
             self.has_updated = True
             self.compute_routes()
