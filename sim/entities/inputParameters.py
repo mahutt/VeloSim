@@ -23,6 +23,7 @@ SOFTWARE.
 """
 
 # This class is a placeholder for when we define input params later down in the project.
+import json
 from sim.entities.map_payload import MapPayload
 from typing import Dict, Mapping, Optional, List
 from sim.entities.station import Station
@@ -133,6 +134,7 @@ class InputParameter:
             MapPayload with map configuration, or None.
         """
         return self.map_payload
+
     def get_station_scheduled_tasks(self) -> Optional[Dict[int, Dict[int, List[int]]]]:
         """Get the station scheduled tasks.
 

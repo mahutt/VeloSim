@@ -22,11 +22,8 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 """
 
-import simpy
-
 from sim.behaviour.sim_behaviour import SimBehaviour
 from sim.entities.station import Station
-from sim.entities.position import Position
 
 
 class _StubTPU:
@@ -53,28 +50,3 @@ def test_sim_behaviour_setters_assign_strategies() -> None:
 
     assert beh.TPU_strategy is tpu  # type: ignore[comparison-overlap]
     assert beh.RCNT_strategy is rcnt  # type: ignore[comparison-overlap]
-
-
-def test_station_uses_tpu_strategy_in_run_loop() -> None:
-    env = simpy.Environment()
-    station = Station(station_id=1, name="S1", position=Position([0.0, 0.0]))
-
-    # Set the env attribute since it's no longer passed in constructor
-    station.env = env
-
-    # Set up behaviour with a TPU strategy that returns True once
-    beh = SimBehaviour()
-    tpu = _StubTPU()
-    tpu.return_value = True
-    beh.set_TPU_strategy(tpu)  # type: ignore[arg-type]
-    station.set_behaviour(beh)
-
-    env.process(station.run())
-    # Run long enough for the station to call check_for_new_task once
-    env.run(until=2)
-
-    # The TPU strategy should *not* have been invoked
-    # (for now, since pop-up tasks are disabled until #581 is resolved)
-    assert tpu.calls == 0
-    assert len(station.pop_up_tasks) == 0
-    assert station.get_task_count() == 0

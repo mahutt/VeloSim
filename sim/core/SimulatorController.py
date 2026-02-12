@@ -98,9 +98,12 @@ class SimulatorController:
         )
 
         if isinstance(sim_behaviour.TPU_strategy, DefaultTPUStrategy):
-            sim_behaviour.TPU_strategy.station_scheduled_tasks = (
-                inputParameters.get_station_scheduled_tasks()
-            )
+            station_scheduled_tasks = inputParameters.get_station_scheduled_tasks()
+            if station_scheduled_tasks is not None:
+                sim_behaviour.TPU_strategy.set_station_scheduled_tasks(
+                    station_scheduled_tasks
+                )
+
         self.task_entities = inputParameters.get_task_entities()
         self.prep_entities()
 
@@ -121,19 +124,6 @@ class SimulatorController:
             task.set_behaviour(self.sim_behaviour)
             # Rebind to the actual simulation environment
             task.env = self.simEnv
-            task.spawn_time = self.simEnv.now + (
-                task.spawn_delay if task.spawn_delay else 0
-            )
-            # Handle scheduling
-            if task.spawn_delay is not None and task.spawn_delay > 0:
-                # Task starts SCHEDULED, will become OPEN after delay
-                task.state = State.SCHEDULED
-                # Start self-spawning process
-                self.simEnv.process(task._spawn_after_delay(task.spawn_delay))
-            else:
-                # Initial (non-scheduled) tasks are automatically
-                # set to assigned in json_parser_strategy
-                pass
 
         for _, driver in self.driver_entities.items():
             driver.set_behaviour(self.sim_behaviour)
@@ -607,6 +597,19 @@ class SimulatorController:
                     ),
                 }
             )
+
+        # Backwards compatibility for scheduled tasks spawning with Default TPU Strategy
+        TPU_strategy = self.sim_behaviour.TPU_strategy
+        if is_key and isinstance(TPU_strategy, DefaultTPUStrategy):
+            for station_id, time, task_id in TPU_strategy.get_scheduled_tasks():
+                tasks.append(
+                    {
+                        "id": task_id,
+                        "state": str(State.SCHEDULED),
+                        "stationId": station_id,
+                        "assignedDriverId": None,
+                    }
+                )
 
         stations = [
             {

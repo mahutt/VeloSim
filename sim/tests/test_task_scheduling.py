@@ -33,6 +33,7 @@ from sim.entities.station import Station
 from sim.entities.task_state import State
 from sim.entities.vehicle import Vehicle
 from sim.entities.shift import Shift
+from sim.behaviour.default.default_TPU_strategy import DefaultTPUStrategy
 
 
 @pytest.fixture
@@ -46,7 +47,9 @@ def env() -> SimulationEnvironment:
 @pytest.fixture
 def station(env: simpy.Environment) -> Station:
     # Create new test station
-    return Station(station_id=1, name="Test Station", position=Position([6, 7]))
+    station = Station(station_id=1, name="Test Station", position=Position([6, 7]))
+    station.env = env
+    return station
 
 
 @pytest.fixture
@@ -109,47 +112,36 @@ def test_task_immediate_spawn(env: simpy.Environment, station: Station) -> None:
     assert task_immediate.get_state() == State.OPEN, "Immediate task should be OPEN"
 
 
-def test_task_scheduled_spawn(env: simpy.Environment, station: Station) -> None:
-    # Testing tasks which have a spawn delay (task is scheduled)
-    task_scheduled = BatterySwapTask(task_id=2, station=station, spawn_delay=5.0)
-    task_scheduled.env = env
-    assert (
-        task_scheduled.get_state() == State.SCHEDULED
-    ), "Delayed task should be SCHEDULED"
-
-    if task_scheduled.spawn_delay is not None and task_scheduled.spawn_delay > 0:
-        env.process(task_scheduled._spawn_after_delay(task_scheduled.spawn_delay))
-
-    env.run(until=6.0)
-    assert (
-        task_scheduled.get_state() == State.OPEN
-    ), f"Task should be OPEN but is {task_scheduled.get_state().name}"
-
-
 def test_multiple_scheduled_tasks(env: simpy.Environment, station: Station) -> None:
-    # Checking when there are multiple scheduled tasks.
-    creation_time = env.now
-    task3 = BatterySwapTask(task_id=3, station=station, spawn_delay=2.0)
-    task3.env = env
-    task4 = BatterySwapTask(task_id=4, station=station, spawn_delay=5.0)
-    task4.env = env
+    # Checking when there are multiple scheduled tasks using TPU strategy.
+    strategy = DefaultTPUStrategy()
+    scheduled_tasks = {station.id: {2: [3], 5: [4]}}
+    strategy.set_station_scheduled_tasks(scheduled_tasks)
 
-    for t in (task3, task4):
-        if t.spawn_delay is not None and t.spawn_delay > 0:
-            env.process(t._spawn_after_delay(t.spawn_delay))
+    # Set the strategy on the station
+    if not hasattr(station, "behaviour") or station.behaviour is None:
+        station.behaviour = Mock()
+    station.behaviour.TPU_strategy = strategy
 
-    env.run(until=creation_time + 3.0)
+    # Check at time 2 when first task is scheduled
+    env.run(until=2.0)
+    tasks_at_2 = station.behaviour.TPU_strategy.check_for_new_task(station)
+    assert len(tasks_at_2) == 1
+    task3 = tasks_at_2[0]
     assert (
         task3.get_state() == State.OPEN
     ), f"Task 3 should be OPEN but is {task3.get_state().name}"
-    assert (
-        task4.get_state() == State.SCHEDULED
-    ), f"Task 4 should still be SCHEDULED but is {task4.get_state().name}"
+    assert task3.get_task_id() == 3
 
-    env.run(until=creation_time + 6.0)
+    # Check at time 5 when second task is scheduled
+    env.run(until=5.0)
+    tasks_at_5 = station.behaviour.TPU_strategy.check_for_new_task(station)
+    assert len(tasks_at_5) == 1
+    task4 = tasks_at_5[0]
     assert (
         task4.get_state() == State.OPEN
     ), f"Task 4 should be OPEN but is {task4.get_state().name}"
+    assert task4.get_task_id() == 4
 
 
 def test_resource_immediate_dispatch(
@@ -197,33 +189,45 @@ def test_resource_scheduled_dispatch(env: simpy.Environment, station: Station) -
 
 
 def test_simulation_time_waiting(env: simpy.Environment, station: Station) -> None:
-    # Testing task waiting / scheduled time
-    task = BatterySwapTask(task_id=1, station=station, spawn_delay=2.0)
-    task.env = env
-    assert task.get_state() == State.SCHEDULED
+    # Testing task waiting / scheduled time using TPU strategy
+    strategy = DefaultTPUStrategy()
+    scheduled_tasks = {station.id: {2: [1]}}
+    strategy.set_station_scheduled_tasks(scheduled_tasks)
 
-    if task.spawn_delay is not None and task.spawn_delay > 0:
-        env.process(task._spawn_after_delay(task.spawn_delay))
+    # Set the strategy on the station
+    if not hasattr(station, "behaviour") or station.behaviour is None:
+        station.behaviour = Mock()
+    station.behaviour.TPU_strategy = strategy
 
     env.run(until=1.0)
-    assert task.get_state() == State.SCHEDULED, "Task should still be SCHEDULED at t=1"
+    tasks_at_1 = station.behaviour.TPU_strategy.check_for_new_task(station)
+    assert len(tasks_at_1) == 0, "Task should not have spawned at t=1"
 
-    env.run(until=3.0)
-    assert task.get_state() == State.OPEN, "Task should have spawned by t=3"
+    # Check at exactly time 2 when task is scheduled
+    env.run(until=2.0)
+    tasks_at_2 = station.behaviour.TPU_strategy.check_for_new_task(station)
+    assert len(tasks_at_2) == 1, "Task should have spawned at t=2"
+    assert tasks_at_2[0].get_state() == State.OPEN
 
 
 def test_full_lifecycle_with_scheduling(
     env: simpy.Environment, station: Station, driver: Driver
 ) -> None:
-    # Testing complete task lifecylce with delays
-    task = BatterySwapTask(task_id=1, station=station, spawn_delay=2.0)
-    task.env = env
-    assert task.get_state() == State.SCHEDULED
+    # Testing complete task lifecycle with scheduling using TPU strategy
+    strategy = DefaultTPUStrategy()
+    scheduled_tasks = {station.id: {2: [1]}}
+    strategy.set_station_scheduled_tasks(scheduled_tasks)
 
-    if task.spawn_delay is not None and task.spawn_delay > 0:
-        env.process(task._spawn_after_delay(task.spawn_delay))
+    # Set the strategy on the station
+    if not hasattr(station, "behaviour") or station.behaviour is None:
+        station.behaviour = Mock()
+    station.behaviour.TPU_strategy = strategy
 
-    env.run(until=3.0)
+    # Check at exactly time 2 when task is scheduled
+    env.run(until=2.0)
+    tasks = station.behaviour.TPU_strategy.check_for_new_task(station)
+    assert len(tasks) == 1
+    task = tasks[0]
     assert task.get_state() == State.OPEN
 
     assign_time = env.now
@@ -424,14 +428,6 @@ def test_resource_with_initial_task_list(
     assert task2.get_assigned_driver() == resource
 
 
-def test_zero_spawn_delay_creates_open_task(
-    env: simpy.Environment, station: Station
-) -> None:
-    # Test that spawn_delay of 0 creates an OPEN task immediately.
-    task = BatterySwapTask(task_id=1, station=station, spawn_delay=0)
-    assert task.get_state() == State.OPEN
-
-
 def test_zero_dispatch_delay_keeps_task_assigned(
     env: simpy.Environment, station: Station
 ) -> None:
@@ -474,20 +470,9 @@ def test_task_state_string_conversions(
 ) -> None:
     # Test that all task states convert to their string representations correctly
 
-    # Test SCHEDULED state string conversion (helps with code coverage)
-    task = BatterySwapTask(task_id=1, station=station, spawn_delay=1.0)
-    task.env = env
-    assert task.get_state() == State.SCHEDULED
-    assert str(task.get_state()) == "scheduled"
-    task_dict = task.to_dict()
-    assert task_dict["state"] == "scheduled"
-
-    # Test OPEN state
-    # start spawn process for scheduled task so it will open
-    if task.spawn_delay is not None and task.spawn_delay > 0:
-        env.process(task._spawn_after_delay(task.spawn_delay))
-
-    env.run(until=2.0)
+    # Test OPEN state - create task directly in OPEN state
+    task = BatterySwapTask(task_id=1, station=station)
+    assert task.get_state() == State.OPEN
     assert str(task.get_state()) == "open"
 
     # Test ASSIGNED state

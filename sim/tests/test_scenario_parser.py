@@ -94,27 +94,18 @@ def test_json_parse_strategy_valid_input() -> None:
     assert len(params.station_entities) == 3
     assert len(params.driver_entities) == 1
     assert len(params.vehicle_entities) == 1
-    assert len(params.task_entities) == 4
+    assert len(params.task_entities) == 2
 
     tasks = params.task_entities
     stations = params.station_entities
     drivers = params.driver_entities
     vehicles = params.vehicle_entities
 
-    # With new schema, station IDs are auto-generated sequentially (1..n)
-    # Scenario defines: Station 1 has 2 initial tasks and 1 scheduled at 09:30,
-    # Station 2 has 1 scheduled at 09:30 -> total 4 tasks
+    # With new refactored approach:
+    # - Initial tasks (2 from Station 1) are created immediately with IDs 1, 2
+    # - Scheduled tasks are NOT in task_entities until they pop up during simulation
     assert tasks[1].get_station() == stations[1]  # First task (initial, Station 1)
     assert tasks[2].get_station() == stations[1]  # Second task (initial, Station 1)
-    assert tasks[3].get_station() == stations[1]  # Third task (scheduled, Station 1)
-    assert tasks[4].get_station() == stations[2]  # Fourth task (scheduled, Station 2)
-
-    # Check spawn delays
-    assert tasks[1].spawn_delay == 0  # Initial task
-    assert tasks[2].spawn_delay == 0  # Initial task
-    # Scheduled at 09:30 with start at 08:00 => 1.5 hours (5400 seconds)
-    assert tasks[3].spawn_delay == 90 * 60
-    assert tasks[4].spawn_delay == 90 * 60
 
     for drv in drivers.values():
         assert isinstance(drv, Driver)

@@ -42,9 +42,9 @@ class BatterySwapTask(Task):
         self,
         task_id: int,
         station: Optional["Station"] = None,
-        spawn_delay: Optional[float] = None,
+        spawn_time: float = 0.0,
     ) -> None:
-        super().__init__(task_id, station, spawn_delay)
+        super().__init__(task_id, station, spawn_time)
 
     def get_state(self) -> State:
         """Get the current state of the task.

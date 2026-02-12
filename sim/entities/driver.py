@@ -438,11 +438,7 @@ class Driver:
             self.vehicle.tasks_completed += 1
 
             # Get service time and add it to reporting.
-            spawn_time = task.spawn_delay
-
-            if spawn_time is None:
-                spawn_time = 0
-
+            spawn_time = getattr(task, "spawn_time", 0)
             self.env.report.add_service_time(self.env.now - spawn_time)
 
             self.has_updated = True
