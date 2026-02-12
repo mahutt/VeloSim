@@ -26,8 +26,10 @@ import { describe, it, expect } from 'vitest';
 import {
   adaptStationsToGeoJSON,
   adaptRouteToGeoJSON,
+  adaptResourcesToGeoJSON,
 } from '~/lib/geojson-adapters';
 import type { Station, Position } from '~/types';
+import { makeDriver } from 'tests/test-helpers';
 
 describe('adaptStationsToGeoJSON', () => {
   it('should convert an array of stations to a GeoJSON FeatureCollection', () => {
@@ -173,5 +175,95 @@ describe('adaptRouteToGeoJSON', () => {
 
     expect(nextTaskFeatures).toHaveLength(0);
     expect(futureTasksFeatures).toHaveLength(0);
+  });
+});
+
+describe('adaptResourcesToGeoJSON', () => {
+  const baseDriver = makeDriver({
+    id: 1,
+    name: 'Vini',
+    position: [-73.935, 40.73],
+    taskIds: [10, 20],
+    vehicleId: 5,
+  });
+
+  it('should include driver name in GeoJSON properties', () => {
+    const result = adaptResourcesToGeoJSON([baseDriver]);
+
+    expect(result.features).toHaveLength(1);
+    expect(result.features[0].properties).toEqual(
+      expect.objectContaining({ name: baseDriver.name })
+    );
+  });
+
+  it('should convert drivers to a GeoJSON FeatureCollection with all properties', () => {
+    const result = adaptResourcesToGeoJSON([baseDriver]);
+
+    expect(result).toEqual({
+      type: 'FeatureCollection',
+      features: [
+        {
+          type: 'Feature',
+          properties: {
+            id: baseDriver.id,
+            name: baseDriver.name,
+            route: [],
+            taskList: baseDriver.taskIds,
+            selected: false,
+            hover: false,
+          },
+          geometry: {
+            type: 'Point',
+            coordinates: baseDriver.position,
+          },
+        },
+      ],
+    });
+  });
+
+  it('should mark the selected resource', () => {
+    const result = adaptResourcesToGeoJSON([baseDriver], baseDriver.id);
+
+    expect(result.features[0].properties).toEqual(
+      expect.objectContaining({ selected: true, hover: false })
+    );
+  });
+
+  it('should mark the hovered resource', () => {
+    const result = adaptResourcesToGeoJSON(
+      [baseDriver],
+      undefined,
+      baseDriver.id
+    );
+
+    expect(result.features[0].properties).toEqual(
+      expect.objectContaining({ selected: false, hover: true })
+    );
+  });
+
+  it('should return an empty FeatureCollection when given an empty array', () => {
+    const result = adaptResourcesToGeoJSON([]);
+
+    expect(result).toEqual({
+      type: 'FeatureCollection',
+      features: [],
+    });
+  });
+
+  it('should include route coordinates when driver has a route', () => {
+    const routeCoordinates: Position[] = [
+      [-73.935, 40.73],
+      [-73.94, 40.74],
+    ];
+    const driverWithRoute = makeDriver({
+      ...baseDriver,
+      route: { coordinates: routeCoordinates, nextStopIndex: 1 },
+    });
+
+    const result = adaptResourcesToGeoJSON([driverWithRoute]);
+
+    expect(result.features[0].properties).toEqual(
+      expect.objectContaining({ route: routeCoordinates })
+    );
   });
 });
