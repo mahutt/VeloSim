@@ -50,9 +50,21 @@ function TestComponent() {
     <div>
       <button
         data-testid="req-assign"
-        onClick={() => requestAssignment(10, 42)}
+        onClick={() => requestAssignment(10, [42])}
       >
         Request Assign
+      </button>
+      <button
+        data-testid="req-assign-batch"
+        onClick={() => requestAssignment(10, [42, 43])}
+      >
+        Request Assign Batch
+      </button>
+      <button
+        data-testid="req-assign-empty"
+        onClick={() => requestAssignment(10, [])}
+      >
+        Request Assign Empty
       </button>
       <button
         data-testid="req-unassign"
@@ -76,6 +88,7 @@ function TestComponent() {
 describe('TaskAssignmentProvider', () => {
   it('creates an assign pending assignment and calls assignTask on confirm', async () => {
     const assignTask = vi.fn();
+    const assignTasksBatch = vi.fn();
     const unassignTask = vi.fn();
     const reassignTask = vi.fn();
 
@@ -84,6 +97,7 @@ describe('TaskAssignmentProvider', () => {
 
     vi.mocked(useSimulation).mockReturnValue({
       assignTask,
+      assignTasksBatch,
       unassignTask,
       reassignTask,
       driversRef,
@@ -109,6 +123,7 @@ describe('TaskAssignmentProvider', () => {
 
   it('creates a reassign pending assignment when task already assigned and calls reassignTask on confirm', async () => {
     const assignTask = vi.fn();
+    const assignTasksBatch = vi.fn();
     const unassignTask = vi.fn();
     const reassignTask = vi.fn();
 
@@ -121,6 +136,7 @@ describe('TaskAssignmentProvider', () => {
 
     vi.mocked(useSimulation).mockReturnValue({
       assignTask,
+      assignTasksBatch,
       unassignTask,
       reassignTask,
       driversRef,
@@ -149,6 +165,7 @@ describe('TaskAssignmentProvider', () => {
 
   it('creates an unassign pending assignment and calls unassignTask on confirm', async () => {
     const assignTask = vi.fn();
+    const assignTasksBatch = vi.fn();
     const unassignTask = vi.fn();
     const reassignTask = vi.fn();
 
@@ -156,6 +173,7 @@ describe('TaskAssignmentProvider', () => {
 
     vi.mocked(useSimulation).mockReturnValue({
       assignTask,
+      assignTasksBatch,
       unassignTask,
       reassignTask,
       driversRef,
@@ -177,5 +195,111 @@ describe('TaskAssignmentProvider', () => {
     await waitFor(() => {
       expect(unassignTask).toHaveBeenCalledWith(5, 99);
     });
+  });
+
+  it('creates an assign pending assignment for multiple tasks and calls assignTasksBatch on confirm', async () => {
+    const assignTask = vi.fn();
+    const assignTasksBatch = vi.fn();
+    const unassignTask = vi.fn();
+    const reassignTask = vi.fn();
+
+    const driversRef = { current: new Map<number, unknown>() };
+
+    vi.mocked(useSimulation).mockReturnValue({
+      assignTask,
+      assignTasksBatch,
+      unassignTask,
+      reassignTask,
+      driversRef,
+    } as unknown as ReturnType<typeof useSimulation>);
+
+    const user = userEvent.setup();
+
+    render(
+      <TaskAssignmentProvider>
+        <TestComponent />
+      </TaskAssignmentProvider>
+    );
+
+    await user.click(screen.getByTestId('req-assign-batch'));
+    expect(screen.getByTestId('pending').textContent).toBe('assign');
+
+    await user.click(screen.getByTestId('confirm'));
+
+    await waitFor(() => {
+      expect(assignTasksBatch).toHaveBeenCalledWith(10, [42, 43]);
+    });
+    expect(assignTask).not.toHaveBeenCalled();
+  });
+
+  it('creates a reassign pending assignment for multiple tasks and calls assignTasksBatch on confirm', async () => {
+    const assignTask = vi.fn();
+    const assignTasksBatch = vi.fn();
+    const unassignTask = vi.fn();
+    const reassignTask = vi.fn();
+
+    const driversRef = {
+      current: new Map<number, Driver>([
+        [5, makeDriver({ id: 5, taskIds: [42, 43] })],
+      ]),
+    };
+
+    vi.mocked(useSimulation).mockReturnValue({
+      assignTask,
+      assignTasksBatch,
+      unassignTask,
+      reassignTask,
+      driversRef,
+    } as unknown as ReturnType<typeof useSimulation>);
+
+    const user = userEvent.setup();
+
+    render(
+      <TaskAssignmentProvider>
+        <TestComponent />
+      </TaskAssignmentProvider>
+    );
+
+    await user.click(screen.getByTestId('req-assign-batch'));
+
+    expect(screen.getByTestId('pending').textContent).toBe('reassign');
+    expect(screen.getByTestId('prev').textContent).toBe('5');
+
+    await user.click(screen.getByTestId('confirm'));
+
+    await waitFor(() => {
+      expect(assignTasksBatch).toHaveBeenCalledWith(10, [42, 43]);
+    });
+    expect(reassignTask).not.toHaveBeenCalled();
+  });
+
+  it('ignores batch requests with no task ids', async () => {
+    const assignTask = vi.fn();
+    const assignTasksBatch = vi.fn();
+    const unassignTask = vi.fn();
+    const reassignTask = vi.fn();
+
+    const driversRef = { current: new Map<number, unknown>() };
+
+    vi.mocked(useSimulation).mockReturnValue({
+      assignTask,
+      assignTasksBatch,
+      unassignTask,
+      reassignTask,
+      driversRef,
+    } as unknown as ReturnType<typeof useSimulation>);
+
+    const user = userEvent.setup();
+
+    render(
+      <TaskAssignmentProvider>
+        <TestComponent />
+      </TaskAssignmentProvider>
+    );
+
+    await user.click(screen.getByTestId('req-assign-empty'));
+
+    expect(screen.getByTestId('pending').textContent).toBe('none');
+    expect(assignTasksBatch).not.toHaveBeenCalled();
   });
 });

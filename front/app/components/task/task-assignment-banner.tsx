@@ -27,31 +27,43 @@ import { Button } from '~/components/ui/button';
 import type { TaskAction } from '~/types';
 
 interface TaskAssignmentBannerProps {
-  taskId: number;
+  taskIds: number[];
   resourceId: number;
   prevResourceId?: number;
   action: TaskAction;
+  isLoading?: boolean;
   onConfirm: () => void;
   onCancel: () => void;
 }
 
 export function TaskAssignmentBanner({
-  taskId,
+  taskIds,
   resourceId,
   prevResourceId,
   action,
+  isLoading = false,
   onConfirm,
   onCancel,
 }: TaskAssignmentBannerProps) {
   const renderMessage = () => {
+    if (!taskIds.length) return null;
+
+    const firstTaskId = taskIds[0];
+
     if (action === 'reassign' && prevResourceId !== undefined) {
-      return `Re-assign task #${taskId} from resource #${prevResourceId} to resource #${resourceId}?`;
+      if (taskIds.length > 1) {
+        return `Re-assign ${taskIds.length} tasks from resource #${prevResourceId} to resource #${resourceId}?`;
+      }
+      return `Re-assign task #${firstTaskId} from resource #${prevResourceId} to resource #${resourceId}?`;
     }
     if (action === 'unassign') {
-      return `Un-assign task #${taskId} from resource #${resourceId}?`;
+      return `Un-assign task #${firstTaskId} from resource #${resourceId}?`;
     }
     if (action === 'assign') {
-      return `Assign task #${taskId} to resource #${resourceId}?`;
+      if (taskIds.length > 1) {
+        return `Assign ${taskIds.length} tasks to resource #${resourceId}?`;
+      }
+      return `Assign task #${firstTaskId} to resource #${resourceId}?`;
     }
     return null;
   };
@@ -64,11 +76,22 @@ export function TaskAssignmentBanner({
           <span className="text-sm">{renderMessage()}</span>
         </div>
         <div className="flex gap-2 justify-center">
-          <Button onClick={onCancel} size="sm" variant="outline">
+          <Button
+            onClick={onCancel}
+            size="sm"
+            variant="outline"
+            disabled={isLoading}
+            aria-busy={isLoading}
+          >
             Cancel
           </Button>
-          <Button onClick={onConfirm} size="sm">
-            Confirm
+          <Button
+            onClick={onConfirm}
+            size="sm"
+            disabled={isLoading}
+            aria-busy={isLoading}
+          >
+            {isLoading ? 'Confirming...' : 'Confirm'}
           </Button>
         </div>
       </div>

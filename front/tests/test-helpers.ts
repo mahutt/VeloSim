@@ -106,6 +106,7 @@ export function makeSimulationContext(
     selectItem: overrides.selectItem ?? vi.fn(),
     clearSelection: overrides.clearSelection ?? vi.fn(),
     assignTask: overrides.assignTask ?? vi.fn(),
+    assignTasksBatch: overrides.assignTasksBatch ?? vi.fn(),
     unassignTask: overrides.unassignTask ?? vi.fn(),
     reassignTask: overrides.reassignTask ?? vi.fn(),
     reorderTasks: overrides.reorderTasks ?? vi.fn(),

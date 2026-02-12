@@ -270,13 +270,16 @@ describe('SelectedItemBar', () => {
       );
 
       // Get the task wrappers
-      const taskWrappers = screen
+      const taskElements = screen
         .getAllByText(/^Task #/)
-        .map((el) => el.closest('[data-slot="item"]')?.parentElement)
+        .map((el) => el.closest('[data-slot="item"]'))
         .filter(Boolean) as HTMLElement[];
+      const taskWrappers = taskElements.map(
+        (el) => el.parentElement as HTMLElement
+      );
 
       // Simulate dragstart on task 1
-      fireEvent.dragStart(taskWrappers[0]);
+      fireEvent.dragStart(taskElements[0]);
 
       // Simulate drop on task 3 wrapper (index 2)
       fireEvent.drop(taskWrappers[2]);
@@ -314,13 +317,16 @@ describe('SelectedItemBar', () => {
         </FeatureToggleProvider>
       );
 
-      const taskWrappers = screen
+      const taskElements = screen
         .getAllByText(/^Task #/)
-        .map((el) => el.closest('[data-slot="item"]')?.parentElement)
+        .map((el) => el.closest('[data-slot="item"]'))
         .filter(Boolean) as HTMLElement[];
+      const taskWrappers = taskElements.map(
+        (el) => el.parentElement as HTMLElement
+      );
 
       // Simulate drag task 3 to top (index 0)
-      fireEvent.dragStart(taskWrappers[2]);
+      fireEvent.dragStart(taskElements[2]);
       fireEvent.drop(taskWrappers[0]);
 
       // Should not call reorderTasks
@@ -353,10 +359,13 @@ describe('SelectedItemBar', () => {
         </FeatureToggleProvider>
       );
 
-      const taskWrappers = screen
+      const taskElements = screen
         .getAllByText(/^Task #/)
-        .map((el) => el.closest('[data-slot="item"]')?.parentElement)
+        .map((el) => el.closest('[data-slot="item"]'))
         .filter(Boolean) as HTMLElement[];
+      const taskWrappers = taskElements.map(
+        (el) => el.parentElement as HTMLElement
+      );
 
       // Simulate dragover WITHOUT dragstart (draggedTaskId will be null)
       const dragOverEvent = fireEvent.dragOver(taskWrappers[1]);
@@ -391,13 +400,16 @@ describe('SelectedItemBar', () => {
         </FeatureToggleProvider>
       );
 
-      const taskWrappers = screen
+      const taskElements = screen
         .getAllByText(/^Task #/)
-        .map((el) => el.closest('[data-slot="item"]')?.parentElement)
+        .map((el) => el.closest('[data-slot="item"]'))
         .filter(Boolean) as HTMLElement[];
+      const taskWrappers = taskElements.map(
+        (el) => el.parentElement as HTMLElement
+      );
 
       // Start drag on task 2
-      fireEvent.dragStart(taskWrappers[1]);
+      fireEvent.dragStart(taskElements[1]);
 
       // Dragover task at index 0
       const dragOverEvent = fireEvent.dragOver(taskWrappers[0]);
@@ -433,13 +445,16 @@ describe('SelectedItemBar', () => {
         </FeatureToggleProvider>
       );
 
-      const taskWrappers = screen
+      const taskElements = screen
         .getAllByText(/^Task #/)
-        .map((el) => el.closest('[data-slot="item"]')?.parentElement)
+        .map((el) => el.closest('[data-slot="item"]'))
         .filter(Boolean) as HTMLElement[];
+      const taskWrappers = taskElements.map(
+        (el) => el.parentElement as HTMLElement
+      );
 
       // Manually set draggedTaskId to a task that doesn't exist
-      fireEvent.dragStart(taskWrappers[0]);
+      fireEvent.dragStart(taskElements[0]);
 
       // Now manually trigger drop with a different task id
       // This simulates the edge case where draggedTaskId doesn't match any task
@@ -478,13 +493,16 @@ describe('SelectedItemBar', () => {
         </FeatureToggleProvider>
       );
 
-      const taskWrappers = screen
+      const taskElements = screen
         .getAllByText(/^Task #/)
-        .map((el) => el.closest('[data-slot="item"]')?.parentElement)
+        .map((el) => el.closest('[data-slot="item"]'))
         .filter(Boolean) as HTMLElement[];
+      const taskWrappers = taskElements.map(
+        (el) => el.parentElement as HTMLElement
+      );
 
       // Drag task 2 and drop it on itself
-      fireEvent.dragStart(taskWrappers[1]);
+      fireEvent.dragStart(taskElements[1]);
       fireEvent.drop(taskWrappers[1]);
 
       // Should not call reorderTasks when dropping at same position

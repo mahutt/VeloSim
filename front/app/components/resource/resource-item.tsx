@@ -96,12 +96,18 @@ export function ResourceItem({
   const handleDropOnResource = (e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault();
     e.stopPropagation();
-
     setIsDragOver(false);
 
-    const taskId = Number(e.dataTransfer.getData('taskId'));
-    if (!Number.isNaN(taskId)) {
-      requestAssignment(resource.id, taskId);
+    const taskIdsPayload = e.dataTransfer.getData('taskIds');
+    if (taskIdsPayload) {
+      try {
+        const taskIds = JSON.parse(taskIdsPayload || '[]');
+        if (taskIds.length === 0) return;
+
+        requestAssignment(resource.id, taskIds);
+      } catch {
+        return;
+      }
     }
   };
 

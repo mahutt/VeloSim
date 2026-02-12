@@ -31,6 +31,7 @@ import {
   useCallback,
   type ReactNode,
 } from 'react';
+import { toast } from 'sonner';
 
 import { useMap } from './map-provider';
 import {
@@ -100,6 +101,7 @@ export type SimulationContextType = {
   selectItem: (type: SelectedItemType, id: number) => void;
   clearSelection: () => void;
   assignTask: (driverId: number, taskId: number) => Promise<void>;
+  assignTasksBatch: (driverId: number, taskIds: number[]) => Promise<void>;
   unassignTask: (driverId: number, taskId: number) => Promise<void>;
   reassignTask: (
     prevDriverId: number,
@@ -323,6 +325,79 @@ export const SimulationProvider = ({
       displayError(
         'Assignment failed',
         'An error occurred while assigning a task to a resource. Please try again later.'
+      );
+      throw error;
+    }
+  };
+
+  const assignTasksBatch = async (driverId: number, taskIds: number[]) => {
+    const resource = driversRef.current.get(driverId);
+
+    if (!resource) {
+      throw new Error(`Driver #${driverId} not found.`);
+    }
+
+    try {
+      const payload = { driver_id: driverId, task_ids: taskIds };
+      const response = await api.post<{
+        items: { driver_id: number; task_id: number; success: boolean }[];
+      }>(`/simulation/${simId!}/drivers/assign/batch`, payload);
+
+      const items = response.data.items;
+      const successfulTaskIds = new Set(
+        items.filter((item) => item.success).map((item) => item.task_id)
+      );
+      const failedTaskIds = items
+        .filter((item) => !item.success)
+        .map((item) => item.task_id);
+      const totalTaskCount = items.length || taskIds.length;
+
+      if (failedTaskIds.length > 0) {
+        if (successfulTaskIds.size === 0) {
+          toast.error(
+            `Failed to assign ${totalTaskCount} task${totalTaskCount === 1 ? '' : 's'}.`
+          );
+        } else {
+          toast.error(
+            `Assigned ${successfulTaskIds.size} of ${totalTaskCount} tasks. ${failedTaskIds.length} failed.`
+          );
+        }
+      }
+
+      if (successfulTaskIds.size === 0) return;
+
+      // add successfully assigned tasks to new driver
+      const existingIds = new Set(resource.taskIds);
+      const newTaskIds = [...successfulTaskIds].filter(
+        (id) => !existingIds.has(id)
+      );
+      resource.taskIds.push(...newTaskIds);
+      driversRef.current.set(driverId, resource);
+
+      // remove successfully assigned tasks from previous driver
+      for (const [otherId, otherDriver] of driversRef.current) {
+        if (otherId === driverId) continue;
+
+        const filteredTaskIds = otherDriver.taskIds.filter(
+          (taskId) => !successfulTaskIds.has(taskId)
+        );
+
+        if (filteredTaskIds.length !== otherDriver.taskIds.length) {
+          driversRef.current.set(otherId, {
+            ...otherDriver,
+            taskIds: filteredTaskIds,
+          });
+        }
+      }
+
+      updateResourceBarElement();
+      if (selectedItem) {
+        updateSelectedItem(selectedItem.value.id, selectedItem.type);
+      }
+    } catch (error) {
+      displayError(
+        'Batch assignment failed',
+        'An error occurred while assigning tasks to a resource. Please try again later.'
       );
       throw error;
     }
@@ -1008,6 +1083,7 @@ export const SimulationProvider = ({
         selectItem,
         clearSelection,
         assignTask,
+        assignTasksBatch,
         unassignTask,
         reassignTask,
         reorderTasks,

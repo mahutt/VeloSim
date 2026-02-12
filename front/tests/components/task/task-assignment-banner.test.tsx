@@ -32,7 +32,7 @@ describe('TaskAssignmentBanner', () => {
   it('renders prompt with task and resource ids and buttons', () => {
     render(
       <TaskAssignmentBanner
-        taskId={1}
+        taskIds={[1]}
         resourceId={4}
         prevResourceId={2}
         action="assign"
@@ -57,7 +57,7 @@ describe('TaskAssignmentBanner', () => {
 
     render(
       <TaskAssignmentBanner
-        taskId={1}
+        taskIds={[1]}
         resourceId={2}
         prevResourceId={4}
         action="assign"
@@ -76,7 +76,7 @@ describe('TaskAssignmentBanner', () => {
   it('renders reassign prompt when action is reassign and previous resource is provided', () => {
     render(
       <TaskAssignmentBanner
-        taskId={1}
+        taskIds={[1]}
         resourceId={2}
         prevResourceId={4}
         action="reassign"
@@ -93,7 +93,7 @@ describe('TaskAssignmentBanner', () => {
   it('renders unassign prompt when action is unassign', () => {
     render(
       <TaskAssignmentBanner
-        taskId={5}
+        taskIds={[5]}
         resourceId={3}
         action="unassign"
         onConfirm={() => {}}

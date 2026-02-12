@@ -140,7 +140,7 @@ let rafCallCount = 0;
 global.requestAnimationFrame = vi.fn((cb) => {
   rafCallCount++;
   // Only execute the first few calls to prevent infinite loops in tests
-  if (rafCallCount <= 5) {
+  if (rafCallCount <= 20) {
     setTimeout(() => cb(performance.now()), 0);
   }
   return rafCallCount;
