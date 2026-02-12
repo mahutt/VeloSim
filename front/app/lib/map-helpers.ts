@@ -272,6 +272,17 @@ export function setMapLayers(map: mapboxgl.Map) {
       ],
       'icon-allow-overlap': true,
       'icon-size': ['interpolate', ['linear'], ['zoom'], 10, 0.5, 13, 1.0],
+      'text-field': ['get', 'name'],
+      'text-font': ['Open Sans Bold', 'Arial Unicode MS Bold'],
+      'text-size': ['interpolate', ['linear'], ['zoom'], 10, 8, 15, 12],
+      'text-offset': [0, -1.5],
+      'text-anchor': 'bottom',
+      'text-allow-overlap': true,
+    },
+    paint: {
+      'text-color': '#000000',
+      'text-halo-color': '#ffffff',
+      'text-halo-width': 1,
     },
   });
 }
