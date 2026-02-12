@@ -35,15 +35,33 @@
     state: present
     update_cache: true
 
+- name: Create keyrings directory
+  ansible.builtin.file:
+    path: /usr/share/keyrings
+    state: directory
+    mode: '0755'
+
 - name: Add PostgreSQL official APT key
-  ansible.builtin.apt_key:
+  ansible.builtin.get_url:
     url: https://www.postgresql.org/media/keys/ACCC4CF8.asc
-    state: present
+    dest: /tmp/postgresql-gpg
+    mode: '0644'
+
+- name: Import PostgreSQL GPG key to keyring
+  ansible.builtin.command:
+    cmd: gpg --dearmor -o /usr/share/keyrings/postgresql-keyring.gpg /tmp/postgresql-gpg
+    creates: /usr/share/keyrings/postgresql-keyring.gpg
+
+- name: Remove temporary GPG file
+  ansible.builtin.file:
+    path: /tmp/postgresql-gpg
+    state: absent
 
 - name: Add PostgreSQL official repository
   ansible.builtin.apt_repository:
-    repo: "deb http://apt.postgresql.org/pub/repos/apt/ {{ ansible_distribution_release }}-pgdg main"
+    repo: "deb [signed-by=/usr/share/keyrings/postgresql-keyring.gpg] http://apt.postgresql.org/pub/repos/apt/ {{ ansible_distribution_release }}-pgdg main"
     state: present
+    filename: pgdg
     update_cache: true
 
 - name: Install PostgreSQL client tools

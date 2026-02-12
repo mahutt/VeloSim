@@ -22,15 +22,33 @@
     state: present
     update_cache: true
 
+- name: Create keyrings directory
+  ansible.builtin.file:
+    path: /usr/share/keyrings
+    state: directory
+    mode: '0755'
+
 - name: Add Docker official GPG key
-  ansible.builtin.apt_key:
+  ansible.builtin.get_url:
     url: https://download.docker.com/linux/ubuntu/gpg
-    state: present
+    dest: /tmp/docker-gpg
+    mode: '0644'
+
+- name: Import Docker GPG key to keyring
+  ansible.builtin.command:
+    cmd: gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg /tmp/docker-gpg
+    creates: /usr/share/keyrings/docker-archive-keyring.gpg
+
+- name: Remove temporary GPG file
+  ansible.builtin.file:
+    path: /tmp/docker-gpg
+    state: absent
 
 - name: Add Docker repository
   ansible.builtin.apt_repository:
-    repo: "deb [arch=amd64] https://download.docker.com/linux/ubuntu {{ ansible_distribution_release }} stable"
+    repo: "deb [arch=amd64 signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/ubuntu {{ ansible_distribution_release }} stable"
     state: present
+    filename: docker
     update_cache: true
 
 - name: Install Docker packages
@@ -85,7 +103,7 @@
     owner: root
     group: root
     mode: '0644'
-  notify: 
+  notify:
     - reload systemd
     - restart docker
 
