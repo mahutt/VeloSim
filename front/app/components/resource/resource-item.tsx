@@ -26,6 +26,8 @@ import { useState } from 'react';
 import { Item, ItemContent, ItemTitle } from '~/components/ui/item';
 import { useTaskAssignment } from '~/providers/task-assignment-provider';
 import { Battery, BatteryLow, BatteryMedium, BatteryFull } from 'lucide-react';
+import { DriverState } from '~/types';
+import DriverStateBadge from '~/components/map/driver-state-badge';
 
 function getBatteryIconAndColor(
   batteryCount: number,
@@ -74,6 +76,7 @@ export interface ResourceItemElement {
   taskCount: number;
   batteryCount: number;
   batteryCapacity: number;
+  state: DriverState;
 }
 
 export function ResourceItem({
@@ -132,7 +135,7 @@ export function ResourceItem({
       onDragEnter={handleDragEnter}
       onDragLeave={handleDragLeave}
       className={`
-        rounded-full px-4 py-2 cursor-pointer flex items-center justify-between transition-all duration-200 border
+        rounded-2xl px-4 py-1.5 cursor-pointer flex flex-col gap-0.5 transition-all duration-200 border
         ${
           isSelected
             ? 'bg-red-50 border-red-500 border-2 shadow-md ring-1 ring-red-200'
@@ -141,27 +144,37 @@ export function ResourceItem({
         ${isDragOver ? 'ring-1 ring-yellow-300 bg-yellow-50' : ''}
       `}
     >
-      <ItemContent>
+      <ItemContent className="min-w-0 w-full">
         <div className="flex items-center gap-2">
-          <ItemTitle
-            className={`text-sm font-medium ${isSelected ? 'text-red-700' : ''}`}
-          >
-            {resource.name}
-          </ItemTitle>
-          <span className="text-xs text-gray-500">#{resource.id}</span>
+          <div className="flex-1 min-w-0 overflow-hidden">
+            <ItemTitle
+              className={`truncate block w-full max-w-full ${isSelected ? 'text-red-700' : ''}`}
+              title={resource.name}
+            >
+              {resource.name}
+            </ItemTitle>
+          </div>
+          <span className="text-xs text-gray-500 whitespace-nowrap shrink-0">
+            #{resource.id}
+          </span>
+        </div>
+
+        <div className="flex items-center justify-between">
+          <DriverStateBadge state={resource.state} />
+          <div className="flex items-center gap-1">
+            <span className={`text-xs text-gray-400`}>
+              {resource.batteryCount}
+            </span>
+            {(() => {
+              const { Icon, color } = getBatteryIconAndColor(
+                resource.batteryCount,
+                resource.batteryCapacity
+              );
+              return <Icon className={`h-4 w-4 ${color}`} />;
+            })()}
+          </div>
         </div>
       </ItemContent>
-
-      <div className="flex items-center gap-1.5">
-        {(() => {
-          const { Icon, color } = getBatteryIconAndColor(
-            resource.batteryCount,
-            resource.batteryCapacity
-          );
-          return <Icon className={`h-4 w-4 ${color}`} />;
-        })()}
-        <span className={`text-xs text-gray-400`}>{resource.batteryCount}</span>
-      </div>
     </Item>
   );
 }

@@ -68,6 +68,13 @@ repos:
         files: ^front/.*\.(js|jsx|ts|tsx)$
         pass_filenames: true
 
+      - id: typecheck-frontend
+        name: TypeScript Type Check (Frontend)
+        entry: bash -c 'cd front && npm run typecheck' --
+        language: system
+        files: ^front/.*\.(ts|tsx)$
+        pass_filenames: false
+
   # Custom hooks for commit message validation and license headers
   - repo: local
     hooks:

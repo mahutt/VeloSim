@@ -58,9 +58,9 @@ export function driverResourceHasUpdated(
   updatedDriver: Driver
 ): boolean {
   return (
-    // If driver is part of a resource and task count changed
     existingDriver !== undefined &&
     existingDriver.vehicleId !== null &&
-    existingDriver.taskIds.length !== updatedDriver.taskIds.length
+    (existingDriver.taskIds.length !== updatedDriver.taskIds.length ||
+      existingDriver.state !== updatedDriver.state)
   );
 }

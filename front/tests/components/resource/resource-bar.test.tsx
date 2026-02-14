@@ -33,6 +33,7 @@ import ResourceBar, {
 } from '~/components/resource/resource-bar';
 import userEvent from '@testing-library/user-event';
 import { SelectedItemType } from '~/components/map/selected-item-bar';
+import { DriverState } from '~/types';
 
 // Mock ResourceItem to simplify rendering
 vi.mock('~/components/resource/resource-item', () => ({
@@ -65,6 +66,7 @@ const mockResourceBarElement: ResourceBarElement = [
     taskCount: 3,
     batteryCount: 1,
     batteryCapacity: 100,
+    state: DriverState.OnRoute,
   },
   {
     id: 2,
@@ -72,6 +74,7 @@ const mockResourceBarElement: ResourceBarElement = [
     taskCount: 1,
     batteryCount: 2,
     batteryCapacity: 100,
+    state: DriverState.Idle,
   },
   {
     id: 12,
@@ -79,6 +82,7 @@ const mockResourceBarElement: ResourceBarElement = [
     taskCount: 0,
     batteryCount: 0,
     batteryCapacity: 100,
+    state: DriverState.SeekingHQForInventory,
   },
 ];
 
