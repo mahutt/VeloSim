@@ -433,7 +433,18 @@ class Driver:
             self.task_list.remove(task)
             battery_count = self.vehicle.use_battery()
             task.set_state(State.CLOSED)
+
+            # increment completed task count for reporting.
             self.vehicle.tasks_completed += 1
+
+            # Get service time and add it to reporting.
+            spawn_time = task.spawn_delay
+
+            if spawn_time is None:
+                spawn_time = 0
+
+            self.env.report.add_service_time(self.env.now - spawn_time)
+
             self.has_updated = True
             self.compute_routes()
 

@@ -32,6 +32,7 @@ class SimulationReport:
         self.total_driving_time = 0
         self.total_servicing_time = 0
         self.tasks_completed_per_shift: list[int] = []
+        self.response_times: list[float] = []
 
     def reset(self) -> None:
         """Reset all metrics to zero.
@@ -42,6 +43,7 @@ class SimulationReport:
         self.total_driving_time = 0
         self.total_servicing_time = 0
         self.tasks_completed_per_shift = []
+        self.response_times = []
 
     def increment_driving_time(self) -> None:
         """
@@ -73,6 +75,18 @@ class SimulationReport:
         """
         self.tasks_completed_per_shift.append(task_count)
 
+    def add_service_time(self, service_time: float) -> None:
+        """
+        Adds the service time for a task from spawn to being serviced to the list.
+        Args:
+            service_time (float): time of task from spawn to being serviced.
+
+        Returns:
+            None
+        """
+
+        self.response_times.append(service_time)
+
     def get_servicing_to_driving_ratio(self) -> float:
         """
         Compute the ratio of servicing time to driving time.
@@ -95,3 +109,15 @@ class SimulationReport:
             return 0.0
 
         return sum(self.tasks_completed_per_shift) / len(self.tasks_completed_per_shift)
+
+    def get_average_service_time_for_tasks(self) -> float:
+        """
+        Retrieves the average service time for tasks.
+        Returns:
+            float: average service time for tasks.
+        """
+
+        if len(self.response_times) == 0:
+            return 0.0
+
+        return sum(self.response_times) / len(self.response_times)
