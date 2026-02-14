@@ -23,8 +23,8 @@ SOFTWARE.
 """
 
 from abc import ABC, abstractmethod
-
-from typing import TYPE_CHECKING
+from sim.entities.BatterySwapTask import BatterySwapTask
+from typing import TYPE_CHECKING, List
 
 if TYPE_CHECKING:
     from sim.entities.station import Station
@@ -34,7 +34,7 @@ class TaskPopupStrategy(ABC):
     """Abstract base class for task popup strategies at stations."""
 
     @abstractmethod
-    def check_for_new_task(self, station: "Station") -> bool:
+    def check_for_new_task(self, station: "Station") -> List[BatterySwapTask]:
         """Check if a new task should popup at the station.
 
         Args:

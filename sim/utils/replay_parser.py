@@ -219,7 +219,6 @@ class ReplayParser:
             task = BatterySwapTask(
                 task_id=t["id"],
                 station=None,
-                spawn_delay=0,
             )
 
             state_str = t["state"].lower()

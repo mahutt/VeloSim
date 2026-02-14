@@ -47,18 +47,14 @@ class Task(ABC):
         self,
         task_id: int,
         station: Optional[Station] = None,
-        spawn_delay: Optional[float] = None,
+        spawn_time: float = 0.0,
     ) -> None:
         self.id: int = task_id
         self.station: Optional[Station] = station
         self.assigned_driver: Optional[Driver] = None
         self.has_updated = False
-
-        self.spawn_delay = spawn_delay
-        if spawn_delay is not None and spawn_delay > 0:
-            self.state = State.SCHEDULED
-        else:
-            self.state = State.OPEN
+        self.state = State.OPEN
+        self.spawn_time = spawn_time
 
     def _spawn_after_delay(self, delay: float) -> Generator[simpy.Event, None, None]:
         """Internal generator that spawns a task after a specified delay.
