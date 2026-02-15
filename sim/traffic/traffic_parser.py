@@ -24,12 +24,14 @@ SOFTWARE.
 
 import ast
 import csv
+from datetime import datetime
 from pathlib import Path
 from typing import List, Optional
 
 from sim.entities.traffic_event import TrafficEvent
 from sim.entities.traffic_event_state import TrafficEventState
 from sim.map.routing_provider import SegmentKey
+from sim.entities.map_payload import TrafficConfig
 
 
 class TrafficParseError(Exception):
@@ -58,17 +60,22 @@ class TrafficParser:
     """
 
     SUPPORTED_TYPES = {"local_traffic"}
-    REQUIRED_COLUMNS = {"TYPE", "tick_start", "segment_key", "duration", "weight"}
+    REQUIRED_COLUMNS = {"TYPE", "start_time", "segment_key", "duration", "weight"}
 
-    def __init__(self, csv_path: str) -> None:
-        """Initialize the parser with a CSV file path.
+    def __init__(self, traffic_config: TrafficConfig) -> None:
+        """Initialize the parser with a CSV file path and sim start time.
 
         Args:
-            csv_path: Path to the traffic CSV file.
+            traffic_config: TrafficConfig with traffic settings.
 
         Raises:
             FileNotFoundError: If the CSV file does not exist.
         """
+        csv_path = traffic_config.traffic_path
+        self._start_time = traffic_config.sim_start_time
+        self._end_time = traffic_config.sim_end_time
+        self._window_start: Optional[int] = None
+        self._window_end: Optional[int] = None
         self._path = Path(csv_path)
         if not self._path.exists():
             raise FileNotFoundError(f"Traffic CSV file not found: {csv_path}")
@@ -101,9 +108,9 @@ class TrafficParser:
 
             for row_num, row in enumerate(reader, start=2):
                 try:
-                    event = self._parse_row(row, row_num)
-                    if event is not None:
-                        events.append(event)
+                    new_events = self._parse_row(row, row_num)
+                    if new_events:
+                        events.extend(new_events)
                 except ValueError as e:
                     errors.append(f"Row {row_num}: {e}")
 
@@ -112,7 +119,7 @@ class TrafficParser:
 
         return events
 
-    def _parse_row(self, row: dict, row_num: int) -> Optional[TrafficEvent]:
+    def _parse_row(self, row: dict, row_num: int) -> list[TrafficEvent]:
         """Parse a single CSV row into a TrafficEvent.
 
         Args:
@@ -136,16 +143,17 @@ class TrafficParser:
                 f"Supported: {', '.join(sorted(self.SUPPORTED_TYPES))}"
             )
 
-        # Parse tick_start
-        tick_start_str = row.get("tick_start", "").strip()
-        if not tick_start_str:
-            raise ValueError("tick_start is empty")
+        # Parse start_time
+        start_time_str = row.get("start_time", "").strip()
+        if not start_time_str:
+            raise ValueError("start_time is empty")
         try:
-            tick_start = int(tick_start_str)
-        except ValueError:
-            raise ValueError(f"tick_start must be an integer, got '{tick_start_str}'")
-        if tick_start < 0:
-            raise ValueError(f"tick_start must be non-negative, got {tick_start}")
+            start_ticks = self._get_all_ticks(start_time_str)
+        except Exception:
+            raise ValueError(
+                f"Unsupported start_time format {start_time_str}. Should use simple "
+                f"time format (e.g. '08:00' or '08:00:00')"
+            )
 
         # Parse segment_key
         segment_key_str = row.get("segment_key", "").strip()
@@ -176,15 +184,20 @@ class TrafficParser:
         if not (0.0 <= weight < 1.0):
             raise ValueError(f"weight must be >= 0.0 and < 1.0, got {weight}")
 
-        return TrafficEvent(
-            event_type=event_type,
-            tick_start=tick_start,
-            segment_key=segment_key,
-            duration=duration,
-            weight=weight,
-            name=name,
-            state=TrafficEventState.PENDING,
-        )
+        events = []
+        for tick in start_ticks:
+            events.append(
+                TrafficEvent(
+                    event_type=event_type,
+                    tick_start=tick,
+                    segment_key=segment_key,
+                    duration=duration,
+                    weight=weight,
+                    name=name,
+                    state=TrafficEventState.PENDING,
+                )
+            )
+        return events
 
     @staticmethod
     def _parse_segment_key(raw: str) -> SegmentKey:
@@ -240,3 +253,70 @@ class TrafficParser:
             )
 
         return (lon1, lat1), (lon2, lat2)
+
+    def _convert_relative_time_to_seconds(self, time_str: str) -> int:
+        """
+        Converts time in format "dayX:HH:MM" to integer seconds.
+
+        Args:
+            time_str: Time string in format "dayX:HH:MM".
+
+        Returns:
+            Relative time in seconds.
+        """
+        try:
+            parts = time_str.replace("day", "").split(":")
+            days = int(parts[0]) - 1  # normalizes day1 to 0 offset
+            hours = int(parts[1])
+            minutes = int(parts[2])
+            return (days * 24 * 3600) + (hours * 3600) + (minutes * 60)
+        except (ValueError, IndexError):
+            raise ValueError(f"Invalid format: {time_str}. Use 'dayX:HH:MM'")
+
+    def _get_daily_seconds(self, time_str: str) -> int:
+        """
+        Converts a time in the day to integer seconds.
+
+        Args:
+            time_str: Time string in format "HH:MM" or "HH:MM:SS".
+
+        Returns:
+            Time in seconds.
+        """
+        t = datetime.strptime(time_str, "%H:%M").time()
+        return (t.hour * 3600) + (t.minute * 60)
+
+    def _get_all_ticks(self, event_time_str: str) -> list[int]:
+        """
+        Calculates all occurrences of a daily recurring event within the
+        [start_time, end_time] window. It takes a static daily time and
+        projects it across multiple days to find every instance that falls
+        within the simulation bounds.
+
+        Args:
+            event_time_str: Static daily time string.
+
+        Returns:
+            List of ticks in seconds relative to the simulation's start time.
+            Returns an empty list if no occurences happen during the sim window.
+        """
+        if self._window_start is None or self._window_end is None:
+            self._window_start = self._convert_relative_time_to_seconds(
+                self._start_time
+            )
+            self._window_end = self._convert_relative_time_to_seconds(self._end_time)
+
+        daily_event_seconds = self._get_daily_seconds(event_time_str)
+
+        ticks = []
+        # determine how many full days have passed since the beginning of day1
+        total_days_in_window = (self._window_end // (24 * 3600)) + 1
+
+        for day_offset in range(total_days_in_window + 1):
+            event_tick = (day_offset * 24 * 3600) + daily_event_seconds
+
+            # add tick if within the sim window
+            if self._window_start <= event_tick <= self._window_end:
+                ticks.append(event_tick - self._window_start)
+
+        return ticks

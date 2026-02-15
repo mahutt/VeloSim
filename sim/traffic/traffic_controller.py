@@ -101,7 +101,7 @@ class TrafficController:
 
         # Parse traffic events from CSV if config provided
         if traffic_config and traffic_config.traffic_path:
-            parser = TrafficParser(traffic_config.traffic_path)
+            parser = TrafficParser(traffic_config)
             self._traffic_events = parser.parse()
             logger.info(f"Loaded {len(self._traffic_events)} traffic event(s)")
             for i, event in enumerate(self._traffic_events):

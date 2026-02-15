@@ -362,6 +362,19 @@ async function main() {
       console.log('[INFO] Error:', error.message);
     }
 
+    // Step 10: Prepare Traffic Datasets
+    console.log('\n[SETUP] Preparing traffic datasets...');
+    console.log('[INFO] This will download the Montreal dataset and create the traffic csv');
+    console.log('[INFO] This is a one-time setup and may take about 3-5 minutes')
+    try{
+      await runCommand('npm', ['run', 'traffic-csv']);
+      console.log('[SUCCESS] Traffic datasets ready for use');
+    } catch (error) {
+      console.log('[WARNING] Traffic csv setup failed');
+      console.log('[INFO] You can run manually the script: npm run traffic-csv')
+      console.log('[INFO] Error:', error.message);
+    }
+
     console.log('\n[SUCCESS] Setup completed successfully!');
     console.log('\nNext step:');
     console.log('  npm run dev  # Start development servers');

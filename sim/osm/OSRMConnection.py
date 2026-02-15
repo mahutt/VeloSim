@@ -218,35 +218,6 @@ class OSRMConnection:
             logger.error(f"OSRM nearest request failed: {e}")
             return (lon, lat)
 
-    def coordinates_to_edge_nodes(self, row: Series) -> Series:
-        """
-        Gets the intersection nodes of an edge according to their coordinates.
-
-        Args:
-            row: csv row containing SrcLongitude, SrcLatitude,
-                DestLongitude and DestLatitude
-
-        Returns:
-            Series object with node_id1 and node_id2 if edge found,
-            otherwise Series([None, None])
-        """
-        s_lon, s_lat = row["SrcLongitude"], row["SrcLatitude"]
-        e_lon, e_lat = row["DestLongitude"], row["DestLatitude"]
-        coords = f"{s_lon},{s_lat};{e_lon},{e_lat}"
-        params = "annotations=nodes&overview=full"
-        url = f"{self.osrm_base_url}/match/v1/driving/{coords}?{params}"
-
-        try:
-            response = requests.get(url).json()
-            if response["code"] == "Ok":
-                nodes = response["matchings"][0]["legs"][0]["annotation"]["nodes"]
-                result: Series = Series([nodes[0], nodes[-1]])
-                return result
-        except Exception as e:
-            print(f"Error matching {coords}: {e}")
-
-        return Series([None, None])
-
     # ============================================================================
     # Utility methods
     # ============================================================================

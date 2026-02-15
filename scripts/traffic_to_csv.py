@@ -31,6 +31,7 @@ from pathlib import Path
 import pandas as pd
 from tqdm import tqdm
 
+
 def download_dataset(file_id, local_path) -> bool:
     """
     Securely downloads the file_id dataset from the drive if it does not exist already.
@@ -43,7 +44,7 @@ def download_dataset(file_id, local_path) -> bool:
     Returns:
         True if file successfully downloaded or already exists. Otherwise, False
     """
-    url = f'https://drive.google.com/uc?id={file_id}'
+    url = f"https://drive.google.com/uc?id={file_id}"
     temp_path = local_path + ".tmp"
 
     # Check if local file exists and compare size
@@ -69,60 +70,55 @@ def download_dataset(file_id, local_path) -> bool:
 
     return False
 
+
 try:
     os.makedirs("sim/traffic/montreal_data", exist_ok=True)
-    traffic_file_id = 'REDACTED'
-    url = f'https://drive.google.com/uc?export=download&id={traffic_file_id}'
+    traffic_file_id = "REDACTED"
+    url = f"https://drive.google.com/uc?export=download&id={traffic_file_id}"
     output = "sim/traffic/montreal_data/traffic2019.csv"
 
-    # takes about a minute if the file does not already exist
+    # takes about 30 seconds to a minute to fully download if does not exist
     if not download_dataset(traffic_file_id, output):
-        print("Script was interrupted. Please verify that the drive is still available and rerun the script.")
+        print(
+            "Script was interrupted. Please verify that the drive is still available and rerun the script."
+        )
         sys.exit()
 
     filtered_chunks = []
-    for chunk in tqdm(pd.read_csv(output, chunksize=50000), desc="Loading Montreal Dataset"):
+    for chunk in tqdm(
+        pd.read_csv(output, chunksize=50000), desc="Loading Montreal Dataset"
+    ):
         chunk = chunk.drop(columns=["SrcDetectorId", "DestDetectorId"])
         filtered_chunks.append(chunk)
     trips = pd.concat(filtered_chunks)
 
     # filter dataframe
     # removes unnecessary columns, trips with short segments
-    start_time = time.perf_counter()
     trips = trips[trips["PathDistance_m"] >= 100]
-    filter_time = time.perf_counter()
-    print(f"time to filter dataframe: {filter_time - start_time}")
 
     # convert TripStart_dt to datetime format
     # includes progress bar as slower process
-    tqdm.pandas(desc="Preparing Dataframe")
+    tqdm.pandas(desc="Preparing dataframe")
     trips["TripStart_dt"] = pd.to_datetime(trips["TripStart_dt"]).progress_apply(
         lambda x: x
     )
 
+    print("Preparing values needed for csv...")
     # calculate free flow speeds for each segment by LinkId using 85th percentile
-    speed_time = time.perf_counter()
     baselines = trips.groupby("LinkId")["Speed_kmh"].quantile(0.85).reset_index()
     baselines.columns = ["LinkId", "free_flow_speed"]
-    free_speed = time.perf_counter()
-    print(f"time to calc all free flow speeds: {free_speed - speed_time}")
 
     # merge baselines back with trips dataframe
     df = trips.merge(baselines, on="LinkId")
-    merge_time = time.perf_counter()
-    print(f"time to merge back: {merge_time - free_speed}")
 
     # define the congestion (speed) ratio (current speed/free flow speed)
-    # caps ratio values to 1 max
+    # filters our ratios >= 1
     df["speed_ratio"] = df["Speed_kmh"] / df["free_flow_speed"]
-    df["speed_ratio"] = df["speed_ratio"].clip(upper=1)
+    df = df[df["speed_ratio"] < 1].reset_index(drop=True)
 
     # filter for weekdays to exclude weekend traffic state
-    start_filter = time.perf_counter()
     df["day_of_week"] = df["TripStart_dt"].dt.day_of_week
     weekday_df = df[df["day_of_week"] < 5].copy()  # 0-5 -> Monday to Friday
-    filter_time = time.perf_counter()
-    print(f"time to filter to weekdays only: {filter_time - start_filter}")
 
     # create a time of day column with intervals of 5 minutes
     # rounds 08:07 down to 08:05, 08:22 down to 08:20, etc.
@@ -135,8 +131,6 @@ try:
         .reset_index()
     )
     typical_day = typical_day.sort_values(["LinkId", "time_window"])
-    typical_time = time.perf_counter()
-    print(f"time to get typical day: {typical_time - filter_time}")
 
     # get the speed ratio difference between the current row and the previous one
     typical_day["ratio_diff"] = (
@@ -149,8 +143,6 @@ try:
     typical_day["state_change"] = (typical_day["ratio_diff"] >= 0.05) | (
         typical_day["LinkId"] != typical_day["LinkId"].shift()
     )
-    state_change_time = time.perf_counter()
-    print(f"time to determine all state changes: {state_change_time - typical_time}")
 
     # create a unique ID for each event on each segment and group them with
     # their start and end time, as well as their average speed ratio
@@ -164,17 +156,27 @@ try:
         )
         .reset_index()
     )
-    grouping_time = time.perf_counter()
-    print(f"time to group events: {grouping_time - state_change_time}")
+
+    # convert start_time to "HH:MM" formatt
+    final_df["start_time"] = final_df["start_time"].apply(lambda x: x.strftime("%H:%M"))
 
     # calculate duration of an event
     # if 3 windows of 5 minute intervals -> 3 slots * 5 = 15 minutes * 60 sec
     final_df["event_duration"] = final_df["window_count"] * 5 * 60
 
     # get segment_key for all segments
-    bornes_file_id = 'REDACTED'
-    url = f'https://drive.google.com/uc?export=download&id={bornes_file_id}'
-    segments = pd.read_excel("sim/traffic/montreal_data/bornes.xlsx")
+    bornes_file_id = "REDACTED"
+    url = f"https://drive.google.com/uc?export=download&id={bornes_file_id}"
+    output = "sim/traffic/montreal_data/bornes.xlsx"
+    if not download_dataset(bornes_file_id, output):
+        print(
+            "Script was interrupted. Please verify that the drive is still available"
+            " and rerun the script."
+        )
+        sys.exit()
+
+    print("Finalizing and creating csv...")
+    segments = pd.read_excel(output)
     subset_segments = segments[
         ["LinkId", "SrcLatitude", "SrcLongitude", "DestLatitude", "DestLongitude"]
     ].copy()
@@ -186,15 +188,9 @@ try:
         )
     )
     final_subset = subset_segments[["LinkId", "segment_key"]]
-    prepare_segment_key = time.perf_counter()
-    print(
-        f"time to read segments and get segment_keys: {prepare_segment_key - grouping_time}"
-    )
 
     # merge both final dataframes by LinkId
     mapped_data = pd.merge(final_df, final_subset, on="LinkId")
-    map_time = time.perf_counter()
-    print(f"time to map both datasets: {map_time - prepare_segment_key}")
 
     # create traffic csv with specific columns
     # TYPE,start_time,segment_key,name,duration,weight
@@ -212,7 +208,7 @@ try:
         ]
     ]
     final_output.columns = [
-        "traffic_type",
+        "TYPE",
         "start_time",
         "segment_key",
         "name",
@@ -224,7 +220,6 @@ try:
     file_path = Path(filename)
     file_path.parent.mkdir(exist_ok=True)  # create traffic_datasets if does not exist
     final_output.to_csv(filename, index=False)
-    print(f"time to make traffic csv: {time.perf_counter() - map_time}")
 
 except Exception as e:
     print(e)
