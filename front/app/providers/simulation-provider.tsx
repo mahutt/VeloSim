@@ -129,6 +129,8 @@ export type SimulationContextType = {
   startTime: number;
   simulationSecondsPassed: number;
   scrubSimulationSecond: number;
+  updateHoverState: (stationId: number | null, driverId: number | null) => void;
+  setHoverLocked: (locked: boolean) => void;
 };
 
 const SimulationContext = createContext<SimulationContextType | undefined>(
@@ -525,6 +527,9 @@ export const SimulationProvider = ({
   const hoveredStationIdRef = useRef<number | null>(null);
   const hoveredResourceIdRef = useRef<number | null>(null);
 
+  // Lock hover state during station drag (prevents mouseleave from clearing it)
+  const hoverLockedRef = useRef(false);
+
   // Debounce hover updates to prevent excessive re-renders
   const hoverDebounceTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -853,6 +858,10 @@ export const SimulationProvider = ({
     stationId: number | null,
     driverId: number | null
   ) => {
+    // During drag, ignore all external hover updates
+    if (hoverLockedRef.current) {
+      return;
+    }
     hoveredStationIdRef.current = stationId;
     hoveredResourceIdRef.current = driverId;
 
@@ -1104,6 +1113,10 @@ export const SimulationProvider = ({
         startTime,
         simulationSecondsPassed,
         scrubSimulationSecond,
+        updateHoverState,
+        setHoverLocked: (locked: boolean) => {
+          hoverLockedRef.current = locked;
+        },
       }}
     >
       {children}

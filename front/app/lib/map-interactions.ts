@@ -23,7 +23,7 @@
  */
 
 import type { Map as MapboxMap, MapMouseEvent } from 'mapbox-gl';
-import { isMapLayer, MapLayer } from './map-helpers';
+import { isMapLayer, MapLayer, MapSource } from './map-helpers';
 import { SelectedItemType } from '~/components/map/selected-item-bar';
 import type { Position } from '~/types';
 
@@ -182,5 +182,197 @@ export function setupMapDropHandlers(
   return () => {
     canvas.removeEventListener('dragover', handleDragOver);
     canvas.removeEventListener('drop', handleDrop);
+  };
+}
+
+// Minimum pixel movement before entering drag mode (so clicks still work)
+const DRAG_THRESHOLD = 5;
+
+const EMPTY_FC: GeoJSON.FeatureCollection = {
+  type: 'FeatureCollection',
+  features: [],
+};
+
+export type StationDragDropCallback = (
+  stationId: number,
+  driverId: number
+) => void;
+
+/**
+ * Set up map-level station drag handlers.
+ * Long-press / mousedown on a station icon, drag to a driver icon, release to
+ * trigger `onDrop(stationId, driverId)`.
+ */
+export function setupStationDragHandlers(
+  map: MapboxMap,
+  onDrop: StationDragDropCallback,
+  onHighlight?: (stationId: number | null) => void
+) {
+  let dragging = false;
+  let stationId: number | null = null;
+  let originLngLat: [number, number] | null = null;
+  let startPoint: { x: number; y: number } | null = null;
+  let thresholdMet = false;
+  let hoveredDriverId: number | null = null;
+  let wasDragPanEnabled: boolean | null = null;
+
+  const stationLayers = [MapLayer.Stations, MapLayer.StationCircle];
+
+  function setGhostData(lngLat: [number, number]) {
+    (map.getSource(MapSource.DragGhost) as mapboxgl.GeoJSONSource)?.setData({
+      type: 'FeatureCollection',
+      features: [
+        {
+          type: 'Feature',
+          geometry: { type: 'Point', coordinates: lngLat },
+          properties: {},
+        },
+      ],
+    });
+  }
+
+  function clearDragVisuals() {
+    (map.getSource(MapSource.DragGhost) as mapboxgl.GeoJSONSource)?.setData(
+      EMPTY_FC
+    );
+  }
+
+  // Convert a screen pixel to map lngLat
+  function screenToLngLat(x: number, y: number): [number, number] {
+    const rect = map.getCanvas().getBoundingClientRect();
+    const point = map.unproject([x - rect.left, y - rect.top]);
+    return [point.lng, point.lat];
+  }
+
+  function cleanup() {
+    dragging = false;
+    stationId = null;
+    originLngLat = null;
+    startPoint = null;
+    thresholdMet = false;
+    hoveredDriverId = null;
+    clearDragVisuals();
+    onHighlight?.(null);
+    if (wasDragPanEnabled !== null) {
+      if (wasDragPanEnabled) {
+        map.dragPan.enable();
+      } else {
+        map.dragPan.disable();
+      }
+      wasDragPanEnabled = null;
+    }
+    map.getCanvas().style.cursor = '';
+  }
+
+  function onMouseDown(e: MapMouseEvent) {
+    const features = map.queryRenderedFeatures(e.point, {
+      layers: stationLayers,
+    });
+    if (!features || features.length === 0) return;
+
+    const feature = features[0];
+    const id = feature.properties?.id;
+    if (id === undefined) return;
+
+    stationId = Number(id);
+    onHighlight?.(stationId);
+    const coords = (feature.geometry as GeoJSON.Point).coordinates as [
+      number,
+      number,
+    ];
+    originLngLat = coords;
+    startPoint = { x: e.point.x, y: e.point.y };
+    dragging = true;
+    thresholdMet = false;
+    wasDragPanEnabled = map.dragPan.isEnabled();
+    if (wasDragPanEnabled) {
+      map.dragPan.disable();
+    }
+
+    // Don't prevent default click yet — wait for threshold
+    e.preventDefault();
+  }
+
+  function onMouseMove(e: MapMouseEvent) {
+    if (!dragging || !startPoint || !originLngLat) return;
+
+    const dx = e.point.x - startPoint.x;
+    const dy = e.point.y - startPoint.y;
+
+    if (!thresholdMet) {
+      if (Math.sqrt(dx * dx + dy * dy) < DRAG_THRESHOLD) return;
+      thresholdMet = true;
+      map.getCanvas().style.cursor = 'grabbing';
+    }
+
+    // Check if hovering over a driver
+    const features = map.queryRenderedFeatures(e.point, {
+      layers: [MapLayer.Resources],
+    });
+    const newHoveredId =
+      features && features.length > 0
+        ? Number(features[0].properties?.id)
+        : null;
+
+    if (newHoveredId !== hoveredDriverId) {
+      hoveredDriverId = newHoveredId;
+      map.getCanvas().style.cursor =
+        hoveredDriverId !== null ? 'copy' : 'grabbing';
+    }
+  }
+
+  // Track ghost on window so it follows even outside canvas
+  function onWindowMouseMove(e: MouseEvent) {
+    if (!dragging || !thresholdMet) return;
+    const lngLat = screenToLngLat(e.clientX, e.clientY);
+    setGhostData(lngLat);
+  }
+
+  function onMouseUp(e: MapMouseEvent) {
+    if (!dragging) return;
+
+    if (thresholdMet && stationId !== null) {
+      // Check for a driver under the cursor
+      const features = map.queryRenderedFeatures(e.point, {
+        layers: [MapLayer.Resources],
+      });
+
+      if (features && features.length > 0) {
+        const driverId = Number(features[0].properties?.id);
+        if (!Number.isNaN(driverId)) {
+          onDrop(stationId, driverId);
+        }
+      }
+    }
+
+    cleanup();
+  }
+
+  // Bind handlers to station layers for mousedown, and globally for move/up
+  stationLayers.forEach((layer) => {
+    map.on('mousedown', layer, onMouseDown);
+  });
+  map.on('mousemove', onMouseMove);
+  map.on('mouseup', onMouseUp);
+
+  function onWindowMouseUp(e: MouseEvent) {
+    if (!dragging) return;
+    const target = e.target as Node | null;
+    if (target && map.getCanvas().contains(target)) return;
+    cleanup();
+  }
+
+  window.addEventListener('mouseup', onWindowMouseUp);
+  window.addEventListener('mousemove', onWindowMouseMove);
+
+  return () => {
+    stationLayers.forEach((layer) => {
+      map.off('mousedown', layer, onMouseDown);
+    });
+    map.off('mousemove', onMouseMove);
+    map.off('mouseup', onMouseUp);
+    window.removeEventListener('mouseup', onWindowMouseUp);
+    window.removeEventListener('mousemove', onWindowMouseMove);
+    cleanup();
   };
 }
