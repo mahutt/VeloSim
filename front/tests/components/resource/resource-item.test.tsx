@@ -28,6 +28,7 @@ import {
   ResourceItem,
   type ResourceItemElement,
 } from '~/components/resource/resource-item';
+import { DriverState } from '~/types';
 import { MapProvider } from '~/providers/map-provider';
 import { SimulationProvider } from '~/providers/simulation-provider';
 import { TaskAssignmentProvider } from '~/providers/task-assignment-provider';
@@ -59,6 +60,7 @@ test('resource item renders with resource data', () => {
     taskCount: 3,
     batteryCount: 1,
     batteryCapacity: 100,
+    state: DriverState.Idle,
   };
 
   const mockOnSelect = vi.fn();
@@ -84,6 +86,7 @@ test('resource item renders with selection state', () => {
     taskCount: 5,
     batteryCount: 0,
     batteryCapacity: 100,
+    state: DriverState.OnRoute,
   };
 
   const mockOnSelect = vi.fn();
@@ -142,6 +145,7 @@ test('resource item calls onSelect when clicked', () => {
     taskCount: 5,
     batteryCount: 2,
     batteryCapacity: 100,
+    state: DriverState.ServicingStation,
   };
 
   const mockOnSelect = vi.fn();
@@ -171,6 +175,7 @@ test('resource item displays driver name and ID', () => {
     taskCount: 2,
     batteryCount: 1,
     batteryCapacity: 100,
+    state: DriverState.Idle,
   };
 
   const mockOnSelect = vi.fn();
@@ -196,6 +201,7 @@ test('resource item displays battery status indicator', () => {
     taskCount: 1,
     batteryCount: 2,
     batteryCapacity: 100,
+    state: DriverState.OnRoute,
   };
 
   const mockOnSelect = vi.fn();
@@ -220,6 +226,7 @@ test('resource item handles dragOver event correctly', () => {
     taskCount: 0,
     batteryCount: 1,
     batteryCapacity: 100,
+    state: DriverState.OnBreak,
   };
 
   const mockOnSelect = vi.fn();
@@ -256,6 +263,7 @@ test('resource item handles drop event and stops propagation (#583)', () => {
     taskCount: 0,
     batteryCount: 1,
     batteryCapacity: 100,
+    state: DriverState.RestockingBatteries,
   };
 
   const mockOnSelect = vi.fn();
@@ -298,6 +306,7 @@ test('resource item handles dragEnter and applies hover state', () => {
     taskCount: 0,
     batteryCount: 1,
     batteryCapacity: 100,
+    state: DriverState.EndingShift,
   };
 
   const mockOnSelect = vi.fn();
@@ -335,6 +344,7 @@ test('resource item handles dragLeave with relatedTarget outside element (#583)'
     taskCount: 0,
     batteryCount: 1,
     batteryCapacity: 100,
+    state: DriverState.SeekingHQForInventory,
   };
 
   const mockOnSelect = vi.fn();
@@ -383,6 +393,7 @@ test('resource item handles dragLeave with null relatedTarget (#583 Safari fix)'
     taskCount: 0,
     batteryCount: 1,
     batteryCapacity: 100,
+    state: DriverState.PendingShift,
   };
 
   const mockOnSelect = vi.fn();

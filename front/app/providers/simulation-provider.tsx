@@ -787,6 +787,7 @@ export const SimulationProvider = ({
             taskCount: resource.taskIds.length,
             batteryCount: vehicle!.batteryCount,
             batteryCapacity: vehicle!.batteryCapacity,
+            state: resource.state,
           };
         })
     );
