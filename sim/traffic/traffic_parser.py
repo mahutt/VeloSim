@@ -152,7 +152,7 @@ class TrafficParser:
         except Exception:
             raise ValueError(
                 f"Unsupported start_time format {start_time_str}. Should use simple "
-                f"time format (e.g. '08:00' or '08:00:00')"
+                f"time format (e.g. '08:00')"
             )
 
         # Parse segment_key
