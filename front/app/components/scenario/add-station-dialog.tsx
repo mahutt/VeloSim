@@ -34,6 +34,7 @@ import {
 import { Button } from '~/components/ui/button';
 import { Input } from '~/components/ui/input';
 import { Label } from '~/components/ui/label';
+import { log, LogLevel } from '~/lib/logger';
 import { MONTREAL_BOUNDS, SCHEDULED_TASK_PATTERN } from '~/constants';
 
 interface AddStationDialogProps {
@@ -122,6 +123,12 @@ export default function AddStationDialog({
     e.preventDefault();
 
     if (!validateForm()) {
+      log({
+        message: 'Station form validation failed',
+        level: LogLevel.WARNING,
+        context: 'AddStationDialog',
+        entityType: 'station',
+      });
       return;
     }
 
@@ -130,7 +137,7 @@ export default function AddStationDialog({
       .map((task) => task.trim())
       .filter((task) => task.length > 0);
 
-    onSubmit({
+    const stationData = {
       name: name.trim(),
       latitude: parseFloat(latitude),
       longitude: parseFloat(longitude),
@@ -138,7 +145,16 @@ export default function AddStationDialog({
         ? parseInt(initialTaskCount, 10)
         : undefined,
       scheduledTasks: tasks.length > 0 ? tasks : undefined,
+    };
+
+    log({
+      message: `Station form submitted: ${stationData.name}`,
+      level: LogLevel.INFO,
+      context: 'AddStationDialog',
+      entityType: 'station',
     });
+
+    onSubmit(stationData);
 
     // Reset form
     setName('');

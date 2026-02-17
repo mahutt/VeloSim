@@ -36,6 +36,7 @@ import { Input } from '~/components/ui/input';
 import { Label } from '~/components/ui/label';
 import { MONTREAL_BOUNDS } from '~/constants';
 import type { ScenarioContentVehicle } from '~/types';
+import { log, LogLevel } from '~/lib/logger';
 
 interface AddVehicleDialogProps {
   open: boolean;
@@ -143,6 +144,12 @@ export default function AddVehicleDialog({
     e.preventDefault();
 
     if (!validateForm()) {
+      log({
+        message: 'Vehicle form validation failed',
+        level: LogLevel.WARNING,
+        context: 'AddVehicleDialog',
+        entityType: 'vehicle',
+      });
       return;
     }
 
@@ -158,6 +165,13 @@ export default function AddVehicleDialog({
     if (batteryCount.trim()) {
       vehicleData.batteryCount = parseInt(batteryCount, 10);
     }
+
+    log({
+      message: `Vehicle form submitted: ${vehicleData.name}`,
+      level: LogLevel.INFO,
+      context: 'AddVehicleDialog',
+      entityType: 'vehicle',
+    });
 
     onSubmit(vehicleData);
 
