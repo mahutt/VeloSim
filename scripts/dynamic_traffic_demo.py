@@ -145,6 +145,122 @@ def generate_traffic_csv(path, segment_key, tick_start, duration, weight, name):
         ])
 
 
+def generate_staggered_traffic_csv(path, road_info):
+    """Generate a staggered traffic CSV from actual route geometry.
+
+    Creates traffic events at different times on different road segments,
+    plus off-route events that should NOT appear on the route overlay.
+
+    Segment keys use road.geometry endpoints (registered in PositionRegistry
+    by RouteController), ensuring exact Position hash matching.
+
+    Args:
+        path: Output file path.
+        road_info: List of road info dicts from analyze_route().
+    """
+    total_roads = len(road_info)
+    if total_roads < 8:
+        print(f"   WARNING: Route only has {total_roads} roads, need 8+ for staggered demo")
+        return
+
+    # Pick 4 groups spread across the route
+    groups = [
+        {
+            "name_prefix": "early_severe",
+            "start_frac": 0.05,  # Near start
+            "count": 3,
+            "tick_start": 30,
+            "duration": 300,
+            "weight": 0.15,
+        },
+        {
+            "name_prefix": "mid_moderate",
+            "start_frac": 0.25,  # Quarter way
+            "count": 3,
+            "tick_start": 200,
+            "duration": 500,
+            "weight": 0.5,
+        },
+        {
+            "name_prefix": "mid_severe",
+            "start_frac": 0.50,  # Half way
+            "count": 4,
+            "tick_start": 400,
+            "duration": 400,
+            "weight": 0.15,
+        },
+        {
+            "name_prefix": "late_moderate",
+            "start_frac": 0.75,  # Three quarters
+            "count": 4,
+            "tick_start": 600,
+            "duration": 500,
+            "weight": 0.5,
+        },
+    ]
+
+    rows = []
+    used_indices = set()
+
+    for group in groups:
+        start_idx = max(1, int(total_roads * group["start_frac"]))
+        count = min(group["count"], total_roads - start_idx)
+
+        for i in range(count):
+            road_idx = start_idx + i
+            if road_idx >= total_roads or road_idx in used_indices:
+                continue
+            used_indices.add(road_idx)
+
+            road = road_info[road_idx]["road"]
+            seg_key = get_event_segment_key(road)
+            rows.append({
+                "type": "local_traffic",
+                "tick_start": group["tick_start"],
+                "segment_key": format_segment_key_for_csv(seg_key),
+                "name": f"{group['name_prefix']}_{i}",
+                "duration": group["duration"],
+                "weight": group["weight"],
+            })
+
+    # Add off-route events (coordinates that are NOT on the route)
+    off_route = [
+        ((-73.5718, 45.5048), (-73.5682, 45.5035), "offroute_sherbrooke"),
+        ((-73.5802, 45.5145), (-73.5773, 45.5120), "offroute_parc"),
+        ((-73.5614, 45.5152), (-73.5590, 45.5128), "offroute_stdenis"),
+        ((-73.5595, 45.5072), (-73.5571, 45.5051), "offroute_stlaurent"),
+    ]
+    for start, end, name in off_route:
+        rows.append({
+            "type": "local_traffic",
+            "tick_start": 0,
+            "segment_key": format_segment_key_for_csv((start, end)),
+            "name": name,
+            "duration": 3000,
+            "weight": 0.15,
+        })
+
+    with open(path, "w", newline="", encoding="utf-8") as f:
+        writer = csv.writer(f)
+        writer.writerow(["TYPE", "tick_start", "segment_key", "name", "duration", "weight"])
+        for row in rows:
+            writer.writerow([
+                row["type"],
+                row["tick_start"],
+                row["segment_key"],
+                row["name"],
+                row["duration"],
+                row["weight"],
+            ])
+
+    print(f"   Generated {len(rows)} events ({len(rows) - len(off_route)} on-route, "
+          f"{len(off_route)} off-route)")
+    for group in groups:
+        print(f"     {group['name_prefix']}: tick {group['tick_start']}, "
+              f"weight={group['weight']}, duration={group['duration']}")
+    print(f"     off-route: tick 0, weight=0.15, duration=3000 (should NOT appear)")
+
+
 def generate_scenario_json(json_path, csv_path, start_pos, end_pos):
     """Write a full scenario JSON importable into the scenario editor.
 
@@ -759,6 +875,11 @@ def parse_args():
         help="Skip pass 2 (pipeline simulation) for quick runs",
     )
     parser.add_argument(
+        "--staggered", action="store_true",
+        help="Generate staggered traffic CSV (events at different ticks on "
+             "different road segments, plus off-route events)",
+    )
+    parser.add_argument(
         "--verbose", action="store_true",
         help="Enable DEBUG logging for traffic pipeline",
     )
@@ -812,6 +933,24 @@ def main():
 
         total_ticks = sum(r["points"] for r in road_info)
         print(f"\n   Total estimated ticks: {total_ticks}")
+
+        # ── Staggered mode: generate CSV + scenario and exit ─────────────
+        if args.staggered:
+            scripts_dir = Path(__file__).parent
+            csv_path = scripts_dir / "dynamic_traffic_output.csv"
+            json_path = scripts_dir / "dynamic_traffic_scenario.json"
+
+            print(f"\n4. Generating staggered traffic scenario...")
+            generate_staggered_traffic_csv(csv_path, road_info)
+            generate_scenario_json(json_path, csv_path, start_pos, end_pos)
+            print(f"\n   CSV:      {csv_path}")
+            print(f"   Scenario: {json_path}")
+            print(f"\n   Import the scenario JSON into the editor to test.")
+            mc.close()
+            print(f"\n{'='*70}")
+            print("Staggered scenario generated!")
+            print(f"{'='*70}")
+            return
 
         # ── Phase 2: Pick Target & Plan Scenario ─────────────────────────
         target_idx = int(len(road_info) * target_frac)

@@ -161,6 +161,14 @@ class RouteController:
         for road in roads:
             self._register_road_to_route(road, route)
 
+        # Build initial traffic triples cache for roads with pre-existing traffic.
+        # This covers the case where traffic events fired before the route was
+        # created (e.g. tick_start=0 events). The _on_road_created callback
+        # applies traffic to the road but can't notify the route (it doesn't
+        # exist yet). So we do a one-time cache build here.
+        if any(road.get_traffic_geometry_ranges() for road in roads):
+            route.notify_traffic_changed(roads[0])
+
         return route
 
     def generate_point_collection(

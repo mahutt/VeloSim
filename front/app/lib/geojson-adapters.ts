@@ -24,7 +24,14 @@
 
 import { lineString, point } from '@turf/helpers';
 import lineSlice from '@turf/line-slice';
-import type { Driver, Station, Position, Headquarters } from '~/types';
+import type {
+  Driver,
+  Station,
+  Position,
+  Headquarters,
+  TrafficRange,
+  CongestionLevel,
+} from '~/types';
 
 export function adaptHeadquartersToGeoJSON(
   headquarters: Headquarters
@@ -96,10 +103,92 @@ export function adaptResourcesToGeoJSON(
   };
 }
 
+/**
+ * Split a coordinate array into colored sub-segments based on traffic ranges.
+ * When ranges overlap, the worst congestion level wins.
+ */
+function splitByTraffic(
+  coords: Position[],
+  globalOffset: number,
+  trafficRanges: TrafficRange[],
+  segment: string
+): GeoJSON.Feature[] {
+  if (coords.length < 2) return [];
+
+  const defaultColor = '#22c55e';
+  const defaultOpacity = 0.9;
+
+  if (!trafficRanges || trafficRanges.length === 0) {
+    return [
+      {
+        type: 'Feature',
+        properties: { segment, color: defaultColor, opacity: defaultOpacity },
+        geometry: { type: 'LineString', coordinates: coords },
+      },
+    ];
+  }
+
+  const len = coords.length;
+  const severity: number[] = new Array(len).fill(0);
+
+  const severityOf = (level: CongestionLevel): number => {
+    switch (level) {
+      case 'severe':
+        return 2;
+      case 'moderate':
+        return 1;
+      default:
+        return 0;
+    }
+  };
+
+  for (const range of trafficRanges) {
+    const localStart = Math.max(range.startCoordinateIndex - globalOffset, 0);
+    const localEnd = Math.min(range.endCoordinateIndex - globalOffset, len - 1);
+    if (localStart >= len || localEnd < 0) continue;
+
+    const s = severityOf(range.congestionLevel);
+    for (let i = localStart; i <= localEnd; i++) {
+      if (s > severity[i]) {
+        severity[i] = s;
+      }
+    }
+  }
+
+  const severityToColor = [defaultColor, '#fbb83c', '#f87171'];
+  const severityToOpacity = [defaultOpacity, 0.95, 1.0];
+  const colors = severity.map((s) => severityToColor[s]);
+  const opacities = severity.map((s) => severityToOpacity[s]);
+
+  const features: GeoJSON.Feature[] = [];
+  let runStart = 0;
+
+  for (let i = 1; i <= len; i++) {
+    if (i === len || colors[i] !== colors[runStart]) {
+      const slice = coords.slice(runStart, i + (i < len ? 1 : 0));
+      if (slice.length >= 2) {
+        features.push({
+          type: 'Feature',
+          properties: {
+            segment,
+            color: colors[runStart],
+            opacity: opacities[runStart],
+          },
+          geometry: { type: 'LineString', coordinates: slice },
+        });
+      }
+      runStart = i;
+    }
+  }
+
+  return features;
+}
+
 export function adaptRouteToGeoJSON(
   routeGeometry: Position[] | null,
   position: Position | null,
-  nextStopIndex: number
+  nextStopIndex: number,
+  trafficRanges?: TrafficRange[]
 ): {
   nextTask: GeoJSON.FeatureCollection;
   futureTasks: GeoJSON.FeatureCollection;
@@ -123,11 +212,11 @@ export function adaptRouteToGeoJSON(
     };
   }
 
-  // 1. split the route at nextStopIndex to avoid snapping to the incorrect part of a line (due to double-backing)
+  // Split at nextStopIndex to avoid snapping to incorrect segment on double-back
   const preNextTaskSegment = routeGeometry.slice(0, nextStopIndex + 1);
   const postNextTaskSegment = routeGeometry.slice(nextStopIndex);
 
-  // 2. remove points already travelled on preNextTaskSegment (using position)
+  // Trim already-travelled portion
   const nextTaskLine = lineSlice(
     point(position),
     point(routeGeometry[nextStopIndex]),
@@ -144,33 +233,43 @@ export function adaptRouteToGeoJSON(
     };
   }
 
-  const result: {
-    nextTask: GeoJSON.FeatureCollection;
-    futureTasks: GeoJSON.FeatureCollection;
-  } = {
-    nextTask: {
-      type: 'FeatureCollection',
-      features: [
-        {
-          type: 'Feature',
-          properties: { segment: 'next-task' },
-          geometry: nextTaskLine.geometry,
-        },
-      ],
-    },
-    futureTasks: {
-      type: 'FeatureCollection',
-      features:
-        postNextTaskSegment.length >= 2
-          ? [
-              {
-                type: 'Feature',
-                properties: { segment: 'future-tasks' },
-                geometry: lineString(postNextTaskSegment).geometry,
-              },
-            ]
-          : [],
-    },
+  // Find the global offset by matching trimmedCoords[1] (first original point
+  // after the driver) to avoid oscillation at coordinate midpoints.
+  const trimmedCoords = nextTaskLine.geometry.coordinates as Position[];
+  let nextTaskGlobalOffset = 0;
+  if (trimmedCoords.length >= 2) {
+    const [tx, ty] = trimmedCoords[1];
+    let bestDist = Number.POSITIVE_INFINITY;
+    for (let i = 0; i < preNextTaskSegment.length; i++) {
+      const dx = preNextTaskSegment[i][0] - tx;
+      const dy = preNextTaskSegment[i][1] - ty;
+      const dist = dx * dx + dy * dy;
+      if (dist < bestDist) {
+        bestDist = dist;
+        nextTaskGlobalOffset = Math.max(i - 1, 0);
+      }
+    }
+  }
+
+  const nextTaskFeatures = splitByTraffic(
+    trimmedCoords,
+    nextTaskGlobalOffset,
+    trafficRanges ?? [],
+    'next-task'
+  );
+
+  const futureTaskFeatures =
+    postNextTaskSegment.length >= 2
+      ? splitByTraffic(
+          postNextTaskSegment,
+          nextStopIndex,
+          trafficRanges ?? [],
+          'future-tasks'
+        )
+      : [];
+
+  return {
+    nextTask: { type: 'FeatureCollection', features: nextTaskFeatures },
+    futureTasks: { type: 'FeatureCollection', features: futureTaskFeatures },
   };
-  return result;
 }

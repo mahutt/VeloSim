@@ -27,8 +27,9 @@ import {
   adaptStationsToGeoJSON,
   adaptRouteToGeoJSON,
   adaptResourcesToGeoJSON,
+  adaptHeadquartersToGeoJSON,
 } from '~/lib/geojson-adapters';
-import type { Station, Position } from '~/types';
+import type { Station, Position, CongestionLevel } from '~/types';
 import { makeDriver } from 'tests/test-helpers';
 
 describe('adaptStationsToGeoJSON', () => {
@@ -175,6 +176,223 @@ describe('adaptRouteToGeoJSON', () => {
 
     expect(nextTaskFeatures).toHaveLength(0);
     expect(futureTasksFeatures).toHaveLength(0);
+  });
+
+  it('should return empty collection when position is null', () => {
+    const result = adaptRouteToGeoJSON(
+      [
+        [-74.0, 40.7],
+        [-74.1, 40.8],
+      ],
+      null,
+      1
+    );
+    expect(result.nextTask).toEqual(emptyFeatureCollection);
+    expect(result.futureTasks).toEqual(emptyFeatureCollection);
+  });
+
+  it('should return empty collection when nextStopIndex is negative', () => {
+    const result = adaptRouteToGeoJSON(
+      [
+        [-74.0, 40.7],
+        [-74.1, 40.8],
+      ],
+      [-74.0, 40.7],
+      -1
+    );
+    expect(result.nextTask).toEqual(emptyFeatureCollection);
+    expect(result.futureTasks).toEqual(emptyFeatureCollection);
+  });
+
+  it('should produce green default color when no trafficRanges are provided', () => {
+    const routeGeometry: Position[] = [
+      [-74.0, 40.7],
+      [-74.1, 40.8],
+      [-74.2, 40.9],
+    ];
+    const result = adaptRouteToGeoJSON(routeGeometry, [-74.0, 40.7], 2);
+
+    const feature = result.nextTask.features[0];
+    expect(feature.properties?.color).toBe('#22c55e');
+    expect(feature.properties?.opacity).toBe(0.9);
+  });
+
+  it('should color route segments by congestion level', () => {
+    const routeGeometry: Position[] = [
+      [-74.0, 40.7],
+      [-74.1, 40.8],
+      [-74.2, 40.9],
+      [-74.3, 41.0],
+      [-74.4, 41.1],
+    ];
+
+    const trafficRanges = [
+      {
+        startCoordinateIndex: 1,
+        endCoordinateIndex: 2,
+        congestionLevel: 'moderate' as CongestionLevel,
+      },
+      {
+        startCoordinateIndex: 3,
+        endCoordinateIndex: 4,
+        congestionLevel: 'severe' as CongestionLevel,
+      },
+    ];
+
+    const result = adaptRouteToGeoJSON(
+      routeGeometry,
+      [-74.0, 40.7],
+      4,
+      trafficRanges
+    );
+
+    const colors = result.nextTask.features.map((f) => f.properties?.color);
+
+    expect(colors).toContain('#fbb83c'); // moderate = orange
+    expect(colors).toContain('#f87171'); // severe = red
+  });
+
+  it('should pick worst severity when traffic ranges overlap', () => {
+    const routeGeometry: Position[] = [
+      [-74.0, 40.7],
+      [-74.1, 40.8],
+      [-74.2, 40.9],
+      [-74.3, 41.0],
+    ];
+
+    const trafficRanges = [
+      {
+        startCoordinateIndex: 0,
+        endCoordinateIndex: 2,
+        congestionLevel: 'moderate' as CongestionLevel,
+      },
+      {
+        startCoordinateIndex: 1,
+        endCoordinateIndex: 3,
+        congestionLevel: 'severe' as CongestionLevel,
+      },
+    ];
+
+    const result = adaptRouteToGeoJSON(
+      routeGeometry,
+      [-74.0, 40.7],
+      3,
+      trafficRanges
+    );
+
+    // The overlapping region (indices 1-2) should be severe (red), not moderate
+    const colors = result.nextTask.features.map((f) => f.properties?.color);
+    expect(colors).toContain('#f87171'); // severe wins
+  });
+
+  it('should ignore traffic ranges that fall entirely outside coordinate array', () => {
+    const routeGeometry: Position[] = [
+      [-74.0, 40.7],
+      [-74.1, 40.8],
+      [-74.2, 40.9],
+    ];
+
+    const trafficRanges = [
+      {
+        startCoordinateIndex: 100,
+        endCoordinateIndex: 200,
+        congestionLevel: 'severe' as CongestionLevel,
+      },
+    ];
+
+    const result = adaptRouteToGeoJSON(
+      routeGeometry,
+      [-74.0, 40.7],
+      2,
+      trafficRanges
+    );
+
+    // Should be all default green since the range doesn't overlap
+    const colors = result.nextTask.features.map((f) => f.properties?.color);
+    expect(colors).toEqual(['#22c55e']);
+  });
+
+  it('should apply traffic to future-tasks segment', () => {
+    const routeGeometry: Position[] = [
+      [-74.0, 40.7],
+      [-74.1, 40.8],
+      [-74.2, 40.9],
+      [-74.3, 41.0],
+      [-74.4, 41.1],
+    ];
+
+    // Traffic on the future portion (after nextStopIndex = 2)
+    const trafficRanges = [
+      {
+        startCoordinateIndex: 3,
+        endCoordinateIndex: 4,
+        congestionLevel: 'severe' as CongestionLevel,
+      },
+    ];
+
+    const result = adaptRouteToGeoJSON(
+      routeGeometry,
+      [-74.0, 40.7],
+      2,
+      trafficRanges
+    );
+
+    expect(result.futureTasks.features.length).toBeGreaterThanOrEqual(1);
+    const futureColors = result.futureTasks.features.map(
+      (f) => f.properties?.color
+    );
+    expect(futureColors).toContain('#f87171');
+  });
+});
+
+describe('adaptHeadquartersToGeoJSON', () => {
+  it('should convert headquarters to a GeoJSON FeatureCollection', () => {
+    const hq = { position: [-73.5, 45.5] as Position };
+    const result = adaptHeadquartersToGeoJSON(hq);
+
+    expect(result).toEqual({
+      type: 'FeatureCollection',
+      features: [
+        {
+          type: 'Feature',
+          properties: {
+            id: 'headquarters',
+            name: 'Headquarters',
+          },
+          geometry: {
+            type: 'Point',
+            coordinates: [-73.5, 45.5],
+          },
+        },
+      ],
+    });
+  });
+});
+
+
+
+describe('adaptStationsToGeoJSON — selection and hover', () => {
+  const stations: Station[] = [
+    { id: 1, name: 'A', position: [-73.5, 45.5], taskIds: [1, 2] },
+    { id: 2, name: 'B', position: [-73.6, 45.6], taskIds: [3] },
+  ];
+
+  it('should set selected flag for the matching station', () => {
+    const result = adaptStationsToGeoJSON(stations, 2);
+    expect(result.features[0].properties?.selected).toBe(false);
+    expect(result.features[1].properties?.selected).toBe(true);
+  });
+
+  it('should set hover flag for the matching station', () => {
+    const result = adaptStationsToGeoJSON(stations, undefined, 1);
+    expect(result.features[0].properties?.hover).toBe(true);
+    expect(result.features[1].properties?.hover).toBe(false);
+  });
+
+  it('should include the correct taskCount', () => {
+    const result = adaptStationsToGeoJSON(stations);
+    expect(result.features[0].properties?.taskCount).toBe(2);
+    expect(result.features[1].properties?.taskCount).toBe(1);
   });
 });
 

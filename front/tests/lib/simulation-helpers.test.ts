@@ -28,6 +28,7 @@ import {
   driverResourceHasUpdated,
   vehicleResourceHasUpdated,
 } from '~/lib/simulation-helpers';
+import { DriverState } from '~/types';
 
 describe('vehicleResourceHasUpdated', () => {
   it('should return true if the vehicle did not exist before but is part of a resource', () => {
@@ -104,5 +105,21 @@ describe('driverResourceHasUpdated', () => {
     const updatedDriver = makeDriver({ id: 1, vehicleId: 1, taskIds: [1, 2] });
     const result = driverResourceHasUpdated(existingDriver, updatedDriver);
     expect(result).toBe(false);
+  });
+  it('should return true if only driver state changed but task count is the same', () => {
+    const existingDriver = makeDriver({
+      id: 1,
+      vehicleId: 1,
+      taskIds: [1, 2],
+      state: DriverState.OffShift,
+    });
+    const updatedDriver = makeDriver({
+      id: 1,
+      vehicleId: 1,
+      taskIds: [1, 2],
+      state: DriverState.Idle,
+    });
+    const result = driverResourceHasUpdated(existingDriver, updatedDriver);
+    expect(result).toBe(true);
   });
 });

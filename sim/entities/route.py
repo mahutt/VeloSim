@@ -26,6 +26,7 @@ import math
 from typing import TYPE_CHECKING
 from sim.entities.position import Position
 from sim.entities.road import Road
+from sim.entities.traffic_data import TrafficTriple
 from sim.map.routing_provider import RoutingProvider, RouteResult
 from shapely.geometry import LineString
 from grafana_logging.logger import get_logger
@@ -64,6 +65,34 @@ def map_index_forward(current_idx: int, old_count: int, new_count: int) -> int:
         return min(current_idx, new_count - 1)
     progress = current_idx / (old_count - 1)
     return min(math.ceil(progress * (new_count - 1)), new_count - 1)
+
+
+def find_nearest_index(points: list[Position], target: Position) -> int:
+    """Find the index of the point nearest to target in geographic space.
+
+    Used when traffic changes a road's pointcollection mid-traversal.
+    Geographic proximity prevents the position jump (rubber-banding) caused
+    by ratio-based mapping on non-uniform point distributions.
+
+    Args:
+        points: The new pointcollection to search.
+        target: The driver's last known geographic position.
+
+    Returns:
+        Index of the nearest point. O(n) — only called on traffic changes.
+    """
+    target_pos = target.get_position()
+    best_idx = 0
+    best_dist_sq = float("inf")
+    for i, pt in enumerate(points):
+        pos = pt.get_position()
+        dx = pos[0] - target_pos[0]
+        dy = pos[1] - target_pos[1]
+        dist_sq = dx * dx + dy * dy
+        if dist_sq < best_dist_sq:
+            best_dist_sq = dist_sq
+            best_idx = i
+    return best_idx
 
 
 class Route:
@@ -142,6 +171,10 @@ class Route:
             )
         self.roads = roads
 
+        # Cached traffic triples (eagerly updated via notify_traffic_changed)
+        self._traffic_triples_cache: list[TrafficTriple] = []
+        self.traffic_changed = False
+
         # If no roads were created, the route was finished from the start
         if not self.roads:
             self.is_finished = True
@@ -211,14 +244,29 @@ class Route:
         return success
 
     def _handle_traffic_point_change(self, active_count: int) -> None:
-        """Detect and remap index when traffic changes point count."""
+        """Detect and remap index when traffic changes point count.
+
+        Uses geographic proximity when the driver's last position is known.
+        This prevents rubber-banding caused by ratio-based mapping on
+        non-uniform point distributions (traffic creates dense points in
+        affected zones and normal spacing elsewhere).
+        """
         if (
             self._last_point_count is not None
             and self._last_point_count != active_count
         ):
-            self.current_point_index = map_index_forward(
-                self.current_point_index, self._last_point_count, active_count
-            )
+            if self._last_returned_position is not None:
+                current_road = self.roads[self.current_road_index]
+                active_points = current_road.active_pointcollection
+                self.current_point_index = find_nearest_index(
+                    active_points, self._last_returned_position
+                )
+            else:
+                self.current_point_index = map_index_forward(
+                    self.current_point_index,
+                    self._last_point_count,
+                    active_count,
+                )
         self._last_point_count = active_count
 
     def _get_current_position(self) -> Position | None:
@@ -296,6 +344,56 @@ class Route:
             List of [lon, lat] coordinate pairs from routing provider.
         """
         return [pos.get_position() for pos in self.coordinates]
+
+    def get_traffic_triples(self) -> list[TrafficTriple]:
+        """Get cached traffic triples in route coordinate index space.
+
+        Returns the eagerly-maintained cache. Updated via notify_traffic_changed()
+        when traffic is applied/removed on any road in this route.
+
+        Returns:
+            List of TrafficTriple objects for non-FREE_FLOW segments.
+        """
+        return self._traffic_triples_cache
+
+    def notify_traffic_changed(self, road: Road) -> None:
+        """Rebuild cached traffic triples after a road's traffic changed.
+
+        Called by TrafficController when traffic is applied/removed on a road
+        belonging to this route. Rebuilds the full triple list from all roads.
+
+        Args:
+            road: The road whose traffic state changed (used for logging only;
+                the rebuild walks all roads).
+
+        Returns:
+            None
+        """
+        triples: list[TrafficTriple] = []
+        coord_offset = 0
+        for r in self.roads:
+            if not r.geometry:
+                continue
+            geom_len = len(r.geometry)
+            for geom_start, geom_end, level in r.get_traffic_geometry_ranges():
+                abs_start = coord_offset + geom_start
+                abs_end = coord_offset + geom_end
+                # Merge with previous if adjacent + same level
+                if (
+                    triples
+                    and triples[-1].congestion_level == level
+                    and triples[-1].end_index >= abs_start
+                ):
+                    triples[-1] = TrafficTriple(
+                        triples[-1].start_index,
+                        max(triples[-1].end_index, abs_end),
+                        level,
+                    )
+                else:
+                    triples.append(TrafficTriple(abs_start, abs_end, level))
+            coord_offset += geom_len - 1  # shared boundary point
+        self._traffic_triples_cache = triples
+        self.traffic_changed = True
 
     def next(self) -> Position | None:
         """Return the next position in the route traversal.

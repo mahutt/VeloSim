@@ -35,7 +35,7 @@ import {
   MapSource,
 } from '~/lib/map-helpers';
 import { MockMap } from 'tests/mocks';
-import type { Position } from '~/types';
+import type { Position, CongestionLevel } from '~/types';
 
 test('loadMapImages loads all necessary images', () => {
   MockMap.createRandomInstance();
@@ -434,9 +434,9 @@ test('setMapLayers adds route layers with correct configuration', () => {
       'line-cap': 'round',
     },
     paint: {
-      'line-color': '#3b82f6',
+      'line-color': ['coalesce', ['get', 'color'], '#22c55e'],
       'line-width': 4,
-      'line-opacity': 0.8,
+      'line-opacity': ['coalesce', ['get', 'opacity'], 0.9],
     },
   });
 
@@ -449,9 +449,13 @@ test('setMapLayers adds route layers with correct configuration', () => {
       'line-cap': 'round',
     },
     paint: {
-      'line-color': '#3b82f6',
+      'line-color': ['coalesce', ['get', 'color'], '#22c55e'],
       'line-width': 4,
-      'line-opacity': 0.3,
+      'line-opacity': [
+        'number',
+        ['*', ['coalesce', ['get', 'opacity'], 0.9], 0.45],
+        0.4,
+      ],
     },
   });
 });
@@ -675,4 +679,41 @@ test('clearAllRoutesDisplay clears the all-routes layer', () => {
     type: 'FeatureCollection',
     features: [],
   });
+});
+
+test('updateRouteDisplay passes traffic ranges through to route features', () => {
+  MockMap.createRandomInstance();
+
+  const mockGeoJSONSource = { setData: vi.fn() };
+  MockMap.instance!.getSource = vi.fn().mockReturnValue(mockGeoJSONSource);
+
+  const routeGeometry: Position[] = [
+    [-73.5, 45.5],
+    [-73.6, 45.6],
+    [-73.7, 45.7],
+    [-73.8, 45.8],
+  ];
+
+  const trafficRanges = [
+    {
+      startCoordinateIndex: 1,
+      endCoordinateIndex: 2,
+      congestionLevel: 'severe' as CongestionLevel,
+    },
+  ];
+
+  updateRouteDisplay(
+    routeGeometry,
+    [-73.5, 45.5],
+    3,
+    MockMap.instance! as unknown as mapboxgl.Map,
+    trafficRanges
+  );
+
+  const nextTaskCall = mockGeoJSONSource.setData.mock.calls[0][0];
+  const colors = nextTaskCall.features.map(
+    (f: GeoJSON.Feature) => f.properties?.color
+  );
+  // Should include severe red for the traffic range
+  expect(colors).toContain('#f87171');
 });

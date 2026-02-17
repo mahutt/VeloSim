@@ -624,7 +624,7 @@ class SimulatorController:
 
         drivers = []
         for driver in self.driver_entities.values():
-            if is_key or (driver.has_updated):
+            if is_key or driver.has_updated:
                 in_progress_task = driver.get_in_progress_task()
                 current_vehicle = driver.get_vehicle()
                 shift: Shift = driver.get_driver_shift()
@@ -654,8 +654,27 @@ class SimulatorController:
                 # Only include route field when there's something to communicate:
                 # - Key frames: always include (coordinates or null)
                 # - Diff frames: only include if route_changed
-                if is_key or driver.route_changed:
-                    driver_data["route"] = driver.get_route_json()
+                if is_key or driver.route_changed or driver.traffic_changed:
+                    route_json = driver.get_route_json()
+
+                    # Build trafficRanges and nest inside route
+                    traffic_ranges: list = []
+                    coord_offset = 0
+                    for route in driver.routes:
+                        for triple in route.get_traffic_triples():
+                            traffic_ranges.append(
+                                triple.to_json_with_offset(coord_offset)
+                            )
+                        raw_coords = route.get_raw_coordinates()
+                        if raw_coords:
+                            coord_offset += len(raw_coords) - 1
+
+                    if route_json is not None:
+                        route_json["trafficRanges"] = (
+                            traffic_ranges if driver.routes else None
+                        )
+
+                    driver_data["route"] = route_json
 
                 drivers.append(driver_data)
 

@@ -22,7 +22,7 @@
  * SOFTWARE.
  */
 
-import type { Position, Route } from '~/types';
+import type { Position, Route, TrafficRange } from '~/types';
 import { adaptRouteToGeoJSON } from './geojson-adapters';
 
 export enum MapSource {
@@ -145,7 +145,7 @@ export function setMapLayers(map: mapboxgl.Map) {
       'line-cap': 'round',
     },
     paint: {
-      'line-color': '#3b82f6',
+      'line-color': ['coalesce', ['get', 'color'], '#22c55e'],
       'line-width': 3,
       'line-opacity': 0.35,
     },
@@ -161,9 +161,9 @@ export function setMapLayers(map: mapboxgl.Map) {
       'line-cap': 'round',
     },
     paint: {
-      'line-color': '#3b82f6',
+      'line-color': ['coalesce', ['get', 'color'], '#22c55e'],
       'line-width': 4,
-      'line-opacity': 0.8,
+      'line-opacity': ['coalesce', ['get', 'opacity'], 0.9],
     },
   });
 
@@ -176,9 +176,13 @@ export function setMapLayers(map: mapboxgl.Map) {
       'line-cap': 'round',
     },
     paint: {
-      'line-color': '#3b82f6',
+      'line-color': ['coalesce', ['get', 'color'], '#22c55e'],
       'line-width': 4,
-      'line-opacity': 0.3,
+      'line-opacity': [
+        'number',
+        ['*', ['coalesce', ['get', 'opacity'], 0.9], 0.45],
+        0.4,
+      ],
     },
   });
 
@@ -308,12 +312,14 @@ export function updateRouteDisplay(
   routeGeometry: Position[] | null,
   position: Position,
   nextStopIndex: number,
-  map: mapboxgl.Map
+  map: mapboxgl.Map,
+  trafficRanges?: TrafficRange[]
 ) {
   const { nextTask, futureTasks } = adaptRouteToGeoJSON(
     routeGeometry,
     position,
-    nextStopIndex
+    nextStopIndex,
+    trafficRanges
   );
 
   setMapSource(MapSource.RouteNextTask, nextTask, map);
@@ -358,7 +364,8 @@ export function updateAllRoutesDisplay(
     const { nextTask } = adaptRouteToGeoJSON(
       route.coordinates,
       position,
-      route.nextStopIndex
+      route.nextStopIndex,
+      route.trafficRanges
     );
 
     // Only show next task for background routes (reduces visual clutter)
