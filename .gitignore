@@ -177,6 +177,8 @@ front/.env.production.local
 
 # Simulator
 sim/osm/OSMData
+sim/traffic/traffic_datasets
+sim/traffic/montreal_data
 
 # OSRM preprocessed data files (large binary files, regenerate locally)
 osrm-data/

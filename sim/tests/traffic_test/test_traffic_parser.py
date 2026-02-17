@@ -27,6 +27,7 @@ import tempfile
 
 import pytest
 
+from sim.entities.map_payload import TrafficConfig
 from sim.entities.traffic_event import TrafficEvent
 from sim.entities.traffic_event_state import TrafficEventState
 from sim.traffic.traffic_parser import TrafficParser, TrafficParseError
@@ -142,26 +143,29 @@ class TestTrafficParser:
 
     def test_parse_valid_csv(self) -> None:
         csv_content = (
-            "TYPE,tick_start,segment_key,name,duration,weight\n"
-            'local_traffic,100,"((-73.5673,45.5017),(-73.5680,45.5020))",'
+            "TYPE,start_time,segment_key,name,duration,weight\n"
+            'local_traffic,"08:05","((-73.5673,45.5017),(-73.5680,45.5020))",'
             "rush_hour,50,0.3\n"
-            'local_traffic,200,"((-73.5700,45.5100),(-73.5710,45.5110))",'
+            'local_traffic,"09:00","((-73.5700,45.5100),(-73.5710,45.5110))",'
             ",30,0.8\n"
         )
         path = self._write_csv(csv_content)
+        traffic_config = TrafficConfig(
+            traffic_path=path, sim_start_time="day1:08:00", sim_end_time="day1:12:00"
+        )
         try:
-            parser = TrafficParser(path)
+            parser = TrafficParser(traffic_config)
             events = parser.parse()
             assert len(events) == 2
 
             assert events[0].event_type == "local_traffic"
-            assert events[0].tick_start == 100
+            assert events[0].tick_start == 300
             assert events[0].name == "rush_hour"
             assert events[0].duration == 50
             assert events[0].weight == 0.3
             assert events[0].state == TrafficEventState.PENDING
 
-            assert events[1].tick_start == 200
+            assert events[1].tick_start == 3600
             assert events[1].name is None
             assert events[1].duration == 30
             assert events[1].weight == 0.8
@@ -171,12 +175,15 @@ class TestTrafficParser:
 
     def test_parse_single_row(self) -> None:
         csv_content = (
-            "TYPE,tick_start,segment_key,name,duration,weight\n"
-            'local_traffic,0,"((-73.5,45.5),(-73.6,45.6))",start_event,10,0.5\n'
+            "TYPE,start_time,segment_key,name,duration,weight\n"
+            'local_traffic,"08:00","((-73.5,45.5),(-73.6,45.6))",start_event,10,0.5\n'
         )
         path = self._write_csv(csv_content)
+        traffic_config = TrafficConfig(
+            traffic_path=path, sim_start_time="day1:08:00", sim_end_time="day1:12:00"
+        )
         try:
-            parser = TrafficParser(path)
+            parser = TrafficParser(traffic_config)
             events = parser.parse()
             assert len(events) == 1
             assert events[0].tick_start == 0
@@ -186,34 +193,48 @@ class TestTrafficParser:
             os.unlink(path)
 
     def test_parse_header_only_returns_empty(self) -> None:
-        csv_content = "TYPE,tick_start,segment_key,name,duration,weight\n"
+        csv_content = "TYPE,start_time,segment_key,name,duration,weight\n"
         path = self._write_csv(csv_content)
+        traffic_config = TrafficConfig(
+            traffic_path=path, sim_start_time="day1:08:00", sim_end_time="day1:12:00"
+        )
         try:
-            parser = TrafficParser(path)
+            parser = TrafficParser(traffic_config)
             events = parser.parse()
             assert len(events) == 0
         finally:
             os.unlink(path)
 
     def test_file_not_found(self) -> None:
+        traffic_config = TrafficConfig(
+            traffic_path="/nonexistent/path/traffic.csv",
+            sim_start_time="day1:08:00",
+            sim_end_time="day1:12:00",
+        )
         with pytest.raises(FileNotFoundError):
-            TrafficParser("/nonexistent/path/traffic.csv")
+            TrafficParser(traffic_config)
 
     def test_empty_csv_file(self) -> None:
         csv_content = ""
         path = self._write_csv(csv_content)
+        traffic_config = TrafficConfig(
+            traffic_path=path, sim_start_time="day1:08:00", sim_end_time="day1:12:00"
+        )
         try:
-            parser = TrafficParser(path)
+            parser = TrafficParser(traffic_config)
             with pytest.raises(TrafficParseError, match="empty"):
                 parser.parse()
         finally:
             os.unlink(path)
 
     def test_missing_required_columns(self) -> None:
-        csv_content = "TYPE,tick_start\nlocal_traffic,100\n"
+        csv_content = "TYPE,start_time\n" 'local_traffic,"08:00"\n'
         path = self._write_csv(csv_content)
+        traffic_config = TrafficConfig(
+            traffic_path=path, sim_start_time="day1:08:00", sim_end_time="day1:12:00"
+        )
         try:
-            parser = TrafficParser(path)
+            parser = TrafficParser(traffic_config)
             with pytest.raises(TrafficParseError, match="Missing required columns"):
                 parser.parse()
         finally:
@@ -221,12 +242,15 @@ class TestTrafficParser:
 
     def test_unsupported_type(self) -> None:
         csv_content = (
-            "TYPE,tick_start,segment_key,name,duration,weight\n"
-            'global_traffic,100,"((-73.5,45.5),(-73.6,45.6))",test,50,0.5\n'
+            "TYPE,start_time,segment_key,name,duration,weight\n"
+            'global_traffic,"08:00","((-73.5,45.5),(-73.6,45.6))",test,50,0.5\n'
         )
         path = self._write_csv(csv_content)
+        traffic_config = TrafficConfig(
+            traffic_path=path, sim_start_time="day1:08:00", sim_end_time="day1:12:00"
+        )
         try:
-            parser = TrafficParser(path)
+            parser = TrafficParser(traffic_config)
             with pytest.raises(TrafficParseError, match="Unsupported TYPE"):
                 parser.parse()
         finally:
@@ -234,55 +258,63 @@ class TestTrafficParser:
 
     def test_empty_type(self) -> None:
         csv_content = (
-            "TYPE,tick_start,segment_key,name,duration,weight\n"
-            ',100,"((-73.5,45.5),(-73.6,45.6))",test,50,0.5\n'
+            "TYPE,start_time,segment_key,name,duration,weight\n"
+            ',"08:00","((-73.5,45.5),(-73.6,45.6))",test,50,0.5\n'
         )
         path = self._write_csv(csv_content)
+        traffic_config = TrafficConfig(
+            traffic_path=path, sim_start_time="day1:08:00", sim_end_time="day1:12:00"
+        )
         try:
-            parser = TrafficParser(path)
+            parser = TrafficParser(traffic_config)
             with pytest.raises(TrafficParseError, match="TYPE column is empty"):
                 parser.parse()
         finally:
             os.unlink(path)
 
-    def test_invalid_tick_start_not_integer(self) -> None:
+    def test_invalid_start_time_empty(self) -> None:
         csv_content = (
-            "TYPE,tick_start,segment_key,name,duration,weight\n"
-            'local_traffic,abc,"((-73.5,45.5),(-73.6,45.6))",test,50,0.5\n'
+            "TYPE,start_time,segment_key,name,duration,weight\n"
+            'local_traffic,,"((-73.5,45.5),(-73.6,45.6))",test,50,0.5\n'
         )
         path = self._write_csv(csv_content)
+        traffic_config = TrafficConfig(
+            traffic_path=path, sim_start_time="day1:08:00", sim_end_time="day1:12:00"
+        )
         try:
-            parser = TrafficParser(path)
-            with pytest.raises(
-                TrafficParseError, match="tick_start must be an integer"
-            ):
+            parser = TrafficParser(traffic_config)
+            with pytest.raises(TrafficParseError, match="start_time is empty"):
                 parser.parse()
         finally:
             os.unlink(path)
 
-    def test_negative_tick_start(self) -> None:
+    def test_invalid_start_time_format(self) -> None:
         csv_content = (
-            "TYPE,tick_start,segment_key,name,duration,weight\n"
-            'local_traffic,-5,"((-73.5,45.5),(-73.6,45.6))",test,50,0.5\n'
+            "TYPE,start_time,segment_key,name,duration,weight\n"
+            'local_traffic,"day1:08:00","((-73.5,45.5),(-73.6,45.6))",test,50,0.5\n'
         )
         path = self._write_csv(csv_content)
+        traffic_config = TrafficConfig(
+            traffic_path=path, sim_start_time="day1:08:00", sim_end_time="day1:12:00"
+        )
         try:
-            parser = TrafficParser(path)
-            with pytest.raises(
-                TrafficParseError, match="tick_start must be non-negative"
-            ):
+            parser = TrafficParser(traffic_config)
+            with pytest.raises(TrafficParseError):
                 parser.parse()
         finally:
             os.unlink(path)
 
     def test_invalid_segment_key_format(self) -> None:
         csv_content = (
-            "TYPE,tick_start,segment_key,name,duration,weight\n"
-            "local_traffic,100,not_a_tuple,test,50,0.5\n"
+            "TYPE,start_time,segment_key,name,duration,weight\n"
+            'local_traffic,"08:00",not_a_tuple,test,50,0.5\n'
         )
         path = self._write_csv(csv_content)
+        traffic_config = TrafficConfig(
+            traffic_path=path, sim_start_time="day1:08:00", sim_end_time="day1:12:00"
+        )
         try:
-            parser = TrafficParser(path)
+            parser = TrafficParser(traffic_config)
             with pytest.raises(TrafficParseError, match="Invalid segment_key"):
                 parser.parse()
         finally:
@@ -290,12 +322,15 @@ class TestTrafficParser:
 
     def test_segment_key_wrong_structure(self) -> None:
         csv_content = (
-            "TYPE,tick_start,segment_key,name,duration,weight\n"
-            'local_traffic,100,"(1,2,3)",test,50,0.5\n'
+            "TYPE,start_time,segment_key,name,duration,weight\n"
+            'local_traffic,"08:00","(1,2,3)",test,50,0.5\n'
         )
         path = self._write_csv(csv_content)
+        traffic_config = TrafficConfig(
+            traffic_path=path, sim_start_time="day1:08:00", sim_end_time="day1:12:00"
+        )
         try:
-            parser = TrafficParser(path)
+            parser = TrafficParser(traffic_config)
             with pytest.raises(TrafficParseError, match="segment_key must be"):
                 parser.parse()
         finally:
@@ -303,12 +338,15 @@ class TestTrafficParser:
 
     def test_empty_segment_key(self) -> None:
         csv_content = (
-            "TYPE,tick_start,segment_key,name,duration,weight\n"
-            "local_traffic,100,,test,50,0.5\n"
+            "TYPE,start_time,segment_key,name,duration,weight\n"
+            'local_traffic,"08:00",,test,50,0.5\n'
         )
         path = self._write_csv(csv_content)
+        traffic_config = TrafficConfig(
+            traffic_path=path, sim_start_time="day1:08:00", sim_end_time="day1:12:00"
+        )
         try:
-            parser = TrafficParser(path)
+            parser = TrafficParser(traffic_config)
             with pytest.raises(TrafficParseError, match="segment_key is empty"):
                 parser.parse()
         finally:
@@ -316,12 +354,15 @@ class TestTrafficParser:
 
     def test_zero_duration(self) -> None:
         csv_content = (
-            "TYPE,tick_start,segment_key,name,duration,weight\n"
-            'local_traffic,100,"((-73.5,45.5),(-73.6,45.6))",test,0,0.5\n'
+            "TYPE,start_time,segment_key,name,duration,weight\n"
+            'local_traffic,"08:00","((-73.5,45.5),(-73.6,45.6))",test,0,0.5\n'
         )
         path = self._write_csv(csv_content)
+        traffic_config = TrafficConfig(
+            traffic_path=path, sim_start_time="day1:08:00", sim_end_time="day1:12:00"
+        )
         try:
-            parser = TrafficParser(path)
+            parser = TrafficParser(traffic_config)
             with pytest.raises(TrafficParseError, match="duration must be positive"):
                 parser.parse()
         finally:
@@ -329,12 +370,15 @@ class TestTrafficParser:
 
     def test_negative_duration(self) -> None:
         csv_content = (
-            "TYPE,tick_start,segment_key,name,duration,weight\n"
-            'local_traffic,100,"((-73.5,45.5),(-73.6,45.6))",test,-10,0.5\n'
+            "TYPE,start_time,segment_key,name,duration,weight\n"
+            'local_traffic,"08:00","((-73.5,45.5),(-73.6,45.6))",test,-10,0.5\n'
         )
         path = self._write_csv(csv_content)
+        traffic_config = TrafficConfig(
+            traffic_path=path, sim_start_time="day1:08:00", sim_end_time="day1:12:00"
+        )
         try:
-            parser = TrafficParser(path)
+            parser = TrafficParser(traffic_config)
             with pytest.raises(TrafficParseError, match="duration must be positive"):
                 parser.parse()
         finally:
@@ -342,12 +386,15 @@ class TestTrafficParser:
 
     def test_invalid_duration_not_integer(self) -> None:
         csv_content = (
-            "TYPE,tick_start,segment_key,name,duration,weight\n"
-            'local_traffic,100,"((-73.5,45.5),(-73.6,45.6))",test,abc,0.5\n'
+            "TYPE,start_time,segment_key,name,duration,weight\n"
+            'local_traffic,"08:00","((-73.5,45.5),(-73.6,45.6))",test,abc,0.5\n'
         )
         path = self._write_csv(csv_content)
+        traffic_config = TrafficConfig(
+            traffic_path=path, sim_start_time="day1:08:00", sim_end_time="day1:12:00"
+        )
         try:
-            parser = TrafficParser(path)
+            parser = TrafficParser(traffic_config)
             with pytest.raises(TrafficParseError, match="duration must be an integer"):
                 parser.parse()
         finally:
@@ -355,12 +402,16 @@ class TestTrafficParser:
 
     def test_segment_key_parsed_as_correct_type(self) -> None:
         csv_content = (
-            "TYPE,tick_start,segment_key,name,duration,weight\n"
-            'local_traffic,100,"((-73.5673,45.5017),(-73.5680,45.5020))",test,50,0.5\n'
+            "TYPE,start_time,segment_key,name,duration,weight\n"
+            'local_traffic,"08:00","((-73.5673,45.5017),(-73.5680,45.5020))"'
+            ",test,50,0.5\n"
         )
         path = self._write_csv(csv_content)
+        traffic_config = TrafficConfig(
+            traffic_path=path, sim_start_time="day1:08:00", sim_end_time="day1:12:00"
+        )
         try:
-            parser = TrafficParser(path)
+            parser = TrafficParser(traffic_config)
             events = parser.parse()
             key = events[0].segment_key
             assert key == ((-73.5673, 45.5017), (-73.5680, 45.5020))
@@ -375,13 +426,16 @@ class TestTrafficParser:
 
     def test_multiple_errors_aggregated(self) -> None:
         csv_content = (
-            "TYPE,tick_start,segment_key,name,duration,weight\n"
-            'local_traffic,-1,"((-73.5,45.5),(-73.6,45.6))",test,50,0.5\n'
-            'local_traffic,100,"((-73.5,45.5),(-73.6,45.6))",test,-5,0.5\n'
+            "TYPE,start_time,segment_key,name,duration,weight\n"
+            'local_traffic,,"((-73.5,45.5),(-73.6,45.6))",test,50,0.5\n'
+            'local_traffic,"08:00","((-73.5,45.5),(-73.6,45.6))",test,-5,0.5\n'
         )
         path = self._write_csv(csv_content)
+        traffic_config = TrafficConfig(
+            traffic_path=path, sim_start_time="day1:08:00", sim_end_time="day1:12:00"
+        )
         try:
-            parser = TrafficParser(path)
+            parser = TrafficParser(traffic_config)
             with pytest.raises(TrafficParseError) as exc_info:
                 parser.parse()
             assert len(exc_info.value.errors) == 2
@@ -392,12 +446,15 @@ class TestTrafficParser:
 
     def test_weight_out_of_range_high(self) -> None:
         csv_content = (
-            "TYPE,tick_start,segment_key,name,duration,weight\n"
-            'local_traffic,100,"((-73.5,45.5),(-73.6,45.6))",test,50,1.5\n'
+            "TYPE,start_time,segment_key,name,duration,weight\n"
+            'local_traffic,"08:00","((-73.5,45.5),(-73.6,45.6))",test,50,1.5\n'
         )
         path = self._write_csv(csv_content)
+        traffic_config = TrafficConfig(
+            traffic_path=path, sim_start_time="day1:08:00", sim_end_time="day1:12:00"
+        )
         try:
-            parser = TrafficParser(path)
+            parser = TrafficParser(traffic_config)
             with pytest.raises(
                 TrafficParseError, match="weight must be >= 0.0 and < 1.0"
             ):
@@ -407,12 +464,15 @@ class TestTrafficParser:
 
     def test_weight_out_of_range_negative(self) -> None:
         csv_content = (
-            "TYPE,tick_start,segment_key,name,duration,weight\n"
-            'local_traffic,100,"((-73.5,45.5),(-73.6,45.6))",test,50,-0.1\n'
+            "TYPE,start_time,segment_key,name,duration,weight\n"
+            'local_traffic,"08:00","((-73.5,45.5),(-73.6,45.6))",test,50,-0.1\n'
         )
         path = self._write_csv(csv_content)
+        traffic_config = TrafficConfig(
+            traffic_path=path, sim_start_time="day1:08:00", sim_end_time="day1:12:00"
+        )
         try:
-            parser = TrafficParser(path)
+            parser = TrafficParser(traffic_config)
             with pytest.raises(
                 TrafficParseError, match="weight must be >= 0.0 and < 1.0"
             ):
@@ -422,12 +482,15 @@ class TestTrafficParser:
 
     def test_weight_invalid_format(self) -> None:
         csv_content = (
-            "TYPE,tick_start,segment_key,name,duration,weight\n"
-            'local_traffic,100,"((-73.5,45.5),(-73.6,45.6))",test,50,abc\n'
+            "TYPE,start_time,segment_key,name,duration,weight\n"
+            'local_traffic,"08:00","((-73.5,45.5),(-73.6,45.6))",test,50,abc\n'
         )
         path = self._write_csv(csv_content)
+        traffic_config = TrafficConfig(
+            traffic_path=path, sim_start_time="day1:08:00", sim_end_time="day1:12:00"
+        )
         try:
-            parser = TrafficParser(path)
+            parser = TrafficParser(traffic_config)
             with pytest.raises(TrafficParseError, match="weight must be a number"):
                 parser.parse()
         finally:

@@ -1130,18 +1130,26 @@ class JsonParseStrategy(BaseParseStrategy):
         if validation_errors:
             raise ScenarioParseError(validation_errors)
 
-        # Extract traffic configuration (optional param)
-        map_payload = None
-        traffic_raw = content.get("traffic", None)
-        if traffic_raw is not None and isinstance(traffic_raw, dict):
-            traffic_path = traffic_raw.get("traffic_path", "")
-            map_payload = MapPayload(traffic=TrafficConfig(traffic_path=traffic_path))
-
         # Parse times (validation ensures these are valid)
         start_time = self._time_to_seconds(str(content.get("start_time", "day1:00:00")))
         end_time = self._time_to_seconds(str(content.get("end_time", "day1:00:00")))
 
         sim_time = end_time - start_time
+
+        # Extract traffic configuration (optional param)
+        map_payload = None
+        traffic_raw = content.get("traffic", None)
+        if traffic_raw is not None and isinstance(traffic_raw, dict):
+            traffic_path = traffic_raw.get("traffic_path", "")
+            start_daytime = str(content.get("start_time", "day1:00:00"))
+            end_daytime = str(content.get("end_time", "day1:00:00"))
+            map_payload = MapPayload(
+                traffic=TrafficConfig(
+                    traffic_path=traffic_path,
+                    sim_start_time=start_daytime,
+                    sim_end_time=end_daytime,
+                )
+            )
 
         # Entity Counters
         task_id_counter = 1

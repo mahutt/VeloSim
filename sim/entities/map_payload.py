@@ -35,9 +35,13 @@ class TrafficConfig:
 
     Attributes:
         traffic_path: Path to the traffic CSV file.
+        sim_start_time: Start time of simulation.
+        sim_end_time: End time of simulation.
     """
 
     traffic_path: str = ""
+    sim_start_time: str = field(default="day1:00:00")
+    sim_end_time: str = field(default="day1:00:00")
 
 
 @dataclass
@@ -47,6 +51,7 @@ class MapPayload:
     Attributes:
         traffic: Optional traffic configuration.
         env: Optional SimPy environment for time-based operations.
+        sim_id: Simulation ID.
     """
 
     traffic: Optional[TrafficConfig] = field(default=None)
