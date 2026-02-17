@@ -32,8 +32,10 @@ interface TaskAssignmentBannerProps {
   prevDriverName?: string;
   remainingBatteryCount: number;
   action: TaskAction;
+  reassignCount?: number;
   isLoading?: boolean;
   onConfirm: () => void;
+  onConfirmUnassignedOnly?: () => void;
   onCancel: () => void;
 }
 
@@ -43,17 +45,25 @@ export function TaskAssignmentBanner({
   prevDriverName,
   remainingBatteryCount,
   action,
+  reassignCount = 0,
   isLoading = false,
   onConfirm,
+  onConfirmUnassignedOnly,
   onCancel,
 }: TaskAssignmentBannerProps) {
+  const hasMixedTasks =
+    action === 'assign' && taskIds.length > 1 && reassignCount > 0;
+  const unassignedCount = taskIds.length - reassignCount;
+
   const renderMessage = () => {
     if (!taskIds.length) return null;
 
-    if (
+    const firstTaskId = taskIds[0];
+    const exceedsBattery =
       taskIds.length > remainingBatteryCount &&
-      (action === 'assign' || action === 'reassign')
-    ) {
+      (action === 'assign' || action === 'reassign');
+
+    if (exceedsBattery) {
       const actionLabel = action === 'reassign' ? 'Re-assign' : 'Assign';
 
       return (
@@ -62,6 +72,11 @@ export function TaskAssignmentBanner({
             {driverName} has {remainingBatteryCount}{' '}
             {remainingBatteryCount === 1 ? 'battery' : 'batteries'} remaining.
           </span>
+          {hasMixedTasks && (
+            <span className="block text-muted-foreground">
+              ({reassignCount} already assigned to other drivers)
+            </span>
+          )}
           <span className="block">
             {actionLabel} {taskIds.length}{' '}
             {taskIds.length === 1 ? 'task' : 'tasks'} anyway?
@@ -69,8 +84,6 @@ export function TaskAssignmentBanner({
         </>
       );
     }
-
-    const firstTaskId = taskIds[0];
 
     if (action === 'reassign' && prevDriverName !== undefined) {
       if (taskIds.length > 1) {
@@ -82,6 +95,18 @@ export function TaskAssignmentBanner({
       return `Un-assign task #${firstTaskId} from ${driverName}?`;
     }
     if (action === 'assign') {
+      if (hasMixedTasks) {
+        return (
+          <>
+            <span className="block">
+              Assign {taskIds.length} tasks to {driverName}?
+            </span>
+            <span className="block">
+              ({reassignCount} already assigned to other drivers)
+            </span>
+          </>
+        );
+      }
       if (taskIds.length > 1) {
         return `Assign ${taskIds.length} tasks to ${driverName}?`;
       }
@@ -95,7 +120,7 @@ export function TaskAssignmentBanner({
       <div className="bg-white border rounded-lg shadow-lg p-4">
         <div className="flex items-center gap-2 mb-3 justify-center">
           <AlertCircle className="h-5 w-5 text-amber-500" />
-          <span className="text-sm">{renderMessage()}</span>
+          <div className="text-sm">{renderMessage()}</div>
         </div>
         <div className="flex gap-2 justify-center">
           <Button
@@ -107,14 +132,36 @@ export function TaskAssignmentBanner({
           >
             Cancel
           </Button>
-          <Button
-            onClick={onConfirm}
-            size="sm"
-            disabled={isLoading}
-            aria-busy={isLoading}
-          >
-            {isLoading ? 'Confirming...' : 'Confirm'}
-          </Button>
+          {hasMixedTasks && onConfirmUnassignedOnly ? (
+            <>
+              <Button
+                onClick={onConfirmUnassignedOnly}
+                size="sm"
+                disabled={isLoading}
+                aria-busy={isLoading}
+                className="bg-blue-500 hover:bg-blue-400 text-white"
+              >
+                {isLoading ? 'Assigning...' : `Remaining (${unassignedCount})`}
+              </Button>
+              <Button
+                onClick={onConfirm}
+                size="sm"
+                disabled={isLoading}
+                aria-busy={isLoading}
+              >
+                {isLoading ? 'Assigning...' : `All (${taskIds.length})`}
+              </Button>
+            </>
+          ) : (
+            <Button
+              onClick={onConfirm}
+              size="sm"
+              disabled={isLoading}
+              aria-busy={isLoading}
+            >
+              {isLoading ? 'Confirming...' : 'Confirm'}
+            </Button>
+          )}
         </div>
       </div>
     </div>

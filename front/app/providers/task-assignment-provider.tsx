@@ -36,7 +36,9 @@ type PendingAssignment =
   | {
       action: 'assign';
       taskIds: number[];
+      unassignedTaskIds: number[];
       resourceId: number;
+      reassignCount: number;
     }
   | {
       action: 'reassign';
@@ -62,6 +64,7 @@ type TaskAssignmentContextType = {
   ) => void;
   requestUnassignment: (resourceId: number, taskId: number) => void;
   confirmAssignment: () => Promise<void>;
+  confirmUnassignedOnly: () => Promise<void>;
   cancelAssignment: () => void;
 };
 
@@ -135,10 +138,23 @@ export function TaskAssignmentProvider({ children }: { children: ReactNode }) {
           return;
         }
 
+        const reassignCount = taskIds.filter((taskId) => {
+          return drivers.some(
+            (r) =>
+              r.id !== resourceId && r.taskIds && r.taskIds.includes(taskId)
+          );
+        }).length;
+
+        const unassignedTaskIds = taskIds.filter((taskId) => {
+          return !drivers.some((r) => r.taskIds && r.taskIds.includes(taskId));
+        });
+
         setPendingAssignment({
           taskIds,
+          unassignedTaskIds,
           resourceId,
           action: 'assign',
+          reassignCount,
         });
         return;
       }
@@ -157,7 +173,13 @@ export function TaskAssignmentProvider({ children }: { children: ReactNode }) {
         return;
       }
 
-      setPendingAssignment({ taskIds: [taskId], resourceId, action: 'assign' });
+      setPendingAssignment({
+        taskIds: [taskId],
+        unassignedTaskIds: [taskId],
+        resourceId,
+        action: 'assign',
+        reassignCount: 0,
+      });
     },
     [driversRef, requestReassignment]
   );
@@ -248,6 +270,32 @@ export function TaskAssignmentProvider({ children }: { children: ReactNode }) {
     [driversRef]
   );
 
+  const confirmUnassignedOnly = useCallback(async () => {
+    if (!pendingAssignment || isLoading) return;
+    if (pendingAssignment.action !== 'assign') return;
+
+    const unassignedTaskIds = pendingAssignment.unassignedTaskIds;
+    if (unassignedTaskIds.length === 0) {
+      setPendingAssignment(null);
+      return;
+    }
+
+    setIsLoading(true);
+
+    try {
+      if (unassignedTaskIds.length > 1) {
+        await assignTasksBatch(pendingAssignment.resourceId, unassignedTaskIds);
+      } else {
+        await assignTask(pendingAssignment.resourceId, unassignedTaskIds[0]);
+      }
+    } catch (error) {
+      console.error('Failed to assign unassigned tasks:', error);
+    } finally {
+      setPendingAssignment(null);
+      setIsLoading(false);
+    }
+  }, [pendingAssignment, isLoading, assignTask, assignTasksBatch]);
+
   return (
     <TaskAssignmentContext.Provider
       value={{
@@ -257,6 +305,7 @@ export function TaskAssignmentProvider({ children }: { children: ReactNode }) {
         requestReassignment,
         requestUnassignment,
         confirmAssignment,
+        confirmUnassignedOnly,
         cancelAssignment,
       }}
     >
@@ -274,7 +323,13 @@ export function TaskAssignmentProvider({ children }: { children: ReactNode }) {
             pendingAssignment.resourceId
           )}
           action={pendingAssignment.action}
+          reassignCount={
+            pendingAssignment.action === 'assign'
+              ? pendingAssignment.reassignCount
+              : 0
+          }
           onConfirm={confirmAssignment}
+          onConfirmUnassignedOnly={confirmUnassignedOnly}
           onCancel={cancelAssignment}
           isLoading={isLoading}
         />

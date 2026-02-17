@@ -44,6 +44,7 @@ function TestComponent() {
     requestAssignment,
     requestUnassignment,
     confirmAssignment,
+    confirmUnassignedOnly,
   } = useTaskAssignment();
 
   return (
@@ -61,6 +62,12 @@ function TestComponent() {
         Request Assign Batch
       </button>
       <button
+        data-testid="req-assign-mixed"
+        onClick={() => requestAssignment(10, [42, 43, 44])}
+      >
+        Request Assign Mixed
+      </button>
+      <button
         data-testid="req-assign-empty"
         onClick={() => requestAssignment(10, [])}
       >
@@ -74,6 +81,12 @@ function TestComponent() {
       </button>
       <button data-testid="confirm" onClick={() => confirmAssignment()}>
         Confirm
+      </button>
+      <button
+        data-testid="confirm-unassigned"
+        onClick={() => confirmUnassignedOnly()}
+      >
+        Confirm Unassigned Only
       </button>
       <div data-testid="pending">{pendingAssignment?.action ?? 'none'}</div>
       <div data-testid="prev">
@@ -301,5 +314,45 @@ describe('TaskAssignmentProvider', () => {
 
     expect(screen.getByTestId('pending').textContent).toBe('none');
     expect(assignTasksBatch).not.toHaveBeenCalled();
+  });
+
+  it('assigns only unassigned tasks when confirmUnassignedOnly is called on mixed batch', async () => {
+    const assignTask = vi.fn();
+    const assignTasksBatch = vi.fn();
+    const unassignTask = vi.fn();
+    const reassignTask = vi.fn();
+
+    // Task 42 is assigned to driver 5, tasks 43 and 44 are unassigned
+    const driversRef = {
+      current: new Map<number, Driver>([
+        [5, makeDriver({ id: 5, taskIds: [42] })],
+      ]),
+    };
+
+    vi.mocked(useSimulation).mockReturnValue({
+      assignTask,
+      assignTasksBatch,
+      unassignTask,
+      reassignTask,
+      driversRef,
+    } as unknown as ReturnType<typeof useSimulation>);
+
+    const user = userEvent.setup();
+
+    render(
+      <TaskAssignmentProvider>
+        <TestComponent />
+      </TaskAssignmentProvider>
+    );
+
+    await user.click(screen.getByTestId('req-assign-mixed'));
+    expect(screen.getByTestId('pending').textContent).toBe('assign');
+
+    await user.click(screen.getByTestId('confirm-unassigned'));
+
+    await waitFor(() => {
+      expect(assignTasksBatch).toHaveBeenCalledWith(10, [43, 44]);
+    });
+    expect(assignTask).not.toHaveBeenCalled();
   });
 });
