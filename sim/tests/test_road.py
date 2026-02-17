@@ -869,3 +869,164 @@ class TestRoadPointStrategy:
         assert road._point_strategy is None
         points = road.active_pointcollection
         assert len(points) > len(road.pointcollection)
+
+
+class TestRoadDistance:
+    """Tests for proportional distance computation on Road.
+
+    Distance is computed as index / (n-1) * length, where n is the number
+    of active points. Traffic changes n (more points = less distance per point),
+    so the total always sums to road.length.
+    """
+
+    def _create_road(
+        self,
+        num_points: int = 11,
+        length: float = 100.0,
+        maxspeed: float = 10.0,
+    ) -> Road:
+        """Create a road with specified number of evenly-spaced points."""
+        points = [Position([i * 0.001, 0.0]) for i in range(num_points)]
+        return Road(
+            road_id=1,
+            name="Test Road",
+            pointcollection=points,
+            length=length,
+            maxspeed=maxspeed,
+        )
+
+    def test_distance_at_index_zero_is_zero(self) -> None:
+        """Test that distance at index 0 is always 0."""
+        road = self._create_road()
+        assert road.get_distance_at_index(0) == 0.0
+
+    def test_distance_proportional_no_traffic(self) -> None:
+        """Test cumulative distance is proportional: index / (n-1) * length."""
+        road = self._create_road(num_points=11, length=100.0)
+        for i in range(11):
+            expected = (i / 10) * 100.0
+            assert road.get_distance_at_index(i) == pytest.approx(expected)
+
+    def test_distance_at_last_index_equals_length(self) -> None:
+        """Test that distance at last index equals road length."""
+        road = self._create_road(num_points=11, length=100.0)
+        assert road.get_distance_at_index(10) == pytest.approx(100.0)
+
+    def test_distance_monotonically_increasing(self) -> None:
+        """Test that distance is non-decreasing across all indices."""
+        road = self._create_road(num_points=20, length=200.0)
+        for i in range(1, 20):
+            assert road.get_distance_at_index(i) >= road.get_distance_at_index(i - 1)
+
+    def test_distance_with_traffic_still_spans_full_length(self) -> None:
+        """Test that traffic changes point count but total still equals length.
+
+        Traffic generates more points (slower speed), so each point covers
+        less distance, but the last point still reaches road.length.
+        """
+        nodes = [
+            Position([0.0, 0.0]),
+            Position([1.0, 0.0]),
+            Position([2.0, 0.0]),
+        ]
+        road = Road(
+            road_id=1,
+            name="Traffic Road",
+            pointcollection=nodes,
+            length=200.0,
+            maxspeed=10.0,
+            geometry=nodes,
+        )
+
+        # Apply traffic to segment 1 (N1->N2) with multiplier 0.5
+        segment_key = ((1.0, 0.0), (2.0, 0.0))
+        overlap = [Position([1.0, 0.0]), Position([2.0, 0.0])]
+        road.apply_traffic_for_overlap(overlap, 0.5, segment_key)
+
+        active = road.active_pointcollection
+        n = len(active)
+
+        # More points than without traffic
+        assert n > len(nodes)
+
+        assert road.get_distance_at_index(0) == 0.0
+        assert road.get_distance_at_index(n - 1) == pytest.approx(200.0)
+
+        # Monotonically increasing
+        for i in range(1, n):
+            assert road.get_distance_at_index(i) > road.get_distance_at_index(i - 1)
+
+    def test_traffic_reduces_distance_per_point(self) -> None:
+        """Test that more points from traffic means less distance per point.
+
+        With traffic generating more points, distance_per_point = length / (n-1)
+        becomes smaller than without traffic.
+        """
+        nodes = [
+            Position([0.0, 0.0]),
+            Position([1.0, 0.0]),
+            Position([2.0, 0.0]),
+        ]
+        road = Road(
+            road_id=1,
+            name="Traffic Road",
+            pointcollection=nodes,
+            length=200.0,
+            maxspeed=10.0,
+            geometry=nodes,
+        )
+
+        # Distance per point without traffic: 200 / (3-1) = 100m
+        free_flow_increment = road.get_distance_at_index(1)
+        assert free_flow_increment == pytest.approx(100.0)
+
+        # Apply traffic -> generates more points
+        segment_key = ((0.0, 0.0), (2.0, 0.0))
+        overlap = [Position([0.0, 0.0]), Position([2.0, 0.0])]
+        road.apply_traffic_for_overlap(overlap, 0.5, segment_key)
+
+        n = len(road.active_pointcollection)
+        traffic_increment = road.get_distance_at_index(1)
+        # More points -> smaller increment: 200 / (n-1) < 100
+        assert traffic_increment < free_flow_increment
+        assert traffic_increment == pytest.approx(200.0 / (n - 1))
+
+    def test_total_distance_equals_length(self) -> None:
+        """Test that total_distance property equals road length."""
+        road = self._create_road(length=150.0)
+        assert road.total_distance == 150.0
+
+    def test_distance_out_of_bounds_clamped(self) -> None:
+        """Test that out-of-bounds indices are clamped to valid range."""
+        road = self._create_road(num_points=5, length=40.0)
+
+        # Beyond last index: returns distance at last point (= length)
+        assert road.get_distance_at_index(100) == pytest.approx(40.0)
+        assert road.get_distance_at_index(100) == road.get_distance_at_index(4)
+
+        # Negative index: returns 0.0
+        assert road.get_distance_at_index(-1) == 0.0
+
+    def test_distance_single_point_road(self) -> None:
+        """Test distance on a road with a single point."""
+        road = Road(
+            road_id=1,
+            name="Single",
+            pointcollection=[Position([0.0, 0.0])],
+            length=0.0,
+            maxspeed=10.0,
+        )
+        assert road.get_distance_at_index(0) == 0.0
+
+    def test_distance_two_point_road(self) -> None:
+        """Test distance on a road with exactly two points."""
+        road = Road(
+            road_id=1,
+            name="Two Point",
+            pointcollection=[Position([0.0, 0.0]), Position([1.0, 0.0])],
+            length=50.0,
+            maxspeed=10.0,
+        )
+        assert road.get_distance_at_index(0) == 0.0
+        # 1 / (2-1) * 50 = 50.0
+        assert road.get_distance_at_index(1) == pytest.approx(50.0)

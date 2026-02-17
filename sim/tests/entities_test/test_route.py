@@ -2348,3 +2348,160 @@ class TestFindNearestIndex:
         assert Route.find_nearest_index(points, Position([52.0, 0.0])) == 1
         # Driver at ~100m — should get index 2 (traffic boundary)
         assert Route.find_nearest_index(points, Position([99.0, 0.0])) == 2
+        assert map_index_forward(2, 5, 10) == 5
+
+
+class TestRouteDistanceTravelled:
+    """Tests for Route.get_distance_travelled()."""
+
+    def test_distance_at_start_is_zero(
+        self, mock_routing_provider: Mock, test_config: dict
+    ) -> None:
+        """Test that distance at start of route is 0."""
+        step = RouteStep(
+            name="Test Road",
+            distance=100.0,
+            duration=10.0,
+            geometry=[Position([0.0, 0.0]), Position([0.001, 0.0])],
+            speed=10.0,
+        )
+        route_result = RouteResult(
+            coordinates=[Position([0.0, 0.0]), Position([0.001, 0.0])],
+            distance=100.0,
+            duration=10.0,
+            steps=[step],
+            segments=[],
+        )
+        roads = build_roads_from_route_result(route_result)
+        route = Route(route_result, mock_routing_provider, test_config, roads=roads)
+
+        assert route.get_distance_travelled() == 0.0
+
+    def test_distance_increases_during_traversal(
+        self, mock_routing_provider: Mock, test_config: dict
+    ) -> None:
+        """Test that distance increases monotonically during traversal."""
+        points = [Position([i * 0.001, 0.0]) for i in range(11)]
+        step = RouteStep(
+            name="Test Road",
+            distance=100.0,
+            duration=10.0,
+            geometry=points,
+            speed=10.0,
+        )
+        route_result = RouteResult(
+            coordinates=points,
+            distance=100.0,
+            duration=10.0,
+            steps=[step],
+            segments=[],
+        )
+        roads = build_roads_from_route_result(route_result)
+        route = Route(route_result, mock_routing_provider, test_config, roads=roads)
+
+        prev_distance = 0.0
+        while not route.is_finished:
+            route.next()
+            d = route.get_distance_travelled()
+            assert d >= prev_distance
+            prev_distance = d
+
+    def test_distance_across_multiple_roads(
+        self, mock_routing_provider: Mock, test_config: dict
+    ) -> None:
+        """Test distance computation across multiple road segments."""
+        step1 = RouteStep(
+            name="Road 1",
+            distance=100.0,
+            duration=10.0,
+            geometry=[Position([0.0, 0.0]), Position([0.001, 0.0])],
+            speed=10.0,
+        )
+        step2 = RouteStep(
+            name="Road 2",
+            distance=150.0,
+            duration=15.0,
+            geometry=[Position([0.001, 0.0]), Position([0.002, 0.0])],
+            speed=10.0,
+        )
+        route_result = RouteResult(
+            coordinates=[
+                Position([0.0, 0.0]),
+                Position([0.001, 0.0]),
+                Position([0.002, 0.0]),
+            ],
+            distance=250.0,
+            duration=25.0,
+            steps=[step1, step2],
+            segments=[],
+        )
+        roads = build_roads_from_route_result(route_result)
+        route = Route(route_result, mock_routing_provider, test_config, roads=roads)
+
+        # Traverse past first road
+        while route.current_road_index == 0 and not route.is_finished:
+            route.next()
+
+        # After completing first road, distance should be >= first road's length
+        if not route.is_finished:
+            d = route.get_distance_travelled()
+            assert d >= 100.0
+
+    def test_distance_when_route_finished(
+        self, mock_routing_provider: Mock, test_config: dict
+    ) -> None:
+        """Test distance covers total route when fully traversed."""
+        step1 = RouteStep(
+            name="Road 1",
+            distance=100.0,
+            duration=10.0,
+            geometry=[Position([0.0, 0.0]), Position([0.001, 0.0])],
+            speed=10.0,
+        )
+        step2 = RouteStep(
+            name="Road 2",
+            distance=50.0,
+            duration=5.0,
+            geometry=[Position([0.001, 0.0]), Position([0.002, 0.0])],
+            speed=10.0,
+        )
+        route_result = RouteResult(
+            coordinates=[
+                Position([0.0, 0.0]),
+                Position([0.001, 0.0]),
+                Position([0.002, 0.0]),
+            ],
+            distance=150.0,
+            duration=15.0,
+            steps=[step1, step2],
+            segments=[],
+        )
+        roads = build_roads_from_route_result(route_result)
+        route = Route(route_result, mock_routing_provider, test_config, roads=roads)
+
+        # Traverse to end
+        while route.next() is not None:
+            pass
+
+        assert route.is_finished
+        d = route.get_distance_travelled()
+        # Should be approximately the total route distance (sum of road lengths)
+        total = sum(r.length for r in route.roads)
+        assert d == pytest.approx(total)
+
+    def test_distance_empty_route_is_zero(
+        self, mock_routing_provider: Mock, test_config: dict
+    ) -> None:
+        """Test that empty (finished) route reports 0 distance."""
+        route_result = RouteResult(
+            coordinates=[],
+            distance=0,
+            duration=0,
+            steps=[],
+            segments=[],
+        )
+        roads = build_roads_from_route_result(route_result)
+        route = Route(route_result, mock_routing_provider, test_config, roads=roads)
+
+        assert route.is_finished
+        assert route.get_distance_travelled() == 0.0

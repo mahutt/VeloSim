@@ -212,6 +212,35 @@ class Road:
         return multiplier_to_congestion_level(self.traffic_multiplier)
 
     @property
+    def total_distance(self) -> float:
+        """Total road distance in meters (alias for length).
+
+        Returns:
+            Road length in meters.
+        """
+        return self.length
+
+    def get_distance_at_index(self, index: int) -> float:
+        """Get cumulative distance from road start to a point index.
+
+        Since the total road length is fixed and traffic only changes the
+        number of points (more points = slower speed = less distance per point),
+        distance is simply proportional to progress through the point collection:
+        ``index / (n - 1) * length``.
+
+        Args:
+            index: Point index in active_pointcollection.
+
+        Returns:
+            Cumulative distance in meters from road start.
+        """
+        n = len(self.active_pointcollection)
+        if n <= 1:
+            return 0.0
+        clamped = max(0, min(index, n - 1))
+        return (clamped / (n - 1)) * self.length
+
+    @property
     def active_pointcollection(self) -> List[Position]:
         """Get the active point collection (traffic or default).
 

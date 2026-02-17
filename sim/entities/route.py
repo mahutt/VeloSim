@@ -28,6 +28,7 @@ from sim.entities.position import Position
 from sim.entities.road import Road
 from sim.entities.traffic_data import TrafficTriple
 from sim.map.routing_provider import RoutingProvider, RouteResult
+
 from shapely.geometry import LineString
 from grafana_logging.logger import get_logger
 
@@ -407,6 +408,22 @@ class Route:
             coord_offset += geom_len - 1  # shared boundary point
         self._traffic_triples_cache = triples
         self._has_traffic_changed = True
+    def get_distance_travelled(self) -> float:
+        """Get total distance travelled along the route so far.
+
+        Sums the length of all completed roads plus partial distance
+        on the current road using speed-based distance computation.
+
+        Returns:
+            Distance in meters from route start to current position.
+        """
+        distance = sum(road.length for road in self.roads[: self.current_road_index])
+
+        if self.current_road_index < len(self.roads):
+            current_road = self.roads[self.current_road_index]
+            distance += current_road.get_distance_at_index(self.current_point_index)
+
+        return distance
 
     def next(self) -> Position | None:
         """Return the next position in the route traversal.
