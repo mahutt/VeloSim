@@ -1186,11 +1186,17 @@ class JsonParseStrategy(BaseParseStrategy):
                 tid = task_id_counter
                 task_id_counter += 1
                 delay = self._time_to_seconds(t) - start_time
-                if station_id not in station_scheduled_tasks:
-                    station_scheduled_tasks[station_id] = {}
-                if delay not in station_scheduled_tasks[station_id]:
-                    station_scheduled_tasks[station_id][delay] = []
-                station_scheduled_tasks[station_id][delay].append(tid)
+                if delay <= 0:
+                    tasks[tid] = BatterySwapTask(
+                        task_id=tid, station=stations[station_id]
+                    )
+                    stations[station_id].add_task(tasks[tid])
+                else:
+                    if station_id not in station_scheduled_tasks:
+                        station_scheduled_tasks[station_id] = {}
+                    if delay not in station_scheduled_tasks[station_id]:
+                        station_scheduled_tasks[station_id][delay] = []
+                    station_scheduled_tasks[station_id][delay].append(tid)
 
         # Build Vehicles and Drivers
         drivers: Dict[int, Driver] = {}
