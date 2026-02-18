@@ -730,6 +730,9 @@ class SimulatorController:
             "averageTaskResponseTime": round(
                 self.sim_env.report.get_average_service_time_for_tasks(), 4
             ),
+            "vehicleDistanceTravelled": round(
+                self.map_controller.route_controller.get_total_vehicle_distance(), 2
+            ),
         }
 
         # Only include metrics on keyframe and on change.

@@ -81,6 +81,9 @@ class RouteController:
         # All active routes
         self.routes: Set["Route"] = set()
 
+        # Accumulated distance from completed (unregistered) routes
+        self._total_completed_distance: float = 0.0
+
         # Callbacks for road lifecycle events
         self._on_road_created_callbacks: List[Callable[[Road], None]] = []
         self._on_road_deallocated_callbacks: List[Callable[[Road], None]] = []
@@ -347,6 +350,7 @@ class RouteController:
         """
         if route not in self.routes:
             return
+        self._total_completed_distance += route.get_distance_travelled()
         self.routes.discard(route)
         roads_to_check = [
             road for road, routes in self.roads_to_routes.items() if route in routes
@@ -561,6 +565,18 @@ class RouteController:
         """
         return len(self.roads_to_routes)
 
+    def get_total_vehicle_distance(self) -> float:
+        """Get total distance travelled by all service vehicles.
+
+        Combines distance from completed (unregistered) routes with
+        in-progress distance from currently active routes.
+
+        Returns:
+            Total distance in meters.
+        """
+        active = sum(route.get_distance_travelled() for route in self.routes)
+        return self._total_completed_distance + active
+
     def clear(self) -> None:
         """Clear all route and road registrations (called during simulation reset).
 
@@ -571,5 +587,6 @@ class RouteController:
         self.segment_key_to_road.clear()
         self.road_id_to_road.clear()
         self.routes.clear()
+        self._total_completed_distance = 0.0
         self._on_road_created_callbacks.clear()
         self._on_road_deallocated_callbacks.clear()

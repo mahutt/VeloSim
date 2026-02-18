@@ -174,6 +174,7 @@ class TestRouteControllerRouteRegistration:
         mock_road2.segment_key = ((1.0, 1.0), (2.0, 2.0))
         mock_road2.nodes = []  # Empty list for mock road
         mock_route = Mock()
+        mock_route.get_distance_travelled.return_value = 0.0
 
         controller.routes.add(mock_route)
         controller._register_road_to_route(mock_road1, mock_route)
@@ -738,3 +739,97 @@ class TestRoadDeallocationCallbacks:
         # Verify callbacks list is empty by trying to unregister
         result = controller.unregister_on_road_deallocated(on_dealloc)
         assert result is False  # Callback no longer exists
+
+
+class TestTotalVehicleDistance:
+    """Tests for get_total_vehicle_distance() aggregation."""
+
+    def _make_controller(self) -> RouteController:
+        return RouteController(Mock(), PositionRegistry())
+
+    def test_initial_distance_is_zero(self) -> None:
+        """Total distance is 0.0 on a fresh controller."""
+        controller = self._make_controller()
+        assert controller.get_total_vehicle_distance() == 0.0
+
+    def test_active_routes_contribute_distance(self) -> None:
+        """Active routes' get_distance_travelled() is summed."""
+        controller = self._make_controller()
+
+        route1 = Mock()
+        route1.get_distance_travelled.return_value = 150.0
+        route2 = Mock()
+        route2.get_distance_travelled.return_value = 250.0
+
+        controller.routes.add(route1)
+        controller.routes.add(route2)
+
+        assert controller.get_total_vehicle_distance() == 400.0
+
+    def test_completed_route_distance_preserved_after_unregister(self) -> None:
+        """Distance from an unregistered route is retained."""
+        controller = self._make_controller()
+
+        route = Mock()
+        route.get_distance_travelled.return_value = 300.0
+        controller.routes.add(route)
+
+        # Unregister captures distance
+        controller.unregister_route(route)
+
+        assert route not in controller.routes
+        assert controller.get_total_vehicle_distance() == 300.0
+
+    def test_mix_of_active_and_completed(self) -> None:
+        """Combines completed route distance with active route distance."""
+        controller = self._make_controller()
+
+        # First route: completes with 200m
+        completed_route = Mock()
+        completed_route.get_distance_travelled.return_value = 200.0
+        controller.routes.add(completed_route)
+        controller.unregister_route(completed_route)
+
+        # Second route: still active at 120m
+        active_route = Mock()
+        active_route.get_distance_travelled.return_value = 120.0
+        controller.routes.add(active_route)
+
+        assert controller.get_total_vehicle_distance() == 320.0
+
+    def test_multiple_completed_routes_accumulate(self) -> None:
+        """Multiple unregistered routes accumulate distance."""
+        controller = self._make_controller()
+
+        for dist in [100.0, 200.0, 300.0]:
+            route = Mock()
+            route.get_distance_travelled.return_value = dist
+            controller.routes.add(route)
+            controller.unregister_route(route)
+
+        assert controller.get_total_vehicle_distance() == 600.0
+
+    def test_clear_resets_total_distance(self) -> None:
+        """clear() resets accumulated completed distance to zero."""
+        controller = self._make_controller()
+
+        route = Mock()
+        route.get_distance_travelled.return_value = 500.0
+        controller.routes.add(route)
+        controller.unregister_route(route)
+
+        controller.clear()
+
+        assert controller.get_total_vehicle_distance() == 0.0
+
+    def test_unregister_nonexistent_route_no_effect(self) -> None:
+        """Unregistering a route not in the set doesn't change distance."""
+        controller = self._make_controller()
+
+        route = Mock()
+        route.get_distance_travelled.return_value = 999.0
+
+        # Route was never registered
+        controller.unregister_route(route)
+
+        assert controller.get_total_vehicle_distance() == 0.0
