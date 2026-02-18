@@ -33,8 +33,9 @@ describe('TaskAssignmentBanner', () => {
     render(
       <TaskAssignmentBanner
         taskIds={[1]}
-        resourceId={4}
-        prevResourceId={2}
+        driverName="Driver 4"
+        prevDriverName="Driver 2"
+        remainingBatteryCount={10}
         action="assign"
         onConfirm={() => {}}
         onCancel={() => {}}
@@ -42,7 +43,7 @@ describe('TaskAssignmentBanner', () => {
     );
 
     expect(
-      screen.getByText(/Assign Task #1 to Resource #4\?/i)
+      screen.getByText(/Assign task #1 to Driver 4\?/i)
     ).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /cancel/i })).toBeInTheDocument();
     expect(
@@ -58,8 +59,9 @@ describe('TaskAssignmentBanner', () => {
     render(
       <TaskAssignmentBanner
         taskIds={[1]}
-        resourceId={2}
-        prevResourceId={4}
+        driverName="Driver 4"
+        prevDriverName="Driver 2"
+        remainingBatteryCount={10}
         action="assign"
         onConfirm={onConfirm}
         onCancel={onCancel}
@@ -77,8 +79,9 @@ describe('TaskAssignmentBanner', () => {
     render(
       <TaskAssignmentBanner
         taskIds={[1]}
-        resourceId={2}
-        prevResourceId={4}
+        driverName="Driver 4"
+        prevDriverName="Driver 2"
+        remainingBatteryCount={10}
         action="reassign"
         onConfirm={() => {}}
         onCancel={() => {}}
@@ -86,7 +89,7 @@ describe('TaskAssignmentBanner', () => {
     );
 
     expect(
-      screen.getByText(/Re-assign task #1 from resource #4 to resource #2\?/i)
+      screen.getByText(/Re-assign task #1 from Driver 2 to Driver 4\?/i)
     ).toBeInTheDocument();
   });
 
@@ -94,7 +97,8 @@ describe('TaskAssignmentBanner', () => {
     render(
       <TaskAssignmentBanner
         taskIds={[5]}
-        resourceId={3}
+        driverName="Driver 3"
+        remainingBatteryCount={10}
         action="unassign"
         onConfirm={() => {}}
         onCancel={() => {}}
@@ -102,7 +106,7 @@ describe('TaskAssignmentBanner', () => {
     );
 
     expect(
-      screen.getByText(/Un-assign task #5 from resource #3\?/i)
+      screen.getByText(/Un-assign task #5 from Driver 3\?/i)
     ).toBeInTheDocument();
   });
 });

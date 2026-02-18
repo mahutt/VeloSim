@@ -28,8 +28,9 @@ import type { TaskAction } from '~/types';
 
 interface TaskAssignmentBannerProps {
   taskIds: number[];
-  resourceId: number;
-  prevResourceId?: number;
+  driverName: string;
+  prevDriverName?: string;
+  remainingBatteryCount: number;
   action: TaskAction;
   isLoading?: boolean;
   onConfirm: () => void;
@@ -38,8 +39,9 @@ interface TaskAssignmentBannerProps {
 
 export function TaskAssignmentBanner({
   taskIds,
-  resourceId,
-  prevResourceId,
+  driverName,
+  prevDriverName,
+  remainingBatteryCount,
   action,
   isLoading = false,
   onConfirm,
@@ -48,22 +50,42 @@ export function TaskAssignmentBanner({
   const renderMessage = () => {
     if (!taskIds.length) return null;
 
+    if (
+      taskIds.length > remainingBatteryCount &&
+      (action === 'assign' || action === 'reassign')
+    ) {
+      const actionLabel = action === 'reassign' ? 'Re-assign' : 'Assign';
+
+      return (
+        <>
+          <span className="block">
+            {driverName} has {remainingBatteryCount}{' '}
+            {remainingBatteryCount === 1 ? 'battery' : 'batteries'} remaining.
+          </span>
+          <span className="block">
+            {actionLabel} {taskIds.length}{' '}
+            {taskIds.length === 1 ? 'task' : 'tasks'} anyway?
+          </span>
+        </>
+      );
+    }
+
     const firstTaskId = taskIds[0];
 
-    if (action === 'reassign' && prevResourceId !== undefined) {
+    if (action === 'reassign' && prevDriverName !== undefined) {
       if (taskIds.length > 1) {
-        return `Re-assign ${taskIds.length} tasks from resource #${prevResourceId} to resource #${resourceId}?`;
+        return `Re-assign ${taskIds.length} tasks from ${prevDriverName} to ${driverName}?`;
       }
-      return `Re-assign task #${firstTaskId} from resource #${prevResourceId} to resource #${resourceId}?`;
+      return `Re-assign task #${firstTaskId} from ${prevDriverName} to ${driverName}?`;
     }
     if (action === 'unassign') {
-      return `Un-assign task #${firstTaskId} from resource #${resourceId}?`;
+      return `Un-assign task #${firstTaskId} from ${driverName}?`;
     }
     if (action === 'assign') {
       if (taskIds.length > 1) {
-        return `Assign ${taskIds.length} tasks to resource #${resourceId}?`;
+        return `Assign ${taskIds.length} tasks to ${driverName}?`;
       }
-      return `Assign task #${firstTaskId} to resource #${resourceId}?`;
+      return `Assign task #${firstTaskId} to ${driverName}?`;
     }
     return null;
   };
@@ -72,7 +94,7 @@ export function TaskAssignmentBanner({
     <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50">
       <div className="bg-white border rounded-lg shadow-lg p-4">
         <div className="flex items-center gap-2 mb-3 justify-center">
-          <AlertCircle className="h-5 w-5" />
+          <AlertCircle className="h-5 w-5 text-amber-500" />
           <span className="text-sm">{renderMessage()}</span>
         </div>
         <div className="flex gap-2 justify-center">
