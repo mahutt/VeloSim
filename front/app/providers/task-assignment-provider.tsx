@@ -76,6 +76,7 @@ export function TaskAssignmentProvider({ children }: { children: ReactNode }) {
     unassignTask,
     reassignTask,
     driversRef,
+    vehiclesRef,
   } = useSimulation();
   const [pendingAssignment, setPendingAssignment] =
     useState<PendingAssignment>(null);
@@ -221,6 +222,32 @@ export function TaskAssignmentProvider({ children }: { children: ReactNode }) {
     setPendingAssignment(null);
   }, []);
 
+  const getRemainingBatteryCount = useCallback(
+    (resourceId: number) => {
+      const driver = driversRef.current.get(resourceId);
+      if (!driver || !driver.vehicleId) {
+        return 0;
+      }
+
+      const vehicle = vehiclesRef.current.get(driver.vehicleId);
+      if (!vehicle) {
+        return 0;
+      }
+
+      const currentTaskCount = driver.taskIds?.length || 0;
+      return Math.max(0, vehicle.batteryCount - currentTaskCount);
+    },
+    [driversRef, vehiclesRef]
+  );
+
+  const getDriverName = useCallback(
+    (resourceId: number) => {
+      const driver = driversRef.current.get(resourceId);
+      return driver?.name || `#${resourceId}`;
+    },
+    [driversRef]
+  );
+
   return (
     <TaskAssignmentContext.Provider
       value={{
@@ -236,12 +263,16 @@ export function TaskAssignmentProvider({ children }: { children: ReactNode }) {
       {pendingAssignment && (
         <TaskAssignmentBanner
           taskIds={pendingAssignment.taskIds}
-          resourceId={pendingAssignment.resourceId}
-          prevResourceId={
-            pendingAssignment.action === 'reassign'
-              ? pendingAssignment.prevResourceId
+          driverName={getDriverName(pendingAssignment.resourceId)}
+          prevDriverName={
+            pendingAssignment.action === 'reassign' &&
+            pendingAssignment.prevResourceId != null
+              ? getDriverName(pendingAssignment.prevResourceId)
               : undefined
           }
+          remainingBatteryCount={getRemainingBatteryCount(
+            pendingAssignment.resourceId
+          )}
           action={pendingAssignment.action}
           onConfirm={confirmAssignment}
           onCancel={cancelAssignment}
