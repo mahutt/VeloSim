@@ -31,10 +31,10 @@ import {
 } from '~/utils/simulation-error-utils';
 import type FrameSource from './frame-source';
 
-export class ServerFrameSource implements FrameSource {
+export default class ServerFrameSource implements FrameSource {
   private simulationId: string;
   private onFrame: (frame: BackendPayload) => void;
-  private onError: (title: string, message: string) => void;
+  private onError: (error: string) => void;
 
   private wsUrl: string | null;
   private ws: WebSocket | null;
@@ -46,7 +46,7 @@ export class ServerFrameSource implements FrameSource {
   constructor(
     simulationId: string,
     onFrame: (frame: BackendPayload) => void,
-    onError: (title: string, message: string) => void
+    onError: (error: string) => void
   ) {
     this.simulationId = simulationId;
     this.onFrame = onFrame;
@@ -100,10 +100,7 @@ export class ServerFrameSource implements FrameSource {
           this.rejectIsRunning(
             new Error(message.message || 'Simulation error')
           );
-          this.onError(
-            'Simulation Error',
-            message.message || 'An error occurred'
-          );
+          this.onError(message.message || 'An error occurred');
           return;
         }
 
@@ -128,8 +125,7 @@ export class ServerFrameSource implements FrameSource {
               payloadKeys: Object.keys(payload),
             });
             this.onError(
-              'Initialization Error',
-              'Failed to initialize simulation. Please refresh and try again.'
+              'Initialization Error: Failed to initialize simulation. Please refresh and try again.'
             );
           }
           return;
@@ -156,8 +152,7 @@ export class ServerFrameSource implements FrameSource {
         console.error('[WS] Raw data:', event.data);
         logFrameProcessingError(error, event.data?.seq || -1);
         this.onError(
-          'Simulation Frame Error',
-          'An error occurred while processing simulation data. The simulation may not display correctly.'
+          'Simulation Frame Error: An error occurred while processing simulation data. The simulation may not display correctly.'
         );
       }
     };
@@ -172,8 +167,7 @@ export class ServerFrameSource implements FrameSource {
       });
 
       this.onError(
-        'Connection Error',
-        'Failed to connect to simulation. Check authentication and try again.'
+        'Connection Error: Failed to connect to simulation. Check authentication and try again.'
       );
     };
 
@@ -212,8 +206,7 @@ export class ServerFrameSource implements FrameSource {
         );
 
         this.onError(
-          'Authentication Failed',
-          'WebSocket authentication failed. Please try logging in again.'
+          'Authentication Failed: WebSocket authentication failed. Please try logging in again.'
         );
         return;
       }

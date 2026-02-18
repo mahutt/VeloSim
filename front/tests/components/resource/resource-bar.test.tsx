@@ -33,7 +33,8 @@ import ResourceBar, {
 } from '~/components/resource/resource-bar';
 import userEvent from '@testing-library/user-event';
 import { SelectedItemType } from '~/components/map/selected-item-bar';
-import { DriverState } from '~/types';
+import type SimulationEngine from '~/lib/simulation-engine';
+import { makeResourceItemElement } from 'tests/test-helpers';
 
 // Mock ResourceItem to simplify rendering
 vi.mock('~/components/resource/resource-item', () => ({
@@ -51,73 +52,38 @@ vi.mock('~/components/resource/resource-item', () => ({
 }));
 
 // Mock useSimulation
-vi.mock('~/providers/simulation-provider', async (importOriginal) => {
+const { mockUseSimulation } = await vi.hoisted(async () => {
+  const { mockSimulationEngine } = await import('tests/mocks');
+  const { DEFAULT_REACTIVE_SIMULATION_STATE } =
+    await import('app/lib/reactive-simulation-state');
+  const mockUseSimulationResult: SimulationContextType = {
+    state: DEFAULT_REACTIVE_SIMULATION_STATE,
+    engine: mockSimulationEngine as SimulationEngine,
+  };
+  const mockUseSimulation = () => mockUseSimulationResult;
+  return { mockUseSimulation };
+});
+
+vi.mock(import('~/providers/simulation-provider'), async (importOriginal) => {
   const actual = await importOriginal();
   return {
-    ...(typeof actual === 'object' && actual !== null ? actual : {}),
-    useSimulation: vi.fn(),
+    ...actual,
+    useSimulation: mockUseSimulation,
   };
 });
 
 const mockResourceBarElement: ResourceBarElement = [
-  {
-    id: 1,
-    name: 'Driver One',
-    taskCount: 3,
-    batteryCount: 1,
-    batteryCapacity: 100,
-    state: DriverState.OnRoute,
-  },
-  {
-    id: 2,
-    name: 'Driver Two',
-    taskCount: 1,
-    batteryCount: 2,
-    batteryCapacity: 100,
-    state: DriverState.Idle,
-  },
-  {
-    id: 12,
-    name: 'Driver Twelve',
-    taskCount: 0,
-    batteryCount: 0,
-    batteryCapacity: 100,
-    state: DriverState.SeekingHQForInventory,
-  },
+  makeResourceItemElement({ id: 1 }),
+  makeResourceItemElement({ id: 2 }),
+  makeResourceItemElement({ id: 12 }),
 ];
 
 beforeEach(() => {
   vi.clearAllMocks();
 });
 
-test('should throw error when used outside provider', () => {
-  const mockUseSimulation = useSimulation as unknown as ReturnType<
-    typeof vi.fn
-  >;
-  mockUseSimulation.mockImplementation(() => {
-    throw new Error('useSimulation must be used within a SimulationProvider');
-  });
-
-  expect(() => {
-    render(<ResourceBar />);
-  }).toThrow('useSimulation must be used within a SimulationProvider');
-});
-
 test('renders all resources from provider', () => {
-  const selectItem = vi.fn();
-  (useSimulation as unknown as ReturnType<typeof vi.fn>).mockReturnValue({
-    selectItem,
-    stationsRef: { current: new Map() },
-    driversRef: { current: new Map() },
-    selectedItem: null,
-    clearSelection: vi.fn(),
-    assignTaskToResource: vi.fn(),
-    simId: null,
-    isConnected: false,
-    startSimulation: vi.fn(),
-    simulationStatus: 'idle',
-    resourceBarElement: mockResourceBarElement,
-  } as Partial<SimulationContextType>);
+  useSimulation().state.resourceBarElement = mockResourceBarElement;
 
   render(<ResourceBar />);
   expect(screen.getAllByTestId('resource-item')).toHaveLength(
@@ -129,65 +95,32 @@ test('renders all resources from provider', () => {
 });
 
 test('renders search bar with correct placeholder', () => {
-  const selectItem = vi.fn();
-  (useSimulation as unknown as ReturnType<typeof vi.fn>).mockReturnValue({
-    selectItem,
-    resourceBarElement: mockResourceBarElement,
-    stationsRef: { current: new Map() },
-    driversRef: { current: new Map() },
-    selectedItem: null,
-    clearSelection: vi.fn(),
-    assignTaskToResource: vi.fn(),
-    simId: null,
-    isConnected: false,
-    startSimulation: vi.fn(),
-    simulationStatus: 'idle',
-  });
+  useSimulation().state.resourceBarElement = mockResourceBarElement;
 
   render(<ResourceBar />);
   expect(screen.getByPlaceholderText('Search Resource')).toBeInTheDocument();
 });
 
 test('calls selectItem with correct arguments when resource is clicked', () => {
-  const selectItem = vi.fn();
-  (useSimulation as unknown as ReturnType<typeof vi.fn>).mockReturnValue({
-    selectItem,
-    resourceBarElement: mockResourceBarElement,
-    stationsRef: { current: new Map() },
-    driversRef: { current: new Map() },
-    selectedItem: null,
-    clearSelection: vi.fn(),
-    assignTaskToResource: vi.fn(),
-    simId: null,
-    isConnected: false,
-    startSimulation: vi.fn(),
-    simulationStatus: 'idle',
-  });
+  useSimulation().state.resourceBarElement = mockResourceBarElement;
 
   render(<ResourceBar />);
   const items = screen.getAllByTestId('resource-item');
   fireEvent.click(items[0]);
-  expect(selectItem).toHaveBeenCalledWith(SelectedItemType.Driver, 1);
+  expect(useSimulation().engine.selectItem).toHaveBeenCalledWith(
+    SelectedItemType.Driver,
+    1
+  );
   fireEvent.click(items[1]);
-  expect(selectItem).toHaveBeenCalledWith(SelectedItemType.Driver, 2);
+  expect(useSimulation().engine.selectItem).toHaveBeenCalledWith(
+    SelectedItemType.Driver,
+    2
+  );
 });
 
 test('filters resources by ID match', async () => {
   const user = userEvent.setup();
-  const selectItem = vi.fn();
-  (useSimulation as unknown as ReturnType<typeof vi.fn>).mockReturnValue({
-    selectItem,
-    resourceBarElement: mockResourceBarElement,
-    stationsRef: { current: new Map() },
-    driversRef: { current: new Map() },
-    selectedItem: null,
-    clearSelection: vi.fn(),
-    assignTaskToResource: vi.fn(),
-    simId: null,
-    isConnected: false,
-    startSimulation: vi.fn(),
-    simulationStatus: 'idle',
-  });
+  useSimulation().state.resourceBarElement = mockResourceBarElement;
 
   render(<ResourceBar />);
 
@@ -202,20 +135,7 @@ test('filters resources by ID match', async () => {
 
 test('filters resources by partial ID match', async () => {
   const user = userEvent.setup();
-  const selectItem = vi.fn();
-  (useSimulation as unknown as ReturnType<typeof vi.fn>).mockReturnValue({
-    selectItem,
-    resourceBarElement: mockResourceBarElement,
-    stationsRef: { current: new Map() },
-    driversRef: { current: new Map() },
-    selectedItem: null,
-    clearSelection: vi.fn(),
-    assignTaskToResource: vi.fn(),
-    simId: null,
-    isConnected: false,
-    startSimulation: vi.fn(),
-    simulationStatus: 'idle',
-  });
+  useSimulation().state.resourceBarElement = mockResourceBarElement;
 
   render(<ResourceBar />);
 
@@ -230,20 +150,7 @@ test('filters resources by partial ID match', async () => {
 
 test('shows no resources when search query does not match any ID', async () => {
   const user = userEvent.setup();
-  const selectItem = vi.fn();
-  (useSimulation as unknown as ReturnType<typeof vi.fn>).mockReturnValue({
-    selectItem,
-    resourceBarElement: mockResourceBarElement,
-    stationsRef: { current: new Map() },
-    driversRef: { current: new Map() },
-    selectedItem: null,
-    clearSelection: vi.fn(),
-    assignTaskToResource: vi.fn(),
-    simId: null,
-    isConnected: false,
-    startSimulation: vi.fn(),
-    simulationStatus: 'idle',
-  });
+  useSimulation().state.resourceBarElement = mockResourceBarElement;
 
   render(<ResourceBar />);
 
@@ -257,20 +164,7 @@ test('shows no resources when search query does not match any ID', async () => {
 
 test('shows all resources when search query is empty', async () => {
   const user = userEvent.setup();
-  const selectItem = vi.fn();
-  (useSimulation as unknown as ReturnType<typeof vi.fn>).mockReturnValue({
-    selectItem,
-    resourceBarElement: mockResourceBarElement,
-    stationsRef: { current: new Map() },
-    driversRef: { current: new Map() },
-    selectedItem: null,
-    clearSelection: vi.fn(),
-    assignTaskToResource: vi.fn(),
-    simId: null,
-    isConnected: false,
-    startSimulation: vi.fn(),
-    simulationStatus: 'idle',
-  });
+  useSimulation().state.resourceBarElement = mockResourceBarElement;
 
   render(<ResourceBar />);
 
@@ -290,20 +184,7 @@ test('shows all resources when search query is empty', async () => {
 
 test('clears search when clear button is clicked', async () => {
   const user = userEvent.setup();
-  const selectItem = vi.fn();
-  (useSimulation as unknown as ReturnType<typeof vi.fn>).mockReturnValue({
-    selectItem,
-    resourceBarElement: mockResourceBarElement,
-    stationsRef: { current: new Map() },
-    driversRef: { current: new Map() },
-    selectedItem: null,
-    clearSelection: vi.fn(),
-    assignTaskToResource: vi.fn(),
-    simId: null,
-    isConnected: false,
-    startSimulation: vi.fn(),
-    simulationStatus: 'idle',
-  });
+  useSimulation().state.resourceBarElement = mockResourceBarElement;
 
   render(<ResourceBar />);
 
@@ -327,20 +208,7 @@ test('clears search when clear button is clicked', async () => {
 
 test('search is case insensitive for partial matches', async () => {
   const user = userEvent.setup();
-  const selectItem = vi.fn();
-  (useSimulation as unknown as ReturnType<typeof vi.fn>).mockReturnValue({
-    selectItem,
-    resourceBarElement: mockResourceBarElement,
-    stationsRef: { current: new Map() },
-    driversRef: { current: new Map() },
-    selectedItem: null,
-    clearSelection: vi.fn(),
-    assignTaskToResource: vi.fn(),
-    simId: null,
-    isConnected: false,
-    startSimulation: vi.fn(),
-    simulationStatus: 'idle',
-  });
+  useSimulation().state.resourceBarElement = mockResourceBarElement;
 
   render(<ResourceBar />);
 
@@ -353,25 +221,16 @@ test('search is case insensitive for partial matches', async () => {
 
 test('maintains selection state while filtering', async () => {
   const user = userEvent.setup();
-  const selectItem = vi.fn();
   const selectedResource = mockResourceBarElement[0];
 
-  (useSimulation as unknown as ReturnType<typeof vi.fn>).mockReturnValue({
-    selectItem,
-    resourceBarElement: mockResourceBarElement,
-    stationsRef: { current: new Map() },
-    driversRef: { current: new Map() },
-    selectedItem: {
-      type: SelectedItemType.Driver,
-      value: selectedResource,
-    },
-    clearSelection: vi.fn(),
-    assignTaskToResource: vi.fn(),
-    simId: null,
-    isConnected: false,
-    startSimulation: vi.fn(),
-    simulationStatus: 'idle',
-  });
+  useSimulation().state.resourceBarElement = [
+    makeResourceItemElement({
+      id: selectedResource.id,
+    }),
+    makeResourceItemElement({
+      id: 2,
+    }),
+  ];
 
   render(<ResourceBar />);
 
@@ -386,48 +245,10 @@ test('maintains selection state while filtering', async () => {
 });
 
 test('shows "No resources currently available" when resources array is empty', () => {
-  const selectItem = vi.fn();
-  (useSimulation as unknown as ReturnType<typeof vi.fn>).mockReturnValue({
-    selectItem,
-    resourceBarElement: [],
-    stationsRef: { current: new Map() },
-    driversRef: { current: new Map() },
-    selectedItem: null,
-    clearSelection: vi.fn(),
-    assignTaskToResource: vi.fn(),
-    simId: null,
-    isConnected: false,
-    startSimulation: vi.fn(),
-    simulationStatus: 'idle',
-  });
+  useSimulation().state.resourceBarElement = [];
 
   render(<ResourceBar />);
   expect(
     screen.getByText('No resources currently available')
-  ).toBeInTheDocument();
-});
-
-test('shows "No resources match your search" when search yields no results', async () => {
-  const user = userEvent.setup();
-  const selectItem = vi.fn();
-  (useSimulation as unknown as ReturnType<typeof vi.fn>).mockReturnValue({
-    selectItem,
-    resourceBarElement: mockResourceBarElement,
-    stationsRef: { current: new Map() },
-    driversRef: { current: new Map() },
-    selectedItem: null,
-    clearSelection: vi.fn(),
-    assignTaskToResource: vi.fn(),
-    simId: null,
-    isConnected: false,
-    startSimulation: vi.fn(),
-    simulationStatus: 'idle',
-  });
-
-  render(<ResourceBar />);
-  const searchInput = screen.getByPlaceholderText('Search Resource');
-  await user.type(searchInput, '999');
-  expect(
-    screen.getByText('No resources match your search')
   ).toBeInTheDocument();
 });

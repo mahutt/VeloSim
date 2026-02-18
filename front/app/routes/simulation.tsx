@@ -25,13 +25,12 @@
 import 'mapbox-gl/dist/mapbox-gl.css';
 import MapContainer from '~/components/map/map-container';
 import SelectedItemBar from '~/components/map/selected-item-bar';
-import { MapProvider } from '~/providers/map-provider';
+import { MapProvider, useMap } from '~/providers/map-provider';
 import {
   SimulationProvider,
   useSimulation,
 } from '~/providers/simulation-provider';
 import ResourceBar from '~/components/resource/resource-bar';
-import { TaskAssignmentProvider } from '~/providers/task-assignment-provider';
 import { useParams } from 'react-router';
 import { Loader2 } from 'lucide-react';
 import PlaybackControls from '~/components/map/playback-controls';
@@ -40,6 +39,7 @@ import SimulationClock from '~/components/map/clock';
 import HQWidget from '~/components/simulation/hq-widget';
 import Scrubber from '~/components/map/scrubber';
 import useFeature from '~/hooks/use-feature';
+import { TaskAssignmentBanner } from '~/components/task/task-assignment-banner';
 
 export function meta() {
   return [{ title: 'Simulation' }];
@@ -51,31 +51,30 @@ export default function Simulation() {
   if (!sim_id) return null; // Should never happen due to routing
 
   return (
-    <>
-      <MapProvider>
-        <SimulationProvider simId={sim_id}>
-          <TaskAssignmentProvider>
-            <SimulationContent />
-          </TaskAssignmentProvider>
-        </SimulationProvider>
-      </MapProvider>
-    </>
+    <MapProvider>
+      <MapContainer />
+      <MapReadyGate simulationId={sim_id} />
+    </MapProvider>
+  );
+}
+
+function MapReadyGate({ simulationId }: { simulationId: string }) {
+  const { mapRef, mapLoaded } = useMap();
+  if (!mapLoaded || !mapRef.current) return null;
+  return (
+    <SimulationProvider simulationId={simulationId} map={mapRef.current}>
+      <SimulationContent />
+    </SimulationProvider>
   );
 }
 
 function SimulationContent() {
-  const { isLoading, currentDay } = useSimulation();
-
-  // Dynamic width based on day digit count
-  const getContainerWidth = () => {
-    if (currentDay >= 100) return 'w-[277px]';
-    if (currentDay >= 10) return 'w-[268px]';
-    return 'w-[260px]';
-  };
+  const { state } = useSimulation();
+  const { isLoading, currentDay } = state;
+  const showScrubber = useFeature('simulationScrubber');
 
   return (
     <>
-      <MapContainer />
       {isLoading && (
         <div className="absolute inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm">
           <div className="flex flex-col items-center gap-4">
@@ -86,12 +85,13 @@ function SimulationContent() {
       )}
       {!isLoading && (
         <>
+          <TaskAssignmentBanner />
           <div className="absolute top-12 left-4 z-10 w-72">
             <SelectedItemBar />
           </div>
           {/* max-h-[calc(100vh-2.5rem) is set so that the Mapbox & OSM copyright notices aren't blocked. */}
           <div
-            className={`${getContainerWidth()} absolute top-4 right-4 flex flex-col gap-2 max-h-[calc(100vh-2.5rem)]`}
+            className={`${getContainerWidth(currentDay)} absolute top-4 right-4 flex flex-col gap-2 max-h-[calc(100vh-2.5rem)]`}
           >
             <div className="w-full flex justify-between gap-2 items-center">
               <SimulationClock />
@@ -101,7 +101,7 @@ function SimulationContent() {
             <ResourceBar />
             <HQWidget />
           </div>
-          {useFeature('simulationScrubber') && (
+          {showScrubber && (
             <div className="absolute bottom-10 left-1/2 -translate-x-1/2 w-2xl max-w-full px-2">
               <Scrubber />
             </div>
@@ -110,4 +110,11 @@ function SimulationContent() {
       )}
     </>
   );
+}
+
+// Dynamic width based on day digit count
+export function getContainerWidth(currentDay: number) {
+  if (currentDay >= 100) return 'w-[277px]';
+  if (currentDay >= 10) return 'w-[268px]';
+  return 'w-[260px]';
 }

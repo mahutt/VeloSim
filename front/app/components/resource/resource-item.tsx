@@ -24,10 +24,10 @@
 
 import { useState } from 'react';
 import { Item, ItemContent, ItemTitle } from '~/components/ui/item';
-import { useTaskAssignment } from '~/providers/task-assignment-provider';
 import { Battery, BatteryLow, BatteryMedium, BatteryFull } from 'lucide-react';
 import { DriverState } from '~/types';
 import DriverStateBadge from '~/components/map/driver-state-badge';
+import { useSimulation } from '~/providers/simulation-provider';
 
 function getBatteryIconAndColor(
   batteryCount: number,
@@ -89,7 +89,7 @@ export function ResourceItem({
   isSelected?: boolean;
 }) {
   const [isDragOver, setIsDragOver] = useState(false);
-  const { requestAssignment } = useTaskAssignment();
+  const { engine } = useSimulation();
 
   const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault();
@@ -107,7 +107,7 @@ export function ResourceItem({
         const taskIds = JSON.parse(taskIdsPayload || '[]');
         if (taskIds.length === 0) return;
 
-        requestAssignment(resource.id, taskIds);
+        engine.requestAssignment(resource.id, taskIds);
       } catch {
         return;
       }

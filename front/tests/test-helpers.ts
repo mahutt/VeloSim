@@ -22,15 +22,31 @@
  * SOFTWARE.
  */
 
-import { vi } from 'vitest';
-import type { PopulatedDriver } from '~/components/map/selected-item-bar';
+import {
+  SelectedItemType,
+  type PopulatedDriver,
+  type PopulatedStation,
+  type SelectedItemBarElement,
+} from '~/components/map/selected-item-bar';
+import SimulationEngine from '~/lib/simulation-engine';
+import {
+  DEFAULT_REACTIVE_SIMULATION_STATE,
+  type ReactiveSimulationState,
+} from '~/lib/reactive-simulation-state';
 import type { SimulationContextType } from '~/providers/simulation-provider';
 import {
   DriverState,
+  TaskAction,
   type BackendPayload,
   type Driver,
+  type Headquarters,
+  type PendingAssignment,
+  type Station,
+  type StationTask,
   type Vehicle,
 } from '~/types';
+import type { ResourceItemElement } from '~/components/resource/resource-item';
+import type { HQWidgetProps } from '~/components/simulation/hq-widget';
 
 export function makePayload(
   overrides: Partial<BackendPayload> = {}
@@ -51,6 +67,28 @@ export function makePayload(
       realMinutesPassed: 0,
       startTime: Date.now(),
     },
+  };
+}
+
+export function makeStation(overrides: Partial<Station> = {}): Station {
+  const id = overrides.id ?? Math.floor(Math.random() * 10000);
+  return {
+    id,
+    name: overrides.name ?? `Station ${id}`,
+    position: overrides.position ?? [0, 0],
+    taskIds: overrides.taskIds ?? [],
+  };
+}
+
+export function makePopulatedStation(
+  overrides: Partial<PopulatedStation> = {}
+): PopulatedStation {
+  const id = overrides.id ?? Math.floor(Math.random() * 10000);
+  return {
+    id,
+    name: overrides.name ?? `Station ${id}`,
+    position: overrides.position ?? [0, 0],
+    tasks: overrides.tasks ?? [],
   };
 }
 
@@ -78,7 +116,7 @@ export function makePopulatedDriver(
     name: overrides.name ?? `Driver ${id}`,
     position: overrides.position ?? [0, 0],
     tasks: overrides.tasks ?? [],
-    route: overrides.route,
+    route: overrides.route ?? null,
     state: overrides.state ?? DriverState.OffShift,
     inProgressTask: overrides.inProgressTask ?? null,
   };
@@ -93,44 +131,114 @@ export function makeVehicle(overrides: Partial<Vehicle> = {}): Vehicle {
   } as Vehicle;
 }
 
+export function makeStationTask(
+  overrides: Partial<StationTask> = {}
+): StationTask {
+  const id = overrides.id ?? Math.floor(Math.random() * 10000);
+  return {
+    id,
+    stationId: overrides.stationId ?? 1,
+    state: overrides.state ?? 'open',
+    assignedDriverId: overrides.assignedDriverId ?? null,
+  };
+}
+
 export function makeSimulationContext(
   overrides: Partial<SimulationContextType> = {}
 ): SimulationContextType {
   return {
-    speedRef: overrides.speedRef ?? { current: 1 },
-    stationsRef: overrides.stationsRef ?? { current: new Map() },
-    driversRef: overrides.driversRef ?? { current: new Map() },
-    vehiclesRef: overrides.vehiclesRef ?? { current: new Map() },
-    resourceBarElement: overrides.resourceBarElement ?? [],
-    selectedItem: overrides.selectedItem ?? null,
-    selectItem: overrides.selectItem ?? vi.fn(),
-    clearSelection: overrides.clearSelection ?? vi.fn(),
-    assignTask: overrides.assignTask ?? vi.fn(),
-    assignTasksBatch: overrides.assignTasksBatch ?? vi.fn(),
-    unassignTask: overrides.unassignTask ?? vi.fn(),
-    reassignTask: overrides.reassignTask ?? vi.fn(),
-    reorderTasks: overrides.reorderTasks ?? vi.fn(),
-    simId: overrides.simId ?? null,
-    isLoading: overrides.isLoading ?? false,
-    formattedSimTime: overrides.formattedSimTime ?? null,
-    currentDay: overrides.currentDay ?? 1,
-    HQWidgetState: overrides.HQWidgetState ?? {
-      entities: null,
-      driversAtHQ: [],
-      driversPendingShift: [],
-    },
-    showAllRoutes: overrides.showAllRoutes ?? false,
-    toggleShowAllRoutes: overrides.toggleShowAllRoutes ?? vi.fn(),
-    speed: overrides.speed ?? 1,
-    setSpeed: overrides.setSpeed ?? vi.fn(),
-    paused: overrides.paused ?? false,
-    setPaused: overrides.setPaused ?? vi.fn(),
-    scrub: overrides.scrub ?? vi.fn(),
-    commitScrub: overrides.commitScrub ?? vi.fn(),
-    startTime: overrides.startTime ?? 0,
-    simulationSecondsPassed: overrides.simulationSecondsPassed ?? 0,
-    scrubSimulationSecond: overrides.scrubSimulationSecond ?? 0,
-    updateHoverState: overrides.updateHoverState ?? vi.fn(),
-    setHoverLocked: overrides.setHoverLocked ?? vi.fn(),
+    state: overrides.state ?? DEFAULT_REACTIVE_SIMULATION_STATE,
+    engine: overrides.engine ?? ({} as unknown as SimulationEngine),
+  };
+}
+
+export function makeReactiveSimulationState(
+  overrides: Partial<ReactiveSimulationState> = {}
+): ReactiveSimulationState {
+  return {
+    ...DEFAULT_REACTIVE_SIMULATION_STATE,
+    ...overrides,
+  };
+}
+
+export function makeSelectedItemBarElement(
+  overrides: Partial<SelectedItemBarElement> = {}
+): SelectedItemBarElement {
+  if (overrides.type === SelectedItemType.Driver) {
+    return {
+      type: SelectedItemType.Driver,
+      value: (overrides.value as PopulatedDriver) ?? makePopulatedDriver(),
+    };
+  } else {
+    return {
+      type: SelectedItemType.Station,
+      value: (overrides.value as PopulatedStation) ?? makePopulatedStation(),
+    };
+  }
+}
+
+export function makePendingAssignment(
+  overrides: Partial<PendingAssignment> = {}
+): PendingAssignment {
+  if (overrides.action === TaskAction.Assign) {
+    return {
+      action: TaskAction.Assign,
+      taskIds: overrides.taskIds ?? [],
+      driverId: overrides.driverId ?? 1,
+      driverName: overrides.driverName ?? 'Driver 1',
+      driverBatteryCount: overrides.driverBatteryCount ?? 0,
+      unassignedTaskIds: overrides.unassignedTaskIds ?? [],
+      reassignCount: overrides.reassignCount ?? 0,
+    };
+  } else if (overrides.action === TaskAction.Reassign) {
+    return {
+      action: TaskAction.Reassign,
+      taskIds: overrides.taskIds ?? [],
+      driverId: overrides.driverId ?? 1,
+      driverName: overrides.driverName ?? 'Driver 1',
+      driverBatteryCount: overrides.driverBatteryCount ?? 0,
+      prevDriverId: overrides.prevDriverId ?? 2,
+      prevDriverName: overrides.prevDriverName ?? 'Driver 2',
+    };
+  } else {
+    return {
+      action: TaskAction.Unassign,
+      taskIds: overrides.taskIds ?? [],
+      driverId: overrides.driverId ?? 1,
+      driverName: overrides.driverName ?? 'Driver 1',
+      driverBatteryCount: overrides.driverBatteryCount ?? 0,
+    };
+  }
+}
+
+export function makeResourceItemElement(
+  overrides: Partial<ResourceItemElement> = {}
+): ResourceItemElement {
+  const id = overrides.id ?? Math.floor(Math.random() * 10000);
+  return {
+    id,
+    name: overrides.name ?? `Resource ${id}`,
+    taskCount: overrides.taskCount ?? 0,
+    batteryCount: overrides.batteryCount ?? 0,
+    batteryCapacity: overrides.batteryCapacity ?? 100,
+    state: overrides.state ?? DriverState.OffShift,
+  };
+}
+
+export function makeHQWidgetProps(
+  overrides: Partial<HQWidgetProps> = {}
+): HQWidgetProps {
+  return {
+    entities: overrides.entities ?? null,
+    driversAtHQ: overrides.driversAtHQ ?? [],
+    driversPendingShift: overrides.driversPendingShift ?? [],
+  };
+}
+
+export function makeHeadquarters(
+  overrides: Partial<Headquarters> = {}
+): Headquarters {
+  return {
+    position: overrides.position ?? [0, 0],
   };
 }

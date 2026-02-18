@@ -32,7 +32,6 @@ import {
 import { useState } from 'react';
 import Nested from '~/icons/nested';
 import { useSimulation } from '~/providers/simulation-provider';
-
 export interface HQEntitiesState {
   type: 'driver' | 'vehicle';
   count: number; // should be > 0
@@ -45,8 +44,8 @@ export interface HQWidgetProps {
 }
 
 export default function HQWidget() {
-  const { HQWidgetState } = useSimulation();
-  const { driversAtHQ, driversPendingShift, entities } = HQWidgetState;
+  const { state } = useSimulation();
+  const { driversAtHQ, driversPendingShift, entities } = state.HQWidgetState;
   const [open, setOpen] = useState<boolean>(false);
   const drivers = [...driversAtHQ, ...driversPendingShift].sort(
     (a, b) => a.minutesTillShift - b.minutesTillShift

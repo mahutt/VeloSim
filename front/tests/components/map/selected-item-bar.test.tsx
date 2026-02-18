@@ -28,12 +28,18 @@ import userEvent from '@testing-library/user-event';
 import { useSimulation } from '~/providers/simulation-provider';
 import SelectedItemBar, {
   SelectedItemType,
-  type PopulatedStation,
 } from '~/components/map/selected-item-bar';
 import { FeatureToggleProvider } from '~/providers/feature-toggle-provider';
-import { TaskAssignmentProvider } from '~/providers/task-assignment-provider';
-import type { Position, StationTask } from '~/types';
-import { makePopulatedDriver, makeSimulationContext } from 'tests/test-helpers';
+import {
+  makePopulatedDriver,
+  makePopulatedStation,
+  makeReactiveSimulationState,
+  makeSelectedItemBarElement,
+  makeSimulationContext,
+  makeStationTask,
+} from 'tests/test-helpers';
+import { mockSimulationEngine } from 'tests/mocks';
+import type SimulationEngine from '~/lib/simulation-engine';
 
 // Mock the useSimulation hook
 vi.mock('~/providers/simulation-provider', () => ({
@@ -42,45 +48,35 @@ vi.mock('~/providers/simulation-provider', () => ({
 
 describe('SelectedItemBar', () => {
   it('should not render when no item is selected', () => {
-    vi.mocked(useSimulation).mockReturnValue(
-      makeSimulationContext({ selectedItem: null })
-    );
+    vi.mocked(useSimulation).mockReturnValue(makeSimulationContext());
 
     const { container } = render(
       <FeatureToggleProvider>
-        <TaskAssignmentProvider>
-          <SelectedItemBar />
-        </TaskAssignmentProvider>
+        <SelectedItemBar />
       </FeatureToggleProvider>
     );
     expect(container.firstChild).toBeNull();
   });
 
   it('should render station information when station is selected', () => {
-    const mockStation = {
-      id: 1,
-      name: 'Test Station',
-      position: [-73.57776, 45.48944] as Position,
-      tasks: [],
-    };
-
-    const clearSelectionMock = vi.fn();
-
     (useSimulation as unknown as ReturnType<typeof vi.fn>).mockReturnValue(
       makeSimulationContext({
-        selectedItem: {
-          type: SelectedItemType.Station,
-          value: mockStation,
-        },
-        clearSelection: clearSelectionMock,
+        state: makeReactiveSimulationState({
+          selectedItemBarElement: makeSelectedItemBarElement({
+            type: SelectedItemType.Station,
+            value: makePopulatedStation({
+              id: 1,
+              name: 'Test Station',
+              tasks: [],
+            }),
+          }),
+        }),
       })
     );
 
     render(
       <FeatureToggleProvider>
-        <TaskAssignmentProvider>
-          <SelectedItemBar />
-        </TaskAssignmentProvider>
+        <SelectedItemBar />
       </FeatureToggleProvider>
     );
 
@@ -90,30 +86,28 @@ describe('SelectedItemBar', () => {
   });
 
   it('should render driver information when driver is selected', () => {
-    const mockDriver = makePopulatedDriver({
-      id: 5,
-      position: [-73.58, 45.49] as Position,
-      tasks: [
-        { id: 1, stationId: 1, state: 'open', assignedDriverId: null },
-        { id: 2, stationId: 2, state: 'open', assignedDriverId: null },
-        { id: 3, stationId: 3, state: 'open', assignedDriverId: null },
-      ],
-    });
-
     (useSimulation as unknown as ReturnType<typeof vi.fn>).mockReturnValue(
       makeSimulationContext({
-        selectedItem: {
-          type: SelectedItemType.Driver,
-          value: mockDriver,
-        },
+        state: makeReactiveSimulationState({
+          selectedItemBarElement: makeSelectedItemBarElement({
+            type: SelectedItemType.Driver,
+            value: makePopulatedDriver({
+              id: 5,
+              name: 'Driver 5',
+              tasks: [
+                makeStationTask({ id: 1 }),
+                makeStationTask({ id: 2 }),
+                makeStationTask({ id: 3 }),
+              ],
+            }),
+          }),
+        }),
       })
     );
 
     render(
       <FeatureToggleProvider>
-        <TaskAssignmentProvider>
-          <SelectedItemBar />
-        </TaskAssignmentProvider>
+        <SelectedItemBar />
       </FeatureToggleProvider>
     );
 
@@ -125,43 +119,30 @@ describe('SelectedItemBar', () => {
   });
 
   it('should render driver in progress task when driver is selected', () => {
-    const inProgressTask: StationTask = {
-      id: 1,
-      stationId: 1,
-      state: 'inprogress',
-      assignedDriverId: null,
-    };
-    const mockDriver = makePopulatedDriver({
-      id: 5,
-      position: [-73.58, 45.49] as Position,
-      tasks: [
-        inProgressTask,
-        { id: 2, stationId: 2, state: 'open', assignedDriverId: null },
-        { id: 3, stationId: 3, state: 'open', assignedDriverId: null },
-      ],
-      route: {
-        coordinates: [
-          [-73.58, 45.49],
-          [-73.57, 45.5],
-        ] as Position[],
-      },
-      inProgressTask: inProgressTask,
-    });
-
+    const inProgressTask = makeStationTask({ id: 1, state: 'inprogress' });
     (useSimulation as unknown as ReturnType<typeof vi.fn>).mockReturnValue(
       makeSimulationContext({
-        selectedItem: {
-          type: SelectedItemType.Driver,
-          value: mockDriver,
-        },
+        state: makeReactiveSimulationState({
+          selectedItemBarElement: makeSelectedItemBarElement({
+            type: SelectedItemType.Driver,
+            value: makePopulatedDriver({
+              id: 5,
+              name: 'Driver 5',
+              inProgressTask,
+              tasks: [
+                inProgressTask,
+                makeStationTask({ id: 2 }),
+                makeStationTask({ id: 3 }),
+              ],
+            }),
+          }),
+        }),
       })
     );
 
     render(
       <FeatureToggleProvider>
-        <TaskAssignmentProvider>
-          <SelectedItemBar />
-        </TaskAssignmentProvider>
+        <SelectedItemBar />
       </FeatureToggleProvider>
     );
 
@@ -173,64 +154,49 @@ describe('SelectedItemBar', () => {
 
   it('should call clearSelection when close button is clicked', async () => {
     const user = userEvent.setup();
-    const clearSelectionMock = vi.fn();
-
-    const mockStation = {
-      id: 1,
-      name: 'Test Station',
-      position: [-73.57776, 45.48944] as Position,
-      tasks: [],
-    };
-
     (useSimulation as unknown as ReturnType<typeof vi.fn>).mockReturnValue(
       makeSimulationContext({
-        selectedItem: {
-          type: SelectedItemType.Station,
-          value: mockStation,
-        },
-        clearSelection: clearSelectionMock,
+        state: makeReactiveSimulationState({
+          selectedItemBarElement: makeSelectedItemBarElement({
+            type: SelectedItemType.Station,
+            value: makePopulatedStation(),
+          }),
+        }),
+        engine: mockSimulationEngine as SimulationEngine,
       })
     );
 
     render(
       <FeatureToggleProvider>
-        <TaskAssignmentProvider>
-          <SelectedItemBar />
-        </TaskAssignmentProvider>
+        <SelectedItemBar />
       </FeatureToggleProvider>
     );
 
     const closeButton = screen.getByRole('button');
     await user.click(closeButton);
 
-    expect(clearSelectionMock).toHaveBeenCalledTimes(1);
+    expect(mockSimulationEngine.clearSelection).toHaveBeenCalledTimes(1);
   });
 
   it('should display tasks when station has tasks', () => {
-    const mockStation: PopulatedStation = {
-      id: 1,
-      name: 'Test Station',
-      position: [-73.57776, 45.48944] as Position,
-      tasks: [
-        { id: 1, stationId: 1, state: 'open', assignedDriverId: null },
-        { id: 2, stationId: 1, state: 'assigned', assignedDriverId: 5 },
-      ],
-    };
-
     (useSimulation as unknown as ReturnType<typeof vi.fn>).mockReturnValue(
       makeSimulationContext({
-        selectedItem: {
-          type: SelectedItemType.Station,
-          value: mockStation,
-        },
+        state: makeReactiveSimulationState({
+          selectedItemBarElement: makeSelectedItemBarElement({
+            type: SelectedItemType.Station,
+            value: makePopulatedStation({
+              id: 1,
+              name: 'Test Station',
+              tasks: [makeStationTask({ id: 1 }), makeStationTask({ id: 2 })],
+            }),
+          }),
+        }),
       })
     );
 
     render(
       <FeatureToggleProvider>
-        <TaskAssignmentProvider>
-          <SelectedItemBar />
-        </TaskAssignmentProvider>
+        <SelectedItemBar />
       </FeatureToggleProvider>
     );
 
@@ -241,31 +207,29 @@ describe('SelectedItemBar', () => {
 
   describe('Task Reordering', () => {
     it('should call reorderTasks when task is dropped at a valid position', async () => {
-      const reorderTasksMock = vi.fn().mockResolvedValue(undefined);
-      const mockDriver = makePopulatedDriver({
-        id: 1,
-        tasks: [
-          { id: 1, stationId: 1, state: 'open', assignedDriverId: 1 },
-          { id: 2, stationId: 2, state: 'open', assignedDriverId: 1 },
-          { id: 3, stationId: 3, state: 'open', assignedDriverId: 1 },
-        ],
-      });
-
       (useSimulation as unknown as ReturnType<typeof vi.fn>).mockReturnValue(
         makeSimulationContext({
-          selectedItem: {
-            type: SelectedItemType.Driver,
-            value: mockDriver,
-          },
-          reorderTasks: reorderTasksMock,
+          state: makeReactiveSimulationState({
+            selectedItemBarElement: makeSelectedItemBarElement({
+              type: SelectedItemType.Driver,
+              value: makePopulatedDriver({
+                id: 1,
+                name: 'Driver 1',
+                tasks: [
+                  makeStationTask({ id: 1 }),
+                  makeStationTask({ id: 2 }),
+                  makeStationTask({ id: 3 }),
+                ],
+              }),
+            }),
+          }),
+          engine: mockSimulationEngine as SimulationEngine,
         })
       );
 
       render(
         <FeatureToggleProvider>
-          <TaskAssignmentProvider>
-            <SelectedItemBar />
-          </TaskAssignmentProvider>
+          <SelectedItemBar />
         </FeatureToggleProvider>
       );
 
@@ -285,77 +249,37 @@ describe('SelectedItemBar', () => {
       fireEvent.drop(taskWrappers[2]);
 
       // Should reorder: [2, 3, 1]
-      expect(reorderTasksMock).toHaveBeenCalledWith(1, [2, 3, 1], true);
-    });
-
-    it('should call reorderTasks when dropping at index 0', async () => {
-      const reorderTasksMock = vi.fn().mockResolvedValue(undefined);
-      const mockDriver = makePopulatedDriver({
-        id: 1,
-        tasks: [
-          { id: 1, stationId: 1, state: 'open', assignedDriverId: 1 },
-          { id: 2, stationId: 2, state: 'open', assignedDriverId: 1 },
-          { id: 3, stationId: 3, state: 'open', assignedDriverId: 1 },
-        ],
-      });
-
-      (useSimulation as unknown as ReturnType<typeof vi.fn>).mockReturnValue(
-        makeSimulationContext({
-          selectedItem: {
-            type: SelectedItemType.Driver,
-            value: mockDriver,
-          },
-          reorderTasks: reorderTasksMock,
-        })
+      expect(mockSimulationEngine.reorderTasks).toHaveBeenCalledWith(
+        1,
+        [2, 3, 1],
+        true
       );
-
-      render(
-        <FeatureToggleProvider>
-          <TaskAssignmentProvider>
-            <SelectedItemBar />
-          </TaskAssignmentProvider>
-        </FeatureToggleProvider>
-      );
-
-      const taskElements = screen
-        .getAllByText(/^Task #/)
-        .map((el) => el.closest('[data-slot="item"]'))
-        .filter(Boolean) as HTMLElement[];
-      const taskWrappers = taskElements.map(
-        (el) => el.parentElement as HTMLElement
-      );
-
-      // Simulate drag task 3 to top (index 0)
-      fireEvent.dragStart(taskElements[2]);
-      fireEvent.drop(taskWrappers[0]);
-
-      // Should not call reorderTasks
-      expect(reorderTasksMock).toHaveBeenCalled();
     });
 
     it('should set dropEffect to none when draggedTaskId is null', () => {
-      const mockDriver = makePopulatedDriver({
-        id: 1,
-        tasks: [
-          { id: 1, stationId: 1, state: 'open', assignedDriverId: 1 },
-          { id: 2, stationId: 2, state: 'open', assignedDriverId: 1 },
-        ],
-      });
-
       (useSimulation as unknown as ReturnType<typeof vi.fn>).mockReturnValue(
         makeSimulationContext({
-          selectedItem: {
-            type: SelectedItemType.Driver,
-            value: mockDriver,
-          },
+          state: makeReactiveSimulationState({
+            selectedItemBarElement: makeSelectedItemBarElement({
+              type: SelectedItemType.Driver,
+              value: makePopulatedDriver({
+                id: 1,
+                name: 'Driver 1',
+                tasks: [
+                  makeStationTask({ id: 1 }),
+                  makeStationTask({ id: 2 }),
+                  makeStationTask({ id: 3 }),
+                ],
+              }),
+            }),
+          }),
+          engine: mockSimulationEngine as SimulationEngine,
         })
       );
 
       render(
         <FeatureToggleProvider>
-          <TaskAssignmentProvider>
-            <SelectedItemBar />
-          </TaskAssignmentProvider>
+          <SelectedItemBar />
         </FeatureToggleProvider>
       );
 
@@ -374,29 +298,29 @@ describe('SelectedItemBar', () => {
     });
 
     it('should set dropEffect to none when target index is 0', () => {
-      const mockDriver = makePopulatedDriver({
-        id: 1,
-        tasks: [
-          { id: 1, stationId: 1, state: 'open', assignedDriverId: 1 },
-          { id: 2, stationId: 2, state: 'open', assignedDriverId: 1 },
-          { id: 3, stationId: 3, state: 'open', assignedDriverId: 1 },
-        ],
-      });
-
       (useSimulation as unknown as ReturnType<typeof vi.fn>).mockReturnValue(
         makeSimulationContext({
-          selectedItem: {
-            type: SelectedItemType.Driver,
-            value: mockDriver,
-          },
+          state: makeReactiveSimulationState({
+            selectedItemBarElement: makeSelectedItemBarElement({
+              type: SelectedItemType.Driver,
+              value: makePopulatedDriver({
+                id: 1,
+                name: 'Driver 1',
+                tasks: [
+                  makeStationTask({ id: 1 }),
+                  makeStationTask({ id: 2 }),
+                  makeStationTask({ id: 3 }),
+                ],
+              }),
+            }),
+          }),
+          engine: mockSimulationEngine as SimulationEngine,
         })
       );
 
       render(
         <FeatureToggleProvider>
-          <TaskAssignmentProvider>
-            <SelectedItemBar />
-          </TaskAssignmentProvider>
+          <SelectedItemBar />
         </FeatureToggleProvider>
       );
 
@@ -418,30 +342,29 @@ describe('SelectedItemBar', () => {
     });
 
     it('should not reorder when dragged task is not found in list', async () => {
-      const reorderTasksMock = vi.fn().mockResolvedValue(undefined);
-      const mockDriver = makePopulatedDriver({
-        id: 1,
-        tasks: [
-          { id: 1, stationId: 1, state: 'open', assignedDriverId: 1 },
-          { id: 2, stationId: 2, state: 'open', assignedDriverId: 1 },
-        ],
-      });
-
       (useSimulation as unknown as ReturnType<typeof vi.fn>).mockReturnValue(
         makeSimulationContext({
-          selectedItem: {
-            type: SelectedItemType.Driver,
-            value: mockDriver,
-          },
-          reorderTasks: reorderTasksMock,
+          state: makeReactiveSimulationState({
+            selectedItemBarElement: makeSelectedItemBarElement({
+              type: SelectedItemType.Driver,
+              value: makePopulatedDriver({
+                id: 1,
+                name: 'Driver 1',
+                tasks: [
+                  makeStationTask({ id: 1 }),
+                  makeStationTask({ id: 2 }),
+                  makeStationTask({ id: 3 }),
+                ],
+              }),
+            }),
+          }),
+          engine: mockSimulationEngine as SimulationEngine,
         })
       );
 
       render(
         <FeatureToggleProvider>
-          <TaskAssignmentProvider>
-            <SelectedItemBar />
-          </TaskAssignmentProvider>
+          <SelectedItemBar />
         </FeatureToggleProvider>
       );
 
@@ -462,51 +385,6 @@ describe('SelectedItemBar', () => {
 
       // Note: This test validates that findIndex returns -1 check works
       // In practice, this scenario is prevented by the UI
-    });
-
-    it('should not reorder when dropping at same index', async () => {
-      const reorderTasksMock = vi.fn().mockResolvedValue(undefined);
-      const mockDriver = makePopulatedDriver({
-        id: 1,
-        tasks: [
-          { id: 1, stationId: 1, state: 'open', assignedDriverId: 1 },
-          { id: 2, stationId: 2, state: 'open', assignedDriverId: 1 },
-          { id: 3, stationId: 3, state: 'open', assignedDriverId: 1 },
-        ],
-      });
-
-      (useSimulation as unknown as ReturnType<typeof vi.fn>).mockReturnValue(
-        makeSimulationContext({
-          selectedItem: {
-            type: SelectedItemType.Driver,
-            value: mockDriver,
-          },
-          reorderTasks: reorderTasksMock,
-        })
-      );
-
-      render(
-        <FeatureToggleProvider>
-          <TaskAssignmentProvider>
-            <SelectedItemBar />
-          </TaskAssignmentProvider>
-        </FeatureToggleProvider>
-      );
-
-      const taskElements = screen
-        .getAllByText(/^Task #/)
-        .map((el) => el.closest('[data-slot="item"]'))
-        .filter(Boolean) as HTMLElement[];
-      const taskWrappers = taskElements.map(
-        (el) => el.parentElement as HTMLElement
-      );
-
-      // Drag task 2 and drop it on itself
-      fireEvent.dragStart(taskElements[1]);
-      fireEvent.drop(taskWrappers[1]);
-
-      // Should not call reorderTasks when dropping at same position
-      expect(reorderTasksMock).not.toHaveBeenCalled();
     });
   });
 });

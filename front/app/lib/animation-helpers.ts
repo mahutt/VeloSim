@@ -28,6 +28,7 @@ import along from '@turf/along';
 import length from '@turf/length';
 import type { Driver, Position, Route } from '~/types';
 import { positionsEqual } from './utils';
+import type { NonZeroSpeed } from '~/providers/simulation-provider';
 
 /**
  * Project a position onto the route LineString and find its distance from start.
@@ -96,7 +97,7 @@ const BASE_FRAME_INTERVAL_MS = 1000;
 /**
  * Updates driver positions for the current animation loop.
  *
- * @param drivers map of driver IDs to Driver objects
+ * @param drivers list of Driver objects
  * @param currentPositions map of driver IDs to their current positions
  * @param frameStartPositions map of driver IDs to their positions at the start of the frame
  * @param frameTargetPositions map of driver IDs to their target positions at the end of the frame
@@ -106,13 +107,13 @@ const BASE_FRAME_INTERVAL_MS = 1000;
  * @returns true if any driver positions were updated, false otherwise
  */
 export function updateDriverPositions(
-  drivers: Map<number, Driver>,
+  drivers: Driver[],
   currentPositions: Map<number, Position>,
   frameStartPositions: Map<number, Position>,
   frameTargetPositions: Map<number, Position>,
   routes: Map<number, Route>,
   lastDriverUpdates: Map<number, number>,
-  speed: number
+  nonZeroSpeed: NonZeroSpeed
 ): boolean {
   let driverPositionsChanged = false;
   drivers.forEach((driver) => {
@@ -125,10 +126,7 @@ export function updateDriverPositions(
     // Calculate interpolation progress (0 to 1)
     const now = performance.now();
     const frameElapsedMs = now - (lastDriverUpdates.get(driver.id) || 0);
-    const speedAdjustedFrameInterval =
-      speed === 0
-        ? BASE_FRAME_INTERVAL_MS // If paused, use normal interval to avoid division by zero
-        : BASE_FRAME_INTERVAL_MS / speed;
+    const speedAdjustedFrameInterval = BASE_FRAME_INTERVAL_MS / nonZeroSpeed;
     const frameIntervalProgress = Math.min(
       frameElapsedMs / speedAdjustedFrameInterval,
       1

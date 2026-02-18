@@ -1,0 +1,168 @@
+/**
+ * MIT License
+ *
+ * Copyright (c) 2025 VeloSim Contributors
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in all
+ * copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ * SOFTWARE.
+ */
+
+import type { SelectedItemBarElement } from '~/components/map/selected-item-bar';
+import type { ResourceBarElement } from '~/components/resource/resource-bar';
+import type { ResourceItemElement } from '~/components/resource/resource-item';
+import type { HQWidgetProps } from '~/components/simulation/hq-widget';
+import type { NonZeroSpeed } from '~/providers/simulation-provider';
+import type { PendingAssignment } from '~/types';
+import { areHQWidgetStatesEqual } from './hq-widget-helpers';
+
+export interface ReactiveSimulationState {
+  // loader
+  isLoading: boolean;
+
+  // selected item bar
+  selectedItemBarElement: SelectedItemBarElement | null;
+
+  // task assignment banner
+  pendingAssignment: PendingAssignment | null;
+  pendingAssignmentLoading: boolean;
+
+  // clock
+  formattedSimTime: string;
+  currentDay: number;
+
+  // playback controls
+  nonZeroSpeed: NonZeroSpeed;
+  paused: boolean;
+
+  // options
+  showAllRoutes: boolean;
+
+  // resource bar
+  resourceBarElement: ResourceBarElement;
+
+  // HQ widget
+  HQWidgetState: HQWidgetProps;
+
+  // scrubber
+  startTime: number;
+  simulationSecondsPassed: number;
+  scrubSimulationSecond: number;
+}
+
+export const DEFAULT_REACTIVE_SIMULATION_STATE: ReactiveSimulationState = {
+  isLoading: true,
+  selectedItemBarElement: null,
+  pendingAssignment: null,
+  pendingAssignmentLoading: false,
+  formattedSimTime: '--:--',
+  currentDay: 0,
+  nonZeroSpeed: 1,
+  paused: false,
+  showAllRoutes: false,
+  resourceBarElement: [],
+  HQWidgetState: {
+    entities: null,
+    driversAtHQ: [],
+    driversPendingShift: [],
+  },
+  startTime: 0,
+  simulationSecondsPassed: 0,
+  scrubSimulationSecond: 0,
+};
+
+export function areReactiveSimulationStatesEqual(
+  a: ReactiveSimulationState,
+  b: ReactiveSimulationState
+): boolean {
+  return (
+    a.isLoading === b.isLoading &&
+    areSelectedItemBarElementsEqual(
+      a.selectedItemBarElement,
+      b.selectedItemBarElement
+    ) &&
+    arePendingAssignmentsEqual(a.pendingAssignment, b.pendingAssignment) &&
+    a.pendingAssignmentLoading === b.pendingAssignmentLoading &&
+    a.formattedSimTime === b.formattedSimTime &&
+    a.currentDay === b.currentDay &&
+    a.nonZeroSpeed === b.nonZeroSpeed &&
+    a.paused === b.paused &&
+    a.showAllRoutes === b.showAllRoutes &&
+    areResourceBarElementsEqual(a.resourceBarElement, b.resourceBarElement) &&
+    areHQWidgetStatesEqual(a.HQWidgetState, b.HQWidgetState) &&
+    a.startTime === b.startTime &&
+    a.simulationSecondsPassed === b.simulationSecondsPassed &&
+    a.scrubSimulationSecond === b.scrubSimulationSecond
+  );
+}
+
+function areSelectedItemBarElementsEqual(
+  a: SelectedItemBarElement | null,
+  b: SelectedItemBarElement | null
+): boolean {
+  if (a === b) return true; // covers case where both are null or same reference
+  if (!a || !b) return false; // one is null and the other isn't
+  if (a.type !== b.type) return false; // different types
+  return a.value.id === b.value.id; // same type, compare by id
+}
+
+function arePendingAssignmentsEqual(
+  a: PendingAssignment | null,
+  b: PendingAssignment | null
+): boolean {
+  if (a === b) return true; // covers case where both are null or same reference
+  if (!a || !b) return false; // one is null and the other isn't
+  if (a.action !== b.action) return false; // different actions
+  if (a.driverId !== b.driverId) return false; // different drivers
+  if (a.taskIds.length !== b.taskIds.length) return false; // different number of tasks
+  const sortedA = [...a.taskIds].sort();
+  const sortedB = [...b.taskIds].sort();
+  for (let i = 0; i < sortedA.length; i++) {
+    if (sortedA[i] !== sortedB[i]) return false; // different task IDs
+  }
+  // We don't compare driver names since they never change
+  // We don't compare battery count as we don't expect battery counts to change
+  // in the time that it takes to confirm / cancel an assignment.
+  // We don't compare the previous driver IDs since this is a function of the taskIds list
+  return true;
+}
+
+function areResourceBarElementsEqual(
+  a: ResourceBarElement,
+  b: ResourceBarElement
+): boolean {
+  if (a.length !== b.length) return false;
+  // order matters for resource bar elements since they are displayed in the order of the list
+  for (let i = 0; i < a.length; i++) {
+    if (!areResourceItemElementsEqual(a[i], b[i])) return false;
+  }
+  return true;
+}
+
+function areResourceItemElementsEqual(
+  a: ResourceItemElement,
+  b: ResourceItemElement
+): boolean {
+  return (
+    a.id === b.id &&
+    a.name === b.name &&
+    a.taskCount === b.taskCount &&
+    a.batteryCount === b.batteryCount &&
+    a.batteryCapacity === b.batteryCapacity &&
+    a.state === b.state
+  );
+}

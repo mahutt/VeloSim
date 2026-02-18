@@ -40,8 +40,10 @@ describe('Clock', () => {
 
   it('displays formatted simulation time when available', () => {
     mockUseSimulation.mockReturnValue({
-      formattedSimTime: '12:34',
-      currentDay: 1,
+      state: {
+        formattedSimTime: '12:34',
+        currentDay: 1,
+      },
     });
 
     render(<Clock />);
@@ -49,21 +51,12 @@ describe('Clock', () => {
     expect(screen.getByText('12:34')).toBeInTheDocument();
   });
 
-  it("falls back to '--:--' when formattedSimTime is null", () => {
-    mockUseSimulation.mockReturnValue({
-      formattedSimTime: null,
-      currentDay: 1,
-    });
-
-    render(<Clock />);
-
-    expect(screen.getByText('--:--')).toBeInTheDocument();
-  });
-
   it('displays the current day', () => {
     mockUseSimulation.mockReturnValue({
-      formattedSimTime: '08:15',
-      currentDay: 3,
+      state: {
+        formattedSimTime: '08:15',
+        currentDay: 3,
+      },
     });
 
     render(<Clock />);

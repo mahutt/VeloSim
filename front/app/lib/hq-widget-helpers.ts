@@ -62,20 +62,20 @@ function adaptDriverForHQWidget(
  * @returns A valid HQ widget state.
  */
 export function createHQWidgetState({
-  driversMap,
-  vehiclesMap,
+  drivers,
+  vehicles,
   simulationSeconds,
   startTime,
 }: {
-  driversMap: Map<number, Driver>;
-  vehiclesMap: Map<number, Vehicle>;
+  drivers: Driver[];
+  vehicles: Vehicle[];
   simulationSeconds: number;
   startTime: number;
 }): HQWidgetProps {
   const driversAtHQ: Driver[] = [];
   const driversPendingShift: Driver[] = [];
 
-  for (const driver of driversMap.values()) {
+  for (const driver of drivers) {
     if (driver.state === DriverState.Idle && driver.vehicleId === null) {
       // necessarily at HQ if idle and no vehicle
       driversAtHQ.push(driver);
@@ -91,7 +91,7 @@ export function createHQWidgetState({
       count: driversAtHQ.length,
     };
   } else {
-    const vehiclesAtHQ = Array.from(vehiclesMap.values()).filter(
+    const vehiclesAtHQ = vehicles.filter(
       (vehicle) => vehicle.driverId === null // A vehicle is known to be at HQ if it is not assigned a driver
     ).length;
     entities =

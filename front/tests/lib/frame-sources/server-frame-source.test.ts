@@ -28,7 +28,7 @@
 
 import { makePayload } from 'tests/test-helpers';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { ServerFrameSource } from '~/lib/frame-sources/server-frame-source';
+import ServerFrameSource from '~/lib/frame-sources/server-frame-source';
 
 // Mock the api module
 const { mockApiPost } = vi.hoisted(() => {
@@ -136,10 +136,7 @@ describe('ServerFrameSource', () => {
       });
 
       await expect(startPromise).rejects.toThrow('Test error');
-      expect(mockOnError).toHaveBeenCalledWith(
-        'Simulation Error',
-        'Test error'
-      );
+      expect(mockOnError).toHaveBeenCalledWith('Test error');
     });
 
     it('should handle error messages without message field', async () => {
@@ -150,10 +147,7 @@ describe('ServerFrameSource', () => {
       });
 
       await expect(startPromise).rejects.toThrow('Simulation error');
-      expect(mockOnError).toHaveBeenCalledWith(
-        'Simulation Error',
-        'An error occurred'
-      );
+      expect(mockOnError).toHaveBeenCalledWith('An error occurred');
     });
 
     it('should handle regular frames', () => {
@@ -186,8 +180,7 @@ describe('ServerFrameSource', () => {
       });
 
       expect(mockOnError).toHaveBeenCalledWith(
-        'Simulation Frame Error',
-        expect.stringContaining('processing simulation data')
+        'Simulation Frame Error: An error occurred while processing simulation data. The simulation may not display correctly.'
       );
     });
 
@@ -197,8 +190,7 @@ describe('ServerFrameSource', () => {
       mockWebSocket.onerror(new Error('Connection failed'));
 
       expect(mockOnError).toHaveBeenCalledWith(
-        'Connection Error',
-        expect.stringContaining('Failed to connect')
+        'Connection Error: Failed to connect to simulation. Check authentication and try again.'
       );
     });
 
@@ -223,8 +215,7 @@ describe('ServerFrameSource', () => {
       });
 
       expect(mockOnError).toHaveBeenCalledWith(
-        'Authentication Failed',
-        expect.stringContaining('authentication failed')
+        'Authentication Failed: WebSocket authentication failed. Please try logging in again.'
       );
     });
 

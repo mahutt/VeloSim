@@ -22,11 +22,11 @@
  * SOFTWARE.
  */
 
-import { expect, test, vi, beforeEach } from 'vitest';
+import { expect, test, vi, beforeEach, it, describe } from 'vitest';
 import { render, screen } from '@testing-library/react';
-import Simulation, { meta } from '~/routes/simulation';
+import Simulation, { meta, getContainerWidth } from '~/routes/simulation';
 import { createRoutesStub } from 'react-router';
-import { makeSimulationContext } from 'tests/test-helpers';
+import type { MapContextType } from '~/providers/map-provider';
 
 // Mock MapContainer component
 vi.mock('~/components/map/map-container', () => ({
@@ -47,20 +47,37 @@ vi.mock('~/components/resource/resource-bar', () => ({
 }));
 
 // Mock providers to render children without context logic
+const { mockUseMap } = vi.hoisted(() => {
+  return {
+    mockUseMap: {
+      mapRef: { current: null },
+      mapContainerRef: { current: null },
+      mapLoaded: false,
+    } as MapContextType,
+  };
+});
 vi.mock('~/providers/map-provider', () => ({
+  useMap: (): MapContextType => mockUseMap,
   MapProvider: ({ children }: { children: React.ReactNode }) => (
     <div>{children}</div>
   ),
 }));
 
+const { mockUseSimulation } = await vi.hoisted(async () => {
+  const { makeSimulationContext, makeReactiveSimulationState } =
+    await import('tests/test-helpers');
+  return {
+    mockUseSimulation: makeSimulationContext({
+      state: makeReactiveSimulationState({ isLoading: false }),
+    }),
+  };
+});
+
 vi.mock('~/providers/simulation-provider', () => ({
   SimulationProvider: ({ children }: { children: React.ReactNode }) => (
     <div>{children}</div>
   ),
-  useSimulation: () =>
-    makeSimulationContext({
-      simId: 'test-sim-id',
-    }),
+  useSimulation: () => mockUseSimulation,
 }));
 
 vi.mock('~/providers/task-assignment-provider', () => ({
@@ -96,4 +113,69 @@ test('simulation page loads the map container', async () => {
 
   render(<Stub initialEntries={['/simulation/sim-id']} />);
   expect(screen.getByTestId('map-container')).toBeInTheDocument();
+});
+
+test('simulation page simulation provider and simulation UI elements when map is ready', async () => {
+  mockUseMap.mapLoaded = true;
+  mockUseMap.mapRef.current = {} as unknown as mapboxgl.Map;
+  const Stub = createRoutesStub([
+    {
+      path: '/simulation/:sim_id',
+      Component: Simulation,
+    },
+  ]);
+
+  render(<Stub initialEntries={['/simulation/sim-id']} />);
+  expect(screen.getByText('Resource Bar')).toBeInTheDocument();
+  expect(screen.getByText('Playback Controls')).toBeInTheDocument();
+  expect(screen.getByText('Selected Item Bar')).toBeInTheDocument();
+});
+
+test('simulation page renders loader while simulation engine is loading', async () => {
+  mockUseMap.mapLoaded = true;
+  mockUseMap.mapRef.current = {} as unknown as mapboxgl.Map;
+  mockUseSimulation.state.isLoading = true;
+  const Stub = createRoutesStub([
+    {
+      path: '/simulation/:sim_id',
+      Component: Simulation,
+    },
+  ]);
+
+  render(<Stub initialEntries={['/simulation/sim-id']} />);
+  // assert NO UI elements are shown while loading
+  expect(screen.queryByText('Resource Bar')).not.toBeInTheDocument();
+  expect(screen.queryByText('Playback Controls')).not.toBeInTheDocument();
+  expect(screen.queryByText('Selected Item Bar')).not.toBeInTheDocument();
+  // assert loader is shown
+  expect(screen.queryByText('Loading')).toBeInTheDocument();
+});
+
+test('simulation page renders nothing if sim_id is missing', async () => {
+  const Stub = createRoutesStub([
+    {
+      path: '/simulation',
+      Component: Simulation,
+    },
+  ]);
+
+  render(<Stub initialEntries={['/simulation']} />);
+  expect(screen.queryByText('Resource Bar')).not.toBeInTheDocument();
+  expect(screen.queryByText('Playback Controls')).not.toBeInTheDocument();
+  expect(screen.queryByText('Selected Item Bar')).not.toBeInTheDocument();
+  expect(screen.queryByText('Map Container')).not.toBeInTheDocument();
+});
+
+describe('getContainerWidth', () => {
+  it('returns correct width for single digit day', () => {
+    expect(getContainerWidth(5)).toBe('w-[260px]');
+  });
+
+  it('returns correct width for double digit day', () => {
+    expect(getContainerWidth(15)).toBe('w-[268px]');
+  });
+
+  it('returns correct width for triple digit day', () => {
+    expect(getContainerWidth(150)).toBe('w-[277px]');
+  });
 });

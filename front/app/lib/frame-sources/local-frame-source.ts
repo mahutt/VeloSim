@@ -26,7 +26,7 @@ import type { Speed } from '~/providers/simulation-provider';
 import type { BackendPayload } from '~/types';
 import type FrameSource from './frame-source';
 
-export class LocalFrameSource implements FrameSource {
+export default class LocalFrameSource implements FrameSource {
   private simulationId: string;
   private onFrame: (frame: BackendPayload) => void;
   private onError: (title: string, message: string) => void;
@@ -40,7 +40,7 @@ export class LocalFrameSource implements FrameSource {
   constructor(
     simulationId: string,
     onFrame: (frame: BackendPayload) => void,
-    onError: (title: string, message: string) => void
+    onError: (error: string) => void
   ) {
     this.simulationId = simulationId;
     this.onFrame = onFrame;

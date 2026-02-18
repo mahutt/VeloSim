@@ -24,7 +24,7 @@
 
 import { makePayload } from 'tests/test-helpers';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { LocalFrameSource } from '~/lib/frame-sources/local-frame-source';
+import LocalFrameSource from '~/lib/frame-sources/local-frame-source';
 import type { BackendPayload } from '~/types';
 
 describe('LocalFrameSource', () => {
