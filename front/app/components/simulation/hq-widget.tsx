@@ -52,10 +52,10 @@ export default function HQWidget() {
     (a, b) => a.minutesTillShift - b.minutesTillShift
   );
   return (
-    <div className="w-full bg-gray-50 border shadow rounded-lg overflow-hidden">
+    <div className="w-full bg-gray-50 border shadow rounded-lg">
       {/* header */}
       <button
-        className={`${!entities ? 'text-muted-foreground' : ''} w-full flex flex-row items-center gap-2 hover:bg-gray-100 p-2`}
+        className={`${!entities ? 'text-muted-foreground' : ''} w-full flex flex-row items-center gap-2 hover:bg-gray-100 p-2 rounded-lg`}
         onClick={() => setOpen((prev) => !prev)}
       >
         {!entities ? (
