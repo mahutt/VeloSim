@@ -502,7 +502,7 @@ class Driver:
         self.has_updated = False
         self.route_changed = False
         for route in self.routes:
-            route.traffic_changed = False
+            route.has_traffic_changed = False
 
     def reorder_tasks(
         self, task_ids_to_reorder: list[int], apply_from_top: bool
@@ -700,7 +700,7 @@ class Driver:
         Returns:
             True if any route has pending traffic changes.
         """
-        return any(route.traffic_changed for route in self.routes)
+        return any(route.has_traffic_changed for route in self.routes)
 
     def compute_routes(self) -> list[Route]:
         """

@@ -323,10 +323,10 @@ class TestRouteGetTrafficTriples:
         road = _make_road(geom, geometry=geom)
         route = _make_route([road])
 
-        assert route.traffic_changed is False
+        assert route.has_traffic_changed is False
         seg_key: SegmentKey = ((0, 0), (2, 0))
         _apply_traffic(road, route, geom, 0.15, seg_key)
-        assert route.traffic_changed is True
+        assert route.has_traffic_changed is True
 
     def test_notify_updates_cache_on_traffic_removal(self) -> None:
         """Cache should update when traffic is removed."""

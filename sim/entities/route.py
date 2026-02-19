@@ -173,7 +173,7 @@ class Route:
 
         # Cached traffic triples (eagerly updated via notify_traffic_changed)
         self._traffic_triples_cache: list[TrafficTriple] = []
-        self.traffic_changed = False
+        self._has_traffic_changed: bool = False
 
         # If no roads were created, the route was finished from the start
         if not self.roads:
@@ -345,6 +345,27 @@ class Route:
         """
         return [pos.get_position() for pos in self.coordinates]
 
+    @property
+    def has_traffic_changed(self) -> bool:
+        """Whether traffic triples have changed since last clear.
+
+        Returns:
+            True if traffic triples have been updated since the last reset.
+        """
+        return self._has_traffic_changed
+
+    @has_traffic_changed.setter
+    def has_traffic_changed(self, value: bool) -> None:
+        """Set the traffic changed flag.
+
+        Args:
+            value: New flag state.
+
+        Returns:
+            None
+        """
+        self._has_traffic_changed = value
+
     def get_traffic_triples(self) -> list[TrafficTriple]:
         """Get cached traffic triples in route coordinate index space.
 
@@ -393,7 +414,7 @@ class Route:
                     triples.append(TrafficTriple(abs_start, abs_end, level))
             coord_offset += geom_len - 1  # shared boundary point
         self._traffic_triples_cache = triples
-        self.traffic_changed = True
+        self._has_traffic_changed = True
 
     def next(self) -> Position | None:
         """Return the next position in the route traversal.
