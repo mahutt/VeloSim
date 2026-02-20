@@ -22,6 +22,7 @@
  * SOFTWARE.
  */
 
+import { useState } from 'react';
 import { AlertCircle } from 'lucide-react';
 import { Button } from '~/components/ui/button';
 import type { TaskAction } from '~/types';
@@ -51,8 +52,14 @@ export function TaskAssignmentBanner({
   onConfirmUnassignedOnly,
   onCancel,
 }: TaskAssignmentBannerProps) {
+  const [loadingAction, setLoadingAction] = useState<
+    'all' | 'remaining' | null
+  >(null);
   const hasMixedTasks =
-    action === 'assign' && taskIds.length > 1 && reassignCount > 0;
+    action === 'assign' &&
+    taskIds.length > 1 &&
+    reassignCount > 0 &&
+    reassignCount < taskIds.length;
   const unassignedCount = taskIds.length - reassignCount;
 
   const renderMessage = () => {
@@ -135,21 +142,31 @@ export function TaskAssignmentBanner({
           {hasMixedTasks && onConfirmUnassignedOnly ? (
             <>
               <Button
-                onClick={onConfirmUnassignedOnly}
+                onClick={() => {
+                  setLoadingAction('remaining');
+                  onConfirmUnassignedOnly();
+                }}
                 size="sm"
                 disabled={isLoading}
-                aria-busy={isLoading}
+                aria-busy={isLoading && loadingAction === 'remaining'}
                 className="bg-blue-500 hover:bg-blue-400 text-white"
               >
-                {isLoading ? 'Assigning...' : `Remaining (${unassignedCount})`}
+                {isLoading && loadingAction === 'remaining'
+                  ? 'Assigning...'
+                  : `Remaining (${unassignedCount})`}
               </Button>
               <Button
-                onClick={onConfirm}
+                onClick={() => {
+                  setLoadingAction('all');
+                  onConfirm();
+                }}
                 size="sm"
                 disabled={isLoading}
-                aria-busy={isLoading}
+                aria-busy={isLoading && loadingAction === 'all'}
               >
-                {isLoading ? 'Assigning...' : `All (${taskIds.length})`}
+                {isLoading && loadingAction === 'all'
+                  ? 'Assigning...'
+                  : `All (${taskIds.length})`}
               </Button>
             </>
           ) : (
