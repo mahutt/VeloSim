@@ -126,7 +126,7 @@ describe('TaskAssignmentBanner', () => {
       screen.getByText(/Assign 5 tasks to Driver A\?/i)
     ).toBeInTheDocument();
     expect(
-      screen.getByText(/2 already assigned to other drivers/i)
+      screen.getByText(/2 tasks already assigned to other drivers/i)
     ).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /cancel/i })).toBeInTheDocument();
     expect(
@@ -179,5 +179,94 @@ describe('TaskAssignmentBanner', () => {
     expect(
       screen.queryByRole('button', { name: /remaining/i })
     ).not.toBeInTheDocument();
+  });
+
+  it('shows reassign message when all tasks are already assigned to other drivers', () => {
+    render(
+      <TaskAssignmentBanner
+        taskIds={[1, 2]}
+        driverName="Driver C"
+        remainingBatteryCount={10}
+        action="assign"
+        reassignCount={2}
+        onConfirm={() => {}}
+        onConfirmUnassignedOnly={() => {}}
+        onCancel={() => {}}
+      />
+    );
+
+    expect(
+      screen.getByText(/Re-assign 2 tasks to Driver C\?/i)
+    ).toBeInTheDocument();
+    // Should show single confirm, not the 3-button mixed UI
+    expect(screen.getByRole('button', { name: /cancel/i })).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: /confirm/i })
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: /remaining/i })
+    ).not.toBeInTheDocument();
+  });
+
+  it('renders multi-reassign prompt from a single known driver', () => {
+    render(
+      <TaskAssignmentBanner
+        taskIds={[1, 2, 3]}
+        driverName="Driver B"
+        prevDriverName="Driver A"
+        remainingBatteryCount={10}
+        action="reassign"
+        onConfirm={() => {}}
+        onCancel={() => {}}
+      />
+    );
+
+    expect(
+      screen.getByText(/Re-assign 3 tasks from Driver A to Driver B\?/i)
+    ).toBeInTheDocument();
+  });
+
+  it('shows loading text on mixed-task Remaining button when isLoading', async () => {
+    const user = userEvent.setup();
+    const onConfirmUnassignedOnly = vi.fn();
+
+    render(
+      <TaskAssignmentBanner
+        taskIds={[1, 2, 3]}
+        driverName="Driver A"
+        remainingBatteryCount={10}
+        action="assign"
+        reassignCount={1}
+        isLoading={false}
+        onConfirm={() => {}}
+        onConfirmUnassignedOnly={onConfirmUnassignedOnly}
+        onCancel={() => {}}
+      />
+    );
+
+    await user.click(screen.getByRole('button', { name: /remaining \(2\)/i }));
+    expect(onConfirmUnassignedOnly).toHaveBeenCalledTimes(1);
+  });
+
+  it('shows loading text on mixed-task All button when isLoading', async () => {
+    const user = userEvent.setup();
+    const onConfirm = vi.fn();
+
+    render(
+      <TaskAssignmentBanner
+        taskIds={[1, 2, 3]}
+        driverName="Driver A"
+        remainingBatteryCount={10}
+        action="assign"
+        reassignCount={1}
+        isLoading={false}
+        onConfirm={onConfirm}
+        onConfirmUnassignedOnly={() => {}}
+        onCancel={() => {}}
+      />
+    );
+
+    await user.click(screen.getByRole('button', { name: /all \(3\)/i }));
+    expect(onConfirm).toHaveBeenCalledTimes(1);
   });
 });

@@ -44,8 +44,8 @@ test('setupMapClickHandlers registers event listeners', () => {
   const onItemSelect = vi.fn();
   setupMapClickHandlers(mockMap, onItemSelect);
 
-  // Should register 1 click + 18 cursor listeners (9 layers * 2 events)
-  expect(mockMap.on).toHaveBeenCalledTimes(19);
+  // Should register 1 click + 16 cursor listeners (8 layers * 2 events)
+  expect(mockMap.on).toHaveBeenCalledTimes(17);
   expect(mockMap.on).toHaveBeenCalledWith('click', expect.any(Function));
   expect(mockMap.on).toHaveBeenCalledWith(
     'mouseenter',
@@ -881,8 +881,6 @@ describe('setupStationDragHandlers', () => {
       contains: vi.fn(() => true),
     };
 
-    const ghostSource = { setData: vi.fn() };
-
     const mockMap = {
       on: vi.fn(
         (
@@ -899,10 +897,7 @@ describe('setupStationDragHandlers', () => {
       ),
       off: vi.fn(),
       getCanvas: vi.fn(() => canvas),
-      getSource: vi.fn((id: string) => {
-        if (id === MapSource.DragGhost) return ghostSource;
-        return undefined;
-      }),
+      getSource: vi.fn(() => undefined),
       queryRenderedFeatures: vi.fn(() => []),
       dragPan: {
         isEnabled: vi.fn(() => true),
@@ -915,7 +910,7 @@ describe('setupStationDragHandlers', () => {
       })),
     } as unknown as MapboxMap;
 
-    return { mockMap, mapHandlers, canvas, ghostSource };
+    return { mockMap, mapHandlers, canvas };
   }
 
   // Helper: simulate a mousedown on a station feature
@@ -939,6 +934,10 @@ describe('setupStationDragHandlers', () => {
     window.addEventListener = origAddEventListener;
     window.removeEventListener = origRemoveEventListener;
     windowListeners = {};
+    // Clean up any leftover DOM ghosts from station drag tests
+    document
+      .querySelectorAll('[data-testid="station-drag-ghost"]')
+      .forEach((el) => el.remove());
   });
 
   function interceptWindowListeners() {
@@ -1064,7 +1063,7 @@ describe('setupStationDragHandlers', () => {
 
   test('drag below threshold does not activate dragging visuals', () => {
     interceptWindowListeners();
-    const { mockMap, mapHandlers, canvas, ghostSource } = createMockMap();
+    const { mockMap, mapHandlers, canvas } = createMockMap();
     const onDrop = vi.fn();
 
     (
@@ -1085,12 +1084,14 @@ describe('setupStationDragHandlers', () => {
     });
 
     expect(canvas.style.cursor).toBe('');
-    expect(ghostSource.setData).not.toHaveBeenCalled();
+    expect(
+      document.querySelector('[data-testid="station-drag-ghost"]')
+    ).toBeNull();
   });
 
   test('drag above threshold activates cursor and ghost via window mousemove', () => {
     interceptWindowListeners();
-    const { mockMap, mapHandlers, canvas, ghostSource } = createMockMap();
+    const { mockMap, mapHandlers, canvas } = createMockMap();
     const onDrop = vi.fn();
 
     (mockMap.queryRenderedFeatures as ReturnType<typeof vi.fn>).mockReturnValue(
@@ -1115,22 +1116,15 @@ describe('setupStationDragHandlers', () => {
 
     expect(canvas.style.cursor).toBe('grabbing');
 
-    // window mousemove should update ghost
+    // window mousemove should update DOM ghost position
     windowListeners['mousemove']({ clientX: 200, clientY: 300 } as MouseEvent);
 
-    expect(ghostSource.setData).toHaveBeenCalledWith(
-      expect.objectContaining({
-        type: 'FeatureCollection',
-        features: [
-          expect.objectContaining({
-            geometry: expect.objectContaining({
-              type: 'Point',
-              coordinates: expect.any(Array),
-            }),
-          }),
-        ],
-      })
-    );
+    const ghost = document.querySelector(
+      '[data-testid="station-drag-ghost"]'
+    ) as HTMLElement;
+    expect(ghost).not.toBeNull();
+    expect(ghost.style.left).toBe('200px');
+    expect(ghost.style.top).toBe('300px');
   });
 
   test('cursor changes to copy when hovering over a driver during drag', () => {
@@ -1261,7 +1255,7 @@ describe('setupStationDragHandlers', () => {
 
   test('cleanup restores dragPan and calls onHighlight(null)', () => {
     interceptWindowListeners();
-    const { mockMap, mapHandlers, canvas, ghostSource } = createMockMap();
+    const { mockMap, mapHandlers, canvas } = createMockMap();
     const onDrop = vi.fn();
     const onHighlight = vi.fn();
 
@@ -1287,10 +1281,10 @@ describe('setupStationDragHandlers', () => {
     expect(mockMap.dragPan.enable).toHaveBeenCalled();
     // onHighlight(null) called during cleanup
     expect(onHighlight).toHaveBeenCalledWith(null);
-    // ghost cleared
-    expect(ghostSource.setData).toHaveBeenCalledWith(
-      expect.objectContaining({ type: 'FeatureCollection', features: [] })
-    );
+    // DOM ghost removed
+    expect(
+      document.querySelector('[data-testid="station-drag-ghost"]')
+    ).toBeNull();
     // cursor reset
     expect(canvas.style.cursor).toBe('');
   });
@@ -1328,7 +1322,7 @@ describe('setupStationDragHandlers', () => {
 
   test('window mouseup outside canvas cancels drag', () => {
     interceptWindowListeners();
-    const { mockMap, mapHandlers, canvas, ghostSource } = createMockMap();
+    const { mockMap, mapHandlers, canvas } = createMockMap();
     const onDrop = vi.fn();
     const onHighlight = vi.fn();
 
@@ -1352,11 +1346,11 @@ describe('setupStationDragHandlers', () => {
       target: document.body,
     } as unknown as MouseEvent);
 
-    // Should cancel: onHighlight(null), ghost cleared, dragPan restored
+    // Should cancel: onHighlight(null), DOM ghost removed, dragPan restored
     expect(onHighlight).toHaveBeenCalledWith(null);
-    expect(ghostSource.setData).toHaveBeenCalledWith(
-      expect.objectContaining({ type: 'FeatureCollection', features: [] })
-    );
+    expect(
+      document.querySelector('[data-testid="station-drag-ghost"]')
+    ).toBeNull();
     expect(onDrop).not.toHaveBeenCalled();
   });
 
@@ -1390,7 +1384,7 @@ describe('setupStationDragHandlers', () => {
 
   test('window mousemove does not update ghost before threshold is met', () => {
     interceptWindowListeners();
-    const { mockMap, mapHandlers, ghostSource } = createMockMap();
+    const { mockMap, mapHandlers } = createMockMap();
     const onDrop = vi.fn();
 
     (
@@ -1408,7 +1402,9 @@ describe('setupStationDragHandlers', () => {
     // window mousemove without exceeding threshold
     windowListeners['mousemove']({ clientX: 102, clientY: 100 } as MouseEvent);
 
-    expect(ghostSource.setData).not.toHaveBeenCalled();
+    expect(
+      document.querySelector('[data-testid="station-drag-ghost"]')
+    ).toBeNull();
   });
 
   test('mousedown is ignored when feature has no id', () => {
@@ -1453,7 +1449,7 @@ describe('setupStationDragHandlers', () => {
 
   test('window mousemove when not dragging is a no-op', () => {
     interceptWindowListeners();
-    const { mockMap, ghostSource } = createMockMap();
+    const { mockMap } = createMockMap();
     const onDrop = vi.fn();
 
     setupStationDragHandlers(mockMap, onDrop);
@@ -1461,7 +1457,9 @@ describe('setupStationDragHandlers', () => {
     // window mousemove without prior mousedown
     windowListeners['mousemove']({ clientX: 200, clientY: 300 } as MouseEvent);
 
-    expect(ghostSource.setData).not.toHaveBeenCalled();
+    expect(
+      document.querySelector('[data-testid="station-drag-ghost"]')
+    ).toBeNull();
   });
 
   test('window mouseup when not dragging is a no-op', () => {
@@ -1504,9 +1502,94 @@ describe('setupStationDragHandlers', () => {
     expect(onDrop).not.toHaveBeenCalled();
   });
 
+  test('window mouseup over sidebar resource item triggers onDrop', () => {
+    interceptWindowListeners();
+    const { mockMap, mapHandlers, canvas } = createMockMap();
+    const onDrop = vi.fn();
+
+    (
+      mockMap.queryRenderedFeatures as ReturnType<typeof vi.fn>
+    ).mockReturnValueOnce([stationFeature(10)]);
+
+    setupStationDragHandlers(mockMap, onDrop);
+
+    // mousedown on station
+    mapHandlers[`mousedown-${MapLayer.Stations}`]({
+      point: { x: 100, y: 100 },
+      preventDefault: vi.fn(),
+    });
+
+    // exceed threshold
+    (
+      mockMap.queryRenderedFeatures as ReturnType<typeof vi.fn>
+    ).mockReturnValueOnce([]);
+    mapHandlers['mousemove']({ point: { x: 108, y: 100 } });
+    expect(canvas.style.cursor).toBe('grabbing');
+
+    // Simulate a sidebar resource element under the cursor
+    const div = document.createElement('div');
+    div.setAttribute('data-resource-id', '77');
+    document.body.appendChild(div);
+    vi.spyOn(document, 'elementFromPoint').mockReturnValueOnce(div);
+
+    // Release outside canvas → should find resource via DOM
+    (canvas.contains as ReturnType<typeof vi.fn>).mockReturnValueOnce(false);
+    windowListeners['mouseup']({
+      target: div,
+      clientX: 500,
+      clientY: 300,
+    } as unknown as MouseEvent);
+
+    expect(onDrop).toHaveBeenCalledWith(10, 77);
+
+    // cleanup
+    div.remove();
+    vi.restoreAllMocks();
+  });
+
+  test('window mouseup over sidebar with NaN resource id does not call onDrop', () => {
+    interceptWindowListeners();
+    const { mockMap, mapHandlers, canvas } = createMockMap();
+    const onDrop = vi.fn();
+
+    (
+      mockMap.queryRenderedFeatures as ReturnType<typeof vi.fn>
+    ).mockReturnValueOnce([stationFeature(10)]);
+
+    setupStationDragHandlers(mockMap, onDrop);
+
+    mapHandlers[`mousedown-${MapLayer.Stations}`]({
+      point: { x: 100, y: 100 },
+      preventDefault: vi.fn(),
+    });
+
+    (
+      mockMap.queryRenderedFeatures as ReturnType<typeof vi.fn>
+    ).mockReturnValueOnce([]);
+    mapHandlers['mousemove']({ point: { x: 108, y: 100 } });
+
+    // Resource element with non-numeric id
+    const div = document.createElement('div');
+    div.setAttribute('data-resource-id', 'abc');
+    document.body.appendChild(div);
+    vi.spyOn(document, 'elementFromPoint').mockReturnValueOnce(div);
+
+    (canvas.contains as ReturnType<typeof vi.fn>).mockReturnValueOnce(false);
+    windowListeners['mouseup']({
+      target: div,
+      clientX: 500,
+      clientY: 300,
+    } as unknown as MouseEvent);
+
+    expect(onDrop).not.toHaveBeenCalled();
+
+    div.remove();
+    vi.restoreAllMocks();
+  });
+
   test('full drag flow: mousedown → exceed threshold → drop on driver → cleanup', () => {
     interceptWindowListeners();
-    const { mockMap, mapHandlers, canvas, ghostSource } = createMockMap();
+    const { mockMap, mapHandlers, canvas } = createMockMap();
     const onDrop = vi.fn();
     const onHighlight = vi.fn();
 
@@ -1530,18 +1613,14 @@ describe('setupStationDragHandlers', () => {
     mapHandlers['mousemove']({ point: { x: 108, y: 100 } });
     expect(canvas.style.cursor).toBe('grabbing');
 
-    // 3. window mousemove updates ghost
+    // 3. window mousemove updates DOM ghost
     windowListeners['mousemove']({ clientX: 150, clientY: 200 } as MouseEvent);
-    expect(ghostSource.setData).toHaveBeenCalledWith(
-      expect.objectContaining({
-        type: 'FeatureCollection',
-        features: expect.arrayContaining([
-          expect.objectContaining({
-            geometry: expect.objectContaining({ type: 'Point' }),
-          }),
-        ]),
-      })
-    );
+    const ghost = document.querySelector(
+      '[data-testid="station-drag-ghost"]'
+    ) as HTMLElement;
+    expect(ghost).not.toBeNull();
+    expect(ghost.style.left).toBe('150px');
+    expect(ghost.style.top).toBe('200px');
 
     // 4. hover over driver 99 → cursor changes
     (

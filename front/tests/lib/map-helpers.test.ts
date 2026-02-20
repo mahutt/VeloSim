@@ -83,7 +83,7 @@ test('setMapLayers adds stations layer with correct configuration', () => {
   MockMap.createRandomInstance();
   setMapLayers(MockMap.instance! as unknown as mapboxgl.Map);
 
-  expect(MockMap.instance?.addLayer).toHaveBeenCalledTimes(9);
+  expect(MockMap.instance?.addLayer).toHaveBeenCalledTimes(8);
   expect(MockMap.instance?.addLayer).toHaveBeenCalledWith({
     id: 'stations',
     type: 'symbol',

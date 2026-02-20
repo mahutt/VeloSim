@@ -32,7 +32,6 @@ export enum MapSource {
   RouteNextTask = 'route-next-task',
   RouteFutureTasks = 'route-future-tasks',
   AllRoutesNextTask = 'all-routes-next-task',
-  DragGhost = 'drag-ghost',
 }
 
 export enum MapLayer {
@@ -44,7 +43,6 @@ export enum MapLayer {
   RouteNextTask = 'route-next-task',
   RouteFutureTasks = 'route-future-tasks',
   AllRoutesNextTask = 'all-routes-next-task',
-  DragGhost = 'drag-ghost',
 }
 
 export function isMapLayer(value: string): value is MapLayer {
@@ -285,18 +283,6 @@ export function setMapLayers(map: mapboxgl.Map) {
       'text-color': '#000000',
       'text-halo-color': '#ffffff',
       'text-halo-width': 1,
-    },
-  });
-
-  // Drag-and-drop ghost layer (hidden until a station drag starts)
-  map.addLayer({
-    id: MapLayer.DragGhost,
-    type: 'symbol',
-    source: MapSource.DragGhost,
-    layout: {
-      'icon-image': 'station-marker-selected',
-      'icon-allow-overlap': true,
-      'icon-size': ['interpolate', ['linear'], ['zoom'], 10, 0.4, 15, 1.0],
     },
   });
 }

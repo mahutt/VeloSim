@@ -23,7 +23,7 @@
  */
 
 import type { Map as MapboxMap, MapMouseEvent } from 'mapbox-gl';
-import { isMapLayer, MapLayer, MapSource } from './map-helpers';
+import { isMapLayer, MapLayer } from './map-helpers';
 import { SelectedItemType } from '~/components/map/selected-item-bar';
 import type { Position } from '~/types';
 
@@ -188,10 +188,34 @@ export function setupMapDropHandlers(
 // Minimum pixel movement before entering drag mode (so clicks still work)
 const DRAG_THRESHOLD = 5;
 
-const EMPTY_FC: GeoJSON.FeatureCollection = {
-  type: 'FeatureCollection',
-  features: [],
-};
+// DOM-based drag ghost that floats above all overlays
+const GHOST_WIDTH = 28;
+
+function createDomGhost(): HTMLImageElement {
+  const img = document.createElement('img');
+  img.src = '/station-selected.png';
+  img.setAttribute('data-testid', 'station-drag-ghost');
+  Object.assign(img.style, {
+    position: 'fixed',
+    width: `${GHOST_WIDTH}px`,
+    height: 'auto',
+    pointerEvents: 'none',
+    zIndex: '9999',
+    opacity: '0.85',
+    transform: 'translate(-50%, -50%)',
+  });
+  document.body.appendChild(img);
+  return img;
+}
+
+function moveDomGhost(ghost: HTMLImageElement, x: number, y: number) {
+  ghost.style.left = `${x}px`;
+  ghost.style.top = `${y}px`;
+}
+
+function removeDomGhost(ghost: HTMLImageElement | null) {
+  ghost?.remove();
+}
 
 export type StationDragDropCallback = (
   stationId: number,
@@ -215,34 +239,9 @@ export function setupStationDragHandlers(
   let thresholdMet = false;
   let hoveredDriverId: number | null = null;
   let wasDragPanEnabled: boolean | null = null;
+  let domGhost: HTMLImageElement | null = null;
 
   const stationLayers = [MapLayer.Stations, MapLayer.StationCircle];
-
-  function setGhostData(lngLat: [number, number]) {
-    (map.getSource(MapSource.DragGhost) as mapboxgl.GeoJSONSource)?.setData({
-      type: 'FeatureCollection',
-      features: [
-        {
-          type: 'Feature',
-          geometry: { type: 'Point', coordinates: lngLat },
-          properties: {},
-        },
-      ],
-    });
-  }
-
-  function clearDragVisuals() {
-    (map.getSource(MapSource.DragGhost) as mapboxgl.GeoJSONSource)?.setData(
-      EMPTY_FC
-    );
-  }
-
-  // Convert a screen pixel to map lngLat
-  function screenToLngLat(x: number, y: number): [number, number] {
-    const rect = map.getCanvas().getBoundingClientRect();
-    const point = map.unproject([x - rect.left, y - rect.top]);
-    return [point.lng, point.lat];
-  }
 
   function cleanup() {
     dragging = false;
@@ -251,7 +250,8 @@ export function setupStationDragHandlers(
     startPoint = null;
     thresholdMet = false;
     hoveredDriverId = null;
-    clearDragVisuals();
+    removeDomGhost(domGhost);
+    domGhost = null;
     onHighlight?.(null);
     if (wasDragPanEnabled !== null) {
       if (wasDragPanEnabled) {
@@ -303,6 +303,14 @@ export function setupStationDragHandlers(
       if (Math.sqrt(dx * dx + dy * dy) < DRAG_THRESHOLD) return;
       thresholdMet = true;
       map.getCanvas().style.cursor = 'grabbing';
+      // Create the DOM ghost so it floats above sidebar/overlays
+      domGhost = createDomGhost();
+    }
+
+    // Move the DOM ghost to follow the cursor
+    const rect = map.getCanvas().getBoundingClientRect();
+    if (domGhost) {
+      moveDomGhost(domGhost, rect.left + e.point.x, rect.top + e.point.y);
     }
 
     // Check if hovering over a driver
@@ -321,11 +329,20 @@ export function setupStationDragHandlers(
     }
   }
 
-  // Track ghost on window so it follows even outside canvas
+  function findResourceIdAtPoint(x: number, y: number): number | null {
+    const el = document.elementFromPoint(x, y);
+    if (!el) return null;
+    const resourceEl = (el as HTMLElement).closest?.('[data-resource-id]');
+    if (!resourceEl) return null;
+    const id = Number(resourceEl.getAttribute('data-resource-id'));
+    return Number.isNaN(id) ? null : id;
+  }
+
   function onWindowMouseMove(e: MouseEvent) {
     if (!dragging || !thresholdMet) return;
-    const lngLat = screenToLngLat(e.clientX, e.clientY);
-    setGhostData(lngLat);
+    if (domGhost) {
+      moveDomGhost(domGhost, e.clientX, e.clientY);
+    }
   }
 
   function onMouseUp(e: MapMouseEvent) {
@@ -358,7 +375,17 @@ export function setupStationDragHandlers(
   function onWindowMouseUp(e: MouseEvent) {
     if (!dragging) return;
     const target = e.target as Node | null;
+    // If released inside the map canvas, let onMouseUp handle it
     if (target && map.getCanvas().contains(target)) return;
+
+    // Check if released over a sidebar resource item
+    if (thresholdMet && stationId !== null) {
+      const resourceId = findResourceIdAtPoint(e.clientX, e.clientY);
+      if (resourceId !== null) {
+        onDrop(stationId, resourceId);
+      }
+    }
+
     cleanup();
   }
 
