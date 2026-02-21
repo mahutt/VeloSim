@@ -99,8 +99,8 @@ class TrafficController:
         self._route_controller.register_on_road_created(self._on_road_created)
         self._route_controller.register_on_road_deallocated(self._on_road_deallocated)
 
-        # Parse traffic events from CSV if config provided
-        if traffic_config and traffic_config.traffic_path:
+        # Parse traffic events if config provided
+        if traffic_config and traffic_config.traffic_level:
             parser = TrafficParser(traffic_config)
             self._traffic_events = parser.parse()
             logger.info(f"Loaded {len(self._traffic_events)} traffic event(s)")

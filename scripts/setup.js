@@ -375,6 +375,17 @@ async function main() {
       console.log('[INFO] Error:', error.message);
     }
 
+    // Step 11: Get Traffic Templates
+    console.log('\n[SETUP] Retrieving traffic templates...');
+    try{
+      await runCommand('npm', ['run', 'traffic-templates']);
+       console.log('[SUCCESS] Retrieved all three traffic templates')
+    } catch (error) {
+      console.log('[WARNING] Traffic template retrieval failed')
+      console.log('[INFO] You can run manually the script: npm run traffic-templates')
+      console.log('[INFO] Error:', error.message);
+    }
+
     console.log('\n[SUCCESS] Setup completed successfully!');
     console.log('\nNext step:');
     console.log('  npm run dev  # Start development servers');
