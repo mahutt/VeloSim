@@ -184,3 +184,222 @@ export function setupMapDropHandlers(
     canvas.removeEventListener('drop', handleDrop);
   };
 }
+
+// Minimum pixel movement before entering drag mode (so clicks still work)
+const DRAG_THRESHOLD = 5;
+
+// DOM-based drag ghost that floats above all overlays
+const GHOST_WIDTH = 28;
+
+function createDomGhost(): HTMLImageElement {
+  const img = document.createElement('img');
+  img.src = '/station-selected.png';
+  img.setAttribute('data-testid', 'station-drag-ghost');
+  Object.assign(img.style, {
+    position: 'fixed',
+    width: `${GHOST_WIDTH}px`,
+    height: 'auto',
+    pointerEvents: 'none',
+    zIndex: '9999',
+    opacity: '0.85',
+    transform: 'translate(-50%, -50%)',
+  });
+  document.body.appendChild(img);
+  return img;
+}
+
+function moveDomGhost(ghost: HTMLImageElement, x: number, y: number) {
+  ghost.style.left = `${x}px`;
+  ghost.style.top = `${y}px`;
+}
+
+function removeDomGhost(ghost: HTMLImageElement | null) {
+  ghost?.remove();
+}
+
+export type StationDragDropCallback = (
+  stationId: number,
+  driverId: number
+) => void;
+
+/**
+ * Set up map-level station drag handlers.
+ * Long-press / mousedown on a station icon, drag to a driver icon, release to
+ * trigger `onDrop(stationId, driverId)`.
+ */
+export function setupStationDragHandlers(
+  map: MapboxMap,
+  onDrop: StationDragDropCallback,
+  onHighlight?: (stationId: number | null) => void
+) {
+  let dragging = false;
+  let stationId: number | null = null;
+  let originLngLat: [number, number] | null = null;
+  let startPoint: { x: number; y: number } | null = null;
+  let thresholdMet = false;
+  let hoveredDriverId: number | null = null;
+  let wasDragPanEnabled: boolean | null = null;
+  let domGhost: HTMLImageElement | null = null;
+
+  const stationLayers = [MapLayer.Stations, MapLayer.StationCircle];
+
+  function cleanup() {
+    dragging = false;
+    stationId = null;
+    originLngLat = null;
+    startPoint = null;
+    thresholdMet = false;
+    hoveredDriverId = null;
+    removeDomGhost(domGhost);
+    domGhost = null;
+    onHighlight?.(null);
+    if (wasDragPanEnabled !== null) {
+      if (wasDragPanEnabled) {
+        map.dragPan.enable();
+      } else {
+        map.dragPan.disable();
+      }
+      wasDragPanEnabled = null;
+    }
+    map.getCanvas().style.cursor = '';
+  }
+
+  function onMouseDown(e: MapMouseEvent) {
+    const features = map.queryRenderedFeatures(e.point, {
+      layers: stationLayers,
+    });
+    if (!features || features.length === 0) return;
+
+    const feature = features[0];
+    const id = feature.properties?.id;
+    if (id === undefined) return;
+
+    stationId = Number(id);
+    onHighlight?.(stationId);
+    const coords = (feature.geometry as GeoJSON.Point).coordinates as [
+      number,
+      number,
+    ];
+    originLngLat = coords;
+    startPoint = { x: e.point.x, y: e.point.y };
+    dragging = true;
+    thresholdMet = false;
+    wasDragPanEnabled = map.dragPan.isEnabled();
+    if (wasDragPanEnabled) {
+      map.dragPan.disable();
+    }
+
+    // Don't prevent default click yet — wait for threshold
+    e.preventDefault();
+  }
+
+  function onMouseMove(e: MapMouseEvent) {
+    if (!dragging || !startPoint || !originLngLat) return;
+
+    const dx = e.point.x - startPoint.x;
+    const dy = e.point.y - startPoint.y;
+
+    if (!thresholdMet) {
+      if (Math.sqrt(dx * dx + dy * dy) < DRAG_THRESHOLD) return;
+      thresholdMet = true;
+      map.getCanvas().style.cursor = 'grabbing';
+      // Create the DOM ghost so it floats above sidebar/overlays
+      domGhost = createDomGhost();
+    }
+
+    // Move the DOM ghost to follow the cursor
+    const rect = map.getCanvas().getBoundingClientRect();
+    if (domGhost) {
+      moveDomGhost(domGhost, rect.left + e.point.x, rect.top + e.point.y);
+    }
+
+    // Check if hovering over a driver
+    const features = map.queryRenderedFeatures(e.point, {
+      layers: [MapLayer.Resources],
+    });
+    const newHoveredId =
+      features && features.length > 0
+        ? Number(features[0].properties?.id)
+        : null;
+
+    if (newHoveredId !== hoveredDriverId) {
+      hoveredDriverId = newHoveredId;
+      map.getCanvas().style.cursor =
+        hoveredDriverId !== null ? 'copy' : 'grabbing';
+    }
+  }
+
+  function findResourceIdAtPoint(x: number, y: number): number | null {
+    const el = document.elementFromPoint(x, y);
+    if (!el) return null;
+    const resourceEl = (el as HTMLElement).closest?.('[data-resource-id]');
+    if (!resourceEl) return null;
+    const id = Number(resourceEl.getAttribute('data-resource-id'));
+    return Number.isNaN(id) ? null : id;
+  }
+
+  function onWindowMouseMove(e: MouseEvent) {
+    if (!dragging || !thresholdMet) return;
+    if (domGhost) {
+      moveDomGhost(domGhost, e.clientX, e.clientY);
+    }
+  }
+
+  function onMouseUp(e: MapMouseEvent) {
+    if (!dragging) return;
+
+    if (thresholdMet && stationId !== null) {
+      // Check for a driver under the cursor
+      const features = map.queryRenderedFeatures(e.point, {
+        layers: [MapLayer.Resources],
+      });
+
+      if (features && features.length > 0) {
+        const driverId = Number(features[0].properties?.id);
+        if (!Number.isNaN(driverId)) {
+          onDrop(stationId, driverId);
+        }
+      }
+    }
+
+    cleanup();
+  }
+
+  // Bind handlers to station layers for mousedown, and globally for move/up
+  stationLayers.forEach((layer) => {
+    map.on('mousedown', layer, onMouseDown);
+  });
+  map.on('mousemove', onMouseMove);
+  map.on('mouseup', onMouseUp);
+
+  function onWindowMouseUp(e: MouseEvent) {
+    if (!dragging) return;
+    const target = e.target as Node | null;
+    // If released inside the map canvas, let onMouseUp handle it
+    if (target && map.getCanvas().contains(target)) return;
+
+    // Check if released over a sidebar resource item
+    if (thresholdMet && stationId !== null) {
+      const resourceId = findResourceIdAtPoint(e.clientX, e.clientY);
+      if (resourceId !== null) {
+        onDrop(stationId, resourceId);
+      }
+    }
+
+    cleanup();
+  }
+
+  window.addEventListener('mouseup', onWindowMouseUp);
+  window.addEventListener('mousemove', onWindowMouseMove);
+
+  return () => {
+    stationLayers.forEach((layer) => {
+      map.off('mousedown', layer, onMouseDown);
+    });
+    map.off('mousemove', onMouseMove);
+    map.off('mouseup', onMouseUp);
+    window.removeEventListener('mouseup', onWindowMouseUp);
+    window.removeEventListener('mousemove', onWindowMouseMove);
+    cleanup();
+  };
+}

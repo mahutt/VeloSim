@@ -110,6 +110,7 @@ vi.mock('~/lib/map-interactions.ts', () => {
     setupMapClickHandlers: vi.fn(),
     setupMapHoverHandlers: vi.fn(),
     setupMapDropHandlers: vi.fn(),
+    setupStationDragHandlers: vi.fn(),
   };
 });
 

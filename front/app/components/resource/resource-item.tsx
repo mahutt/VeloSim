@@ -129,6 +129,7 @@ export function ResourceItem({
 
   return (
     <Item
+      data-resource-id={resource.id}
       onClick={onSelect}
       onDragOver={handleDragOver}
       onDrop={handleDropOnResource}

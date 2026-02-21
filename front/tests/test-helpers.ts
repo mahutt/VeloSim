@@ -130,5 +130,7 @@ export function makeSimulationContext(
     startTime: overrides.startTime ?? 0,
     simulationSecondsPassed: overrides.simulationSecondsPassed ?? 0,
     scrubSimulationSecond: overrides.scrubSimulationSecond ?? 0,
+    updateHoverState: overrides.updateHoverState ?? vi.fn(),
+    setHoverLocked: overrides.setHoverLocked ?? vi.fn(),
   };
 }
