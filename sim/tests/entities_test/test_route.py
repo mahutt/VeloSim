@@ -29,7 +29,7 @@ from typing import List
 from unittest.mock import Mock
 from shapely.geometry import LineString
 
-from sim.entities.route import Route, map_index_forward, find_nearest_index
+from sim.entities.route import Route
 from sim.entities.road import Road
 from sim.entities.position import Position
 from sim.entities.traffic_data import TrafficRange
@@ -2224,60 +2224,60 @@ class TestMapIndexForward:
     def test_basic_forward_mapping(self):
         """Test basic ratio-based mapping."""
         # 78% through (index 7 of 10), maps to index 3 of 4 (100% - ceil)
-        assert map_index_forward(7, 10, 4) == 3
+        assert Route.map_index_forward(7, 10, 4) == 3
 
     def test_exact_progress_mapping(self):
         """Test mapping when progress is exactly representable."""
         # 50% through (index 4 of 9), maps to index 2 of 5 (50% exactly)
         # progress = 4/8 = 0.5, ceil(0.5 * 4) = ceil(2.0) = 2
-        assert map_index_forward(4, 9, 5) == 2
+        assert Route.map_index_forward(4, 9, 5) == 2
 
     def test_uses_ceil_for_forward_only(self):
         """Test that ceil() is used to ensure forward-only progress."""
         # 33% through (index 3 of 10), would round to 1 but ceil gives 2
         # progress = 3/9 = 0.333, ceil(0.333 * 3) = ceil(1.0) = 1
-        assert map_index_forward(3, 10, 4) == 1
+        assert Route.map_index_forward(3, 10, 4) == 1
 
         # 44% through (index 4 of 10), round would give 1, ceil gives 2
         # progress = 4/9 = 0.444, ceil(0.444 * 3) = ceil(1.33) = 2
-        assert map_index_forward(4, 10, 4) == 2
+        assert Route.map_index_forward(4, 10, 4) == 2
 
     def test_at_start(self):
         """Test mapping at the start of the route."""
-        assert map_index_forward(0, 10, 4) == 0
+        assert Route.map_index_forward(0, 10, 4) == 0
 
     def test_at_end(self):
         """Test mapping at the end of the route."""
-        assert map_index_forward(9, 10, 4) == 3
+        assert Route.map_index_forward(9, 10, 4) == 3
 
     def test_beyond_bounds_clamps_to_max(self):
         """Test that index beyond bounds is clamped to max."""
         # Index 15 in a 10-point collection, mapping to 4 points
         # progress = 15/9 = 1.67, ceil(1.67 * 3) = ceil(5.0) = 5
         # But clamped to max valid index 3
-        assert map_index_forward(15, 10, 4) == 3
+        assert Route.map_index_forward(15, 10, 4) == 3
 
     def test_single_point_old_collection(self):
         """Test fallback when old collection has single point."""
-        assert map_index_forward(0, 1, 4) == 0
-        assert map_index_forward(5, 1, 4) == 3  # Clamps to max
+        assert Route.map_index_forward(0, 1, 4) == 0
+        assert Route.map_index_forward(5, 1, 4) == 3  # Clamps to max
 
     def test_single_point_new_collection(self):
         """Test fallback when new collection has single point."""
-        assert map_index_forward(5, 10, 1) == 0
-        assert map_index_forward(0, 10, 1) == 0
+        assert Route.map_index_forward(5, 10, 1) == 0
+        assert Route.map_index_forward(0, 10, 1) == 0
 
     def test_same_size_collections(self):
         """Test mapping between same-sized collections."""
-        assert map_index_forward(5, 10, 10) == 5
-        assert map_index_forward(0, 10, 10) == 0
-        assert map_index_forward(9, 10, 10) == 9
+        assert Route.map_index_forward(5, 10, 10) == 5
+        assert Route.map_index_forward(0, 10, 10) == 0
+        assert Route.map_index_forward(9, 10, 10) == 9
 
     def test_larger_new_collection(self):
         """Test mapping to a larger collection."""
         # 50% through (index 2 of 5), maps to 50% of 10 = index 5
         # progress = 2/4 = 0.5, ceil(0.5 * 9) = ceil(4.5) = 5
-        assert map_index_forward(2, 5, 10) == 5
+        assert Route.map_index_forward(2, 5, 10) == 5
 
 
 class TestFindNearestIndex:
@@ -2290,7 +2290,7 @@ class TestFindNearestIndex:
             Position([-73.57, 45.50]),
             Position([-73.56, 45.51]),
         ]
-        assert find_nearest_index(points, Position([-73.57, 45.50])) == 1
+        assert Route.find_nearest_index(points, Position([-73.57, 45.50])) == 1
 
     def test_nearest_to_middle(self) -> None:
         """Target between two points selects the closer one."""
@@ -2301,7 +2301,7 @@ class TestFindNearestIndex:
             Position([3.0, 0.0]),
         ]
         # Closest to (1.1, 0.0) is index 1 at (1.0, 0.0)
-        assert find_nearest_index(points, Position([1.1, 0.0])) == 1
+        assert Route.find_nearest_index(points, Position([1.1, 0.0])) == 1
 
     def test_nearest_to_start(self) -> None:
         """Target near the start selects index 0."""
@@ -2310,7 +2310,7 @@ class TestFindNearestIndex:
             Position([10.0, 0.0]),
             Position([20.0, 0.0]),
         ]
-        assert find_nearest_index(points, Position([0.1, 0.0])) == 0
+        assert Route.find_nearest_index(points, Position([0.1, 0.0])) == 0
 
     def test_nearest_to_end(self) -> None:
         """Target near the end selects last index."""
@@ -2319,12 +2319,12 @@ class TestFindNearestIndex:
             Position([10.0, 0.0]),
             Position([20.0, 0.0]),
         ]
-        assert find_nearest_index(points, Position([19.9, 0.0])) == 2
+        assert Route.find_nearest_index(points, Position([19.9, 0.0])) == 2
 
     def test_single_point(self) -> None:
         """Single-point collection always returns 0."""
         points = [Position([5.0, 5.0])]
-        assert find_nearest_index(points, Position([99.0, 99.0])) == 0
+        assert Route.find_nearest_index(points, Position([99.0, 99.0])) == 0
 
     def test_non_uniform_distribution(self) -> None:
         """Non-uniform spacing (like traffic-affected roads) finds correct point.
@@ -2345,6 +2345,6 @@ class TestFindNearestIndex:
             Position([140.0, 0.0]),  # 6: 140m
         ]
         # Driver at ~50m — should get index 1, not a ratio-mapped index
-        assert find_nearest_index(points, Position([52.0, 0.0])) == 1
+        assert Route.find_nearest_index(points, Position([52.0, 0.0])) == 1
         # Driver at ~100m — should get index 2 (traffic boundary)
-        assert find_nearest_index(points, Position([99.0, 0.0])) == 2
+        assert Route.find_nearest_index(points, Position([99.0, 0.0])) == 2

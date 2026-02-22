@@ -37,64 +37,6 @@ if TYPE_CHECKING:
     from sim.map.route_controller import RouteController
 
 
-def map_index_forward(current_idx: int, old_count: int, new_count: int) -> int:
-    """Map index from old collection to new, ensuring forward-only progress.
-
-    When traffic changes reduce the number of points mid-traversal, this function
-    maps the current index to the new collection such that the driver is placed
-    at or ahead of their current progress - never behind.
-
-    Uses ceil() to guarantee forward-only mapping.
-
-    Args:
-        current_idx: Current index in the old collection
-        old_count: Number of points in the old (original) collection
-        new_count: Number of points in the new (active) collection
-
-    Returns:
-        Mapped index in the new collection, guaranteed to represent
-        progress >= current progress. O(1) time complexity.
-
-    Example:
-        >>> map_index_forward(7, 10, 4)  # 78% through, maps to index 3 (100%)
-        3
-        >>> map_index_forward(3, 10, 4)  # 33% through, maps to index 1 (33%)
-        1
-    """
-    if old_count <= 1 or new_count <= 1:
-        return min(current_idx, new_count - 1)
-    progress = current_idx / (old_count - 1)
-    return min(math.ceil(progress * (new_count - 1)), new_count - 1)
-
-
-def find_nearest_index(points: list[Position], target: Position) -> int:
-    """Find the index of the point nearest to target in geographic space.
-
-    Used when traffic changes a road's pointcollection mid-traversal.
-    Geographic proximity prevents the position jump (rubber-banding) caused
-    by ratio-based mapping on non-uniform point distributions.
-
-    Args:
-        points: The new pointcollection to search.
-        target: The driver's last known geographic position.
-
-    Returns:
-        Index of the nearest point. O(n) — only called on traffic changes.
-    """
-    target_pos = target.get_position()
-    best_idx = 0
-    best_dist_sq = float("inf")
-    for i, pt in enumerate(points):
-        pos = pt.get_position()
-        dx = pos[0] - target_pos[0]
-        dy = pos[1] - target_pos[1]
-        dist_sq = dx * dx + dy * dy
-        if dist_sq < best_dist_sq:
-            best_dist_sq = dist_sq
-            best_idx = i
-    return best_idx
-
-
 class Route:
     """
     Owns a list of roads, which contain a list of positions.
@@ -105,6 +47,64 @@ class Route:
     """
 
     _route_counter = 0  # Unique ID generation.
+
+    @staticmethod
+    def map_index_forward(current_idx: int, old_count: int, new_count: int) -> int:
+        """Map index from old collection to new, ensuring forward-only progress.
+
+        When traffic changes reduce the number of points mid-traversal, this function
+        maps the current index to the new collection such that the driver is placed
+        at or ahead of their current progress - never behind.
+
+        Uses ceil() to guarantee forward-only mapping.
+
+        Args:
+            current_idx: Current index in the old collection
+            old_count: Number of points in the old (original) collection
+            new_count: Number of points in the new (active) collection
+
+        Returns:
+            Mapped index in the new collection, guaranteed to represent
+            progress >= current progress. O(1) time complexity.
+
+        Example:
+            >>> Route.map_index_forward(7, 10, 4)  # 78% through, maps to index 3 (100%)
+            3
+            >>> Route.map_index_forward(3, 10, 4)  # 33% through, maps to index 1 (33%)
+            1
+        """
+        if old_count <= 1 or new_count <= 1:
+            return min(current_idx, new_count - 1)
+        progress = current_idx / (old_count - 1)
+        return min(math.ceil(progress * (new_count - 1)), new_count - 1)
+
+    @staticmethod
+    def find_nearest_index(points: list[Position], target: Position) -> int:
+        """Find the index of the point nearest to target in geographic space.
+
+        Used when traffic changes a road's pointcollection mid-traversal.
+        Geographic proximity prevents the position jump (rubber-banding) caused
+        by ratio-based mapping on non-uniform point distributions.
+
+        Args:
+            points: The new pointcollection to search.
+            target: The driver's last known geographic position.
+
+        Returns:
+            Index of the nearest point. O(n) — only called on traffic changes.
+        """
+        target_pos = target.get_position()
+        best_idx = 0
+        best_dist_sq = float("inf")
+        for i, pt in enumerate(points):
+            pos = pt.get_position()
+            dx = pos[0] - target_pos[0]
+            dy = pos[1] - target_pos[1]
+            dist_sq = dx * dx + dy * dy
+            if dist_sq < best_dist_sq:
+                best_dist_sq = dist_sq
+                best_idx = i
+        return best_idx
 
     def __init__(
         self,
@@ -258,11 +258,11 @@ class Route:
             if self._last_returned_position is not None:
                 current_road = self.roads[self.current_road_index]
                 active_points = current_road.active_pointcollection
-                self.current_point_index = find_nearest_index(
+                self.current_point_index = Route.find_nearest_index(
                     active_points, self._last_returned_position
                 )
             else:
-                self.current_point_index = map_index_forward(
+                self.current_point_index = Route.map_index_forward(
                     self.current_point_index,
                     self._last_point_count,
                     active_count,
