@@ -366,7 +366,7 @@ async function main() {
     console.log('\n[SETUP] Preparing traffic datasets...');
     console.log('[INFO] This will download the Montreal dataset and create the traffic csv');
     console.log('[INFO] This is a one-time setup and may take about 3-5 minutes')
-    try{
+    try {
       await runCommand('npm', ['run', 'traffic-csv']);
       console.log('[SUCCESS] Traffic datasets ready for use');
     } catch (error) {
@@ -377,7 +377,7 @@ async function main() {
 
     // Step 11: Get Traffic Templates
     console.log('\n[SETUP] Retrieving traffic templates...');
-    try{
+    try {
       await runCommand('npm', ['run', 'traffic-templates']);
        console.log('[SUCCESS] Retrieved all three traffic templates')
     } catch (error) {

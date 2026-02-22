@@ -80,8 +80,8 @@ try:
         "low_congestion": "1-iGTP1bzEaesItxF-SgXm8820DRs4u1M",
     }
 
-    for level, id in templates.items():
-        if not download_template(level, id):
+    for level, file_id in templates.items():
+        if not download_template(level, file_id):
             sys.exit(1)
 
 except Exception as e:

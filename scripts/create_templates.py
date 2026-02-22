@@ -75,7 +75,7 @@ def get_segment_coords(
     return (lon1, lat1), (lon2, lat2)
 
 
-def is_brigde_involved(segment_key: str) -> bool:
+def is_bridge_involved(segment_key: str) -> bool:
     """
     Determines if a segment is within a bridge box range.
 
@@ -134,7 +134,7 @@ def generate_template(
     Args:
         df: Original Montreal traffic dataframe
         level: Congestion level to generate the template on
-        shift_probability: Probability of a row having a new weight value
+        base_probability: Probability of a row having a new weight value
 
     Returns:
         A template dataset with the new affected weights
@@ -156,7 +156,7 @@ def generate_template(
         if np.random.random() > final_prob:
             return row["weight"]
 
-        is_bridge = is_brigde_involved(row["segment_key"])
+        is_bridge = is_bridge_involved(row["segment_key"])
 
         new_weight = np.random.uniform(low_bound, high_bound)
         if is_bridge:

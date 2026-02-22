@@ -258,8 +258,19 @@ class TrafficParser:
 
         return (lon1, lat1), (lon2, lat2)
 
-    def _template_path_from_level(self, level: str) -> Optional[str]:
-        # check if path exists -> return path
+    def _template_path_from_level(self, level: str) -> str:
+        """
+        Determines the traffic template path according to the provided level.
+
+        Args:
+            level: Traffic level selected
+
+        Returns:
+            String path to the selected traffic template.
+
+        Raises:
+            ValueError if the provided level is unsupporteds.
+        """
         if level == "default":
             path = "sim/traffic/traffic_datasets/traffic.csv"
         elif level in self.TEMPLATES:
