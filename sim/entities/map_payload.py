@@ -39,7 +39,7 @@ class TrafficConfig:
         sim_end_time: End time of simulation.
     """
 
-    traffic_level: str = ""
+    traffic_level: str = "default"
     sim_start_time: str = field(default="day1:00:00")
     sim_end_time: str = field(default="day1:00:00")
 

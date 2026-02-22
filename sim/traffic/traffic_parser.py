@@ -260,8 +260,8 @@ class TrafficParser:
 
     def _template_path_from_level(self, level: str) -> Optional[str]:
         # check if path exists -> return path
-        if level == "":
-            path = ""  # default traffic setting
+        if level == "default":
+            path = "sim/traffic/traffic_datasets/traffic.csv"
         elif level in self.TEMPLATES:
             path = f"sim/traffic/traffic_datasets/{level}.csv"
         else:
