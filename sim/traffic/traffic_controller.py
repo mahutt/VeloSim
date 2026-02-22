@@ -472,7 +472,7 @@ class TrafficController:
     def _notify_routes_for_road(self, road: Road) -> None:
         """Notify all routes using this road to rebuild their traffic triples."""
         for route in self._route_controller.get_routes_for_road(road):
-            route.notify_traffic_changed(road)
+            route.notify_traffic_changed()
 
     # =========================================================================
     # Legacy / Manual Traffic API (backward compatible)

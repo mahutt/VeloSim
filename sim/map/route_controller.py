@@ -167,7 +167,7 @@ class RouteController:
         # applies traffic to the road but can't notify the route (it doesn't
         # exist yet). So we do a one-time cache build here.
         if any(road.get_traffic_geometry_ranges() for road in roads):
-            route.notify_traffic_changed(roads[0])
+            route.notify_traffic_changed()
 
         return route
 

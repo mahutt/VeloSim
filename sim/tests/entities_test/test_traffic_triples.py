@@ -93,7 +93,7 @@ def _apply_traffic(
 ) -> None:
     """Apply traffic to a road and notify its route (mirrors TrafficController)."""
     road.apply_traffic_for_overlap(overlap, multiplier, seg_key)
-    route.notify_traffic_changed(road)
+    route.notify_traffic_changed()
 
 
 # ── TrafficTriple Tests ─────────────────────────────────────────────
@@ -340,7 +340,7 @@ class TestRouteGetTrafficTriples:
 
         # Remove traffic and notify
         road.remove_traffic(seg_key)
-        route.notify_traffic_changed(road)
+        route.notify_traffic_changed()
         assert route.get_traffic_triples() == []
 
 

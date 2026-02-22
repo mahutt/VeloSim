@@ -377,15 +377,11 @@ class Route:
         """
         return self._traffic_triples_cache
 
-    def notify_traffic_changed(self, road: Road) -> None:
+    def notify_traffic_changed(self) -> None:
         """Rebuild cached traffic triples after a road's traffic changed.
 
         Called by TrafficController when traffic is applied/removed on a road
         belonging to this route. Rebuilds the full triple list from all roads.
-
-        Args:
-            road: The road whose traffic state changed (used for logging only;
-                the rebuild walks all roads).
 
         Returns:
             None
