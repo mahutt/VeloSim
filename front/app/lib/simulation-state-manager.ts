@@ -201,6 +201,11 @@ export default class SimulationStateManager implements SimulationStateManagerInt
 
   public setTask(task: StationTask) {
     this.tasks.set(task.id, task);
+
+    if (this.selectedItem && this.selectedItem.taskIds.includes(task.id)) {
+      this.setSelectedItem(this.selectedItem);
+    }
+
     this.setMapShouldRefresh(true);
   }
 

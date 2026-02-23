@@ -89,6 +89,16 @@ export interface InitializeSimulationResponse {
   status: string;
 }
 
+export interface BatchAssignTasksToDriverResponse {
+  items: BatchAssignTasksToDriverResponseItem[];
+}
+
+export interface BatchAssignTasksToDriverResponseItem {
+  driver_id: number;
+  task_id: number;
+  success: boolean;
+}
+
 // GBFS Response Types
 
 export interface GBFSStationInformationResponse {

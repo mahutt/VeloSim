@@ -281,7 +281,7 @@ describe('SimulationEngine', () => {
           driverId: driver.id,
           driverName: driver.name,
           driverBatteryCount: vehicle.batteryCount,
-          reassignCount: 2,
+          reassignCount: 0,
           unassignedTaskIds: [1, 2],
         })
       );

@@ -142,10 +142,14 @@ function StationTasks({ station }: { station: PopulatedStation }) {
             getDragTaskIds={() =>
               selectedTaskIds.includes(task.id) ? selectedTaskIds : [task.id]
             }
-            onUnassign={() => {
-              if (!task.assignedDriverId) return;
-              engine.requestUnassignment(task.assignedDriverId, task.id);
-            }}
+            onUnassign={
+              task.assignedDriverId
+                ? () => {
+                    if (!task.assignedDriverId) return;
+                    engine.requestUnassignment(task.assignedDriverId, task.id);
+                  }
+                : undefined
+            }
           />
         );
       })}
