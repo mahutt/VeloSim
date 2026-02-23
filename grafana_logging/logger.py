@@ -90,6 +90,10 @@ class LokiHandler(logging.Handler):
                 labels["user_id"] = str(record.user_id)
             if hasattr(record, "context"):
                 labels["context"] = record.context
+            if hasattr(record, "entity_type"):
+                labels["entity_type"] = record.entity_type
+            if hasattr(record, "error_type"):
+                labels["error_type"] = record.error_type
 
             # Format the log message
             message = self.format(record)

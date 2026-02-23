@@ -210,6 +210,8 @@ def test_loki_handler_emit_includes_extra_labels() -> None:
         record.source = "frontend"
         record.user_id = 123
         record.context = "login"
+        record.entity_type = "station"
+        record.error_type = "MISSING_ENTITY_DATA"
 
         handler.emit(record)
 
@@ -219,6 +221,8 @@ def test_loki_handler_emit_includes_extra_labels() -> None:
         assert labels["source"] == "frontend"
         assert labels["user_id"] == "123"
         assert labels["context"] == "login"
+        assert labels["entity_type"] == "station"
+        assert labels["error_type"] == "MISSING_ENTITY_DATA"
 
 
 def test_loki_handler_emit_handles_errors_gracefully() -> None:
