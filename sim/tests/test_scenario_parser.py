@@ -41,50 +41,46 @@ def test_base_parse_strategy_is_abstract() -> None:
 
 def test_json_parse_strategy_valid_input() -> None:
     scenario_json = {
-        "id": 1,
-        "name": "Test Scenario",
-        "content": {
-            "start_time": "day1:08:00",
-            "end_time": "day1:12:00",
-            "vehicle_battery_capacity": 999,
-            "stations": [
-                {
-                    "name": "Station 1",
-                    "initial_task_count": 2,
-                    "scheduled_tasks": ["day1:09:30"],
-                    "position": [-73.5, 45.5],
+        "start_time": "day1:08:00",
+        "end_time": "day1:12:00",
+        "vehicle_battery_capacity": 999,
+        "stations": [
+            {
+                "name": "Station 1",
+                "initial_task_count": 2,
+                "scheduled_tasks": ["day1:09:30"],
+                "position": [-73.5, 45.5],
+            },
+            {
+                "name": "Station 2",
+                "initial_task_count": 0,
+                "scheduled_tasks": ["day1:09:30"],
+                "position": [-73.55, 45.501],
+            },
+            {
+                "name": "Station 3",
+                "initial_task_count": 0,
+                "scheduled_tasks": [],
+                "position": [-73.56, 45.511],
+            },
+        ],
+        "drivers": [
+            {
+                "name": "Driver 1",
+                "shift": {
+                    "start_time": "day1:08:00",
+                    "end_time": "day1:12:00",
+                    "lunch_break": "day1:10:00",
                 },
-                {
-                    "name": "Station 2",
-                    "initial_task_count": 0,
-                    "scheduled_tasks": ["day1:09:30"],
-                    "position": [-73.55, 45.501],
-                },
-                {
-                    "name": "Station 3",
-                    "initial_task_count": 0,
-                    "scheduled_tasks": [],
-                    "position": [-73.56, 45.511],
-                },
-            ],
-            "drivers": [
-                {
-                    "name": "Driver 1",
-                    "shift": {
-                        "start_time": "day1:08:00",
-                        "end_time": "day1:12:00",
-                        "lunch_break": "day1:10:00",
-                    },
-                }
-            ],
-            "vehicles": [
-                {
-                    "name": "Vehicle 1",
-                    "position": [-73.5610, 45.5070],
-                    "battery_count": 999,
-                }
-            ],
-        },
+            }
+        ],
+        "vehicles": [
+            {
+                "name": "Vehicle 1",
+                "position": [-73.5610, 45.5070],
+                "battery_count": 999,
+            }
+        ],
     }
 
     strategy = JsonParseStrategy(scenario_json=scenario_json)
@@ -119,70 +115,66 @@ def test_json_parse_strategy_invalid_json() -> None:
     strategy = JsonParseStrategy(
         scenario_json="string_instead_of_dict"  # type: ignore[arg-type]
     )
-    with pytest.raises((AttributeError, ValueError)):
+    with pytest.raises((AttributeError, ValueError, TypeError)):
         strategy.parse()
 
 
 def test_json_parse_strategy_with_invalid_time() -> None:
     """Test that invalid time formats now raise ScenarioParseError."""
     scenario_json_with_bad_time_format = {
-        "id": 1,
-        "name": "Test Scenario",
-        "content": {
-            "start_time": "day1:00:00",
-            "end_time": "day2:01",  # invalid time format
-            "vehicle_battery_capacity": 999,
-            "stations": [
-                {
-                    "name": "Lionel-Groulx",
-                    "position": [-73.58, 45.48],
-                    "initial_task_count": 1,
-                    "scheduled_tasks": [],
+        "start_time": "day1:00:00",
+        "end_time": "day2:01",  # invalid time format
+        "vehicle_battery_capacity": 999,
+        "stations": [
+            {
+                "name": "Lionel-Groulx",
+                "position": [-73.58, 45.48],
+                "initial_task_count": 1,
+                "scheduled_tasks": [],
+            },
+            {
+                "name": "Guy-Concordia",
+                "position": [-73.57, 45.49],
+                "initial_task_count": 0,
+                "scheduled_tasks": ["day1:05:00"],
+            },
+            {
+                "name": "Peel",
+                "position": [-73.57, 45.50],
+                "initial_task_count": 0,
+                "scheduled_tasks": ["day1:08:00"],
+            },
+        ],
+        "vehicles": [
+            {
+                "name": "Vehicle 1",
+                "position": [-73.5610, 45.5070],
+                "battery_count": 999,
+            },
+            {
+                "name": "Vehicle 2",
+                "position": [-73.5670, 45.5090],
+                "battery_count": 999,
+            },
+        ],
+        "drivers": [
+            {
+                "name": "Driver 1",
+                "shift": {
+                    "start_time": "day1:00:00",
+                    "end_time": "day1:12:00",
+                    "lunch_break": "day1:06:00",
                 },
-                {
-                    "name": "Guy-Concordia",
-                    "position": [-73.57, 45.49],
-                    "initial_task_count": 0,
-                    "scheduled_tasks": ["day1:05:00"],
+            },
+            {
+                "name": "Driver 2",
+                "shift": {
+                    "start_time": "day1:00:00",
+                    "end_time": "day1:12:00",
+                    "lunch_break": "day1:06:00",
                 },
-                {
-                    "name": "Peel",
-                    "position": [-73.57, 45.50],
-                    "initial_task_count": 0,
-                    "scheduled_tasks": ["day1:08:00"],
-                },
-            ],
-            "vehicles": [
-                {
-                    "name": "Vehicle 1",
-                    "position": [-73.5610, 45.5070],
-                    "battery_count": 999,
-                },
-                {
-                    "name": "Vehicle 2",
-                    "position": [-73.5670, 45.5090],
-                    "battery_count": 999,
-                },
-            ],
-            "drivers": [
-                {
-                    "name": "Driver 1",
-                    "shift": {
-                        "start_time": "day1:00:00",
-                        "end_time": "day1:12:00",
-                        "lunch_break": "day1:06:00",
-                    },
-                },
-                {
-                    "name": "Driver 2",
-                    "shift": {
-                        "start_time": "day1:00:00",
-                        "end_time": "day1:12:00",
-                        "lunch_break": "day1:06:00",
-                    },
-                },
-            ],
-        },
+            },
+        ],
     }
 
     strategy = JsonParseStrategy(scenario_json=scenario_json_with_bad_time_format)
@@ -196,46 +188,42 @@ def test_json_parse_strategy_with_invalid_time() -> None:
 
 def test_json_parse_with_no_lunch_break_and_long_shift() -> None:
     scenario_json = {
-        "id": 1,
-        "name": "Test Scenario",
-        "content": {
-            "start_time": "day1:08:00",
-            "end_time": "day1:12:00",
-            "vehicle_battery_capacity": 50,
-            "stations": [
-                {
-                    "name": "Station 1",
-                    "initial_task_count": 2,
-                    "scheduled_tasks": ["day1:09:30"],
-                    "position": [-73.5, 45.5],
-                },
-                {
-                    "name": "Station 2",
-                    "initial_task_count": 0,
-                    "scheduled_tasks": ["day1:09:30"],
-                    "position": [-73.55, 45.501],
-                },
-                {
-                    "name": "Station 3",
-                    "initial_task_count": 0,
-                    "scheduled_tasks": [],
-                    "position": [-73.56, 45.511],
-                },
-            ],
-            "drivers": [
-                {
-                    "name": "Driver 1",
-                    "shift": {"start_time": "day1:07:00", "end_time": "day1:15:00"},
-                }
-            ],
-            "vehicles": [
-                {
-                    "name": "Vehicle 1",
-                    "position": [-73.5610, 45.5070],
-                    "battery_count": 20,
-                }
-            ],
-        },
+        "start_time": "day1:08:00",
+        "end_time": "day1:12:00",
+        "vehicle_battery_capacity": 50,
+        "stations": [
+            {
+                "name": "Station 1",
+                "initial_task_count": 2,
+                "scheduled_tasks": ["day1:09:30"],
+                "position": [-73.5, 45.5],
+            },
+            {
+                "name": "Station 2",
+                "initial_task_count": 0,
+                "scheduled_tasks": ["day1:09:30"],
+                "position": [-73.55, 45.501],
+            },
+            {
+                "name": "Station 3",
+                "initial_task_count": 0,
+                "scheduled_tasks": [],
+                "position": [-73.56, 45.511],
+            },
+        ],
+        "drivers": [
+            {
+                "name": "Driver 1",
+                "shift": {"start_time": "day1:07:00", "end_time": "day1:15:00"},
+            }
+        ],
+        "vehicles": [
+            {
+                "name": "Vehicle 1",
+                "position": [-73.5610, 45.5070],
+                "battery_count": 20,
+            }
+        ],
     }
 
     strategy = JsonParseStrategy(scenario_json=scenario_json)
@@ -258,46 +246,42 @@ def test_json_parse_with_no_lunch_break_and_long_shift() -> None:
 
 def test_json_parse_with_lunch_break_assigned_before_sim_time() -> None:
     scenario_json = {
-        "id": 1,
-        "name": "Test Scenario",
-        "content": {
-            "start_time": "day1:12:00",
-            "end_time": "day1:16:00",
-            "vehicle_battery_capacity": 50,
-            "stations": [
-                {
-                    "name": "Station 1",
-                    "initial_task_count": 2,
-                    "scheduled_tasks": ["day1:09:30"],
-                    "position": [-73.5, 45.5],
-                },
-                {
-                    "name": "Station 2",
-                    "initial_task_count": 0,
-                    "scheduled_tasks": ["day1:09:30"],
-                    "position": [-73.55, 45.501],
-                },
-                {
-                    "name": "Station 3",
-                    "initial_task_count": 0,
-                    "scheduled_tasks": [],
-                    "position": [-73.56, 45.511],
-                },
-            ],
-            "drivers": [
-                {
-                    "name": "Driver 1",
-                    "shift": {"start_time": "day1:08:00", "end_time": "day1:14:00"},
-                }
-            ],
-            "vehicles": [
-                {
-                    "name": "Vehicle 1",
-                    "position": [-73.5610, 45.5070],
-                    "battery_count": 20,
-                }
-            ],
-        },
+        "start_time": "day1:12:00",
+        "end_time": "day1:16:00",
+        "vehicle_battery_capacity": 50,
+        "stations": [
+            {
+                "name": "Station 1",
+                "initial_task_count": 2,
+                "scheduled_tasks": ["day1:09:30"],
+                "position": [-73.5, 45.5],
+            },
+            {
+                "name": "Station 2",
+                "initial_task_count": 0,
+                "scheduled_tasks": ["day1:09:30"],
+                "position": [-73.55, 45.501],
+            },
+            {
+                "name": "Station 3",
+                "initial_task_count": 0,
+                "scheduled_tasks": [],
+                "position": [-73.56, 45.511],
+            },
+        ],
+        "drivers": [
+            {
+                "name": "Driver 1",
+                "shift": {"start_time": "day1:08:00", "end_time": "day1:14:00"},
+            }
+        ],
+        "vehicles": [
+            {
+                "name": "Vehicle 1",
+                "position": [-73.5610, 45.5070],
+                "battery_count": 20,
+            }
+        ],
     }
 
     strategy = JsonParseStrategy(scenario_json=scenario_json)
@@ -319,46 +303,42 @@ def test_json_parse_with_lunch_break_assigned_before_sim_time() -> None:
 
 def test_json_parse_with_no_lunch_break_and_short_shift() -> None:
     scenario_json = {
-        "id": 1,
-        "name": "Test Scenario",
-        "content": {
-            "start_time": "day1:08:00",
-            "end_time": "day1:12:00",
-            "vehicle_battery_capacity": 50,
-            "stations": [
-                {
-                    "name": "Station 1",
-                    "initial_task_count": 2,
-                    "scheduled_tasks": ["day1:09:30"],
-                    "position": [-73.5, 45.5],
-                },
-                {
-                    "name": "Station 2",
-                    "initial_task_count": 0,
-                    "scheduled_tasks": ["day1:09:30"],
-                    "position": [-73.55, 45.501],
-                },
-                {
-                    "name": "Station 3",
-                    "initial_task_count": 0,
-                    "scheduled_tasks": [],
-                    "position": [-73.56, 45.511],
-                },
-            ],
-            "drivers": [
-                {
-                    "name": "Driver 1",
-                    "shift": {"start_time": "day1:08:00", "end_time": "day1:11:00"},
-                }
-            ],
-            "vehicles": [
-                {
-                    "name": "Vehicle 1",
-                    "position": [-73.5610, 45.5070],
-                    "battery_count": 20,
-                }
-            ],
-        },
+        "start_time": "day1:08:00",
+        "end_time": "day1:12:00",
+        "vehicle_battery_capacity": 50,
+        "stations": [
+            {
+                "name": "Station 1",
+                "initial_task_count": 2,
+                "scheduled_tasks": ["day1:09:30"],
+                "position": [-73.5, 45.5],
+            },
+            {
+                "name": "Station 2",
+                "initial_task_count": 0,
+                "scheduled_tasks": ["day1:09:30"],
+                "position": [-73.55, 45.501],
+            },
+            {
+                "name": "Station 3",
+                "initial_task_count": 0,
+                "scheduled_tasks": [],
+                "position": [-73.56, 45.511],
+            },
+        ],
+        "drivers": [
+            {
+                "name": "Driver 1",
+                "shift": {"start_time": "day1:08:00", "end_time": "day1:11:00"},
+            }
+        ],
+        "vehicles": [
+            {
+                "name": "Vehicle 1",
+                "position": [-73.5610, 45.5070],
+                "battery_count": 20,
+            }
+        ],
     }
 
     strategy = JsonParseStrategy(scenario_json=scenario_json)
@@ -375,46 +355,42 @@ def test_json_parse_with_no_lunch_break_and_short_shift() -> None:
 
 def test_json_parse_with_no_lunch_break_and_short_sim_duration() -> None:
     scenario_json = {
-        "id": 1,
-        "name": "Test Scenario",
-        "content": {
-            "start_time": "day1:08:00",
-            "end_time": "day1:08:30",
-            "vehicle_battery_capacity": 50,
-            "stations": [
-                {
-                    "name": "Station 1",
-                    "initial_task_count": 2,
-                    "scheduled_tasks": ["day1:08:05"],
-                    "position": [-73.5, 45.5],
-                },
-                {
-                    "name": "Station 2",
-                    "initial_task_count": 0,
-                    "scheduled_tasks": ["day1:08:10"],
-                    "position": [-73.55, 45.501],
-                },
-                {
-                    "name": "Station 3",
-                    "initial_task_count": 0,
-                    "scheduled_tasks": [],
-                    "position": [-73.56, 45.511],
-                },
-            ],
-            "drivers": [
-                {
-                    "name": "Driver 1",
-                    "shift": {"start_time": "day1:08:00", "end_time": "day1:11:00"},
-                }
-            ],
-            "vehicles": [
-                {
-                    "name": "Vehicle 1",
-                    "position": [-73.5610, 45.5070],
-                    "battery_count": 20,
-                }
-            ],
-        },
+        "start_time": "day1:08:00",
+        "end_time": "day1:08:30",
+        "vehicle_battery_capacity": 50,
+        "stations": [
+            {
+                "name": "Station 1",
+                "initial_task_count": 2,
+                "scheduled_tasks": ["day1:08:05"],
+                "position": [-73.5, 45.5],
+            },
+            {
+                "name": "Station 2",
+                "initial_task_count": 0,
+                "scheduled_tasks": ["day1:08:10"],
+                "position": [-73.55, 45.501],
+            },
+            {
+                "name": "Station 3",
+                "initial_task_count": 0,
+                "scheduled_tasks": [],
+                "position": [-73.56, 45.511],
+            },
+        ],
+        "drivers": [
+            {
+                "name": "Driver 1",
+                "shift": {"start_time": "day1:08:00", "end_time": "day1:11:00"},
+            }
+        ],
+        "vehicles": [
+            {
+                "name": "Vehicle 1",
+                "position": [-73.5610, 45.5070],
+                "battery_count": 20,
+            }
+        ],
     }
 
     strategy = JsonParseStrategy(scenario_json=scenario_json)

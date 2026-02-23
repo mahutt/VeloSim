@@ -453,9 +453,10 @@ class TestSimulationAPI:
         from back.schemas.sim_instance import SimulationResponse
 
         # Create a scenario in the database
+        # Database stores bare scenario content (not wrapped in {"content": ...})
         scenario = Scenario(
             name="Test Scenario",
-            content=SCENARIO_PAYLOAD,
+            content=SCENARIO_CONTENT,
             user_id=1,
         )
         db.add(scenario)
