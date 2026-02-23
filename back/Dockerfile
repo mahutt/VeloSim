@@ -25,6 +25,12 @@ RUN python -m pip install --upgrade pip setuptools wheel \
 # Copy remaining files into container.
 COPY scripts/ ./scripts
 
+# Download traffic dataset and generate base traffic.csv, then download
+# congestion-level templates from Google Drive.  Both scripts are
+# idempotent — they skip files that already exist on disk.
+RUN python scripts/traffic_to_csv.py \
+    && python scripts/retrieve_templates.py
+
 ENV PYTHONPATH=/app
 EXPOSE 8000
 CMD ["uvicorn", "back.main:app", "--host", "0.0.0.0", "--port", "8000"]
