@@ -23,9 +23,11 @@ SOFTWARE.
 """
 
 import os
+from pathlib import Path
 import tempfile
 
 import pytest
+from unittest.mock import patch
 
 from sim.entities.map_payload import TrafficConfig
 from sim.entities.traffic_event import TrafficEvent
@@ -151,25 +153,30 @@ class TestTrafficParser:
         )
         path = self._write_csv(csv_content)
         traffic_config = TrafficConfig(
-            traffic_path=path, sim_start_time="day1:08:00", sim_end_time="day1:12:00"
+            traffic_level="low_congestion",
+            sim_start_time="day1:08:00",
+            sim_end_time="day1:12:00",
         )
         try:
-            parser = TrafficParser(traffic_config)
-            events = parser.parse()
-            assert len(events) == 2
+            with patch.object(
+                TrafficParser, "_template_path_from_level", return_value=path
+            ):
+                parser = TrafficParser(traffic_config)
+                events = parser.parse()
+                assert len(events) == 2
 
-            assert events[0].event_type == "local_traffic"
-            assert events[0].tick_start == 300
-            assert events[0].name == "rush_hour"
-            assert events[0].duration == 50
-            assert events[0].weight == 0.3
-            assert events[0].state == TrafficEventState.PENDING
+                assert events[0].event_type == "local_traffic"
+                assert events[0].tick_start == 300
+                assert events[0].name == "rush_hour"
+                assert events[0].duration == 50
+                assert events[0].weight == 0.3
+                assert events[0].state == TrafficEventState.PENDING
 
-            assert events[1].tick_start == 3600
-            assert events[1].name is None
-            assert events[1].duration == 30
-            assert events[1].weight == 0.8
-            assert events[1].state == TrafficEventState.PENDING
+                assert events[1].tick_start == 3600
+                assert events[1].name is None
+                assert events[1].duration == 30
+                assert events[1].weight == 0.8
+                assert events[1].state == TrafficEventState.PENDING
         finally:
             os.unlink(path)
 
@@ -180,15 +187,20 @@ class TestTrafficParser:
         )
         path = self._write_csv(csv_content)
         traffic_config = TrafficConfig(
-            traffic_path=path, sim_start_time="day1:08:00", sim_end_time="day1:12:00"
+            traffic_level="low_congestion",
+            sim_start_time="day1:08:00",
+            sim_end_time="day1:12:00",
         )
         try:
-            parser = TrafficParser(traffic_config)
-            events = parser.parse()
-            assert len(events) == 1
-            assert events[0].tick_start == 0
-            assert events[0].name == "start_event"
-            assert events[0].weight == 0.5
+            with patch.object(
+                TrafficParser, "_template_path_from_level", return_value=path
+            ):
+                parser = TrafficParser(traffic_config)
+                events = parser.parse()
+                assert len(events) == 1
+                assert events[0].tick_start == 0
+                assert events[0].name == "start_event"
+                assert events[0].weight == 0.5
         finally:
             os.unlink(path)
 
@@ -196,34 +208,48 @@ class TestTrafficParser:
         csv_content = "TYPE,start_time,segment_key,name,duration,weight\n"
         path = self._write_csv(csv_content)
         traffic_config = TrafficConfig(
-            traffic_path=path, sim_start_time="day1:08:00", sim_end_time="day1:12:00"
+            traffic_level="low_congestion",
+            sim_start_time="day1:08:00",
+            sim_end_time="day1:12:00",
         )
         try:
-            parser = TrafficParser(traffic_config)
-            events = parser.parse()
-            assert len(events) == 0
+            with patch.object(
+                TrafficParser, "_template_path_from_level", return_value=path
+            ):
+                parser = TrafficParser(traffic_config)
+                events = parser.parse()
+                assert len(events) == 0
         finally:
             os.unlink(path)
 
     def test_file_not_found(self) -> None:
+        non_existent_path = "/nonexistent/path/traffic.csv"
         traffic_config = TrafficConfig(
-            traffic_path="/nonexistent/path/traffic.csv",
+            traffic_level="low_congestion",
             sim_start_time="day1:08:00",
             sim_end_time="day1:12:00",
         )
-        with pytest.raises(FileNotFoundError):
-            TrafficParser(traffic_config)
+        with patch.object(
+            TrafficParser, "_template_path_from_level", return_value=non_existent_path
+        ):
+            with pytest.raises(FileNotFoundError):
+                TrafficParser(traffic_config)
 
     def test_empty_csv_file(self) -> None:
         csv_content = ""
         path = self._write_csv(csv_content)
         traffic_config = TrafficConfig(
-            traffic_path=path, sim_start_time="day1:08:00", sim_end_time="day1:12:00"
+            traffic_level="low_congestion",
+            sim_start_time="day1:08:00",
+            sim_end_time="day1:12:00",
         )
         try:
-            parser = TrafficParser(traffic_config)
-            with pytest.raises(TrafficParseError, match="empty"):
-                parser.parse()
+            with patch.object(
+                TrafficParser, "_template_path_from_level", return_value=path
+            ):
+                parser = TrafficParser(traffic_config)
+                with pytest.raises(TrafficParseError, match="empty"):
+                    parser.parse()
         finally:
             os.unlink(path)
 
@@ -231,12 +257,17 @@ class TestTrafficParser:
         csv_content = "TYPE,start_time\n" 'local_traffic,"08:00"\n'
         path = self._write_csv(csv_content)
         traffic_config = TrafficConfig(
-            traffic_path=path, sim_start_time="day1:08:00", sim_end_time="day1:12:00"
+            traffic_level="low_congestion",
+            sim_start_time="day1:08:00",
+            sim_end_time="day1:12:00",
         )
         try:
-            parser = TrafficParser(traffic_config)
-            with pytest.raises(TrafficParseError, match="Missing required columns"):
-                parser.parse()
+            with patch.object(
+                TrafficParser, "_template_path_from_level", return_value=path
+            ):
+                parser = TrafficParser(traffic_config)
+                with pytest.raises(TrafficParseError, match="Missing required columns"):
+                    parser.parse()
         finally:
             os.unlink(path)
 
@@ -247,12 +278,17 @@ class TestTrafficParser:
         )
         path = self._write_csv(csv_content)
         traffic_config = TrafficConfig(
-            traffic_path=path, sim_start_time="day1:08:00", sim_end_time="day1:12:00"
+            traffic_level="low_congestion",
+            sim_start_time="day1:08:00",
+            sim_end_time="day1:12:00",
         )
         try:
-            parser = TrafficParser(traffic_config)
-            with pytest.raises(TrafficParseError, match="Unsupported TYPE"):
-                parser.parse()
+            with patch.object(
+                TrafficParser, "_template_path_from_level", return_value=path
+            ):
+                parser = TrafficParser(traffic_config)
+                with pytest.raises(TrafficParseError, match="Unsupported TYPE"):
+                    parser.parse()
         finally:
             os.unlink(path)
 
@@ -263,12 +299,17 @@ class TestTrafficParser:
         )
         path = self._write_csv(csv_content)
         traffic_config = TrafficConfig(
-            traffic_path=path, sim_start_time="day1:08:00", sim_end_time="day1:12:00"
+            traffic_level="low_congestion",
+            sim_start_time="day1:08:00",
+            sim_end_time="day1:12:00",
         )
         try:
-            parser = TrafficParser(traffic_config)
-            with pytest.raises(TrafficParseError, match="TYPE column is empty"):
-                parser.parse()
+            with patch.object(
+                TrafficParser, "_template_path_from_level", return_value=path
+            ):
+                parser = TrafficParser(traffic_config)
+                with pytest.raises(TrafficParseError, match="TYPE column is empty"):
+                    parser.parse()
         finally:
             os.unlink(path)
 
@@ -279,12 +320,17 @@ class TestTrafficParser:
         )
         path = self._write_csv(csv_content)
         traffic_config = TrafficConfig(
-            traffic_path=path, sim_start_time="day1:08:00", sim_end_time="day1:12:00"
+            traffic_level="low_congestion",
+            sim_start_time="day1:08:00",
+            sim_end_time="day1:12:00",
         )
         try:
-            parser = TrafficParser(traffic_config)
-            with pytest.raises(TrafficParseError, match="start_time is empty"):
-                parser.parse()
+            with patch.object(
+                TrafficParser, "_template_path_from_level", return_value=path
+            ):
+                parser = TrafficParser(traffic_config)
+                with pytest.raises(TrafficParseError, match="start_time is empty"):
+                    parser.parse()
         finally:
             os.unlink(path)
 
@@ -295,12 +341,17 @@ class TestTrafficParser:
         )
         path = self._write_csv(csv_content)
         traffic_config = TrafficConfig(
-            traffic_path=path, sim_start_time="day1:08:00", sim_end_time="day1:12:00"
+            traffic_level="low_congestion",
+            sim_start_time="day1:08:00",
+            sim_end_time="day1:12:00",
         )
         try:
-            parser = TrafficParser(traffic_config)
-            with pytest.raises(TrafficParseError):
-                parser.parse()
+            with patch.object(
+                TrafficParser, "_template_path_from_level", return_value=path
+            ):
+                parser = TrafficParser(traffic_config)
+                with pytest.raises(TrafficParseError):
+                    parser.parse()
         finally:
             os.unlink(path)
 
@@ -311,12 +362,17 @@ class TestTrafficParser:
         )
         path = self._write_csv(csv_content)
         traffic_config = TrafficConfig(
-            traffic_path=path, sim_start_time="day1:08:00", sim_end_time="day1:12:00"
+            traffic_level="low_congestion",
+            sim_start_time="day1:08:00",
+            sim_end_time="day1:12:00",
         )
         try:
-            parser = TrafficParser(traffic_config)
-            with pytest.raises(TrafficParseError, match="Invalid segment_key"):
-                parser.parse()
+            with patch.object(
+                TrafficParser, "_template_path_from_level", return_value=path
+            ):
+                parser = TrafficParser(traffic_config)
+                with pytest.raises(TrafficParseError, match="Invalid segment_key"):
+                    parser.parse()
         finally:
             os.unlink(path)
 
@@ -327,12 +383,17 @@ class TestTrafficParser:
         )
         path = self._write_csv(csv_content)
         traffic_config = TrafficConfig(
-            traffic_path=path, sim_start_time="day1:08:00", sim_end_time="day1:12:00"
+            traffic_level="low_congestion",
+            sim_start_time="day1:08:00",
+            sim_end_time="day1:12:00",
         )
         try:
-            parser = TrafficParser(traffic_config)
-            with pytest.raises(TrafficParseError, match="segment_key must be"):
-                parser.parse()
+            with patch.object(
+                TrafficParser, "_template_path_from_level", return_value=path
+            ):
+                parser = TrafficParser(traffic_config)
+                with pytest.raises(TrafficParseError, match="segment_key must be"):
+                    parser.parse()
         finally:
             os.unlink(path)
 
@@ -343,12 +404,17 @@ class TestTrafficParser:
         )
         path = self._write_csv(csv_content)
         traffic_config = TrafficConfig(
-            traffic_path=path, sim_start_time="day1:08:00", sim_end_time="day1:12:00"
+            traffic_level="low_congestion",
+            sim_start_time="day1:08:00",
+            sim_end_time="day1:12:00",
         )
         try:
-            parser = TrafficParser(traffic_config)
-            with pytest.raises(TrafficParseError, match="segment_key is empty"):
-                parser.parse()
+            with patch.object(
+                TrafficParser, "_template_path_from_level", return_value=path
+            ):
+                parser = TrafficParser(traffic_config)
+                with pytest.raises(TrafficParseError, match="segment_key is empty"):
+                    parser.parse()
         finally:
             os.unlink(path)
 
@@ -359,12 +425,19 @@ class TestTrafficParser:
         )
         path = self._write_csv(csv_content)
         traffic_config = TrafficConfig(
-            traffic_path=path, sim_start_time="day1:08:00", sim_end_time="day1:12:00"
+            traffic_level="low_congestion",
+            sim_start_time="day1:08:00",
+            sim_end_time="day1:12:00",
         )
         try:
-            parser = TrafficParser(traffic_config)
-            with pytest.raises(TrafficParseError, match="duration must be positive"):
-                parser.parse()
+            with patch.object(
+                TrafficParser, "_template_path_from_level", return_value=path
+            ):
+                parser = TrafficParser(traffic_config)
+                with pytest.raises(
+                    TrafficParseError, match="duration must be positive"
+                ):
+                    parser.parse()
         finally:
             os.unlink(path)
 
@@ -375,12 +448,19 @@ class TestTrafficParser:
         )
         path = self._write_csv(csv_content)
         traffic_config = TrafficConfig(
-            traffic_path=path, sim_start_time="day1:08:00", sim_end_time="day1:12:00"
+            traffic_level="low_congestion",
+            sim_start_time="day1:08:00",
+            sim_end_time="day1:12:00",
         )
         try:
-            parser = TrafficParser(traffic_config)
-            with pytest.raises(TrafficParseError, match="duration must be positive"):
-                parser.parse()
+            with patch.object(
+                TrafficParser, "_template_path_from_level", return_value=path
+            ):
+                parser = TrafficParser(traffic_config)
+                with pytest.raises(
+                    TrafficParseError, match="duration must be positive"
+                ):
+                    parser.parse()
         finally:
             os.unlink(path)
 
@@ -391,12 +471,19 @@ class TestTrafficParser:
         )
         path = self._write_csv(csv_content)
         traffic_config = TrafficConfig(
-            traffic_path=path, sim_start_time="day1:08:00", sim_end_time="day1:12:00"
+            traffic_level="low_congestion",
+            sim_start_time="day1:08:00",
+            sim_end_time="day1:12:00",
         )
         try:
-            parser = TrafficParser(traffic_config)
-            with pytest.raises(TrafficParseError, match="duration must be an integer"):
-                parser.parse()
+            with patch.object(
+                TrafficParser, "_template_path_from_level", return_value=path
+            ):
+                parser = TrafficParser(traffic_config)
+                with pytest.raises(
+                    TrafficParseError, match="duration must be an integer"
+                ):
+                    parser.parse()
         finally:
             os.unlink(path)
 
@@ -408,19 +495,24 @@ class TestTrafficParser:
         )
         path = self._write_csv(csv_content)
         traffic_config = TrafficConfig(
-            traffic_path=path, sim_start_time="day1:08:00", sim_end_time="day1:12:00"
+            traffic_level="low_congestion",
+            sim_start_time="day1:08:00",
+            sim_end_time="day1:12:00",
         )
         try:
-            parser = TrafficParser(traffic_config)
-            events = parser.parse()
-            key = events[0].segment_key
-            assert key == ((-73.5673, 45.5017), (-73.5680, 45.5020))
-            assert isinstance(key, tuple)
-            assert isinstance(key[0], tuple)
-            assert isinstance(key[1], tuple)
-            assert len(key) == 2
-            assert len(key[0]) == 2
-            assert len(key[1]) == 2
+            with patch.object(
+                TrafficParser, "_template_path_from_level", return_value=path
+            ):
+                parser = TrafficParser(traffic_config)
+                events = parser.parse()
+                key = events[0].segment_key
+                assert key == ((-73.5673, 45.5017), (-73.5680, 45.5020))
+                assert isinstance(key, tuple)
+                assert isinstance(key[0], tuple)
+                assert isinstance(key[1], tuple)
+                assert len(key) == 2
+                assert len(key[0]) == 2
+                assert len(key[1]) == 2
         finally:
             os.unlink(path)
 
@@ -432,15 +524,20 @@ class TestTrafficParser:
         )
         path = self._write_csv(csv_content)
         traffic_config = TrafficConfig(
-            traffic_path=path, sim_start_time="day1:08:00", sim_end_time="day1:12:00"
+            traffic_level="low_congestion",
+            sim_start_time="day1:08:00",
+            sim_end_time="day1:12:00",
         )
         try:
-            parser = TrafficParser(traffic_config)
-            with pytest.raises(TrafficParseError) as exc_info:
-                parser.parse()
-            assert len(exc_info.value.errors) == 2
-            assert "Row 2" in exc_info.value.errors[0]
-            assert "Row 3" in exc_info.value.errors[1]
+            with patch.object(
+                TrafficParser, "_template_path_from_level", return_value=path
+            ):
+                parser = TrafficParser(traffic_config)
+                with pytest.raises(TrafficParseError) as exc_info:
+                    parser.parse()
+                assert len(exc_info.value.errors) == 2
+                assert "Row 2" in exc_info.value.errors[0]
+                assert "Row 3" in exc_info.value.errors[1]
         finally:
             os.unlink(path)
 
@@ -451,14 +548,19 @@ class TestTrafficParser:
         )
         path = self._write_csv(csv_content)
         traffic_config = TrafficConfig(
-            traffic_path=path, sim_start_time="day1:08:00", sim_end_time="day1:12:00"
+            traffic_level="low_congestion",
+            sim_start_time="day1:08:00",
+            sim_end_time="day1:12:00",
         )
         try:
-            parser = TrafficParser(traffic_config)
-            with pytest.raises(
-                TrafficParseError, match="weight must be >= 0.0 and < 1.0"
+            with patch.object(
+                TrafficParser, "_template_path_from_level", return_value=path
             ):
-                parser.parse()
+                parser = TrafficParser(traffic_config)
+                with pytest.raises(
+                    TrafficParseError, match="weight must be >= 0.0 and < 1.0"
+                ):
+                    parser.parse()
         finally:
             os.unlink(path)
 
@@ -469,14 +571,19 @@ class TestTrafficParser:
         )
         path = self._write_csv(csv_content)
         traffic_config = TrafficConfig(
-            traffic_path=path, sim_start_time="day1:08:00", sim_end_time="day1:12:00"
+            traffic_level="low_congestion",
+            sim_start_time="day1:08:00",
+            sim_end_time="day1:12:00",
         )
         try:
-            parser = TrafficParser(traffic_config)
-            with pytest.raises(
-                TrafficParseError, match="weight must be >= 0.0 and < 1.0"
+            with patch.object(
+                TrafficParser, "_template_path_from_level", return_value=path
             ):
-                parser.parse()
+                parser = TrafficParser(traffic_config)
+                with pytest.raises(
+                    TrafficParseError, match="weight must be >= 0.0 and < 1.0"
+                ):
+                    parser.parse()
         finally:
             os.unlink(path)
 
@@ -487,12 +594,17 @@ class TestTrafficParser:
         )
         path = self._write_csv(csv_content)
         traffic_config = TrafficConfig(
-            traffic_path=path, sim_start_time="day1:08:00", sim_end_time="day1:12:00"
+            traffic_level="low_congestion",
+            sim_start_time="day1:08:00",
+            sim_end_time="day1:12:00",
         )
         try:
-            parser = TrafficParser(traffic_config)
-            with pytest.raises(TrafficParseError, match="weight must be a number"):
-                parser.parse()
+            with patch.object(
+                TrafficParser, "_template_path_from_level", return_value=path
+            ):
+                parser = TrafficParser(traffic_config)
+                with pytest.raises(TrafficParseError, match="weight must be a number"):
+                    parser.parse()
         finally:
             os.unlink(path)
 
@@ -501,3 +613,44 @@ class TestTrafficParser:
         assert error.errors == ["error1", "error2"]
         assert "error1" in str(error)
         assert "error2" in str(error)
+
+    def test_default_template_path_from_level_mapping(self) -> None:
+        test_level = "default"
+        traffic_config = TrafficConfig(
+            traffic_level=test_level,
+            sim_start_time="day1:08:00",
+            sim_end_time="day1:12:00",
+        )
+        with patch.object(Path, "exists", return_value=True):
+            parser = TrafficParser(traffic_config)
+
+            actual_path = parser._path.as_posix()
+            expected_path = "sim/traffic/traffic_datasets/traffic.csv"
+            assert expected_path in actual_path
+
+    def test_valid_template_path_from_level_mapping(self) -> None:
+        test_level = "high_congestion"
+        traffic_config = TrafficConfig(
+            traffic_level=test_level,
+            sim_start_time="day1:08:00",
+            sim_end_time="day1:12:00",
+        )
+        with patch.object(Path, "exists", return_value=True):
+            parser = TrafficParser(traffic_config)
+
+            actual_path = parser._path.as_posix()
+            expected_path = f"sim/traffic/traffic_datasets/{test_level}.csv"
+            assert expected_path in actual_path
+
+    def test_invalid_template_path_from_level_mapping(self) -> None:
+        test_level = "some_random_level"
+        traffic_config = TrafficConfig(
+            traffic_level=test_level,
+            sim_start_time="day1:08:00",
+            sim_end_time="day1:12:00",
+        )
+        with pytest.raises(
+            ValueError,
+            match=f"Could not find path for unsupported level '{test_level}'",
+        ):
+            TrafficParser(traffic_config)

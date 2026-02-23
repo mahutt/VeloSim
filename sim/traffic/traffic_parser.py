@@ -61,9 +61,10 @@ class TrafficParser:
 
     SUPPORTED_TYPES = {"local_traffic"}
     REQUIRED_COLUMNS = {"TYPE", "start_time", "segment_key", "duration", "weight"}
+    TEMPLATES = {"high_congestion", "medium_congestion", "low_congestion"}
 
     def __init__(self, traffic_config: TrafficConfig) -> None:
-        """Initialize the parser with a CSV file path and sim start time.
+        """Initialize the parser with a traffic configuration.
 
         Args:
             traffic_config: TrafficConfig with traffic settings.
@@ -71,14 +72,17 @@ class TrafficParser:
         Raises:
             FileNotFoundError: If the CSV file does not exist.
         """
-        csv_path = traffic_config.traffic_path
+        traffic_level = traffic_config.traffic_level
         self._start_time = traffic_config.sim_start_time
         self._end_time = traffic_config.sim_end_time
         self._window_start: Optional[int] = None
         self._window_end: Optional[int] = None
-        self._path = Path(csv_path)
-        if not self._path.exists():
-            raise FileNotFoundError(f"Traffic CSV file not found: {csv_path}")
+
+        csv_path = self._template_path_from_level(traffic_level)
+        if csv_path:
+            self._path = Path(csv_path)
+            if not self._path.exists():
+                raise FileNotFoundError(f"Traffic CSV file not found: {csv_path}")
 
     def parse(self) -> List[TrafficEvent]:
         """Parse the CSV file and return a list of TrafficEvent objects.
@@ -253,6 +257,28 @@ class TrafficParser:
             )
 
         return (lon1, lat1), (lon2, lat2)
+
+    def _template_path_from_level(self, level: str) -> str:
+        """
+        Determines the traffic template path according to the provided level.
+
+        Args:
+            level: Traffic level selected
+
+        Returns:
+            String path to the selected traffic template.
+
+        Raises:
+            ValueError if the provided level is unsupporteds.
+        """
+        if level == "default":
+            path = "sim/traffic/traffic_datasets/traffic.csv"
+        elif level in self.TEMPLATES:
+            path = f"sim/traffic/traffic_datasets/{level}.csv"
+        else:
+            raise ValueError(f"Could not find path for unsupported level '{level}'")
+
+        return path
 
     def _convert_relative_time_to_seconds(self, time_str: str) -> int:
         """

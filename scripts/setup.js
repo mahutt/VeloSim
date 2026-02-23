@@ -366,12 +366,23 @@ async function main() {
     console.log('\n[SETUP] Preparing traffic datasets...');
     console.log('[INFO] This will download the Montreal dataset and create the traffic csv');
     console.log('[INFO] This is a one-time setup and may take about 3-5 minutes')
-    try{
+    try {
       await runCommand('npm', ['run', 'traffic-csv']);
       console.log('[SUCCESS] Traffic datasets ready for use');
     } catch (error) {
       console.log('[WARNING] Traffic csv setup failed');
       console.log('[INFO] You can run manually the script: npm run traffic-csv')
+      console.log('[INFO] Error:', error.message);
+    }
+
+    // Step 11: Get Traffic Templates
+    console.log('\n[SETUP] Retrieving traffic templates...');
+    try {
+      await runCommand('npm', ['run', 'traffic-templates']);
+       console.log('[SUCCESS] Retrieved all three traffic templates')
+    } catch (error) {
+      console.log('[WARNING] Traffic template retrieval failed')
+      console.log('[INFO] You can run manually the script: npm run traffic-templates')
       console.log('[INFO] Error:', error.message);
     }
 

@@ -1138,14 +1138,30 @@ class JsonParseStrategy(BaseParseStrategy):
 
         # Extract traffic configuration (optional param)
         map_payload = None
+        supported_templates = {
+            "high_congestion",
+            "medium_congestion",
+            "low_congestion",
+            "default",
+            "no_traffic",
+        }
         traffic_raw = content.get("traffic", None)
         if traffic_raw is not None and isinstance(traffic_raw, dict):
-            traffic_path = traffic_raw.get("traffic_path", "")
+            traffic_level = traffic_raw.get("traffic_level", "default")
+        else:
+            traffic_level = "default"
+
+        if traffic_level not in supported_templates:
+            raise ValueError(
+                f"Unsupported traffic_level '{traffic_level}'. "
+                f"Supported: {', '.join(supported_templates)}"
+            )
+        if traffic_level != "no_traffic":
             start_daytime = str(content.get("start_time", "day1:00:00"))
             end_daytime = str(content.get("end_time", "day1:00:00"))
             map_payload = MapPayload(
                 traffic=TrafficConfig(
-                    traffic_path=traffic_path,
+                    traffic_level=traffic_level,
                     sim_start_time=start_daytime,
                     sim_end_time=end_daytime,
                 )

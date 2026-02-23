@@ -34,12 +34,12 @@ class TrafficConfig:
     """Configuration for traffic event loading.
 
     Attributes:
-        traffic_path: Path to the traffic CSV file.
+        traffic_level: Desired traffic level template to use.
         sim_start_time: Start time of simulation.
         sim_end_time: End time of simulation.
     """
 
-    traffic_path: str = ""
+    traffic_level: str = "default"
     sim_start_time: str = field(default="day1:00:00")
     sim_end_time: str = field(default="day1:00:00")
 
