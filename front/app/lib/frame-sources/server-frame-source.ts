@@ -162,14 +162,22 @@ export class ServerFrameSource implements FrameSource {
       }
     };
 
-    this.ws.onerror = (error) => {
-      console.error('[WS] ❌ WebSocket error:', error);
+    this.ws.onerror = (event) => {
+      console.error('[WS] ❌ WebSocket error:', event);
 
-      logSimulationError(error, 'WebSocket connection error', {
-        errorType: 'WEBSOCKET_ERROR',
-        simId: this.simulationId,
-        wsUrl: this.wsUrl,
-      });
+      logSimulationError(
+        new Error('WebSocket connection failed'),
+        'WebSocket connection error',
+        {
+          errorType: 'WEBSOCKET_ERROR',
+          simId: this.simulationId,
+          wsUrl: this.wsUrl,
+          readyState:
+            (['CONNECTING', 'OPEN', 'CLOSING', 'CLOSED'] as const)[
+              this.ws?.readyState ?? -1
+            ] ?? 'UNKNOWN',
+        }
+      );
 
       this.onError(
         'Connection Error',

@@ -72,6 +72,20 @@ describe('simulation-error-utils', () => {
         expect.stringContaining('Context')
       );
     });
+
+    it('should not produce [object Event] when passed a DOM Event', () => {
+      const event = new Event('error');
+      logSimulationError(event, 'WebSocket error');
+
+      const mockConsoleError = console.error as unknown as ReturnType<
+        typeof vi.fn
+      >;
+      const call = mockConsoleError.mock.calls[0][1] as string;
+      const loggedData = JSON.parse(call);
+
+      expect(loggedData.message).not.toBe('[object Event]');
+      expect(loggedData.message).toBe('An unknown error occurred');
+    });
   });
 
   describe('logMissingEntityError', () => {
