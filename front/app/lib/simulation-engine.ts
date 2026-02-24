@@ -172,10 +172,10 @@ export default class SimulationEngine {
     for (const id of successfullyAssignedTaskIds) {
       const task = this.state.getTask(id)!;
       if (task.assignedDriverId) {
-        const previousdriver = this.state.getDriver(task.assignedDriverId)!;
+        const previousDriver = this.state.getDriver(task.assignedDriverId)!;
         this.state.setDriver({
-          ...previousdriver,
-          taskIds: previousdriver.taskIds.filter((t) => t !== id),
+          ...previousDriver,
+          taskIds: previousDriver.taskIds.filter((t) => t !== id),
         });
       }
       this.state.setTask({
@@ -343,7 +343,7 @@ export default class SimulationEngine {
       this.localFrameSource.setPosition(seconds);
       this.localFrameSource.setSpeed(this.getFrameSourceSpeed());
       this.mode = SimulationMode.Local;
-    } else if (!scrubToPast) {
+    } else {
       // Unpause server source to play from live position
       const frame = this.localFrameSource.getMaxFrame();
       if (frame) this.handleFrame(frame, false);

@@ -29,7 +29,7 @@ import type FrameSource from './frame-source';
 export default class LocalFrameSource implements FrameSource {
   private simulationId: string;
   private onFrame: (frame: BackendPayload) => void;
-  private onError: (title: string, message: string) => void;
+  private onError: (error: string) => void;
 
   private frames: Map<number, BackendPayload>;
   private maxFramePosition: number;
