@@ -160,6 +160,9 @@ export const mockSimulationStateManager: Partial<SimulationStateManager> = {
   getLoading: vi.fn(),
   setLoading: vi.fn(),
 
+  getBlockAssignments: vi.fn().mockReturnValue(false),
+  setBlockAssignments: vi.fn(),
+
   getPendingAssignment: vi.fn(),
   setPendingAssignment: vi.fn(),
 

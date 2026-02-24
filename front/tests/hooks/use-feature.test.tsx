@@ -64,7 +64,7 @@ describe('useFeature', () => {
       JSON.stringify({ taskDragAndDrop: true })
     );
 
-    const { result } = renderHook(() => useFeature('taskDragAndDrop'), {
+    const { result } = renderHook(() => useFeature('sidebar'), {
       wrapper: createWrapper(),
     });
 
@@ -128,7 +128,7 @@ describe('useFeature', () => {
   });
 
   test('handles all feature flag types', async () => {
-    const flags = ['sidebar', 'taskDragAndDrop', 'simulationsPage'] as const;
+    const flags = ['sidebar', 'simulationsPage'] as const;
 
     for (const flag of flags) {
       const { result } = renderHook(() => useFeature(flag), {

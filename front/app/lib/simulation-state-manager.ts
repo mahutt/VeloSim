@@ -76,6 +76,9 @@ export interface SimulationStateManagerInterface {
   getLoading: () => boolean;
   setLoading: (isLoading: boolean) => void;
 
+  getBlockAssignments: () => boolean;
+  setBlockAssignments: (block: boolean) => void;
+
   getPendingAssignment: () => PendingAssignment | null;
   setPendingAssignment: (assignment: PendingAssignment | null) => void;
 
@@ -137,6 +140,15 @@ export default class SimulationStateManager implements SimulationStateManagerInt
 
   public setLoading(isLoading: boolean) {
     this.updateReactiveState({ isLoading });
+  }
+
+  public getBlockAssignments() {
+    return this.reactiveState.blockAssignments;
+  }
+
+  public setBlockAssignments(blockAssignments: boolean) {
+    if (this.reactiveState.blockAssignments === blockAssignments) return;
+    this.updateReactiveState({ blockAssignments });
   }
 
   public setDriver(driver: Driver) {

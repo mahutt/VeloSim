@@ -23,10 +23,10 @@
  */
 
 import { Item, ItemContent, ItemTitle } from '~/components/ui/item';
-import { useFeature } from '~/hooks/use-feature';
 import { Button } from '~/components/ui/button';
 import { X } from 'lucide-react';
 import type { StationTask } from '~/types';
+import { useSimulation } from '~/providers/simulation-provider';
 
 export function TaskItem({
   task,
@@ -43,13 +43,14 @@ export function TaskItem({
   onDragStart?: (event: React.DragEvent<HTMLDivElement>) => void;
   getDragTaskIds?: () => number[];
 }) {
+  const { state } = useSimulation();
   const taskIsInProgress = task.state === 'inprogress';
   const taskIsInService = task.state === 'inservice';
 
-  const dragEnabled = useFeature('taskDragAndDrop') && !taskIsInService;
+  const assignable = !(state.blockAssignments || taskIsInService);
 
   const handleSelect = (event: React.MouseEvent<HTMLDivElement>) => {
-    if (taskIsInService) {
+    if (!assignable) {
       event.preventDefault();
       event.stopPropagation();
       return;
@@ -83,14 +84,14 @@ export function TaskItem({
 
   return (
     <Item
-      draggable={dragEnabled}
+      draggable={assignable}
       onDragStart={handleDragStart}
       onClick={handleSelect}
       className={`rounded-lg px-3 py-2 bg-white border border-gray-200 h-10
         ${
-          dragEnabled
+          assignable
             ? 'cursor-grab hover:shadow-sm active:cursor-grabbing active:opacity-50'
-            : 'cursor-default'
+            : 'cursor-default opacity-50'
         } ${isSelected ? 'border-blue-500 bg-blue-50' : ''}`}
     >
       <ItemContent>

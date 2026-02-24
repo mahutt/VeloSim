@@ -45,7 +45,6 @@ function TestConsumer() {
   return (
     <div>
       <div data-testid="sidebar-flag">{String(flags.sidebar)}</div>
-      <div data-testid="task-drag-flag">{String(flags.taskDragAndDrop)}</div>
       <div data-testid="simulations-flag">{String(flags.simulationsPage)}</div>
       <div data-testid="sidebar-enabled">{String(isEnabled('sidebar'))}</div>
       <button
@@ -83,9 +82,6 @@ describe('FeatureToggleProvider', () => {
       expect(screen.getByTestId('sidebar-flag')).toHaveTextContent(
         String(DEFAULT_FLAGS.sidebar)
       );
-      expect(screen.getByTestId('task-drag-flag')).toHaveTextContent(
-        String(DEFAULT_FLAGS.taskDragAndDrop)
-      );
       expect(screen.getByTestId('simulations-flag')).toHaveTextContent(
         String(DEFAULT_FLAGS.simulationsPage)
       );
@@ -121,7 +117,6 @@ describe('FeatureToggleProvider', () => {
 
     await waitFor(() => {
       expect(screen.getByTestId('sidebar-flag')).toHaveTextContent('false');
-      expect(screen.getByTestId('task-drag-flag')).toHaveTextContent('true');
       // simulationsPage should still be default since not overridden
       expect(screen.getByTestId('simulations-flag')).toHaveTextContent(
         String(DEFAULT_FLAGS.simulationsPage)
@@ -162,7 +157,7 @@ describe('FeatureToggleProvider', () => {
     // set initial override
     sessionStorage.setItem(
       FEATURE_FLAGS_KEY,
-      JSON.stringify({ taskDragAndDrop: true })
+      JSON.stringify({ simulationsPage: false })
     );
 
     render(
@@ -172,7 +167,7 @@ describe('FeatureToggleProvider', () => {
     );
 
     await waitFor(() => {
-      expect(screen.getByTestId('task-drag-flag')).toHaveTextContent('true');
+      expect(screen.getByTestId('simulations-flag')).toHaveTextContent('false');
     });
 
     // add another override
@@ -186,7 +181,7 @@ describe('FeatureToggleProvider', () => {
 
     const stored = sessionStorage.getItem(FEATURE_FLAGS_KEY);
     const parsed = JSON.parse(stored!);
-    expect(parsed.taskDragAndDrop).toBe(true);
+    expect(parsed.simulationsPage).toBe(false);
     expect(parsed.sidebar).toBe(false);
   });
 
@@ -217,7 +212,6 @@ describe('FeatureToggleProvider', () => {
     // ensure flags were reloaded
     await waitFor(() => {
       expect(screen.getByTestId('sidebar-flag')).toHaveTextContent('false');
-      expect(screen.getByTestId('task-drag-flag')).toHaveTextContent('true');
     });
   });
 
@@ -233,9 +227,6 @@ describe('FeatureToggleProvider', () => {
     await waitFor(() => {
       expect(screen.getByTestId('sidebar-flag')).toHaveTextContent(
         String(DEFAULT_FLAGS.sidebar)
-      );
-      expect(screen.getByTestId('task-drag-flag')).toHaveTextContent(
-        String(DEFAULT_FLAGS.taskDragAndDrop)
       );
     });
   });

@@ -82,6 +82,19 @@ describe('SimulationStateManager', () => {
     expect(setState).not.toHaveBeenCalled();
   });
 
+  // block assignments
+  it('gets initial block assignments state and sets it', () => {
+    expect(manager.getBlockAssignments()).toBe(false);
+    manager.setBlockAssignments(true);
+    expect(setState).toHaveBeenCalled();
+  });
+
+  it('does not call setState when block assignments is unchanged', () => {
+    expect(manager.getBlockAssignments()).toBe(false);
+    manager.setBlockAssignments(false);
+    expect(setState).not.toHaveBeenCalled();
+  });
+
   // Drivers
   it('gets undefined for unknown driver', () => {
     expect(manager.getDriver(999)).toBeUndefined();

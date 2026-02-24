@@ -78,6 +78,7 @@ describe('areReactiveSimulationStatesEqual', () => {
           inProgressTask: null,
         },
       },
+      blockAssignments: false,
       HQWidgetState: {
         entities: { type: SelectedItemType.Driver, count: 2 },
         driversAtHQ: [{ id: 1, name: 'Alice', minutesTillShift: 3 }],
