@@ -258,27 +258,47 @@ class TrafficParser:
 
         return (lon1, lat1), (lon2, lat2)
 
+    # Canonical directory for traffic dataset files (resolved at class load time)
+    _DATASETS_DIR = Path(__file__).resolve().parent / "traffic_datasets"
+
     def _template_path_from_level(self, level: str) -> str:
         """
         Determines the traffic template path according to the provided level.
 
+        Uses an allowlist of template names and resolves the resulting path
+        to ensure it stays inside the ``traffic_datasets`` directory.
+        This prevents any path-traversal or arbitrary-file-read attack even
+        if a future code change passes unsanitised user input here.
+
         Args:
-            level: Traffic level selected
+            level: Traffic level selected (must be "default" or a member
+                of ``TEMPLATES``).
 
         Returns:
             String path to the selected traffic template.
 
         Raises:
-            ValueError if the provided level is unsupporteds.
+            ValueError: If the provided level is unsupported or the
+                resolved path escapes the datasets directory.
         """
         if level == "default":
-            path = "sim/traffic/traffic_datasets/traffic.csv"
+            filename = "traffic.csv"
         elif level in self.TEMPLATES:
-            path = f"sim/traffic/traffic_datasets/{level}.csv"
+            filename = f"{level}.csv"
         else:
             raise ValueError(f"Could not find path for unsupported level '{level}'")
 
-        return path
+        resolved = (self._DATASETS_DIR / filename).resolve()
+
+        # Defence-in-depth: verify the resolved path is inside the
+        # expected datasets directory so a crafted level value can never
+        # escape (even though the allowlist above already prevents it).
+        if not str(resolved).startswith(str(self._DATASETS_DIR)):
+            raise ValueError(
+                f"Resolved template path escapes the datasets directory: {resolved}"
+            )
+
+        return str(resolved)
 
     def _convert_relative_time_to_seconds(self, time_str: str) -> int:
         """
