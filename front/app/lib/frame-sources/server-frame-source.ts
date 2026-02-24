@@ -173,7 +173,7 @@ export class ServerFrameSource implements FrameSource {
           simId: this.simulationId,
           wsUrl: this.wsUrl,
           readyState:
-            (['CONNECTING', 'OPEN', 'CLOSING', 'CLOSED'] as const)[
+            ['CONNECTING', 'OPEN', 'CLOSING', 'CLOSED'][
               this.ws?.readyState ?? -1
             ] ?? 'UNKNOWN',
         }
