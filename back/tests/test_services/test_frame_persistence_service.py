@@ -247,8 +247,8 @@ class TestFramePersistenceSubscriber:
         from unittest.mock import patch, MagicMock
 
         with patch(
-            "back.services.frame_persistence_service.sim_frame_crud.upsert"
-        ) as mock_upsert:
+            "back.services.frame_persistence_service.sim_frame_crud.upsert_many"
+        ) as mock_upsert_many:
             with patch(
                 "back.services.frame_persistence_service.SessionLocal"
             ) as mock_session:
@@ -260,8 +260,12 @@ class TestFramePersistenceSubscriber:
                 subscriber.start()
 
                 try:
-                    # Give the background thread time to start
-                    time.sleep(0.1)
+                    # Wait for the worker coroutine to enter its main loop.
+                    # This avoids timing races where on_frame is called before
+                    # the worker is ready to receive frames.
+                    assert subscriber._worker_initialized.wait(
+                        timeout=10.0
+                    ), "Worker did not become ready within 10 seconds"
 
                     # Queue a frame (simulating on_frame being called)
                     frame = MagicMock(spec=Frame)
@@ -293,7 +297,7 @@ class TestFramePersistenceSubscriber:
                     # Verify mock was called (success_count is authoritative
                     # since patches can have threading issues)
                     assert (
-                        mock_upsert.call_count >= 1
+                        mock_upsert_many.call_count >= 1
                         or subscriber.persist_success_count == 1
                     )
                 finally:

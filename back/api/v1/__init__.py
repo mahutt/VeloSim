@@ -27,7 +27,11 @@ from .simulation import router as simulation_router
 from .users import router as users_router
 from .logs import router as logs_router
 from .scenarios import router as scenarios_router
-from .metrics import router as metrics_router
+
+# Note: the Prometheus metrics router is excluded out of `api_router`.
+# `api_router` is mounted in `back.main` with auth dependencies, and including
+# metrics here would require authentication for `/api/v1/metric/metrics`,
+# breaking Prometheus scraping.
 
 # Create the main v1 API router
 api_router = APIRouter()
@@ -37,6 +41,5 @@ api_router.include_router(simulation_router)
 api_router.include_router(users_router)
 api_router.include_router(logs_router)
 api_router.include_router(scenarios_router)
-api_router.include_router(metrics_router)
 
 __all__ = ["api_router"]

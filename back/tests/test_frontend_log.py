@@ -180,21 +180,30 @@ class TestFrontendLogEndpoint:
 
     def test_rate_limit_enforcement(self, authenticated_client: TestClient) -> None:
         """Test that rate limiting is enforced."""
-        # Send MAX_LOGS_PER_MINUTE + 1 requests
-        for i in range(MAX_LOGS_PER_MINUTE + 1):
-            response = authenticated_client.post(
-                "/api/v1/logs/frontend",
-                json={
-                    "message": f"Message {i}",
-                    "timestamp": datetime.now().isoformat(),
-                },
-            )
-            if i < MAX_LOGS_PER_MINUTE:
-                assert response.status_code == 201
-            else:
-                # Last request should be rate limited
-                assert response.status_code == 429
-                assert "Rate limit exceeded" in response.json()["detail"]
+        from unittest.mock import patch
+
+        # Freeze time so rate-limit entries are never pruned by the sliding
+        # 1-minute window. Without this, slow logging I/O (~2s per request)
+        # causes old entries to expire before the 61st request is sent.
+        fixed_now = datetime(2024, 1, 1, 12, 0, 0)
+        with patch("back.api.v1.logs.datetime") as mock_dt:
+            mock_dt.now.return_value = fixed_now
+
+            # Send MAX_LOGS_PER_MINUTE + 1 requests
+            for i in range(MAX_LOGS_PER_MINUTE + 1):
+                response = authenticated_client.post(
+                    "/api/v1/logs/frontend",
+                    json={
+                        "message": f"Message {i}",
+                        "timestamp": datetime.now().isoformat(),
+                    },
+                )
+                if i < MAX_LOGS_PER_MINUTE:
+                    assert response.status_code == 201
+                else:
+                    # Last request should be rate limited
+                    assert response.status_code == 429
+                    assert "Rate limit exceeded" in response.json()["detail"]
 
     def test_batch_logging(self, authenticated_client: TestClient) -> None:
         """Test batch logging endpoint."""

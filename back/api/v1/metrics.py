@@ -25,6 +25,8 @@ SOFTWARE.
 from fastapi import APIRouter, Response
 from prometheus_client import generate_latest, CONTENT_TYPE_LATEST
 
+# This router is intentionally mounted separately in `back.main` (not inside
+# `api_router`) so the metrics endpoint remains public for Prometheus scrapes.
 router = APIRouter(prefix="/metric", tags=["metrics"])
 
 
@@ -36,6 +38,10 @@ def metrics() -> Response:
     This endpoint returns metrics collected by the Prometheus client.
     Metrics are automatically populated via OpenTelemetry instrumentation
     and are scraped by Prometheus.
+
+    Operational note:
+        This endpoint is expected to be unauthenticated. Do not place this
+        route behind user auth dependencies.
 
     Returns:
         Response: A plaintext HTTP response containing Prometheus metrics

@@ -101,6 +101,10 @@ class FramePersistenceSubscriber(Subscriber):
             self.persist_failure_count = 0
             self.queue_drop_count = 0
 
+            # Event that is set once the worker coroutine enters its main loop.
+            # Use threading.Event so external threads can wait on it safely.
+            self._worker_initialized = threading.Event()
+
             # Track last keyframe for final persistence on shutdown
             self.last_keyframe: Optional[Frame] = None
 
@@ -176,6 +180,11 @@ class FramePersistenceSubscriber(Subscriber):
         # Batch configuration (fallbacks currently match config defaults)
         batch_size = getattr(settings, "FRAME_PERSIST_BATCH_SIZE", 32)
         batch_timeout = getattr(settings, "FRAME_PERSIST_BATCH_TIMEOUT", 0.5)
+
+        # Signal that the worker has finished initialisation and is ready
+        # to receive frames. External waiters (e.g. tests) can block on
+        # _worker_initialized.wait() instead of using arbitrary sleeps.
+        self._worker_initialized.set()
 
         while not self.closed:
             batch = []
@@ -401,7 +410,21 @@ class FramePersistenceSubscriber(Subscriber):
         if frame.is_key:
             self.last_keyframe = frame
 
-        # Try to queue the frame (no interval filtering - persist all frames)
+        # When a background event loop is running in a separate thread, use
+        # call_soon_threadsafe so the queue's internal wakeup Future is
+        # signalled from inside that loop's thread — plain put_nowait() from
+        # an external thread is not thread-safe in this regard.
+        if self.loop is not None and self.loop.is_running():
+            self.loop.call_soon_threadsafe(self._enqueue_frame, frame)
+        else:
+            self._enqueue_frame(frame)
+
+    def _enqueue_frame(self, frame: Frame) -> None:
+        """Put a frame into the async queue, dropping a random entry if full.
+
+        Must be called from within the owning event loop's thread, or
+        scheduled via ``call_soon_threadsafe`` when using a background loop.
+        """
         try:
             self.frame_queue.put_nowait(frame)
         except asyncio.QueueFull:
