@@ -23,19 +23,30 @@
  */
 
 import { useEffect } from 'react';
-import { Outlet, useNavigate } from 'react-router';
+import { Outlet, useLocation, useNavigate } from 'react-router';
 import PageLoader from '~/components/page-loader';
 import useAuth from '~/hooks/use-auth';
+
+const isSafeInternalPath = (path: string | null): path is string => {
+  if (!path) {
+    return false;
+  }
+
+  return path.startsWith('/') && !path.startsWith('//');
+};
 
 export default function Unauthenticated() {
   const { user, loading } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
 
   useEffect(() => {
     if (user && !loading) {
-      navigate('/');
+      const nextParam = new URLSearchParams(location.search).get('next');
+      const destination = isSafeInternalPath(nextParam) ? nextParam : '/';
+      navigate(destination, { replace: true });
     }
-  }, [user, loading]);
+  }, [user, loading, location.search, navigate]);
 
   if (loading || user) {
     return <PageLoader />;

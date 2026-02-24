@@ -43,11 +43,19 @@ import useAuth from '~/hooks/use-auth';
 
 // Mock useNavigate hook
 const mockNavigate = vi.fn();
+const mockUseLocation = vi.fn(() => ({
+  pathname: '/login',
+  search: '',
+  hash: '',
+  state: null,
+  key: 'default',
+}));
 vi.mock('react-router', async (importOriginal) => {
   const actual = await importOriginal();
   return {
     ...(typeof actual === 'object' && actual !== null ? actual : {}),
     useNavigate: () => mockNavigate,
+    useLocation: () => mockUseLocation(),
   };
 });
 
@@ -58,6 +66,13 @@ describe('Unauthenticated Layout', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockNavigate.mockClear();
+    mockUseLocation.mockReturnValue({
+      pathname: '/login',
+      search: '',
+      hash: '',
+      state: null,
+      key: 'default',
+    });
   });
 
   it('shows loader when authentication is loading', () => {
@@ -79,7 +94,7 @@ describe('Unauthenticated Layout', () => {
     expect(getByTestId('page-loader')).toBeInTheDocument();
   });
 
-  it('redirects to / when user is authenticated', async () => {
+  it('redirects to / when user is authenticated and next is absent', async () => {
     (useAuth as Mock).mockReturnValue({
       loading: false,
       user: { id: 'user1', name: 'Test User' },
@@ -96,7 +111,65 @@ describe('Unauthenticated Layout', () => {
     );
 
     await waitFor(() => {
-      expect(mockNavigate).toHaveBeenCalledWith('/');
+      expect(mockNavigate).toHaveBeenCalledWith('/', { replace: true });
+    });
+  });
+
+  it('redirects to safe next path when user is authenticated', async () => {
+    (useAuth as Mock).mockReturnValue({
+      loading: false,
+      user: { id: 'user1', name: 'Test User' },
+    });
+    mockUseLocation.mockReturnValue({
+      pathname: '/login',
+      search: '?next=%2Fsimulation%2Fabc-123',
+      hash: '',
+      state: null,
+      key: 'default',
+    });
+
+    render(
+      <BrowserRouter>
+        <Routes>
+          <Route element={<Unauthenticated />}>
+            <Route path="/" element={<MockChild />} />
+          </Route>
+        </Routes>
+      </BrowserRouter>
+    );
+
+    await waitFor(() => {
+      expect(mockNavigate).toHaveBeenCalledWith('/simulation/abc-123', {
+        replace: true,
+      });
+    });
+  });
+
+  it('ignores unsafe next path when user is authenticated', async () => {
+    (useAuth as Mock).mockReturnValue({
+      loading: false,
+      user: { id: 'user1', name: 'Test User' },
+    });
+    mockUseLocation.mockReturnValue({
+      pathname: '/login',
+      search: '?next=%2F%2Fevil.example%2Fphish',
+      hash: '',
+      state: null,
+      key: 'default',
+    });
+
+    render(
+      <BrowserRouter>
+        <Routes>
+          <Route element={<Unauthenticated />}>
+            <Route path="/" element={<MockChild />} />
+          </Route>
+        </Routes>
+      </BrowserRouter>
+    );
+
+    await waitFor(() => {
+      expect(mockNavigate).toHaveBeenCalledWith('/', { replace: true });
     });
   });
 

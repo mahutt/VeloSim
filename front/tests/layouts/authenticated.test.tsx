@@ -101,7 +101,9 @@ describe('Authenticated Layout', () => {
     );
 
     await waitFor(() => {
-      expect(mockNavigate).toHaveBeenCalledWith('/login');
+      expect(mockNavigate).toHaveBeenCalledWith('/login?next=%2F', {
+        replace: true,
+      });
     });
   });
 
