@@ -40,6 +40,7 @@ import {
 } from 'tests/test-helpers';
 import { mockSimulationEngine } from 'tests/mocks';
 import type SimulationEngine from '~/lib/simulation-engine';
+import { TaskState } from '~/types';
 
 // Mock the useSimulation hook
 vi.mock('~/providers/simulation-provider', () => ({
@@ -119,7 +120,10 @@ describe('SelectedItemBar', () => {
   });
 
   it('should render driver in progress task when driver is selected', () => {
-    const inProgressTask = makeStationTask({ id: 1, state: 'inprogress' });
+    const inProgressTask = makeStationTask({
+      id: 1,
+      state: TaskState.InProgress,
+    });
     (useSimulation as unknown as ReturnType<typeof vi.fn>).mockReturnValue(
       makeSimulationContext({
         state: makeReactiveSimulationState({

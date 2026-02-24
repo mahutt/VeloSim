@@ -37,6 +37,7 @@ import type { SimulationContextType } from '~/providers/simulation-provider';
 import {
   DriverState,
   TaskAction,
+  TaskState,
   type BackendPayload,
   type Driver,
   type Headquarters,
@@ -138,7 +139,7 @@ export function makeStationTask(
   return {
     id,
     stationId: overrides.stationId ?? 1,
-    state: overrides.state ?? 'open',
+    state: overrides.state ?? TaskState.Open,
     assignedDriverId: overrides.assignedDriverId ?? null,
   };
 }

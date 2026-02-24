@@ -29,6 +29,7 @@ import SimulationStateManager from './simulation-state-manager';
 import {
   SimulationMode,
   TaskAction,
+  TaskState,
   type BackendPayload,
   type BatchAssignTasksToDriverResponse,
   type BatchAssignTasksToDriverResponseItem,
@@ -181,6 +182,7 @@ export default class SimulationEngine {
       }
       this.state.setTask({
         ...task,
+        state: TaskState.Assigned,
         assignedDriverId: driverId,
       });
     }
@@ -222,6 +224,7 @@ export default class SimulationEngine {
 
       this.state.setTask({
         ...task,
+        state: TaskState.Open,
         assignedDriverId: null,
       });
       this.state.setDriver({
