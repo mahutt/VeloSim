@@ -113,7 +113,7 @@ class BatterySwapTask(Task):
         self.assigned_driver = driver
         # Preserve IN_PROGRESS if already dispatched; otherwise mark ASSIGNED
         if self.state != State.IN_PROGRESS:
-            self.state = State.ASSIGNED
+            self.set_state(State.ASSIGNED)
 
     def unassign_driver(self) -> None:
         """Unassign the driver from this task.
@@ -122,7 +122,7 @@ class BatterySwapTask(Task):
             None
         """
         self.assigned_driver: Optional["Driver"] = None
-        self.state = State.OPEN
+        self.set_state(State.OPEN)
 
     def is_assigned(self) -> bool:
         """Check if the task is assigned to a driver.

@@ -25,7 +25,7 @@
 import { Item, ItemContent, ItemTitle } from '~/components/ui/item';
 import { Button } from '~/components/ui/button';
 import { X } from 'lucide-react';
-import type { StationTask } from '~/types';
+import { TaskState, type StationTask } from '~/types';
 import { useSimulation } from '~/providers/simulation-provider';
 
 export function TaskItem({
@@ -44,8 +44,8 @@ export function TaskItem({
   getDragTaskIds?: () => number[];
 }) {
   const { state } = useSimulation();
-  const taskIsInProgress = task.state === 'inprogress';
-  const taskIsInService = task.state === 'inservice';
+  const taskIsInProgress = task.state === TaskState.InProgress;
+  const taskIsInService = task.state === TaskState.InService;
 
   const assignable = !(state.blockAssignments || taskIsInService);
 
