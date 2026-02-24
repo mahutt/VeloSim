@@ -28,24 +28,24 @@ import {
   createHQWidgetState,
   areHQWidgetStatesEqual,
 } from '../../app/lib/hq-widget-helpers';
-import { DriverState, type Driver, type Vehicle } from '../../app/types';
+import { DriverState, type Vehicle } from '../../app/types';
 import type { HQWidgetProps } from '~/components/simulation/hq-widget';
 import { makeDriver, makeVehicle } from 'tests/test-helpers';
 
 describe('createHQWidgetState', () => {
   it('returns null entities when no drivers at HQ and no vehicles at HQ (all quiet)', () => {
-    const drivers = new Map<number, Driver>([
-      [1, makeDriver({ id: 1, state: DriverState.OnRoute, vehicleId: 11 })],
-      [2, makeDriver({ id: 2, state: DriverState.OnRoute, vehicleId: 12 })],
-    ]);
-    const vehicles = new Map<number, Vehicle>([
-      [11, makeVehicle({ id: 11, driverId: 1 })],
-      [12, makeVehicle({ id: 12, driverId: 2 })],
-    ]);
+    const drivers = [
+      makeDriver({ id: 1, state: DriverState.OnRoute, vehicleId: 11 }),
+      makeDriver({ id: 2, state: DriverState.OnRoute, vehicleId: 12 }),
+    ];
+    const vehicles = [
+      makeVehicle({ id: 11, driverId: 1 }),
+      makeVehicle({ id: 12, driverId: 2 }),
+    ];
 
     const state = createHQWidgetState({
-      driversMap: drivers,
-      vehiclesMap: vehicles,
+      drivers,
+      vehicles,
       simulationSeconds: 0,
       startTime: 0,
     });
@@ -56,33 +56,27 @@ describe('createHQWidgetState', () => {
 
   it('detects drivers at HQ and adapts minutesTillShift correctly', () => {
     // simulationSeconds = 30, driver shift starts at 90 seconds => ceil((90-30)/60)=1 minute
-    const drivers = new Map<number, Driver>([
-      [
-        1,
-        makeDriver({
-          id: 1,
-          state: DriverState.Idle,
-          vehicleId: null,
-          shift: { startTime: 90, endTime: 3600 },
-          name: 'Alice',
-        }),
-      ],
-      [
-        2,
-        makeDriver({
-          id: 2,
-          state: DriverState.PendingShift,
-          vehicleId: null,
-          shift: { startTime: 300, endTime: 3600 },
-          name: 'Bob',
-        }),
-      ],
-    ]);
-    const vehicles = new Map<number, Vehicle>();
+    const drivers = [
+      makeDriver({
+        id: 1,
+        state: DriverState.Idle,
+        vehicleId: null,
+        shift: { startTime: 90, endTime: 3600 },
+        name: 'Alice',
+      }),
+      makeDriver({
+        id: 2,
+        state: DriverState.PendingShift,
+        vehicleId: null,
+        shift: { startTime: 300, endTime: 3600 },
+        name: 'Bob',
+      }),
+    ];
+    const vehicles: Vehicle[] = [];
 
     const state = createHQWidgetState({
-      driversMap: drivers,
-      vehiclesMap: vehicles,
+      drivers,
+      vehicles,
       simulationSeconds: 30,
       startTime: 0,
     });
@@ -102,17 +96,17 @@ describe('createHQWidgetState', () => {
   });
 
   it('detects vehicles at HQ when no drivers at HQ', () => {
-    const drivers = new Map<number, Driver>([
-      [1, makeDriver({ id: 1, state: DriverState.OnRoute, vehicleId: 11 })],
-    ]);
-    const vehicles = new Map<number, Vehicle>([
-      [11, makeVehicle({ id: 11, driverId: null })],
-      [12, makeVehicle({ id: 12, driverId: null })],
-    ]);
+    const drivers = [
+      makeDriver({ id: 1, state: DriverState.OnRoute, vehicleId: 11 }),
+    ];
+    const vehicles = [
+      makeVehicle({ id: 11, driverId: null }),
+      makeVehicle({ id: 12, driverId: null }),
+    ];
 
     const state = createHQWidgetState({
-      driversMap: drivers,
-      vehiclesMap: vehicles,
+      drivers,
+      vehicles,
       simulationSeconds: 0,
       startTime: 0,
     });

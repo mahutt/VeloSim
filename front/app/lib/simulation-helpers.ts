@@ -57,10 +57,16 @@ export function driverResourceHasUpdated(
   existingDriver: Driver | undefined,
   updatedDriver: Driver
 ): boolean {
-  return (
-    existingDriver !== undefined &&
+  // If driver didn't exist before, then we update based on whether it is part of a resource
+  if (existingDriver === undefined) return updatedDriver.vehicleId !== null;
+  // If vehicle assignment changed
+  if (existingDriver.vehicleId !== updatedDriver.vehicleId) return true;
+  // If task count or state changed
+  if (
     existingDriver.vehicleId !== null &&
     (existingDriver.taskIds.length !== updatedDriver.taskIds.length ||
       existingDriver.state !== updatedDriver.state)
-  );
+  )
+    return true;
+  return false;
 }

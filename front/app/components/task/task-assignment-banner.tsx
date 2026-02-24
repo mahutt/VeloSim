@@ -25,49 +25,36 @@
 import { useState } from 'react';
 import { AlertCircle } from 'lucide-react';
 import { Button } from '~/components/ui/button';
-import type { TaskAction } from '~/types';
+import { useSimulation } from '~/providers/simulation-provider';
+import { TaskAction, type ReassignTaskAction } from '~/types';
 
-interface TaskAssignmentBannerProps {
-  taskIds: number[];
-  driverName: string;
-  prevDriverName?: string;
-  remainingBatteryCount: number;
-  action: TaskAction;
-  reassignCount?: number;
-  isLoading?: boolean;
-  onConfirm: () => void;
-  onConfirmUnassignedOnly?: () => void;
-  onCancel: () => void;
-}
+export function TaskAssignmentBanner() {
+  const { state, engine } = useSimulation();
+  const { pendingAssignment, pendingAssignmentLoading: isLoading } = state;
 
-export function TaskAssignmentBanner({
-  taskIds,
-  driverName,
-  prevDriverName,
-  remainingBatteryCount,
-  action,
-  reassignCount = 0,
-  isLoading = false,
-  onConfirm,
-  onConfirmUnassignedOnly,
-  onCancel,
-}: TaskAssignmentBannerProps) {
   const [loadingAction, setLoadingAction] = useState<
     'all' | 'remaining' | null
   >(null);
+  if (!pendingAssignment) return null;
 
+  const taskIds = pendingAssignment.taskIds;
   const count = taskIds.length;
   const isMulti = count > 1;
   const firstTaskId = taskIds[0];
 
   // When action is 'assign' but every task belongs to another driver,
   // the user is really doing a reassign (from multiple sources).
+  const action = pendingAssignment.action;
+  const reassignCount =
+    pendingAssignment.action === TaskAction.Assign
+      ? pendingAssignment.reassignCount
+      : 0;
   const isAllReassign =
-    action === 'assign' && isMulti && reassignCount === count;
+    action === TaskAction.Assign && isMulti && reassignCount === count;
 
   // Mixed = some assigned, some not → show 3-button UI
   const hasMixedTasks =
-    action === 'assign' &&
+    action === TaskAction.Assign &&
     isMulti &&
     reassignCount > 0 &&
     reassignCount < count;
@@ -76,11 +63,16 @@ export function TaskAssignmentBanner({
 
   // Derive a display label from the action + reassign state
   const actionLabel =
-    isAllReassign || action === 'reassign' ? 'Re-assign' : 'Assign';
+    isAllReassign || action === TaskAction.Reassign ? 'Re-assign' : 'Assign';
 
   const exceedsBattery =
-    count > remainingBatteryCount &&
-    (action === 'assign' || action === 'reassign');
+    count > pendingAssignment.driverBatteryCount &&
+    (action === TaskAction.Assign || action === TaskAction.Reassign);
+
+  const driverName = pendingAssignment.driverName;
+  const remainingBatteryCount = pendingAssignment.driverBatteryCount;
+  const prevDriverName =
+    (pendingAssignment as ReassignTaskAction).prevDriverName ?? undefined;
 
   const renderMessage = () => {
     if (!count) return null;
@@ -107,12 +99,12 @@ export function TaskAssignmentBanner({
     }
 
     // Unassign
-    if (action === 'unassign') {
+    if (action === TaskAction.Unassign) {
       return `Un-assign task #${firstTaskId} from ${driverName}?`;
     }
 
     // Reassign from a single known driver
-    if (action === 'reassign' && prevDriverName !== undefined) {
+    if (action === TaskAction.Reassign && prevDriverName !== undefined) {
       return isMulti
         ? `Re-assign ${count} tasks from ${prevDriverName} to ${driverName}?`
         : `Re-assign task #${firstTaskId} from ${prevDriverName} to ${driverName}?`;
@@ -153,7 +145,7 @@ export function TaskAssignmentBanner({
         </div>
         <div className="flex gap-2 justify-center">
           <Button
-            onClick={onCancel}
+            onClick={() => engine.cancelAssignment()}
             size="sm"
             variant="outline"
             disabled={isLoading}
@@ -161,12 +153,12 @@ export function TaskAssignmentBanner({
           >
             Cancel
           </Button>
-          {hasMixedTasks && onConfirmUnassignedOnly ? (
+          {hasMixedTasks ? (
             <>
               <Button
                 onClick={() => {
                   setLoadingAction('remaining');
-                  onConfirmUnassignedOnly();
+                  engine.confirmUnassignedOnly();
                 }}
                 size="sm"
                 disabled={isLoading}
@@ -180,7 +172,7 @@ export function TaskAssignmentBanner({
               <Button
                 onClick={() => {
                   setLoadingAction('all');
-                  onConfirm();
+                  engine.confirmAssignment();
                 }}
                 size="sm"
                 disabled={isLoading}
@@ -193,7 +185,7 @@ export function TaskAssignmentBanner({
             </>
           ) : (
             <Button
-              onClick={onConfirm}
+              onClick={() => engine.confirmAssignment()}
               size="sm"
               disabled={isLoading}
               aria-busy={isLoading}

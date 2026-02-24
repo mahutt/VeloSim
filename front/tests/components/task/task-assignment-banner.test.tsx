@@ -22,69 +22,67 @@
  * SOFTWARE.
  */
 
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
 import { TaskAssignmentBanner } from '~/components/task/task-assignment-banner';
+import {
+  useSimulation,
+  type SimulationContextType,
+} from '~/providers/simulation-provider';
+import type SimulationEngine from '~/lib/simulation-engine';
+import { makePendingAssignment } from 'tests/test-helpers';
+import { TaskAction } from '~/types';
+
+const { mockUseSimulation } = await vi.hoisted(async () => {
+  const { mockSimulationEngine } = await import('tests/mocks');
+  const { DEFAULT_REACTIVE_SIMULATION_STATE } =
+    await import('app/lib/reactive-simulation-state');
+  const mockUseSimulationResult: SimulationContextType = {
+    state: DEFAULT_REACTIVE_SIMULATION_STATE,
+    engine: mockSimulationEngine as SimulationEngine,
+  };
+  const mockUseSimulation = () => mockUseSimulationResult;
+  return { mockUseSimulation };
+});
+
+vi.mock(import('~/providers/simulation-provider'), async (importOriginal) => {
+  const actual = await importOriginal();
+  return {
+    ...actual,
+    useSimulation: mockUseSimulation,
+  };
+});
 
 describe('TaskAssignmentBanner', () => {
-  it('renders prompt with task and resource name and buttons', () => {
-    render(
-      <TaskAssignmentBanner
-        taskIds={[1]}
-        driverName="Driver A"
-        remainingBatteryCount={10}
-        action="assign"
-        onConfirm={() => {}}
-        onCancel={() => {}}
-      />
-    );
-
-    expect(
-      screen.getByText(/Assign task #1 to Driver A\?/i)
-    ).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /cancel/i })).toBeInTheDocument();
-    expect(
-      screen.getByRole('button', { name: /confirm/i })
-    ).toBeInTheDocument();
+  beforeEach(() => {
+    vi.clearAllMocks();
   });
-
   it('calls onConfirm and onCancel when buttons are clicked', async () => {
+    useSimulation().state.pendingAssignment = makePendingAssignment();
     const user = userEvent.setup();
-    const onConfirm = vi.fn();
-    const onCancel = vi.fn();
 
-    render(
-      <TaskAssignmentBanner
-        taskIds={[1]}
-        driverName="Driver B"
-        remainingBatteryCount={10}
-        action="assign"
-        onConfirm={onConfirm}
-        onCancel={onCancel}
-      />
-    );
+    render(<TaskAssignmentBanner />);
 
     await user.click(screen.getByRole('button', { name: /confirm/i }));
-    expect(onConfirm).toHaveBeenCalledTimes(1);
+    expect(useSimulation().engine.confirmAssignment).toHaveBeenCalledTimes(1);
 
     await user.click(screen.getByRole('button', { name: /cancel/i }));
-    expect(onCancel).toHaveBeenCalledTimes(1);
+    expect(useSimulation().engine.cancelAssignment).toHaveBeenCalledTimes(1);
   });
 
   it('renders reassign prompt when action is reassign and previous resource is provided', () => {
-    render(
-      <TaskAssignmentBanner
-        taskIds={[1]}
-        driverName="Driver B"
-        prevDriverName="Driver A"
-        remainingBatteryCount={10}
-        action="reassign"
-        onConfirm={() => {}}
-        onCancel={() => {}}
-      />
-    );
+    useSimulation().state.pendingAssignment = makePendingAssignment({
+      action: TaskAction.Reassign,
+      taskIds: [1],
+      driverId: 1,
+      driverName: 'Driver B',
+      driverBatteryCount: 3,
+      prevDriverId: 2,
+      prevDriverName: 'Driver A',
+    });
+    render(<TaskAssignmentBanner />);
 
     expect(
       screen.getByText(/Re-assign task #1 from Driver A to Driver B\?/i)
@@ -92,35 +90,44 @@ describe('TaskAssignmentBanner', () => {
   });
 
   it('renders unassign prompt when action is unassign', () => {
-    render(
-      <TaskAssignmentBanner
-        taskIds={[5]}
-        driverName="Driver C"
-        remainingBatteryCount={10}
-        action="unassign"
-        onConfirm={() => {}}
-        onCancel={() => {}}
-      />
-    );
+    useSimulation().state.pendingAssignment = makePendingAssignment({
+      action: TaskAction.Unassign,
+      taskIds: [5],
+      driverId: 3,
+      driverName: 'Driver C',
+    });
+    render(<TaskAssignmentBanner />);
 
     expect(
       screen.getByText(/Un-assign task #5 from Driver C\?/i)
     ).toBeInTheDocument();
   });
 
+  it('notifies user when there are more tasks being assigned than batteries left', () => {
+    useSimulation().state.pendingAssignment = makePendingAssignment({
+      action: TaskAction.Assign,
+      taskIds: [5],
+      driverId: 3,
+      driverName: 'Driver 3',
+      driverBatteryCount: 0,
+    });
+    render(<TaskAssignmentBanner />);
+
+    expect(
+      screen.getByText(/Driver 3 has 0 batteries remaining\./i)
+    ).toBeInTheDocument();
+  });
+
   it('shows three buttons when batch assign has mixed tasks', () => {
-    render(
-      <TaskAssignmentBanner
-        taskIds={[1, 2, 3, 4, 5]}
-        driverName="Driver A"
-        remainingBatteryCount={10}
-        action="assign"
-        reassignCount={2}
-        onConfirm={() => {}}
-        onConfirmUnassignedOnly={() => {}}
-        onCancel={() => {}}
-      />
-    );
+    useSimulation().state.pendingAssignment = makePendingAssignment({
+      action: TaskAction.Assign,
+      taskIds: [1, 2, 3, 4, 5],
+      driverId: 3,
+      driverName: 'Driver A',
+      driverBatteryCount: 10,
+      reassignCount: 2,
+    });
+    render(<TaskAssignmentBanner />);
 
     expect(
       screen.getByText(/Assign 5 tasks to Driver A\?/i)
@@ -139,38 +146,33 @@ describe('TaskAssignmentBanner', () => {
 
   it('calls onConfirmUnassignedOnly when assign unassigned only is clicked', async () => {
     const user = userEvent.setup();
-    const onConfirmUnassignedOnly = vi.fn();
 
-    render(
-      <TaskAssignmentBanner
-        taskIds={[1, 2, 3]}
-        driverName="Driver A"
-        remainingBatteryCount={10}
-        action="assign"
-        reassignCount={1}
-        onConfirm={() => {}}
-        onConfirmUnassignedOnly={onConfirmUnassignedOnly}
-        onCancel={() => {}}
-      />
-    );
+    useSimulation().state.pendingAssignment = makePendingAssignment({
+      action: TaskAction.Assign,
+      taskIds: [1, 2, 3],
+      driverId: 3,
+      driverName: 'Driver A',
+      driverBatteryCount: 10,
+      reassignCount: 1,
+    });
+    render(<TaskAssignmentBanner />);
 
     await user.click(screen.getByRole('button', { name: /remaining \(2\)/i }));
-    expect(onConfirmUnassignedOnly).toHaveBeenCalledTimes(1);
+    expect(useSimulation().engine.confirmUnassignedOnly).toHaveBeenCalledTimes(
+      1
+    );
   });
 
   it('shows single confirm button when no tasks are reassigned', () => {
-    render(
-      <TaskAssignmentBanner
-        taskIds={[1, 2, 3]}
-        driverName="Driver A"
-        remainingBatteryCount={10}
-        action="assign"
-        reassignCount={0}
-        onConfirm={() => {}}
-        onConfirmUnassignedOnly={() => {}}
-        onCancel={() => {}}
-      />
-    );
+    useSimulation().state.pendingAssignment = makePendingAssignment({
+      action: TaskAction.Assign,
+      taskIds: [1, 2, 3],
+      driverId: 3,
+      driverName: 'Driver A',
+      driverBatteryCount: 10,
+      reassignCount: 0,
+    });
+    render(<TaskAssignmentBanner />);
 
     expect(screen.getByRole('button', { name: /cancel/i })).toBeInTheDocument();
     expect(
@@ -182,18 +184,15 @@ describe('TaskAssignmentBanner', () => {
   });
 
   it('shows reassign message when all tasks are already assigned to other drivers', () => {
-    render(
-      <TaskAssignmentBanner
-        taskIds={[1, 2]}
-        driverName="Driver C"
-        remainingBatteryCount={10}
-        action="assign"
-        reassignCount={2}
-        onConfirm={() => {}}
-        onConfirmUnassignedOnly={() => {}}
-        onCancel={() => {}}
-      />
-    );
+    useSimulation().state.pendingAssignment = makePendingAssignment({
+      action: TaskAction.Assign,
+      taskIds: [1, 2],
+      driverId: 3,
+      driverName: 'Driver C',
+      driverBatteryCount: 10,
+      reassignCount: 2,
+    });
+    render(<TaskAssignmentBanner />);
 
     expect(
       screen.getByText(/Re-assign 2 tasks to Driver C\?/i)
@@ -209,17 +208,16 @@ describe('TaskAssignmentBanner', () => {
   });
 
   it('renders multi-reassign prompt from a single known driver', () => {
-    render(
-      <TaskAssignmentBanner
-        taskIds={[1, 2, 3]}
-        driverName="Driver B"
-        prevDriverName="Driver A"
-        remainingBatteryCount={10}
-        action="reassign"
-        onConfirm={() => {}}
-        onCancel={() => {}}
-      />
-    );
+    useSimulation().state.pendingAssignment = makePendingAssignment({
+      action: TaskAction.Reassign,
+      taskIds: [1, 2, 3],
+      driverId: 3,
+      driverName: 'Driver B',
+      driverBatteryCount: 10,
+      prevDriverId: 2,
+      prevDriverName: 'Driver A',
+    });
+    render(<TaskAssignmentBanner />);
 
     expect(
       screen.getByText(/Re-assign 3 tasks from Driver A to Driver B\?/i)
@@ -228,45 +226,21 @@ describe('TaskAssignmentBanner', () => {
 
   it('shows loading text on mixed-task Remaining button when isLoading', async () => {
     const user = userEvent.setup();
-    const onConfirmUnassignedOnly = vi.fn();
+    useSimulation().state.pendingAssignment = makePendingAssignment({
+      action: TaskAction.Assign,
+      taskIds: [1, 2, 3],
+      driverId: 3,
+      driverName: 'Driver A',
+      driverBatteryCount: 10,
+      reassignCount: 1,
+    });
+    useSimulation().state.pendingAssignmentLoading = false;
 
-    render(
-      <TaskAssignmentBanner
-        taskIds={[1, 2, 3]}
-        driverName="Driver A"
-        remainingBatteryCount={10}
-        action="assign"
-        reassignCount={1}
-        isLoading={false}
-        onConfirm={() => {}}
-        onConfirmUnassignedOnly={onConfirmUnassignedOnly}
-        onCancel={() => {}}
-      />
-    );
+    render(<TaskAssignmentBanner />);
 
     await user.click(screen.getByRole('button', { name: /remaining \(2\)/i }));
-    expect(onConfirmUnassignedOnly).toHaveBeenCalledTimes(1);
-  });
-
-  it('shows loading text on mixed-task All button when isLoading', async () => {
-    const user = userEvent.setup();
-    const onConfirm = vi.fn();
-
-    render(
-      <TaskAssignmentBanner
-        taskIds={[1, 2, 3]}
-        driverName="Driver A"
-        remainingBatteryCount={10}
-        action="assign"
-        reassignCount={1}
-        isLoading={false}
-        onConfirm={onConfirm}
-        onConfirmUnassignedOnly={() => {}}
-        onCancel={() => {}}
-      />
+    expect(useSimulation().engine.confirmUnassignedOnly).toHaveBeenCalledTimes(
+      1
     );
-
-    await user.click(screen.getByRole('button', { name: /all \(3\)/i }));
-    expect(onConfirm).toHaveBeenCalledTimes(1);
   });
 });

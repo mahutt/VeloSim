@@ -24,22 +24,14 @@
 
 import { expect, test, vi } from 'vitest';
 import { render, act, renderHook } from '@testing-library/react';
-import {
-  INITIAL_CENTER,
-  INITIAL_ZOOM,
-  MapProvider,
-  useMap,
-} from '~/providers/map-provider';
+import { MapProvider, useMap } from '~/providers/map-provider';
 import { MockMap } from 'tests/mocks';
-import MapContainer from '~/components/map/map-container';
 import {
   initializeMapSources,
   loadMapImages,
   setMapLayers,
 } from '~/lib/map-helpers';
 import { logSimulationError } from '~/utils/simulation-error-utils';
-import { SimulationProvider } from '~/providers/simulation-provider';
-import { TaskAssignmentProvider } from '~/providers/task-assignment-provider';
 
 // Mock useAuth hook
 vi.mock('~/hooks/use-auth', () => ({
@@ -82,22 +74,6 @@ vi.mock('~/lib/frame-sources/server-frame-source', () => {
   return {
     ServerFrameSource: mockServerFrameSource,
   };
-});
-
-test('map provider instantiates mapboxgl Map instance in presence of map container', async () => {
-  render(
-    <MapProvider>
-      <SimulationProvider simId="test-sim-123">
-        <TaskAssignmentProvider>
-          <MapContainer />
-        </TaskAssignmentProvider>
-      </SimulationProvider>
-    </MapProvider>
-  );
-  const map = MockMap.instance;
-  expect(map).toBeDefined();
-  expect(map!.getCenter()).toBe(INITIAL_CENTER);
-  expect(map!.getZoom()).toBe(INITIAL_ZOOM);
 });
 
 test("map provider doesn't instantiate mapboxgl Map instance without map container", async () => {

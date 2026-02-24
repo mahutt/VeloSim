@@ -25,17 +25,14 @@
 import { useSimulation } from '~/providers/simulation-provider';
 
 export default function Clock() {
-  const { formattedSimTime, currentDay } = useSimulation();
-
-  // HH:MM time format
-  const time = formattedSimTime ?? '--:--';
-
+  const { state } = useSimulation();
+  const { formattedSimTime, currentDay } = state;
   return (
     <div className="bg-background border shadow-sm rounded-md h-10 px-3 flex items-center">
       <div className="flex items-center gap-1 font-mono text-sm">
         <span className="font-medium text-foreground">Day {currentDay}</span>
         <span className="text-xs font-bold text-foreground/50">—</span>
-        <span className="font-medium text-foreground">{time}</span>
+        <span className="font-medium text-foreground">{formattedSimTime}</span>
       </div>
     </div>
   );

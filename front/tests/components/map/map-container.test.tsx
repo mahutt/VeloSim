@@ -26,8 +26,6 @@ import { expect, test, vi } from 'vitest';
 import { render } from '@testing-library/react';
 import MapContainer from '~/components/map/map-container';
 import { MapProvider } from '~/providers/map-provider';
-import { SimulationProvider } from '~/providers/simulation-provider';
-import { TaskAssignmentProvider } from '~/providers/task-assignment-provider';
 
 // Mock useAuth hook
 vi.mock('~/hooks/use-auth', () => ({
@@ -58,11 +56,7 @@ test('map container render should fail without a map provider', async () => {
 test('map container render should succeed with a map provider', async () => {
   const { getByTestId } = render(
     <MapProvider>
-      <SimulationProvider simId="test-sim-123">
-        <TaskAssignmentProvider>
-          <MapContainer />
-        </TaskAssignmentProvider>
-      </SimulationProvider>
+      <MapContainer />
     </MapProvider>
   );
   expect(getByTestId('map-container')).toBeDefined();

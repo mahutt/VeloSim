@@ -24,85 +24,58 @@
 
 import { expect, test, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
-import {
-  ResourceItem,
-  type ResourceItemElement,
-} from '~/components/resource/resource-item';
-import { DriverState } from '~/types';
-import { MapProvider } from '~/providers/map-provider';
-import { SimulationProvider } from '~/providers/simulation-provider';
-import { TaskAssignmentProvider } from '~/providers/task-assignment-provider';
+import { ResourceItem } from '~/components/resource/resource-item';
+import { type SimulationContextType } from '~/providers/simulation-provider';
+import { makeResourceItemElement } from 'tests/test-helpers';
+import type SimulationEngine from '~/lib/simulation-engine';
 
-// Mock useAuth hook
-vi.mock('~/hooks/use-auth', () => ({
-  default: () => ({
-    user: { id: 1, username: 'test_user', is_admin: false },
-    setUser: vi.fn(),
-    loading: false,
-    setLoading: vi.fn(),
-    logout: vi.fn(),
-    refreshUser: vi.fn(),
-    setToken: vi.fn(),
-  }),
-}));
+const { mockUseSimulation } = await vi.hoisted(async () => {
+  const { mockSimulationEngine } = await import('tests/mocks');
+  const { DEFAULT_REACTIVE_SIMULATION_STATE } =
+    await import('app/lib/reactive-simulation-state');
+  const mockUseSimulationResult: SimulationContextType = {
+    state: DEFAULT_REACTIVE_SIMULATION_STATE,
+    engine: mockSimulationEngine as SimulationEngine,
+  };
+  const mockUseSimulation = () => mockUseSimulationResult;
+  return { mockUseSimulation };
+});
 
-const { mockServerFrameSource } = await vi.hoisted(() => import('tests/mocks'));
-vi.mock('~/lib/frame-sources/server-frame-source', () => {
+vi.mock(import('~/providers/simulation-provider'), async (importOriginal) => {
+  const actual = await importOriginal();
   return {
-    ServerFrameSource: mockServerFrameSource,
+    ...actual,
+    useSimulation: mockUseSimulation,
   };
 });
 
 test('resource item renders with resource data', () => {
-  const mockResource: ResourceItemElement = {
+  const mockResource = makeResourceItemElement({
     id: 1,
     name: 'John Doe',
-    taskCount: 3,
-    batteryCount: 1,
-    batteryCapacity: 100,
-    state: DriverState.Idle,
-  };
+  });
 
   const mockOnSelect = vi.fn();
 
-  render(
-    <MapProvider>
-      <SimulationProvider simId="test-sim-123">
-        <TaskAssignmentProvider>
-          <ResourceItem resource={mockResource} onSelect={mockOnSelect} />
-        </TaskAssignmentProvider>
-      </SimulationProvider>
-    </MapProvider>
-  );
+  render(<ResourceItem resource={mockResource} onSelect={mockOnSelect} />);
 
   expect(screen.getByText('John Doe')).toBeDefined();
   expect(screen.getByText('#1')).toBeDefined();
 });
 
 test('resource item renders with selection state', () => {
-  const mockResource: ResourceItemElement = {
-    id: 1,
+  const mockResource = makeResourceItemElement({
+    id: 2,
     name: 'Jane Smith',
-    taskCount: 5,
-    batteryCount: 0,
-    batteryCapacity: 100,
-    state: DriverState.OnRoute,
-  };
-
+  });
   const mockOnSelect = vi.fn();
 
   const { rerender } = render(
-    <MapProvider>
-      <SimulationProvider simId="test-sim-123">
-        <TaskAssignmentProvider>
-          <ResourceItem
-            resource={mockResource}
-            onSelect={mockOnSelect}
-            isSelected={false}
-          />
-        </TaskAssignmentProvider>
-      </SimulationProvider>
-    </MapProvider>
+    <ResourceItem
+      resource={mockResource}
+      onSelect={mockOnSelect}
+      isSelected={false}
+    />
   );
 
   // Check unselected state styling
@@ -116,17 +89,11 @@ test('resource item renders with selection state', () => {
 
   // Rerender with selected state
   rerender(
-    <MapProvider>
-      <SimulationProvider simId="test-sim-123">
-        <TaskAssignmentProvider>
-          <ResourceItem
-            resource={mockResource}
-            onSelect={mockOnSelect}
-            isSelected={true}
-          />
-        </TaskAssignmentProvider>
-      </SimulationProvider>
-    </MapProvider>
+    <ResourceItem
+      resource={mockResource}
+      onSelect={mockOnSelect}
+      isSelected={true}
+    />
   );
 
   const selectedItemRoot = screen
@@ -139,26 +106,14 @@ test('resource item renders with selection state', () => {
 });
 
 test('resource item calls onSelect when clicked', () => {
-  const mockResource: ResourceItemElement = {
-    id: 2,
+  const mockResource = makeResourceItemElement({
+    id: 3,
     name: 'Bob Johnson',
-    taskCount: 5,
-    batteryCount: 2,
-    batteryCapacity: 100,
-    state: DriverState.ServicingStation,
-  };
+  });
 
   const mockOnSelect = vi.fn();
 
-  render(
-    <MapProvider>
-      <SimulationProvider simId="test-sim-123">
-        <TaskAssignmentProvider>
-          <ResourceItem resource={mockResource} onSelect={mockOnSelect} />
-        </TaskAssignmentProvider>
-      </SimulationProvider>
-    </MapProvider>
-  );
+  render(<ResourceItem resource={mockResource} onSelect={mockOnSelect} />);
 
   const container = screen.getByText('Bob Johnson').closest('div');
   if (container) {
@@ -169,80 +124,40 @@ test('resource item calls onSelect when clicked', () => {
 });
 
 test('resource item displays driver name and ID', () => {
-  const mockResource: ResourceItemElement = {
+  const mockResource = makeResourceItemElement({
     id: 3,
     name: 'Charlie Brown',
-    taskCount: 2,
-    batteryCount: 1,
-    batteryCapacity: 100,
-    state: DriverState.Idle,
-  };
+  });
 
   const mockOnSelect = vi.fn();
 
-  render(
-    <MapProvider>
-      <SimulationProvider simId="test-sim-123">
-        <TaskAssignmentProvider>
-          <ResourceItem resource={mockResource} onSelect={mockOnSelect} />
-        </TaskAssignmentProvider>
-      </SimulationProvider>
-    </MapProvider>
-  );
+  render(<ResourceItem resource={mockResource} onSelect={mockOnSelect} />);
 
   expect(screen.getByText('Charlie Brown')).toBeDefined();
   expect(screen.getByText('#3')).toBeDefined();
 });
 
 test('resource item displays battery status indicator', () => {
-  const mockResource: ResourceItemElement = {
-    id: 4,
-    name: 'Diana Prince',
-    taskCount: 1,
+  const mockResource = makeResourceItemElement({
     batteryCount: 2,
-    batteryCapacity: 100,
-    state: DriverState.OnRoute,
-  };
-
+  });
   const mockOnSelect = vi.fn();
-
-  render(
-    <MapProvider>
-      <SimulationProvider simId="test-sim-123">
-        <TaskAssignmentProvider>
-          <ResourceItem resource={mockResource} onSelect={mockOnSelect} />
-        </TaskAssignmentProvider>
-      </SimulationProvider>
-    </MapProvider>
-  );
-
+  render(<ResourceItem resource={mockResource} onSelect={mockOnSelect} />);
   expect(screen.getByText('2')).toBeDefined();
 });
 
 test('resource item handles dragOver event correctly', () => {
-  const mockResource: ResourceItemElement = {
-    id: 5,
-    name: 'Test Driver',
-    taskCount: 0,
-    batteryCount: 1,
-    batteryCapacity: 100,
-    state: DriverState.OnBreak,
-  };
+  const mockResource = makeResourceItemElement({
+    id: 4,
+    name: 'Drag Test Driver',
+  });
 
   const mockOnSelect = vi.fn();
 
-  render(
-    <MapProvider>
-      <SimulationProvider simId="test-sim-123">
-        <TaskAssignmentProvider>
-          <ResourceItem resource={mockResource} onSelect={mockOnSelect} />
-        </TaskAssignmentProvider>
-      </SimulationProvider>
-    </MapProvider>
-  );
+  render(<ResourceItem resource={mockResource} onSelect={mockOnSelect} />);
 
   const container = screen
-    .getByText('Test Driver')
+    .getByText('Drag Test Driver')
     .closest('[data-slot="item"]') as HTMLElement;
 
   const dragOverEvent = new DragEvent('dragover', {
@@ -252,31 +167,18 @@ test('resource item handles dragOver event correctly', () => {
   });
 
   fireEvent(container, dragOverEvent);
-
   expect(dragOverEvent.defaultPrevented).toBe(true);
 });
 
 test('resource item handles drop event and stops propagation (#583)', () => {
-  const mockResource: ResourceItemElement = {
-    id: 6,
+  const mockResource = makeResourceItemElement({
+    id: 5,
     name: 'Drop Test Driver',
-    taskCount: 0,
-    batteryCount: 1,
-    batteryCapacity: 100,
-    state: DriverState.RestockingBatteries,
-  };
+  });
 
   const mockOnSelect = vi.fn();
 
-  render(
-    <MapProvider>
-      <SimulationProvider simId="test-sim-123">
-        <TaskAssignmentProvider>
-          <ResourceItem resource={mockResource} onSelect={mockOnSelect} />
-        </TaskAssignmentProvider>
-      </SimulationProvider>
-    </MapProvider>
-  );
+  render(<ResourceItem resource={mockResource} onSelect={mockOnSelect} />);
 
   const container = screen
     .getByText('Drop Test Driver')
@@ -300,26 +202,14 @@ test('resource item handles drop event and stops propagation (#583)', () => {
 });
 
 test('resource item handles dragEnter and applies hover state', () => {
-  const mockResource: ResourceItemElement = {
-    id: 7,
+  const mockResource = makeResourceItemElement({
+    id: 6,
     name: 'Hover Test Driver',
-    taskCount: 0,
-    batteryCount: 1,
-    batteryCapacity: 100,
-    state: DriverState.EndingShift,
-  };
+  });
 
   const mockOnSelect = vi.fn();
 
-  render(
-    <MapProvider>
-      <SimulationProvider simId="test-sim-123">
-        <TaskAssignmentProvider>
-          <ResourceItem resource={mockResource} onSelect={mockOnSelect} />
-        </TaskAssignmentProvider>
-      </SimulationProvider>
-    </MapProvider>
-  );
+  render(<ResourceItem resource={mockResource} onSelect={mockOnSelect} />);
 
   const container = screen
     .getByText('Hover Test Driver')
@@ -338,26 +228,14 @@ test('resource item handles dragEnter and applies hover state', () => {
 });
 
 test('resource item handles dragLeave with relatedTarget outside element (#583)', () => {
-  const mockResource: ResourceItemElement = {
-    id: 8,
+  const mockResource = makeResourceItemElement({
+    id: 7,
     name: 'Leave Test Driver',
-    taskCount: 0,
-    batteryCount: 1,
-    batteryCapacity: 100,
-    state: DriverState.SeekingHQForInventory,
-  };
+  });
 
   const mockOnSelect = vi.fn();
 
-  render(
-    <MapProvider>
-      <SimulationProvider simId="test-sim-123">
-        <TaskAssignmentProvider>
-          <ResourceItem resource={mockResource} onSelect={mockOnSelect} />
-        </TaskAssignmentProvider>
-      </SimulationProvider>
-    </MapProvider>
-  );
+  render(<ResourceItem resource={mockResource} onSelect={mockOnSelect} />);
 
   const container = screen
     .getByText('Leave Test Driver')
@@ -387,26 +265,14 @@ test('resource item handles dragLeave with relatedTarget outside element (#583)'
 });
 
 test('resource item handles dragLeave with null relatedTarget (#583 Safari fix)', () => {
-  const mockResource: ResourceItemElement = {
-    id: 9,
+  const mockResource = makeResourceItemElement({
+    id: 8,
     name: 'Null Leave Test Driver',
-    taskCount: 0,
-    batteryCount: 1,
-    batteryCapacity: 100,
-    state: DriverState.PendingShift,
-  };
+  });
 
   const mockOnSelect = vi.fn();
 
-  render(
-    <MapProvider>
-      <SimulationProvider simId="test-sim-123">
-        <TaskAssignmentProvider>
-          <ResourceItem resource={mockResource} onSelect={mockOnSelect} />
-        </TaskAssignmentProvider>
-      </SimulationProvider>
-    </MapProvider>
-  );
+  render(<ResourceItem resource={mockResource} onSelect={mockOnSelect} />);
 
   const container = screen
     .getByText('Null Leave Test Driver')

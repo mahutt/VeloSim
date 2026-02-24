@@ -28,7 +28,7 @@ import {
   interpolateAlongRoute,
   updateDriverPositions,
 } from '~/lib/animation-helpers';
-import type { Driver, Position, Route } from '~/types';
+import type { Position, Route } from '~/types';
 
 // Helper to check if two positions are approximately equal
 function expectPositionClose(actual: Position, expected: Position) {
@@ -122,7 +122,7 @@ test('interpolateAlongRoute falls back to linear for single-point route', () => 
 
 describe('updateDriverPositions', () => {
   it("doesn't update a driver's position when no start / target positions are available", () => {
-    const drivers = new Map<number, Driver>([[1, makeDriver({ id: 1 })]]);
+    const drivers = [makeDriver({ id: 1 })];
     const currentPositions = new Map<number, Position>([[1, [0, 0]]]);
     const frameStartPositions = new Map<number, Position>();
     const frameTargetPositions = new Map<number, Position>();
@@ -145,7 +145,7 @@ describe('updateDriverPositions', () => {
   });
 
   it("updates a driver's position when start / target positions are available", () => {
-    const drivers = new Map<number, Driver>([[1, makeDriver({ id: 1 })]]);
+    const drivers = [makeDriver({ id: 1 })];
     const currentPositions = new Map<number, Position>([[1, [0.1, 0.1]]]);
     const frameStartPositions = new Map<number, Position>([[1, [0, 0]]]);
     const frameTargetPositions = new Map<number, Position>([[1, [1, 1]]]);
@@ -184,7 +184,7 @@ describe('updateDriverPositions', () => {
   });
 
   it('uses linear interpolation when no route is available', () => {
-    const drivers = new Map<number, Driver>([[1, makeDriver({ id: 1 })]]);
+    const drivers = [makeDriver({ id: 1 })];
     const currentPositions = new Map<number, Position>([[1, [0.1, 0.1]]]);
     const frameStartPositions = new Map<number, Position>([[1, [0, 0]]]);
     const frameTargetPositions = new Map<number, Position>([[1, [1, 1]]]);
@@ -192,7 +192,7 @@ describe('updateDriverPositions', () => {
     const lastDriverUpdates = new Map<number, number>([
       [1, performance.now() - 500],
     ]);
-    const speed = 0;
+    const speed = 1;
 
     const result = updateDriverPositions(
       drivers,
@@ -210,7 +210,7 @@ describe('updateDriverPositions', () => {
   });
 
   it('clears the start / target positions if the target is reached', () => {
-    const drivers = new Map<number, Driver>([[1, makeDriver({ id: 1 })]]);
+    const drivers = [makeDriver({ id: 1 })];
     const currentPositions = new Map<number, Position>([[1, [0.1, 0.1]]]);
     const frameStartPositions = new Map<number, Position>([[1, [0, 0]]]);
     const frameTargetPositions = new Map<number, Position>([[1, [1, 1]]]);

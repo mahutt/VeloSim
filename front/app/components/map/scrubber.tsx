@@ -34,24 +34,19 @@ import { useSimulation } from '~/providers/simulation-provider';
 import { SIMULATION_FRAMES_PER_KEY_FRAME } from '~/constants';
 
 export default function Scrubber() {
-  const {
-    startTime,
-    simulationSecondsPassed,
-    scrubSimulationSecond,
-    scrub,
-    commitScrub,
-  } = useSimulation();
+  const { state, engine } = useSimulation();
+  const { startTime, simulationSecondsPassed, scrubSimulationSecond } = state;
 
   const [open, setOpen] = useState(false);
 
   const handleChange = (value: number[]) => {
     console.log('Slider value changed to: ', value);
-    scrub(value[0]);
+    engine.scrub(value[0]);
   };
 
   const handleCommit = () => {
     console.log('Slider value committed: ', scrubSimulationSecond);
-    commitScrub(scrubSimulationSecond);
+    engine.commitScrub(scrubSimulationSecond);
   };
 
   return (

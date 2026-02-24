@@ -23,6 +23,11 @@
  */
 
 import { vi } from 'vitest';
+import type LocalFrameSource from '~/lib/frame-sources/local-frame-source';
+import type ServerFrameSource from '~/lib/frame-sources/server-frame-source';
+import type MapManager from '~/lib/map-manager';
+import type SimulationEngine from '~/lib/simulation-engine';
+import type SimulationStateManager from '~/lib/simulation-state-manager';
 import type { Position } from '~/types';
 
 type eventType = 'load' | 'move' | 'error';
@@ -92,10 +97,106 @@ export const consoleErrorSpy = vi
   .spyOn(console, 'error')
   .mockImplementation(() => {});
 
-export const mockServerFrameSource = class {
-  constructor() {}
-  async start() {
-    return true;
-  }
-  public stop() {}
+export const mockLocalFrameSource: Partial<LocalFrameSource> = {
+  setSpeed: vi.fn(),
+  getFrame: vi.fn(),
+  getMaxFrame: vi.fn(),
+  setPosition: vi.fn(),
 };
+export const MockLocalFrameSource = vi
+  .fn()
+  .mockImplementation(() => mockLocalFrameSource);
+
+export const mockServerFrameSource: Partial<ServerFrameSource> = {
+  start: vi.fn().mockResolvedValue(true),
+  stop: vi.fn(),
+  setSpeed: vi.fn(),
+};
+export const MockServerFrameSource = vi
+  .fn()
+  .mockImplementation(() => mockServerFrameSource);
+
+export const mockSimulationEngine: Partial<SimulationEngine> = {
+  hasStarted: vi.fn().mockReturnValue(false),
+  setPaused: vi.fn(),
+  setSpeed: vi.fn(),
+  selectItem: vi.fn(),
+  clearSelection: vi.fn(),
+  confirmAssignment: vi.fn(),
+  confirmUnassignedOnly: vi.fn(),
+  cancelAssignment: vi.fn(),
+  reorderTasks: vi.fn(),
+  destroy: vi.fn(),
+};
+export const MockSimulationEngine = vi
+  .fn()
+  .mockImplementation(() => mockSimulationEngine);
+
+export const mockSimulationStateManager: Partial<SimulationStateManager> = {
+  getDriver: vi.fn(),
+  getAllDrivers: vi.fn().mockReturnValue([]),
+  setDriver: vi.fn(),
+
+  getStation: vi.fn(),
+  getAllStations: vi.fn().mockReturnValue([]),
+  setStation: vi.fn(),
+
+  getVehicle: vi.fn(),
+  getAllVehicles: vi.fn().mockReturnValue([]),
+  setVehicle: vi.fn(),
+
+  getTask: vi.fn(),
+  setTask: vi.fn(),
+
+  getSelectedItem: vi.fn().mockReturnValue(null),
+  setSelectedItem: vi.fn(),
+
+  getHeadquarters: vi.fn(),
+  setHeadquarters: vi.fn(),
+
+  getMapShouldRefresh: vi.fn(),
+  setMapShouldRefresh: vi.fn(),
+
+  getLoading: vi.fn(),
+  setLoading: vi.fn(),
+
+  getPendingAssignment: vi.fn(),
+  setPendingAssignment: vi.fn(),
+
+  getPendingAssignmentLoading: vi.fn(),
+  setPendingAssignmentLoading: vi.fn(),
+
+  getFormattedSimTime: vi.fn(),
+  setFormattedSimTime: vi.fn(),
+
+  getCurrentDay: vi.fn(),
+  setCurrentDay: vi.fn(),
+
+  getNonZeroSpeed: vi.fn(),
+  setNonZeroSpeed: vi.fn(),
+
+  getPaused: vi.fn(),
+  setPaused: vi.fn(),
+
+  getShowAllRoutes: vi.fn(),
+  setShowAllRoutes: vi.fn(),
+
+  getStartTime: vi.fn(),
+  setStartTime: vi.fn(),
+
+  getSimulationSecondsPassed: vi.fn(),
+  setSimulationSecondsPassed: vi.fn(),
+
+  getScrubSimulationSecond: vi.fn(),
+  setScrubSimulationSecond: vi.fn(),
+
+  updateHQWidgetState: vi.fn(),
+};
+export const MockSimulationStateManager = vi
+  .fn()
+  .mockImplementation(() => mockSimulationStateManager);
+
+export const mockMapManager: Partial<MapManager> = {
+  processFrame: vi.fn(),
+};
+export const MockMapManager = vi.fn().mockImplementation(() => mockMapManager);

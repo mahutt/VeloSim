@@ -44,7 +44,7 @@ import { logSimulationError } from '~/utils/simulation-error-utils';
 export const INITIAL_CENTER = [-73.57776, 45.48944] as Position;
 export const INITIAL_ZOOM = 10.12;
 
-type MapContextType = {
+export type MapContextType = {
   mapRef: RefObject<mapboxgl.Map | null>;
   mapContainerRef: RefObject<HTMLDivElement | null>;
   mapLoaded: boolean;

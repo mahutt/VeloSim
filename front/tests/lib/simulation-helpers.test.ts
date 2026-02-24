@@ -63,6 +63,18 @@ describe('vehicleResourceHasUpdated', () => {
 });
 
 describe('driverResourceHasUpdated', () => {
+  it('should return true if the driver did not exist before but is part of a resource', () => {
+    const existingDriver = undefined;
+    const updatedDriver = makeDriver({ vehicleId: 1 });
+    const result = driverResourceHasUpdated(existingDriver, updatedDriver);
+    expect(result).toBe(true);
+  });
+  it('should return true if vehicle assignment changed', () => {
+    const existingDriver = makeDriver({ id: 1, vehicleId: null });
+    const updatedDriver = makeDriver({ id: 1, vehicleId: 1 });
+    const result = driverResourceHasUpdated(existingDriver, updatedDriver);
+    expect(result).toBe(true);
+  });
   it('should return true if the driver is part of a resource and task count changed', () => {
     const existingDriver = makeDriver({ id: 1, vehicleId: 1, taskIds: [1, 2] });
     const updatedDriver = makeDriver({

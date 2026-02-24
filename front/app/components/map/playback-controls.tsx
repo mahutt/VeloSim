@@ -34,7 +34,8 @@ import {
 import { SPEED_OPTIONS, useSimulation } from '~/providers/simulation-provider';
 
 export default function PlaybackControls() {
-  const { speed, setSpeed, paused, setPaused } = useSimulation();
+  const { state, engine } = useSimulation();
+  const { nonZeroSpeed, paused } = state;
   const [loading, setLoading] = useState<boolean>(false);
 
   return (
@@ -47,7 +48,7 @@ export default function PlaybackControls() {
           <DropdownMenu>
             <DropdownMenuTrigger className="cursor-pointer" asChild>
               <button className="select-none text-center text-sm w-7 hover:text-foreground/80">
-                {speed}x
+                {nonZeroSpeed}x
               </button>
             </DropdownMenuTrigger>
             <DropdownMenuContent
@@ -59,7 +60,7 @@ export default function PlaybackControls() {
                   key={option}
                   onSelect={async () => {
                     setLoading(true);
-                    await setSpeed(option);
+                    await engine.setSpeed(option);
                     setLoading(false);
                   }}
                   className="flex justify-center items-center"
@@ -78,7 +79,7 @@ export default function PlaybackControls() {
           className="group px-1 flex items-center justify-center disabled:opacity-50 disabled:pointer-events-none hover:bg-accent"
           onClick={async () => {
             setLoading(true);
-            await setPaused(!paused);
+            await engine.setPaused(!paused);
             setLoading(false);
           }}
           disabled={loading}

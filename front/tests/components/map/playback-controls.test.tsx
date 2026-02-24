@@ -26,7 +26,11 @@ import { describe, it, expect, vi, type Mock } from 'vitest';
 import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import PlaybackControls from '~/components/map/playback-controls';
-import { useSimulation } from '~/providers/simulation-provider';
+import {
+  useSimulation,
+  type SimulationContextType,
+} from '~/providers/simulation-provider';
+import type SimulationEngine from '~/lib/simulation-engine';
 
 vi.mock('~/api', () => ({
   default: {
@@ -35,13 +39,13 @@ vi.mock('~/api', () => ({
 }));
 
 const { mockUseSimulation } = await vi.hoisted(async () => {
-  const { makeSimulationContext } = await import('tests/test-helpers');
-  const mockUseSimulationResult = makeSimulationContext({
-    speed: 1,
-    setSpeed: vi.fn(),
-    paused: false,
-    setPaused: vi.fn(),
-  });
+  const { mockSimulationEngine } = await import('tests/mocks');
+  const { DEFAULT_REACTIVE_SIMULATION_STATE } =
+    await import('app/lib/reactive-simulation-state');
+  const mockUseSimulationResult: SimulationContextType = {
+    state: DEFAULT_REACTIVE_SIMULATION_STATE,
+    engine: mockSimulationEngine as SimulationEngine,
+  };
   const mockUseSimulation = () => mockUseSimulationResult;
   return { mockUseSimulation };
 });
@@ -61,7 +65,7 @@ describe('PlaybackControls', () => {
   });
 
   it('renders with play button when initially paused', () => {
-    useSimulation().paused = true;
+    useSimulation().state.paused = true;
     render(<PlaybackControls />);
 
     const playButton = screen.getByRole('button', { name: 'Play simulation' });
@@ -69,7 +73,7 @@ describe('PlaybackControls', () => {
   });
 
   it('renders with pause button when initially playing', () => {
-    useSimulation().paused = false;
+    useSimulation().state.paused = false;
     render(<PlaybackControls />);
 
     const pauseButton = screen.getByRole('button', {
@@ -120,22 +124,23 @@ describe('PlaybackControls', () => {
     const speed2x = await screen.findByText('2x');
     await userEvent.click(speed2x);
 
-    expect(mockUseSimulation().setSpeed).toHaveBeenCalledWith(2);
+    expect(mockUseSimulation().engine.setSpeed).toHaveBeenCalledWith(2);
   });
 
   it('handles successful pause toggle', async () => {
+    useSimulation().state.paused = false;
     render(<PlaybackControls />);
     const pauseButton = screen.getByTestId('simulation-pause-play-button');
     await userEvent.click(pauseButton);
-    expect(mockUseSimulation().setPaused).toHaveBeenCalledWith(true);
+    expect(mockUseSimulation().engine.setPaused).toHaveBeenCalledWith(true);
   });
 
   it('handles successful play toggle', async () => {
-    mockUseSimulation().paused = true;
+    mockUseSimulation().state.paused = true;
     render(<PlaybackControls />);
     const pauseButton = screen.getByTestId('simulation-pause-play-button');
     await userEvent.click(pauseButton);
-    expect(mockUseSimulation().setPaused).toHaveBeenCalledWith(false);
+    expect(mockUseSimulation().engine.setPaused).toHaveBeenCalledWith(false);
   });
 
   it('disables controls while speed update is in progress', async () => {
@@ -144,7 +149,9 @@ describe('PlaybackControls', () => {
     const setSpeedPromise = new Promise((resolve) => {
       resolveSetSpeed = resolve;
     });
-    (mockUseSimulation().setSpeed as Mock).mockReturnValueOnce(setSpeedPromise);
+    (mockUseSimulation().engine.setSpeed as Mock).mockReturnValueOnce(
+      setSpeedPromise
+    );
 
     const speedButton = screen.getByText('1x');
     await userEvent.click(speedButton);

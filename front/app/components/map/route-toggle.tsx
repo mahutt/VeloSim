@@ -33,7 +33,8 @@ import {
 } from '~/components/ui/dropdown-menu';
 
 export default function RouteToggle() {
-  const { showAllRoutes, toggleShowAllRoutes } = useSimulation();
+  const { state, engine } = useSimulation();
+  const { showAllRoutes } = state;
 
   return (
     <DropdownMenu>
@@ -52,7 +53,7 @@ export default function RouteToggle() {
         <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
           <div
             className="flex items-center justify-between w-full cursor-pointer"
-            onClick={toggleShowAllRoutes}
+            onClick={() => engine.toggleShowAllRoutes()}
             role="switch"
             aria-checked={showAllRoutes}
             aria-label="Show all vehicle routes"

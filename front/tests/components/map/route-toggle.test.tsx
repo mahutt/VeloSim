@@ -37,10 +37,7 @@ vi.mock('~/providers/simulation-provider', () => ({
 describe('RouteToggle', () => {
   it('should render the menu button', () => {
     (useSimulation as unknown as ReturnType<typeof vi.fn>).mockReturnValue(
-      makeSimulationContext({
-        showAllRoutes: false,
-        toggleShowAllRoutes: vi.fn(),
-      })
+      makeSimulationContext()
     );
 
     render(<RouteToggle />);
@@ -54,10 +51,7 @@ describe('RouteToggle', () => {
   it('should open dropdown menu when button is clicked', async () => {
     const user = userEvent.setup();
     (useSimulation as unknown as ReturnType<typeof vi.fn>).mockReturnValue(
-      makeSimulationContext({
-        showAllRoutes: false,
-        toggleShowAllRoutes: vi.fn(),
-      })
+      makeSimulationContext()
     );
 
     render(<RouteToggle />);
@@ -73,10 +67,7 @@ describe('RouteToggle', () => {
   it('should show toggle switch in off state when showAllRoutes is false', async () => {
     const user = userEvent.setup();
     (useSimulation as unknown as ReturnType<typeof vi.fn>).mockReturnValue(
-      makeSimulationContext({
-        showAllRoutes: false,
-        toggleShowAllRoutes: vi.fn(),
-      })
+      makeSimulationContext()
     );
 
     render(<RouteToggle />);
@@ -96,10 +87,7 @@ describe('RouteToggle', () => {
   it('should show toggle switch in on state when showAllRoutes is true', async () => {
     const user = userEvent.setup();
     (useSimulation as unknown as ReturnType<typeof vi.fn>).mockReturnValue(
-      makeSimulationContext({
-        showAllRoutes: true,
-        toggleShowAllRoutes: vi.fn(),
-      })
+      makeSimulationContext()
     );
 
     render(<RouteToggle />);
@@ -121,16 +109,9 @@ describe('RouteToggle', () => {
 
   it('should toggle showAllRoutes state when clicked', async () => {
     const user = userEvent.setup();
-    let showAllRoutes = false;
-    const toggleShowAllRoutesMock = vi.fn(() => {
-      showAllRoutes = !showAllRoutes;
-    });
 
     // Initial render with showAllRoutes = false
-    const mockContext = makeSimulationContext({
-      showAllRoutes: false,
-      toggleShowAllRoutes: toggleShowAllRoutesMock,
-    });
+    const mockContext = makeSimulationContext();
     (useSimulation as unknown as ReturnType<typeof vi.fn>).mockReturnValue(
       mockContext
     );
@@ -156,10 +137,7 @@ describe('RouteToggle', () => {
   it('should not close dropdown when toggle is clicked', async () => {
     const user = userEvent.setup();
     (useSimulation as unknown as ReturnType<typeof vi.fn>).mockReturnValue(
-      makeSimulationContext({
-        showAllRoutes: false,
-        toggleShowAllRoutes: vi.fn(),
-      })
+      makeSimulationContext()
     );
 
     render(<RouteToggle />);
@@ -180,10 +158,7 @@ describe('RouteToggle', () => {
 
   it('should have correct aria-label for accessibility', () => {
     (useSimulation as unknown as ReturnType<typeof vi.fn>).mockReturnValue(
-      makeSimulationContext({
-        showAllRoutes: false,
-        toggleShowAllRoutes: vi.fn(),
-      })
+      makeSimulationContext()
     );
 
     render(<RouteToggle />);
@@ -194,10 +169,7 @@ describe('RouteToggle', () => {
 
   it('should render menu icon', () => {
     (useSimulation as unknown as ReturnType<typeof vi.fn>).mockReturnValue(
-      makeSimulationContext({
-        showAllRoutes: false,
-        toggleShowAllRoutes: vi.fn(),
-      })
+      makeSimulationContext()
     );
 
     const { container } = render(<RouteToggle />);

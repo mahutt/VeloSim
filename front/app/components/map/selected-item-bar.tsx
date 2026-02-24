@@ -25,9 +25,13 @@
 import { useState } from 'react';
 import { X } from 'lucide-react';
 import { useSimulation } from '~/providers/simulation-provider';
-import { DriverState, type Position, type StationTask } from '~/types';
+import {
+  DriverState,
+  type Position,
+  type Route,
+  type StationTask,
+} from '~/types';
 import { TaskItem } from '../task/task-item';
-import { useTaskAssignment } from '~/providers/task-assignment-provider';
 import { ScrollArea } from '~/components/ui/scroll-area';
 import { Button } from '../ui/button';
 import DriverStateBadge from './driver-state-badge';
@@ -50,9 +54,7 @@ export interface PopulatedDriver {
   name: string;
   position: Position;
   tasks: StationTask[];
-  route?: {
-    coordinates: Position[];
-  };
+  route: Route | null;
   state: DriverState;
   inProgressTask: StationTask | null;
 }
@@ -62,12 +64,13 @@ export type SelectedItemBarElement =
   | { type: SelectedItemType.Driver; value: PopulatedDriver };
 
 export default function SelectedItemBar() {
-  const { selectedItem, clearSelection } = useSimulation();
+  const { state, engine } = useSimulation();
+  const { selectedItemBarElement: selectedItem } = state;
 
   if (!selectedItem) return null;
 
   const handleClose = () => {
-    clearSelection();
+    engine.clearSelection();
   };
 
   return (
@@ -116,8 +119,7 @@ export default function SelectedItemBar() {
 }
 
 function StationTasks({ station }: { station: PopulatedStation }) {
-  const { driversRef } = useSimulation();
-  const { requestUnassignment } = useTaskAssignment();
+  const { engine } = useSimulation();
   const taskIds = station.tasks.map((task) => task.id);
   const { selectedTaskIds, handleTaskSelect, selectForDrag } =
     useTaskMassSelect(taskIds, station.id);
@@ -130,10 +132,6 @@ function StationTasks({ station }: { station: PopulatedStation }) {
           : `Tasks (${station.tasks.length})`}
       </p>
       {station.tasks.map((task, index) => {
-        const assignedResource = Array.from(driversRef.current.values()).find(
-          (r) => r.taskIds.includes(task.id)
-        );
-
         return (
           <TaskItem
             key={task.id}
@@ -145,8 +143,11 @@ function StationTasks({ station }: { station: PopulatedStation }) {
               selectedTaskIds.includes(task.id) ? selectedTaskIds : [task.id]
             }
             onUnassign={
-              assignedResource
-                ? () => requestUnassignment(assignedResource.id, task.id)
+              task.assignedDriverId
+                ? () => {
+                    if (!task.assignedDriverId) return;
+                    engine.requestUnassignment(task.assignedDriverId, task.id);
+                  }
                 : undefined
             }
           />
@@ -157,8 +158,7 @@ function StationTasks({ station }: { station: PopulatedStation }) {
 }
 
 function DriverTasks({ driver }: { driver: PopulatedDriver }) {
-  const { requestUnassignment } = useTaskAssignment();
-  const { reorderTasks } = useSimulation();
+  const { engine } = useSimulation();
   const [dropTargetIndex, setDropTargetIndex] = useState<number | null>(null);
   // Track which task is being dragged to distinguish reordering (within same driver)
   // from reassignment (to different driver). Null when dragging from a station.
@@ -205,7 +205,7 @@ function DriverTasks({ driver }: { driver: PopulatedDriver }) {
     taskIds.splice(draggedIndex, 1);
     taskIds.splice(targetIndex, 0, draggedTaskId);
 
-    await reorderTasks(driver.id, taskIds, true);
+    await engine.reorderTasks(driver.id, taskIds, true);
   };
 
   return (
@@ -244,7 +244,7 @@ function DriverTasks({ driver }: { driver: PopulatedDriver }) {
               getDragTaskIds={() =>
                 selectedTaskIds.includes(task.id) ? selectedTaskIds : [task.id]
               }
-              onUnassign={() => requestUnassignment(driver.id, task.id)}
+              onUnassign={() => engine.requestUnassignment(driver.id, task.id)}
             />
           </div>
         );

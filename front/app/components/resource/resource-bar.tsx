@@ -33,11 +33,12 @@ import { SelectedItemType } from '../map/selected-item-bar';
 export type ResourceBarElement = ResourceItemElement[];
 
 export default function ResourceBar() {
-  const { selectItem, resourceBarElement, selectedItem } = useSimulation();
+  const { state, engine } = useSimulation();
+  const { resourceBarElement, selectedItemBarElement: selectedItem } = state;
   const [searchQuery, setSearchQuery] = useState('');
 
   const handleSelect = (resourceId: number) => {
-    selectItem(SelectedItemType.Driver, resourceId);
+    engine.selectItem(SelectedItemType.Driver, resourceId);
   };
 
   // Check if a resource is currently selected

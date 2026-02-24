@@ -89,6 +89,16 @@ export interface InitializeSimulationResponse {
   status: string;
 }
 
+export interface BatchAssignTasksToDriverResponse {
+  items: BatchAssignTasksToDriverResponseItem[];
+}
+
+export interface BatchAssignTasksToDriverResponseItem {
+  driver_id: number;
+  task_id: number;
+  success: boolean;
+}
+
 // GBFS Response Types
 
 export interface GBFSStationInformationResponse {
@@ -137,7 +147,7 @@ export interface Driver {
   name: string;
   position: Position;
   taskIds: number[];
-  route?: Route;
+  route: Route | null;
   state: DriverState;
   shift: {
     startTime: number;
@@ -226,4 +236,37 @@ export interface BackendPayload {
 }
 
 // Task assignment types
-export type TaskAction = 'assign' | 'reassign' | 'unassign';
+export enum TaskAction {
+  Assign = 'assign',
+  Reassign = 'reassign',
+  Unassign = 'unassign',
+}
+
+export interface AbstractTaskAssignment {
+  action: TaskAction;
+  taskIds: number[];
+  driverId: number;
+  driverName: string;
+  driverBatteryCount: number;
+}
+
+export interface AssignTaskAction extends AbstractTaskAssignment {
+  action: TaskAction.Assign;
+  unassignedTaskIds: number[];
+  reassignCount: number;
+}
+
+export interface ReassignTaskAction extends AbstractTaskAssignment {
+  action: TaskAction.Reassign;
+  prevDriverId: number;
+  prevDriverName: string;
+}
+
+export interface UnassignTaskAction extends AbstractTaskAssignment {
+  action: TaskAction.Unassign;
+}
+
+export type PendingAssignment =
+  | AssignTaskAction
+  | ReassignTaskAction
+  | UnassignTaskAction;
