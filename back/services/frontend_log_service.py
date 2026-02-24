@@ -88,6 +88,17 @@ class FrontendLogService:
         # Format as JSON for structured logging
         log_message = json.dumps(log_data)
 
+        # Build extra labels to be added as Loki stream labels (queryable in Grafana)
+        extra: dict = {"source": "frontend"}
+        if user_id is not None:
+            extra["user_id"] = user_id
+        if log_entry.context:
+            extra["context"] = log_entry.context
+        if log_entry.entityType:
+            extra["entity_type"] = log_entry.entityType
+        if log_entry.errorType:
+            extra["error_type"] = log_entry.errorType
+
         # Log at the appropriate level based on frontend's level field
         # Defaults to ERROR if not specified (backward compatible)
         level_map = {
@@ -99,7 +110,7 @@ class FrontendLogService:
         log_func = level_map.get(
             log_entry.level.value if log_entry.level else "error", self.logger.error
         )
-        log_func(log_message)
+        log_func(log_message, extra=extra)
 
         if log_entry.context:
             frontend_action_counter.add(

@@ -112,6 +112,35 @@ def test_log_entry_with_different_actions() -> None:
         assert mock_counter.add.call_count == len(actions)
 
 
+def test_log_entry_passes_loki_labels_via_extra() -> None:
+    """Test that log_entry passes frontend labels as Loki stream labels via extra."""
+    with patch.object(frontend_log_service.logger, "error") as mock_log:
+        log_entry = FrontendLogEntry(
+            message="Station not found",
+            timestamp="2026-01-02T10:00:00Z",
+            level=LogLevel.ERROR,
+            stack=None,
+            context="Missing station data",
+            userAgent=None,
+            url=None,
+            entityType="station",
+            entityId=42,
+            errorType="MISSING_ENTITY_DATA",
+        )
+
+        frontend_log_service.log_entry(log_entry, user_id=99)
+
+        mock_log.assert_called_once()
+        _, kwargs = mock_log.call_args
+        extra = kwargs["extra"]
+
+        assert extra["source"] == "frontend"
+        assert extra["user_id"] == 99
+        assert extra["context"] == "Missing station data"
+        assert extra["entity_type"] == "station"
+        assert extra["error_type"] == "MISSING_ENTITY_DATA"
+
+
 def test_log_entry_with_no_user_id() -> None:
     """Test that metrics work when user_id is None."""
     with patch(
