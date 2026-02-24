@@ -547,11 +547,6 @@ class _ScenarioValidator:
         if field_path in self.line_map:
             return self.line_map[field_path]
 
-        # Try with "content." prefix (JSON may have content wrapper)
-        prefixed_path = f"content.{field_path}"
-        if prefixed_path in self.line_map:
-            return self.line_map[prefixed_path]
-
         # Try the array element itself (e.g., 'drivers[1]')
         if "[" in field_path:
             array_element = re.match(r"^([^\[]+\[\d+\])", field_path)
@@ -559,15 +554,11 @@ class _ScenarioValidator:
                 element_path = array_element.group(1)
                 if element_path in self.line_map:
                     return self.line_map[element_path]
-                # Try with content prefix
-                prefixed_element = f"content.{element_path}"
-                if prefixed_element in self.line_map:
-                    return self.line_map[prefixed_element]
 
                 # Fallback: use the first known subfield mapping under the array element
                 # This handles inline array objects like `{ "name": "D1" }` where
                 # we may have `drivers[0].name` but not `drivers[0]` mapped.
-                candidate_prefixes = [f"{element_path}.", f"content.{element_path}."]
+                candidate_prefixes = [f"{element_path}."]
                 for prefix in candidate_prefixes:
                     # Collect all matching subfield paths and choose the earliest line
                     matching = [
@@ -1036,8 +1027,8 @@ class JsonParseStrategy(BaseParseStrategy):
             raise ValueError(
                 "scenario_json must be provided either in constructor or as parameter"
             )
-        content = json_to_validate.get("content", json_to_validate)
-        return self._validator.validate_all(content)
+
+        return self._validator.validate_all(json_to_validate)
 
     def _time_to_seconds(self, time_str: str) -> int:
         """Convert day-time string to total seconds.
@@ -1122,13 +1113,12 @@ class JsonParseStrategy(BaseParseStrategy):
                 "scenario_json must be provided either in constructor or as parameter"
             )
 
-        # Extract content (handle both direct content and wrapped format)
-        content = json_to_parse.get("content", json_to_parse)
-
         # Validate before parsing
         validation_errors = self.validate(json_to_parse)
         if validation_errors:
             raise ScenarioParseError(validation_errors)
+
+        content = json_to_parse
 
         # Parse times (validation ensures these are valid)
         start_time = self._time_to_seconds(str(content.get("start_time", "day1:00:00")))

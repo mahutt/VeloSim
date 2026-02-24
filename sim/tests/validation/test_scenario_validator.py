@@ -391,35 +391,33 @@ def test_scheduled_tasks_with_invalid_type(validator: ScenarioValidator) -> None
 def test_array_elements_have_distinct_line_numbers() -> None:
     """Missing driver fields in different array elements use distinct lines."""
     json_string = """{
-    "content": {
-        "start_time": "day1:08:00",
-        "end_time": "day1:12:00",
-        "vehicle_battery_capacity": 999,
-        "stations": [
-            {
-                "name": "Station 1",
-                "position": [-73.5, 45.5],
-                "initial_task_count": 0,
-                "scheduled_tasks": []
-            }
-        ],
-        "vehicles": [
-            {
-                "name": "V1",
-                "position": [-73.56, 45.51],
-                "battery_count": 2
-            }
-        ],
-        "drivers": [
-            { "name": "D1" },
-            { "name": "D2" }
-        ]
-    }
+    "start_time": "day1:08:00",
+    "end_time": "day1:12:00",
+    "vehicle_battery_capacity": 999,
+    "stations": [
+        {
+            "name": "Station 1",
+            "position": [-73.5, 45.5],
+            "initial_task_count": 0,
+            "scheduled_tasks": []
+        }
+    ],
+    "vehicles": [
+        {
+            "name": "V1",
+            "position": [-73.56, 45.51],
+            "battery_count": 2
+        }
+    ],
+    "drivers": [
+        { "name": "D1" },
+        { "name": "D2" }
+    ]
 }"""
 
     data = json.loads(json_string)
     validator = ScenarioValidator(json_string=json_string)
-    errors = validator.validate_all(data["content"])
+    errors = validator.validate_all(data)
 
     # Should have errors for missing shift on drivers[0] and drivers[1]
     shift_errors = [
