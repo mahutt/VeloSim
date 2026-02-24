@@ -136,10 +136,10 @@ export function ResourceItem({
       onDragEnter={handleDragEnter}
       onDragLeave={handleDragLeave}
       className={`
-        rounded-2xl px-4 py-1.5 cursor-pointer flex flex-col gap-0.5 transition-all duration-200 border
+        rounded-2xl px-4 py-2 cursor-pointer flex flex-col gap-0.5 transition-all duration-200 border
         ${
           isSelected
-            ? 'bg-red-50 border-red-500 border-2 shadow-md ring-1 ring-red-200'
+            ? 'bg-red-50 border-red-500 shadow-md ring-1 ring-red-200'
             : 'bg-white border-gray-200 hover:bg-gray-200 hover:border-gray-400'
         }
         ${isDragOver ? 'ring-1 ring-yellow-300 bg-yellow-50' : ''}
@@ -155,13 +155,7 @@ export function ResourceItem({
               {resource.name}
             </ItemTitle>
           </div>
-          <span className="text-xs text-gray-500 whitespace-nowrap shrink-0">
-            #{resource.id}
-          </span>
-        </div>
-
-        <div className="flex items-center justify-between">
-          <DriverStateBadge state={resource.state} />
+          <DriverStateBadge state={resource.state} shortened />
           <div className="flex items-center gap-1">
             <span className={`text-xs text-gray-400`}>
               {resource.batteryCount}

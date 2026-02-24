@@ -60,7 +60,6 @@ test('resource item renders with resource data', () => {
   render(<ResourceItem resource={mockResource} onSelect={mockOnSelect} />);
 
   expect(screen.getByText('John Doe')).toBeDefined();
-  expect(screen.getByText('#1')).toBeDefined();
 });
 
 test('resource item renders with selection state', () => {
@@ -134,7 +133,6 @@ test('resource item displays driver name and ID', () => {
   render(<ResourceItem resource={mockResource} onSelect={mockOnSelect} />);
 
   expect(screen.getByText('Charlie Brown')).toBeDefined();
-  expect(screen.getByText('#3')).toBeDefined();
 });
 
 test('resource item displays battery status indicator', () => {

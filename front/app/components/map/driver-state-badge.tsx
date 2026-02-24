@@ -24,56 +24,80 @@
 
 import { DriverState } from '~/types';
 import { Badge } from '../ui/badge';
+import { useState } from 'react';
 
 interface DriverStateBadgeProps {
   state: DriverState;
+  shortened?: boolean;
 }
 
-export default function DriverStateBadge({ state }: DriverStateBadgeProps) {
+export default function DriverStateBadge({
+  state,
+  shortened = false,
+}: DriverStateBadgeProps) {
+  const [isHovering, setIsHovering] = useState(false);
   let className = '';
   let label = '';
+  let shortenedLabel = '';
   switch (state) {
     case DriverState.OffShift:
       className = 'bg-gray-200';
       label = 'Off shift';
+      shortenedLabel = 'Off';
       break;
     case DriverState.PendingShift:
       className = 'bg-blue-200';
       label = 'Pending shift';
+      shortenedLabel = 'Pending';
       break;
     case DriverState.Idle:
       className = 'bg-green-200';
       label = 'Idle';
+      shortenedLabel = 'Idle';
       break;
     case DriverState.OnRoute:
       className = 'bg-yellow-200';
       label = 'On route';
+      shortenedLabel = 'On route';
       break;
     case DriverState.ServicingStation:
       className = 'bg-purple-200';
       label = 'Servicing';
+      shortenedLabel = 'Servicing';
       break;
     case DriverState.OnBreak:
       className = 'bg-orange-200';
       label = 'On break';
+      shortenedLabel = 'Break';
       break;
     case DriverState.EndingShift:
       className = 'bg-red-200';
       label = 'Ending shift';
+      shortenedLabel = 'Ending';
       break;
     case DriverState.SeekingHQForInventory:
-      className = 'bg-red-200';
+      className = 'bg-indigo-200';
       label = 'Returning for restock';
+      shortenedLabel = 'Return';
       break;
     case DriverState.RestockingBatteries:
       className = 'bg-teal-200';
       label = 'Restocking';
+      shortenedLabel = 'Restock';
       break;
   }
 
   return (
-    <Badge variant="secondary" className={`${className}`}>
-      {label}
+    <Badge
+      variant="secondary"
+      className={`${className}`}
+      onMouseEnter={() => setIsHovering(true)}
+      onMouseLeave={() => setIsHovering(false)}
+    >
+      {(() => {
+        if (!shortened) return label;
+        return isHovering ? label : shortenedLabel;
+      })()}
     </Badge>
   );
 }

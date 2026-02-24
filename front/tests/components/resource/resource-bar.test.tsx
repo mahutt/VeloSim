@@ -31,7 +31,6 @@ import {
 import ResourceBar, {
   type ResourceBarElement,
 } from '~/components/resource/resource-bar';
-import userEvent from '@testing-library/user-event';
 import { SelectedItemType } from '~/components/map/selected-item-bar';
 import type SimulationEngine from '~/lib/simulation-engine';
 import { makeResourceItemElement } from 'tests/test-helpers';
@@ -94,13 +93,6 @@ test('renders all resources from provider', () => {
   expect(screen.getByText('#12')).toBeInTheDocument();
 });
 
-test('renders search bar with correct placeholder', () => {
-  useSimulation().state.resourceBarElement = mockResourceBarElement;
-
-  render(<ResourceBar />);
-  expect(screen.getByPlaceholderText('Search Resource')).toBeInTheDocument();
-});
-
 test('calls selectItem with correct arguments when resource is clicked', () => {
   useSimulation().state.resourceBarElement = mockResourceBarElement;
 
@@ -116,132 +108,6 @@ test('calls selectItem with correct arguments when resource is clicked', () => {
     SelectedItemType.Driver,
     2
   );
-});
-
-test('filters resources by ID match', async () => {
-  const user = userEvent.setup();
-  useSimulation().state.resourceBarElement = mockResourceBarElement;
-
-  render(<ResourceBar />);
-
-  const searchInput = screen.getByPlaceholderText('Search Resource');
-  await user.type(searchInput, '1');
-
-  // Should show resources with ID 1 and 12 (since both start with "1")
-  expect(screen.getByText('#1')).toBeInTheDocument();
-  expect(screen.getByText('#12')).toBeInTheDocument();
-  expect(screen.queryByText('#2')).not.toBeInTheDocument();
-});
-
-test('filters resources by partial ID match', async () => {
-  const user = userEvent.setup();
-  useSimulation().state.resourceBarElement = mockResourceBarElement;
-
-  render(<ResourceBar />);
-
-  const searchInput = screen.getByPlaceholderText('Search Resource');
-  await user.type(searchInput, '12');
-
-  // Should only show resource that has ID 12
-  expect(screen.queryByText('#1')).not.toBeInTheDocument();
-  expect(screen.queryByText('#2')).not.toBeInTheDocument();
-  expect(screen.getByText('#12')).toBeInTheDocument();
-});
-
-test('shows no resources when search query does not match any ID', async () => {
-  const user = userEvent.setup();
-  useSimulation().state.resourceBarElement = mockResourceBarElement;
-
-  render(<ResourceBar />);
-
-  const searchInput = screen.getByPlaceholderText('Search Resource');
-  await user.type(searchInput, '999');
-
-  expect(screen.queryByText('#1')).not.toBeInTheDocument();
-  expect(screen.queryByText('#2')).not.toBeInTheDocument();
-  expect(screen.queryByText('#12')).not.toBeInTheDocument();
-});
-
-test('shows all resources when search query is empty', async () => {
-  const user = userEvent.setup();
-  useSimulation().state.resourceBarElement = mockResourceBarElement;
-
-  render(<ResourceBar />);
-
-  const searchInput = screen.getByPlaceholderText('Search Resource');
-
-  await user.type(searchInput, '1');
-  expect(screen.queryByText('#2')).not.toBeInTheDocument();
-
-  // Clear the input
-  await user.clear(searchInput);
-
-  // Should show all resources again
-  expect(screen.getByText('#1')).toBeInTheDocument();
-  expect(screen.getByText('#2')).toBeInTheDocument();
-  expect(screen.getByText('#12')).toBeInTheDocument();
-});
-
-test('clears search when clear button is clicked', async () => {
-  const user = userEvent.setup();
-  useSimulation().state.resourceBarElement = mockResourceBarElement;
-
-  render(<ResourceBar />);
-
-  const searchInput = screen.getByPlaceholderText('Search Resource');
-
-  await user.type(searchInput, '2');
-  expect(screen.getByDisplayValue('2')).toBeInTheDocument();
-  expect(screen.queryByText('#1')).not.toBeInTheDocument();
-  expect(screen.getByText('#2')).toBeInTheDocument();
-
-  // Click clear button
-  const clearButton = screen.getByRole('button', { name: 'Clear search' });
-  await user.click(clearButton);
-
-  // Search should be cleared and all resources should be visible
-  expect(screen.getByDisplayValue('')).toBeInTheDocument();
-  expect(screen.getByText('#1')).toBeInTheDocument();
-  expect(screen.getByText('#2')).toBeInTheDocument();
-  expect(screen.getByText('#12')).toBeInTheDocument();
-});
-
-test('search is case insensitive for partial matches', async () => {
-  const user = userEvent.setup();
-  useSimulation().state.resourceBarElement = mockResourceBarElement;
-
-  render(<ResourceBar />);
-
-  const searchInput = screen.getByPlaceholderText('Search Resource');
-
-  await user.type(searchInput, '1');
-  expect(screen.getByText('#1')).toBeInTheDocument();
-  expect(screen.getByText('#12')).toBeInTheDocument();
-});
-
-test('maintains selection state while filtering', async () => {
-  const user = userEvent.setup();
-  const selectedResource = mockResourceBarElement[0];
-
-  useSimulation().state.resourceBarElement = [
-    makeResourceItemElement({
-      id: selectedResource.id,
-    }),
-    makeResourceItemElement({
-      id: 2,
-    }),
-  ];
-
-  render(<ResourceBar />);
-
-  expect(screen.getByText('#1')).toBeInTheDocument();
-  expect(screen.getByText('#2')).toBeInTheDocument();
-
-  const searchInput = screen.getByPlaceholderText('Search Resource');
-  await user.type(searchInput, '1');
-
-  expect(screen.getByText('#1')).toBeInTheDocument();
-  expect(screen.queryByText('#2')).not.toBeInTheDocument();
 });
 
 test('shows "No resources currently available" when resources array is empty', () => {

@@ -24,9 +24,7 @@
 
 import { ResourceItem, type ResourceItemElement } from './resource-item';
 import { useSimulation } from '~/providers/simulation-provider';
-import { Card, CardContent, CardHeader } from '~/components/ui/card';
-import { SearchBar } from './search-bar';
-import { useMemo, useState } from 'react';
+import { Card, CardContent } from '~/components/ui/card';
 import { SelectedItemType } from '../map/selected-item-bar';
 
 // Restricted Resource[] type for ResourceBar component
@@ -35,7 +33,6 @@ export type ResourceBarElement = ResourceItemElement[];
 export default function ResourceBar() {
   const { state, engine } = useSimulation();
   const { resourceBarElement, selectedItemBarElement: selectedItem } = state;
-  const [searchQuery, setSearchQuery] = useState('');
 
   const handleSelect = (resourceId: number) => {
     engine.selectItem(SelectedItemType.Driver, resourceId);
@@ -49,44 +46,16 @@ export default function ResourceBar() {
     );
   };
 
-  // Filter resources based on their ID
-  const filteredResources = useMemo(() => {
-    const trimmedQuery = searchQuery.trim();
-    if (!trimmedQuery) {
-      return resourceBarElement;
-    }
-
-    return resourceBarElement.filter((resource) => {
-      const resourceIdString = resource.id.toString();
-      return (
-        resourceIdString === trimmedQuery ||
-        resourceIdString.startsWith(trimmedQuery)
-      );
-    });
-  }, [resourceBarElement, searchQuery]);
-
   return (
-    <Card className="w-full min-h-0 bg-gray-50 gap-0 flex flex-col">
-      <CardHeader className="px-3">
-        <SearchBar
-          placeholder="Search Resource"
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          onClear={() => setSearchQuery('')}
-        />
-      </CardHeader>
+    <Card className="py-3 w-full min-h-0 bg-gray-50 gap-0 flex flex-col">
       <CardContent className="pt-0 px-3 flex-1 overflow-y-auto min-h-0">
         <div className="space-y-2">
           {resourceBarElement.length === 0 ? (
             <div className="text-center text-muted-foreground py-8 select-none">
               No resources currently available
             </div>
-          ) : filteredResources.length === 0 ? (
-            <div className="text-center text-muted-foreground py-8 select-none">
-              No resources match your search
-            </div>
           ) : (
-            filteredResources.map((resource) => (
+            resourceBarElement.map((resource) => (
               <ResourceItem
                 key={resource.id}
                 resource={resource}
