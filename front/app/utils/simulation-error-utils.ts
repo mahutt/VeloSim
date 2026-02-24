@@ -51,18 +51,23 @@ export function logSimulationError(
   additionalData?: Record<string, unknown>
 ) {
   let errorMessage: string;
+  let rawErrorType: string | undefined;
   if (error instanceof Error) {
     errorMessage = error.message;
   } else if (typeof error === 'string') {
     errorMessage = error;
   } else {
     errorMessage = 'An unknown error occurred';
+    rawErrorType =
+      (error as { constructor?: { name?: string } })?.constructor?.name ??
+      typeof error;
   }
   const errorData = {
     message: errorMessage,
     level: LogLevel.ERROR,
     stack: error instanceof Error ? error.stack : undefined,
     context,
+    ...(rawErrorType !== undefined && { rawErrorType }),
     ...additionalData,
   };
 

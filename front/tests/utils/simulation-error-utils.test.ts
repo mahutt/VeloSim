@@ -85,6 +85,7 @@ describe('simulation-error-utils', () => {
 
       expect(loggedData.message).not.toBe('[object Event]');
       expect(loggedData.message).toBe('An unknown error occurred');
+      expect(loggedData.rawErrorType).toBe('Event');
     });
   });
 
