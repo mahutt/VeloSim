@@ -36,6 +36,7 @@ export interface ReactiveSimulationState {
 
   // selected item bar
   selectedItemBarElement: SelectedItemBarElement | null;
+  blockAssignments: boolean;
 
   // task assignment banner
   pendingAssignment: PendingAssignment | null;
@@ -67,6 +68,7 @@ export interface ReactiveSimulationState {
 export const DEFAULT_REACTIVE_SIMULATION_STATE: ReactiveSimulationState = {
   isLoading: true,
   selectedItemBarElement: null,
+  blockAssignments: false,
   pendingAssignment: null,
   pendingAssignmentLoading: false,
   formattedSimTime: '--:--',
@@ -95,6 +97,7 @@ export function areReactiveSimulationStatesEqual(
       a.selectedItemBarElement,
       b.selectedItemBarElement
     ) &&
+    a.blockAssignments === b.blockAssignments &&
     arePendingAssignmentsEqual(a.pendingAssignment, b.pendingAssignment) &&
     a.pendingAssignmentLoading === b.pendingAssignmentLoading &&
     a.formattedSimTime === b.formattedSimTime &&

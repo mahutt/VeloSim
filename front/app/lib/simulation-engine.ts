@@ -99,6 +99,7 @@ export default class SimulationEngine {
           this.localFrameSource.setSpeed(0);
           this.serverFrameSource.setSpeed(this.state.getNonZeroSpeed());
           this.mode = SimulationMode.Server;
+          this.state.setBlockAssignments(false);
         }
       },
       toast.error
@@ -305,6 +306,7 @@ export default class SimulationEngine {
   public scrub(seconds: number): void {
     //   // stop sources until scrub is committed
     this.mode = SimulationMode.Scrubbing;
+    this.state.setBlockAssignments(true);
     this.localFrameSource.setSpeed(0);
     this.serverFrameSource.setSpeed(0);
     this.state.setScrubSimulationSecond(seconds);
@@ -343,12 +345,14 @@ export default class SimulationEngine {
       this.localFrameSource.setPosition(seconds);
       this.localFrameSource.setSpeed(this.getFrameSourceSpeed());
       this.mode = SimulationMode.Local;
+      this.state.setBlockAssignments(true);
     } else {
       // Unpause server source to play from live position
       const frame = this.localFrameSource.getMaxFrame();
       if (frame) this.handleFrame(frame, false);
       this.serverFrameSource.setSpeed(this.getFrameSourceSpeed());
       this.mode = SimulationMode.Server;
+      this.state.setBlockAssignments(false);
     }
   }
 
