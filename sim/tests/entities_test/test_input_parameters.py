@@ -30,8 +30,8 @@ from sim.entities.station import Station
 from sim.entities.position import Position
 from sim.entities.driver import Driver
 from sim.entities.vehicle import Vehicle
-from sim.entities.BatterySwapTask import BatterySwapTask
-from sim.entities.inputParameters import InputParameter
+from sim.entities.battery_swap_task import BatterySwapTask
+from sim.entities.input_parameter import InputParameter
 from sim.entities.shift import Shift
 
 # Default shift used for creating drivers in this module

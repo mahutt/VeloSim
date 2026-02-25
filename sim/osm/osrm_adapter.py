@@ -34,7 +34,7 @@ from sim.map.routing_provider import (
     EdgeIdentifier,
     TrafficUpdate,
 )
-from sim.osm.OSRMConnection import OSRMConnection
+from sim.osm.osrm_connection import OSRMConnection
 from sim.osm.osrm_result import OSRMResult
 from sim.osm.traffic_state_store import traffic_state_store
 

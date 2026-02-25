@@ -43,7 +43,7 @@ from back.schemas.sim_frame import (
 )
 from sim.core.simulation_environment import SimulationEnvironment
 from sim.simulator import Simulator
-from sim.entities.inputParameters import InputParameter
+from sim.entities.input_parameter import InputParameter
 from back.crud import sim_instance_crud, user_crud, sim_frame_crud
 from back.schemas.sim_instance import (
     SimInstanceCreate,
@@ -700,8 +700,8 @@ class SimulationService:
         sim_info = sim.get_sim_by_id(sim_id)
         if sim_info is None:
             raise RuntimeError(f"Simulation {sim_id} not found in simulator")
-        sim_controller = sim_info["simController"]
-        driver = sim_controller.realTimeDriver
+        sim_controller = sim_info["sim_controller"]
+        driver = sim_controller.real_time_driver
 
         # Adjust playback based on requested speed
         speed_value = playback_speed.playback_speed
@@ -785,7 +785,7 @@ class SimulationService:
             raise RuntimeError(f"Simulator for simulation {sim_id} not found")
         sim_info = sim.get_sim_by_id(sim_id)
         # Retrieve the corresponding realTimeDriver
-        driver = sim_info["simController"].realTimeDriver  # type: ignore
+        driver = sim_info["sim_controller"].real_time_driver  # type: ignore
 
         # Determine status based on the boolean value of 'running' attribute
         # from realTimeDriver
@@ -850,7 +850,7 @@ class SimulationService:
                 sim_info = self.simulator.get_sim_by_id(sim_id)
                 if sim_info:
                     current_sim_seconds = sim_info[
-                        "simController"
+                        "sim_controller"
                     ].clock.sim_time_seconds
                 else:
                     # Fallback if sim not found in simulator

@@ -25,7 +25,7 @@ SOFTWARE.
 import pytest
 import simpy
 from sim.core.simulation_environment import SimulationEnvironment
-from sim.entities.BatterySwapTask import BatterySwapTask, State
+from sim.entities.battery_swap_task import BatterySwapTask, State
 from sim.entities.station import Station
 from sim.entities.position import Position
 from sim.entities.driver import Driver

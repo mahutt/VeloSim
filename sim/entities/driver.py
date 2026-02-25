@@ -28,7 +28,7 @@ import random
 from enum import Enum
 
 from sim.core.simulation_environment import SimulationEnvironment
-from sim.map.MapController import MapController
+from sim.map.map_controller import MapController
 from typing import Optional, TYPE_CHECKING
 from .task_state import State
 from sim.entities.route import Route
@@ -661,8 +661,6 @@ class Driver:
             # TODO Implement interrupt logic
             pass
         finally:
-            # Clear current route when travel completes or is interrupted
-            # self.current_route = None
             self.compute_routes()
 
     def get_route_json(self) -> dict | None:
@@ -791,12 +789,6 @@ class Driver:
                 for _ in range(int(batteries_to_add)):
                     yield self.env.timeout(interval)
                     self.vehicle.add_battery()
-
-        # # continues/starts shift
-        # if self.get_task_count() > 0:
-        #     self.state = DriverState.ON_SHIFT
-        # else:  # waits for task
-        #     self.state = DriverState.IDLE
 
     def get_initial_state(self) -> DriverState:
         """

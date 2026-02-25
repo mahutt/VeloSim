@@ -33,7 +33,7 @@ from sim.map.routing_provider import RoutingProvider, RouteResult, SegmentKey
 
 if TYPE_CHECKING:
     from sim.entities.route import Route
-    from sim.map.MapController import MapController
+    from sim.map.map_controller import MapController
     from sim.map.position_registry import PositionRegistry
 
 logger = logging.getLogger(__name__)

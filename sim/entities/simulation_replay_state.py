@@ -23,8 +23,8 @@ SOFTWARE.
 """
 
 from dataclasses import dataclass
-from sim.map.MapController import MapController
-from sim.entities.inputParameters import InputParameter
+from sim.map.map_controller import MapController
+from sim.entities.input_parameter import InputParameter
 
 
 @dataclass

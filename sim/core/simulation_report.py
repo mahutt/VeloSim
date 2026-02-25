@@ -92,7 +92,7 @@ class SimulationReport:
         Compute the ratio of servicing time to driving time.
 
         Returns:
-            float: The driving-to-servicing ratio, or 0 if servicing time is zero.
+            float: The servicing-to-driving ratio, or 0 if driving time is zero.
         """
         if self.total_driving_time == 0:
             return 0.0

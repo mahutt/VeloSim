@@ -26,7 +26,7 @@ import pytest
 import simpy
 from unittest.mock import Mock
 from sim.core.simulation_environment import SimulationEnvironment
-from sim.entities.BatterySwapTask import BatterySwapTask
+from sim.entities.battery_swap_task import BatterySwapTask
 from sim.entities.driver import Driver
 from sim.entities.position import Position
 from sim.entities.station import Station

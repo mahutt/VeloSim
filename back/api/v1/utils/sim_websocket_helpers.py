@@ -501,7 +501,7 @@ def _is_simulation_paused(sim_info: RunInfo) -> bool:
     """
     Check if a simulation is currently in its paused state.
     """
-    driver = sim_info["simController"].realTimeDriver
+    driver = sim_info["sim_controller"].real_time_driver
     return not driver.running
 
 
@@ -524,7 +524,7 @@ def _resume_simulation(sim_info: RunInfo) -> None:
     """
     Resume a paused simulation.
     """
-    driver = sim_info["simController"].realTimeDriver
+    driver = sim_info["sim_controller"].real_time_driver
     driver.resume()
 
 
@@ -585,7 +585,7 @@ async def _handle_restored_simulation(
 ) -> None:
     """Handle reconnection to a restored simulation (thread was closed, restarted from
     DB)."""
-    driver = sim_info["simController"].realTimeDriver
+    driver = sim_info["sim_controller"].real_time_driver
     logger.info(f"Starting restored sim {sim_id}, driver.running={driver.running}")
     _start_simulation(sim_id, requesting_user)
     logger.info(f"After start, driver.running={driver.running}")
@@ -608,14 +608,14 @@ async def _handle_restored_simulation(
 
 def _emit_restored_keyframe(sim_info: RunInfo, sim_data: ActiveSimulationData) -> None:
     """Emit the restored keyframe for a paused simulation."""
-    sim_controller = sim_info["simController"]
+    sim_controller = sim_info["sim_controller"]
     restored_keyframe = sim_data.get("restored_keyframe")
     paused_by_user = sim_data.get("paused_by_user", False)
 
     if restored_keyframe:
         logger.info("Found restored keyframe, creating frame from payload")
         frame = Frame(
-            seq_numb=sim_controller.frameCounter,
+            seq_numb=sim_controller.frame_counter,
             payload=restored_keyframe,
             is_key=True,
         )
@@ -642,7 +642,7 @@ async def _handle_paused_simulation(
         logger.info(
             f"Reconnect to user-paused sim {sim_id}, staying paused, emitting frame"
         )
-        sim_controller = sim_info["simController"]
+        sim_controller = sim_info["sim_controller"]
         current_frame = sim_controller.create_frame(is_key=True, paused_by_user=True)
         sim_controller.emit_frame(current_frame)
     else:
@@ -699,7 +699,7 @@ def _pause_simulation(sim_info: RunInfo) -> None:
     """
     Pause the simulation execution.
     """
-    driver = sim_info["simController"].realTimeDriver
+    driver = sim_info["sim_controller"].real_time_driver
     driver.pause()
 
 
@@ -740,8 +740,8 @@ async def cleanup_simulation(
 
     async with lock:
         # Check if simulation was running BEFORE any cleanup to avoid race conditions
-        sim_controller = sim_info["simController"]
-        driver = sim_controller.realTimeDriver
+        sim_controller = sim_info["sim_controller"]
+        driver = sim_controller.real_time_driver
         was_running_before_disconnect = driver.running
 
         # Clean up subscriber

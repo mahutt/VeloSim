@@ -148,10 +148,10 @@ def mock_heavy_sim_operations() -> Generator[None, None, None]:
     """
     with (
         patch(
-            "sim.osm.OSRMConnection.OSRMConnection._verify_osrm_connection",
+            "sim.osm.osrm_connection.OSRMConnection._verify_osrm_connection",
             return_value=True,
         ),
-        patch("sim.core.SimulatorController.SimulatorController.start") as mock_start,
+        patch("sim.core.simulator_controller.SimulatorController.start") as mock_start,
     ):
         # Make start() a no-op that doesn't spawn threads or do heavy work
         mock_start.return_value = None
@@ -274,7 +274,7 @@ def mocked_simulator(monkeypatch: pytest.MonkeyPatch) -> Generator[None, None, N
         "sim123": {
             "emitter": mock_emitter,
             "thread": MagicMock(),
-            "simController": MagicMock(),
+            "sim_controller": MagicMock(),
         }
     }
     mock_sim.thread_pool_lock = MagicMock()
@@ -1660,12 +1660,12 @@ class TestWebSocketSimulationStream:
         mock_sim_controller = MagicMock()
         mock_driver = MagicMock()
         mock_driver.running = False
-        mock_sim_controller.realTimeDriver = mock_driver
+        mock_sim_controller.real_time_driver = mock_driver
 
         sim_info = {
             "emitter": mock_emitter,
             "thread": None,
-            "simController": mock_sim_controller,
+            "sim_controller": mock_sim_controller,
         }
 
         sim_data = {
@@ -1856,7 +1856,7 @@ class TestWebSocketHelpers:
 
         sim_info: dict[str, Any] = {
             "thread": MagicMock(),
-            "simController": MagicMock(realTimeDriver=mock_driver),
+            "sim_controller": MagicMock(realt_time_driver=mock_driver),
         }
 
         asyncio.run(
@@ -1886,7 +1886,7 @@ class TestWebSocketHelpers:
         mock_emitter = MagicMock()
         sim_info: dict[str, Any] = {
             "thread": MagicMock(),
-            "simController": MagicMock(realTimeDriver=mock_driver),
+            "sim_controller": MagicMock(real_time_driver=mock_driver),
             "emitter": mock_emitter,
         }
 
@@ -1920,7 +1920,7 @@ class TestWebSocketHelpers:
         mock_driver.running = False
 
         mock_controller = MagicMock()
-        mock_controller.realTimeDriver = mock_driver
+        mock_controller.real_time_driver = mock_driver
         mock_controller.frameCounter = 100
         mock_frame = Frame(seq_numb=100, payload={}, is_key=True)
         mock_controller.create_frame.return_value = mock_frame
@@ -1928,7 +1928,7 @@ class TestWebSocketHelpers:
         mock_emitter = MagicMock()
         sim_info: dict[str, Any] = {
             "thread": MagicMock(),
-            "simController": mock_controller,
+            "sim_controller": mock_controller,
             "emitter": mock_emitter,
         }
 
@@ -1968,7 +1968,7 @@ class TestWebSocketHelpers:
         mock_emitter = MagicMock()
         sim_info: dict[str, Any] = {
             "thread": MagicMock(),
-            "simController": MagicMock(realTimeDriver=mock_driver),
+            "sim_controller": MagicMock(real_time_driver=mock_driver),
             "emitter": mock_emitter,
         }
 
@@ -2001,7 +2001,7 @@ class TestWebSocketHelpers:
         mock_emitter = MagicMock()
         sim_info: dict[str, Any] = {
             "thread": MagicMock(),
-            "simController": MagicMock(realTimeDriver=mock_driver),
+            "sim_controller": MagicMock(real_time_driver=mock_driver),
             "emitter": mock_emitter,
         }
 
@@ -2040,12 +2040,12 @@ class TestWebSocketHelpers:
         mock_driver.running = False
 
         mock_controller = MagicMock()
-        mock_controller.realTimeDriver = mock_driver
+        mock_controller.real_time_driver = mock_driver
         mock_controller.frameCounter = 50
 
         sim_info: dict[str, Any] = {
             "thread": None,  # Restored simulation
-            "simController": mock_controller,
+            "sim_controller": mock_controller,
         }
 
         # Mock restored keyframe in sim_data
@@ -2090,11 +2090,11 @@ class TestWebSocketHelpers:
         mock_driver.running = True  # Restored as running
 
         mock_controller = MagicMock()
-        mock_controller.realTimeDriver = mock_driver
+        mock_controller.real_time_driver = mock_driver
 
         sim_info: dict[str, Any] = {
             "thread": None,  # Restored simulation
-            "simController": mock_controller,
+            "sim_controller": mock_controller,
         }
 
         mock_service.active_simulations = {"sim123": {"user_id": 1}}
@@ -2132,7 +2132,7 @@ class TestWebSocketHelpers:
 
         sim_info: dict[str, Any] = {
             "thread": None,
-            "simController": MagicMock(realTimeDriver=mock_driver),
+            "sim_controller": MagicMock(real_time_driver=mock_driver),
         }
 
         asyncio.run(
@@ -2166,7 +2166,7 @@ class TestWebSocketHelpers:
         mock_driver = MagicMock()
         sim_info: dict[str, Any] = {
             "emitter": emitter,
-            "simController": MagicMock(realTimeDriver=mock_driver),
+            "sim_controller": MagicMock(real_time_driver=mock_driver),
         }
         sim_data: dict[str, Any] = {"ws_subscriber": subscriber, "user_id": 1}
 
@@ -2209,7 +2209,7 @@ class TestWebSocketHelpers:
         mock_driver = MagicMock()
         sim_info: dict[str, Any] = {
             "emitter": emitter,
-            "simController": MagicMock(realTimeDriver=mock_driver),
+            "sim_controller": MagicMock(real_time_driver=mock_driver),
         }
         sim_data: dict[str, Any] = {"ws_subscriber": subscriber, "user_id": 1}
 
@@ -2255,7 +2255,7 @@ class TestWebSocketHelpers:
         mock_driver.running = True  # Simulation is running
 
         mock_controller = MagicMock()
-        mock_controller.realTimeDriver = mock_driver
+        mock_controller.real_time_driver = mock_driver
         mock_frame = Frame(seq_numb=100, payload={}, is_key=True)
         mock_controller.create_frame.return_value = mock_frame
 
@@ -2263,7 +2263,7 @@ class TestWebSocketHelpers:
 
         sim_info: dict[str, Any] = {
             "emitter": emitter,
-            "simController": mock_controller,
+            "sim_controller": mock_controller,
         }
         sim_data: dict[str, Any] = {
             "ws_subscriber": subscriber,
@@ -2323,7 +2323,7 @@ class TestWebSocketHelpers:
         mock_driver.running = False  # Simulation is paused by user
 
         mock_controller = MagicMock()
-        mock_controller.realTimeDriver = mock_driver
+        mock_controller.real_time_driver = mock_driver
         mock_frame = Frame(seq_numb=100, payload={}, is_key=True)
         mock_controller.create_frame.return_value = mock_frame
 
@@ -2331,7 +2331,7 @@ class TestWebSocketHelpers:
 
         sim_info: dict[str, Any] = {
             "emitter": emitter,
-            "simController": mock_controller,
+            "sim_controller": mock_controller,
         }
         sim_data: dict[str, Any] = {
             "ws_subscriber": subscriber,
@@ -2617,7 +2617,7 @@ class TestWebSocketHelpers:
 
         sim_info: dict[str, Any] = {
             "emitter": emitter,
-            "simController": MagicMock(realTimeDriver=mock_driver),
+            "sim_controller": MagicMock(real_time_driver=mock_driver),
         }
         sim_data: dict[str, Any] = {
             "ws_subscriber": subscriber,
@@ -2692,7 +2692,7 @@ class TestWebSocketHelpers:
         mock_driver = MagicMock()
         sim_info: dict[str, Any] = {
             "emitter": emitter,
-            "simController": MagicMock(realTimeDriver=mock_driver),
+            "sim_controller": MagicMock(real_time_driver=mock_driver),
         }
         sim_data: dict[str, Any] = {"user_id": 1}
 
@@ -3156,7 +3156,7 @@ class TestWebSocketIntegration:
         mock_ws = MagicMock(spec=WebSocket)
         mock_subscriber = MagicMock()
         sim_data = {"db_id": 1, "status": "running", "user_id": 1, "sim_time": 3600}
-        sim_info = {"emitter": MagicMock(), "simController": MagicMock()}
+        sim_info = {"emitter": MagicMock(), "sim_controller": MagicMock()}
 
         mock_accept.return_value = True
         mock_verify.return_value = True
@@ -3278,7 +3278,7 @@ class TestWebSocketIntegration:
         mock_ws = MagicMock(spec=WebSocket)
         mock_subscriber = MagicMock()
         sim_data = {"db_id": 1, "status": "running", "user_id": 1, "sim_time": 3600}
-        sim_info = {"emitter": MagicMock(), "simController": MagicMock()}
+        sim_info = {"emitter": MagicMock(), "sim_controller": MagicMock()}
 
         mock_accept.return_value = True
         mock_verify.return_value = True
@@ -3513,7 +3513,7 @@ class TestSeekEndpoint:
         mock_clock.sim_time_seconds = 100.0
         mock_sim_controller = MagicMock()
         mock_sim_controller.clock = mock_clock
-        mock_sim_info = {"simController": mock_sim_controller}
+        mock_sim_info = {"sim_controller": mock_sim_controller}
 
         from back.services import simulation_service
         from typing import cast, Any
@@ -3707,7 +3707,7 @@ class TestSeekEndpoint:
         mock_clock.sim_time_seconds = 10.0
         mock_sim_controller = MagicMock()
         mock_sim_controller.clock = mock_clock
-        mock_sim_info = {"simController": mock_sim_controller}
+        mock_sim_info = {"sim_controller": mock_sim_controller}
 
         from back.services import simulation_service
         from typing import cast, Any

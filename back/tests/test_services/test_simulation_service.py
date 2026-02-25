@@ -35,7 +35,7 @@ from back.schemas.playback_speed import (
     SimulationPlaybackStatus,
 )
 from back.services.simulation_service import ActiveSimulationData, SimulationService
-from sim.entities.inputParameters import InputParameter
+from sim.entities.input_parameter import InputParameter
 
 # Apply patches before any simulator code is imported
 pytestmark = pytest.mark.usefixtures("mock_heavy_sim_operations")
@@ -49,10 +49,10 @@ def mock_heavy_sim_operations() -> Generator[None, None, None]:
     """
     with (
         patch(
-            "sim.osm.OSRMConnection.OSRMConnection._verify_osrm_connection",
+            "sim.osm.osrm_connection.OSRMConnection._verify_osrm_connection",
             return_value=True,
         ),
-        patch("sim.core.SimulatorController.SimulatorController.start") as mock_start,
+        patch("sim.core.simulator_controller.SimulatorController.start") as mock_start,
     ):
         # Make start() a no-op that doesn't spawn threads or do heavy work
         mock_start.return_value = None
@@ -986,9 +986,9 @@ class TestSimulationService:
             mock_driver.running = False
 
         mock_driver.pause.side_effect = pause_side_effect
-        mock_controller.realTimeDriver = mock_driver
+        mock_controller.real_time_driver = mock_driver
 
-        sim_info["simController"] = mock_controller
+        sim_info["sim_controller"] = mock_controller
 
         # Mock the keyframe subscriber
         mock_keyframe_subscriber = Mock()
@@ -1242,7 +1242,7 @@ class TestSimulationService:
         # Verify simulator was initialized with correct params by checking driver state
         sim_info = simulation_service.simulator.get_sim_by_id("test-sim-id")
         assert sim_info is not None
-        assert sim_info["simController"].realTimeDriver.running is False  # Paused
+        assert sim_info["sim_controller"].real_time_driver.running is False  # Paused
 
     def test_get_all_simulations_success(
         self,

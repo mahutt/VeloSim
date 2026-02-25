@@ -25,7 +25,7 @@ SOFTWARE.
 import pytest
 from sim.utils.base_parse_strategy import BaseParseStrategy
 from sim.utils.json_parser_strategy import JsonParseStrategy, ScenarioParseError
-from sim.entities.inputParameters import InputParameter
+from sim.entities.input_parameter import InputParameter
 from sim.entities.driver import Driver
 from sim.entities.vehicle import Vehicle
 from sim.utils.scenario_parser import ScenarioParser

@@ -22,7 +22,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 """
 
-from sim.core.RealTimeDriver import RealTimeDriver
+from sim.core.real_time_driver import RealTimeDriver
 import threading
 from typing import Callable, Optional, Dict
 from sim.core.types import BatchAssignResult
@@ -36,11 +36,11 @@ from sim.entities.vehicle import Vehicle
 from sim.entities.shift import Shift
 from sim.entities.clock import Clock
 from sim.entities.task import Task
-from sim.entities.inputParameters import InputParameter
+from sim.entities.input_parameter import InputParameter
 from sim.entities.map_payload import MapPayload
 from sim.behaviour.sim_behaviour import SimBehaviour
 from sim.behaviour.default.default_TPU_strategy import DefaultTPUStrategy
-from sim.map.MapController import MapController
+from sim.map.map_controller import MapController
 from grafana_logging.logger import get_logger
 
 logger = get_logger(__name__)
@@ -51,60 +51,60 @@ class SimulatorController:
 
     def __init__(
         self,
-        simEnv: SimulationEnvironment,
-        frameEmitter: FrameEmitter,
-        inputParameters: InputParameter,
+        sim_env: SimulationEnvironment,
+        frame_emitter: FrameEmitter,
+        input_parameters: InputParameter,
         sim_behaviour: SimBehaviour,
         strict: bool = False,
         map_controller: MapController | None = None,
         on_completed_callback: Optional[Callable[[str], None]] = None,
         sim_id: str = "",
     ) -> None:
-        self.simEnv = simEnv
+        self.sim_env = sim_env
 
         # Build map_payload with simpy env for time-based operations
-        existing_payload = inputParameters.get_map_payload()
+        existing_payload = input_parameters.get_map_payload()
         map_payload = MapPayload(
             traffic=existing_payload.traffic if existing_payload else None,
-            env=simEnv,
+            env=sim_env,
             sim_id=sim_id,
         )
         self.map_controller = map_controller or MapController(map_payload=map_payload)
 
         # Get parameters directly from InputParameter object
-        real_time_factor = inputParameters.get_real_time_factor()
-        keyframe_freq = inputParameters.get_key_frame_freq()
+        real_time_factor = input_parameters.get_real_time_factor()
+        keyframe_freq = input_parameters.get_key_frame_freq()
         if keyframe_freq is None:
             keyframe_freq = 60
 
-        self.realTimeDriver = RealTimeDriver(simEnv, real_time_factor, strict)
-        self.frameEmitter = frameEmitter
-        self.keyframeFreq = keyframe_freq
-        self.clock = Clock(simEnv)
+        self.real_time_driver = RealTimeDriver(sim_env, real_time_factor, strict)
+        self.frame_emitter = frame_emitter
+        self.keyframe_freq = keyframe_freq
+        self.clock = Clock(sim_env)
         self.sim_behaviour = sim_behaviour
-        self.frameCounter: int = 0
-        self.start_time: int = inputParameters.get_start_time()
+        self.frame_counter: int = 0
+        self.start_time: int = input_parameters.get_start_time()
         self.on_completed_callback = on_completed_callback
         self.last_reporting: dict | None = None
 
         # Unpack InputParameter object to populate entity lists
         self.station_entities: Dict[int, Station] = (
-            inputParameters.get_station_entities()
+            input_parameters.get_station_entities()
         )
-        self.driver_entities: Dict[int, Driver] = inputParameters.get_driver_entities()
+        self.driver_entities: Dict[int, Driver] = input_parameters.get_driver_entities()
 
         self.vehicle_entities: Dict[int, Vehicle] = (
-            inputParameters.get_vehicle_entities()
+            input_parameters.get_vehicle_entities()
         )
 
         if isinstance(sim_behaviour.TPU_strategy, DefaultTPUStrategy):
-            station_scheduled_tasks = inputParameters.get_station_scheduled_tasks()
+            station_scheduled_tasks = input_parameters.get_station_scheduled_tasks()
             if station_scheduled_tasks is not None:
                 sim_behaviour.TPU_strategy.set_station_scheduled_tasks(
                     station_scheduled_tasks
                 )
 
-        self.task_entities = inputParameters.get_task_entities()
+        self.task_entities = input_parameters.get_task_entities()
         self.prep_entities()
 
     def prep_entities(self) -> None:
@@ -117,29 +117,29 @@ class SimulatorController:
         for _, station in self.station_entities.items():
             station.set_behaviour(self.sim_behaviour)
             # Rebind to the actual simulation environment
-            station.env = self.simEnv
-            self.simEnv.process(station.run())
+            station.env = self.sim_env
+            self.sim_env.process(station.run())
 
         for _, task in self.task_entities.items():
             task.set_behaviour(self.sim_behaviour)
             # Rebind to the actual simulation environment
-            task.env = self.simEnv
+            task.env = self.sim_env
 
         for _, driver in self.driver_entities.items():
             driver.set_behaviour(self.sim_behaviour)
             driver.set_map_controller(self.map_controller)
 
-            driver.env = self.simEnv
+            driver.env = self.sim_env
 
             if driver.state is None:
                 driver.state = driver.get_initial_state()
 
-            self.simEnv.process(driver.run())
+            self.sim_env.process(driver.run())
 
         for _, vehicle in self.vehicle_entities.items():
-            vehicle.env = self.simEnv
+            vehicle.env = self.sim_env
             if vehicle.get_driver() is None:
-                self.simEnv.hq.push_vehicle(vehicle)
+                self.sim_env.hq.push_vehicle(vehicle)
 
     def start(self, sim_time: int) -> None:
         """Start the simulation.
@@ -162,13 +162,13 @@ class SimulatorController:
             """
 
             try:
-                self.realTimeDriver.run_until(
+                self.real_time_driver.run_until(
                     until=sim_time,
                     step_callback=self.emit_frame,
                 )
             finally:
 
-                running_at_completion = self.realTimeDriver.running
+                running_at_completion = self.real_time_driver.running
 
                 # Emit final keyframe only if sim ended naturally
                 if running_at_completion:
@@ -181,7 +181,7 @@ class SimulatorController:
                 # If the sim reaches end_time, realTimeDriver.running = true
                 # If diconnected/paused, realTimeDriver.running = false
                 if running_at_completion and self.on_completed_callback:
-                    self.on_completed_callback(self.frameEmitter.sim_id)
+                    self.on_completed_callback(self.frame_emitter.sim_id)
 
         self.sim_thread = threading.Thread(
             target=run,
@@ -196,9 +196,9 @@ class SimulatorController:
         """
         # Capture running state before stopping - if already paused, the correct
         # keyframe was already emitted (by user pause or cleanup_simulation)
-        was_running = self.realTimeDriver.running
+        was_running = self.real_time_driver.running
 
-        self.realTimeDriver.stop()
+        self.real_time_driver.stop()
         if hasattr(self, "sim_thread") and self.sim_thread.is_alive():
             self.sim_thread.join()
 
@@ -219,7 +219,7 @@ class SimulatorController:
         Returns:
             None
         """
-        self.realTimeDriver.pause()
+        self.real_time_driver.pause()
 
     def resume(self) -> None:
         """Resume the paused simulation.
@@ -227,7 +227,7 @@ class SimulatorController:
         Returns:
             None
         """
-        self.realTimeDriver.resume()
+        self.real_time_driver.resume()
 
     def set_factor(self, factor: float) -> None:
         """Set the real-time factor for simulation pacing.
@@ -238,7 +238,7 @@ class SimulatorController:
         Returns:
             None
         """
-        self.realTimeDriver.set_real_time_factor(factor)
+        self.real_time_driver.set_real_time_factor(factor)
 
     def get_task_by_id(self, task_id: int) -> Optional[Task]:
         """Get a task by its ID.
@@ -517,16 +517,16 @@ class SimulatorController:
         # specified for key frames
         if not frame:
             is_key = (
-                self.frameCounter % self.keyframeFreq == 0
-                or self.frameCounter == self.sim_time
-                or self.frameCounter == 0
+                self.frame_counter % self.keyframe_freq == 0
+                or self.frame_counter == self.sim_time
+                or self.frame_counter == 0
             )
             frame = self.create_frame(is_key=is_key)
-        self.frameEmitter.notify(frame=frame)
+        self.frame_emitter.notify(frame=frame)
         # After emitting the frame, clear update flags so only fresh
         # changes appear next time
         self.clear_entity_updates()
-        self.frameCounter += 1
+        self.frame_counter += 1
 
     def clear_entity_updates(self) -> None:
         """Clear update flags on all entities after emitting frame.
@@ -675,22 +675,22 @@ class SimulatorController:
                 )
 
         payload = {
-            "simId": self.frameEmitter.sim_id,
+            "simId": self.frame_emitter.sim_id,
             "headquarters": {
-                "position": self.simEnv.hq.position.get_position(),
+                "position": self.sim_env.hq.position.get_position(),
             },
             "tasks": tasks,
             "stations": stations,
             "drivers": drivers,
-            "vehicles": vehicles,  # Placeholder for future vehicle entities
+            "vehicles": vehicles,
             "clock": {
                 "realSecondsPassed": self.clock.real_seconds_passed,
                 "realMinutesPassed": self.clock.real_minutes_passed,
                 "simSecondsPassed": self.clock.sim_time_seconds,
                 "simMinutesPassed": self.clock.sim_time_minutes,
                 "startTime": self.start_time,
-                "running": self.realTimeDriver.running,
-                "realTimeFactor": self.realTimeDriver.real_time_factor,
+                "running": self.real_time_driver.running,
+                "realTimeFactor": self.real_time_driver.real_time_factor,
                 "pausedByUser": paused_by_user,
             },
             "reporting": {},
@@ -698,13 +698,13 @@ class SimulatorController:
 
         current_reporting = {
             "servicingToDrivingRatio": round(
-                self.simEnv.report.get_servicing_to_driving_ratio(), 4
+                self.sim_env.report.get_servicing_to_driving_ratio(), 4
             ),
             "averageTasksServicedPerShift": round(
-                self.simEnv.report.get_average_tasks_per_shift(), 4
+                self.sim_env.report.get_average_tasks_per_shift(), 4
             ),
             "averageTaskResponseTime": round(
-                self.simEnv.report.get_average_service_time_for_tasks(), 4
+                self.sim_env.report.get_average_service_time_for_tasks(), 4
             ),
         }
 
@@ -713,5 +713,5 @@ class SimulatorController:
             payload["reporting"] = current_reporting
             self.last_reporting = current_reporting
 
-        frame = Frame(seq_numb=self.frameCounter, payload=payload, is_key=is_key)
+        frame = Frame(seq_numb=self.frame_counter, payload=payload, is_key=is_key)
         return frame
