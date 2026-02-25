@@ -45,6 +45,22 @@ from sim.utils.json_parser_strategy import JsonParseStrategy
 router = APIRouter(prefix="/scenarios", tags=["scenarios"])
 
 
+async def get_raw_body(request: Request) -> bytes:
+    """Async dependency that reads and returns the raw request body.
+
+    Allows route handlers to be plain ``def`` while still accessing the raw
+    body for line-number extraction, avoiding a blocking session inside an
+    ``async def`` handler.
+
+    Args:
+        request: The incoming FastAPI request object.
+
+    Returns:
+        The raw request body as bytes.
+    """
+    return await request.body()
+
+
 class ValidationRequest(BaseModel):
     """Request schema for validating scenario content only."""
 
@@ -232,11 +248,11 @@ def get_scenario(
 
 
 @router.post("/", response_model=ScenarioResponse, status_code=status.HTTP_201_CREATED)
-async def create_scenario(
-    request_obj: Request,
+def create_scenario(
     request: ScenarioCreateRequest,
     requesting_user: int = Depends(get_user_id),
     db: Session = Depends(get_db),
+    raw_body: bytes = Depends(get_raw_body),
 ) -> ScenarioResponse:
     """
     Create a new scenario.
@@ -262,8 +278,7 @@ async def create_scenario(
                     f"Set allow_duplicate_name=true to create anyway."
                 )
 
-        # Get raw body for line number extraction
-        raw_body = await request_obj.body()
+        # Get raw body for line number extraction (injected via get_raw_body dependency)
         content_json_string = None
         try:
             import json
@@ -315,12 +330,12 @@ async def create_scenario(
 
 
 @router.put("/{scenario_id}", response_model=ScenarioResponse)
-async def update_scenario(
-    request_obj: Request,
+def update_scenario(
     scenario_id: int,
     request: ScenarioUpdateRequest,
     requesting_user: int = Depends(get_user_id),
     db: Session = Depends(get_db),
+    raw_body: bytes = Depends(get_raw_body),
 ) -> ScenarioResponse:
     """
     Update an existing scenario.
@@ -339,7 +354,7 @@ async def update_scenario(
         # Validate scenario content if it's being updated
         if request.content is not None:
             # Get raw body for line number extraction
-            raw_body = await request_obj.body()
+            # (injected via get_raw_body dependency)
             content_json_string = None
             try:
                 import json
