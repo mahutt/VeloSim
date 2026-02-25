@@ -120,6 +120,44 @@ jobs:
             exit 0
           fi
 
+      - name: Check for in-branch merge commits
+        run: |
+          echo "Checking for in-branch merge commits in PR #${{ github.event.pull_request.number }}"
+
+          COMMITS=$(git log --format="%H" ${{ github.event.pull_request.base.sha }}..${{ github.event.pull_request.head.sha }})
+
+          if [ -z "$COMMITS" ]; then
+            echo "⚠️  No commits found in PR"
+            exit 1
+          fi
+
+          MERGE_COMMITS=0
+
+          for COMMIT in $COMMITS; do
+            PARENT_COUNT=$(git cat-file -p "$COMMIT" | grep -c "^parent ")
+            if [ "$PARENT_COUNT" -gt 1 ]; then
+              MESSAGE=$(git log --format="%s" -n 1 "$COMMIT")
+              echo "❌ Merge commit detected: $COMMIT"
+              echo "   Message: $MESSAGE"
+              MERGE_COMMITS=$((MERGE_COMMITS + 1))
+            fi
+          done
+
+          if [ "$MERGE_COMMITS" -gt 0 ]; then
+            echo ""
+            echo "❌ This PR contains $MERGE_COMMITS in-branch merge commit(s)."
+            echo ""
+            echo "In-branch merge commits pollute history with noise like"
+            echo "'Merge branch '\''main'\'' into feature/xyz'."
+            echo ""
+            echo "Please rebase instead:"
+            echo "  git rebase origin/main"
+            echo "  git push --force-with-lease"
+            exit 1
+          else
+            echo "✅ No in-branch merge commits found."
+          fi
+
       - name: Analyze changed files
         id: check-changes
         run: |
