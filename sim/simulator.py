@@ -28,14 +28,14 @@ from sim.core.types import BatchAssignResult
 import uuid
 
 from sim.core.simulation_environment import SimulationEnvironment
-from sim.entities.inputParameters import InputParameter
+from sim.entities.input_parameter import InputParameter
 from sim.entities.request_type import RequestType
 from sim.core.frame_emitter import FrameEmitter
 from sim.utils.subscriber import Subscriber
-from sim.core.SimulatorController import SimulatorController
+from sim.core.simulator_controller import SimulatorController
 from sim.entities.task import Task
 from sim.behaviour.sim_behaviour import SimBehaviour
-from sim.map.MapController import MapController
+from sim.map.map_controller import MapController
 from grafana_logging.logger import get_logger
 
 logger = get_logger(__name__)
@@ -46,7 +46,7 @@ class RunInfo(TypedDict):
 
     thread: Optional[threading.Thread]
     emitter: FrameEmitter
-    simController: SimulatorController
+    sim_controller: SimulatorController
 
 
 class Simulator:
@@ -113,11 +113,11 @@ class Simulator:
         if env is None:
             env = SimulationEnvironment()
 
-        simController = SimulatorController(
-            simEnv=env,
+        sim_controller = SimulatorController(
+            sim_env=env,
             sim_id=run_id,
-            inputParameters=input_parameters,
-            frameEmitter=emitter,
+            input_parameters=input_parameters,
+            frame_emitter=emitter,
             sim_behaviour=sim_behaviour,
             strict=True,
             map_controller=map_controller,
@@ -126,10 +126,10 @@ class Simulator:
 
         # Apply playback state for restored simulations
         if real_time_factor is not None:
-            simController.realTimeDriver.set_real_time_factor(real_time_factor)
+            sim_controller.real_time_driver.set_real_time_factor(real_time_factor)
 
         if not initial_running:
-            simController.realTimeDriver.pause()
+            sim_controller.real_time_driver.pause()
 
         with self.thread_pool_lock:
             if run_id in self.thread_pool:
@@ -138,12 +138,12 @@ class Simulator:
             self.thread_pool[run_id] = {
                 "thread": None,  # No thread yet
                 "emitter": emitter,
-                "simController": simController,
+                "sim_controller": sim_controller,
             }
 
         return run_id
 
-    def start(self, sim_id: str, simTime: int) -> None:
+    def start(self, sim_id: str, sim_time: int) -> None:
         """Start the simulation loop for an initialized simulation.
 
         Creates and starts a daemon thread that runs the simulation for the
@@ -152,7 +152,7 @@ class Simulator:
 
         Args:
             sim_id: Unique simulation ID returned from initialize().
-            simTime: Maximum simulation time in seconds.
+            sim_time: Maximum simulation time in seconds.
 
         Returns:
             None
@@ -174,8 +174,8 @@ class Simulator:
 
         # Create and start the simulation thread
         t = threading.Thread(
-            target=rec["simController"].start,
-            args=(simTime,),
+            target=rec["sim_controller"].start,
+            args=(sim_time,),
             name=f"SIM-{sim_id}",
             daemon=True,
         )
@@ -205,7 +205,7 @@ class Simulator:
         if rec is None:
             return  # Unknown/Thread is already closed.
 
-        rec["simController"].stop()
+        rec["sim_controller"].stop()
 
         # Only join if there's an actual thread
         if rec["thread"] is not None:
@@ -234,7 +234,7 @@ class Simulator:
         try:
             sim_info = self.get_sim_by_id(sim_id)
             if sim_info is not None:
-                sim_info["simController"].pause()
+                sim_info["sim_controller"].pause()
         except Exception as e:
             print(f"Could not pause simulation due to: {e}")
 
@@ -252,7 +252,7 @@ class Simulator:
         try:
             sim_info = self.get_sim_by_id(sim_id)
             if sim_info is not None:
-                sim_info["simController"].resume()
+                sim_info["sim_controller"].resume()
         except Exception as e:
             print(f"Could not resume simulation due to: {e}")
 
@@ -272,7 +272,7 @@ class Simulator:
         try:
             sim_info = self.get_sim_by_id(sim_id)
             if sim_info is not None:
-                sim_info["simController"].set_factor(factor)
+                sim_info["sim_controller"].set_factor(factor)
         except Exception as e:
             print(f"Could not set factor due to: {e}")
 
@@ -333,7 +333,7 @@ class Simulator:
         try:
             sim_info = self.get_sim_by_id(sim_id)
             if sim_info is not None:
-                sim_info["simController"].add_task(task)
+                sim_info["sim_controller"].add_task(task)
         except Exception as e:
             print(f"Could not add task to sim due to: {e}")
 
@@ -351,7 +351,7 @@ class Simulator:
         try:
             sim_info = self.get_sim_by_id(sim_id)
             if sim_info is not None:
-                sim_info["simController"].assign_task_to_driver(task_id, driver_id)
+                sim_info["sim_controller"].assign_task_to_driver(task_id, driver_id)
         except Exception as e:
             print(f"Could not assign task due to: {e}")
 
@@ -377,7 +377,7 @@ class Simulator:
         if sim_info is None:
             raise Exception(f"Simulation {sim_id} not found")
         try:
-            return sim_info["simController"].batch_assign_tasks_to_driver(
+            return sim_info["sim_controller"].batch_assign_tasks_to_driver(
                 driver_id, task_ids
             )
         except Exception as e:
@@ -399,7 +399,7 @@ class Simulator:
         try:
             sim_info = self.get_sim_by_id(sim_id)
             if sim_info is not None:
-                sim_info["simController"].unassign_task_from_driver(task_id, driver_id)
+                sim_info["sim_controller"].unassign_task_from_driver(task_id, driver_id)
         except Exception as e:
             print(f"Could not unassign task due to: {e}")
 
@@ -420,7 +420,7 @@ class Simulator:
         try:
             sim_info = self.get_sim_by_id(sim_id)
             if sim_info is not None:
-                sim_info["simController"].reassign_task(
+                sim_info["sim_controller"].reassign_task(
                     task_id, old_driver_id, new_driver_id
                 )
         except Exception as e:
@@ -453,7 +453,7 @@ class Simulator:
             sim_info = self.get_sim_by_id(sim_id)
             if sim_info is not None:
                 try:
-                    return sim_info["simController"].reorder_driver_tasks(
+                    return sim_info["sim_controller"].reorder_driver_tasks(
                         driver_id, task_ids_to_reorder, apply_from_top
                     )
                 except Exception as e:

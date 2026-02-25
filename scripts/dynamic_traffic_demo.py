@@ -74,7 +74,7 @@ import simpy
 from sim.entities.map_payload import MapPayload, TrafficConfig
 from sim.entities.position import Position
 from sim.entities.traffic_event_state import TrafficEventState
-from sim.map.MapController import MapController
+from sim.map.map_controller import MapController
 try:
     from sim.osm.traffic_state_store import traffic_state_store
 except ImportError:

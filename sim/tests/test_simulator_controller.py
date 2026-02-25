@@ -27,21 +27,21 @@ import pytest
 from typing import List, Any
 from unittest.mock import Mock, patch
 
-from sim.core.SimulatorController import SimulatorController
+from sim.core.simulator_controller import SimulatorController
 from sim.core.frame_emitter import FrameEmitter
 from sim.core.simulation_environment import SimulationEnvironment
-from sim.entities.inputParameters import InputParameter
+from sim.entities.input_parameter import InputParameter
 from sim.entities.frame import Frame
 from sim.entities.station import Station
 from sim.entities.driver import Driver, DriverState
 from sim.entities.shift import Shift
-from sim.entities.BatterySwapTask import BatterySwapTask
+from sim.entities.battery_swap_task import BatterySwapTask
 from sim.entities.position import Position
 from sim.entities.task_state import State
 from sim.utils.subscriber import Subscriber
 from sim.behaviour.sim_behaviour import SimBehaviour
-import sim.core.RealTimeDriver as rtd
-import sim.core.SimulatorController as sc_mod
+import sim.core.real_time_driver as rtd
+import sim.core.simulator_controller as sc_mod
 from types import SimpleNamespace
 
 
@@ -172,14 +172,14 @@ def simulator_controller(
     # Mock OSRMConnection initialization to avoid file I/O
     with (
         patch(
-            "sim.osm.OSRMConnection.OSRMConnection._verify_osrm_connection",
+            "sim.osm.osrm_connection.OSRMConnection._verify_osrm_connection",
             return_value=True,
         ),
     ):
         controller = SimulatorController(
-            simEnv=env,
-            frameEmitter=frame_emitter,
-            inputParameters=input_params,
+            sim_env=env,
+            frame_emitter=frame_emitter,
+            input_parameters=input_params,
             sim_behaviour=FakeSimBehaviour(),
             strict=False,
         )
@@ -192,9 +192,9 @@ def test_simulator_controller_initialization(
 ) -> None:
     """Test that SimulatorController initializes correctly with proper attributes."""
     # Check that the map has the expected attributes
-    assert simulator_controller.simEnv is not None
-    assert simulator_controller.frameEmitter is not None
-    assert simulator_controller.realTimeDriver is not None
+    assert simulator_controller.sim_env is not None
+    assert simulator_controller.frame_emitter is not None
+    assert simulator_controller.real_time_driver is not None
     assert simulator_controller.clock is not None
 
     # Check that entities are properly loaded from InputParameter
@@ -203,10 +203,10 @@ def test_simulator_controller_initialization(
     assert len(simulator_controller.task_entities) == 2
 
     # Check keyframe frequency
-    assert simulator_controller.keyframeFreq == 60  # default value
+    assert simulator_controller.keyframe_freq == 60  # default value
 
     # Check frame counter initialization
-    assert simulator_controller.frameCounter == 0
+    assert simulator_controller.frame_counter == 0
 
 
 def test_emit_initial_frame(
@@ -232,7 +232,7 @@ def test_emit_initial_frame(
     assert "clock" in frame.payload_dict
 
     # Check that frame counter was incremented
-    assert simulator_controller.frameCounter == 1
+    assert simulator_controller.frame_counter == 1
 
 
 def test_create_key_frame(simulator_controller: SimulatorController) -> None:
@@ -322,7 +322,7 @@ def test_emit_frame_with_provided_frame(
     assert subscriber.received[0] == custom_frame
 
     # Check that frame counter was incremented
-    assert simulator_controller.frameCounter == 1
+    assert simulator_controller.frame_counter == 1
 
 
 def test_emit_frame_without_provided_frame_key_frame(
@@ -334,7 +334,7 @@ def test_emit_frame_without_provided_frame_key_frame(
     frame_emitter.attach(subscriber)
 
     # Set frame counter to multiple of keyframe frequency
-    simulator_controller.frameCounter = 60  # Should create key frame
+    simulator_controller.frame_counter = 60  # Should create key frame
 
     simulator_controller.emit_frame()
 
@@ -357,7 +357,7 @@ def test_emit_frame_without_provided_frame_diff_frame(
     frame_emitter.attach(subscriber)
 
     # Set frame counter to non-multiple of keyframe frequency
-    simulator_controller.frameCounter = 30  # Should create diff frame
+    simulator_controller.frame_counter = 30  # Should create diff frame
 
     # Mark some entities as updated (using ID keys instead of indices)
     simulator_controller.station_entities[1].has_updated = True
@@ -559,8 +559,8 @@ def test_pause_and_resume(simulator_controller: SimulatorController) -> None:
     """Test pause and resume functionality."""
     # Mock the real time driver methods
     with (
-        patch.object(simulator_controller.realTimeDriver, "pause") as mock_pause,
-        patch.object(simulator_controller.realTimeDriver, "resume") as mock_resume,
+        patch.object(simulator_controller.real_time_driver, "pause") as mock_pause,
+        patch.object(simulator_controller.real_time_driver, "resume") as mock_resume,
     ):
 
         simulator_controller.pause()
@@ -573,7 +573,7 @@ def test_pause_and_resume(simulator_controller: SimulatorController) -> None:
 def test_stop(simulator_controller: SimulatorController) -> None:
     """Test stop functionality."""
     # Mock the real time driver stop method
-    with patch.object(simulator_controller.realTimeDriver, "stop") as mock_stop:
+    with patch.object(simulator_controller.real_time_driver, "stop") as mock_stop:
         simulator_controller.stop()
         mock_stop.assert_called_once()
 
@@ -582,7 +582,7 @@ def test_set_factor(simulator_controller: SimulatorController) -> None:
     """Test set_factor functionality."""
     # Mock the real time driver set_real_time_factor method
     with patch.object(
-        simulator_controller.realTimeDriver, "set_real_time_factor"
+        simulator_controller.real_time_driver, "set_real_time_factor"
     ) as mock_set_factor:
         simulator_controller.set_factor(2.0)
         mock_set_factor.assert_called_once_with(2.0)
@@ -863,18 +863,18 @@ def test_custom_keyframe_frequency(
     params.set_key_frame_freq(30)  # Custom frequency
 
     with patch(
-        "sim.osm.OSRMConnection.OSRMConnection._verify_osrm_connection",
+        "sim.osm.osrm_connection.OSRMConnection._verify_osrm_connection",
         return_value=True,
     ):
         controller = SimulatorController(
-            simEnv=env,
-            frameEmitter=frame_emitter,
-            inputParameters=params,
+            sim_env=env,
+            frame_emitter=frame_emitter,
+            input_parameters=params,
             sim_behaviour=FakeSimBehaviour(),
             strict=False,
         )
 
-    assert controller.keyframeFreq == 30
+    assert controller.keyframe_freq == 30
 
 
 def test_strict_mode_initialization(
@@ -889,19 +889,19 @@ def test_strict_mode_initialization(
     monkeypatch.setenv("OSRM_URL", "http://localhost:5000")
 
     with patch(
-        "sim.osm.OSRMConnection.OSRMConnection._verify_osrm_connection",
+        "sim.osm.osrm_connection.OSRMConnection._verify_osrm_connection",
         return_value=True,
     ):
         controller = SimulatorController(
-            simEnv=env,
-            frameEmitter=frame_emitter,
-            inputParameters=input_params,
+            sim_env=env,
+            frame_emitter=frame_emitter,
+            input_parameters=input_params,
             sim_behaviour=FakeSimBehaviour(),
             strict=True,
         )
 
     # The strict parameter should be passed to RealTimeDriver
-    assert controller.realTimeDriver.strict is True
+    assert controller.real_time_driver.strict is True
 
 
 def test_reorder_driver_tasks_success(
@@ -1042,7 +1042,7 @@ def test_create_frame_includes_running_state(
     assert clock["running"] is True
 
     # Pause and check again
-    simulator_controller.realTimeDriver.pause()
+    simulator_controller.real_time_driver.pause()
     frame_paused = simulator_controller.create_frame(is_key=True)
     clock_paused = frame_paused.payload_dict["clock"]
     assert "running" in clock_paused
@@ -1063,7 +1063,7 @@ def test_create_frame_includes_real_time_factor(
     assert clock["realTimeFactor"] == 1.0
 
     # Change factor and check again
-    simulator_controller.realTimeDriver.set_real_time_factor(0.5)  # 2x speed
+    simulator_controller.real_time_driver.set_real_time_factor(0.5)  # 2x speed
     frame_fast = simulator_controller.create_frame(is_key=True)
     clock_fast = frame_fast.payload_dict["clock"]
     assert "realTimeFactor" in clock_fast
@@ -1082,8 +1082,8 @@ def test_stop_does_not_emit_keyframe_when_already_paused(
     frame_emitter.attach(subscriber)
 
     # Pause the driver first (simulates user pausing or cleanup)
-    simulator_controller.realTimeDriver.pause()
-    assert simulator_controller.realTimeDriver.running is False
+    simulator_controller.real_time_driver.pause()
+    assert simulator_controller.real_time_driver.running is False
 
     # Now call stop
     simulator_controller.stop()
@@ -1102,7 +1102,7 @@ def test_stop_emits_keyframe_when_running(
     frame_emitter.attach(subscriber)
 
     # Driver should be running by default
-    assert simulator_controller.realTimeDriver.running is True
+    assert simulator_controller.real_time_driver.running is True
 
     # Call stop
     simulator_controller.stop()

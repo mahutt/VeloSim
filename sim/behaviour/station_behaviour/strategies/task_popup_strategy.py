@@ -23,7 +23,7 @@ SOFTWARE.
 """
 
 from abc import ABC, abstractmethod
-from sim.entities.BatterySwapTask import BatterySwapTask
+from sim.entities.battery_swap_task import BatterySwapTask
 from typing import TYPE_CHECKING, List
 
 if TYPE_CHECKING:

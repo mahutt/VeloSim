@@ -37,15 +37,15 @@ from unittest.mock import patch, MagicMock
 
 # Import the module so we can monkeypatch its time.sleep
 from sim.core.simulation_environment import SimulationEnvironment
-from sim.entities.inputParameters import InputParameter
+from sim.entities.input_parameter import InputParameter
 from sim.entities.request_type import RequestType
 from sim.entities.station import Station
 from sim.entities.position import Position
 from sim.entities.driver import Driver
 from sim.entities.shift import Shift
-from sim.entities.BatterySwapTask import BatterySwapTask
+from sim.entities.battery_swap_task import BatterySwapTask
 
-import sim.core.RealTimeDriver as rtd_mod
+import sim.core.real_time_driver as rtd_mod
 from sim.simulator import Simulator
 from sim.utils.subscriber import Subscriber
 from sim.behaviour.sim_behaviour import SimBehaviour
@@ -62,7 +62,7 @@ def mock_osrm_connection(monkeypatch: Any) -> Any:
 
     # Mock the OSRM connection verification
     with patch(
-        "sim.osm.OSRMConnection.OSRMConnection._verify_osrm_connection",
+        "sim.osm.osrm_connection.OSRMConnection._verify_osrm_connection",
         return_value=True,
     ):
         yield
@@ -202,7 +202,7 @@ def test_start_creates_thread_and_emits_output(
     # Patch heavy map building and routing before start
     sim_info = sim.get_sim_by_id(sim_id)
     assert sim_info is not None
-    ctrl = sim_info["simController"]
+    ctrl = sim_info["sim_controller"]
     with patch.object(
         ctrl.map_controller, "get_route", return_value=SimpleNamespace(roads=[1])
     ):
@@ -244,7 +244,7 @@ def test_start_with_already_running_sim(
     sim_id = sim.initialize(params, subList, FakeSimBehaviour())
     sim_info = sim.get_sim_by_id(sim_id)
     assert sim_info is not None
-    ctrl = sim_info["simController"]
+    ctrl = sim_info["sim_controller"]
     with patch.object(
         ctrl.map_controller, "get_route", return_value=SimpleNamespace(roads=[1])
     ):
@@ -266,7 +266,7 @@ def test_stop_removes_thread_from_pool(
     sim_id = sim.initialize(params, subList, FakeSimBehaviour())
     sim_info = sim.get_sim_by_id(sim_id)
     assert sim_info is not None
-    ctrl = sim_info["simController"]
+    ctrl = sim_info["sim_controller"]
     with patch.object(
         ctrl.map_controller,
         "get_route",
@@ -303,8 +303,8 @@ def test_multiple_parallel_sims(
     a_info = sim.get_sim_by_id(a)
     b_info = sim.get_sim_by_id(b)
     assert a_info is not None and b_info is not None
-    a_ctrl = a_info["simController"]
-    b_ctrl = b_info["simController"]
+    a_ctrl = a_info["sim_controller"]
+    b_ctrl = b_info["sim_controller"]
     with (
         patch.object(
             a_ctrl.map_controller,
@@ -345,7 +345,7 @@ def test_pause_success(sim: Simulator, input_params: InputParameter) -> None:
     assert sim_info is not None
 
     # Act & Assert
-    with patch.object(sim_info["simController"], "pause") as mock_pause:
+    with patch.object(sim_info["sim_controller"], "pause") as mock_pause:
         sim.pause(a)
         mock_pause.assert_called_once()
 
@@ -377,7 +377,7 @@ def test_resume_success(sim: Simulator, input_params: InputParameter) -> None:
     assert sim_info is not None
 
     # Act & Assert
-    with patch.object(sim_info["simController"], "resume") as mock_resume:
+    with patch.object(sim_info["sim_controller"], "resume") as mock_resume:
         sim.resume(a)
         mock_resume.assert_called_once()
 
@@ -409,7 +409,7 @@ def test_set_factor_success(sim: Simulator, input_params: InputParameter) -> Non
     assert sim_info is not None
 
     # Act & Assert
-    with patch.object(sim_info["simController"], "set_factor") as mock_set_factor:
+    with patch.object(sim_info["sim_controller"], "set_factor") as mock_set_factor:
         sim.set_factor(a, 2.5)
         mock_set_factor.assert_called_once_with(2.5)
 
@@ -448,7 +448,7 @@ def test_get_sim_by_id_success(
     a = sim.initialize(params, subList, FakeSimBehaviour())
     a_info = sim.get_sim_by_id(a)
     assert a_info is not None
-    ctrl = a_info["simController"]
+    ctrl = a_info["sim_controller"]
     with patch.object(
         ctrl.map_controller,
         "get_route",
@@ -461,7 +461,7 @@ def test_get_sim_by_id_success(
 
     # Assert
     assert sim_info is not None
-    assert sim_info["simController"] is not None
+    assert sim_info["sim_controller"] is not None
 
     sim.stop(a)
 
@@ -475,7 +475,7 @@ def test_get_sim_by_id_fail(
     a = sim.initialize(params, subList, FakeSimBehaviour())
     a_info = sim.get_sim_by_id(a)
     assert a_info is not None
-    ctrl = a_info["simController"]
+    ctrl = a_info["sim_controller"]
     with patch.object(
         ctrl.map_controller,
         "get_route",
@@ -502,7 +502,7 @@ def test_add_task_to_sim_success(
     a = sim.initialize(params, subList, FakeSimBehaviour())
     a_info = sim.get_sim_by_id(a)
     assert a_info is not None
-    ctrl = a_info["simController"]
+    ctrl = a_info["sim_controller"]
     with patch.object(
         ctrl.map_controller,
         "get_route",
@@ -518,7 +518,7 @@ def test_add_task_to_sim_success(
     # Assert
     sim_info = sim.get_sim_by_id(a)
     if sim_info is not None:
-        sim_controller = sim_info["simController"]
+        sim_controller = sim_info["sim_controller"]
 
         # task_entities is a dict keyed by task id
         assert len(sim_controller.task_entities) != 0
@@ -542,7 +542,7 @@ def test_add_task_to_sim_fail(
     a = sim.initialize(params, subList, FakeSimBehaviour())
     a_info = sim.get_sim_by_id(a)
     assert a_info is not None
-    ctrl = a_info["simController"]
+    ctrl = a_info["sim_controller"]
     with patch.object(
         ctrl.map_controller,
         "get_route",
@@ -571,7 +571,7 @@ def test_assign_task_to_driver_success(
     a = sim.initialize(input_params, subList, FakeSimBehaviour())
     a_info = sim.get_sim_by_id(a)
     assert a_info is not None
-    ctrl = a_info["simController"]
+    ctrl = a_info["sim_controller"]
     with patch.object(
         ctrl.map_controller,
         "get_route",
@@ -585,7 +585,7 @@ def test_assign_task_to_driver_success(
     # Assert
     sim_info = sim.get_sim_by_id(a)
     if sim_info is not None:
-        sim_controller = sim_info["simController"]
+        sim_controller = sim_info["sim_controller"]
         task = sim_controller.get_task_by_id(1)
         assert task is not None
         driver = task.get_assigned_driver()
@@ -610,7 +610,7 @@ def test_simulator_wrapper_delegates_and_returns(sim: Simulator) -> None:
 
     # Patch the simulator instance to return our fake controller for any sim_id
     with patch.object(
-        sim, "get_sim_by_id", return_value={"simController": mock_controller}
+        sim, "get_sim_by_id", return_value={"sim_controller": mock_controller}
     ):
         results = sim.batch_assign_tasks_to_driver("fake-sim", 1, [1, 2])
 
@@ -628,7 +628,7 @@ def test_assign_task_to_driver_fail(
     a = sim.initialize(input_params, subList, FakeSimBehaviour())
     a_info = sim.get_sim_by_id(a)
     assert a_info is not None
-    ctrl = a_info["simController"]
+    ctrl = a_info["sim_controller"]
     with patch.object(
         ctrl.map_controller,
         "get_route",
@@ -651,7 +651,7 @@ def test_unassign_task_from_driver_success(
     a = sim.initialize(input_params, subList, FakeSimBehaviour())
     a_info = sim.get_sim_by_id(a)
     assert a_info is not None
-    ctrl = a_info["simController"]
+    ctrl = a_info["sim_controller"]
     with patch.object(
         ctrl.map_controller,
         "get_route",
@@ -666,7 +666,7 @@ def test_unassign_task_from_driver_success(
     # Assert
     sim_info = sim.get_sim_by_id(a)
     if sim_info is not None:
-        sim_controller = sim_info["simController"]
+        sim_controller = sim_info["sim_controller"]
         task = sim_controller.get_task_by_id(1)
         assert task is not None
         assert task.get_assigned_driver() is None
@@ -680,7 +680,7 @@ def test_unassign_task_from_driver_fail(
     a = sim.initialize(input_params, subList, FakeSimBehaviour())
     a_info = sim.get_sim_by_id(a)
     assert a_info is not None
-    ctrl = a_info["simController"]
+    ctrl = a_info["sim_controller"]
     with patch.object(
         ctrl.map_controller,
         "get_route",
@@ -701,7 +701,7 @@ def test_reassign_task_success(sim: Simulator, input_params: InputParameter) -> 
     a = sim.initialize(input_params, subList, FakeSimBehaviour())
     a_info = sim.get_sim_by_id(a)
     assert a_info is not None
-    ctrl = a_info["simController"]
+    ctrl = a_info["sim_controller"]
     with patch.object(
         ctrl.map_controller,
         "get_route",
@@ -716,7 +716,7 @@ def test_reassign_task_success(sim: Simulator, input_params: InputParameter) -> 
     # Assert
     sim_info = sim.get_sim_by_id(a)
     if sim_info is not None:
-        sim_controller = sim_info["simController"]
+        sim_controller = sim_info["sim_controller"]
         task = sim_controller.get_task_by_id(1)
         assert task is not None
         old_driver = sim_controller.get_driver_by_id(1)
@@ -738,7 +738,7 @@ def test_reassign_task_fail(
     a = sim.initialize(input_params, subList, FakeSimBehaviour())
     a_info = sim.get_sim_by_id(a)
     assert a_info is not None
-    ctrl = a_info["simController"]
+    ctrl = a_info["sim_controller"]
     with patch.object(
         ctrl.map_controller,
         "get_route",
@@ -775,7 +775,7 @@ def test_stop_all_stops_everything_and_is_idempotent(
         sim_id = sim.initialize(params, subList, FakeSimBehaviour())
         sim_info = sim.get_sim_by_id(sim_id)
         assert sim_info is not None
-        ctrl = sim_info["simController"]
+        ctrl = sim_info["sim_controller"]
         with patch.object(
             ctrl.map_controller,
             "get_route",
@@ -810,7 +810,7 @@ def test_reorder_driver_tasks_success(
     # Get the controller and driver
     sim_info = sim.get_sim_by_id(sim_id)
     assert sim_info is not None
-    controller = sim_info["simController"]
+    controller = sim_info["sim_controller"]
     driver = controller.get_driver_by_id(1)
     assert driver is not None
 
@@ -870,7 +870,7 @@ def test_reorder_driver_tasks_with_thread_lock(
     # Get the controller and driver
     sim_info = sim.get_sim_by_id(sim_id)
     assert sim_info is not None
-    controller = sim_info["simController"]
+    controller = sim_info["sim_controller"]
     driver = controller.get_driver_by_id(1)
     assert driver is not None
 
@@ -912,8 +912,8 @@ def test_initialize_with_initial_running_false_pauses_simulation(
     # Assert
     sim_info = sim.get_sim_by_id(sim_id)
     assert sim_info is not None
-    controller = sim_info["simController"]
-    assert controller.realTimeDriver.running is False
+    controller = sim_info["sim_controller"]
+    assert controller.real_time_driver.running is False
 
 
 def test_initialize_with_initial_running_true_keeps_simulation_running(
@@ -927,8 +927,8 @@ def test_initialize_with_initial_running_true_keeps_simulation_running(
     # Assert
     sim_info = sim.get_sim_by_id(sim_id)
     assert sim_info is not None
-    controller = sim_info["simController"]
-    assert controller.realTimeDriver.running is True
+    controller = sim_info["sim_controller"]
+    assert controller.real_time_driver.running is True
 
 
 def test_initialize_with_real_time_factor_sets_driver_speed(
@@ -942,8 +942,8 @@ def test_initialize_with_real_time_factor_sets_driver_speed(
     # Assert
     sim_info = sim.get_sim_by_id(sim_id)
     assert sim_info is not None
-    controller = sim_info["simController"]
-    assert controller.realTimeDriver.real_time_factor == 2.5
+    controller = sim_info["sim_controller"]
+    assert controller.real_time_driver.real_time_factor == 2.5
 
 
 def test_initialize_with_real_time_factor_none_uses_default(
@@ -957,8 +957,8 @@ def test_initialize_with_real_time_factor_none_uses_default(
     # Assert
     sim_info = sim.get_sim_by_id(sim_id)
     assert sim_info is not None
-    controller = sim_info["simController"]
-    assert controller.realTimeDriver.real_time_factor == 1.0
+    controller = sim_info["sim_controller"]
+    assert controller.real_time_driver.real_time_factor == 1.0
 
 
 def test_initialize_with_paused_and_custom_speed(
@@ -974,6 +974,6 @@ def test_initialize_with_paused_and_custom_speed(
     # Assert
     sim_info = sim.get_sim_by_id(sim_id)
     assert sim_info is not None
-    controller = sim_info["simController"]
-    assert controller.realTimeDriver.running is False
-    assert controller.realTimeDriver.real_time_factor == 0.5
+    controller = sim_info["sim_controller"]
+    assert controller.real_time_driver.running is False
+    assert controller.real_time_driver.real_time_factor == 0.5

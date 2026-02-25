@@ -41,7 +41,7 @@ def test_replay_parser_parse_minimal_valid_replay(
     mock_map_controller: MagicMock,
 ) -> None:
     from sim.utils.replay_parser import ReplayParser
-    from sim.entities.inputParameters import InputParameter
+    from sim.entities.input_parameter import InputParameter
     from sim.entities.task_state import State
     from sim.entities.driver import DriverState
 

@@ -30,7 +30,7 @@ from unittest.mock import patch, MagicMock, Mock
 from sim.core.simulation_environment import SimulationEnvironment
 from sim.entities.driver import Driver, DriverState
 from sim.entities.position import Position
-from sim.entities.BatterySwapTask import BatterySwapTask
+from sim.entities.battery_swap_task import BatterySwapTask
 from sim.entities.task import Task, State
 from sim.entities.station import Station
 from sim.entities.vehicle import Vehicle

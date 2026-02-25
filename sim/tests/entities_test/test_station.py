@@ -26,7 +26,7 @@ import pytest
 import simpy
 from sim.entities.station import Station
 from sim.entities.position import Position
-from sim.entities.BatterySwapTask import BatterySwapTask
+from sim.entities.battery_swap_task import BatterySwapTask
 from sim.entities.task import Task
 
 

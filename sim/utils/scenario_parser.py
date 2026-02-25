@@ -22,7 +22,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 """
 
-from sim.entities.inputParameters import InputParameter
+from sim.entities.input_parameter import InputParameter
 from sim.utils.base_parse_strategy import BaseParseStrategy
 
 

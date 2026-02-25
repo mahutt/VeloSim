@@ -36,11 +36,11 @@ from pydantic import (
 )
 
 from sim.entities.headquarters import Headquarters
-from sim.entities.inputParameters import InputParameter
+from sim.entities.input_parameter import InputParameter
 from sim.entities.station import Station
 from sim.entities.driver import Driver, LUNCH_BREAK_DURATION
 from sim.entities.vehicle import Vehicle
-from sim.entities.BatterySwapTask import BatterySwapTask
+from sim.entities.battery_swap_task import BatterySwapTask
 from sim.entities.shift import Shift
 from sim.entities.position import Position
 from sim.entities.map_payload import MapPayload, TrafficConfig

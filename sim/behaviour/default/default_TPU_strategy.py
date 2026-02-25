@@ -25,7 +25,7 @@ SOFTWARE.
 from sim.behaviour.station_behaviour.strategies.task_popup_strategy import (
     TaskPopupStrategy,
 )
-from sim.entities.BatterySwapTask import BatterySwapTask
+from sim.entities.battery_swap_task import BatterySwapTask
 from sim.entities.task_state import State
 from typing import Dict, List, TYPE_CHECKING, Optional
 

@@ -11,12 +11,12 @@ Core Simulation
    :undoc-members:
    :show-inheritance:
 
-.. automodule:: sim.core.SimulatorController
+.. automodule:: sim.core.simulator_controller
    :members:
    :undoc-members:
    :show-inheritance:
 
-.. automodule:: sim.core.RealTimeDriver
+.. automodule:: sim.core.real_time_driver
    :members:
    :undoc-members:
    :show-inheritance:
@@ -90,12 +90,12 @@ Behavior System
 Map and Routing
 ---------------
 
-.. automodule:: sim.map.MapController
+.. automodule:: sim.map.map_controller
    :members:
    :undoc-members:
    :show-inheritance:
 
-.. automodule:: sim.osm.OSRMConnection
+.. automodule:: sim.osm.osrm_connection
    :members:
    :undoc-members:
    :show-inheritance:

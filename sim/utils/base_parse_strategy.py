@@ -24,7 +24,7 @@ SOFTWARE.
 
 from abc import ABC, abstractmethod
 
-from sim.entities.inputParameters import InputParameter
+from sim.entities.input_parameter import InputParameter
 
 
 class BaseParseStrategy(ABC):

@@ -64,8 +64,8 @@ class InputParameter:
         self.station_scheduled_tasks: Optional[Dict[int, Dict[int, List[int]]]] = (
             station_scheduled_tasks
         )
-        self.realTimeFactor: Optional[float] = real_time_factor
-        self.keyFrameFreq: Optional[int] = key_frame_freq
+        self.real_time_factor: Optional[float] = real_time_factor
+        self.key_frame_freq: Optional[int] = key_frame_freq
         self.sim_time: int = sim_time if sim_time is not None else 0
         self.start_time: int = start_time if start_time is not None else 0
         self.map_payload: Optional[MapPayload] = map_payload
@@ -109,7 +109,7 @@ class InputParameter:
         Returns:
             Real seconds per simulated second, or None.
         """
-        return self.realTimeFactor
+        return self.real_time_factor
 
     def get_key_frame_freq(self) -> Optional[int]:
         """Get the key frame frequency.
@@ -117,7 +117,7 @@ class InputParameter:
         Returns:
             Number of frames between key frames, or None.
         """
-        return self.keyFrameFreq
+        return self.key_frame_freq
 
     def get_start_time(self) -> int:
         """Get the simulation start time.
@@ -222,7 +222,7 @@ class InputParameter:
         Returns:
             None
         """
-        self.realTimeFactor = real_time_factor
+        self.real_time_factor = real_time_factor
 
     def set_key_frame_freq(self, key_frame_freq: Optional[int]) -> None:
         """Set the key frame frequency.
@@ -233,7 +233,7 @@ class InputParameter:
         Returns:
             None
         """
-        self.keyFrameFreq = key_frame_freq
+        self.key_frame_freq = key_frame_freq
 
     # Utility methods to add individual entities
     def add_station(self, station: Station) -> None:
@@ -395,9 +395,9 @@ class InputParameter:
                 }
                 for tid, task in self.task_entities.items()
             },
-            "realTimeFactor": self.realTimeFactor,
+            "realTimeFactor": self.real_time_factor,
             "sim_time": self.sim_time,
-            "keyFrameFreq": self.keyFrameFreq,
+            "keyFrameFreq": self.key_frame_freq,
         }
 
         return json.dumps(data, indent=2)

@@ -26,7 +26,7 @@ import pytest
 from unittest.mock import Mock, patch
 from requests.exceptions import RequestException, Timeout
 
-from sim.osm.OSRMConnection import OSRMConnection, get_osrm_connection
+from sim.osm.osrm_connection import OSRMConnection, get_osrm_connection
 
 
 @pytest.fixture
@@ -96,7 +96,7 @@ class TestOSRMConnectionInitialization:
     def test_initialization_with_explicit_url(self, mock_session: Mock) -> None:
         """Test initialization with explicit OSRM URL."""
         with patch(
-            "sim.osm.OSRMConnection.requests.Session", return_value=mock_session
+            "sim.osm.osrm_connection.requests.Session", return_value=mock_session
         ):
             mock_session.get.return_value = Mock(status_code=200)
 
@@ -108,7 +108,7 @@ class TestOSRMConnectionInitialization:
     def test_initialization_with_env_osrm_url(self, mock_session: Mock) -> None:
         """Test initialization with OSRM_URL environment variable."""
         with patch(
-            "sim.osm.OSRMConnection.requests.Session", return_value=mock_session
+            "sim.osm.osrm_connection.requests.Session", return_value=mock_session
         ):
             with patch.dict("os.environ", {"OSRM_URL": "http://env-osrm:5000"}):
                 mock_session.get.return_value = Mock(status_code=200)
@@ -120,7 +120,7 @@ class TestOSRMConnectionInitialization:
     def test_initialization_with_env_local_url(self, mock_session: Mock) -> None:
         """Test initialization with OSRM_LOCAL_URL environment variable."""
         with patch(
-            "sim.osm.OSRMConnection.requests.Session", return_value=mock_session
+            "sim.osm.osrm_connection.requests.Session", return_value=mock_session
         ):
             with patch.dict(
                 "os.environ",
@@ -136,7 +136,7 @@ class TestOSRMConnectionInitialization:
     def test_initialization_with_env_public_url(self, mock_session: Mock) -> None:
         """Test initialization with OSRM_PUBLIC_URL environment variable."""
         with patch(
-            "sim.osm.OSRMConnection.requests.Session", return_value=mock_session
+            "sim.osm.osrm_connection.requests.Session", return_value=mock_session
         ):
             with patch.dict(
                 "os.environ",
@@ -154,7 +154,7 @@ class TestOSRMConnectionInitialization:
     ) -> None:
         """Test that explicit URL takes priority over environment variables."""
         with patch(
-            "sim.osm.OSRMConnection.requests.Session", return_value=mock_session
+            "sim.osm.osrm_connection.requests.Session", return_value=mock_session
         ):
             with patch.dict("os.environ", {"OSRM_URL": "http://env-osrm:5000"}):
                 mock_session.get.return_value = Mock(status_code=200)
@@ -166,7 +166,7 @@ class TestOSRMConnectionInitialization:
     def test_initialization_no_url_raises_error(self, mock_session: Mock) -> None:
         """Test that initialization without URL uses default localhost:5001."""
         with patch(
-            "sim.osm.OSRMConnection.requests.Session", return_value=mock_session
+            "sim.osm.osrm_connection.requests.Session", return_value=mock_session
         ):
             with patch.dict("os.environ", {}, clear=True):
                 mock_session.get.return_value = Mock(status_code=200)
@@ -181,7 +181,7 @@ class TestOSRMConnectionInitialization:
     ) -> None:
         """Test that connection failure raises ConnectionError."""
         with patch(
-            "sim.osm.OSRMConnection.requests.Session", return_value=mock_session
+            "sim.osm.osrm_connection.requests.Session", return_value=mock_session
         ):
             mock_session.get.return_value = Mock(
                 status_code=200, json=lambda: {"code": "Ok"}
@@ -201,7 +201,7 @@ class TestVerifyOSRMConnection:
     def test_verify_connection_success(self, mock_session: Mock) -> None:
         """Test successful connection verification."""
         with patch(
-            "sim.osm.OSRMConnection.requests.Session", return_value=mock_session
+            "sim.osm.osrm_connection.requests.Session", return_value=mock_session
         ):
             mock_session.get.return_value = Mock(status_code=200)
 
@@ -212,7 +212,7 @@ class TestVerifyOSRMConnection:
     def test_verify_connection_failure_bad_status(self, mock_session: Mock) -> None:
         """Test connection verification with bad status code."""
         with patch(
-            "sim.osm.OSRMConnection.requests.Session", return_value=mock_session
+            "sim.osm.osrm_connection.requests.Session", return_value=mock_session
         ):
             mock_session.get.return_value = Mock(status_code=200)
 
@@ -226,7 +226,7 @@ class TestVerifyOSRMConnection:
     def test_verify_connection_timeout(self, mock_session: Mock) -> None:
         """Test connection verification with timeout."""
         with patch(
-            "sim.osm.OSRMConnection.requests.Session", return_value=mock_session
+            "sim.osm.osrm_connection.requests.Session", return_value=mock_session
         ):
             mock_session.get.return_value = Mock(status_code=200)
 
@@ -240,7 +240,7 @@ class TestVerifyOSRMConnection:
     def test_verify_connection_request_exception(self, mock_session: Mock) -> None:
         """Test connection verification with request exception."""
         with patch(
-            "sim.osm.OSRMConnection.requests.Session", return_value=mock_session
+            "sim.osm.osrm_connection.requests.Session", return_value=mock_session
         ):
             mock_session.get.return_value = Mock(status_code=200)
 
@@ -260,7 +260,7 @@ class TestShortestPathCoords:
     ) -> None:
         """Test successful shortest path query."""
         with patch(
-            "sim.osm.OSRMConnection.requests.Session", return_value=mock_session
+            "sim.osm.osrm_connection.requests.Session", return_value=mock_session
         ):
             mock_session.get.return_value = mock_osrm_response
 
@@ -277,7 +277,7 @@ class TestShortestPathCoords:
     def test_shortest_path_coords_no_route(self, mock_session: Mock) -> None:
         """Test shortest path when no route is found."""
         with patch(
-            "sim.osm.OSRMConnection.requests.Session", return_value=mock_session
+            "sim.osm.osrm_connection.requests.Session", return_value=mock_session
         ):
             no_route_response = Mock()
             no_route_response.status_code = 200
@@ -292,7 +292,7 @@ class TestShortestPathCoords:
     def test_shortest_path_coords_request_exception(self, mock_session: Mock) -> None:
         """Test shortest path with request exception."""
         with patch(
-            "sim.osm.OSRMConnection.requests.Session", return_value=mock_session
+            "sim.osm.osrm_connection.requests.Session", return_value=mock_session
         ):
             init_response = Mock(status_code=200)
             mock_session.get.return_value = init_response
@@ -308,7 +308,7 @@ class TestShortestPathCoords:
     def test_shortest_path_coords_no_legs(self, mock_session: Mock) -> None:
         """Test shortest path response with no legs."""
         with patch(
-            "sim.osm.OSRMConnection.requests.Session", return_value=mock_session
+            "sim.osm.osrm_connection.requests.Session", return_value=mock_session
         ):
             response_no_legs = Mock()
             response_no_legs.status_code = 200
@@ -339,7 +339,7 @@ class TestGetDistanceCoords:
     ) -> None:
         """Test successful distance calculation."""
         with patch(
-            "sim.osm.OSRMConnection.requests.Session", return_value=mock_session
+            "sim.osm.osrm_connection.requests.Session", return_value=mock_session
         ):
             mock_session.get.return_value = mock_osrm_response
 
@@ -351,7 +351,7 @@ class TestGetDistanceCoords:
     def test_get_distance_coords_no_route(self, mock_session: Mock) -> None:
         """Test distance calculation when no route found."""
         with patch(
-            "sim.osm.OSRMConnection.requests.Session", return_value=mock_session
+            "sim.osm.osrm_connection.requests.Session", return_value=mock_session
         ):
             no_route_response = Mock()
             no_route_response.status_code = 200
@@ -370,7 +370,7 @@ class TestSnapToRoad:
     def test_snap_to_road_success(self, mock_session: Mock) -> None:
         """Test successful coordinate snapping."""
         with patch(
-            "sim.osm.OSRMConnection.requests.Session", return_value=mock_session
+            "sim.osm.osrm_connection.requests.Session", return_value=mock_session
         ):
             init_response = Mock(status_code=200)
             snap_response = Mock()
@@ -390,7 +390,7 @@ class TestSnapToRoad:
     def test_snap_to_road_failure(self, mock_session: Mock) -> None:
         """Test coordinate snapping failure."""
         with patch(
-            "sim.osm.OSRMConnection.requests.Session", return_value=mock_session
+            "sim.osm.osrm_connection.requests.Session", return_value=mock_session
         ):
             init_response = Mock(status_code=200)
             snap_response = Mock()
@@ -407,7 +407,7 @@ class TestSnapToRoad:
     def test_snap_to_road_request_exception(self, mock_session: Mock) -> None:
         """Test coordinate snapping with request exception."""
         with patch(
-            "sim.osm.OSRMConnection.requests.Session", return_value=mock_session
+            "sim.osm.osrm_connection.requests.Session", return_value=mock_session
         ):
             init_response = Mock(status_code=200)
             mock_session.get.side_effect = [init_response, RequestException("Error")]
@@ -426,7 +426,7 @@ class TestGetRouteDetails:
     ) -> None:
         """Test successful route details retrieval."""
         with patch(
-            "sim.osm.OSRMConnection.requests.Session", return_value=mock_session
+            "sim.osm.osrm_connection.requests.Session", return_value=mock_session
         ):
             mock_session.get.return_value = mock_osrm_response
 
@@ -441,7 +441,7 @@ class TestGetRouteDetails:
     def test_get_route_details_no_route(self, mock_session: Mock) -> None:
         """Test route details when no route found."""
         with patch(
-            "sim.osm.OSRMConnection.requests.Session", return_value=mock_session
+            "sim.osm.osrm_connection.requests.Session", return_value=mock_session
         ):
             init_response = Mock(status_code=200)
             no_route_response = Mock()
@@ -458,7 +458,7 @@ class TestGetRouteDetails:
     def test_get_route_details_request_exception(self, mock_session: Mock) -> None:
         """Test route details with request exception."""
         with patch(
-            "sim.osm.OSRMConnection.requests.Session", return_value=mock_session
+            "sim.osm.osrm_connection.requests.Session", return_value=mock_session
         ):
             init_response = Mock(status_code=200)
             mock_session.get.side_effect = [init_response, RequestException("Error")]
@@ -475,7 +475,7 @@ class TestSessionManagement:
     def test_close_session(self, mock_session: Mock) -> None:
         """Test closing the session."""
         with patch(
-            "sim.osm.OSRMConnection.requests.Session", return_value=mock_session
+            "sim.osm.osrm_connection.requests.Session", return_value=mock_session
         ):
             mock_session.get.return_value = Mock(status_code=200)
 
@@ -487,7 +487,7 @@ class TestSessionManagement:
     def test_del_closes_session(self, mock_session: Mock) -> None:
         """Test that __del__ closes the session."""
         with patch(
-            "sim.osm.OSRMConnection.requests.Session", return_value=mock_session
+            "sim.osm.osrm_connection.requests.Session", return_value=mock_session
         ):
             mock_session.get.return_value = Mock(status_code=200)
 
@@ -503,7 +503,7 @@ class TestGetOSRMConnection:
     def test_get_osrm_connection(self, mock_session: Mock) -> None:
         """Test get_osrm_connection function."""
         with patch(
-            "sim.osm.OSRMConnection.requests.Session", return_value=mock_session
+            "sim.osm.osrm_connection.requests.Session", return_value=mock_session
         ):
             mock_session.get.return_value = Mock(status_code=200)
 

@@ -23,8 +23,8 @@ SOFTWARE.
 """
 
 from typing import Any
-from sim.entities.BatterySwapTask import BatterySwapTask
-from sim.entities.inputParameters import InputParameter
+from sim.entities.battery_swap_task import BatterySwapTask
+from sim.entities.input_parameter import InputParameter
 from sim.entities.position import Position
 from sim.entities.shift import Shift
 from sim.entities.simulation_replay_state import SimulationRuntimeState
@@ -32,7 +32,7 @@ from sim.entities.station import Station
 from sim.entities.driver import Driver, DriverState
 from sim.entities.task_state import State
 from sim.entities.vehicle import Vehicle
-from sim.map.MapController import MapController
+from sim.map.map_controller import MapController
 from grafana_logging.logger import get_logger
 
 logger = get_logger(__name__)

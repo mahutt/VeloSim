@@ -32,7 +32,7 @@ from typing import Optional, Callable, Any, cast
 """Realtime driver that paces a simpy environment.
 
     Notes:
-    - simEnv time unit is a simulated second.
+    - sim_env time unit is a simulated second.
     - realTimeFactor = real_seconds/ per_sim_second.
     - Calls the supplied callback once per simulated second (after each
       advancement).
@@ -72,14 +72,14 @@ class RealTimeDriver:
 
     def __init__(
         self,
-        simEnv: simpy.Environment,
+        sim_env: simpy.Environment,
         # Load defaults from config, allow override
         real_time_factor: Optional[float] = None,
         strict: Optional[bool] = None,
     ) -> None:
         # Load config once and store it
         self.config = self._load_config()
-        self.simEnv = simEnv
+        self.sim_env = sim_env
         self.real_time_factor = (
             real_time_factor
             if real_time_factor is not None
@@ -101,7 +101,7 @@ class RealTimeDriver:
             None
         """
         self.wall_start_time = time.perf_counter()
-        self.sim_start_time = self.simEnv.now
+        self.sim_start_time = self.sim_env.now
 
     def set_real_time_factor(self, factor: float) -> None:
         """Set the real time factor for simulation pacing.
@@ -143,7 +143,7 @@ class RealTimeDriver:
             if self.stop_flag:
                 break
             if self.running:
-                current_sim_time = self.simEnv.now
+                current_sim_time = self.sim_env.now
 
                 # Calculate target wall time
                 # target_wall_time = wall time that should pass before the next sim step
@@ -164,25 +164,25 @@ class RealTimeDriver:
                 # Allow the simpy environment to step when target wall time is reached
                 try:
                     # Step the environment once, advancing simulated time
-                    self.simEnv.step()
+                    self.sim_env.step()
                 except simpy.core.EmptySchedule:
                     print("Simpy schedule is empty")
                     break
                 # Invoke the step callback once per simulated second advanced
                 # Compare AFTER stepping so we see the incremented env.now
                 if step_callback:
-                    current_after = self.simEnv.now
+                    current_after = self.sim_env.now
                     if current_after > prev_sim_time:
                         step_callback()
                         prev_sim_time = current_after
                 # After stepping, if we've reached or passed the target sim time, stop
-                if self.simEnv.now >= until:
+                if self.sim_env.now >= until:
                     print("Specified Sim-time reached")
                     break
 
                 # Calculate lag if strict mode is on
                 if self.strict:
-                    current_sim_seconds_passed = self.simEnv.now - self.sim_start_time
+                    current_sim_seconds_passed = self.sim_env.now - self.sim_start_time
                     # Same calculation and logic as the target wall time.
                     # Positive lag = we're behind schedule, negative = ahead
                     expected_wall_time = (
