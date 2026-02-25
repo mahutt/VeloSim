@@ -26,8 +26,6 @@ import math
 from fastapi import APIRouter, Depends, HTTPException, Query
 from back.auth.dependency import get_user_id
 from back.database.session import get_db
-from back.exceptions.bad_request_error import BadRequestError
-from back.exceptions.velosim_permission_error import VelosimPermissionError
 from back.schemas import (
     UserCreate,
     UserPasswordUpdate,
@@ -66,28 +64,25 @@ def get_users(
     Returns:
         UsersResponse: Paginated list of users matching the filters.
     """
-    try:
-        users, total = user_crud.get_all(
-            db,
-            is_enabled,
-            is_admin,
-            requesting_user,
-            skip,
-            limit,
-        )
+    users, total = user_crud.get_all(
+        db,
+        is_enabled,
+        is_admin,
+        requesting_user,
+        skip,
+        limit,
+    )
 
-        total_pages = math.ceil(total / limit) if total > 0 else 0
-        page = (skip // limit) + 1
+    total_pages = math.ceil(total / limit) if total > 0 else 0
+    page = (skip // limit) + 1
 
-        return UsersResponse(
-            users=[UserResponse.model_validate(user) for user in users],
-            total=total,
-            page=page,
-            per_page=limit,
-            total_pages=total_pages,
-        )
-    except VelosimPermissionError as err:
-        raise HTTPException(status_code=401, detail=err.args)
+    return UsersResponse(
+        users=[UserResponse.model_validate(user) for user in users],
+        total=total,
+        page=page,
+        per_page=limit,
+        total_pages=total_pages,
+    )
 
 
 @router.get("/me", response_model=UserResponse)
@@ -125,15 +120,12 @@ def get_by_id(
     Returns:
         UserResponse: The requested user's profile.
     """
-    try:
-        user = user_crud.get_if_permission(db, user_id, requesting_user)
+    user = user_crud.get_if_permission(db, user_id, requesting_user)
 
-        if not user:
-            raise HTTPException(status_code=404, detail="User not found")
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
 
-        return UserResponse.model_validate(user)
-    except VelosimPermissionError as err:
-        raise HTTPException(status_code=401, detail=err.args)
+    return UserResponse.model_validate(user)
 
 
 @router.post("/create", response_model=UserResponse, status_code=201)
@@ -154,13 +146,8 @@ def create(
     Returns:
         UserResponse: The created user profile.
     """
-    try:
-        new_user = user_crud.create(db, user_create_data, requesting_user)
-        return UserResponse.model_validate(new_user)
-    except BadRequestError as err:
-        raise HTTPException(status_code=400, detail=err.args)
-    except VelosimPermissionError as err:
-        raise HTTPException(status_code=401, detail=err.args)
+    new_user = user_crud.create(db, user_create_data, requesting_user)
+    return UserResponse.model_validate(new_user)
 
 
 @router.put("/{user_id}/password", response_model=UserResponse)
@@ -183,15 +170,10 @@ def password_update(
     Returns:
         UserResponse: The updated user profile.
     """
-    try:
-        updated_user = user_crud.update_password(
-            db, user_id, password_data, requesting_user
-        )
-        return UserResponse.model_validate(updated_user)
-    except BadRequestError as err:
-        raise HTTPException(status_code=400, detail=err.args)
-    except VelosimPermissionError as err:
-        raise HTTPException(status_code=401, detail=err.args)
+    updated_user = user_crud.update_password(
+        db, user_id, password_data, requesting_user
+    )
+    return UserResponse.model_validate(updated_user)
 
 
 @router.put("/{user_id}/role", response_model=UserResponse)
@@ -216,10 +198,5 @@ def role_update(
     Returns:
         UserResponse: The updated user profile.
     """
-    try:
-        updated_user = user_crud.update_role(db, user_id, role_data, requesting_user)
-        return UserResponse.model_validate(updated_user)
-    except BadRequestError as err:
-        raise HTTPException(status_code=400, detail=err.args)
-    except VelosimPermissionError as err:
-        raise HTTPException(status_code=401, detail=err.args)
+    updated_user = user_crud.update_role(db, user_id, role_data, requesting_user)
+    return UserResponse.model_validate(updated_user)

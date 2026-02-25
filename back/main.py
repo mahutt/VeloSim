@@ -35,6 +35,12 @@ from back.core.telemetry import initialize_global_telemetry
 from back.middleware.metrics_middleware import MetricsMiddleware
 from back.core.config import settings
 from back.api.v1 import api_router
+from back.exception_handlers import (
+    bad_request_error_handler,
+    item_not_found_error_handler,
+    velosim_permission_error_handler,
+)
+from back.exceptions import BadRequestError, ItemNotFoundError, VelosimPermissionError
 from back.services.simulation_service import simulation_service
 from back.auth import Token, authenticate_user
 from back.database.session import get_db
@@ -83,6 +89,11 @@ app = FastAPI(
 
 # Add metrics middleware to track all endpoint calls
 app.add_middleware(MetricsMiddleware)
+
+# Register domain exception handlers to centralize error-to-HTTP mapping
+app.add_exception_handler(BadRequestError, bad_request_error_handler)
+app.add_exception_handler(ItemNotFoundError, item_not_found_error_handler)
+app.add_exception_handler(VelosimPermissionError, velosim_permission_error_handler)
 
 
 @app.post("/api/token")
