@@ -23,12 +23,12 @@ SOFTWARE.
 """
 
 import simpy
-import logging
 import random
 from enum import Enum
 
 from sim.core.simulation_environment import SimulationEnvironment
 from sim.map.map_controller import MapController
+from grafana_logging.logger import get_logger
 from typing import Optional, TYPE_CHECKING
 from .task_state import State
 from sim.entities.route import Route
@@ -36,7 +36,7 @@ from typing import Generator, Any
 from .position import Position
 from .shift import Shift
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 # to avoid circular imports
 if TYPE_CHECKING:  # pragma: no cover

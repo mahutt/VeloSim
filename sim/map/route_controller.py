@@ -23,7 +23,7 @@ SOFTWARE.
 """
 
 from typing import Any, Callable, Dict, List, Optional, Set, TYPE_CHECKING
-import logging
+from grafana_logging.logger import get_logger
 
 from shapely.geometry import LineString
 
@@ -36,7 +36,7 @@ if TYPE_CHECKING:
     from sim.map.map_controller import MapController
     from sim.map.position_registry import PositionRegistry
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 class RouteController:

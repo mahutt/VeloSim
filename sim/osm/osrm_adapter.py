@@ -22,7 +22,6 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 """
 
-import logging
 from typing import List, Optional
 
 from sim.entities.position import Position
@@ -37,8 +36,6 @@ from sim.map.routing_provider import (
 from sim.osm.osrm_connection import OSRMConnection
 from sim.osm.osrm_result import OSRMResult
 from sim.osm.traffic_state_store import traffic_state_store
-
-logger = logging.getLogger(__name__)
 
 
 class OSRMAdapter(RoutingProvider):

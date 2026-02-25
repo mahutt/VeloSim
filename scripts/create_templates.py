@@ -24,12 +24,12 @@ SOFTWARE.
 
 import ast
 import sys
-import logging
 from typing import Tuple
 import pandas as pd
 import numpy as np
+from grafana_logging.logger import get_logger
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 # [min_lat, max_lat, min_lon, max_lon]
 BRIDGE_GATEWAYS = {

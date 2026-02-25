@@ -25,9 +25,9 @@ SOFTWARE.
 import os
 import sys
 import gdown
-import logging
+from grafana_logging.logger import get_logger
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 def download_template(level, file_id) -> bool:

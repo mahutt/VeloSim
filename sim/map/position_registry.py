@@ -22,14 +22,10 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 """
 
-import logging
 from typing import Dict, List, Set
-
 from sim.entities.position import Position
 from sim.entities.road import Road
 from sim.entities.traffic_event import TrafficEvent
-
-logger = logging.getLogger(__name__)
 
 
 class PositionRegistry:
