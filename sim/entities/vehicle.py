@@ -22,20 +22,19 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 """
 
-import simpy
-
 from typing import Optional, TYPE_CHECKING
 
 
 # to avoid circular imports
 if TYPE_CHECKING:  # pragma: no cover
+    from sim.core.simulation_environment import SimulationEnvironment
     from .driver import Driver
 
 
 class Vehicle:
     """Simulation Vehicles entity that can be associated with a driver."""
 
-    env: simpy.Environment
+    env: "SimulationEnvironment"
     driver: Optional["Driver"]
 
     def __init__(
@@ -164,3 +163,17 @@ class Vehicle:
             None
         """
         self.has_updated = False
+
+    def run(self):  # type: ignore[no-untyped-def]
+        """Start the vehicle process in the simulation environment.
+
+        Returns:
+            None
+        """
+
+        while True:
+            if self.driver is None or self.driver.get_task_count() == 0:
+                self.env.report.increment_vehicle_idle_time()
+            else:
+                self.env.report.increment_vehicle_active_time()
+            yield self.env.timeout(1)
