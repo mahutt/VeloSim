@@ -23,7 +23,7 @@
  */
 
 import { useEffect } from 'react';
-import { Outlet, useNavigate } from 'react-router';
+import { Outlet, useLocation, useNavigate } from 'react-router';
 import { AppSidebar } from '~/components/sidebar/app-sidebar';
 import PageLoader from '~/components/page-loader';
 import { SidebarProvider, SidebarTrigger } from '~/components/ui/sidebar';
@@ -33,13 +33,23 @@ import useAuth from '~/hooks/use-auth';
 export default function Authenticated() {
   const { user, loading } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
   const showSidebar = useFeature('sidebar');
 
   useEffect(() => {
     if (!user && !loading) {
-      navigate('/login');
+      const nextPath = `${location.pathname}${location.search}${location.hash}`;
+      const query = new URLSearchParams({ next: nextPath }).toString();
+      navigate(`/login?${query}`, { replace: true });
     }
-  }, [user, loading]);
+  }, [
+    user,
+    loading,
+    location.pathname,
+    location.search,
+    location.hash,
+    navigate,
+  ]);
 
   if (loading || !user) {
     return <PageLoader />;
