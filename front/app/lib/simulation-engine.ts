@@ -462,9 +462,21 @@ export default class SimulationEngine {
     });
   }
 
-  public async confirmAssignment(): Promise<void> {
+  public async confirmAssignment(unassignedOnly = false): Promise<void> {
     const pendingAssignment = this.state.getPendingAssignment();
     if (!pendingAssignment || this.state.getPendingAssignmentLoading()) return;
+
+    let unassignedTaskIds: number[] = [];
+
+    if (unassignedOnly) {
+      if (pendingAssignment.action !== TaskAction.Assign) return;
+
+      unassignedTaskIds = pendingAssignment.unassignedTaskIds;
+      if (unassignedTaskIds.length === 0) {
+        this.state.setPendingAssignment(null);
+        return;
+      }
+    }
 
     this.state.setPendingAssignmentLoading(true);
 
@@ -477,36 +489,12 @@ export default class SimulationEngine {
       } else {
         await this.assignTasks(
           pendingAssignment.driverId,
-          pendingAssignment.taskIds
+          unassignedOnly ? unassignedTaskIds : pendingAssignment.taskIds
         );
       }
       this.selectItem(SelectedItemType.Driver, pendingAssignment.driverId);
     } catch (error) {
       console.error('Failed to complete task assignment action:', error);
-    } finally {
-      this.state.setPendingAssignment(null);
-      this.state.setPendingAssignmentLoading(false);
-    }
-  }
-
-  public async confirmUnassignedOnly() {
-    const pendingAssignment = this.state.getPendingAssignment();
-    if (!pendingAssignment || this.state.getPendingAssignmentLoading()) return;
-    if (pendingAssignment.action !== TaskAction.Assign) return;
-
-    const unassignedTaskIds = pendingAssignment.unassignedTaskIds;
-    if (unassignedTaskIds.length === 0) {
-      this.state.setPendingAssignment(null);
-      return;
-    }
-
-    this.state.setPendingAssignmentLoading(true);
-
-    try {
-      await this.assignTasks(pendingAssignment.driverId, unassignedTaskIds);
-      this.selectItem(SelectedItemType.Driver, pendingAssignment.driverId);
-    } catch (error) {
-      console.error('Failed to assign unassigned tasks:', error);
     } finally {
       this.state.setPendingAssignment(null);
       this.state.setPendingAssignmentLoading(false);

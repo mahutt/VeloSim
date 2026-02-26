@@ -123,7 +123,6 @@ export const mockSimulationEngine: Partial<SimulationEngine> = {
   selectItem: vi.fn(),
   clearSelection: vi.fn(),
   confirmAssignment: vi.fn(),
-  confirmUnassignedOnly: vi.fn(),
   cancelAssignment: vi.fn(),
   reorderTasks: vi.fn(),
   destroy: vi.fn(),
