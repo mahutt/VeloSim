@@ -183,14 +183,7 @@ def get_scenarios(
     Returns:
         ScenarioListResponse containing paginated list of scenarios and metadata
     """
-    try:
-        scenarios, total = scenario_crud.get_by_user(db, requesting_user, skip, limit)
-    except BadRequestError as err:
-        raise HTTPException(status_code=400, detail=str(err))
-    except VelosimPermissionError as err:
-        raise HTTPException(status_code=403, detail=str(err))
-    except ItemNotFoundError as err:
-        raise HTTPException(status_code=404, detail=str(err))
+    scenarios, total = scenario_crud.get_by_user(db, requesting_user, skip, limit)
 
     total_pages = math.ceil(total / limit) if total > 0 else 0
     page = (skip // limit) + 1
@@ -220,15 +213,8 @@ def get_scenario(
     Returns:
         ScenarioResponse containing the requested scenario data
     """
-    try:
-        db_scenario = scenario_crud.get(db, scenario_id, requesting_user)
-        return ScenarioResponse.model_validate(db_scenario)
-    except ItemNotFoundError as err:
-        raise HTTPException(status_code=404, detail=str(err))
-    except BadRequestError as err:
-        raise HTTPException(status_code=400, detail=str(err))
-    except VelosimPermissionError as err:
-        raise HTTPException(status_code=403, detail=str(err))
+    db_scenario = scenario_crud.get(db, scenario_id, requesting_user)
+    return ScenarioResponse.model_validate(db_scenario)
 
 
 @router.post("/", response_model=ScenarioResponse, status_code=status.HTTP_201_CREATED)
@@ -300,12 +286,8 @@ async def create_scenario(
         db_scenario = scenario_crud.create(db, scenario_data)
         return ScenarioResponse.model_validate(db_scenario)
 
-    except HTTPException:
-        raise  # Re-raise HTTPException to preserve structured validation errors
-    except BadRequestError as err:
-        raise HTTPException(status_code=400, detail=str(err))
-    except VelosimPermissionError as err:
-        raise HTTPException(status_code=403, detail=str(err))
+    except (HTTPException, BadRequestError, VelosimPermissionError):
+        raise
     except Exception as err:
         # Handle unexpected database errors
         raise HTTPException(
@@ -374,14 +356,8 @@ async def update_scenario(
         )
         return ScenarioResponse.model_validate(db_scenario)
 
-    except HTTPException:
-        raise  # Re-raise HTTPException to preserve structured validation errors
-    except ItemNotFoundError as err:
-        raise HTTPException(status_code=404, detail=str(err))
-    except BadRequestError as err:
-        raise HTTPException(status_code=400, detail=str(err))
-    except VelosimPermissionError as err:
-        raise HTTPException(status_code=403, detail=str(err))
+    except (HTTPException, ItemNotFoundError, BadRequestError, VelosimPermissionError):
+        raise
     except Exception as err:
         raise HTTPException(
             status_code=500,
@@ -408,12 +384,8 @@ def delete_scenario(
     """
     try:
         scenario_crud.delete(db, scenario_id, requesting_user)
-    except ItemNotFoundError as err:
-        raise HTTPException(status_code=404, detail=str(err))
-    except BadRequestError as err:
-        raise HTTPException(status_code=400, detail=str(err))
-    except VelosimPermissionError as err:
-        raise HTTPException(status_code=403, detail=str(err))
+    except (ItemNotFoundError, BadRequestError, VelosimPermissionError):
+        raise
     except Exception as err:
         raise HTTPException(
             status_code=500,

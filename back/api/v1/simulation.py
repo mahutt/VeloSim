@@ -224,8 +224,8 @@ async def initialize_simulation(
                 "message": "Scenario validation failed",
             },
         )
-    except VelosimPermissionError as err:
-        raise HTTPException(status_code=403, detail=str(err))
+    except VelosimPermissionError:
+        raise
     except ItemNotFoundError as ve:
         raise HTTPException(
             status_code=404 if "not found" in str(ve) else 400, detail=str(ve)
@@ -253,10 +253,8 @@ def stop_simulation(
     try:
         simulation_service.stop_simulation(db, sim_id, requesting_user)
         return SimulationResponse(sim_id=sim_id, db_id=-1, status="stopped")
-    except VelosimPermissionError as err:
-        raise HTTPException(status_code=403, detail=str(err))
-    except ItemNotFoundError as err:
-        raise HTTPException(status_code=404, detail=str(err))
+    except (VelosimPermissionError, ItemNotFoundError):
+        raise
     except Exception as err:
         raise HTTPException(status_code=500, detail=str(err))
 
@@ -281,23 +279,20 @@ def list_my_simulations(
     Returns:
         SimulationListResponse containing paginated list of user's simulations
     """
-    try:
-        sims, total = simulation_service.get_all_user_simulations(
-            db, requesting_user, skip, limit
-        )
+    sims, total = simulation_service.get_all_user_simulations(
+        db, requesting_user, skip, limit
+    )
 
-        total_pages = math.ceil(total / limit) if total > 0 else 0
-        page = (skip // limit) + 1
+    total_pages = math.ceil(total / limit) if total > 0 else 0
+    page = (skip // limit) + 1
 
-        return SimulationListResponse(
-            simulations=[SimInstanceResponse.model_validate(sim) for sim in sims],
-            total=total,
-            page=page,
-            per_page=limit,
-            total_pages=total_pages,
-        )
-    except VelosimPermissionError as err:
-        raise HTTPException(status_code=403, detail=str(err))
+    return SimulationListResponse(
+        simulations=[SimInstanceResponse.model_validate(sim) for sim in sims],
+        total=total,
+        page=page,
+        per_page=limit,
+        total_pages=total_pages,
+    )
 
 
 @router.get("/list", response_model=SimulationListResponse)
@@ -320,23 +315,20 @@ def list_all_simulations(
     Returns:
         SimulationListResponse containing paginated list of all active simulations
     """
-    try:
-        sims, total = simulation_service.get_all_active_simulations(
-            db, requesting_user, skip, limit
-        )
+    sims, total = simulation_service.get_all_active_simulations(
+        db, requesting_user, skip, limit
+    )
 
-        total_pages = math.ceil(total / limit) if total > 0 else 0
-        page = (skip // limit) + 1
+    total_pages = math.ceil(total / limit) if total > 0 else 0
+    page = (skip // limit) + 1
 
-        return SimulationListResponse(
-            simulations=[SimInstanceResponse.model_validate(sim) for sim in sims],
-            total=total,
-            page=page,
-            per_page=limit,
-            total_pages=total_pages,
-        )
-    except VelosimPermissionError as err:
-        raise HTTPException(status_code=403, detail=str(err))
+    return SimulationListResponse(
+        simulations=[SimInstanceResponse.model_validate(sim) for sim in sims],
+        total=total,
+        page=page,
+        per_page=limit,
+        total_pages=total_pages,
+    )
 
 
 @router.get("/status/{sim_id}")
@@ -358,10 +350,8 @@ def get_simulation_status(
     try:
         status = simulation_service.get_simulation_status(db, sim_id, requesting_user)
         return {"sim_id": sim_id, "status": status}
-    except ItemNotFoundError as err:
-        raise HTTPException(status_code=404, detail=str(err))
-    except VelosimPermissionError as err:
-        raise HTTPException(status_code=403, detail=str(err))
+    except (ItemNotFoundError, VelosimPermissionError):
+        raise
     except Exception as err:
         raise HTTPException(status_code=500, detail=str(err))
 
@@ -387,8 +377,8 @@ def stop_all_simulations(
     try:
         simulation_service.stop_all_simulations(db, requesting_user)
         return {"message": "All simulations stopped"}
-    except VelosimPermissionError as err:
-        raise HTTPException(status_code=403, detail=str(err))
+    except VelosimPermissionError:
+        raise
     except Exception as err:
         raise HTTPException(
             status_code=500, detail=f"Failed to stop all simulations: {str(err)}"
@@ -416,10 +406,8 @@ def get_playback_speed(
             db=db, sim_id=sim_id, requesting_user=requesting_user
         )
         return result
-    except ItemNotFoundError as err:
-        raise HTTPException(status_code=404, detail=str(err))
-    except VelosimPermissionError as err:
-        raise HTTPException(status_code=403, detail=str(err))
+    except (ItemNotFoundError, VelosimPermissionError):
+        raise
     except Exception as err:
         raise HTTPException(status_code=500, detail=str(err))
 
@@ -450,10 +438,8 @@ def set_playback_speed(
             requesting_user=requesting_user,
         )
         return result
-    except ItemNotFoundError as err:
-        raise HTTPException(status_code=404, detail=str(err))
-    except VelosimPermissionError as err:
-        raise HTTPException(status_code=403, detail=str(err))
+    except (ItemNotFoundError, VelosimPermissionError):
+        raise
     except Exception as err:
         raise HTTPException(status_code=500, detail=str(err))
 
@@ -535,11 +521,7 @@ def seek_to_position(
             requesting_user=requesting_user,
         )
 
-    except ItemNotFoundError as err:
-        raise HTTPException(status_code=404, detail=str(err))
-    except VelosimPermissionError as err:
-        raise HTTPException(status_code=403, detail=str(err))
-    except HTTPException:
+    except (ItemNotFoundError, VelosimPermissionError, HTTPException):
         raise
     except Exception as err:
         raise HTTPException(status_code=500, detail=str(err))
@@ -605,10 +587,8 @@ def branch_simulation(
             name=request.name,
             requesting_user=requesting_user,
         )
-    except VelosimPermissionError as err:
-        raise HTTPException(status_code=403, detail=str(err))
-    except ItemNotFoundError as err:
-        raise HTTPException(status_code=404, detail=str(err))
+    except (VelosimPermissionError, ItemNotFoundError):
+        raise
     except ValueError as err:
         # No keyframes found - return 400 client error
         raise HTTPException(status_code=400, detail=str(err))
@@ -645,10 +625,6 @@ def assign_task_to_driver(
             requesting_user=requesting_user,
             task_assign_data=task_assign_data,
         )
-    except ItemNotFoundError as err:
-        raise HTTPException(status_code=404, detail=str(err))
-    except VelosimPermissionError as err:
-        raise HTTPException(status_code=403, detail=str(err))
     except RuntimeError as err:
         raise HTTPException(status_code=500, detail=str(err))
 
@@ -695,10 +671,6 @@ def batch_assign_tasks_to_driver(
             batch_request=bulk_request,
         )
         return result
-    except ItemNotFoundError as err:
-        raise HTTPException(status_code=404, detail=str(err))
-    except VelosimPermissionError as err:
-        raise HTTPException(status_code=403, detail=str(err))
     except RuntimeError as err:
         raise HTTPException(status_code=500, detail=str(err))
 
@@ -732,10 +704,6 @@ def unassign_task_from_driver(
             requesting_user=requesting_user,
             task_unassign_data=task_unassign_data,
         )
-    except ItemNotFoundError as err:
-        raise HTTPException(status_code=404, detail=str(err))
-    except VelosimPermissionError as err:
-        raise HTTPException(status_code=403, detail=str(err))
     except RuntimeError as err:
         raise HTTPException(status_code=500, detail=str(err))
 
@@ -770,10 +738,6 @@ def reassign_task_between_drivers(
             requesting_user=requesting_user,
             task_reassign_data=task_reassign_data,
         )
-    except ItemNotFoundError as err:
-        raise HTTPException(status_code=404, detail=str(err))
-    except VelosimPermissionError as err:
-        raise HTTPException(status_code=403, detail=str(err))
     except RuntimeError as err:
         raise HTTPException(status_code=500, detail=str(err))
 
@@ -807,10 +771,6 @@ def reorder_driver_tasks(
             requesting_user=requesting_user,
             reorder_data=reorder_data,
         )
-    except ItemNotFoundError as err:
-        raise HTTPException(status_code=404, detail=str(err))
-    except VelosimPermissionError as err:
-        raise HTTPException(status_code=403, detail=str(err))
     except RuntimeError as err:
         raise HTTPException(status_code=500, detail=str(err))
 
@@ -934,10 +894,8 @@ def get_simulation_keyframes(
             total_pages=total_pages,
         )
 
-    except ItemNotFoundError as e:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
-    except VelosimPermissionError as e:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(e))
+    except (ItemNotFoundError, VelosimPermissionError):
+        raise
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -1015,10 +973,8 @@ def get_simulation_keyframe_at_time(
 
         return SimKeyframeResponse.model_validate(keyframe)
 
-    except ItemNotFoundError as e:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
-    except VelosimPermissionError as e:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(e))
+    except (ItemNotFoundError, VelosimPermissionError):
+        raise
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -1096,10 +1052,8 @@ def get_simulation_state(
 
         return SimStateResponse(**response_data)
 
-    except ItemNotFoundError as e:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
-    except VelosimPermissionError as e:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(e))
+    except (ItemNotFoundError, VelosimPermissionError):
+        raise
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -1274,10 +1228,8 @@ def get_simulation_tasks(
             total_pages=total_pages,
         )
 
-    except ItemNotFoundError as e:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
-    except VelosimPermissionError as e:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(e))
+    except (ItemNotFoundError, VelosimPermissionError, HTTPException):
+        raise
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -1472,10 +1424,8 @@ def get_simulation_drivers(
             total_pages=total_pages,
         )
 
-    except ItemNotFoundError as e:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
-    except VelosimPermissionError as e:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(e))
+    except (ItemNotFoundError, VelosimPermissionError, HTTPException):
+        raise
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,

@@ -135,7 +135,7 @@ class TestUsersAPI:
 
         response = authenticated_client.post("/api/v1/users/create", json=user_data)
 
-        assert response.status_code == 401
+        assert response.status_code == 403
         data = response.json()
         assert "Requesting user cannot create users." in str(data["detail"])
 
@@ -181,7 +181,7 @@ class TestUsersAPI:
 
         response = non_admin_client.post("/api/v1/users/create", json=user_data)
 
-        assert response.status_code == 401
+        assert response.status_code == 403
         data = response.json()
         assert "Requesting user cannot create users." in str(data["detail"])
 
@@ -241,7 +241,7 @@ class TestUsersAPI:
             "/api/v1/users/2/password", json=password_data
         )
 
-        assert response.status_code == 401
+        assert response.status_code == 403
         data = response.json()
         assert "Requesting user cannot update this password." in str(data["detail"])
 
@@ -277,7 +277,7 @@ class TestUsersAPI:
 
         response = non_admin_client.put("/api/v1/users/1/password", json=password_data)
 
-        assert response.status_code == 401
+        assert response.status_code == 403
         data = response.json()
         assert "Requesting user cannot update this password." in str(data["detail"])
 
@@ -371,7 +371,7 @@ class TestUsersAPI:
 
         response = authenticated_client.get("/api/v1/users/")
 
-        assert response.status_code == 401
+        assert response.status_code == 403
         data = response.json()
         assert "Requesting user cannot list users." in str(data["detail"])
 
@@ -394,7 +394,7 @@ class TestUsersAPI:
 
         response = non_admin_client.get("/api/v1/users/")
 
-        assert response.status_code == 401
+        assert response.status_code == 403
         data = response.json()
         assert "Requesting user cannot list users." in str(data["detail"])
 
@@ -470,7 +470,7 @@ class TestUsersAPI:
 
         response = authenticated_client.put("/api/v1/users/1/role", json=role_data)
 
-        assert response.status_code == 401
+        assert response.status_code == 403
         data = response.json()
         assert "Requesting user cannot update this role." in str(data["detail"])
 
@@ -487,7 +487,7 @@ class TestUsersAPI:
 
         response = non_admin_client.put("/api/v1/users/2/role", json=role_data)
 
-        assert response.status_code == 401
+        assert response.status_code == 403
         data = response.json()
         assert "Requesting user cannot update this role." in str(data["detail"])
 
@@ -653,7 +653,7 @@ class TestUsersAPI:
 
         response = disabled_admin_client.post("/api/v1/users/create", json=user_data)
 
-        assert response.status_code == 401
+        assert response.status_code == 403
         data = response.json()
         assert "Requesting user cannot create users." in str(data["detail"])
 
@@ -672,7 +672,7 @@ class TestUsersAPI:
             "/api/v1/users/1/password", json=password_data
         )
 
-        assert response.status_code == 401
+        assert response.status_code == 403
         data = response.json()
         assert "Requesting user cannot update this password." in str(data["detail"])
 
@@ -689,7 +689,7 @@ class TestUsersAPI:
 
         response = disabled_admin_client.put("/api/v1/users/2/role", json=role_data)
 
-        assert response.status_code == 401
+        assert response.status_code == 403
         data = response.json()
         assert "Requesting user cannot update this role." in str(data["detail"])
 
@@ -704,7 +704,7 @@ class TestUsersAPI:
 
         response = disabled_admin_client.get("/api/v1/users/")
 
-        assert response.status_code == 401
+        assert response.status_code == 403
         data = response.json()
         assert "Requesting user cannot list users." in str(data["detail"])
 
@@ -849,7 +849,7 @@ class TestUsersAPI:
 
         response = non_admin_client.get("/api/v1/users/1")
 
-        assert response.status_code == 401
+        assert response.status_code == 403
         data = response.json()
         assert "Requesting user cannot access this user." in str(data["detail"])
         mock_get_if_permission.assert_called_once()
@@ -873,7 +873,7 @@ class TestUsersAPI:
 
         response = disabled_admin_client.get("/api/v1/users/1")
 
-        assert response.status_code == 401
+        assert response.status_code == 403
         data = response.json()
         assert "Requesting user cannot access this user." in str(data["detail"])
         mock_get_if_permission.assert_called_once()
