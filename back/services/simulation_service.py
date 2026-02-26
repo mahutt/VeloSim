@@ -279,6 +279,7 @@ class SimulationService:
         requesting_user: int,
         params: InputParameter,
         scenario_payload: dict | None = None,
+        name: str | None = None,
     ) -> SimulationResponse:
         """Initialize a new simulation with the given parameters.
 
@@ -287,6 +288,7 @@ class SimulationService:
             requesting_user: The ID of the user initializing the simulation.
             params: Input parameters for the simulation.
             scenario_payload: Original scenario payload to persist for future restarts.
+            name: Optional user-provided name for the simulation.
 
         Returns:
             SimulationResponse: Response containing sim_id, db_id, and status.
@@ -295,7 +297,9 @@ class SimulationService:
 
         # Create DB record
         sim_instance_data = SimInstanceCreate(
-            user_id=user.id, scenario_payload=scenario_payload
+            user_id=user.id,
+            scenario_payload=scenario_payload,
+            name=name,
         )
         db_sim_instance = sim_instance_crud.create(db, sim_instance_data)
 
