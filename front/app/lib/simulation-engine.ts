@@ -480,6 +480,7 @@ export default class SimulationEngine {
           pendingAssignment.taskIds
         );
       }
+      this.selectItem(SelectedItemType.Driver, pendingAssignment.driverId);
     } catch (error) {
       console.error('Failed to complete task assignment action:', error);
     } finally {
@@ -503,6 +504,7 @@ export default class SimulationEngine {
 
     try {
       await this.assignTasks(pendingAssignment.driverId, unassignedTaskIds);
+      this.selectItem(SelectedItemType.Driver, pendingAssignment.driverId);
     } catch (error) {
       console.error('Failed to assign unassigned tasks:', error);
     } finally {
