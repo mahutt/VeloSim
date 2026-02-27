@@ -158,7 +158,7 @@ export function TaskAssignmentBanner() {
               <Button
                 onClick={() => {
                   setLoadingAction('remaining');
-                  engine.confirmUnassignedOnly();
+                  engine.confirmAssignment(true);
                 }}
                 size="sm"
                 disabled={isLoading}

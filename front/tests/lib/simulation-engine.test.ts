@@ -355,4 +355,321 @@ describe('SimulationEngine', () => {
       );
     });
   });
+
+  describe('confirmAssignment', () => {
+    it('returns early if there is no pending assignment', async () => {
+      (mockSimulationStateManager.getPendingAssignment as Mock).mockReturnValue(
+        null
+      );
+      await engine.confirmAssignment();
+      expect(
+        mockSimulationStateManager.setPendingAssignmentLoading
+      ).not.toHaveBeenCalled();
+    });
+
+    it('returns early if pending assignment is already loading', async () => {
+      (mockSimulationStateManager.getPendingAssignment as Mock).mockReturnValue(
+        makePendingAssignment()
+      );
+      (
+        mockSimulationStateManager.getPendingAssignmentLoading as Mock
+      ).mockReturnValue(true);
+      await engine.confirmAssignment();
+      expect(
+        mockSimulationStateManager.setPendingAssignmentLoading
+      ).toHaveBeenCalledTimes(0);
+    });
+
+    it('returns early if unassignedOnly is true but action is not Assign', async () => {
+      (mockSimulationStateManager.getPendingAssignment as Mock).mockReturnValue(
+        makePendingAssignment({
+          action: TaskAction.Unassign,
+        })
+      );
+      (
+        mockSimulationStateManager.getPendingAssignmentLoading as Mock
+      ).mockReturnValue(false);
+      await engine.confirmAssignment(true);
+      expect(
+        mockSimulationStateManager.setPendingAssignmentLoading
+      ).not.toHaveBeenCalled();
+    });
+
+    it('clears pending assignment if unassignedOnly is true but there are no unassigned tasks', async () => {
+      (mockSimulationStateManager.getPendingAssignment as Mock).mockReturnValue(
+        makePendingAssignment({
+          action: TaskAction.Assign,
+          unassignedTaskIds: [],
+        })
+      );
+      (
+        mockSimulationStateManager.getPendingAssignmentLoading as Mock
+      ).mockReturnValue(false);
+      await engine.confirmAssignment(true);
+      expect(
+        mockSimulationStateManager.setPendingAssignment
+      ).toHaveBeenCalledWith(null);
+    });
+
+    it('calls unassignTask when action is Unassign', async () => {
+      const driverId = 1;
+      const taskId = 42;
+      (mockSimulationStateManager.getPendingAssignment as Mock).mockReturnValue(
+        makePendingAssignment({
+          action: TaskAction.Unassign,
+          taskIds: [taskId],
+          driverId,
+        })
+      );
+      (
+        mockSimulationStateManager.getPendingAssignmentLoading as Mock
+      ).mockReturnValue(false);
+      const driver = makeDriver({ id: driverId });
+      const task = makeStationTask({ id: taskId });
+      (mockSimulationStateManager.getDriver as Mock).mockReturnValue(driver);
+      (mockSimulationStateManager.getTask as Mock).mockReturnValue(task);
+      (api.post as Mock).mockResolvedValue({ data: {} });
+
+      await engine.confirmAssignment();
+
+      expect(api.post).toHaveBeenCalledWith(
+        `/simulation/test_simulation/drivers/unassign`,
+        { task_id: taskId, driver_id: driverId }
+      );
+    });
+
+    it('calls assignTasks when action is Assign', async () => {
+      const driverId = 1;
+      const taskIds = [1, 2, 3];
+      (mockSimulationStateManager.getPendingAssignment as Mock).mockReturnValue(
+        makePendingAssignment({
+          action: TaskAction.Assign,
+          taskIds,
+          driverId,
+        })
+      );
+      (
+        mockSimulationStateManager.getPendingAssignmentLoading as Mock
+      ).mockReturnValue(false);
+      const driver = makeDriver({ id: driverId });
+      (mockSimulationStateManager.getDriver as Mock).mockReturnValue(driver);
+      (mockSimulationStateManager.getTask as Mock).mockReturnValue(
+        makeStationTask()
+      );
+      (api.post as Mock).mockResolvedValue({
+        data: {
+          items: taskIds.map((id) => ({ task_id: id, success: true })),
+        },
+      });
+
+      await engine.confirmAssignment();
+
+      expect(api.post).toHaveBeenCalledWith(
+        `/simulation/test_simulation/drivers/assign/batch`,
+        { driver_id: driverId, task_ids: taskIds }
+      );
+    });
+
+    it('calls assignTasks with only unassigned tasks when unassignedOnly is true', async () => {
+      const driverId = 1;
+      const allTaskIds = [1, 2, 3];
+      const unassignedTaskIds = [1, 3];
+      (mockSimulationStateManager.getPendingAssignment as Mock).mockReturnValue(
+        makePendingAssignment({
+          action: TaskAction.Assign,
+          taskIds: allTaskIds,
+          unassignedTaskIds,
+          driverId,
+        })
+      );
+      (
+        mockSimulationStateManager.getPendingAssignmentLoading as Mock
+      ).mockReturnValue(false);
+      const driver = makeDriver({ id: driverId });
+      (mockSimulationStateManager.getDriver as Mock).mockReturnValue(driver);
+      (mockSimulationStateManager.getTask as Mock).mockReturnValue(
+        makeStationTask()
+      );
+      (api.post as Mock).mockResolvedValue({
+        data: {
+          items: unassignedTaskIds.map((id) => ({
+            task_id: id,
+            success: true,
+          })),
+        },
+      });
+
+      await engine.confirmAssignment(true);
+
+      expect(api.post).toHaveBeenCalledWith(
+        `/simulation/test_simulation/drivers/assign/batch`,
+        { driver_id: driverId, task_ids: unassignedTaskIds }
+      );
+    });
+
+    it('calls assignTasks when action is Reassign', async () => {
+      const driverId = 1;
+      const taskIds = [1, 2];
+      (mockSimulationStateManager.getPendingAssignment as Mock).mockReturnValue(
+        makePendingAssignment({
+          action: TaskAction.Reassign,
+          taskIds,
+          driverId,
+          prevDriverId: 2,
+          prevDriverName: 'Old Driver',
+        })
+      );
+      (
+        mockSimulationStateManager.getPendingAssignmentLoading as Mock
+      ).mockReturnValue(false);
+      const driver = makeDriver({ id: driverId });
+      (mockSimulationStateManager.getDriver as Mock).mockReturnValue(driver);
+      (mockSimulationStateManager.getTask as Mock).mockReturnValue(
+        makeStationTask()
+      );
+      (api.post as Mock).mockResolvedValue({
+        data: {
+          items: taskIds.map((id) => ({ task_id: id, success: true })),
+        },
+      });
+
+      await engine.confirmAssignment();
+
+      expect(api.post).toHaveBeenCalledWith(
+        `/simulation/test_simulation/drivers/assign/batch`,
+        { driver_id: driverId, task_ids: taskIds }
+      );
+    });
+
+    it('selects the driver after successful assignment', async () => {
+      const driverId = 5;
+      (mockSimulationStateManager.getPendingAssignment as Mock).mockReturnValue(
+        makePendingAssignment({
+          action: TaskAction.Assign,
+          taskIds: [1],
+          driverId,
+        })
+      );
+      (
+        mockSimulationStateManager.getPendingAssignmentLoading as Mock
+      ).mockReturnValue(false);
+      const driver = makeDriver({ id: driverId });
+      (mockSimulationStateManager.getDriver as Mock).mockReturnValue(driver);
+      (mockSimulationStateManager.getTask as Mock).mockReturnValue(
+        makeStationTask()
+      );
+      (api.post as Mock).mockResolvedValue({
+        data: { items: [{ task_id: 1, success: true }] },
+      });
+
+      await engine.confirmAssignment();
+
+      expect(mockSimulationStateManager.setSelectedItem).toHaveBeenCalledWith(
+        driver
+      );
+    });
+
+    it('clears pending assignment and loading state after successful assignment', async () => {
+      const driverId = 1;
+      (mockSimulationStateManager.getPendingAssignment as Mock).mockReturnValue(
+        makePendingAssignment({
+          action: TaskAction.Assign,
+          taskIds: [1],
+          driverId,
+        })
+      );
+      (
+        mockSimulationStateManager.getPendingAssignmentLoading as Mock
+      ).mockReturnValue(false);
+      const driver = makeDriver({ id: driverId });
+      (mockSimulationStateManager.getDriver as Mock).mockReturnValue(driver);
+      (mockSimulationStateManager.getTask as Mock).mockReturnValue(
+        makeStationTask()
+      );
+      (api.post as Mock).mockResolvedValue({
+        data: { items: [{ task_id: 1, success: true }] },
+      });
+
+      await engine.confirmAssignment();
+
+      expect(
+        mockSimulationStateManager.setPendingAssignment
+      ).toHaveBeenCalledWith(null);
+      expect(
+        mockSimulationStateManager.setPendingAssignmentLoading
+      ).toHaveBeenCalledWith(false);
+    });
+
+    it('handles errors gracefully and clears pending assignment', async () => {
+      const consoleErrorSpy = vi
+        .spyOn(console, 'error')
+        .mockImplementation(() => {});
+      const driverId = 1;
+      (mockSimulationStateManager.getPendingAssignment as Mock).mockReturnValue(
+        makePendingAssignment({
+          action: TaskAction.Assign,
+          taskIds: [1],
+          driverId,
+        })
+      );
+      (
+        mockSimulationStateManager.getPendingAssignmentLoading as Mock
+      ).mockReturnValue(false);
+      const driver = makeDriver({ id: driverId });
+      (mockSimulationStateManager.getDriver as Mock).mockReturnValue(driver);
+      (api.post as Mock).mockRejectedValue(new Error('Network error'));
+
+      await engine.confirmAssignment();
+
+      expect(consoleErrorSpy).toHaveBeenCalledWith(
+        'Failed to complete task assignment action:',
+        expect.any(Error)
+      );
+      expect(
+        mockSimulationStateManager.setPendingAssignment
+      ).toHaveBeenCalledWith(null);
+      expect(
+        mockSimulationStateManager.setPendingAssignmentLoading
+      ).toHaveBeenCalledWith(false);
+
+      consoleErrorSpy.mockRestore();
+    });
+
+    it('sets loading state to true before assignment', async () => {
+      const driverId = 1;
+      (mockSimulationStateManager.getPendingAssignment as Mock).mockReturnValue(
+        makePendingAssignment({
+          action: TaskAction.Assign,
+          taskIds: [1],
+          driverId,
+        })
+      );
+      (
+        mockSimulationStateManager.getPendingAssignmentLoading as Mock
+      ).mockReturnValue(false);
+      const driver = makeDriver({ id: driverId });
+      (mockSimulationStateManager.getDriver as Mock).mockReturnValue(driver);
+      (mockSimulationStateManager.getTask as Mock).mockReturnValue(
+        makeStationTask()
+      );
+      (api.post as Mock).mockResolvedValue({
+        data: { items: [{ task_id: 1, success: true }] },
+      });
+
+      await engine.confirmAssignment();
+
+      expect(
+        mockSimulationStateManager.setPendingAssignmentLoading
+      ).toHaveBeenCalledWith(true);
+    });
+  });
+
+  describe('cancelAssignment', () => {
+    it('clears pending assignment', () => {
+      engine.cancelAssignment();
+      expect(
+        mockSimulationStateManager.setPendingAssignment
+      ).toHaveBeenCalledWith(null);
+    });
+  });
 });

@@ -144,7 +144,7 @@ describe('TaskAssignmentBanner', () => {
     ).toBeInTheDocument();
   });
 
-  it('calls onConfirmUnassignedOnly when assign unassigned only is clicked', async () => {
+  it('calls confirmAssignment(true) when assign unassigned only is clicked', async () => {
     const user = userEvent.setup();
 
     useSimulation().state.pendingAssignment = makePendingAssignment({
@@ -158,9 +158,8 @@ describe('TaskAssignmentBanner', () => {
     render(<TaskAssignmentBanner />);
 
     await user.click(screen.getByRole('button', { name: /remaining \(2\)/i }));
-    expect(useSimulation().engine.confirmUnassignedOnly).toHaveBeenCalledTimes(
-      1
-    );
+    expect(useSimulation().engine.confirmAssignment).toHaveBeenCalledTimes(1);
+    expect(useSimulation().engine.confirmAssignment).toHaveBeenCalledWith(true);
   });
 
   it('shows single confirm button when no tasks are reassigned', () => {
@@ -239,8 +238,7 @@ describe('TaskAssignmentBanner', () => {
     render(<TaskAssignmentBanner />);
 
     await user.click(screen.getByRole('button', { name: /remaining \(2\)/i }));
-    expect(useSimulation().engine.confirmUnassignedOnly).toHaveBeenCalledTimes(
-      1
-    );
+    expect(useSimulation().engine.confirmAssignment).toHaveBeenCalledTimes(1);
+    expect(useSimulation().engine.confirmAssignment).toHaveBeenCalledWith(true);
   });
 });
