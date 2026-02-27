@@ -214,3 +214,138 @@ test('simulations page navigates to simulation page on resume', async () => {
   fireEvent.click(resumeButton);
   expect(mockNavigate).toHaveBeenCalledWith('/simulations/sim-uuid-1001');
 });
+
+test('simulations page downloads a simulation report as csv', async () => {
+  vi.mocked(api.get)
+    .mockResolvedValueOnce({
+      data: {
+        simulations: [
+          makeSimulation({
+            id: 1001,
+            uuid: 'sim-uuid-1001',
+            name: 'Test Simulation 1',
+            completed: false,
+          }),
+        ],
+        total: 1,
+        page: 1,
+        per_page: 10,
+        total_pages: 1,
+      },
+    })
+    .mockResolvedValueOnce({
+      data: {
+        servicingToDrivingRatio: 1.5,
+        vehicleUtilizationRatio: 0.8,
+      },
+    });
+
+  const createObjectURL = vi.fn(() => 'blob:report-url');
+  const revokeObjectURL = vi.fn();
+  const originalCreateObjectURL = URL.createObjectURL;
+  const originalRevokeObjectURL = URL.revokeObjectURL;
+  Object.defineProperty(URL, 'createObjectURL', {
+    configurable: true,
+    writable: true,
+    value: createObjectURL,
+  });
+  Object.defineProperty(URL, 'revokeObjectURL', {
+    configurable: true,
+    writable: true,
+    value: revokeObjectURL,
+  });
+
+  const createdLink = document.createElement('a');
+  const clickSpy = vi.spyOn(createdLink, 'click').mockImplementation(() => {});
+  const originalCreateElement = document.createElement.bind(document);
+  const createElementSpy = vi
+    .spyOn(document, 'createElement')
+    .mockImplementation((tagName: string) => {
+      if (tagName === 'a') {
+        return createdLink;
+      }
+      return originalCreateElement(tagName);
+    });
+
+  const Stub = createRoutesStub([
+    {
+      path: '/simulations',
+      Component: Simulations,
+    },
+  ]);
+
+  render(<Stub initialEntries={['/simulations']} />);
+
+  await waitFor(() => {
+    expect(screen.getByText('Test Simulation 1')).toBeInTheDocument();
+  });
+
+  fireEvent.click(screen.getByRole('button', { name: /report/i }));
+
+  await waitFor(() => {
+    expect(api.get).toHaveBeenLastCalledWith(
+      '/simulation/sim-uuid-1001/report'
+    );
+  });
+
+  expect(createObjectURL).toHaveBeenCalledOnce();
+  expect(createdLink.getAttribute('download')).toBe('sim_sim-uuid-1001.csv');
+  expect(createdLink.href).toBe('blob:report-url');
+  expect(clickSpy).toHaveBeenCalledOnce();
+  expect(revokeObjectURL).toHaveBeenCalledWith('blob:report-url');
+
+  createElementSpy.mockRestore();
+  clickSpy.mockRestore();
+  Object.defineProperty(URL, 'createObjectURL', {
+    configurable: true,
+    writable: true,
+    value: originalCreateObjectURL,
+  });
+  Object.defineProperty(URL, 'revokeObjectURL', {
+    configurable: true,
+    writable: true,
+    value: originalRevokeObjectURL,
+  });
+});
+
+test('simulations page displays an error when report download fails', async () => {
+  vi.mocked(api.get)
+    .mockResolvedValueOnce({
+      data: {
+        simulations: [
+          makeSimulation({
+            id: 1001,
+            uuid: 'sim-uuid-1001',
+            name: 'Test Simulation 1',
+            completed: false,
+          }),
+        ],
+        total: 1,
+        page: 1,
+        per_page: 10,
+        total_pages: 1,
+      },
+    })
+    .mockRejectedValueOnce(new Error('Report download failed'));
+
+  const Stub = createRoutesStub([
+    {
+      path: '/simulations',
+      Component: Simulations,
+    },
+  ]);
+
+  render(<Stub initialEntries={['/simulations']} />);
+
+  await waitFor(() => {
+    expect(screen.getByText('Test Simulation 1')).toBeInTheDocument();
+  });
+
+  fireEvent.click(screen.getByRole('button', { name: /report/i }));
+
+  await waitFor(() => {
+    expect(mockDisplayError).toHaveBeenCalledWith(
+      'Error downloading simulation report'
+    );
+  });
+});
