@@ -40,8 +40,10 @@ def metrics() -> Response:
     and are scraped by Prometheus.
 
     Operational note:
-        This endpoint is expected to be unauthenticated. Do not place this
-        route behind user auth dependencies.
+        This endpoint is unauthenticated at the application level.
+        Public access is blocked by nginx (returns 404).  Prometheus
+        scrapes via the Docker internal network, bypassing nginx.
+        See ``ansible/roles/nginx/templates/velosim.conf.j2``.
 
     Returns:
         Response: A plaintext HTTP response containing Prometheus metrics

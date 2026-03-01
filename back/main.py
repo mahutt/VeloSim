@@ -147,6 +147,11 @@ app.add_middleware(
 # Keep auth-free operational endpoints (token, health, metrics) outside the
 # authenticated router to avoid coupling observability/availability checks to
 # end-user authentication.
+#
+# Security note: the metrics endpoint is unauthenticated at the application level,
+# but nginx blocks public access to /api/v1/metric/metrics (returns 404).
+# Prometheus scrapes internally via the Docker bridge network (backend:8000),
+# bypassing nginx entirely.  See ansible/roles/nginx/templates/velosim.conf.j2.
 app.include_router(metrics_router, prefix="/api/v1")
 app.include_router(api_router, prefix="/api/v1", dependencies=[Depends(get_user_id)])
 
