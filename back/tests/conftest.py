@@ -37,6 +37,21 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, Session
 from back.tests.mock_utils import create_mock_db_session
 
+# ---------------------------------------------------------------------------
+# Silence external I/O BEFORE any back/grafana_logging imports.
+#
+# grafana_logging.logger evaluates LOG_TO_LOKI and LOG_TO_CONSOLE at module
+# import time (module-level booleans). Setting these env vars here — before
+# 'from back.main import app' triggers the import chain — ensures that NO
+# LokiHandler or StreamHandler is ever attached to any logger during tests.
+#
+# Without this, every logger.info/error call blocks for ~2 s waiting for a
+# TCP connection to the Loki instance that doesn't exist in the test
+# environment, making the full test suite take 10+ minutes.
+# ---------------------------------------------------------------------------
+os.environ["LOG_TO_LOKI"] = "false"
+os.environ["LOG_TO_CONSOLE"] = "false"
+
 # Set dummy OSRM URL for tests to prevent connection errors
 # This must be set before any simulation code tries to initialize OSRMConnection
 if "OSRM_URL" not in os.environ:
@@ -82,6 +97,46 @@ def db() -> Generator[Session, None, None]:
     finally:
         db.close()
         Base.metadata.drop_all(bind=engine)
+
+
+@pytest.fixture(scope="session", autouse=True)
+def disable_external_logging() -> Generator[None, None, None]:
+    """Strip LokiHandler from all loggers that were created before conftest ran.
+
+    Acts as a belt-and-suspenders guard: LOG_TO_LOKI / LOG_TO_CONSOLE env vars
+    above prevent *new* handlers from being added, but modules imported at
+    package load time may have already called get_logger() and cached a logger
+    with a LokiHandler attached.  This fixture removes those handlers so no
+    HTTP call to Loki is ever made during the test session.
+    """
+    import logging
+
+    try:
+        from grafana_logging.logger import LokiHandler
+    except ImportError:
+        LokiHandler = None  # type: ignore[assignment,misc]
+
+    def _strip(logger: logging.Logger) -> None:
+        if LokiHandler is not None:
+            for h in list(logger.handlers):
+                if isinstance(h, LokiHandler):
+                    logger.removeHandler(h)
+                    h.close()
+        # Also silence StreamHandlers so stdout isn't flooded during tests
+        for h in list(logger.handlers):
+            if isinstance(h, logging.StreamHandler):
+                logger.removeHandler(h)
+                h.close()
+
+    # Strip handlers from every logger currently registered in the hierarchy
+    root = logging.getLogger()
+    _strip(root)
+    for name in list(logging.Logger.manager.loggerDict):
+        inst = logging.Logger.manager.loggerDict[name]
+        if isinstance(inst, logging.Logger):
+            _strip(inst)
+
+    yield
 
 
 @pytest.fixture

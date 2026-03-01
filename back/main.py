@@ -29,8 +29,7 @@ from contextlib import asynccontextmanager
 from fastapi import Depends, FastAPI, HTTPException
 from fastapi.security import OAuth2PasswordRequestForm
 
-# Auth temporarily disabled
-# from back.auth.dependency import get_user_id
+from back.auth.dependency import get_user_id
 from back.core.telemetry import initialize_global_telemetry
 from back.middleware.metrics_middleware import MetricsMiddleware
 from back.core.config import settings
@@ -41,6 +40,7 @@ from back.exception_handlers import (
     velosim_permission_error_handler,
 )
 from back.exceptions import BadRequestError, ItemNotFoundError, VelosimPermissionError
+from back.api.v1.metrics import router as metrics_router
 from back.services.simulation_service import simulation_service
 from back.auth import Token, authenticate_user
 from back.database.session import get_db
@@ -138,11 +138,22 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Include API routes, all protected by auth (though they will have to add to their
-# type signature to get the actual user ID)
-# Disable auth for now
-# app.include_router(api_router, prefix="/api/v1", dependencies=[Depends(get_user_id)])
-app.include_router(api_router, prefix="/api/v1")
+# Routing strategy note:
+# - `api_router` is wrapped with `Depends(get_user_id)` to protect v1 business APIs.
+# - `metrics_router` is intentionally mounted separately and BEFORE `api_router`
+#   so `/api/v1/metric/metrics` remains publicly scrapeable by Prometheus.
+# - If metrics are re-included inside `api_router`, scrapes will return 401.
+#
+# Keep auth-free operational endpoints (token, health, metrics) outside the
+# authenticated router to avoid coupling observability/availability checks to
+# end-user authentication.
+#
+# Security note: the metrics endpoint is unauthenticated at the application level,
+# but nginx blocks public access to /api/v1/metric/metrics (returns 404).
+# Prometheus scrapes internally via the Docker bridge network (backend:8000),
+# bypassing nginx entirely.  See ansible/roles/nginx/templates/velosim.conf.j2.
+app.include_router(metrics_router, prefix="/api/v1")
+app.include_router(api_router, prefix="/api/v1", dependencies=[Depends(get_user_id)])
 
 
 @app.get("/")

@@ -25,6 +25,8 @@ SOFTWARE.
 from fastapi import APIRouter, Response
 from prometheus_client import generate_latest, CONTENT_TYPE_LATEST
 
+# This router is intentionally mounted separately in `back.main` (not inside
+# `api_router`) so the metrics endpoint remains public for Prometheus scrapes.
 router = APIRouter(prefix="/metric", tags=["metrics"])
 
 
@@ -36,6 +38,12 @@ def metrics() -> Response:
     This endpoint returns metrics collected by the Prometheus client.
     Metrics are automatically populated via OpenTelemetry instrumentation
     and are scraped by Prometheus.
+
+    Operational note:
+        This endpoint is unauthenticated at the application level.
+        Public access is blocked by nginx (returns 404).  Prometheus
+        scrapes via the Docker internal network, bypassing nginx.
+        See ``ansible/roles/nginx/templates/velosim.conf.j2``.
 
     Returns:
         Response: A plaintext HTTP response containing Prometheus metrics

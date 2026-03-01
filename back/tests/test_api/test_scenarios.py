@@ -491,7 +491,7 @@ class TestScenariosAPI:
 class TestScenarioValidation:
     """Test class for scenario validation endpoint."""
 
-    def test_validate_valid_content(self, client: TestClient) -> None:
+    def test_validate_valid_content(self, authenticated_client: TestClient) -> None:
         """Test validating valid scenario content."""
         valid_content = {
             "content": {
@@ -526,13 +526,17 @@ class TestScenarioValidation:
             }
         }
 
-        response = client.post("/api/v1/scenarios/validate", json=valid_content)
+        response = authenticated_client.post(
+            "/api/v1/scenarios/validate", json=valid_content
+        )
         assert response.status_code == 200
         data = response.json()
         assert data["valid"] is True
         assert data["errors"] == []
 
-    def test_validate_missing_required_fields(self, client: TestClient) -> None:
+    def test_validate_missing_required_fields(
+        self, authenticated_client: TestClient
+    ) -> None:
         """Test validation fails when required fields are missing."""
         invalid_content: Dict[str, Any] = {
             "content": {
@@ -542,7 +546,9 @@ class TestScenarioValidation:
             }
         }
 
-        response = client.post("/api/v1/scenarios/validate", json=invalid_content)
+        response = authenticated_client.post(
+            "/api/v1/scenarios/validate", json=invalid_content
+        )
         assert response.status_code == 200
         data = response.json()
         assert data["valid"] is False
@@ -552,7 +558,9 @@ class TestScenarioValidation:
         assert any("start_time" in field for field in error_fields)
         assert any("end_time" in field for field in error_fields)
 
-    def test_validate_invalid_time_format(self, client: TestClient) -> None:
+    def test_validate_invalid_time_format(
+        self, authenticated_client: TestClient
+    ) -> None:
         """Test validation fails with invalid time format."""
         invalid_content = {
             "content": {
@@ -565,13 +573,17 @@ class TestScenarioValidation:
             }
         }
 
-        response = client.post("/api/v1/scenarios/validate", json=invalid_content)
+        response = authenticated_client.post(
+            "/api/v1/scenarios/validate", json=invalid_content
+        )
         assert response.status_code == 200
         data = response.json()
         assert data["valid"] is False
         assert len(data["errors"]) > 0
 
-    def test_validate_end_time_before_start_time(self, client: TestClient) -> None:
+    def test_validate_end_time_before_start_time(
+        self, authenticated_client: TestClient
+    ) -> None:
         """Test validation fails when end_time is before start_time."""
         invalid_content = {
             "content": {
@@ -584,7 +596,9 @@ class TestScenarioValidation:
             }
         }
 
-        response = client.post("/api/v1/scenarios/validate", json=invalid_content)
+        response = authenticated_client.post(
+            "/api/v1/scenarios/validate", json=invalid_content
+        )
         assert response.status_code == 200
         data = response.json()
         assert data["valid"] is False
@@ -593,8 +607,8 @@ class TestScenarioValidation:
             for err in data["errors"]
         )
 
-    def test_validate_no_authentication_required(self, client: TestClient) -> None:
-        """Test validation endpoint does not require authentication."""
+    def test_validate_requires_authentication(self, client: TestClient) -> None:
+        """Test validation endpoint requires authentication."""
         valid_content = {
             "content": {
                 "start_time": "day1:08:00",
@@ -606,18 +620,16 @@ class TestScenarioValidation:
             }
         }
 
-        # Should work without authentication
         response = client.post("/api/v1/scenarios/validate", json=valid_content)
-        assert response.status_code == 200
-        data = response.json()
-        assert "valid" in data
-        assert "errors" in data
+        assert response.status_code == 401
 
 
 class TestValidateScenario:
     """Test cases for POST /api/v1/scenarios/validate endpoint."""
 
-    def test_validate_valid_scenario_content(self, client: TestClient) -> None:
+    def test_validate_valid_scenario_content(
+        self, authenticated_client: TestClient
+    ) -> None:
         """Test validating valid scenario content returns success."""
         valid_content = {
             "content": {
@@ -652,13 +664,17 @@ class TestValidateScenario:
             }
         }
 
-        response = client.post("/api/v1/scenarios/validate", json=valid_content)
+        response = authenticated_client.post(
+            "/api/v1/scenarios/validate", json=valid_content
+        )
         assert response.status_code == 200
         data = response.json()
         assert data["valid"] is True
         assert data["errors"] == []
 
-    def test_validate_invalid_scenario_content(self, client: TestClient) -> None:
+    def test_validate_invalid_scenario_content(
+        self, authenticated_client: TestClient
+    ) -> None:
         """Test validating invalid scenario content returns errors."""
         invalid_content: Dict[str, Any] = {
             "content": {
@@ -668,7 +684,9 @@ class TestValidateScenario:
             }
         }
 
-        response = client.post("/api/v1/scenarios/validate", json=invalid_content)
+        response = authenticated_client.post(
+            "/api/v1/scenarios/validate", json=invalid_content
+        )
         assert response.status_code == 200
         data = response.json()
         assert data["valid"] is False
@@ -678,7 +696,9 @@ class TestValidateScenario:
         assert "start_time" in error_fields
         assert "end_time" in error_fields
 
-    def test_validate_invalid_time_format(self, client: TestClient) -> None:
+    def test_validate_invalid_time_format(
+        self, authenticated_client: TestClient
+    ) -> None:
         """Test validating scenario with invalid time format."""
         invalid_content = {
             "content": {
@@ -691,13 +711,17 @@ class TestValidateScenario:
             }
         }
 
-        response = client.post("/api/v1/scenarios/validate", json=invalid_content)
+        response = authenticated_client.post(
+            "/api/v1/scenarios/validate", json=invalid_content
+        )
         assert response.status_code == 200
         data = response.json()
         assert data["valid"] is False
         assert len(data["errors"]) > 0
 
-    def test_validate_end_time_before_start_time(self, client: TestClient) -> None:
+    def test_validate_end_time_before_start_time(
+        self, authenticated_client: TestClient
+    ) -> None:
         """Test validating scenario where end_time is before start_time."""
         invalid_content = {
             "content": {
@@ -710,14 +734,16 @@ class TestValidateScenario:
             }
         }
 
-        response = client.post("/api/v1/scenarios/validate", json=invalid_content)
+        response = authenticated_client.post(
+            "/api/v1/scenarios/validate", json=invalid_content
+        )
         assert response.status_code == 200
         data = response.json()
         assert data["valid"] is False
         assert any("after" in err["message"].lower() for err in data["errors"])
 
-    def test_validate_no_authentication_required(self, client: TestClient) -> None:
-        """Test that validation endpoint does not require authentication."""
+    def test_validate_requires_authentication(self, client: TestClient) -> None:
+        """Test that validation endpoint requires authentication."""
         valid_content = {
             "content": {
                 "start_time": "day1:08:00",
@@ -729,16 +755,17 @@ class TestValidateScenario:
             }
         }
 
-        # Should work without authentication
         response = client.post("/api/v1/scenarios/validate", json=valid_content)
-        assert response.status_code == 200
+        assert response.status_code == 401
 
-    def test_validate_invalid_utf8_encoding(self, client: TestClient) -> None:
+    def test_validate_invalid_utf8_encoding(
+        self, authenticated_client: TestClient
+    ) -> None:
         """Test that validation endpoint handles invalid UTF-8 encoding gracefully."""
         # Send raw bytes with invalid UTF-8 sequence
         invalid_utf8_bytes = b'{"content": {"start_time": "\xff\xfe"}}'
 
-        response = client.post(
+        response = authenticated_client.post(
             "/api/v1/scenarios/validate",
             content=invalid_utf8_bytes,
             headers={"Content-Type": "application/json"},
