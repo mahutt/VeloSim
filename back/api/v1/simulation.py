@@ -150,7 +150,7 @@ class InitializeRequest(BaseModel):
 
 
 @router.post("/initialize", response_model=SimulationResponse)
-async def initialize_simulation(
+def initialize_simulation(
     request: Request,
     initialize_request: InitializeRequest | None = Body(None),
     scenario_id: int | None = Query(None),
