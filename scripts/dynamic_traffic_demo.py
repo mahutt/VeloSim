@@ -121,6 +121,23 @@ def get_event_segment_key(road):
     return road.segment_key
 
 
+def tick_to_start_time(tick_seconds, base_hour=8, base_minute=0):
+    """Convert a tick offset (seconds from sim start) to HH:MM time string.
+
+    Args:
+        tick_seconds: Tick offset in seconds from simulation start.
+        base_hour: Hour component of simulation start time.
+        base_minute: Minute component of simulation start time.
+
+    Returns:
+        Time-of-day string in HH:MM format.
+    """
+    total_minutes = (base_hour * 60 + base_minute) + (tick_seconds // 60)
+    hours = (total_minutes // 60) % 24
+    minutes = total_minutes % 60
+    return f"{hours:02d}:{minutes:02d}"
+
+
 def generate_traffic_csv(path, segment_key, tick_start, duration, weight, name):
     """Write a valid traffic CSV matching TrafficParser format.
 
@@ -132,12 +149,13 @@ def generate_traffic_csv(path, segment_key, tick_start, duration, weight, name):
         weight: Speed multiplier (0.0-1.0).
         name: Human-readable event name.
     """
+    start_time = tick_to_start_time(tick_start)
     with open(path, "w", newline="", encoding="utf-8") as f:
         writer = csv.writer(f)
-        writer.writerow(["TYPE", "tick_start", "segment_key", "name", "duration", "weight"])
+        writer.writerow(["TYPE", "start_time", "segment_key", "name", "duration", "weight"])
         writer.writerow([
             "local_traffic",
-            tick_start,
+            start_time,
             format_segment_key_for_csv(segment_key),
             name,
             duration,
@@ -169,7 +187,7 @@ def generate_staggered_traffic_csv(path, road_info):
             "name_prefix": "early_severe",
             "start_frac": 0.05,  # Near start
             "count": 3,
-            "tick_start": 30,
+            "start_time": "08:01",
             "duration": 300,
             "weight": 0.15,
         },
@@ -177,7 +195,7 @@ def generate_staggered_traffic_csv(path, road_info):
             "name_prefix": "mid_moderate",
             "start_frac": 0.25,  # Quarter way
             "count": 3,
-            "tick_start": 200,
+            "start_time": "08:03",
             "duration": 500,
             "weight": 0.5,
         },
@@ -185,7 +203,7 @@ def generate_staggered_traffic_csv(path, road_info):
             "name_prefix": "mid_severe",
             "start_frac": 0.50,  # Half way
             "count": 4,
-            "tick_start": 400,
+            "start_time": "08:07",
             "duration": 400,
             "weight": 0.15,
         },
@@ -193,7 +211,7 @@ def generate_staggered_traffic_csv(path, road_info):
             "name_prefix": "late_moderate",
             "start_frac": 0.75,  # Three quarters
             "count": 4,
-            "tick_start": 600,
+            "start_time": "08:10",
             "duration": 500,
             "weight": 0.5,
         },
@@ -216,7 +234,7 @@ def generate_staggered_traffic_csv(path, road_info):
             seg_key = get_event_segment_key(road)
             rows.append({
                 "type": "local_traffic",
-                "tick_start": group["tick_start"],
+                "start_time": group["start_time"],
                 "segment_key": format_segment_key_for_csv(seg_key),
                 "name": f"{group['name_prefix']}_{i}",
                 "duration": group["duration"],
@@ -233,7 +251,7 @@ def generate_staggered_traffic_csv(path, road_info):
     for start, end, name in off_route:
         rows.append({
             "type": "local_traffic",
-            "tick_start": 0,
+            "start_time": "08:00",
             "segment_key": format_segment_key_for_csv((start, end)),
             "name": name,
             "duration": 3000,
@@ -242,11 +260,11 @@ def generate_staggered_traffic_csv(path, road_info):
 
     with open(path, "w", newline="", encoding="utf-8") as f:
         writer = csv.writer(f)
-        writer.writerow(["TYPE", "tick_start", "segment_key", "name", "duration", "weight"])
+        writer.writerow(["TYPE", "start_time", "segment_key", "name", "duration", "weight"])
         for row in rows:
             writer.writerow([
                 row["type"],
-                row["tick_start"],
+                row["start_time"],
                 row["segment_key"],
                 row["name"],
                 row["duration"],
@@ -256,9 +274,9 @@ def generate_staggered_traffic_csv(path, road_info):
     print(f"   Generated {len(rows)} events ({len(rows) - len(off_route)} on-route, "
           f"{len(off_route)} off-route)")
     for group in groups:
-        print(f"     {group['name_prefix']}: tick {group['tick_start']}, "
+        print(f"     {group['name_prefix']}: start_time={group['start_time']}, "
               f"weight={group['weight']}, duration={group['duration']}")
-    print(f"     off-route: tick 0, weight=0.15, duration=3000 (should NOT appear)")
+    print(f"     off-route: start_time=08:00, weight=0.15, duration=3000 (should NOT appear)")
 
 
 def generate_scenario_json(json_path, csv_path, start_pos, end_pos):
@@ -1032,7 +1050,11 @@ def main():
 
             # Create fresh SimPy env + MapController with traffic config
             env2 = simpy.Environment()
-            traffic_config = TrafficConfig(traffic_path=str(csv_path))
+            traffic_config = TrafficConfig(
+                traffic_path=str(csv_path),
+                sim_start_time="day1:08:00",
+                sim_end_time="day1:09:00",
+            )
             map_payload2 = MapPayload(env=env2, traffic=traffic_config)
             mc2 = MapController(map_payload2)
 
@@ -1120,7 +1142,11 @@ def main():
             traffic_state_store._reset()  # start clean
 
             env3 = simpy.Environment()
-            traffic_config3 = TrafficConfig(traffic_path=str(csv_path))
+            traffic_config3 = TrafficConfig(
+                traffic_path=str(csv_path),
+                sim_start_time="day1:08:00",
+                sim_end_time="day1:09:00",
+            )
             map_payload3 = MapPayload(env=env3, traffic=traffic_config3)
             mc3 = MapController(map_payload3)
 
