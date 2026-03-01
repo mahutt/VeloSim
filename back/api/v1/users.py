@@ -23,9 +23,10 @@ SOFTWARE.
 """
 
 import math
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, Query
 from back.auth.dependency import get_user_id
 from back.database.session import get_db
+from back.exceptions import ItemNotFoundError
 from back.schemas import (
     UserCreate,
     UserPasswordUpdate,
@@ -123,7 +124,7 @@ def get_by_id(
     user = user_crud.get_if_permission(db, user_id, requesting_user)
 
     if not user:
-        raise HTTPException(status_code=404, detail="User not found")
+        raise ItemNotFoundError("User not found")
 
     return UserResponse.model_validate(user)
 

@@ -33,7 +33,6 @@ from fastapi import (
     Depends,
     Query,
     Request,
-    status,
 )
 from back.api.v1.utils import (
     cleanup_simulation,
@@ -81,7 +80,12 @@ from back.schemas.sim_frame import (
 from sqlalchemy.orm import Session
 
 from back.auth.dependency import get_user_id, get_user_id_over_websocket
-from back.exceptions import VelosimPermissionError, ItemNotFoundError
+from back.exceptions import (
+    BadRequestError,
+    ItemNotFoundError,
+    UnexpectedError,
+    VelosimPermissionError,
+)
 from back.services.driver_service import driver_service
 from back.crud.sim_keyframe import sim_keyframe_crud
 from back.crud.sim_instance import sim_instance_crud
@@ -103,6 +107,9 @@ from sim.entities.driver import DriverState
 from back.schemas.driver_list import DriverTask, DriverVehicle
 from pydantic import BaseModel
 from typing import Any
+from grafana_logging.logger import get_logger
+
+logger = get_logger(__name__)
 
 # Constants
 MAX_PAGE_SIZE = 500
@@ -174,9 +181,8 @@ def initialize_simulation(
     if (initialize_request is None and scenario_id is None) or (
         initialize_request is not None and scenario_id is not None
     ):
-        raise HTTPException(
-            status_code=400,
-            detail="Must provide 'scenario content' or 'scenario_id', but not both.",
+        raise BadRequestError(
+            "Must provide 'scenario content' or 'scenario_id', but not both."
         )
 
     try:
@@ -234,14 +240,11 @@ def initialize_simulation(
                 "message": "Scenario validation failed",
             },
         )
-    except VelosimPermissionError:
+    except (VelosimPermissionError, ItemNotFoundError):
         raise
-    except ItemNotFoundError as ve:
-        raise HTTPException(
-            status_code=404 if "not found" in str(ve) else 400, detail=str(ve)
-        )
     except Exception as err:
-        raise HTTPException(status_code=500, detail=str(err))
+        logger.exception("Unexpected error: %s", err)
+        raise UnexpectedError() from err
 
 
 @router.post("/stop/{sim_id}", response_model=SimulationResponse)
@@ -266,7 +269,8 @@ def stop_simulation(
     except (VelosimPermissionError, ItemNotFoundError):
         raise
     except Exception as err:
-        raise HTTPException(status_code=500, detail=str(err))
+        logger.exception("Unexpected error: %s", err)
+        raise UnexpectedError() from err
 
 
 @router.get("/my", response_model=SimulationListResponse)
@@ -363,7 +367,8 @@ def get_simulation_status(
     except (ItemNotFoundError, VelosimPermissionError):
         raise
     except Exception as err:
-        raise HTTPException(status_code=500, detail=str(err))
+        logger.exception("Unexpected error: %s", err)
+        raise UnexpectedError() from err
 
 
 @router.post("/stopAll")
@@ -390,9 +395,8 @@ def stop_all_simulations(
     except VelosimPermissionError:
         raise
     except Exception as err:
-        raise HTTPException(
-            status_code=500, detail=f"Failed to stop all simulations: {str(err)}"
-        )
+        logger.exception("Unexpected error: %s", err)
+        raise UnexpectedError() from err
 
 
 @router.get("/{sim_id}/playbackSpeed", response_model=PlaybackSpeedResponse)
@@ -419,7 +423,8 @@ def get_playback_speed(
     except (ItemNotFoundError, VelosimPermissionError):
         raise
     except Exception as err:
-        raise HTTPException(status_code=500, detail=str(err))
+        logger.exception("Unexpected error: %s", err)
+        raise UnexpectedError() from err
 
 
 @router.post("/{sim_id}/playbackSpeed", response_model=PlaybackSpeedResponse)
@@ -451,7 +456,8 @@ def set_playback_speed(
     except (ItemNotFoundError, VelosimPermissionError):
         raise
     except Exception as err:
-        raise HTTPException(status_code=500, detail=str(err))
+        logger.exception("Unexpected error: %s", err)
+        raise UnexpectedError() from err
 
 
 @router.get("/{sim_id}/seek", response_model=SeekResponse)
@@ -514,12 +520,9 @@ def seek_to_position(
         if frame_window_seconds is None:
             frame_window_seconds = settings.SEEK_DEFAULT_FRAME_WINDOW_SECONDS
         elif frame_window_seconds > settings.SEEK_MAX_FRAME_WINDOW_SECONDS:
-            raise HTTPException(
-                status_code=400,
-                detail=(
-                    f"frame_window_seconds exceeds maximum allowed value of "
-                    f"{settings.SEEK_MAX_FRAME_WINDOW_SECONDS} seconds"
-                ),
+            raise BadRequestError(
+                f"frame_window_seconds exceeds maximum allowed value of "
+                f"{settings.SEEK_MAX_FRAME_WINDOW_SECONDS} seconds"
             )
 
         return simulation_service.seek_to_position(
@@ -531,10 +534,11 @@ def seek_to_position(
             requesting_user=requesting_user,
         )
 
-    except (ItemNotFoundError, VelosimPermissionError, HTTPException):
+    except (ItemNotFoundError, VelosimPermissionError, BadRequestError):
         raise
     except Exception as err:
-        raise HTTPException(status_code=500, detail=str(err))
+        logger.exception("Unexpected error: %s", err)
+        raise UnexpectedError() from err
 
 
 @router.post("/{sim_id}/branch", response_model=BranchResponse)
@@ -601,9 +605,10 @@ def branch_simulation(
         raise
     except ValueError as err:
         # No keyframes found - return 400 client error
-        raise HTTPException(status_code=400, detail=str(err))
+        raise BadRequestError(str(err)) from err
     except Exception as err:
-        raise HTTPException(status_code=500, detail=str(err))
+        logger.exception("Unexpected error: %s", err)
+        raise UnexpectedError() from err
 
 
 @router.post(
@@ -636,7 +641,8 @@ def assign_task_to_driver(
             task_assign_data=task_assign_data,
         )
     except RuntimeError as err:
-        raise HTTPException(status_code=500, detail=str(err))
+        logger.exception("Unexpected error: %s", err)
+        raise UnexpectedError() from err
 
 
 @router.post(
@@ -682,7 +688,8 @@ def batch_assign_tasks_to_driver(
         )
         return result
     except RuntimeError as err:
-        raise HTTPException(status_code=500, detail=str(err))
+        logger.exception("Unexpected error: %s", err)
+        raise UnexpectedError() from err
 
 
 @router.post(
@@ -715,7 +722,8 @@ def unassign_task_from_driver(
             task_unassign_data=task_unassign_data,
         )
     except RuntimeError as err:
-        raise HTTPException(status_code=500, detail=str(err))
+        logger.exception("Unexpected error: %s", err)
+        raise UnexpectedError() from err
 
 
 @router.post(
@@ -749,7 +757,8 @@ def reassign_task_between_drivers(
             task_reassign_data=task_reassign_data,
         )
     except RuntimeError as err:
-        raise HTTPException(status_code=500, detail=str(err))
+        logger.exception("Unexpected error: %s", err)
+        raise UnexpectedError() from err
 
 
 @router.post(
@@ -782,7 +791,8 @@ def reorder_driver_tasks(
             reorder_data=reorder_data,
         )
     except RuntimeError as err:
-        raise HTTPException(status_code=500, detail=str(err))
+        logger.exception("Unexpected error: %s", err)
+        raise UnexpectedError() from err
 
 
 @router.websocket("/stream/{sim_id}")
@@ -907,10 +917,8 @@ def get_simulation_keyframes(
     except (ItemNotFoundError, VelosimPermissionError):
         raise
     except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Error retrieving keyframes: {str(e)}",
-        )
+        logger.exception("Unexpected error: %s", e)
+        raise UnexpectedError() from e
 
 
 @router.get("/{sim_id}/keyframes/{sim_seconds}", response_model=SimKeyframeResponse)
@@ -986,10 +994,8 @@ def get_simulation_keyframe_at_time(
     except (ItemNotFoundError, VelosimPermissionError):
         raise
     except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Error retrieving keyframe: {str(e)}",
-        )
+        logger.exception("Unexpected error: %s", e)
+        raise UnexpectedError() from e
 
 
 @router.get(
@@ -1065,10 +1071,8 @@ def get_simulation_state(
     except (ItemNotFoundError, VelosimPermissionError):
         raise
     except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Error retrieving simulation state: {str(e)}",
-        )
+        logger.exception("Unexpected error: %s", e)
+        raise UnexpectedError() from e
 
 
 @router.get("/{sim_id}/tasks", response_model=TaskListResponse)
@@ -1146,10 +1150,9 @@ def get_simulation_tasks(
             # Validate states against allowed values
             invalid_states = set(states) - VALID_TASK_STATES
             if invalid_states:
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail=f"Invalid task states: {', '.join(invalid_states)}. "
-                    f"Valid states: {', '.join(sorted(VALID_TASK_STATES))}",
+                raise BadRequestError(
+                    f"Invalid task states: {', '.join(invalid_states)}. "
+                    f"Valid states: {', '.join(sorted(VALID_TASK_STATES))}"
                 )
             tasks_data = [
                 t for t in tasks_data if t.get("state", "OPEN").upper() in states
@@ -1198,10 +1201,9 @@ def get_simulation_tasks(
                 # Validate sort field
                 if field_name not in ALLOWED_TASK_SORT_FIELDS:
                     allowed = ", ".join(sorted(ALLOWED_TASK_SORT_FIELDS))
-                    raise HTTPException(
-                        status_code=status.HTTP_400_BAD_REQUEST,
-                        detail=f"Invalid sort field '{field_name}'. "
-                        f"Allowed fields: {allowed}",
+                    raise BadRequestError(
+                        f"Invalid sort field '{field_name}'. "
+                        f"Allowed fields: {allowed}"
                     )
 
                 # Sort by field - handle None values properly
@@ -1218,9 +1220,8 @@ def get_simulation_tasks(
 
         # Validate pagination parameters
         if start_result >= total and total > 0:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"start_result {start_result} exceeds total results {total}",
+            raise BadRequestError(
+                f"start_result {start_result} exceeds total results {total}"
             )
 
         total_pages = math.ceil(total / max_results) if max_results > 0 else 0
@@ -1238,13 +1239,11 @@ def get_simulation_tasks(
             total_pages=total_pages,
         )
 
-    except (ItemNotFoundError, VelosimPermissionError, HTTPException):
+    except (ItemNotFoundError, VelosimPermissionError, BadRequestError):
         raise
     except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Error retrieving tasks: {str(e)}",
-        )
+        logger.exception("Unexpected error: %s", e)
+        raise UnexpectedError() from e
 
 
 @router.get("/{sim_id}/drivers", response_model=DriverListResponse)
@@ -1326,10 +1325,9 @@ def get_simulation_drivers(
             # Validate states against allowed values
             invalid_states = set(states) - VALID_DRIVER_STATES
             if invalid_states:
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail=f"Invalid driver states: {', '.join(invalid_states)}. "
-                    f"Valid states: {', '.join(sorted(VALID_DRIVER_STATES))}",
+                raise BadRequestError(
+                    f"Invalid driver states: {', '.join(invalid_states)}. "
+                    f"Valid states: {', '.join(sorted(VALID_DRIVER_STATES))}"
                 )
             drivers_data = [
                 d for d in drivers_data if d.get("state", "IDLE").upper() in states
@@ -1394,10 +1392,9 @@ def get_simulation_drivers(
                 # Validate sort field
                 if field_name not in ALLOWED_DRIVER_SORT_FIELDS:
                     allowed = ", ".join(sorted(ALLOWED_DRIVER_SORT_FIELDS))
-                    raise HTTPException(
-                        status_code=status.HTTP_400_BAD_REQUEST,
-                        detail=f"Invalid sort field '{field_name}'. "
-                        f"Allowed fields: {allowed}",
+                    raise BadRequestError(
+                        f"Invalid sort field '{field_name}'. "
+                        f"Allowed fields: {allowed}"
                     )
 
                 # Sort by field - handle None values properly
@@ -1414,9 +1411,8 @@ def get_simulation_drivers(
 
         # Validate pagination parameters
         if start_result >= total and total > 0:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"start_result {start_result} exceeds total results {total}",
+            raise BadRequestError(
+                f"start_result {start_result} exceeds total results {total}"
             )
 
         total_pages = math.ceil(total / max_results) if max_results > 0 else 0
@@ -1434,10 +1430,8 @@ def get_simulation_drivers(
             total_pages=total_pages,
         )
 
-    except (ItemNotFoundError, VelosimPermissionError, HTTPException):
+    except (ItemNotFoundError, VelosimPermissionError, BadRequestError):
         raise
     except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Error retrieving drivers: {str(e)}",
-        )
+        logger.exception("Unexpected error: %s", e)
+        raise UnexpectedError() from e

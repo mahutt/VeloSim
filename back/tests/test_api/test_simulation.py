@@ -54,7 +54,7 @@ from back.services.simulation_service import simulation_service
 
 from back.models.user import User
 
-from datetime import datetime
+from datetime import datetime, timezone
 from uuid import uuid4
 
 SCENARIO_CONTENT = {
@@ -125,8 +125,8 @@ def make_sim_instance(
     sim.user_id = user_id
     sim.uuid = str(uuid4())
     sim.completed = completed
-    sim.date_created = datetime.utcnow()
-    sim.date_updated = datetime.utcnow()
+    sim.date_created = datetime.now(timezone.utc)
+    sim.date_updated = datetime.now(timezone.utc)
 
     # REQUIRED FOR RESPONSE SCHEMA
     sim.name = f"Simulation {id}"
@@ -346,16 +346,21 @@ class TestSimulationAPI:
         assert response.status_code == 403
         assert "No permission" in response.json()["detail"]
 
+    @patch("back.api.v1.simulation.logger")
     @patch("back.services.simulation_service.simulation_service.initialize_simulation")
     def test_initialize_simulation_generic_error(
-        self, mock_init: MagicMock, authenticated_client: TestClient
+        self,
+        mock_init: MagicMock,
+        mock_logger: MagicMock,
+        authenticated_client: TestClient,
     ) -> None:
         mock_init.side_effect = Exception("Unexpected error")
         response = authenticated_client.post(
             "/api/v1/simulation/initialize", json=SCENARIO_PAYLOAD
         )
         assert response.status_code == 500
-        assert "Unexpected error" in response.json()["detail"]
+        assert response.json()["detail"] == "An unexpected error occurred."
+        mock_logger.exception.assert_called_once()
 
     def test_initialize_simulation_missing_both_scenario_and_id(
         self, authenticated_client: TestClient
@@ -637,13 +642,19 @@ class TestSimulationAPI:
         assert response.status_code == 404
         assert "Simulation not found" in response.json()["detail"]
 
+    @patch("back.api.v1.simulation.logger")
     @patch("back.services.simulation_service.simulation_service.stop_simulation")
     def test_stop_simulation_generic_error(
-        self, mock_stop: MagicMock, authenticated_client: TestClient, db: Session
+        self,
+        mock_stop: MagicMock,
+        mock_logger: MagicMock,
+        authenticated_client: TestClient,
+        db: Session,
     ) -> None:
         mock_stop.side_effect = Exception("Unexpected")
         response = authenticated_client.post("/api/v1/simulation/stop/sim123")
         assert response.status_code == 500
+        mock_logger.exception.assert_called_once()
 
     @patch(
         "back.services.simulation_service.simulation_service.get_all_user_simulations"
@@ -746,13 +757,19 @@ class TestSimulationAPI:
         assert response.status_code == 404
         assert "Simulation not found" in response.json()["detail"]
 
+    @patch("back.api.v1.simulation.logger")
     @patch("back.services.simulation_service.simulation_service.get_simulation_status")
     def test_get_simulation_status_generic_error(
-        self, mock_status: MagicMock, authenticated_client: TestClient, db: Session
+        self,
+        mock_status: MagicMock,
+        mock_logger: MagicMock,
+        authenticated_client: TestClient,
+        db: Session,
     ) -> None:
         mock_status.side_effect = Exception("Unexpected")
         response = authenticated_client.get("/api/v1/simulation/status/sim123")
         assert response.status_code == 500
+        mock_logger.exception.assert_called_once()
 
     @patch("back.services.simulation_service.simulation_service.stop_all_simulations")
     def test_stop_all_simulations_success(
@@ -772,13 +789,19 @@ class TestSimulationAPI:
         assert response.status_code == 403
         assert "No permission" in response.json()["detail"]
 
+    @patch("back.api.v1.simulation.logger")
     @patch("back.services.simulation_service.simulation_service.stop_all_simulations")
     def test_stop_all_simulations_generic_error(
-        self, mock_stop_all: MagicMock, authenticated_client: TestClient, db: Session
+        self,
+        mock_stop_all: MagicMock,
+        mock_logger: MagicMock,
+        authenticated_client: TestClient,
+        db: Session,
     ) -> None:
         mock_stop_all.side_effect = Exception("Unexpected")
         response = authenticated_client.post("/api/v1/simulation/stopAll")
         assert response.status_code == 500
+        mock_logger.exception.assert_called_once()
 
     @patch("back.services.simulation_service.simulation_service.get_playback_speed")
     def test_get_playback_speed_success(
@@ -821,14 +844,20 @@ class TestSimulationAPI:
         assert response.status_code == 403
         assert "Forbidden" in response.json()["detail"]
 
+    @patch("back.api.v1.simulation.logger")
     @patch("back.services.simulation_service.simulation_service.get_playback_speed")
     def test_get_playback_speed_generic_error(
-        self, mock_get_speed: MagicMock, authenticated_client: TestClient, db: Session
+        self,
+        mock_get_speed: MagicMock,
+        mock_logger: MagicMock,
+        authenticated_client: TestClient,
+        db: Session,
     ) -> None:
         mock_get_speed.side_effect = Exception("Unexpected")
 
         response = authenticated_client.get("/api/v1/simulation/sim123/playbackSpeed")
         assert response.status_code == 500
+        mock_logger.exception.assert_called_once()
 
     @patch("back.services.simulation_service.simulation_service.set_playback_speed")
     def test_set_playback_speed_success(
@@ -879,9 +908,14 @@ class TestSimulationAPI:
         assert response.status_code == 403
         assert "Forbidden" in response.json()["detail"]
 
+    @patch("back.api.v1.simulation.logger")
     @patch("back.services.simulation_service.simulation_service.set_playback_speed")
     def test_set_playback_speed_generic_error(
-        self, mock_set_speed: MagicMock, authenticated_client: TestClient, db: Session
+        self,
+        mock_set_speed: MagicMock,
+        mock_logger: MagicMock,
+        authenticated_client: TestClient,
+        db: Session,
     ) -> None:
         mock_set_speed.side_effect = Exception("Unexpected")
 
@@ -890,6 +924,7 @@ class TestSimulationAPI:
             json={"playback_speed": 1.0},
         )
         assert response.status_code == 500
+        mock_logger.exception.assert_called_once()
 
     def test_set_playback_speed_invalid_payload(
         self, authenticated_client: TestClient
@@ -1300,7 +1335,7 @@ class TestSimulationAPI:
             f"/api/v1/simulation/{active_sim_id}/drivers/assign", json=payload
         )
         assert response.status_code == 500
-        assert "Simulator error" in response.json()["detail"]
+        assert response.json()["detail"] == "An unexpected error occurred."
 
     @patch("back.api.v1.simulation.driver_service.unassign_task")
     def test_unassign_task_runtime_error(
@@ -1316,7 +1351,7 @@ class TestSimulationAPI:
             f"/api/v1/simulation/{active_sim_id}/drivers/unassign", json=payload
         )
         assert response.status_code == 500
-        assert "Task unassignment failed" in response.json()["detail"]
+        assert response.json()["detail"] == "An unexpected error occurred."
 
     @patch("back.api.v1.simulation.driver_service.unassign_task")
     def test_unassign_task_success(
@@ -3938,8 +3973,8 @@ class TestSimInstanceResponseNameFallback:
         mock.user_id = 1
         mock.uuid = str(uuid4())
         mock.completed = False
-        mock.date_created = datetime.utcnow()
-        mock.date_updated = datetime.utcnow()
+        mock.date_created = datetime.now(timezone.utc)
+        mock.date_updated = datetime.now(timezone.utc)
         mock.name = name
         mock.scenario_payload = scenario_payload
         mock.playback_capable = True

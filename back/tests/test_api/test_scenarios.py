@@ -321,6 +321,25 @@ class TestScenariosAPI:
         )
         assert response.status_code == 401
 
+    @patch("back.api.v1.scenarios.logger")
+    @patch("back.crud.scenario.scenario_crud.create")
+    def test_create_scenario_generic_error(
+        self,
+        mock_create: MagicMock,
+        mock_logger: MagicMock,
+        authenticated_client: TestClient,
+    ) -> None:
+        """Test that unexpected errors return a safe 500 message and are logged."""
+        mock_create.side_effect = Exception("DB exploded")
+
+        response = authenticated_client.post(
+            "/api/v1/scenarios/",
+            json={"name": "Test", "content": {"foo": "bar"}},
+        )
+        assert response.status_code == 500
+        assert response.json()["detail"] == "An unexpected error occurred."
+        mock_logger.exception.assert_called_once()
+
     # ==================== UPDATE SCENARIO TESTS ====================
 
     @patch("back.api.v1.scenarios.JsonParseStrategy")
@@ -443,6 +462,25 @@ class TestScenariosAPI:
         )
         assert response.status_code == 401
 
+    @patch("back.api.v1.scenarios.logger")
+    @patch("back.crud.scenario.scenario_crud.update")
+    def test_update_scenario_generic_error(
+        self,
+        mock_update: MagicMock,
+        mock_logger: MagicMock,
+        authenticated_client: TestClient,
+    ) -> None:
+        """Test that unexpected errors return a safe 500 message and are logged."""
+        mock_update.side_effect = Exception("DB exploded")
+
+        response = authenticated_client.put(
+            "/api/v1/scenarios/1",
+            json={"name": "Updated"},
+        )
+        assert response.status_code == 500
+        assert response.json()["detail"] == "An unexpected error occurred."
+        mock_logger.exception.assert_called_once()
+
     # ==================== DELETE SCENARIO TESTS ====================
 
     @patch("back.crud.scenario.scenario_crud.delete")
@@ -481,6 +519,22 @@ class TestScenariosAPI:
 
         response = authenticated_client.delete("/api/v1/scenarios/1")
         assert response.status_code == 403
+
+    @patch("back.api.v1.scenarios.logger")
+    @patch("back.crud.scenario.scenario_crud.delete")
+    def test_delete_scenario_generic_error(
+        self,
+        mock_delete: MagicMock,
+        mock_logger: MagicMock,
+        authenticated_client: TestClient,
+    ) -> None:
+        """Test that unexpected errors return a safe 500 message and are logged."""
+        mock_delete.side_effect = Exception("DB exploded")
+
+        response = authenticated_client.delete("/api/v1/scenarios/1")
+        assert response.status_code == 500
+        assert response.json()["detail"] == "An unexpected error occurred."
+        mock_logger.exception.assert_called_once()
 
     def test_delete_scenario_requires_authentication(self, client: TestClient) -> None:
         """Test deleting scenario without authentication returns 401."""

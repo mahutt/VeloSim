@@ -31,7 +31,12 @@ from pydantic import BaseModel
 from back.database.session import get_db
 from back.auth.dependency import get_user_id
 from back.crud.scenario import scenario_crud
-from back.exceptions import BadRequestError, ItemNotFoundError, VelosimPermissionError
+from back.exceptions import (
+    BadRequestError,
+    ItemNotFoundError,
+    UnexpectedError,
+    VelosimPermissionError,
+)
 from back.schemas.scenario import (
     ScenarioCreate,
     ScenarioCreateRequest,
@@ -41,6 +46,9 @@ from back.schemas.scenario import (
     ScenarioUpdateRequest,
 )
 from sim.utils.json_parser_strategy import JsonParseStrategy
+from grafana_logging.logger import get_logger
+
+logger = get_logger(__name__)
 
 router = APIRouter(prefix="/scenarios", tags=["scenarios"])
 
@@ -305,10 +313,8 @@ def create_scenario(
         raise
     except Exception as err:
         # Handle unexpected database errors
-        raise HTTPException(
-            status_code=500,
-            detail=f"Failed to create scenario: {str(err)}",
-        )
+        logger.exception("Unexpected error: %s", err)
+        raise UnexpectedError() from err
 
 
 @router.put("/{scenario_id}", response_model=ScenarioResponse)
@@ -374,10 +380,8 @@ def update_scenario(
     except (HTTPException, ItemNotFoundError, BadRequestError, VelosimPermissionError):
         raise
     except Exception as err:
-        raise HTTPException(
-            status_code=500,
-            detail=f"Failed to update scenario: {str(err)}",
-        )
+        logger.exception("Unexpected error: %s", err)
+        raise UnexpectedError() from err
 
 
 @router.delete("/{scenario_id}", status_code=status.HTTP_204_NO_CONTENT)
@@ -402,7 +406,5 @@ def delete_scenario(
     except (ItemNotFoundError, BadRequestError, VelosimPermissionError):
         raise
     except Exception as err:
-        raise HTTPException(
-            status_code=500,
-            detail=f"Failed to delete scenario: {str(err)}",
-        )
+        logger.exception("Unexpected error: %s", err)
+        raise UnexpectedError() from err
