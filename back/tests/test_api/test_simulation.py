@@ -3853,7 +3853,7 @@ class TestBranchEndpoint:
 
             assert response.status_code == 200
             data = response.json()
-            assert data["name"] is None
+            assert data["name"] == ""
 
     def test_branch_simulation_not_found(
         self, authenticated_client: TestClient, mock_db: MagicMock
@@ -3914,3 +3914,247 @@ class TestBranchEndpoint:
         )
 
         assert response.status_code == 401
+
+
+class TestSimInstanceResponseNameFallback:
+    """Tests for SimInstanceResponse name fallback logic.
+
+    When the database `name` column is NULL (or empty), the response
+    schema should derive a human-readable name instead of returning null.
+    """
+
+    def _make_response(
+        self,
+        *,
+        id: int = 1,
+        name: str | None = None,
+        scenario_payload: dict | None = None,
+    ) -> dict:
+        """Build a SimInstanceResponse via model_validate and return dict."""
+        from back.schemas.sim_instance import SimInstanceResponse
+
+        mock = MagicMock()
+        mock.id = id
+        mock.user_id = 1
+        mock.uuid = str(uuid4())
+        mock.completed = False
+        mock.date_created = datetime.utcnow()
+        mock.date_updated = datetime.utcnow()
+        mock.name = name
+        mock.scenario_payload = scenario_payload
+        mock.playback_capable = True
+        mock.parent_sim_instance_id = None
+        mock.branch_keyframe_seq = None
+        mock.drivers = []
+        mock.stations = []
+        mock.tasks = []
+        return SimInstanceResponse.model_validate(mock).model_dump()
+
+    def test_explicit_name_is_preserved(self) -> None:
+        """When a name is provided it should be used as-is."""
+        data = self._make_response(id=7, name="My Custom Sim")
+        assert data["name"] == "My Custom Sim"
+
+    def test_null_name_no_payload_falls_back_to_id(self) -> None:
+        """With NULL name and no scenario_payload, fall back to 'Simulation {id}'."""
+        data = self._make_response(id=42, name=None, scenario_payload=None)
+        assert data["name"] == "Simulation 42"
+
+    def test_empty_name_falls_back_to_id(self) -> None:
+        """An empty string name should trigger the fallback."""
+        data = self._make_response(id=5, name="", scenario_payload=None)
+        assert data["name"] == "Simulation 5"
+
+    def test_null_name_with_scenario_name_in_payload(self) -> None:
+        """When payload contains a 'name' key, derive sim name from it."""
+        payload = {"name": "Rush Hour", "start_time": "day1:06:00"}
+        data = self._make_response(id=10, name=None, scenario_payload=payload)
+        assert data["name"] == 'Simulation from "Rush Hour" scenario'
+
+    def test_null_name_with_whitespace_only_scenario_name(self) -> None:
+        """Whitespace-only scenario name should fall back to id-based name."""
+        payload = {"name": "   ", "start_time": "day1:06:00"}
+        data = self._make_response(id=11, name=None, scenario_payload=payload)
+        assert data["name"] == "Simulation 11"
+
+    def test_null_name_with_non_string_scenario_name(self) -> None:
+        """Non-string 'name' in scenario_payload should fall back to id."""
+        payload = {"name": 123, "start_time": "day1:06:00"}
+        data = self._make_response(id=12, name=None, scenario_payload=payload)
+        assert data["name"] == "Simulation 12"
+
+    def test_null_name_with_payload_missing_name_key(self) -> None:
+        """Payload without 'name' key should fall back to id-based name."""
+        payload = {"start_time": "day1:06:00", "end_time": "day1:12:00"}
+        data = self._make_response(id=13, name=None, scenario_payload=payload)
+        assert data["name"] == "Simulation 13"
+
+    def test_scenario_name_is_trimmed(self) -> None:
+        """Leading/trailing whitespace in scenario name should be trimmed."""
+        payload = {"name": "  Trimmed Name  "}
+        data = self._make_response(id=14, name=None, scenario_payload=payload)
+        assert data["name"] == 'Simulation from "Trimmed Name" scenario'
+
+    def test_name_not_serialized_in_output(self) -> None:
+        """scenario_payload should be excluded from JSON output."""
+        data = self._make_response(
+            id=15, name=None, scenario_payload={"name": "Excluded"}
+        )
+        assert "scenario_payload" not in data
+
+    def test_explicit_name_overrides_scenario_payload_name(self) -> None:
+        """An explicit name should win over scenario_payload derivation."""
+        payload = {"name": "Scenario Name"}
+        data = self._make_response(id=16, name="My Name", scenario_payload=payload)
+        assert data["name"] == "My Name"
+
+
+class TestInitializeSimulationName:
+    """Tests for the /initialize endpoint's name parameter handling."""
+
+    @patch("back.services.simulation_service.simulation_service.initialize_simulation")
+    def test_initialize_with_explicit_name(
+        self, mock_init: MagicMock, authenticated_client: TestClient
+    ) -> None:
+        """Name provided in request body should be forwarded to service."""
+        mock_init.return_value = SimulationResponse(
+            sim_id="sim-name-1", db_id=1, status="initialized"
+        )
+        payload = {**SCENARIO_PAYLOAD, "name": "My Named Sim"}
+        response = authenticated_client.post(
+            "/api/v1/simulation/initialize", json=payload
+        )
+        assert response.status_code == 200
+        mock_init.assert_called_once()
+        assert mock_init.call_args[1]["name"] == "My Named Sim"
+
+    @patch("back.services.simulation_service.simulation_service.initialize_simulation")
+    def test_initialize_without_name(
+        self, mock_init: MagicMock, authenticated_client: TestClient
+    ) -> None:
+        """Omitting name in request body should pass None to service."""
+        mock_init.return_value = SimulationResponse(
+            sim_id="sim-name-2", db_id=2, status="initialized"
+        )
+        response = authenticated_client.post(
+            "/api/v1/simulation/initialize", json=SCENARIO_PAYLOAD
+        )
+        assert response.status_code == 200
+        mock_init.assert_called_once()
+        assert mock_init.call_args[1]["name"] is None
+
+    @patch("back.services.simulation_service.simulation_service.initialize_simulation")
+    def test_initialize_with_scenario_id_defaults_name_from_scenario(
+        self, mock_init: MagicMock, authenticated_client: TestClient, db: Session
+    ) -> None:
+        """When using scenario_id, the sim name should default to the scenario name."""
+        from back.models.scenario import Scenario
+
+        scenario = Scenario(
+            name="Peak Hour Config",
+            content=SCENARIO_CONTENT,
+            user_id=1,
+        )
+        db.add(scenario)
+        db.commit()
+        db.refresh(scenario)
+
+        mock_init.return_value = SimulationResponse(
+            sim_id="sim-name-3", db_id=3, status="initialized"
+        )
+        response = authenticated_client.post(
+            f"/api/v1/simulation/initialize?scenario_id={scenario.id}"
+        )
+        assert response.status_code == 200
+        mock_init.assert_called_once()
+        assert mock_init.call_args[1]["name"] == "Peak Hour Config"
+
+    @patch("back.services.simulation_service.simulation_service.initialize_simulation")
+    def test_initialize_name_is_backwards_compatible(
+        self, mock_init: MagicMock, authenticated_client: TestClient
+    ) -> None:
+        """Existing callers that don't send 'name' should still work."""
+        mock_init.return_value = SimulationResponse(
+            sim_id="sim-compat", db_id=4, status="initialized"
+        )
+        # Original payload shape — no 'name' key
+        response = authenticated_client.post(
+            "/api/v1/simulation/initialize", json={"content": SCENARIO_CONTENT}
+        )
+        assert response.status_code == 200
+
+
+class TestSimulationListNameDisplay:
+    """Tests verifying that the simulation list always returns a non-null name."""
+
+    @patch(
+        "back.services.simulation_service.simulation_service.get_all_user_simulations"
+    )
+    def test_list_returns_explicit_name(
+        self, mock_list: MagicMock, authenticated_client: TestClient
+    ) -> None:
+        """Sims with an explicit name should return it in the list."""
+        sim = make_sim_instance(id=1)
+        sim.name = "Explicit Name"
+        mock_list.return_value = ([sim], 1)
+
+        response = authenticated_client.get("/api/v1/simulation/my")
+        assert response.status_code == 200
+        data = response.json()
+        assert data["simulations"][0]["name"] == "Explicit Name"
+
+    @patch(
+        "back.services.simulation_service.simulation_service.get_all_user_simulations"
+    )
+    def test_list_returns_fallback_name_when_null(
+        self, mock_list: MagicMock, authenticated_client: TestClient
+    ) -> None:
+        """Sims with NULL name should get a fallback 'Simulation {id}'."""
+        sim = make_sim_instance(id=99)
+        sim.name = None
+        sim.scenario_payload = None
+        mock_list.return_value = ([sim], 1)
+
+        response = authenticated_client.get("/api/v1/simulation/my")
+        assert response.status_code == 200
+        data = response.json()
+        assert data["simulations"][0]["name"] == "Simulation 99"
+
+    @patch(
+        "back.services.simulation_service.simulation_service.get_all_user_simulations"
+    )
+    def test_list_derives_name_from_scenario_payload(
+        self, mock_list: MagicMock, authenticated_client: TestClient
+    ) -> None:
+        """Sims with NULL name but a scenario_payload with 'name' key
+        should derive the sim name from the scenario name."""
+        sim = make_sim_instance(id=50)
+        sim.name = None
+        sim.scenario_payload = {"name": "Downtown Config", "start_time": "day1:06:00"}
+        mock_list.return_value = ([sim], 1)
+
+        response = authenticated_client.get("/api/v1/simulation/my")
+        assert response.status_code == 200
+        data = response.json()
+        assert data["simulations"][0]["name"] == (
+            'Simulation from "Downtown Config" scenario'
+        )
+
+    @patch(
+        "back.services.simulation_service.simulation_service.get_all_user_simulations"
+    )
+    def test_list_name_never_null(
+        self, mock_list: MagicMock, authenticated_client: TestClient
+    ) -> None:
+        """The 'name' field must never be null/None in the response."""
+        sim = make_sim_instance(id=77)
+        sim.name = None
+        sim.scenario_payload = None
+        mock_list.return_value = ([sim], 1)
+
+        response = authenticated_client.get("/api/v1/simulation/my")
+        assert response.status_code == 200
+        name = response.json()["simulations"][0]["name"]
+        assert name is not None
+        assert isinstance(name, str)
+        assert len(name) > 0

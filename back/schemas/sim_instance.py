@@ -24,7 +24,15 @@ SOFTWARE.
 
 from datetime import datetime
 from typing import Any, Dict, List, Optional
-from pydantic import UUID4, BaseModel, ConfigDict, Field, computed_field
+from pydantic import (
+    UUID4,
+    BaseModel,
+    ConfigDict,
+    Field,
+    computed_field,
+    field_validator,
+    model_validator,
+)
 
 
 class SimInstanceBase(BaseModel):
@@ -47,6 +55,7 @@ class SimInstanceResponse(SimInstanceBase):
 
     id: int
     name: Optional[str] = None
+    scenario_payload: Optional[Dict[str, Any]] = Field(default=None, exclude=True)
     playback_capable: bool = False
     parent_sim_instance_id: Optional[int] = None
     branch_keyframe_seq: Optional[int] = None
@@ -56,6 +65,32 @@ class SimInstanceResponse(SimInstanceBase):
     completed: bool = Field(default=False)
 
     model_config = ConfigDict(from_attributes=True)
+
+    @model_validator(mode="after")
+    def _ensure_name(self) -> "SimInstanceResponse":
+        """Ensure name is never empty by deriving from scenario_payload."""
+        if not self.name:
+            scenario_name = self._extract_scenario_name()
+            if scenario_name:
+                self.name = f'Simulation from "{scenario_name}" scenario'
+            else:
+                self.name = f"Simulation {self.id}"
+        return self
+
+    def _extract_scenario_name(self) -> Optional[str]:
+        """Extract the scenario name from the stored scenario_payload.
+
+        The scenario_payload is the raw scenario content dict (not the
+        Scenario model) so we look for a top-level 'name' key.  When a
+        simulation was created via scenario_id the payload mirrors
+        Scenario.content which may not contain a 'name' key – in that
+        case we return None.
+        """
+        if isinstance(self.scenario_payload, dict):
+            name = self.scenario_payload.get("name")
+            if isinstance(name, str) and name.strip():
+                return name.strip()
+        return None
 
     @computed_field  # type: ignore[prop-decorator]
     @property
@@ -122,7 +157,13 @@ class BranchResponse(BaseModel):
 
     sim_id: str  # UUID of the new simulation
     db_id: int  # Database ID of the new simulation
-    name: Optional[str]  # Name of the new simulation
+    name: Optional[str] = ""  # Name of the new simulation (never null in output)
     branched_from_sim_id: str  # Original simulation UUID
     branched_from_keyframe_seq: int  # The actual keyframe seq used for branching
     status: str  # "created" - sim not yet running
+
+    @field_validator("name", mode="before")
+    @classmethod
+    def _coerce_name(cls, v: Optional[str]) -> str:
+        """Coerce None to empty string so the API never returns null."""
+        return v or ""

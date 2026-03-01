@@ -146,6 +146,7 @@ class InitializeRequest(BaseModel):
     """Request schema for initializing simulation with scenario content."""
 
     content: Dict[str, Any]
+    name: str | None = None
 
 
 @router.post("/initialize", response_model=SimulationResponse)
@@ -183,8 +184,11 @@ async def initialize_simulation(
         scenario = None
         json_string = None
 
+        sim_name: str | None = None
+
         if initialize_request is not None:
             scenario = initialize_request.content
+            sim_name = initialize_request.name
             # Extract raw JSON string for line number tracking
             # Re-format the content with indentation to match user's editor view
             try:
@@ -196,6 +200,8 @@ async def initialize_simulation(
         else:
             db_scenario = db.query(Scenario).filter(Scenario.id == scenario_id).first()
             scenario = db_scenario.content  # type: ignore[union-attr]
+            # Use the scenario's name as the default sim name when not provided
+            sim_name = db_scenario.name  # type: ignore[union-attr]
 
         # Parse scenario into InputParameter with line tracking
         json_parser = JsonParseStrategy(scenario_json=scenario, json_string=json_string)
@@ -203,7 +209,11 @@ async def initialize_simulation(
 
         # Initialize simulation
         result = simulation_service.initialize_simulation(
-            db, requesting_user, scenario_params, scenario_payload=scenario
+            db,
+            requesting_user,
+            scenario_params,
+            scenario_payload=scenario,
+            name=sim_name,
         )
 
         # Store the start time for the total startup metric
