@@ -140,6 +140,7 @@ VALID_DRIVER_STATES = {
 }
 
 router = APIRouter(prefix="/simulation", tags=["simulation"])
+websocket_router = APIRouter(prefix="/simulation", tags=["simulation"])
 
 
 class InitializeRequest(BaseModel):
@@ -785,7 +786,7 @@ def reorder_driver_tasks(
         raise HTTPException(status_code=500, detail=str(err))
 
 
-@router.websocket("/stream/{sim_id}")
+@websocket_router.websocket("/stream/{sim_id}")
 async def websocket_simulation_stream(
     websocket: WebSocket,
     sim_id: str,

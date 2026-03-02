@@ -34,6 +34,7 @@ from back.core.telemetry import initialize_global_telemetry
 from back.middleware.metrics_middleware import MetricsMiddleware
 from back.core.config import settings
 from back.api.v1 import api_router
+from back.api.v1.simulation import websocket_router as simulation_ws_router
 from back.exception_handlers import (
     bad_request_error_handler,
     item_not_found_error_handler,
@@ -154,6 +155,7 @@ app.add_middleware(
 # bypassing nginx entirely.  See ansible/roles/nginx/templates/velosim.conf.j2.
 app.include_router(metrics_router, prefix="/api/v1")
 app.include_router(api_router, prefix="/api/v1", dependencies=[Depends(get_user_id)])
+app.include_router(simulation_ws_router, prefix="/api/v1")
 
 
 @app.get("/")
