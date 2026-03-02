@@ -28,9 +28,9 @@ from sim.entities.position import Position
 from sim.entities.road import Road
 from sim.map.routing_provider import RoutingProvider, RouteResult
 from shapely.geometry import LineString
-import logging
+from grafana_logging.logger import get_logger
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 if TYPE_CHECKING:
     from sim.map.route_controller import RouteController

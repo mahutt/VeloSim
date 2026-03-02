@@ -22,10 +22,9 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 """
 
-import logging
 import os
 from typing import Optional, Tuple
-
+from grafana_logging.logger import get_logger
 import requests
 
 from sim.osm.osrm_result import OSRMResult
@@ -41,7 +40,7 @@ Key design principles:
 - Keep implementation simple and stateless
 """
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 class OSRMConnection:

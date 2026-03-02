@@ -25,13 +25,13 @@ SOFTWARE.
 import os
 import sys
 import gdown
-import logging
 from pathlib import Path
 import pandas as pd
 from tqdm import tqdm
 from typing import Optional
+from grafana_logging.logger import get_logger
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 def download_dataset(file_id, local_path) -> bool:

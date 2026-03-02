@@ -53,7 +53,6 @@ Usage:
 import argparse
 import csv
 import json
-import logging
 import sys
 import traceback
 from pathlib import Path
@@ -75,12 +74,13 @@ from sim.entities.map_payload import MapPayload, TrafficConfig
 from sim.entities.position import Position
 from sim.entities.traffic_event_state import TrafficEventState
 from sim.map.map_controller import MapController
+from grafana_logging.logger import get_logger
 try:
     from sim.osm.traffic_state_store import traffic_state_store
 except ImportError:
     traffic_state_store = None
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 # ─── Helper Functions ────────────────────────────────────────────────────────
@@ -772,9 +772,9 @@ def main():
     args = parse_args()
 
     if args.verbose:
-        logging.basicConfig(level=logging.DEBUG, format="%(name)s: %(message)s")
+        logger.setLevel("DEBUG")
     else:
-        logging.basicConfig(level=logging.WARNING)
+        logger.setLevel("WARNING")
 
     print("=" * 70)
     print("VeloSim — Dynamic Traffic Demo (Two-Pass)")

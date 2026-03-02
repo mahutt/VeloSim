@@ -22,7 +22,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 """
 
-import logging
+from grafana_logging.logger import get_logger
 from typing import Dict, Generator, List, Optional, Set, TYPE_CHECKING
 
 import simpy
@@ -46,7 +46,7 @@ from sim.traffic.traffic_state_factory import TrafficStateFactory
 if TYPE_CHECKING:
     from sim.map.position_registry import PositionRegistry
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 # Hardcoded GPS sync delay in ticks between sim and routing provider updates
 GPS_SYNC_DELAY = 10
