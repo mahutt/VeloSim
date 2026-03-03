@@ -33,6 +33,8 @@ class SimulationReport:
         self.total_servicing_time = 0
         self.tasks_completed_per_shift: list[int] = []
         self.response_times: list[float] = []
+        self.vehicle_idle_time = 0
+        self.vehicle_active_time = 0
 
     def reset(self) -> None:
         """Reset all metrics to zero.
@@ -44,6 +46,8 @@ class SimulationReport:
         self.total_servicing_time = 0
         self.tasks_completed_per_shift = []
         self.response_times = []
+        self.vehicle_idle_time = 0
+        self.vehicle_active_time = 0
 
     def increment_driving_time(self) -> None:
         """
@@ -62,6 +66,24 @@ class SimulationReport:
             None
         """
         self.total_servicing_time += 1
+
+    def increment_vehicle_idle_time(self) -> None:
+        """
+        Increment the total vehicle idle time.
+
+        Returns:
+            None
+        """
+        self.vehicle_idle_time += 1
+
+    def increment_vehicle_active_time(self) -> None:
+        """
+        Increment the total vehicle active time.
+
+        Returns:
+            None
+        """
+        self.vehicle_active_time += 1
 
     def add_task_count_for_shift(self, task_count: int) -> None:
         """
@@ -110,13 +132,27 @@ class SimulationReport:
 
         return sum(self.tasks_completed_per_shift) / len(self.tasks_completed_per_shift)
 
+    def get_vehicle_utilization_ratio(self) -> float:
+        """
+        Computes the vehicle utilization ratio,
+        defined as the ratio of active time to idle.
+
+        Returns:
+            float: The vehicle utilization ratio.
+        """
+        if self.vehicle_idle_time == 0 and self.vehicle_active_time > 0:
+            return 1.0
+        elif self.vehicle_idle_time == 0 and self.vehicle_active_time == 0:
+            return 0.0
+        else:
+            return self.vehicle_active_time / self.vehicle_idle_time
+
     def get_average_service_time_for_tasks(self) -> float:
         """
         Retrieves the average service time for tasks.
         Returns:
             float: average service time for tasks.
         """
-
         if len(self.response_times) == 0:
             return 0.0
 

@@ -140,6 +140,7 @@ class SimulatorController:
             vehicle.env = self.sim_env
             if vehicle.get_driver() is None:
                 self.sim_env.hq.push_vehicle(vehicle)
+            self.sim_env.process(vehicle.run())
 
     def start(self, sim_time: int) -> None:
         """Start the simulation.
@@ -699,6 +700,9 @@ class SimulatorController:
         current_reporting = {
             "servicingToDrivingRatio": round(
                 self.sim_env.report.get_servicing_to_driving_ratio(), 4
+            ),
+            "vehicleUtilizationRatio": round(
+                self.sim_env.report.get_vehicle_utilization_ratio(), 4
             ),
             "averageTasksServicedPerShift": round(
                 self.sim_env.report.get_average_tasks_per_shift(), 4

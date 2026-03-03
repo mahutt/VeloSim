@@ -272,3 +272,81 @@ def test_add_task_count_for_shift_large_value() -> None:
     metrics.add_task_count_for_shift(1000)
 
     assert metrics.tasks_completed_per_shift == [1000]
+
+
+def test_increment_vehicle_idle_time() -> None:
+    """
+    increment_vehicle_idle_time should increase vehicle_idle_time.
+
+    Returns:
+        None
+    """
+    metrics = SimulationReport()
+
+    metrics.increment_vehicle_idle_time()
+    metrics.increment_vehicle_idle_time()
+
+    assert metrics.vehicle_idle_time == 2
+    assert metrics.vehicle_active_time == 0
+
+
+def test_increment_vehicle_active_time() -> None:
+    """
+    increment_vehicle_active_time should increase vehicle_active_time.
+
+    Returns:
+        None
+    """
+    metrics = SimulationReport()
+
+    metrics.increment_vehicle_active_time()
+    metrics.increment_vehicle_active_time()
+    metrics.increment_vehicle_active_time()
+
+    assert metrics.vehicle_active_time == 3
+    assert metrics.vehicle_idle_time == 0
+
+
+def test_get_vehicle_utilization_ratio_normal_case() -> None:
+    """
+    get_vehicle_utilization_ratio should return active / (active + idle).
+
+    Returns:
+        None
+    """
+    metrics = SimulationReport()
+
+    metrics.increment_vehicle_active_time()
+
+    metrics.increment_vehicle_idle_time()
+    metrics.increment_vehicle_idle_time()
+    metrics.increment_vehicle_idle_time()
+
+    assert metrics.get_vehicle_utilization_ratio() == pytest.approx(0.3333333333)
+
+
+def test_get_vehicle_utilization_ratio_zero_total_time() -> None:
+    """
+    get_vehicle_utilization_ratio should return 0.0 when total time is zero.
+
+    Returns:
+        None
+    """
+    metrics = SimulationReport()
+
+    assert metrics.get_vehicle_utilization_ratio() == 0.0
+
+
+def test_get_vehicle_utilization_ratio_all_active() -> None:
+    """
+    get_vehicle_utilization_ratio should return 1.0 when all time is active.
+
+    Returns:
+        None
+    """
+    metrics = SimulationReport()
+
+    metrics.increment_vehicle_active_time()
+    metrics.increment_vehicle_active_time()
+
+    assert metrics.get_vehicle_utilization_ratio() == 1.0
