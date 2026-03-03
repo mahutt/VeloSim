@@ -801,7 +801,7 @@ class SimulationService:
 
         return PlaybackSpeedResponse(
             simulation_id=sim_id,
-            playback_speed=float(driver.real_time_factor),
+            playback_speed=float(1 / driver.real_time_factor),
             status=status,
         )
 
