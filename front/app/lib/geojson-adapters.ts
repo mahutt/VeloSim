@@ -30,7 +30,6 @@ import type {
   Position,
   Headquarters,
   TrafficRange,
-  CongestionLevel,
 } from '~/types';
 
 export function adaptHeadquartersToGeoJSON(
@@ -111,9 +110,9 @@ function splitByTraffic(
   coords: Position[],
   globalOffset: number,
   trafficRanges: TrafficRange[],
-  segment: string
+  segmentLabel: string
 ): GeoJSON.Feature[] {
-  if (coords.length < 2) return [];
+  if (!coords || coords.length < 2) return [];
 
   const defaultColor = '#22c55e';
   const defaultOpacity = 0.9;
@@ -122,36 +121,47 @@ function splitByTraffic(
     return [
       {
         type: 'Feature',
-        properties: { segment, color: defaultColor, opacity: defaultOpacity },
+        properties: {
+          segmentLabel,
+          color: defaultColor,
+          opacity: defaultOpacity,
+        },
         geometry: { type: 'LineString', coordinates: coords },
       },
     ];
   }
 
   const len = coords.length;
-  const severity: number[] = new Array(len).fill(0);
 
-  const severityOf = (level: CongestionLevel): number => {
-    switch (level) {
-      case 'severe':
-        return 2;
-      case 'moderate':
-        return 1;
-      default:
-        return 0;
-    }
+  // Severity config – add new levels here without changing the algorithm
+  const severityConfig: Record<string, number> = {
+    moderate: 1,
+    severe: 2,
   };
 
+  // One diff array per severity level – O(1) per range
+  const diffs = new Map<number, number[]>();
   for (const range of trafficRanges) {
     const localStart = Math.max(range.startCoordinateIndex - globalOffset, 0);
     const localEnd = Math.min(range.endCoordinateIndex - globalOffset, len - 1);
     if (localStart >= len || localEnd < 0) continue;
 
-    const s = severityOf(range.congestionLevel);
-    for (let i = localStart; i <= localEnd; i++) {
-      if (s > severity[i]) {
-        severity[i] = s;
-      }
+    const s = severityConfig[range.congestionLevel] ?? 0;
+    if (s === 0) continue;
+
+    if (!diffs.has(s)) diffs.set(s, new Array(len + 1).fill(0));
+    const diff = diffs.get(s)!;
+    diff[localStart]++;
+    diff[localEnd + 1]--;
+  }
+
+  // Single prefix-sum pass resolves worst severity at each coordinate – O(n)
+  const severity: number[] = new Array(len).fill(0);
+  for (const [level, diff] of diffs) {
+    let count = 0;
+    for (let i = 0; i < len; i++) {
+      count += diff[i];
+      if (count > 0 && level > severity[i]) severity[i] = level;
     }
   }
 
@@ -170,7 +180,7 @@ function splitByTraffic(
         features.push({
           type: 'Feature',
           properties: {
-            segment,
+            segmentLabel,
             color: colors[runStart],
             opacity: opacities[runStart],
           },

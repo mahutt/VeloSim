@@ -330,7 +330,7 @@ test('updateRouteDisplay splits route at nextStopIndex', () => {
   const nextTaskCall = mockGeoJSONSource.setData.mock.calls[0][0];
   expect(nextTaskCall.type).toBe('FeatureCollection');
   expect(nextTaskCall.features).toHaveLength(1);
-  expect(nextTaskCall.features[0].properties.segment).toBe('next-task');
+  expect(nextTaskCall.features[0].properties.segmentLabel).toBe('next-task');
   const nextTaskCoords = nextTaskCall.features[0].geometry.coordinates;
   expect(nextTaskCoords[0][0]).toBeCloseTo(-73.5, 3);
   expect(nextTaskCoords[0][1]).toBeCloseTo(45.5, 3);
@@ -338,7 +338,9 @@ test('updateRouteDisplay splits route at nextStopIndex', () => {
   const futureTasksCall = mockGeoJSONSource.setData.mock.calls[1][0];
   expect(futureTasksCall.type).toBe('FeatureCollection');
   expect(futureTasksCall.features).toHaveLength(1);
-  expect(futureTasksCall.features[0].properties.segment).toBe('future-tasks');
+  expect(futureTasksCall.features[0].properties.segmentLabel).toBe(
+    'future-tasks'
+  );
   const futureTasksCoords = futureTasksCall.features[0].geometry.coordinates;
   const lastFuture = futureTasksCoords[futureTasksCoords.length - 1];
   expect(lastFuture[0]).toBeCloseTo(-73.8, 3);
@@ -367,7 +369,7 @@ test('updateRouteDisplay handles nextStopIndex at start (0)', () => {
 
   const nextTaskCall = mockGeoJSONSource.setData.mock.calls[0][0];
   expect(nextTaskCall.features).toHaveLength(1);
-  expect(nextTaskCall.features[0].properties.segment).toBe('next-task');
+  expect(nextTaskCall.features[0].properties.segmentLabel).toBe('next-task');
   const nextTaskCoords = nextTaskCall.features[0].geometry.coordinates;
   expect(nextTaskCoords.length).toBeGreaterThanOrEqual(2);
 
@@ -397,7 +399,7 @@ test('updateRouteDisplay handles nextStopIndex at end of route', () => {
 
   const nextTaskCall = mockGeoJSONSource.setData.mock.calls[0][0];
   expect(nextTaskCall.features).toHaveLength(1);
-  expect(nextTaskCall.features[0].properties.segment).toBe('next-task');
+  expect(nextTaskCall.features[0].properties.segmentLabel).toBe('next-task');
   const nextTaskCoords = nextTaskCall.features[0].geometry.coordinates;
   expect(nextTaskCoords.length).toBeGreaterThanOrEqual(2);
 

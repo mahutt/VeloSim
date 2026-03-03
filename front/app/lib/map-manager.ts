@@ -199,10 +199,7 @@ export default class MapManager {
       // Store route geometry if provided (sent in key frames or when route changes)
       // This is the raw OSRM linestring, not the interpolated points
       if (resource.route?.coordinates) {
-        this.routes.set(resource.id, {
-          coordinates: resource.route.coordinates,
-          nextStopIndex: resource.route.nextStopIndex,
-        });
+        this.routes.set(resource.id, resource.route);
       } else if (resource.route === null) {
         // Backend explicitly signals route completion - clear route data
         this.routes.delete(resource.id);
@@ -339,7 +336,8 @@ export default class MapManager {
           route.coordinates,
           position,
           route.nextStopIndex,
-          map
+          map,
+          route.trafficRanges
         );
       } else {
         updateRouteDisplay(null, [0, 0], 0, map);

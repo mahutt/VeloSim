@@ -133,10 +133,10 @@ describe('adaptRouteToGeoJSON', () => {
     );
 
     const nextTaskFeatures = result.nextTask.features.filter(
-      (f) => f.properties?.segment === 'next-task'
+      (f) => f.properties?.segmentLabel === 'next-task'
     );
     const futureTasksFeatures = result.futureTasks.features.filter(
-      (f) => f.properties?.segment === 'future-tasks'
+      (f) => f.properties?.segmentLabel === 'future-tasks'
     );
 
     expect(nextTaskFeatures).toHaveLength(1);
@@ -168,10 +168,10 @@ describe('adaptRouteToGeoJSON', () => {
     );
 
     const nextTaskFeatures = result.nextTask.features.filter(
-      (f) => f.properties?.segment === 'next-task'
+      (f) => f.properties?.segmentLabel === 'next-task'
     );
     const futureTasksFeatures = result.futureTasks.features.filter(
-      (f) => f.properties?.segment === 'future-tasks'
+      (f) => f.properties?.segmentLabel === 'future-tasks'
     );
 
     expect(nextTaskFeatures).toHaveLength(0);
@@ -368,8 +368,6 @@ describe('adaptHeadquartersToGeoJSON', () => {
     });
   });
 });
-
-
 
 describe('adaptStationsToGeoJSON — selection and hover', () => {
   const stations: Station[] = [
