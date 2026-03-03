@@ -401,11 +401,7 @@ class Route:
                     and triples[-1].congestion_level == level
                     and triples[-1].end_index >= abs_start
                 ):
-                    triples[-1] = TrafficTriple(
-                        triples[-1].start_index,
-                        max(triples[-1].end_index, abs_end),
-                        level,
-                    )
+                    triples[-1].end_index = max(triples[-1].end_index, abs_end)
                 else:
                     triples.append(TrafficTriple(abs_start, abs_end, level))
             coord_offset += geom_len - 1  # shared boundary point
