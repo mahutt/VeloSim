@@ -22,26 +22,22 @@
  * SOFTWARE.
  */
 
-export const FEATURE_FLAGS_KEY = 'velosim_feature_flags';
+import { Loader2 } from 'lucide-react';
+import { useSimulation } from '~/providers/simulation-provider';
 
-export type FeatureFlags = {
-  sidebar: boolean;
-  simulationScrubber: boolean;
-};
+export default function BufferOverlay() {
+  const { state } = useSimulation();
 
-export const DEFAULT_FLAGS: FeatureFlags = {
-  sidebar: true,
-  simulationScrubber: true,
-};
+  if (!state.isBuffering) return null;
 
-export function parseFlags(input: string | null): Partial<FeatureFlags> {
-  if (!input) return {};
-  try {
-    const parsed = JSON.parse(input);
-    return parsed && typeof parsed === 'object'
-      ? (parsed as Partial<FeatureFlags>)
-      : {};
-  } catch {
-    return {};
-  }
+  return (
+    <div className="absolute inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm">
+      <div className="flex flex-col items-center gap-4">
+        <Loader2
+          data-testid="buffer-loader"
+          className="h-12 w-12 animate-spin text-primary"
+        />
+      </div>
+    </div>
+  );
 }

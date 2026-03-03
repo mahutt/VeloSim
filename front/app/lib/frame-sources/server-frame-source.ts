@@ -106,10 +106,7 @@ export default class ServerFrameSource implements FrameSource {
         }
 
         // Parse payload if it's a string
-        let payload = message.payload;
-        if (typeof payload === 'string') {
-          payload = JSON.parse(payload);
-        }
+        const payload = message.payload as BackendPayload;
 
         // Assume this message is a frame
         // Resolve the isRunning promise
@@ -134,7 +131,7 @@ export default class ServerFrameSource implements FrameSource {
 
         // Handle regular frames (seq > 0)
         if (message.seq > 0) {
-          console.log('[WS] 🎞️  Frame', message.seq);
+          console.log('[WS] 🎞️  Frame', payload.clock.simSecondsPassed);
           try {
             this.onFrame(payload);
           } catch (error) {

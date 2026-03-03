@@ -22,26 +22,42 @@
  * SOFTWARE.
  */
 
-export const FEATURE_FLAGS_KEY = 'velosim_feature_flags';
+import { render, screen } from '@testing-library/react';
+import { makeReactiveSimulationState } from 'tests/test-helpers';
+import { vi, describe, it, expect, afterEach, type Mock } from 'vitest';
+import BufferOverlay from '~/components/simulation/buffer-overlay';
+import { useSimulation } from '~/providers/simulation-provider';
 
-export type FeatureFlags = {
-  sidebar: boolean;
-  simulationScrubber: boolean;
-};
+vi.mock('~/providers/simulation-provider', () => ({
+  useSimulation: vi.fn(),
+}));
 
-export const DEFAULT_FLAGS: FeatureFlags = {
-  sidebar: true,
-  simulationScrubber: true,
-};
+describe('BufferOverlay', () => {
+  afterEach(() => {
+    vi.clearAllMocks();
+  });
 
-export function parseFlags(input: string | null): Partial<FeatureFlags> {
-  if (!input) return {};
-  try {
-    const parsed = JSON.parse(input);
-    return parsed && typeof parsed === 'object'
-      ? (parsed as Partial<FeatureFlags>)
-      : {};
-  } catch {
-    return {};
-  }
-}
+  it('displays loader when sim is buffering', () => {
+    (useSimulation as Mock).mockReturnValue({
+      state: makeReactiveSimulationState({
+        isBuffering: true,
+      }),
+    });
+
+    render(<BufferOverlay />);
+
+    expect(screen.getByTestId('buffer-loader')).toBeInTheDocument();
+  });
+
+  it("displays nothing when sim isn't buffering", () => {
+    (useSimulation as Mock).mockReturnValue({
+      state: makeReactiveSimulationState({
+        isBuffering: false,
+      }),
+    });
+
+    render(<BufferOverlay />);
+
+    expect(screen.queryByTestId('buffer-loader')).not.toBeInTheDocument();
+  });
+});

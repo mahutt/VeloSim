@@ -85,6 +85,9 @@ export interface SimulationStateManagerInterface {
   getLoading: () => boolean;
   setLoading: (isLoading: boolean) => void;
 
+  getIsBuffering: () => boolean;
+  setIsBuffering: (isBuffering: boolean) => void;
+
   getBlockAssignments: () => boolean;
   setBlockAssignments: (block: boolean) => void;
 
@@ -154,6 +157,15 @@ export default class SimulationStateManager implements SimulationStateManagerInt
     this.updateReactiveState({ isLoading });
   }
 
+  public getIsBuffering() {
+    return this.reactiveState.isBuffering;
+  }
+
+  public setIsBuffering(isBuffering: boolean) {
+    if (this.reactiveState.isBuffering === isBuffering) return;
+    this.updateReactiveState({ isBuffering });
+  }
+
   public getBlockAssignments() {
     return this.reactiveState.blockAssignments;
   }
@@ -194,9 +206,9 @@ export default class SimulationStateManager implements SimulationStateManagerInt
     // If this station is in the selection, refresh selected items
     if (this.isSelectedById(SelectedItemType.Station, station.id)) {
       this.refreshSelectedItems();
-      this.recomputePartialAssignmentForStation(station.id);
     }
 
+    this.recomputePartialAssignmentForStation(station.id);
     this.setMapShouldRefresh(true);
   }
 

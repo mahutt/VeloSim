@@ -61,6 +61,7 @@ export default class SimulationEngine {
   private mode: SimulationMode;
   private serverFrameSource: ServerFrameSource;
   private localFrameSource: LocalFrameSource;
+  private pendingScrub: number | null;
 
   constructor(
     simulationId: string,
@@ -90,23 +91,19 @@ export default class SimulationEngine {
       },
       toast.error
     );
-    this.localFrameSource = new LocalFrameSource(
-      this.simulationId,
-      (frame) => {
-        this.handleFrame(frame);
-        if (
-          frame.clock.simSecondsPassed ===
-          this.state.getSimulationSecondsPassed()
-        ) {
-          // Reached live simulation point, switch to server mode
-          this.localFrameSource.setSpeed(0);
-          this.serverFrameSource.setSpeed(this.state.getNonZeroSpeed());
-          this.mode = SimulationMode.Server;
-          this.state.setBlockAssignments(false);
-        }
-      },
-      toast.error
-    );
+    this.localFrameSource = new LocalFrameSource(this.simulationId, (frame) => {
+      this.handleFrame(frame);
+      if (
+        frame.clock.simSecondsPassed === this.state.getSimulationSecondsPassed()
+      ) {
+        // Reached live simulation point, switch to server mode
+        this.localFrameSource.setSpeed(0);
+        this.serverFrameSource.setSpeed(this.state.getNonZeroSpeed());
+        this.mode = SimulationMode.Server;
+        this.state.setBlockAssignments(false);
+      }
+    });
+    this.pendingScrub = null;
 
     this.serverFrameSource.start().then(() => {
       this.state.setLoading(false);
@@ -374,24 +371,35 @@ export default class SimulationEngine {
     }
   }
 
-  public scrub(seconds: number): void {
-    //   // stop sources until scrub is committed
+  public async scrub(seconds: number): Promise<void> {
+    // stop sources until scrub is committed
     this.mode = SimulationMode.Scrubbing;
     this.state.setBlockAssignments(true);
     this.localFrameSource.setSpeed(0);
     this.serverFrameSource.setSpeed(0);
     this.state.setScrubSimulationSecond(seconds);
 
-    let targetFrame: BackendPayload | undefined;
-    if (seconds === this.state.getSimulationSecondsPassed()) {
-      targetFrame = this.localFrameSource.getMaxFrame();
-    } else {
-      targetFrame = this.localFrameSource.getFrame(seconds);
+    // If frame is stored locally, simply render it
+    if (this.localFrameSource.hasFrame(seconds)) {
+      // Despite the await, this is expected to resolve immediately
+      const targetFrame = await this.localFrameSource.getFrame(seconds);
+      this.handleFrame(targetFrame, false);
+      return;
     }
-    if (targetFrame) this.handleFrame(targetFrame, false);
+
+    this.state.setIsBuffering(true);
+    if (this.pendingScrub) clearTimeout(this.pendingScrub);
+    this.pendingScrub = window.setTimeout(async () => {
+      // If the user hasn't moved from the current scrub position in
+      // some time, assume they want us to fetch and render the frame
+      // at that position
+      const targetFrame = await this.localFrameSource.getFrame(seconds);
+      this.handleFrame(targetFrame, false);
+      this.state.setIsBuffering(false);
+    }, 1000);
   }
 
-  public commitScrub(seconds: number): void {
+  public async commitScrub(seconds: number): Promise<void> {
     // Implementation to commit the scrubbed time change
     // Commit scrub is practically always called from scrubbing state.
     // Under particular circumstances, the simulation provider is not
@@ -407,20 +415,28 @@ export default class SimulationEngine {
       this.state.setScrubSimulationSecond(seconds);
     }
 
-    const scrubToPast = seconds !== this.state.getSimulationSecondsPassed();
+    if (this.pendingScrub) clearTimeout(this.pendingScrub);
+    let frame: BackendPayload;
+    try {
+      frame = await this.localFrameSource.getFrame(seconds);
+    } catch {
+      const t = getRuntimeTranslationTable();
+      toast.error(t.map.scrubbing.fail);
+      this.state.setIsBuffering(false);
+      return;
+    }
+    this.handleFrame(frame, false);
+    this.state.setIsBuffering(false);
 
+    const scrubToPast = seconds !== this.state.getSimulationSecondsPassed();
     if (scrubToPast) {
       // Unpause local source to play from scrubbed position
-      const frame = this.localFrameSource.getFrame(seconds);
-      if (frame) this.handleFrame(frame, false);
       this.localFrameSource.setPosition(seconds);
       this.localFrameSource.setSpeed(this.getFrameSourceSpeed());
       this.mode = SimulationMode.Local;
       this.state.setBlockAssignments(true);
     } else {
       // Unpause server source to play from live position
-      const frame = this.localFrameSource.getMaxFrame();
-      if (frame) this.handleFrame(frame, false);
       this.serverFrameSource.setSpeed(this.getFrameSourceSpeed());
       this.mode = SimulationMode.Server;
       this.state.setBlockAssignments(false);

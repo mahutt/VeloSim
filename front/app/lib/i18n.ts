@@ -320,6 +320,9 @@ export const EN_TRANSLATIONS = {
           'Unassigned {{success}} of {{total}} tasks. {{failed}} failed.',
       },
     },
+    scrubbing: {
+      fail: 'Failed to fetch frames for the scrubbed time. Please try again.',
+    },
   },
   taskAssignmentBanner: {
     unassign: {
@@ -874,6 +877,9 @@ export const FR_TRANSLATIONS = {
         unassignedPartial:
           '{{success}} tâches désassignées sur {{total}}. {{failed}} en échec.',
       },
+    },
+    scrubbing: {
+      fail: 'Échec de la récupération des images pour l’heure sélectionnée. Veuillez réessayer.',
     },
   },
   taskAssignmentBanner: {

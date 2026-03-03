@@ -42,6 +42,7 @@ import useFeature from '~/hooks/use-feature';
 import usePreferences from '~/hooks/use-preferences';
 import { TaskAssignmentBanner } from '~/components/task/task-assignment-banner';
 import ReportingWidget from '~/components/simulation/reporting-widget';
+import BufferOverlay from '~/components/simulation/buffer-overlay';
 
 export function meta() {
   return [{ title: 'Simulation' }];
@@ -88,6 +89,7 @@ function SimulationContent() {
       )}
       {!isLoading && (
         <>
+          <BufferOverlay />
           <TaskAssignmentBanner />
           <div className="absolute top-12 left-4 z-10 w-72">
             <SelectedItemBar />
@@ -108,7 +110,7 @@ function SimulationContent() {
             <ReportingWidget />
           </div>
           {showScrubber && (
-            <div className="absolute bottom-10 left-1/2 -translate-x-1/2 w-2xl max-w-full px-2">
+            <div className="z-60 absolute bottom-10 left-1/2 -translate-x-1/2 w-2xl max-w-full px-2">
               <Scrubber />
             </div>
           )}

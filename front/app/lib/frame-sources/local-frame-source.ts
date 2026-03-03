@@ -23,34 +23,38 @@
  */
 
 import type { Speed } from '~/providers/simulation-provider';
-import type { BackendPayload } from '~/types';
+import type {
+  BackendPayload,
+  Driver,
+  Station,
+  StationTask,
+  Vehicle,
+} from '~/types';
 import type FrameSource from './frame-source';
+import SimulationService from '../simulation-service';
+import { SIMULATION_FRAMES_PER_KEY_FRAME } from '~/constants';
 
 export default class LocalFrameSource implements FrameSource {
   private simulationId: string;
   private onFrame: (frame: BackendPayload) => void;
-  private onError: (error: string) => void;
 
   private frames: Map<number, BackendPayload>;
   private maxFramePosition: number;
   private position: number;
   private intervalTimer: number | null;
   private speed: Speed;
+  private seekPromises: Map<number, Promise<void>>;
 
-  constructor(
-    simulationId: string,
-    onFrame: (frame: BackendPayload) => void,
-    onError: (error: string) => void
-  ) {
+  constructor(simulationId: string, onFrame: (frame: BackendPayload) => void) {
     this.simulationId = simulationId;
     this.onFrame = onFrame;
-    this.onError = onError;
 
     this.frames = new Map<number, BackendPayload>();
     this.maxFramePosition = 0;
     this.position = 0;
     this.intervalTimer = null;
     this.speed = 0;
+    this.seekPromises = new Map<number, Promise<void>>();
   }
 
   public saveFrame(frame: BackendPayload) {
@@ -61,12 +65,45 @@ export default class LocalFrameSource implements FrameSource {
     }
   }
 
-  public getFrame(position: number): BackendPayload | undefined {
-    return this.frames.get(position);
+  /**
+   *
+   * @param position the position (sim seconds passed) of the desired
+   * @returns a keyframe at the desired position
+   */
+  public async getFrame(position: number): Promise<BackendPayload> {
+    if (!this.frames.has(position)) {
+      await this.load(position);
+    }
+    const keyPosition = this.getMaxKeyframePosition(position);
+    const key = this.frames.get(keyPosition)!;
+    const diffs = Array.from(
+      { length: position - keyPosition },
+      (_, i) => keyPosition + i + 1
+    ).map((p) => this.frames.get(p)!);
+    return this.mergeFrames(key, diffs);
   }
 
-  public getMaxFrame(): BackendPayload | undefined {
-    return this.frames.get(this.maxFramePosition);
+  public async load(position: number): Promise<void> {
+    const keyPosition = this.getMaxKeyframePosition(position);
+    if (!this.seekPromises.has(keyPosition)) {
+      const seekPromise = SimulationService.seek(
+        this.simulationId,
+        keyPosition,
+        SIMULATION_FRAMES_PER_KEY_FRAME - 1
+      )
+        .then((frames) => {
+          frames.forEach((f) => this.saveFrame(f));
+        })
+        .finally(() => {
+          this.seekPromises.delete(keyPosition);
+        });
+      this.seekPromises.set(keyPosition, seekPromise);
+    }
+    return this.seekPromises.get(keyPosition);
+  }
+
+  public hasFrame(position: number): boolean {
+    return this.frames.has(position);
   }
 
   public setPosition(position: number) {
@@ -87,26 +124,59 @@ export default class LocalFrameSource implements FrameSource {
     );
   }
 
-  public emitFrame() {
+  public async emitFrame() {
     if (this.position > this.maxFramePosition) {
       this.setSpeed(0);
       return;
     }
 
-    const frame = this.frames.get(this.position);
-
-    if (!frame) {
-      console.warn(
-        `LocalFrameSource: No frame found at position ${this.position}`
-      );
-      this.setSpeed(0);
-      return;
+    const nextKeyFramePosition =
+      this.getMaxKeyframePosition(this.position) +
+      SIMULATION_FRAMES_PER_KEY_FRAME;
+    if (
+      nextKeyFramePosition < this.maxFramePosition &&
+      !this.frames.has(nextKeyFramePosition)
+    ) {
+      this.load(nextKeyFramePosition);
     }
 
-    console.log(
-      `LocalFrameSource: Emitting frame at position ${this.position}`
-    );
+    const frame = await this.getFrame(this.position);
+
     this.onFrame(frame);
     this.position += 1;
+  }
+
+  private getMaxKeyframePosition(limit?: number) {
+    if (limit === undefined || limit > this.maxFramePosition)
+      limit = this.maxFramePosition;
+    return limit - (limit % SIMULATION_FRAMES_PER_KEY_FRAME);
+  }
+
+  private mergeFrames(
+    key: BackendPayload,
+    diffs: BackendPayload[]
+  ): BackendPayload {
+    if (diffs.length === 0) return key;
+
+    const tasks = new Map<number, StationTask>();
+    const stations = new Map<number, Station>();
+    const drivers = new Map<number, Driver>();
+    const vehicles = new Map<number, Vehicle>();
+
+    for (const frame of [key, ...diffs]) {
+      frame.tasks.forEach((t) => tasks.set(t.id, t));
+      frame.stations.forEach((s) => stations.set(s.id, s));
+      frame.drivers.forEach((d) => drivers.set(d.id, d));
+      frame.vehicles.forEach((v) => vehicles.set(v.id, v));
+    }
+
+    const finalDiff = diffs[diffs.length - 1];
+    return {
+      ...finalDiff,
+      tasks: Array.from(tasks.values()),
+      stations: Array.from(stations.values()),
+      drivers: Array.from(drivers.values()),
+      vehicles: Array.from(vehicles.values()),
+    };
   }
 }

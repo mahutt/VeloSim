@@ -22,15 +22,36 @@
  * SOFTWARE.
  */
 
-import { makePayload } from 'tests/test-helpers';
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import {
+  makePayload,
+  makePayloadClock,
+  makeSeekFrame,
+  makeSeekResponse,
+} from 'tests/test-helpers';
+import {
+  describe,
+  it,
+  expect,
+  vi,
+  beforeEach,
+  afterEach,
+  type Mock,
+} from 'vitest';
+import api from '~/api';
 import LocalFrameSource from '~/lib/frame-sources/local-frame-source';
 import type { BackendPayload } from '~/types';
+
+vi.mock('~/api', () => {
+  return {
+    default: {
+      get: vi.fn(),
+    },
+  };
+});
 
 describe('LocalFrameSource', () => {
   let frameSource: LocalFrameSource;
   let mockOnFrame: ReturnType<typeof vi.fn>;
-  let mockOnError: ReturnType<typeof vi.fn>;
 
   const createMockFrame = (simSecondsPassed: number): BackendPayload =>
     makePayload({
@@ -46,8 +67,7 @@ describe('LocalFrameSource', () => {
 
   beforeEach(() => {
     mockOnFrame = vi.fn();
-    mockOnError = vi.fn();
-    frameSource = new LocalFrameSource('test-sim', mockOnFrame, mockOnError);
+    frameSource = new LocalFrameSource('test-sim', mockOnFrame);
     vi.useFakeTimers();
   });
 
@@ -57,24 +77,11 @@ describe('LocalFrameSource', () => {
   });
 
   describe('saveFrame', () => {
-    it('should NOT update maxFramePosition when saving a frame that is overriding an existing frame', () => {
-      const frame5 = createMockFrame(5);
-      const frame10 = createMockFrame(10);
-
-      frameSource.saveFrame(frame10);
-      frameSource.saveFrame(frame5);
-
-      expect(frameSource.getMaxFrame()).toBe(frame10);
-    });
-
-    it('should update maxFramePosition when saving a frame that is the most recent', () => {
-      const frame5 = createMockFrame(5);
-      const frame10 = createMockFrame(10);
-
-      frameSource.saveFrame(frame5);
-      frameSource.saveFrame(frame10);
-
-      expect(frameSource.getMaxFrame()).toBe(frame10);
+    it('should make the frame available via getFrame', async () => {
+      const frame0 = createMockFrame(0);
+      frameSource.saveFrame(frame0);
+      const fetchFrame0 = await frameSource.getFrame(0);
+      expect(fetchFrame0).toBe(frame0);
     });
   });
 
@@ -110,36 +117,90 @@ describe('LocalFrameSource', () => {
       frameSource.emitFrame();
       expect(mockOnFrame).not.toHaveBeenCalled();
     });
-    it("should not call onFrame if frame isn't stored", async () => {
-      const frame10 = createMockFrame(10);
-
-      frameSource.saveFrame(frame10);
-      frameSource.setPosition(5);
-      frameSource.emitFrame();
-
-      expect(mockOnFrame).not.toHaveBeenCalled();
-    });
     it('should call onFrame and increment position if frame is found', async () => {
-      const frame10 = createMockFrame(10);
+      const frame0 = createMockFrame(0);
+      const frame1 = createMockFrame(1);
+      const frame2 = createMockFrame(2);
+      const frame3 = createMockFrame(3);
+      const frame4 = createMockFrame(4);
+      const frame5 = createMockFrame(5);
 
-      frameSource.saveFrame(frame10);
-      frameSource.setPosition(10);
-      frameSource.emitFrame();
+      frameSource.saveFrame(frame0);
+      frameSource.saveFrame(frame1);
+      frameSource.saveFrame(frame2);
+      frameSource.saveFrame(frame3);
+      frameSource.saveFrame(frame4);
+      frameSource.saveFrame(frame5);
 
-      expect(mockOnFrame).toHaveBeenCalledWith(frame10);
+      frameSource.setPosition(5);
+      await frameSource.emitFrame();
+
+      expect(mockOnFrame).toHaveBeenCalled();
+    });
+    it("should fetch the next batch of frames if they exist but aren't locally stored", async () => {
+      (api.get as Mock).mockResolvedValueOnce({ data: makeSeekResponse() });
+      const frame0 = createMockFrame(0);
+
+      frameSource.saveFrame(frame0);
+
+      frameSource.setPosition(0);
+      frameSource['maxFramePosition'] = 30;
+      await frameSource.emitFrame();
+
+      expect(api.get).toHaveBeenCalled();
     });
   });
 
   describe('getFrame', () => {
-    it('should return the correct frame for a given position', () => {
+    it('should return the correct frame for a given position', async () => {
+      // Creating and saving frames 0-4 so that 5 can be fetched
+      const frame0 = createMockFrame(0);
+      const frame1 = createMockFrame(1);
+      const frame2 = createMockFrame(2);
+      const frame3 = createMockFrame(3);
+      const frame4 = createMockFrame(4);
       const frame5 = createMockFrame(5);
-      const frame10 = createMockFrame(10);
 
+      frameSource.saveFrame(frame0);
+      frameSource.saveFrame(frame1);
+      frameSource.saveFrame(frame2);
+      frameSource.saveFrame(frame3);
+      frameSource.saveFrame(frame4);
       frameSource.saveFrame(frame5);
-      frameSource.saveFrame(frame10);
 
-      expect(frameSource.getFrame(5)).toBe(frame5);
-      expect(frameSource.getFrame(10)).toBe(frame10);
+      expect((await frameSource.getFrame(5)).clock.simSecondsPassed).toBe(5);
+    });
+
+    it("should seek and return the correct frame for a given position when it isn't stored", async () => {
+      const frame0 = makePayload({
+        clock: makePayloadClock({ simSecondsPassed: 0 }),
+      });
+      const frame1 = makePayload({
+        clock: makePayloadClock({ simSecondsPassed: 1 }),
+      });
+      const seekResponse = makeSeekResponse({
+        frames: {
+          initial_frames: [
+            makeSeekFrame({ frame_data: frame0 }),
+            makeSeekFrame({ frame_data: frame1 }),
+          ],
+          future_frames: [],
+          has_more_frames: false,
+        },
+      });
+      (api.get as Mock).mockResolvedValueOnce({ data: seekResponse });
+      expect((await frameSource.getFrame(1)).clock.simSecondsPassed).toBe(1);
+    });
+  });
+
+  describe('hasFrame', () => {
+    it('returns true when the frame has previously been saved', async () => {
+      const frame5 = createMockFrame(5);
+      frameSource.saveFrame(frame5);
+      expect(frameSource.hasFrame(5)).toBe(true);
+    });
+    it('returns false when the frame has not previously been saved', async () => {
+      expect(frameSource.hasFrame(5)).toBe(false);
     });
   });
 });

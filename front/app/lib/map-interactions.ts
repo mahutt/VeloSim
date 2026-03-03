@@ -26,6 +26,7 @@ import type { Map as MapboxMap, MapMouseEvent } from 'mapbox-gl';
 import { isMapLayer, MapLayer } from './map-helpers';
 import { SelectedItemType } from '~/components/map/selected-item-bar';
 import type { Position } from '~/types';
+import type SimulationStateManager from './simulation-state-manager';
 
 // Entities may be represented by more than 1 layer (e.g., stations and their task counts)
 // So we use a function to map layers to entity types
@@ -376,6 +377,7 @@ export function setupBoxSelectHandlers(
  */
 export function setupStationDragHandlers(
   map: MapboxMap,
+  state: SimulationStateManager,
   onDrop: StationDragDropCallback,
   onHighlight: (stationId: number | null, clusterId: number | null) => void,
   getMultiSelectedStationIds: () => number[],
@@ -425,6 +427,9 @@ export function setupStationDragHandlers(
   }
 
   function onMouseDown(e: MapMouseEvent) {
+    // Don't start drag if assignments are blocked,
+    // since drag is only for assigning tasks to drivers
+    if (state.getBlockAssignments()) return;
     // Shift+drag and right-click+drag are reserved for box select
     if (e.originalEvent?.shiftKey) return;
     if (e.originalEvent?.button === 2) return;

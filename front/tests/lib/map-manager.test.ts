@@ -206,19 +206,19 @@ function getBoxSelectHandler() {
 function getStationDragHandler() {
   return mockSetupStationDragHandlers.mock.calls[
     mockSetupStationDragHandlers.mock.calls.length - 1
-  ][1];
+  ][2];
 }
 
 function getStationDragHoverHandler() {
   return mockSetupStationDragHandlers.mock.calls[
     mockSetupStationDragHandlers.mock.calls.length - 1
-  ][2];
+  ][3];
 }
 
 function getStationDragIdsGetter() {
   return mockSetupStationDragHandlers.mock.calls[
     mockSetupStationDragHandlers.mock.calls.length - 1
-  ][3];
+  ][4];
 }
 
 describe('MapManager', () => {

@@ -100,7 +100,7 @@ export const consoleErrorSpy = vi
 export const mockLocalFrameSource: Partial<LocalFrameSource> = {
   setSpeed: vi.fn(),
   getFrame: vi.fn(),
-  getMaxFrame: vi.fn(),
+  hasFrame: vi.fn(),
   setPosition: vi.fn(),
 };
 export const MockLocalFrameSource = vi
@@ -169,6 +169,9 @@ export const mockSimulationStateManager: Partial<SimulationStateManager> = {
 
   getLoading: vi.fn(),
   setLoading: vi.fn(),
+
+  getIsBuffering: vi.fn(),
+  setIsBuffering: vi.fn(),
 
   getBlockAssignments: vi.fn().mockReturnValue(false),
   setBlockAssignments: vi.fn(),
