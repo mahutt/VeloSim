@@ -59,6 +59,7 @@ class SimulatorController:
         map_controller: MapController | None = None,
         on_completed_callback: Optional[Callable[[str], None]] = None,
         sim_id: str = "",
+        initial_frame_counter: int = 0,
     ) -> None:
         self.sim_env = sim_env
 
@@ -82,7 +83,7 @@ class SimulatorController:
         self.keyframe_freq = keyframe_freq
         self.clock = Clock(sim_env)
         self.sim_behaviour = sim_behaviour
-        self.frame_counter: int = 0
+        self.frame_counter: int = initial_frame_counter
         self.start_time: int = input_parameters.get_start_time()
         self.on_completed_callback = on_completed_callback
         self.last_reporting: dict | None = None

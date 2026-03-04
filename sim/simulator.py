@@ -73,6 +73,7 @@ class Simulator:
         initial_running: bool = True,
         real_time_factor: float | None = None,
         on_completed_callback: Optional[Callable[[str], None]] = None,
+        initial_frame_counter: int = 0,
     ) -> str:
         """Initialize a simulation instance without starting the simulation loop.
 
@@ -122,6 +123,7 @@ class Simulator:
             strict=True,
             map_controller=map_controller,
             on_completed_callback=on_completed_callback,
+            initial_frame_counter=initial_frame_counter,
         )
 
         # Apply playback state for restored simulations

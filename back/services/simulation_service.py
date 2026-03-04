@@ -243,6 +243,9 @@ class SimulationService:
 
         sim = self.simulator
 
+        max_persisted_seq = sim_frame_crud.get_max_seq_number(db, db_sim.id)
+        initial_frame_counter = max_persisted_seq + 1
+
         frame_subscriber = FramePersistenceSubscriber(db_sim.id)
         frame_subscriber.start()
 
@@ -259,6 +262,7 @@ class SimulationService:
             initial_running=should_auto_resume,
             real_time_factor=real_time_factor,
             on_completed_callback=on_simulation_completed,
+            initial_frame_counter=initial_frame_counter,
         )
 
         self.active_simulations[restore_sim_id] = ActiveSimulationData(
@@ -928,7 +932,9 @@ class SimulationService:
                 ),
             )
 
-        # Get diff frames between keyframe and position (exclusive start)
+        # Get diff frames between keyframe and position (exclusive on both ends).
+        # These are the frames needed to reconstruct state up to (but not including)
+        # position. The frame at position itself belongs in future_frames.
         keyframe_time = keyframe.sim_seconds_elapsed
         diff_frames_to_position = sim_frame_crud.get_frames_in_range(
             db=db,
@@ -936,15 +942,23 @@ class SimulationService:
             start_time=keyframe_time,
             end_time=position,
             include_start=False,  # Don't include the keyframe again
+            include_end=False,  # Don't include the frame at position
         )
 
-        # Build initial_frames: keyframe first, then diffs in order
-        initial_frames = [SimFrameResponse.model_validate(keyframe)]
-        initial_frames.extend(
-            [SimFrameResponse.model_validate(f) for f in diff_frames_to_position]
-        )
+        # Build initial_frames: state reconstruction data strictly before position.
+        # If the keyframe is exactly at position it belongs in future_frames, so
+        # initial_frames is empty in that case.
+        if keyframe_time == position:
+            initial_frames = []
+        else:
+            initial_frames = [SimFrameResponse.model_validate(keyframe)]
+            initial_frames.extend(
+                [SimFrameResponse.model_validate(f) for f in diff_frames_to_position]
+            )
 
-        # Get future frames from position to position + window (inclusive start)
+        # Get future frames from position to position + window.
+        # Always include the frame at position so that future_frames[0] is
+        # consistently the frame the client seeked to.
         frame_window_end = position + frame_window_seconds
         logger.debug(
             f"sim_id={sim_id}, position={position}, window={frame_window_seconds}, "
@@ -957,7 +971,8 @@ class SimulationService:
             sim_instance_id=db_id,
             start_time=position,
             end_time=frame_window_end,
-            include_start=True,  # Include frames at exactly position
+            include_start=True,  # Always include the frame at exactly position
+            include_end=True,  # Include frame at exactly window_end
         )
         logger.debug(
             f"sim_id={sim_id}, Got {len(future_frames_list)} future frames "

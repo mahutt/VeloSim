@@ -548,6 +548,76 @@ class TestSimFrameCRUD:
 
         assert result == []
 
+    def test_get_frames_in_range_include_end_includes_frame_at_end_time(
+        self, mock_db: MagicMock
+    ) -> None:
+        """Test that include_end=True includes the frame at exactly end_time.
+
+        Regression: without include_end=True, a frame at exactly end_time
+        is excluded by the strict `< end_time` filter, creating a silent dead
+        zone where the frame appears in neither future_frames nor has_more_frames.
+        """
+        frame_at_end = SimFrame(
+            id=1,
+            sim_instance_id=100,
+            seq_number=7,
+            sim_seconds_elapsed=7.0,
+            frame_data={},
+            is_key=False,
+        )
+
+        mock_query_chain = (
+            mock_db.query.return_value.filter.return_value.filter.return_value
+        )
+        mock_query_chain.order_by.return_value.all.return_value = [frame_at_end]
+
+        result = sim_frame_crud.get_frames_in_range(
+            mock_db,
+            sim_instance_id=100,
+            start_time=2.0,
+            end_time=7.0,
+            include_start=True,
+            include_end=True,
+        )
+
+        assert len(result) == 1
+        assert result[0].sim_seconds_elapsed == 7.0
+
+    def test_get_frames_in_range_zero_width_with_include_end_returns_frame_at_boundary(
+        self, mock_db: MagicMock
+    ) -> None:
+        """Test zero-width range [t, t] with include_end=True returns frame at t.
+
+        Regression: seeking with frame_window_seconds=0 produced an empty range
+        [position, position) that excluded the frame at exactly position even
+        though it is the first frame the player needs.
+        """
+        frame_at_position = SimFrame(
+            id=1,
+            sim_instance_id=100,
+            seq_number=2,
+            sim_seconds_elapsed=2.0,
+            frame_data={},
+            is_key=False,
+        )
+
+        mock_query_chain = (
+            mock_db.query.return_value.filter.return_value.filter.return_value
+        )
+        mock_query_chain.order_by.return_value.all.return_value = [frame_at_position]
+
+        result = sim_frame_crud.get_frames_in_range(
+            mock_db,
+            sim_instance_id=100,
+            start_time=2.0,
+            end_time=2.0,  # zero-width range
+            include_start=True,
+            include_end=True,
+        )
+
+        assert len(result) == 1
+        assert result[0].sim_seconds_elapsed == 2.0
+
     def test_has_frames_after_returns_true_when_frames_exist(
         self, mock_db: MagicMock
     ) -> None:
@@ -679,3 +749,21 @@ class TestSimFrameCRUD:
 
         assert frames_copied == 0
         assert mock_db.commit.call_count == 1
+
+    def test_get_max_seq_number_returns_max(self, mock_db: MagicMock) -> None:
+        """Test get_max_seq_number returns the highest seq_number when frames exist."""
+        mock_db.query.return_value.filter.return_value.scalar.return_value = 49
+
+        result = sim_frame_crud.get_max_seq_number(mock_db, sim_instance_id=1)
+
+        assert result == 49
+
+    def test_get_max_seq_number_no_frames_returns_minus_one(
+        self, mock_db: MagicMock
+    ) -> None:
+        """Test get_max_seq_number returns -1 when no frames exist for the sim."""
+        mock_db.query.return_value.filter.return_value.scalar.return_value = None
+
+        result = sim_frame_crud.get_max_seq_number(mock_db, sim_instance_id=999)
+
+        assert result == -1

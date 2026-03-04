@@ -110,6 +110,7 @@ class SimFrameCRUD:
         start_time: float,
         end_time: float,
         include_start: bool = True,
+        include_end: bool = False,
     ) -> List[SimFrame]:
         """Get all frames within a time range, ordered by sim_seconds_elapsed.
 
@@ -118,17 +119,23 @@ class SimFrameCRUD:
             sim_instance_id: The simulation instance ID.
             start_time: Start of the time range (inclusive or exclusive based on
                 include_start).
-            end_time: End of the time range (exclusive).
+            end_time: End of the time range (exclusive by default; inclusive if
+                include_end is True).
             include_start: If True, include frames at exactly start_time. Default True.
+            include_end: If True, include frames at exactly end_time. Default False.
 
         Returns:
             List[SimFrame]: List of frames in the range, ordered by time.
-                Returns empty list if no frames match the criteria or if
-                start_time >= end_time.
+                Returns empty list if no frames match the criteria.
         """
+        end_condition = (
+            SimFrame.sim_seconds_elapsed <= end_time
+            if include_end
+            else SimFrame.sim_seconds_elapsed < end_time
+        )
         query = db.query(SimFrame).filter(
             SimFrame.sim_instance_id == sim_instance_id,
-            SimFrame.sim_seconds_elapsed < end_time,
+            end_condition,
         )
 
         if include_start:
@@ -242,6 +249,29 @@ class SimFrameCRUD:
             .order_by(SimFrame.seq_number)
             .all()
         )
+
+    def get_max_seq_number(self, db: Session, sim_instance_id: int) -> int:
+        """Return the highest seq_number persisted for a simulation instance.
+
+        Used by ``restore_simulation`` to offset the restored sim's
+        ``frame_counter`` so that new frames never share a seq_number with
+        historical frames.
+
+        Args:
+            db: Database session.
+            sim_instance_id: The simulation instance ID.
+
+        Returns:
+            int: The highest seq_number, or -1 if no frames exist yet.
+        """
+        from sqlalchemy import func as sa_func
+
+        result = (
+            db.query(sa_func.max(SimFrame.seq_number))
+            .filter(SimFrame.sim_instance_id == sim_instance_id)
+            .scalar()
+        )
+        return result if result is not None else -1
 
     def copy_frames_to_new_instance(
         self,

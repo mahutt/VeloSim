@@ -3780,6 +3780,165 @@ class TestSeekEndpoint:
             # Running simulation is never at live edge
             assert data["state"]["is_at_live_edge"] is False
 
+    @patch("back.services.simulation_service.sim_frame_crud")
+    @patch("back.services.simulation_service.sim_instance_crud")
+    @patch("back.services.simulation_service.user_crud")
+    def test_seek_zero_window_includes_frame_at_position(
+        self,
+        mock_user_crud: MagicMock,
+        mock_instance_crud: MagicMock,
+        mock_frame_crud: MagicMock,
+        authenticated_client: TestClient,
+    ) -> None:
+        """Regression: frame at exactly `position` must appear in future_frames
+        even when frame_window_seconds=0.
+
+        Before the fix, the future query used strict `< end_time`, so a zero-
+        width window [position, position) always returned an empty list despite
+        a frame existing at that exact timestamp.
+        """
+        from back.models.sim_frame import SimFrame
+        from back.models.sim_instance import SimInstance
+        from back.models.user import User
+        from datetime import datetime
+
+        mock_sim_instance = MagicMock(spec=SimInstance)
+        mock_sim_instance.id = 123
+        mock_sim_instance.user_id = 1
+
+        mock_user = MagicMock(spec=User)
+        mock_user.id = 1
+        mock_user.is_admin = False
+
+        mock_instance_crud.get_by_uuid.return_value = mock_sim_instance
+        mock_instance_crud.get.return_value = mock_sim_instance
+        mock_user_crud.get.return_value = mock_user
+
+        # Keyframe at t=0 — position will be 2.0
+        keyframe = SimFrame(
+            id=1,
+            sim_instance_id=123,
+            seq_number=0,
+            sim_seconds_elapsed=0.0,
+            frame_data={"state": "keyframe"},
+            is_key=True,
+            created_at=datetime.now(),
+        )
+        # Frame at exactly position=2.0
+        frame_at_position = SimFrame(
+            id=2,
+            sim_instance_id=123,
+            seq_number=2,
+            sim_seconds_elapsed=2.0,
+            frame_data={"diff": "at_position"},
+            is_key=False,
+            created_at=datetime.now(),
+        )
+
+        mock_frame_crud.get_keyframe_at_or_before.return_value = keyframe
+        mock_frame_crud.get_frames_in_range.side_effect = [
+            # diff frames: (0.0, 2.0) exclusive → only t=1.0 if it existed, here empty
+            [],
+            # future frames: [2.0, 2.0] inclusive (zero window) → frame at position
+            [frame_at_position],
+        ]
+        mock_frame_crud.has_frames_after.return_value = True
+
+        from back.services import simulation_service
+
+        simulation_service.active_simulations = {}
+
+        response = authenticated_client.get(
+            "/api/v1/simulation/test-sim-123/seek?position=2.0&frame_window_seconds=0"
+        )
+
+        assert response.status_code == 200
+        data = response.json()
+
+        # The frame at exactly position must be in future_frames
+        assert len(data["frames"]["future_frames"]) == 1
+        assert data["frames"]["future_frames"][0]["sim_seconds_elapsed"] == 2.0
+        assert data["frames"]["has_more_frames"] is True
+
+    @patch("back.services.simulation_service.sim_frame_crud")
+    @patch("back.services.simulation_service.sim_instance_crud")
+    @patch("back.services.simulation_service.user_crud")
+    def test_seek_includes_frame_at_window_end(
+        self,
+        mock_user_crud: MagicMock,
+        mock_instance_crud: MagicMock,
+        mock_frame_crud: MagicMock,
+        authenticated_client: TestClient,
+    ) -> None:
+        """Regression: frame at exactly `position + frame_window_seconds` must
+        appear in future_frames, not fall into the dead zone between future_frames
+        and has_more_frames.
+
+        Before the fix, a frame at `window_end` was excluded by `< window_end`
+        and also undetected by `has_more_frames` which used `> window_end`,
+        meaning the player never received or knew about that frame.
+        """
+        from back.models.sim_frame import SimFrame
+        from back.models.sim_instance import SimInstance
+        from back.models.user import User
+        from datetime import datetime
+
+        mock_sim_instance = MagicMock(spec=SimInstance)
+        mock_sim_instance.id = 123
+        mock_sim_instance.user_id = 1
+
+        mock_user = MagicMock(spec=User)
+        mock_user.id = 1
+        mock_user.is_admin = False
+
+        mock_instance_crud.get_by_uuid.return_value = mock_sim_instance
+        mock_instance_crud.get.return_value = mock_sim_instance
+        mock_user_crud.get.return_value = mock_user
+
+        keyframe = SimFrame(
+            id=1,
+            sim_instance_id=123,
+            seq_number=0,
+            sim_seconds_elapsed=0.0,
+            frame_data={"state": "keyframe"},
+            is_key=True,
+            created_at=datetime.now(),
+        )
+        # Frame at exactly window_end = position(2.0) + window(5.0) = 7.0
+        frame_at_window_end = SimFrame(
+            id=2,
+            sim_instance_id=123,
+            seq_number=7,
+            sim_seconds_elapsed=7.0,
+            frame_data={"diff": "at_window_end"},
+            is_key=False,
+            created_at=datetime.now(),
+        )
+
+        mock_frame_crud.get_keyframe_at_or_before.return_value = keyframe
+        mock_frame_crud.get_frames_in_range.side_effect = [
+            [],  # diff frames between keyframe and position
+            [frame_at_window_end],  # future frames [2.0, 7.0] inclusive
+        ]
+        mock_frame_crud.has_frames_after.return_value = False
+
+        from back.services import simulation_service
+
+        simulation_service.active_simulations = {}
+
+        response = authenticated_client.get(
+            "/api/v1/simulation/test-sim-123/seek?position=2.0&frame_window_seconds=5.0"
+        )
+
+        assert response.status_code == 200
+        data = response.json()
+
+        # Frame at exactly window_end must be in future_frames
+        assert len(data["frames"]["future_frames"]) == 1
+        assert data["frames"]["future_frames"][0]["sim_seconds_elapsed"] == 7.0
+        # No frames strictly after window_end → not at live edge
+        assert data["frames"]["has_more_frames"] is False
+
 
 class TestBranchEndpoint:
     """Tests for POST /simulation/{sim_id}/branch endpoint."""
