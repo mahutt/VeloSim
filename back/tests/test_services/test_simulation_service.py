@@ -228,6 +228,85 @@ class TestSimulationService:
         assert resp1.db_id in db_ids
         assert resp2.db_id in db_ids
 
+    def test_get_simulation_report_returns_full_persisted_report(
+        self,
+        mock_user_crud: Mock,
+        mock_sim_crud: Mock,
+        mock_db: Mock,
+        test_user: User,
+        simulation_service: SimulationService,
+    ) -> None:
+        """Service should return all persisted report metrics unchanged."""
+        mock_user_crud.get.return_value = test_user
+        mock_sim_crud.get_by_uuid.return_value = Mock(user_id=test_user.id)
+        with patch.object(
+            simulation_service.simulation_data_service,
+            "get_last_persisted_keyframe_by_id",
+            return_value={
+                "reporting": {
+                    "servicingToDrivingRatio": 1.25,
+                    "vehicleUtilizationRatio": 0.8,
+                    "averageTasksServicedPerShift": 3.0,
+                    "averageTaskResponseTime": 120.0,
+                }
+            },
+        ):
+            report = simulation_service.get_simulation_report(
+                mock_db, "sim-123", test_user.id
+            )
+
+        assert report == {
+            "servicingToDrivingRatio": 1.25,
+            "vehicleUtilizationRatio": 0.8,
+            "averageTasksServicedPerShift": 3.0,
+            "averageTaskResponseTime": 120.0,
+        }
+
+    def test_get_simulation_report_returns_nulls_for_missing_metrics(
+        self,
+        mock_user_crud: Mock,
+        mock_sim_crud: Mock,
+        mock_db: Mock,
+        test_user: User,
+        simulation_service: SimulationService,
+    ) -> None:
+        """Missing reporting payload should return nullable metrics."""
+        mock_user_crud.get.return_value = test_user
+        mock_sim_crud.get_by_uuid.return_value = Mock(user_id=test_user.id)
+        with patch.object(
+            simulation_service.simulation_data_service,
+            "get_last_persisted_keyframe_by_id",
+            return_value={},
+        ):
+            report = simulation_service.get_simulation_report(
+                mock_db, "sim-123", test_user.id
+            )
+
+        assert report == {
+            "servicingToDrivingRatio": None,
+            "vehicleUtilizationRatio": None,
+            "averageTasksServicedPerShift": None,
+            "averageTaskResponseTime": None,
+        }
+
+    def test_get_simulation_report_unauthorized(
+        self,
+        mock_user_crud: Mock,
+        mock_sim_crud: Mock,
+        mock_db: Mock,
+        test_user: User,
+        simulation_service: SimulationService,
+    ) -> None:
+        """Non-owner non-admin users cannot access simulation reports."""
+        mock_user_crud.get.return_value = test_user
+        mock_sim_crud.get_by_uuid.return_value = Mock(user_id=999)
+
+        with pytest.raises(
+            VelosimPermissionError,
+            match="Unauthorized to access this simulation report",
+        ):
+            simulation_service.get_simulation_report(mock_db, "sim-123", test_user.id)
+
     def test_get_all_active_simulations_admin(
         self,
         mock_user_crud: Mock,

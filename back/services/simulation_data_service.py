@@ -132,3 +132,33 @@ class SimulationDataService:
             raise ItemNotFoundError(f"No keyframe found for simulation {sim_id}")
 
         return cast(dict[str, Any], keyframe.frame_data)
+
+    def get_last_persisted_keyframe_by_id(
+        self,
+        db: Session,
+        sim_instance_id: int,
+    ) -> dict[str, Any]:
+        """
+        Retrieve the last persisted keyframe for a simulation instance ID.
+
+        Args:
+            db: Active database session.
+            sim_instance_id: Integer ID of the simulation instance.
+
+        Returns:
+            The last persisted keyframe frame data as a dictionary.
+
+        Raises:
+            ItemNotFoundError: If no keyframe exists for the simulation instance.
+        """
+        keyframe = sim_keyframe_crud.get_last_keyframe(
+            db,
+            sim_instance_id=sim_instance_id,
+        )
+
+        if not keyframe:
+            raise ItemNotFoundError(
+                f"No keyframe found for simulation instance {sim_instance_id}"
+            )
+
+        return cast(dict[str, Any], keyframe.frame_data)

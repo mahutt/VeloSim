@@ -824,6 +824,78 @@ class TestSimulationAPI:
 
         mock_get_speed.assert_called()
 
+    @patch("back.services.simulation_service.simulation_service.get_simulation_report")
+    def test_get_simulation_report_success(
+        self, mock_get_report: MagicMock, authenticated_client: TestClient, db: Session
+    ) -> None:
+        mock_get_report.return_value = {
+            "servicingToDrivingRatio": 1.2632,
+            "vehicleUtilizationRatio": 0.75,
+            "averageTasksServicedPerShift": 2.5,
+            "averageTaskResponseTime": 577.0,
+        }
+
+        response = authenticated_client.get("/api/v1/simulation/sim123/report")
+        assert response.status_code == 200
+        data = response.json()
+        assert data["servicingToDrivingRatio"] == 1.2632
+        assert data["vehicleUtilizationRatio"] == 0.75
+        assert data["averageTasksServicedPerShift"] == 2.5
+        assert data["averageTaskResponseTime"] == 577.0
+        mock_get_report.assert_called_once_with(
+            db=ANY, sim_id="sim123", requesting_user=1
+        )
+
+    @patch("back.services.simulation_service.simulation_service.get_simulation_report")
+    def test_get_simulation_report_not_found(
+        self, mock_get_report: MagicMock, authenticated_client: TestClient, db: Session
+    ) -> None:
+        mock_get_report.side_effect = ItemNotFoundError("Simulation not found")
+
+        response = authenticated_client.get("/api/v1/simulation/sim123/report")
+        assert response.status_code == 404
+        assert "Simulation not found" in response.json()["detail"]
+
+    @patch("back.services.simulation_service.simulation_service.get_simulation_report")
+    def test_get_simulation_report_missing_metrics_are_null(
+        self, mock_get_report: MagicMock, authenticated_client: TestClient, db: Session
+    ) -> None:
+        mock_get_report.return_value = {}
+
+        response = authenticated_client.get("/api/v1/simulation/sim123/report")
+        assert response.status_code == 200
+        data = response.json()
+        assert data["servicingToDrivingRatio"] is None
+        assert data["vehicleUtilizationRatio"] is None
+        assert data["averageTasksServicedPerShift"] is None
+        assert data["averageTaskResponseTime"] is None
+
+    @patch("back.services.simulation_service.simulation_service.get_simulation_report")
+    def test_get_simulation_report_permission_error(
+        self, mock_get_report: MagicMock, non_admin_client: TestClient, db: Session
+    ) -> None:
+        mock_get_report.side_effect = VelosimPermissionError(
+            "Unauthorized to access this simulation report"
+        )
+
+        response = non_admin_client.get("/api/v1/simulation/sim123/report")
+        assert response.status_code == 403
+        assert (
+            "Unauthorized to access this simulation report" in response.json()["detail"]
+        )
+
+    @patch("back.services.simulation_service.simulation_service.get_simulation_report")
+    def test_get_simulation_report_generic_error(
+        self,
+        mock_get_report: MagicMock,
+        authenticated_client: TestClient,
+        db: Session,
+    ) -> None:
+        mock_get_report.side_effect = Exception("Unexpected")
+
+        response = authenticated_client.get("/api/v1/simulation/sim123/report")
+        assert response.status_code == 500
+
     @patch("back.services.simulation_service.simulation_service.get_playback_speed")
     def test_get_playback_speed_not_found(
         self, mock_get_speed: MagicMock, authenticated_client: TestClient, db: Session

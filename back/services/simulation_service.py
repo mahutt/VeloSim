@@ -144,6 +144,25 @@ class SimulationService:
             raise VelosimPermissionError("Requesting user is disabled.")
         return user
 
+    def _get_authorized_sim_by_uuid(
+        self,
+        db: Session,
+        sim_id: str,
+        requesting_user: int,
+        unauthorized_message: str,
+    ) -> SimInstance:
+        """Fetch simulation by UUID and enforce owner/admin access."""
+        user = self._get_requesting_user(db, requesting_user)
+        db_sim = sim_instance_crud.get_by_uuid(db, sim_id)
+
+        if not db_sim:
+            raise ItemNotFoundError(f"Simulation {sim_id} not found")
+
+        if db_sim.user_id != user.id and not user.is_admin:
+            raise VelosimPermissionError(unauthorized_message)
+
+        return db_sim
+
     def verify_access(self, db: Session, sim_id: str, requesting_user: int) -> bool:
         """
         Return True if the requesting user has permission to access the simulation
@@ -217,15 +236,12 @@ class SimulationService:
             None
         """
 
-        user = self._get_requesting_user(db, requesting_user)
-
-        db_sim = sim_instance_crud.get_by_uuid(db, sim_id)
-
-        if not db_sim:
-            raise ItemNotFoundError(f"Simulation {sim_id} not found")
-
-        if db_sim.user_id != user.id and not user.is_admin:
-            raise VelosimPermissionError("Unauthorized to restore simulation")
+        db_sim = self._get_authorized_sim_by_uuid(
+            db=db,
+            sim_id=sim_id,
+            requesting_user=requesting_user,
+            unauthorized_message="Unauthorized to restore simulation",
+        )
 
         scenario = self.simulation_data_service.get_scenario(db, sim_id)
         keyframe = self.simulation_data_service.get_last_persisted_keyframe(db, sim_id)
@@ -597,6 +613,49 @@ class SimulationService:
             raise VelosimPermissionError("Unauthorized to access this simulation.")
 
         return str(sim_data["status"])
+
+    def get_simulation_report(
+        self, db: Session, sim_id: str, requesting_user: int
+    ) -> dict:
+        """Retrieve report metrics for a simulation.
+
+        Uses the latest persisted keyframe reporting payload.
+
+        Args:
+            db: Database session.
+            sim_id: Simulation UUID.
+            requesting_user: user ID.
+
+        Returns:
+            dict: Reporting metrics with all expected keys present.
+
+        Raises:
+            ItemNotFoundError: If the simulation does not exist.
+            VelosimPermissionError: If the user is not allowed to access it.
+        """
+        db_sim = self._get_authorized_sim_by_uuid(
+            db=db,
+            sim_id=sim_id,
+            requesting_user=requesting_user,
+            unauthorized_message="Unauthorized to access this simulation report",
+        )
+
+        default_report = {
+            "servicingToDrivingRatio": None,
+            "vehicleUtilizationRatio": None,
+            "averageTasksServicedPerShift": None,
+            "averageTaskResponseTime": None,
+        }
+
+        try:
+            keyframe = self.simulation_data_service.get_last_persisted_keyframe_by_id(
+                db, sim_instance_id=db_sim.id
+            )
+        except ItemNotFoundError:
+            return default_report
+
+        report = keyframe.get("reporting", default_report)
+        return {**default_report, **report}
 
     def _stop_all_simulations_core(self, db: Session) -> None:
         """
