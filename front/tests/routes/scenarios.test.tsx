@@ -103,6 +103,11 @@ describe('ScenarioEditor', () => {
     vi.clearAllMocks();
     mockDisplayError.mockClear();
 
+    vi.mocked(api.get).mockReset();
+    vi.mocked(api.post).mockReset();
+    vi.mocked(api.put).mockReset();
+    vi.mocked(api.delete).mockReset();
+
     // Mock API response for scenarios
     vi.mocked(api.get).mockResolvedValue({
       data: {
@@ -508,6 +513,9 @@ describe('ScenarioEditor', () => {
     });
 
     // Add valid scenario content
+    const nameInput = screen.getByPlaceholderText('Scenario name');
+    fireEvent.change(nameInput, { target: { value: 'Simulation Test' } });
+
     const textarea = screen.getByPlaceholderText(
       'Paste or type your JSON scenario here...'
     );
@@ -517,8 +525,13 @@ describe('ScenarioEditor', () => {
     });
     fireEvent.change(textarea, { target: { value: validScenario } });
 
-    const startButton = screen.getByText('Start Simulation');
-    fireEvent.click(startButton);
+    fireEvent.click(screen.getByText('Start Simulation'));
+
+    await waitFor(() => {
+      expect(screen.getByText('Name your simulation')).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByTestId('start-simulation-button'));
 
     // Wait for navigation
     await waitFor(
@@ -554,6 +567,9 @@ describe('ScenarioEditor', () => {
     });
 
     // Valid JSON to reach API call
+    const nameInput = screen.getByPlaceholderText('Scenario name');
+    fireEvent.change(nameInput, { target: { value: 'Structured Error Test' } });
+
     const textarea = screen.getByPlaceholderText(
       'Paste or type your JSON scenario here...'
     );
@@ -562,6 +578,12 @@ describe('ScenarioEditor', () => {
     });
 
     fireEvent.click(screen.getByText('Start Simulation'));
+
+    await waitFor(() => {
+      expect(screen.getByText('Name your simulation')).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByTestId('start-simulation-button'));
 
     await waitFor(() => {
       expect(mockDisplayError).toHaveBeenCalledWith(
@@ -591,6 +613,9 @@ describe('ScenarioEditor', () => {
       expect(screen.getByText('Start Simulation')).toBeInTheDocument();
     });
 
+    const nameInput = screen.getByPlaceholderText('Scenario name');
+    fireEvent.change(nameInput, { target: { value: 'Test' } });
+
     const textarea = screen.getByPlaceholderText(
       'Paste or type your JSON scenario here...'
     );
@@ -599,6 +624,12 @@ describe('ScenarioEditor', () => {
     });
 
     fireEvent.click(screen.getByText('Start Simulation'));
+
+    await waitFor(() => {
+      expect(screen.getByText('Name your simulation')).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByTestId('start-simulation-button'));
 
     await waitFor(() => {
       expect(mockDisplayError).toHaveBeenCalledWith(
@@ -621,6 +652,11 @@ describe('ScenarioEditor', () => {
       expect(screen.getByText('Start Simulation')).toBeInTheDocument();
     });
 
+    const scenarioNameInput = screen.getByPlaceholderText('Scenario name');
+    fireEvent.change(scenarioNameInput, {
+      target: { value: 'Test Scenario' },
+    });
+
     const textarea = screen.getByPlaceholderText(
       'Paste or type your JSON scenario here...'
     );
@@ -629,6 +665,12 @@ describe('ScenarioEditor', () => {
     });
 
     fireEvent.click(screen.getByText('Start Simulation'));
+
+    await waitFor(() => {
+      expect(screen.getByText('Name your simulation')).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByTestId('start-simulation-button'));
 
     await waitFor(() => {
       expect(mockDisplayError).toHaveBeenCalledWith(
