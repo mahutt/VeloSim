@@ -38,9 +38,15 @@ from back.api.v1.simulation import websocket_router as simulation_ws_router
 from back.exception_handlers import (
     bad_request_error_handler,
     item_not_found_error_handler,
+    unexpected_error_handler,
     velosim_permission_error_handler,
 )
-from back.exceptions import BadRequestError, ItemNotFoundError, VelosimPermissionError
+from back.exceptions import (
+    BadRequestError,
+    ItemNotFoundError,
+    UnexpectedError,
+    VelosimPermissionError,
+)
 from back.api.v1.metrics import router as metrics_router
 from back.services.simulation_service import simulation_service
 from back.auth import Token, authenticate_user
@@ -95,6 +101,7 @@ app.add_middleware(MetricsMiddleware)
 app.add_exception_handler(BadRequestError, bad_request_error_handler)
 app.add_exception_handler(ItemNotFoundError, item_not_found_error_handler)
 app.add_exception_handler(VelosimPermissionError, velosim_permission_error_handler)
+app.add_exception_handler(UnexpectedError, unexpected_error_handler)
 
 
 @app.post("/api/token")

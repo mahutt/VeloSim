@@ -30,6 +30,23 @@ from fastapi.responses import JSONResponse
 logger = logging.getLogger(__name__)
 
 
+async def unexpected_error_handler(request: Request, exc: Exception) -> JSONResponse:
+    """Handle UnexpectedError exceptions with a consistent HTTP 500 response.
+
+    Args:
+        request: The incoming HTTP request that triggered the exception.
+        exc: The UnexpectedError exception instance.
+
+    Returns:
+        JSONResponse with HTTP 500 status code and a generic error detail.
+    """
+    logger.error("UnexpectedError at %s: %s", request.url.path, str(exc))
+    return JSONResponse(
+        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+        content={"detail": "An unexpected error occurred."},
+    )
+
+
 async def bad_request_error_handler(request: Request, exc: Exception) -> JSONResponse:
     """Handle BadRequestError exceptions with a consistent HTTP 400 response.
 

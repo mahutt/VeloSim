@@ -230,15 +230,30 @@ def find_source_files(repo_root: Path) -> List[Path]:
 
     return sorted(source_files)
 
-def main():
+def main() -> None:
     """Main function to validate license headers."""
     repo_root = Path(__file__).parent.parent
 
-    print("Validating MIT license headers in source files...")
-    print(f"Repository root: {repo_root}")
-
-    source_files = find_source_files(repo_root)
-    print(f"Found {len(source_files)} source files to check")
+    # If filenames are passed as arguments (e.g. from pre-commit), only check those.
+    # Otherwise fall back to scanning the whole repo (e.g. CI full check).
+    if len(sys.argv) > 1:
+        source_files = []
+        for arg in sys.argv[1:]:
+            p = Path(arg)
+            if not p.is_absolute():
+                p = repo_root / p
+            if p.is_file() and p.suffix.lower() in FILE_EXTENSIONS and not should_exclude_path(p, repo_root):
+                source_files.append(p)
+        if not source_files:
+            sys.exit(0)
+        print("Validating MIT license headers in source files...")
+        print(f"Repository root: {repo_root}")
+        print(f"Found {len(source_files)} source files to check")
+    else:
+        print("Validating MIT license headers in source files...")
+        print(f"Repository root: {repo_root}")
+        source_files = find_source_files(repo_root)
+        print(f"Found {len(source_files)} source files to check")
 
     missing_headers = []
 

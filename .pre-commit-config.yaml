@@ -80,10 +80,10 @@ repos:
     hooks:
       - id: validate-license-headers
         name: MIT License Header Validation
-        entry: bash -c 'if [ -f .venv/bin/python ]; then .venv/bin/python scripts/validate_license_headers.py; elif [ -f .venv/Scripts/python.exe ]; then .venv/Scripts/python.exe scripts/validate_license_headers.py; else python scripts/validate_license_headers.py; fi'
+        entry: bash -c 'if [ -f .venv/bin/python ]; then .venv/bin/python scripts/validate_license_headers.py "$@"; elif [ -f .venv/Scripts/python.exe ]; then .venv/Scripts/python.exe scripts/validate_license_headers.py "$@"; else python scripts/validate_license_headers.py "$@"; fi' --
         language: system
         files: \.(py|js|jsx|ts|tsx)$
-        pass_filenames: false
+        pass_filenames: true
 
       - id: validate-dependency-licenses
         name: Dependency License Compatibility Validation
