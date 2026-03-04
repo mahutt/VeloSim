@@ -216,7 +216,7 @@ export interface ScenarioContentDriver {
 export interface Simulation {
   id: number;
   uuid: string;
-  name: string | null;
+  name: string;
   user_id: number;
   completed: boolean;
   date_created: string;

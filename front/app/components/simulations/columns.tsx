@@ -35,14 +35,6 @@ export const columns: ColumnDef<Simulation>[] = [
   {
     accessorKey: 'name',
     header: 'Name',
-    cell: ({ row }) => {
-      const name = row.original.name;
-      return (
-        <div className={name ? '' : 'text-muted-foreground'}>
-          {name ?? 'N/A'}
-        </div>
-      );
-    },
   },
   {
     accessorKey: 'date_created',
