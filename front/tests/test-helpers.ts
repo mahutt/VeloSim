@@ -42,6 +42,7 @@ import {
   type Driver,
   type Headquarters,
   type PendingAssignment,
+  type Simulation,
   type Station,
   type StationTask,
   type Vehicle,
@@ -241,5 +242,23 @@ export function makeHeadquarters(
 ): Headquarters {
   return {
     position: overrides.position ?? [0, 0],
+  };
+}
+
+export function makeSimulation(
+  overrides: Partial<Simulation> = {}
+): Simulation {
+  const id = overrides.id ?? Math.floor(Math.random() * 10000);
+  return {
+    id: id,
+    uuid: overrides.uuid ?? 'uuid',
+    name: overrides.name ?? 'Simulation',
+    user_id: overrides.user_id ?? 3,
+    completed: overrides.completed ?? false,
+    date_created: overrides.date_created ?? '2024-02-02T12:00:00Z',
+    date_updated: overrides.date_updated ?? '2024-02-02T12:00:00Z',
+    resource_count: overrides.resource_count ?? 99,
+    station_count: overrides.station_count ?? 99,
+    task_count: overrides.task_count ?? 99,
   };
 }

@@ -24,7 +24,10 @@
 
 import { expect, test, vi, beforeEach, it, describe } from 'vitest';
 import { render, screen } from '@testing-library/react';
-import Simulation, { meta, getContainerWidth } from '~/routes/simulation';
+import Simulation, {
+  meta,
+  getContainerWidth,
+} from '~/routes/simulations/simulation';
 import { createRoutesStub } from 'react-router';
 import type { MapContextType } from '~/providers/map-provider';
 
@@ -106,12 +109,12 @@ test('meta function sets all fields', () => {
 test('simulation page loads the map container', async () => {
   const Stub = createRoutesStub([
     {
-      path: '/simulation/:sim_id',
+      path: '/simulations/:sim_id',
       Component: Simulation,
     },
   ]);
 
-  render(<Stub initialEntries={['/simulation/sim-id']} />);
+  render(<Stub initialEntries={['/simulations/sim-id']} />);
   expect(screen.getByTestId('map-container')).toBeInTheDocument();
 });
 
@@ -120,12 +123,12 @@ test('simulation page simulation provider and simulation UI elements when map is
   mockUseMap.mapRef.current = {} as unknown as mapboxgl.Map;
   const Stub = createRoutesStub([
     {
-      path: '/simulation/:sim_id',
+      path: '/simulations/:sim_id',
       Component: Simulation,
     },
   ]);
 
-  render(<Stub initialEntries={['/simulation/sim-id']} />);
+  render(<Stub initialEntries={['/simulations/sim-id']} />);
   expect(screen.getByText('Resource Bar')).toBeInTheDocument();
   expect(screen.getByText('Playback Controls')).toBeInTheDocument();
   expect(screen.getByText('Selected Item Bar')).toBeInTheDocument();
@@ -137,12 +140,12 @@ test('simulation page renders loader while simulation engine is loading', async 
   mockUseSimulation.state.isLoading = true;
   const Stub = createRoutesStub([
     {
-      path: '/simulation/:sim_id',
+      path: '/simulations/:sim_id',
       Component: Simulation,
     },
   ]);
 
-  render(<Stub initialEntries={['/simulation/sim-id']} />);
+  render(<Stub initialEntries={['/simulations/sim-id']} />);
   // assert NO UI elements are shown while loading
   expect(screen.queryByText('Resource Bar')).not.toBeInTheDocument();
   expect(screen.queryByText('Playback Controls')).not.toBeInTheDocument();
@@ -154,12 +157,12 @@ test('simulation page renders loader while simulation engine is loading', async 
 test('simulation page renders nothing if sim_id is missing', async () => {
   const Stub = createRoutesStub([
     {
-      path: '/simulation',
+      path: '/simulations',
       Component: Simulation,
     },
   ]);
 
-  render(<Stub initialEntries={['/simulation']} />);
+  render(<Stub initialEntries={['/simulations']} />);
   expect(screen.queryByText('Resource Bar')).not.toBeInTheDocument();
   expect(screen.queryByText('Playback Controls')).not.toBeInTheDocument();
   expect(screen.queryByText('Selected Item Bar')).not.toBeInTheDocument();

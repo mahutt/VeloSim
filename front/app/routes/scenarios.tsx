@@ -346,7 +346,7 @@ export default function ScenarioEditor() {
         requestBody
       );
 
-      navigate(`/simulation/${response.data.sim_id}`);
+      navigate(`/simulations/${response.data.sim_id}`);
     } catch (error: unknown) {
       console.error('Error starting simulation:', error);
       displayError('Initialization Failed', formatBackendError(error));

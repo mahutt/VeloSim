@@ -536,7 +536,7 @@ describe('ScenarioEditor', () => {
     // Wait for navigation
     await waitFor(
       () => {
-        expect(mockNavigate).toHaveBeenCalledWith('/simulation/test-sim-123');
+        expect(mockNavigate).toHaveBeenCalledWith('/simulations/test-sim-123');
       },
       { timeout: 3000 }
     );

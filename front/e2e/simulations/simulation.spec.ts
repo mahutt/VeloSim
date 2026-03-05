@@ -58,7 +58,7 @@ async function waitForCanvasChange(
 
 test.describe('Simulation Page', () => {
   test.beforeEach(async ({ authenticatedPage }) => {
-    await authenticatedPage.goto('/simulation');
+    await authenticatedPage.goto('/simulations');
   });
 
   test('AT-1.1: should render map on simulation page launch', async ({
@@ -142,7 +142,7 @@ test.describe('Simulation Page', () => {
       route.abort('failed')
     );
 
-    await authenticatedPage.goto('/simulation');
+    await authenticatedPage.goto('/simulations');
 
     const dialog = authenticatedPage.locator('[data-testid="error-dialog"]');
     await expect(dialog).toBeVisible({ timeout: 10000 });
@@ -173,7 +173,7 @@ test.describe('Simulation Page', () => {
       route.abort('failed')
     );
 
-    await authenticatedPage.goto('/simulation');
+    await authenticatedPage.goto('/simulations');
 
     const canvas = authenticatedPage.locator('canvas').first();
     await expect(canvas).toBeVisible({ timeout: 10000 });

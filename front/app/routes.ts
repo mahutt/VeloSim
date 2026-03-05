@@ -26,14 +26,17 @@ import {
   type RouteConfig,
   index,
   layout,
+  prefix,
   route,
 } from '@react-router/dev/routes';
 
 export default [
   layout('./layouts/authenticated.tsx', [
     index('routes/scenarios.tsx'),
-    route('simulation/:sim_id', 'routes/simulation.tsx'),
-    route('simulations', 'routes/simulations.tsx'),
+    ...prefix('simulations', [
+      index('routes/simulations/index.tsx'),
+      route(':sim_id', 'routes/simulations/simulation.tsx'),
+    ]),
 
     // Admin pages
     route('users', 'routes/users.tsx'),
