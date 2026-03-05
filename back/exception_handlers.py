@@ -22,12 +22,11 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 """
 
-import logging
-
 from fastapi import Request, status
 from fastapi.responses import JSONResponse
+from grafana_logging.logger import get_logger
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 async def unexpected_error_handler(request: Request, exc: Exception) -> JSONResponse:

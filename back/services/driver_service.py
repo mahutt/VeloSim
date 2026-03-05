@@ -25,7 +25,7 @@ SOFTWARE.
 from back.exceptions.item_not_found_error import ItemNotFoundError
 from back.exceptions.velosim_permission_error import VelosimPermissionError
 from back.services.simulation_service import simulation_service
-import logging
+from grafana_logging.logger import get_logger
 
 from back.schemas import (
     DriverTaskAssignRequest,
@@ -42,7 +42,7 @@ from back.schemas import (
 )
 from sqlalchemy.orm import Session
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 class DriverService:
