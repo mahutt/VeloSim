@@ -45,6 +45,7 @@ import { useScenarioOperations } from '~/hooks/use-scenario-operations';
 import useError from '~/hooks/use-error';
 import api from '~/api';
 import { log, LogLevel } from '~/lib/logger';
+import SimulationNameDialog from '~/components/scenario/simulation-name-dialog';
 
 export default function ScenarioEditor() {
   // Refs
@@ -67,6 +68,9 @@ export default function ScenarioEditor() {
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [initialContent, setInitialContent] = useState('');
   const [showUnsavedDialog, setShowUnsavedDialog] = useState(false);
+  const [showSimulationNameDialog, setShowSimulationNameDialog] =
+    useState(false);
+  const [startingSimulation, setStartingSimulation] = useState(false);
   const [pendingScenario, setPendingScenario] = useState<Scenario | null>(null);
   const [pendingNewScenario, setPendingNewScenario] = useState(false);
   const [pendingImport, setPendingImport] = useState(false);
@@ -309,27 +313,31 @@ export default function ScenarioEditor() {
     [hasUnsavedChanges, processImportedScenario]
   );
 
-  const handleStartScenario = async () => {
+  const handleStartScenario = async (simulationName: string) => {
+    setStartingSimulation(true);
+    // Validate content first
+    if (!scenarioContent.trim()) {
+      displayError(
+        'No Scenario',
+        'Please create or load a scenario before starting simulation.'
+      );
+      setStartingSimulation(false);
+      return;
+    }
+
+    // Parse JSON locally (basic check)
+    let parsedContent;
     try {
-      // Validate content first
-      if (!scenarioContent.trim()) {
-        displayError(
-          'No Scenario',
-          'Please create or load a scenario before starting simulation.'
-        );
-        return;
-      }
+      parsedContent = JSON.parse(scenarioContent);
+    } catch {
+      displayError('Invalid Scenario', 'Invalid JSON format');
+      setStartingSimulation(false);
+      return;
+    }
 
-      // Parse JSON locally (basic check)
-      let parsedContent;
-      try {
-        parsedContent = JSON.parse(scenarioContent);
-      } catch {
-        displayError('Invalid Scenario', 'Invalid JSON format');
-        return;
-      }
-
+    try {
       const requestBody = {
+        name: simulationName,
         content: parsedContent,
       };
 
@@ -342,6 +350,7 @@ export default function ScenarioEditor() {
     } catch (error: unknown) {
       console.error('Error starting simulation:', error);
       displayError('Initialization Failed', formatBackendError(error));
+      setStartingSimulation(false);
     }
   };
 
@@ -661,7 +670,7 @@ export default function ScenarioEditor() {
           onChange={setScenarioContent}
           onSave={handleSaveScenario}
           onExport={handleExportScenario}
-          onStart={handleStartScenario}
+          onStart={() => setShowSimulationNameDialog(true)}
           isEditMode={isEditMode}
           isExistingScenario={!!selectedScenarioId}
           onEdit={() => setIsEditMode(true)}
@@ -739,6 +748,14 @@ export default function ScenarioEditor() {
             blocker.proceed?.();
           }
         }}
+      />
+
+      <SimulationNameDialog
+        open={showSimulationNameDialog}
+        onOpenChange={setShowSimulationNameDialog}
+        scenarioName={scenarioName}
+        onStartSimulation={handleStartScenario}
+        startingSimulation={startingSimulation}
       />
     </div>
   );
