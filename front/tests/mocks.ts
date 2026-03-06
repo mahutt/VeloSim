@@ -122,6 +122,7 @@ export const mockSimulationEngine: Partial<SimulationEngine> = {
   setSpeed: vi.fn(),
   selectItem: vi.fn(),
   clearSelection: vi.fn(),
+  clearMultiSelection: vi.fn(),
   confirmAssignment: vi.fn(),
   cancelAssignment: vi.fn(),
   reorderTasks: vi.fn(),
@@ -149,6 +150,11 @@ export const mockSimulationStateManager: Partial<SimulationStateManager> = {
 
   getSelectedItem: vi.fn().mockReturnValue(null),
   setSelectedItem: vi.fn(),
+
+  getMultiSelectedStationIds: vi.fn().mockReturnValue(new Set()),
+  toggleMultiSelectedStation: vi.fn(),
+  setMultiSelectedStations: vi.fn(),
+  clearMultiSelectedStations: vi.fn(),
 
   getHeadquarters: vi.fn(),
   setHeadquarters: vi.fn(),

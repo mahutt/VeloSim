@@ -39,6 +39,7 @@ import {
 import {
   setMapSource,
   MapSource,
+  MapLayer,
   updateAllRoutesDisplay,
   clearAllRoutesDisplay,
   updateRouteDisplay,
@@ -49,6 +50,7 @@ import {
   setupMapDropHandlers,
   setupMapHoverHandlers,
   setupStationDragHandlers,
+  setupBoxSelectHandlers,
 } from '~/lib/map-interactions';
 import { SelectedItemType } from '~/components/map/selected-item-bar';
 import { positionsEqual } from './utils';
@@ -97,11 +99,42 @@ export default class MapManager {
     this.lastDriverUpdates = new Map();
     this.animationFrame = 0;
 
-    setupMapClickHandlers(map, (item) => {
+    setupMapClickHandlers(map, (item, modifiers) => {
       if (!item) {
         clearSelection();
+        this.state.clearMultiSelectedStations();
         return;
       }
+
+      // Ctrl+click on a station toggles multi-selection
+      if (modifiers?.ctrlKey && item.type === SelectedItemType.Station) {
+        // If a single station was selected, promote it into the multi-selection
+        const currentSingle = this.state.getSelectedItem();
+        if (currentSingle && !('shift' in currentSingle)) {
+          const singleStationId = currentSingle.id;
+          clearSelection();
+          if (!this.state.getMultiSelectedStationIds().has(singleStationId)) {
+            this.state.toggleMultiSelectedStation(singleStationId);
+          }
+        } else {
+          clearSelection();
+        }
+        this.state.toggleMultiSelectedStation(item.id);
+
+        // If only 1 station left, demote back to single selection
+        const remaining = this.state.getMultiSelectedStationIds();
+        if (remaining.size <= 1) {
+          const lastId = remaining.values().next().value;
+          this.state.clearMultiSelectedStations();
+          if (remaining.size === 1 && lastId !== undefined) {
+            selectItem(SelectedItemType.Station, lastId);
+          }
+        }
+        return;
+      }
+
+      // Regular click clears multi-selection and selects single item
+      this.state.clearMultiSelectedStations();
       const { type, id } = item;
       selectItem(type, id);
     });
@@ -120,41 +153,68 @@ export default class MapManager {
     });
 
     setupMapDropHandlers(map, requestAssignment);
+
+    setupBoxSelectHandlers(
+      map,
+      [MapLayer.Stations, MapLayer.StationCircle, MapLayer.StationTaskCounts],
+      (stationIds) => {
+        if (stationIds.length > 1) {
+          clearSelection();
+          this.state.setMultiSelectedStations(stationIds);
+        } else if (stationIds.length === 1) {
+          this.state.clearMultiSelectedStations();
+          selectItem(SelectedItemType.Station, stationIds[0]);
+        }
+      }
+    );
+
     setupStationDragHandlers(
       map,
-      (stationId, driverId) => {
-        const station = this.state.getStation(stationId);
-        if (!station) {
-          toast.error(`Station #${stationId} not found.`);
-          log({
-            message: `Failed to drag station #${stationId} onto driver because station was not found`,
-            level: LogLevel.ERROR,
-            context: 'station_drag_drop',
-          });
-          return;
-        }
-
+      (stationIds, driverId) => {
         const driver = this.state.getDriver(driverId);
         if (!driver) {
           toast.error(`Driver #${driverId} not found.`);
           log({
-            message: `Failed to drag station #${stationId} onto driver #${driverId} because driver was not found`,
+            message: `Failed to drag stations onto driver #${driverId} because driver was not found`,
             level: LogLevel.ERROR,
             context: 'station_drag_drop',
           });
           return;
         }
 
-        const openTaskIds = station.taskIds;
+        const allTaskIds: number[] = [];
+        const stationNames: string[] = [];
 
-        if (openTaskIds.length === 0) {
-          toast.info(`No tasks at ${station.name}.`);
+        for (const sid of stationIds) {
+          const station = this.state.getStation(sid);
+          if (!station) {
+            toast.error(`Station #${sid} not found.`);
+            log({
+              message: `Failed to drag station #${sid} onto driver because station was not found`,
+              level: LogLevel.ERROR,
+              context: 'station_drag_drop',
+            });
+            continue;
+          }
+          allTaskIds.push(...station.taskIds);
+          stationNames.push(station.name);
+        }
+
+        if (allTaskIds.length === 0) {
+          if (stationIds.length === 1) {
+            const station = this.state.getStation(stationIds[0]);
+            toast.info(
+              `No tasks at ${station?.name ?? `station #${stationIds[0]}`}.`
+            );
+          } else {
+            toast.info(`No tasks at the selected stations.`);
+          }
           return;
         }
 
-        requestAssignment(driverId, openTaskIds);
+        requestAssignment(driverId, allTaskIds);
         log({
-          message: `Dragged station #${stationId} onto driver #${driverId} to assign ${openTaskIds.length} tasks`,
+          message: `Dragged ${stationIds.length} station(s) onto driver #${driverId} to assign ${allTaskIds.length} tasks`,
           level: LogLevel.INFO,
           context: 'station_drag_drop',
         });
@@ -167,7 +227,8 @@ export default class MapManager {
           this.hoverLocked = false;
           this.updateHoverState(null, null);
         }
-      }
+      },
+      () => Array.from(this.state.getMultiSelectedStationIds())
     );
 
     this.animationFrame = requestAnimationFrame(() => this.animateResources());
@@ -279,7 +340,8 @@ export default class MapManager {
       const geojson = adaptStationsToGeoJSON(
         stations,
         this.getSelectedStationId(),
-        this.hoveredStationId ?? undefined
+        this.hoveredStationId ?? undefined,
+        this.state.getMultiSelectedStationIds()
       );
       setMapSource(MapSource.Stations, geojson, map);
     }

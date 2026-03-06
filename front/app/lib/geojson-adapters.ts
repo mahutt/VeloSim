@@ -66,7 +66,8 @@ export function adaptHeadquartersToGeoJSON(
 export function adaptStationsToGeoJSON(
   stations: Station[],
   selectedStationId?: number,
-  hoveredStationId?: number
+  hoveredStationId?: number,
+  multiSelectedStationIds?: Set<number>
 ): GeoJSON.FeatureCollection {
   return {
     type: 'FeatureCollection',
@@ -76,7 +77,9 @@ export function adaptStationsToGeoJSON(
         id: station.id,
         name: station.name,
         taskCount: station.taskIds.length,
-        selected: station.id === selectedStationId,
+        selected:
+          station.id === selectedStationId ||
+          (multiSelectedStationIds?.has(station.id) ?? false),
         hover: station.id === hoveredStationId,
       },
       geometry: {

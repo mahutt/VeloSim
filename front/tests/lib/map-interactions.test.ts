@@ -28,6 +28,7 @@ import {
   setupMapHoverHandlers,
   setupMapDropHandlers,
   setupStationDragHandlers,
+  setupBoxSelectHandlers,
 } from '~/lib/map-interactions';
 import type { Map as MapboxMap } from 'mapbox-gl';
 import { MapLayer, MapSource } from '~/lib/map-helpers';
@@ -100,11 +101,14 @@ test('clicking station calls onItemSelect with wrapped station data', () => {
 
   handlers['click']({ point: { x: 100, y: 100 } });
 
-  expect(onItemSelect).toHaveBeenCalledWith({
-    type: SelectedItemType.Station,
-    id: 123,
-    coordinates: [-73.5, 45.5],
-  });
+  expect(onItemSelect).toHaveBeenCalledWith(
+    {
+      type: SelectedItemType.Station,
+      id: 123,
+      coordinates: [-73.5, 45.5],
+    },
+    { ctrlKey: false }
+  );
 });
 
 test('clicking resource calls onItemSelect with wrapped resource data', () => {
@@ -138,11 +142,14 @@ test('clicking resource calls onItemSelect with wrapped resource data', () => {
 
   handlers['click']({ point: { x: 100, y: 100 } });
 
-  expect(onItemSelect).toHaveBeenCalledWith({
-    type: SelectedItemType.Driver,
-    id: 1,
-    coordinates: [-73.6, 45.6],
-  });
+  expect(onItemSelect).toHaveBeenCalledWith(
+    {
+      type: SelectedItemType.Driver,
+      id: 1,
+      coordinates: [-73.6, 45.6],
+    },
+    { ctrlKey: false }
+  );
 });
 
 test('clicking station with missing properties throws error', () => {
@@ -243,7 +250,7 @@ test('clicking empty map area deselects item', () => {
     { x: 100, y: 100 },
     { layers: Object.values(MapLayer) }
   );
-  expect(onItemSelect).toHaveBeenCalledWith(null);
+  expect(onItemSelect).toHaveBeenCalledWith(null, { ctrlKey: false });
 });
 
 test('mouseenter and mouseleave change cursor for all layers', () => {
@@ -314,11 +321,14 @@ test('clicking station task count layer calls onItemSelect with station data', (
 
   handlers['click']({ point: { x: 100, y: 100 } });
 
-  expect(onItemSelect).toHaveBeenCalledWith({
-    type: SelectedItemType.Station,
-    id: 123,
-    coordinates: [-73.5, 45.5],
-  });
+  expect(onItemSelect).toHaveBeenCalledWith(
+    {
+      type: SelectedItemType.Station,
+      id: 123,
+      coordinates: [-73.5, 45.5],
+    },
+    { ctrlKey: false }
+  );
 });
 
 test('clicking feature with missing layer throws error', () => {
@@ -1195,7 +1205,7 @@ describe('setupStationDragHandlers', () => {
     ).mockReturnValueOnce([{ properties: { id: 5 } }]);
     mapHandlers['mouseup']({ point: { x: 110, y: 100 } });
 
-    expect(onDrop).toHaveBeenCalledWith(10, 5);
+    expect(onDrop).toHaveBeenCalledWith([10], 5);
   });
 
   test('mouseup without exceeding threshold does not call onDrop', () => {
@@ -1540,7 +1550,7 @@ describe('setupStationDragHandlers', () => {
       clientY: 300,
     } as unknown as MouseEvent);
 
-    expect(onDrop).toHaveBeenCalledWith(10, 77);
+    expect(onDrop).toHaveBeenCalledWith([10], 77);
 
     // cleanup
     div.remove();
@@ -1634,11 +1644,417 @@ describe('setupStationDragHandlers', () => {
       mockMap.queryRenderedFeatures as ReturnType<typeof vi.fn>
     ).mockReturnValueOnce([{ properties: { id: 99 } }]);
     mapHandlers['mouseup']({ point: { x: 120, y: 100 } });
-    expect(onDrop).toHaveBeenCalledWith(42, 99);
+    expect(onDrop).toHaveBeenCalledWith([42], 99);
 
     // 6. cleanup effects
     expect(onHighlight).toHaveBeenCalledWith(null);
     expect(mockMap.dragPan.enable).toHaveBeenCalled();
     expect(canvas.style.cursor).toBe('');
+  });
+
+  test('multi-station drag: drags all multi-selected stations when clicking a selected one', () => {
+    interceptWindowListeners();
+    const { mockMap, mapHandlers } = createMockMap();
+    const onDrop = vi.fn();
+    const getMultiSelectedStationIds = vi.fn(() => [10, 20, 30]);
+
+    (
+      mockMap.queryRenderedFeatures as ReturnType<typeof vi.fn>
+    ).mockReturnValueOnce([stationFeature(20)]);
+
+    setupStationDragHandlers(
+      mockMap,
+      onDrop,
+      undefined,
+      getMultiSelectedStationIds
+    );
+
+    // mousedown on station 20 (which is part of multi-selection)
+    mapHandlers[`mousedown-${MapLayer.Stations}`]({
+      point: { x: 100, y: 100 },
+      originalEvent: { shiftKey: false },
+      preventDefault: vi.fn(),
+    });
+
+    // exceed threshold
+    (
+      mockMap.queryRenderedFeatures as ReturnType<typeof vi.fn>
+    ).mockReturnValueOnce([]);
+    mapHandlers['mousemove']({ point: { x: 108, y: 100 } });
+
+    // mouseup on driver 5
+    (
+      mockMap.queryRenderedFeatures as ReturnType<typeof vi.fn>
+    ).mockReturnValueOnce([{ properties: { id: 5 } }]);
+    mapHandlers['mouseup']({ point: { x: 120, y: 100 } });
+
+    // Should drop all multi-selected stations, not just station 20
+    expect(onDrop).toHaveBeenCalledWith([10, 20, 30], 5);
+  });
+
+  test('multi-station drag: drags single station when it is not in multi-selection', () => {
+    interceptWindowListeners();
+    const { mockMap, mapHandlers } = createMockMap();
+    const onDrop = vi.fn();
+    const getMultiSelectedStationIds = vi.fn(() => [10, 20]);
+
+    (
+      mockMap.queryRenderedFeatures as ReturnType<typeof vi.fn>
+    ).mockReturnValueOnce([stationFeature(99)]);
+
+    setupStationDragHandlers(
+      mockMap,
+      onDrop,
+      undefined,
+      getMultiSelectedStationIds
+    );
+
+    // mousedown on station 99 (NOT in multi-selection)
+    mapHandlers[`mousedown-${MapLayer.Stations}`]({
+      point: { x: 100, y: 100 },
+      originalEvent: { shiftKey: false },
+      preventDefault: vi.fn(),
+    });
+
+    // exceed threshold
+    (
+      mockMap.queryRenderedFeatures as ReturnType<typeof vi.fn>
+    ).mockReturnValueOnce([]);
+    mapHandlers['mousemove']({ point: { x: 108, y: 100 } });
+
+    // mouseup on driver 5
+    (
+      mockMap.queryRenderedFeatures as ReturnType<typeof vi.fn>
+    ).mockReturnValueOnce([{ properties: { id: 5 } }]);
+    mapHandlers['mouseup']({ point: { x: 120, y: 100 } });
+
+    expect(onDrop).toHaveBeenCalledWith([99], 5);
+  });
+
+  test('multi-station drag shows count badge for multiple stations', () => {
+    interceptWindowListeners();
+    const { mockMap, mapHandlers } = createMockMap();
+    const onDrop = vi.fn();
+    const getMultiSelectedStationIds = vi.fn(() => [10, 20, 30]);
+
+    (
+      mockMap.queryRenderedFeatures as ReturnType<typeof vi.fn>
+    ).mockReturnValueOnce([stationFeature(10)]);
+
+    setupStationDragHandlers(
+      mockMap,
+      onDrop,
+      undefined,
+      getMultiSelectedStationIds
+    );
+
+    mapHandlers[`mousedown-${MapLayer.Stations}`]({
+      point: { x: 100, y: 100 },
+      originalEvent: { shiftKey: false },
+      preventDefault: vi.fn(),
+    });
+
+    // exceed threshold
+    (
+      mockMap.queryRenderedFeatures as ReturnType<typeof vi.fn>
+    ).mockReturnValueOnce([]);
+    mapHandlers['mousemove']({ point: { x: 108, y: 100 } });
+
+    const ghost = document.querySelector('[data-testid="station-drag-ghost"]');
+    expect(ghost).not.toBeNull();
+
+    const badge = document.querySelector('[data-testid="station-drag-badge"]');
+    expect(badge).not.toBeNull();
+    expect(badge!.textContent).toBe('3');
+
+    // cleanup
+    mapHandlers['mouseup']({ point: { x: 108, y: 100 } });
+  });
+
+  test('shift+mousedown on station does not start drag (reserved for box select)', () => {
+    interceptWindowListeners();
+    const { mockMap, mapHandlers } = createMockMap();
+    const onDrop = vi.fn();
+    const onHighlight = vi.fn();
+
+    (
+      mockMap.queryRenderedFeatures as ReturnType<typeof vi.fn>
+    ).mockReturnValueOnce([stationFeature(42)]);
+
+    setupStationDragHandlers(mockMap, onDrop, onHighlight);
+
+    mapHandlers[`mousedown-${MapLayer.Stations}`]({
+      point: { x: 100, y: 100 },
+      originalEvent: { shiftKey: true },
+      preventDefault: vi.fn(),
+    });
+
+    expect(onHighlight).not.toHaveBeenCalled();
+    expect(mockMap.dragPan.disable).not.toHaveBeenCalled();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// setupMapClickHandlers - ctrl+click modifiers
+// ---------------------------------------------------------------------------
+
+describe('setupMapClickHandlers with modifiers', () => {
+  function createMockMap(features: unknown[] = []) {
+    const handlers: Record<string, (event: unknown) => void> = {};
+    const mockMap = {
+      on: vi.fn(
+        (
+          event: string,
+          layerOrHandler: string | ((e: unknown) => void),
+          handler?: (e: unknown) => void
+        ) => {
+          if (typeof layerOrHandler === 'function') {
+            handlers[event] = layerOrHandler;
+          } else if (handler) {
+            handlers[`${event}-${layerOrHandler}`] = handler;
+          }
+        }
+      ),
+      getCanvas: vi.fn(() => ({ style: { cursor: '' } })),
+      queryRenderedFeatures: vi.fn(() => features),
+    } as unknown as MapboxMap;
+    return { mockMap, handlers };
+  }
+
+  test('ctrl+click on station passes ctrlKey: true in modifiers', () => {
+    const { mockMap, handlers } = createMockMap([
+      {
+        layer: { id: MapLayer.Stations },
+        geometry: { type: 'Point', coordinates: [-73.5, 45.5] },
+        properties: { id: 1 },
+      },
+    ]);
+
+    const onItemSelect = vi.fn();
+    setupMapClickHandlers(mockMap, onItemSelect);
+
+    handlers['click']({
+      point: { x: 100, y: 100 },
+      originalEvent: { ctrlKey: true, metaKey: false },
+    });
+
+    expect(onItemSelect).toHaveBeenCalledWith(
+      expect.objectContaining({ type: SelectedItemType.Station, id: 1 }),
+      { ctrlKey: true }
+    );
+  });
+
+  test('meta+click (Mac Cmd) on station passes ctrlKey: true in modifiers', () => {
+    const { mockMap, handlers } = createMockMap([
+      {
+        layer: { id: MapLayer.Stations },
+        geometry: { type: 'Point', coordinates: [-73.5, 45.5] },
+        properties: { id: 1 },
+      },
+    ]);
+
+    const onItemSelect = vi.fn();
+    setupMapClickHandlers(mockMap, onItemSelect);
+
+    handlers['click']({
+      point: { x: 100, y: 100 },
+      originalEvent: { ctrlKey: false, metaKey: true },
+    });
+
+    expect(onItemSelect).toHaveBeenCalledWith(
+      expect.objectContaining({ id: 1 }),
+      { ctrlKey: true }
+    );
+  });
+
+  test('clicking empty area with ctrl passes ctrlKey to null callback', () => {
+    const { mockMap, handlers } = createMockMap([]);
+
+    const onItemSelect = vi.fn();
+    setupMapClickHandlers(mockMap, onItemSelect);
+
+    handlers['click']({
+      point: { x: 100, y: 100 },
+      originalEvent: { ctrlKey: true, metaKey: false },
+    });
+
+    expect(onItemSelect).toHaveBeenCalledWith(null, { ctrlKey: true });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// setupBoxSelectHandlers
+// ---------------------------------------------------------------------------
+
+describe('setupBoxSelectHandlers', () => {
+  function createBoxSelectMockMap() {
+    const mapHandlers: Record<string, (e: unknown) => void> = {};
+    const parentElement = document.createElement('div');
+    const canvas = {
+      style: { cursor: '' },
+      parentElement,
+    };
+
+    const mockMap = {
+      on: vi.fn(
+        (
+          event: string,
+          layerOrHandler: string | ((e: unknown) => void),
+          handler?: (e: unknown) => void
+        ) => {
+          if (typeof layerOrHandler === 'function') {
+            mapHandlers[event] = layerOrHandler;
+          } else if (handler) {
+            mapHandlers[`${event}-${layerOrHandler}`] = handler;
+          }
+        }
+      ),
+      off: vi.fn(),
+      getCanvas: vi.fn(() => canvas),
+      queryRenderedFeatures: vi.fn(() => []),
+      boxZoom: { disable: vi.fn() },
+      dragPan: {
+        enable: vi.fn(),
+        disable: vi.fn(),
+      },
+    } as unknown as MapboxMap;
+
+    return { mockMap, mapHandlers, canvas, parentElement };
+  }
+
+  test('disables boxZoom on setup', () => {
+    const { mockMap } = createBoxSelectMockMap();
+    const onBoxSelect = vi.fn();
+
+    setupBoxSelectHandlers(mockMap, [MapLayer.Stations], onBoxSelect);
+
+    expect(mockMap.boxZoom.disable).toHaveBeenCalled();
+  });
+
+  test('registers mousedown, mousemove, mouseup handlers', () => {
+    const { mockMap } = createBoxSelectMockMap();
+    const onBoxSelect = vi.fn();
+
+    setupBoxSelectHandlers(mockMap, [MapLayer.Stations], onBoxSelect);
+
+    expect(mockMap.on).toHaveBeenCalledWith('mousedown', expect.any(Function));
+    expect(mockMap.on).toHaveBeenCalledWith('mousemove', expect.any(Function));
+    expect(mockMap.on).toHaveBeenCalledWith('mouseup', expect.any(Function));
+  });
+
+  test('shift+drag creates box select overlay and selects stations', () => {
+    const { mockMap, mapHandlers, canvas, parentElement } =
+      createBoxSelectMockMap();
+    const onBoxSelect = vi.fn();
+
+    setupBoxSelectHandlers(
+      mockMap,
+      [MapLayer.Stations, MapLayer.StationCircle],
+      onBoxSelect
+    );
+
+    // shift+mousedown
+    mapHandlers['mousedown']({
+      point: { x: 50, y: 50 },
+      originalEvent: { shiftKey: true },
+      preventDefault: vi.fn(),
+    });
+
+    expect(canvas.style.cursor).toBe('crosshair');
+    expect(mockMap.dragPan.disable).toHaveBeenCalled();
+
+    // mousemove creates box overlay
+    mapHandlers['mousemove']({
+      point: { x: 150, y: 150 },
+    });
+
+    const overlay = parentElement.querySelector(
+      '[data-testid="box-select-overlay"]'
+    );
+    expect(overlay).not.toBeNull();
+
+    // mouseup queries features in box
+    (
+      mockMap.queryRenderedFeatures as ReturnType<typeof vi.fn>
+    ).mockReturnValueOnce([
+      { properties: { id: 1 } },
+      { properties: { id: 2 } },
+      { properties: { id: 1 } }, // duplicate
+    ]);
+
+    mapHandlers['mouseup']({
+      point: { x: 150, y: 150 },
+    });
+
+    // Should call onBoxSelect with deduplicated station IDs
+    expect(onBoxSelect).toHaveBeenCalledWith(expect.arrayContaining([1, 2]));
+    expect(onBoxSelect.mock.calls[0][0]).toHaveLength(2);
+
+    // Overlay should be removed
+    expect(
+      parentElement.querySelector('[data-testid="box-select-overlay"]')
+    ).toBeNull();
+
+    // dragPan should be re-enabled
+    expect(mockMap.dragPan.enable).toHaveBeenCalled();
+    expect(canvas.style.cursor).toBe('');
+  });
+
+  test('non-shift mousedown is ignored', () => {
+    const { mockMap, mapHandlers, canvas } = createBoxSelectMockMap();
+    const onBoxSelect = vi.fn();
+
+    setupBoxSelectHandlers(mockMap, [MapLayer.Stations], onBoxSelect);
+
+    mapHandlers['mousedown']({
+      point: { x: 50, y: 50 },
+      originalEvent: { shiftKey: false },
+      preventDefault: vi.fn(),
+    });
+
+    expect(canvas.style.cursor).toBe('');
+    expect(mockMap.dragPan.disable).not.toHaveBeenCalled();
+  });
+
+  test('box select with no stations found does not call onBoxSelect', () => {
+    const { mockMap, mapHandlers } = createBoxSelectMockMap();
+    const onBoxSelect = vi.fn();
+
+    setupBoxSelectHandlers(mockMap, [MapLayer.Stations], onBoxSelect);
+
+    // shift+mousedown
+    mapHandlers['mousedown']({
+      point: { x: 50, y: 50 },
+      originalEvent: { shiftKey: true },
+      preventDefault: vi.fn(),
+    });
+
+    // mousemove
+    mapHandlers['mousemove']({ point: { x: 150, y: 150 } });
+
+    // mouseup with no features
+    (
+      mockMap.queryRenderedFeatures as ReturnType<typeof vi.fn>
+    ).mockReturnValueOnce([]);
+    mapHandlers['mouseup']({ point: { x: 150, y: 150 } });
+
+    expect(onBoxSelect).not.toHaveBeenCalled();
+  });
+
+  test('cleanup removes event listeners', () => {
+    const { mockMap } = createBoxSelectMockMap();
+    const onBoxSelect = vi.fn();
+
+    const cleanup = setupBoxSelectHandlers(
+      mockMap,
+      [MapLayer.Stations],
+      onBoxSelect
+    );
+
+    cleanup();
+
+    expect(mockMap.off).toHaveBeenCalledWith('mousedown', expect.any(Function));
+    expect(mockMap.off).toHaveBeenCalledWith('mousemove', expect.any(Function));
+    expect(mockMap.off).toHaveBeenCalledWith('mouseup', expect.any(Function));
   });
 });

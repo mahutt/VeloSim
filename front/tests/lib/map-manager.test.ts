@@ -27,8 +27,9 @@ import type { Map as MapboxGLMap } from 'mapbox-gl';
 import MapManager from '~/lib/map-manager';
 import { mockSimulationStateManager } from 'tests/mocks';
 import type SimulationStateManager from '~/lib/simulation-state-manager';
-import { makeDriver, makePayload } from 'tests/test-helpers';
+import { makeDriver, makePayload, makeStation } from 'tests/test-helpers';
 import type { Position, Route } from '~/types';
+import { SelectedItemType } from '~/components/map/selected-item-bar';
 
 const raf = vi.fn();
 vi.stubGlobal('requestAnimationFrame', raf);
@@ -47,12 +48,14 @@ const {
   mockSetupMapDropHandlers,
   mockSetupMapHoverHandlers,
   mockSetupStationDragHandlers,
+  mockSetupBoxSelectHandlers,
 } = vi.hoisted(() => {
   return {
     mockSetupMapClickHandlers: vi.fn(),
     mockSetupMapDropHandlers: vi.fn(),
     mockSetupMapHoverHandlers: vi.fn(),
     mockSetupStationDragHandlers: vi.fn(),
+    mockSetupBoxSelectHandlers: vi.fn(),
   };
 });
 vi.mock('~/lib/map-interactions', () => {
@@ -61,6 +64,7 @@ vi.mock('~/lib/map-interactions', () => {
     setupMapDropHandlers: mockSetupMapDropHandlers,
     setupMapHoverHandlers: mockSetupMapHoverHandlers,
     setupStationDragHandlers: mockSetupStationDragHandlers,
+    setupBoxSelectHandlers: mockSetupBoxSelectHandlers,
   };
 });
 
@@ -226,5 +230,96 @@ describe('MapManager', () => {
     );
     manager['animateResources']();
     expect(raf).toHaveBeenCalled();
+  });
+
+  describe('click handler ctrl+click promotes single selection', () => {
+    function getClickHandler() {
+      return mockSetupMapClickHandlers.mock.calls[
+        mockSetupMapClickHandlers.mock.calls.length - 1
+      ][1];
+    }
+
+    beforeEach(() => {
+      (
+        mockSimulationStateManager.toggleMultiSelectedStation as Mock
+      ).mockClear();
+      (
+        mockSimulationStateManager.clearMultiSelectedStations as Mock
+      ).mockClear();
+    });
+
+    test('ctrl+click with existing single-selected station promotes it into multi-selection', () => {
+      const station = makeStation({ id: 5, name: 'Station 5' });
+      (mockSimulationStateManager.getSelectedItem as Mock).mockReturnValue(
+        station
+      );
+      (
+        mockSimulationStateManager.getMultiSelectedStationIds as Mock
+      ).mockReturnValue(new Set());
+
+      const { clearSelection } = makeManager();
+      const clickHandler = getClickHandler();
+      clickHandler(
+        { type: SelectedItemType.Station, id: 10 },
+        { ctrlKey: true }
+      );
+
+      // Should clear the single selection
+      expect(clearSelection).toHaveBeenCalled();
+      // Should promote station 5 into multi-selection, then toggle station 10
+      expect(
+        mockSimulationStateManager.toggleMultiSelectedStation
+      ).toHaveBeenCalledWith(5);
+      expect(
+        mockSimulationStateManager.toggleMultiSelectedStation
+      ).toHaveBeenCalledWith(10);
+    });
+
+    test('ctrl+click without existing single selection does not promote anything', () => {
+      (mockSimulationStateManager.getSelectedItem as Mock).mockReturnValue(
+        null
+      );
+
+      const { clearSelection } = makeManager();
+      const clickHandler = getClickHandler();
+      clickHandler(
+        { type: SelectedItemType.Station, id: 10 },
+        { ctrlKey: true }
+      );
+
+      expect(clearSelection).toHaveBeenCalled();
+      expect(
+        mockSimulationStateManager.toggleMultiSelectedStation
+      ).toHaveBeenCalledTimes(1);
+      expect(
+        mockSimulationStateManager.toggleMultiSelectedStation
+      ).toHaveBeenCalledWith(10);
+    });
+
+    test('ctrl+click does not re-promote a station already in multi-selection', () => {
+      const station = makeStation({ id: 5, name: 'Station 5' });
+      (mockSimulationStateManager.getSelectedItem as Mock).mockReturnValue(
+        station
+      );
+      (
+        mockSimulationStateManager.getMultiSelectedStationIds as Mock
+      ).mockReturnValue(new Set([5]));
+
+      makeManager();
+      const clickHandler = getClickHandler();
+      clickHandler(
+        { type: SelectedItemType.Station, id: 10 },
+        { ctrlKey: true }
+      );
+
+      // station 5 is already in multi-selection, so toggleMultiSelectedStation
+      // should only be called once (for station 10)
+      expect(
+        mockSimulationStateManager.toggleMultiSelectedStation
+      ).toHaveBeenCalledTimes(1);
+      expect(
+        mockSimulationStateManager.toggleMultiSelectedStation
+      ).toHaveBeenCalledWith(10);
+    });
   });
 });

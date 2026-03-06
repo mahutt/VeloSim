@@ -35,6 +35,7 @@ import {
   type ReactiveSimulationState,
 } from './reactive-simulation-state';
 import { SelectedItemType } from '~/components/map/selected-item-bar';
+import type { PopulatedStation } from '~/components/map/selected-item-bar';
 import {
   driverResourceHasUpdated,
   vehicleResourceHasUpdated,
@@ -64,6 +65,11 @@ export interface SimulationStateManagerInterface {
 
   getSelectedItem: () => Driver | Station | null;
   setSelectedItem: (item: Driver | Station | null) => void;
+
+  getMultiSelectedStationIds: () => Set<number>;
+  toggleMultiSelectedStation: (stationId: number) => void;
+  setMultiSelectedStations: (stationIds: number[]) => void;
+  clearMultiSelectedStations: () => void;
 
   getHeadquarters: () => Headquarters | null;
   setHeadquarters: (hq: Headquarters) => void;
@@ -116,6 +122,7 @@ export default class SimulationStateManager implements SimulationStateManagerInt
   private stations: Map<number, Station> = new Map();
   private tasks: Map<number, StationTask> = new Map();
   private selectedItem: Driver | Station | null = null;
+  private multiSelectedStationIds: Set<number> = new Set();
   private headquarters: Headquarters | null = null;
   private mapShouldRefresh: boolean = false;
 
@@ -184,6 +191,12 @@ export default class SimulationStateManager implements SimulationStateManagerInt
     if (this.selectedItem === prevStation) {
       this.setSelectedItem(station);
     }
+
+    // If this station is in multi-selection, update the reactive state
+    if (this.multiSelectedStationIds.has(station.id)) {
+      this.updateMultiSelectedStationsElement();
+    }
+
     this.setMapShouldRefresh(true);
   }
 
@@ -271,6 +284,57 @@ export default class SimulationStateManager implements SimulationStateManagerInt
         },
       });
     }
+  }
+
+  public getMultiSelectedStationIds(): Set<number> {
+    return this.multiSelectedStationIds;
+  }
+
+  public toggleMultiSelectedStation(stationId: number): void {
+    const next = new Set(this.multiSelectedStationIds);
+    if (next.has(stationId)) {
+      next.delete(stationId);
+    } else {
+      next.add(stationId);
+    }
+    this.multiSelectedStationIds = next;
+    this.updateMultiSelectedStationsElement();
+    this.setMapShouldRefresh(true);
+  }
+
+  public setMultiSelectedStations(stationIds: number[]): void {
+    this.multiSelectedStationIds = new Set(stationIds);
+    this.updateMultiSelectedStationsElement();
+    this.setMapShouldRefresh(true);
+  }
+
+  public clearMultiSelectedStations(): void {
+    if (this.multiSelectedStationIds.size === 0) return;
+    this.multiSelectedStationIds = new Set();
+    this.updateMultiSelectedStationsElement();
+    this.setMapShouldRefresh(true);
+  }
+
+  private updateMultiSelectedStationsElement(): void {
+    const ids = this.multiSelectedStationIds;
+    if (ids.size === 0) {
+      this.updateReactiveState({ multiSelectedStations: null });
+      return;
+    }
+
+    const populatedStations: PopulatedStation[] = [];
+    for (const id of ids) {
+      const station = this.stations.get(id);
+      if (!station) continue;
+      populatedStations.push({
+        id: station.id,
+        name: station.name,
+        position: station.position,
+        tasks: station.taskIds.map((taskId: number) => this.tasks.get(taskId)!),
+      });
+    }
+
+    this.updateReactiveState({ multiSelectedStations: populatedStations });
   }
 
   public getStartTime() {

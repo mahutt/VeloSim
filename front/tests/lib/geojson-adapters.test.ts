@@ -95,6 +95,38 @@ describe('adaptStationsToGeoJSON', () => {
       features: [],
     });
   });
+
+  it('should mark multi-selected stations as selected', () => {
+    const stations: Station[] = [
+      { id: 1, name: 'Station A', position: [-74.0, 40.7], taskIds: [10] },
+      { id: 2, name: 'Station B', position: [-73.9, 40.8], taskIds: [20] },
+      { id: 3, name: 'Station C', position: [-73.8, 40.9], taskIds: [30] },
+    ];
+
+    const multiSelectedIds = new Set([1, 3]);
+    const result = adaptStationsToGeoJSON(
+      stations,
+      undefined,
+      undefined,
+      multiSelectedIds
+    );
+
+    expect(result.features[0].properties?.selected).toBe(true);
+    expect(result.features[1].properties?.selected).toBe(false);
+    expect(result.features[2].properties?.selected).toBe(true);
+  });
+
+  it('should mark both single-selected and multi-selected stations as selected', () => {
+    const stations: Station[] = [
+      { id: 1, name: 'Station A', position: [-74.0, 40.7], taskIds: [] },
+      { id: 2, name: 'Station B', position: [-73.9, 40.8], taskIds: [] },
+    ];
+
+    const result = adaptStationsToGeoJSON(stations, 1, undefined, new Set([2]));
+
+    expect(result.features[0].properties?.selected).toBe(true);
+    expect(result.features[1].properties?.selected).toBe(true);
+  });
 });
 
 describe('adaptRouteToGeoJSON', () => {

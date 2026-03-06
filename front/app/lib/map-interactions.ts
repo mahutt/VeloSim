@@ -47,7 +47,8 @@ type ItemSelectCallback = (
     type: SelectedItemType;
     id: number;
     coordinates: Position;
-  } | null
+  } | null,
+  modifiers?: { ctrlKey: boolean }
 ) => void;
 
 type ItemHoverCallback = (
@@ -62,12 +63,15 @@ export function setupMapClickHandlers(
   onItemSelect: ItemSelectCallback
 ) {
   map.on('click', (e: MapMouseEvent) => {
+    const modifiers = {
+      ctrlKey: e.originalEvent?.ctrlKey || e.originalEvent?.metaKey || false,
+    };
     const features = map.queryRenderedFeatures(e.point, {
       layers: Object.values(MapLayer),
     });
 
     if (features.length === 0) {
-      onItemSelect(null);
+      onItemSelect(null, modifiers);
       return;
     }
 
@@ -90,7 +94,7 @@ export function setupMapClickHandlers(
       number,
     ];
 
-    onItemSelect({ type, id, coordinates });
+    onItemSelect({ type, id, coordinates }, modifiers);
   });
 
   Object.values(MapLayer).forEach((layer) => {
@@ -191,61 +195,229 @@ const DRAG_THRESHOLD = 5;
 // DOM-based drag ghost that floats above all overlays
 const GHOST_WIDTH = 28;
 
-function createDomGhost(): HTMLImageElement {
-  const img = document.createElement('img');
-  img.src = '/station-selected.png';
-  img.setAttribute('data-testid', 'station-drag-ghost');
-  Object.assign(img.style, {
+function createDomGhost(stationCount = 1): HTMLElement {
+  if (stationCount <= 1) {
+    const img = document.createElement('img');
+    img.src = '/station-selected.png';
+    img.setAttribute('data-testid', 'station-drag-ghost');
+    Object.assign(img.style, {
+      position: 'fixed',
+      width: `${GHOST_WIDTH}px`,
+      height: 'auto',
+      pointerEvents: 'none',
+      zIndex: '9999',
+      opacity: '0.85',
+      transform: 'translate(-50%, -50%)',
+    });
+    document.body.appendChild(img);
+    return img;
+  }
+
+  const container = document.createElement('div');
+  container.setAttribute('data-testid', 'station-drag-ghost');
+  Object.assign(container.style, {
     position: 'fixed',
-    width: `${GHOST_WIDTH}px`,
-    height: 'auto',
     pointerEvents: 'none',
     zIndex: '9999',
-    opacity: '0.85',
     transform: 'translate(-50%, -50%)',
   });
-  document.body.appendChild(img);
-  return img;
+
+  const img = document.createElement('img');
+  img.src = '/station-selected.png';
+  Object.assign(img.style, {
+    width: `${GHOST_WIDTH}px`,
+    height: 'auto',
+    opacity: '0.85',
+  });
+  container.appendChild(img);
+
+  const badge = document.createElement('span');
+  badge.textContent = String(stationCount);
+  badge.setAttribute('data-testid', 'station-drag-badge');
+  Object.assign(badge.style, {
+    position: 'absolute',
+    top: '-6px',
+    right: '-8px',
+    backgroundColor: '#3b82f6',
+    color: 'white',
+    borderRadius: '50%',
+    width: '18px',
+    height: '18px',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    fontSize: '11px',
+    fontWeight: 'bold',
+  });
+  container.appendChild(badge);
+
+  document.body.appendChild(container);
+  return container;
 }
 
-function moveDomGhost(ghost: HTMLImageElement, x: number, y: number) {
+function moveDomGhost(ghost: HTMLElement, x: number, y: number) {
   ghost.style.left = `${x}px`;
   ghost.style.top = `${y}px`;
 }
 
-function removeDomGhost(ghost: HTMLImageElement | null) {
+function removeDomGhost(ghost: HTMLElement | null) {
   ghost?.remove();
 }
 
 export type StationDragDropCallback = (
-  stationId: number,
+  stationIds: number[],
   driverId: number
 ) => void;
 
 /**
+ * Set up box-select for stations via Shift+drag.
+ * Disables Mapbox's built-in boxZoom and draws a selection rectangle.
+ * On release, queries all station features within the rectangle.
+ */
+export function setupBoxSelectHandlers(
+  map: MapboxMap,
+  stationLayers: string[],
+  onBoxSelect: (stationIds: number[]) => void
+) {
+  map.boxZoom.disable();
+
+  let boxSelectActive = false;
+  let startPoint: { x: number; y: number } | null = null;
+  let boxElement: HTMLDivElement | null = null;
+
+  function createBoxElement(): HTMLDivElement {
+    const div = document.createElement('div');
+    div.setAttribute('data-testid', 'box-select-overlay');
+    Object.assign(div.style, {
+      position: 'absolute',
+      border: '2px dashed #3b82f6',
+      backgroundColor: 'rgba(59, 130, 246, 0.1)',
+      pointerEvents: 'none',
+      zIndex: '1',
+    });
+    map.getCanvas().parentElement?.appendChild(div);
+    return div;
+  }
+
+  function updateBoxElement(
+    box: HTMLDivElement,
+    start: { x: number; y: number },
+    end: { x: number; y: number }
+  ) {
+    const left = Math.min(start.x, end.x);
+    const top = Math.min(start.y, end.y);
+    const width = Math.abs(end.x - start.x);
+    const height = Math.abs(end.y - start.y);
+    box.style.left = `${left}px`;
+    box.style.top = `${top}px`;
+    box.style.width = `${width}px`;
+    box.style.height = `${height}px`;
+  }
+
+  function removeBoxElement() {
+    boxElement?.remove();
+    boxElement = null;
+  }
+
+  function cleanup() {
+    removeBoxElement();
+    boxSelectActive = false;
+    startPoint = null;
+    map.dragPan.enable();
+    map.getCanvas().style.cursor = '';
+  }
+
+  function onMouseDown(e: MapMouseEvent) {
+    if (!e.originalEvent?.shiftKey) return;
+
+    e.preventDefault();
+    startPoint = { x: e.point.x, y: e.point.y };
+    boxSelectActive = true;
+    map.dragPan.disable();
+    map.getCanvas().style.cursor = 'crosshair';
+  }
+
+  function onMouseMove(e: MapMouseEvent) {
+    if (!boxSelectActive || !startPoint) return;
+
+    if (!boxElement) {
+      boxElement = createBoxElement();
+    }
+    updateBoxElement(boxElement, startPoint, {
+      x: e.point.x,
+      y: e.point.y,
+    });
+  }
+
+  function onMouseUp(e: MapMouseEvent) {
+    if (!boxSelectActive || !startPoint) return;
+
+    const minX = Math.min(startPoint.x, e.point.x);
+    const minY = Math.min(startPoint.y, e.point.y);
+    const maxX = Math.max(startPoint.x, e.point.x);
+    const maxY = Math.max(startPoint.y, e.point.y);
+
+    const features = map.queryRenderedFeatures(
+      [
+        [minX, minY],
+        [maxX, maxY],
+      ],
+      { layers: stationLayers }
+    );
+
+    const stationIds = features
+      .map((f) => Number(f.properties?.id))
+      .filter((id) => !Number.isNaN(id));
+
+    const uniqueIds = Array.from(new Set(stationIds));
+
+    if (uniqueIds.length > 0) {
+      onBoxSelect(uniqueIds);
+    }
+
+    cleanup();
+  }
+
+  map.on('mousedown', onMouseDown);
+  map.on('mousemove', onMouseMove);
+  map.on('mouseup', onMouseUp);
+
+  return () => {
+    map.off('mousedown', onMouseDown);
+    map.off('mousemove', onMouseMove);
+    map.off('mouseup', onMouseUp);
+    cleanup();
+  };
+}
+
+/**
  * Set up map-level station drag handlers.
  * Long-press / mousedown on a station icon, drag to a driver icon, release to
- * trigger `onDrop(stationId, driverId)`.
+ * trigger `onDrop(stationIds, driverId)`.
+ * Supports multi-station drag when stations are multi-selected.
  */
 export function setupStationDragHandlers(
   map: MapboxMap,
   onDrop: StationDragDropCallback,
-  onHighlight?: (stationId: number | null) => void
+  onHighlight?: (stationId: number | null) => void,
+  getMultiSelectedStationIds?: () => number[]
 ) {
   let dragging = false;
   let stationId: number | null = null;
+  let draggedStationIds: number[] = [];
   let originLngLat: [number, number] | null = null;
   let startPoint: { x: number; y: number } | null = null;
   let thresholdMet = false;
   let hoveredDriverId: number | null = null;
   let wasDragPanEnabled: boolean | null = null;
-  let domGhost: HTMLImageElement | null = null;
+  let domGhost: HTMLElement | null = null;
 
   const stationLayers = [MapLayer.Stations, MapLayer.StationCircle];
 
   function cleanup() {
     dragging = false;
     stationId = null;
+    draggedStationIds = [];
     originLngLat = null;
     startPoint = null;
     thresholdMet = false;
@@ -265,6 +437,9 @@ export function setupStationDragHandlers(
   }
 
   function onMouseDown(e: MapMouseEvent) {
+    // Shift+drag is reserved for box select
+    if (e.originalEvent?.shiftKey) return;
+
     const features = map.queryRenderedFeatures(e.point, {
       layers: stationLayers,
     });
@@ -275,6 +450,16 @@ export function setupStationDragHandlers(
     if (id === undefined) return;
 
     stationId = Number(id);
+
+    // Determine which stations to drag: if the clicked station is part of
+    // multi-selection, drag all selected stations; otherwise just this one.
+    const multiIds = getMultiSelectedStationIds?.() ?? [];
+    if (multiIds.length > 1 && multiIds.includes(stationId)) {
+      draggedStationIds = multiIds;
+    } else {
+      draggedStationIds = [stationId];
+    }
+
     onHighlight?.(stationId);
     const coords = (feature.geometry as GeoJSON.Point).coordinates as [
       number,
@@ -304,7 +489,7 @@ export function setupStationDragHandlers(
       thresholdMet = true;
       map.getCanvas().style.cursor = 'grabbing';
       // Create the DOM ghost so it floats above sidebar/overlays
-      domGhost = createDomGhost();
+      domGhost = createDomGhost(draggedStationIds.length);
     }
 
     // Move the DOM ghost to follow the cursor
@@ -348,7 +533,7 @@ export function setupStationDragHandlers(
   function onMouseUp(e: MapMouseEvent) {
     if (!dragging) return;
 
-    if (thresholdMet && stationId !== null) {
+    if (thresholdMet && draggedStationIds.length > 0) {
       // Check for a driver under the cursor
       const features = map.queryRenderedFeatures(e.point, {
         layers: [MapLayer.Resources],
@@ -357,7 +542,7 @@ export function setupStationDragHandlers(
       if (features && features.length > 0) {
         const driverId = Number(features[0].properties?.id);
         if (!Number.isNaN(driverId)) {
-          onDrop(stationId, driverId);
+          onDrop(draggedStationIds, driverId);
         }
       }
     }
@@ -379,10 +564,10 @@ export function setupStationDragHandlers(
     if (target && map.getCanvas().contains(target)) return;
 
     // Check if released over a sidebar resource item
-    if (thresholdMet && stationId !== null) {
+    if (thresholdMet && draggedStationIds.length > 0) {
       const resourceId = findResourceIdAtPoint(e.clientX, e.clientY);
       if (resourceId !== null) {
-        onDrop(stationId, resourceId);
+        onDrop(draggedStationIds, resourceId);
       }
     }
 

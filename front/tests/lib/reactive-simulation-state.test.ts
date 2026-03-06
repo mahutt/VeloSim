@@ -78,6 +78,7 @@ describe('areReactiveSimulationStatesEqual', () => {
           inProgressTask: null,
         },
       },
+      multiSelectedStations: null,
       blockAssignments: false,
       HQWidgetState: {
         entities: { type: SelectedItemType.Driver, count: 2 },

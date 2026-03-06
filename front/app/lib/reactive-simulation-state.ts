@@ -22,7 +22,10 @@
  * SOFTWARE.
  */
 
-import type { SelectedItemBarElement } from '~/components/map/selected-item-bar';
+import type {
+  SelectedItemBarElement,
+  PopulatedStation,
+} from '~/components/map/selected-item-bar';
 import type { ResourceBarElement } from '~/components/resource/resource-bar';
 import type { ResourceItemElement } from '~/components/resource/resource-item';
 import type { HQWidgetProps } from '~/components/simulation/hq-widget';
@@ -36,6 +39,7 @@ export interface ReactiveSimulationState {
 
   // selected item bar
   selectedItemBarElement: SelectedItemBarElement | null;
+  multiSelectedStations: PopulatedStation[] | null;
   blockAssignments: boolean;
 
   // task assignment banner
@@ -68,6 +72,7 @@ export interface ReactiveSimulationState {
 export const DEFAULT_REACTIVE_SIMULATION_STATE: ReactiveSimulationState = {
   isLoading: true,
   selectedItemBarElement: null,
+  multiSelectedStations: null,
   blockAssignments: false,
   pendingAssignment: null,
   pendingAssignmentLoading: false,
@@ -96,6 +101,10 @@ export function areReactiveSimulationStatesEqual(
     areSelectedItemBarElementsEqual(
       a.selectedItemBarElement,
       b.selectedItemBarElement
+    ) &&
+    areMultiSelectedStationsEqual(
+      a.multiSelectedStations,
+      b.multiSelectedStations
     ) &&
     a.blockAssignments === b.blockAssignments &&
     arePendingAssignmentsEqual(a.pendingAssignment, b.pendingAssignment) &&
@@ -168,4 +177,16 @@ function areResourceItemElementsEqual(
     a.batteryCapacity === b.batteryCapacity &&
     a.state === b.state
   );
+}
+
+function areMultiSelectedStationsEqual(
+  a: PopulatedStation[] | null,
+  b: PopulatedStation[] | null
+): boolean {
+  if (a === b) return true;
+  if (!a || !b) return false;
+  if (a.length !== b.length) return false;
+  const aIds = a.map((s) => s.id).sort((x, y) => x - y);
+  const bIds = b.map((s) => s.id).sort((x, y) => x - y);
+  return aIds.every((id, i) => id === bIds[i]);
 }

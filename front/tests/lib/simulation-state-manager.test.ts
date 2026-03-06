@@ -309,4 +309,140 @@ describe('SimulationStateManager', () => {
   it('getReactiveState returns current reactive state', () => {
     expect(manager.getReactiveState()).toMatchObject({ isLoading: false });
   });
+
+  // ── Multi-selection ────────────────────────────────────────────────
+
+  describe('multi-station selection', () => {
+    it('getMultiSelectedStationIds returns empty set initially', () => {
+      expect(manager.getMultiSelectedStationIds().size).toBe(0);
+    });
+
+    it('toggleMultiSelectedStation adds a station', () => {
+      const station = makeStation({ id: 1, taskIds: [100] });
+      const task = makeStationTask({ id: 100, stationId: 1 });
+      manager.setStation(station);
+      manager.setTask(task);
+
+      setState.mockClear();
+      manager.toggleMultiSelectedStation(1);
+
+      expect(manager.getMultiSelectedStationIds()).toEqual(new Set([1]));
+      expect(setState).toHaveBeenCalledWith(
+        expect.objectContaining({
+          multiSelectedStations: [
+            expect.objectContaining({
+              id: 1,
+              tasks: [expect.objectContaining({ id: 100 })],
+            }),
+          ],
+        })
+      );
+    });
+
+    it('toggleMultiSelectedStation removes a station that is already selected', () => {
+      const station = makeStation({ id: 1 });
+      manager.setStation(station);
+      manager.toggleMultiSelectedStation(1);
+
+      setState.mockClear();
+      manager.toggleMultiSelectedStation(1);
+
+      expect(manager.getMultiSelectedStationIds().size).toBe(0);
+      expect(setState).toHaveBeenCalledWith(
+        expect.objectContaining({ multiSelectedStations: null })
+      );
+    });
+
+    it('toggleMultiSelectedStation sets mapShouldRefresh', () => {
+      manager.setStation(makeStation({ id: 1 }));
+      manager.setMapShouldRefresh(false);
+      manager.toggleMultiSelectedStation(1);
+      expect(manager.getMapShouldRefresh()).toBe(true);
+    });
+
+    it('setMultiSelectedStations replaces the selection', () => {
+      const s1 = makeStation({ id: 1, taskIds: [10] });
+      const s2 = makeStation({ id: 2, taskIds: [20] });
+      manager.setStation(s1);
+      manager.setStation(s2);
+      manager.setTask(makeStationTask({ id: 10, stationId: 1 }));
+      manager.setTask(makeStationTask({ id: 20, stationId: 2 }));
+
+      setState.mockClear();
+      manager.setMultiSelectedStations([1, 2]);
+
+      expect(manager.getMultiSelectedStationIds()).toEqual(new Set([1, 2]));
+      expect(setState).toHaveBeenCalledWith(
+        expect.objectContaining({
+          multiSelectedStations: expect.arrayContaining([
+            expect.objectContaining({ id: 1 }),
+            expect.objectContaining({ id: 2 }),
+          ]),
+        })
+      );
+    });
+
+    it('setMultiSelectedStations skips unknown station ids', () => {
+      manager.setStation(makeStation({ id: 1 }));
+
+      manager.setMultiSelectedStations([1, 999]);
+
+      const state = manager.getReactiveState();
+      expect(state.multiSelectedStations).toHaveLength(1);
+      expect(state.multiSelectedStations![0].id).toBe(1);
+    });
+
+    it('clearMultiSelectedStations resets selection to null', () => {
+      manager.setStation(makeStation({ id: 1 }));
+      manager.setMultiSelectedStations([1]);
+
+      setState.mockClear();
+      manager.clearMultiSelectedStations();
+
+      expect(manager.getMultiSelectedStationIds().size).toBe(0);
+      expect(setState).toHaveBeenCalledWith(
+        expect.objectContaining({ multiSelectedStations: null })
+      );
+    });
+
+    it('clearMultiSelectedStations is a no-op when already empty', () => {
+      setState.mockClear();
+      manager.clearMultiSelectedStations();
+      expect(setState).not.toHaveBeenCalled();
+    });
+
+    it('setStation updates reactive multi-selection when station is in the set', () => {
+      const station = makeStation({ id: 1, name: 'Old', taskIds: [10] });
+      manager.setStation(station);
+      manager.setTask(makeStationTask({ id: 10, stationId: 1 }));
+      manager.setMultiSelectedStations([1]);
+
+      // Verify initial multi-selection has the old name
+      expect(manager.getReactiveState().multiSelectedStations).toEqual([
+        expect.objectContaining({ id: 1, name: 'Old' }),
+      ]);
+
+      const updated = makeStation({ id: 1, name: 'New', taskIds: [10] });
+      manager.setStation(updated);
+
+      // After updating the station, the reactive multi-selection should reflect the new name
+      expect(manager.getReactiveState().multiSelectedStations).toEqual([
+        expect.objectContaining({ id: 1, name: 'New' }),
+      ]);
+    });
+
+    it('setMultiSelectedStations sets mapShouldRefresh', () => {
+      manager.setMapShouldRefresh(false);
+      manager.setMultiSelectedStations([]);
+      expect(manager.getMapShouldRefresh()).toBe(true);
+    });
+
+    it('clearMultiSelectedStations sets mapShouldRefresh when clearing non-empty set', () => {
+      manager.setStation(makeStation({ id: 1 }));
+      manager.setMultiSelectedStations([1]);
+      manager.setMapShouldRefresh(false);
+      manager.clearMultiSelectedStations();
+      expect(manager.getMapShouldRefresh()).toBe(true);
+    });
+  });
 });
