@@ -27,6 +27,9 @@ import time
 import json
 import os
 from typing import Optional, Callable, Any, cast
+from grafana_logging.logger import get_logger
+
+logger = get_logger(__name__)
 
 
 """Realtime driver that paces a simpy environment.
@@ -57,7 +60,9 @@ class RealTimeDriver:
                 config = json.load(file)
                 return cast(dict[str, Any], config.get("simulation", {}))
         except (FileNotFoundError, json.JSONDecodeError) as e:
-            print(f"Warning: Could not load config.json, using hardcoded defaults: {e}")
+            logger.warning(
+                "Could not load config.json, using hardcoded defaults: %s", e
+            )
             # Fallback to hardcoded defaults if config file is unavailable
             return {
                 # Default 1-1 real second per sim second
@@ -166,7 +171,7 @@ class RealTimeDriver:
                     # Step the environment once, advancing simulated time
                     self.sim_env.step()
                 except simpy.core.EmptySchedule:
-                    print("Simpy schedule is empty")
+                    logger.warning("SimPy schedule is empty")
                     break
                 # Invoke the step callback once per simulated second advanced
                 # Compare AFTER stepping so we see the incremented env.now
@@ -177,7 +182,7 @@ class RealTimeDriver:
                         prev_sim_time = current_after
                 # After stepping, if we've reached or passed the target sim time, stop
                 if self.sim_env.now >= until:
-                    print("Specified Sim-time reached")
+                    logger.info("Specified sim-time reached")
                     break
 
                 # Calculate lag if strict mode is on
@@ -202,7 +207,7 @@ class RealTimeDriver:
         Returns:
             None
         """
-        print("Pausing")
+        logger.info("Simulation paused")
         self.running = False
 
     def resume(self) -> None:
@@ -211,7 +216,7 @@ class RealTimeDriver:
         Returns:
             None
         """
-        print("Resuming")
+        logger.info("Simulation resumed")
         self.reset_pacing_refs()
         # Reset pacing since time during
         # pause makes sim think its lagging.
