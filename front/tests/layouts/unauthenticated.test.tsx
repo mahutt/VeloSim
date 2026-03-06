@@ -122,7 +122,7 @@ describe('Unauthenticated Layout', () => {
     });
     mockUseLocation.mockReturnValue({
       pathname: '/login',
-      search: '?next=%2Fsimulation%2Fabc-123',
+      search: '?next=%2Fsimulations%2Fabc-123',
       hash: '',
       state: null,
       key: 'default',
@@ -139,7 +139,7 @@ describe('Unauthenticated Layout', () => {
     );
 
     await waitFor(() => {
-      expect(mockNavigate).toHaveBeenCalledWith('/simulation/abc-123', {
+      expect(mockNavigate).toHaveBeenCalledWith('/simulations/abc-123', {
         replace: true,
       });
     });

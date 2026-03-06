@@ -65,7 +65,7 @@ export const columns: ColumnDef<Simulation>[] = [
         if (isCompleted) {
           return;
         }
-        navigate(`/simulation/${sim_id}`);
+        navigate(`/simulations/${sim_id}`);
       };
 
       if (isCompleted) {
