@@ -215,6 +215,10 @@ def initialize_simulation(
         json_parser = JsonParseStrategy(scenario_json=scenario, json_string=json_string)
         scenario_params = json_parser.parse()
 
+        # Templates are used for traffic, no need to read files
+        # Traffic CSV data persistence happens during restore/branch operations
+        traffic_csv_data = None
+
         # Initialize simulation
         result = simulation_service.initialize_simulation(
             db,
@@ -222,6 +226,7 @@ def initialize_simulation(
             scenario_params,
             scenario_payload=scenario,
             name=sim_name,
+            traffic_csv_data=traffic_csv_data,
         )
 
         # Store the start time for the total startup metric

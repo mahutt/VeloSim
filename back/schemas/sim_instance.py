@@ -45,6 +45,7 @@ class SimInstanceCreate(SimInstanceBase):
     """Schema for creating a new SimInstance."""
 
     scenario_payload: Optional[Dict[str, Any]] = None
+    traffic_csv_data: Optional[str] = None
     name: Optional[str] = None
     parent_sim_instance_id: Optional[int] = None
     branch_keyframe_seq: Optional[int] = None

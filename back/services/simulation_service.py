@@ -245,14 +245,15 @@ class SimulationService:
 
         scenario = self.simulation_data_service.get_scenario(db, sim_id)
         keyframe = self.simulation_data_service.get_last_persisted_keyframe(db, sim_id)
+        traffic_csv_data = self.simulation_data_service.get_traffic_csv_data(db, sim_id)
 
         resume_state = ReplayParser.parse(
             scenario_json=scenario,
             keyframe_json=keyframe,
+            traffic_csv_data=traffic_csv_data,
         )
 
         input_params = resume_state.input_parameters
-        map_controller = resume_state.map_controller
         current_sim_time = resume_state.current_time_seconds
         real_time_factor = resume_state.real_time_factor
         should_auto_resume = resume_state.should_auto_resume
@@ -270,7 +271,6 @@ class SimulationService:
             input_params,
             subscribers=[frame_subscriber],
             run_id=sim_id,
-            map_controller=map_controller,
             env=env,
             initial_running=should_auto_resume,
             real_time_factor=real_time_factor,
@@ -296,6 +296,7 @@ class SimulationService:
         params: InputParameter,
         scenario_payload: dict | None = None,
         name: str | None = None,
+        traffic_csv_data: str | None = None,
     ) -> SimulationResponse:
         """Initialize a new simulation with the given parameters.
 
@@ -305,6 +306,7 @@ class SimulationService:
             params: Input parameters for the simulation.
             scenario_payload: Original scenario payload to persist for future restarts.
             name: Optional user-provided name for the simulation.
+            traffic_csv_data: Traffic CSV data to persist for deterministic replay.
 
         Returns:
             SimulationResponse: Response containing sim_id, db_id, and status.
@@ -316,6 +318,7 @@ class SimulationService:
             user_id=user.id,
             scenario_payload=scenario_payload,
             name=name,
+            traffic_csv_data=traffic_csv_data,
         )
         db_sim_instance = sim_instance_crud.create(db, sim_instance_data)
 
@@ -1147,10 +1150,14 @@ class SimulationService:
         if scenario is None:
             raise ValueError(f"Source simulation {sim_id} has no scenario payload")
 
+        # Retrieve traffic CSV data from source simulation for deterministic replay
+        traffic_csv_data = self.simulation_data_service.get_traffic_csv_data(db, sim_id)
+
         try:
             resume_state = ReplayParser.parse(
                 scenario_json=scenario,
                 keyframe_json=keyframe_data,
+                traffic_csv_data=traffic_csv_data,
             )
         except Exception as e:
             raise ValueError(
@@ -1159,13 +1166,13 @@ class SimulationService:
             )
 
         input_params = resume_state.input_parameters
-        map_controller = resume_state.map_controller
         current_sim_time = resume_state.current_time_seconds
 
         # 4. Create new SimInstance with branching metadata
         new_sim_data = SimInstanceCreate(
             user_id=requesting_user,
             scenario_payload=source_sim.scenario_payload,
+            traffic_csv_data=traffic_csv_data,
             name=name,
             parent_sim_instance_id=source_sim.id,
             branch_keyframe_seq=actual_keyframe_seq,
@@ -1204,7 +1211,6 @@ class SimulationService:
                 input_params,
                 subscribers=[frame_subscriber],
                 run_id=new_sim.uuid,
-                map_controller=map_controller,
                 env=env,
                 initial_running=False,
                 real_time_factor=0.0,

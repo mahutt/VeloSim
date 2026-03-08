@@ -227,3 +227,154 @@ def test_replay_parser_should_not_auto_resume_when_paused_by_user(
 
     assert state.paused_by_user is True
     assert state.should_auto_resume is False
+
+
+def test_replay_parser_extracts_traffic_config_from_scenario(
+    mock_map_controller: MagicMock,
+) -> None:
+    """Test that ReplayParser extracts traffic config from scenario."""
+    from sim.utils.replay_parser import ReplayParser
+
+    scenario_json = {
+        "start_time": "day1:08:00",
+        "end_time": "day1:17:00",
+        "traffic": {"traffic_level": "high_congestion"},
+    }
+
+    keyframe_json = {
+        "clock": {
+            "simSecondsPassed": 0,
+            "startTime": 0,
+        },
+        "stations": [],
+        "vehicles": [],
+        "drivers": [],
+        "tasks": [],
+    }
+
+    state = ReplayParser.parse(
+        scenario_json=scenario_json,
+        keyframe_json=keyframe_json,
+    )
+
+    assert state.input_parameters.map_payload is not None
+    assert state.input_parameters.map_payload.traffic is not None
+    assert state.input_parameters.map_payload.traffic.traffic_level == (
+        "high_congestion"
+    )
+    assert state.input_parameters.map_payload.traffic.traffic_csv_data is None
+
+
+def test_replay_parser_uses_in_memory_traffic_csv_data(
+    mock_map_controller: MagicMock,
+) -> None:
+    """Test that ReplayParser uses persisted traffic CSV data for resume."""
+    from sim.utils.replay_parser import ReplayParser
+
+    scenario_json = {
+        "start_time": "day1:08:00",
+        "end_time": "day1:17:00",
+        "traffic": {"traffic_level": "medium_congestion"},
+    }
+
+    keyframe_json = {
+        "clock": {
+            "simSecondsPassed": 1800,
+            "startTime": 0,
+        },
+        "stations": [],
+        "vehicles": [],
+        "drivers": [],
+        "tasks": [],
+    }
+
+    csv_data = (
+        "TYPE,start_time,segment_key,name,duration,weight\n"
+        'local_traffic,"08:00","((-73.5,45.5),(-73.6,45.6))",event,10,0.5\n'
+    )
+
+    state = ReplayParser.parse(
+        scenario_json=scenario_json,
+        keyframe_json=keyframe_json,
+        traffic_csv_data=csv_data,
+    )
+
+    assert state.input_parameters.map_payload is not None
+    assert state.input_parameters.map_payload.traffic is not None
+    assert state.input_parameters.map_payload.traffic.traffic_csv_data == csv_data
+    # Level is preserved but CSV data takes precedence
+    assert state.input_parameters.map_payload.traffic.traffic_level == (
+        "medium_congestion"
+    )
+
+
+def test_replay_parser_creates_traffic_config_from_csv_only(
+    mock_map_controller: MagicMock,
+) -> None:
+    """Test backwards compat: create traffic config from CSV data even
+    without traffic block."""
+    from sim.utils.replay_parser import ReplayParser
+
+    scenario_json = {
+        "start_time": "day1:08:00",
+        "end_time": "day1:17:00",
+        # No traffic block in scenario
+    }
+
+    keyframe_json = {
+        "clock": {
+            "simSecondsPassed": 1800,
+            "startTime": 0,
+        },
+        "stations": [],
+        "vehicles": [],
+        "drivers": [],
+        "tasks": [],
+    }
+
+    csv_data = (
+        "TYPE,start_time,segment_key,name,duration,weight\n"
+        'local_traffic,"08:00","((-73.5,45.5),(-73.6,45.6))",event,10,0.5\n'
+    )
+
+    state = ReplayParser.parse(
+        scenario_json=scenario_json,
+        keyframe_json=keyframe_json,
+        traffic_csv_data=csv_data,
+    )
+
+    assert state.input_parameters.map_payload is not None
+    assert state.input_parameters.map_payload.traffic is not None
+    assert state.input_parameters.map_payload.traffic.traffic_csv_data == csv_data
+    assert state.input_parameters.map_payload.traffic.traffic_level == "default"
+
+
+def test_replay_parser_no_traffic_when_no_config_or_csv(
+    mock_map_controller: MagicMock,
+) -> None:
+    """Test that map_payload is None when no traffic config or CSV data."""
+    from sim.utils.replay_parser import ReplayParser
+
+    scenario_json = {
+        "start_time": "day1:08:00",
+        "end_time": "day1:17:00",
+    }
+
+    keyframe_json = {
+        "clock": {
+            "simSecondsPassed": 0,
+            "startTime": 0,
+        },
+        "stations": [],
+        "vehicles": [],
+        "drivers": [],
+        "tasks": [],
+    }
+
+    state = ReplayParser.parse(
+        scenario_json=scenario_json,
+        keyframe_json=keyframe_json,
+        traffic_csv_data=None,
+    )
+
+    assert state.input_parameters.map_payload is None

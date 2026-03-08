@@ -456,6 +456,184 @@ def test_json_parse_strategy_validate_without_parsing() -> None:
     assert any("time" in str(err).lower() for err in errors)
 
 
+def test_json_parse_strategy_defaults_to_default_traffic() -> None:
+    """Test that JsonParseStrategy defaults to 'default' traffic when no traffic
+    block is given (per stakeholder request in #465)."""
+    scenario_json = {
+        "start_time": "day1:08:00",
+        "end_time": "day1:12:00",
+        "vehicle_battery_capacity": 999,
+        "stations": [
+            {
+                "name": "Station 1",
+                "initial_task_count": 1,
+                "scheduled_tasks": [],
+                "position": [-73.5, 45.5],
+            }
+        ],
+        "drivers": [
+            {
+                "name": "Driver 1",
+                "shift": {"start_time": "day1:08:00", "end_time": "day1:12:00"},
+            }
+        ],
+        "vehicles": [
+            {"name": "Vehicle 1", "position": [-73.561, 45.507], "battery_count": 10}
+        ],
+    }
+
+    strategy = JsonParseStrategy(scenario_json=scenario_json)
+    params: InputParameter = strategy.parse()
+
+    assert params.map_payload is not None
+    assert params.map_payload.traffic is not None
+    assert params.map_payload.traffic.traffic_level == "default"
+
+
+def test_json_parse_strategy_no_traffic_overrides_to_none() -> None:
+    """Test that explicitly setting traffic_level to 'no_traffic' yields no
+    traffic config."""
+    scenario_json = {
+        "start_time": "day1:08:00",
+        "end_time": "day1:12:00",
+        "vehicle_battery_capacity": 999,
+        "traffic": {"traffic_level": "no_traffic"},
+        "stations": [
+            {
+                "name": "Station 1",
+                "initial_task_count": 1,
+                "scheduled_tasks": [],
+                "position": [-73.5, 45.5],
+            }
+        ],
+        "drivers": [
+            {
+                "name": "Driver 1",
+                "shift": {"start_time": "day1:08:00", "end_time": "day1:12:00"},
+            }
+        ],
+        "vehicles": [
+            {"name": "Vehicle 1", "position": [-73.561, 45.507], "battery_count": 10}
+        ],
+    }
+
+    strategy = JsonParseStrategy(scenario_json=scenario_json)
+    params: InputParameter = strategy.parse()
+
+    assert params.map_payload is None
+
+
+def test_json_parse_strategy_invalid_traffic_level_raises_error() -> None:
+    """Test that an invalid traffic_level raises ScenarioParseError on parse."""
+    scenario_json = {
+        "start_time": "day1:08:00",
+        "end_time": "day1:12:00",
+        "vehicle_battery_capacity": 999,
+        "traffic": {"traffic_level": "rando"},
+        "stations": [
+            {
+                "name": "Station 1",
+                "initial_task_count": 1,
+                "scheduled_tasks": [],
+                "position": [-73.5, 45.5],
+            }
+        ],
+        "drivers": [
+            {
+                "name": "Driver 1",
+                "shift": {"start_time": "day1:08:00", "end_time": "day1:12:00"},
+            }
+        ],
+        "vehicles": [
+            {"name": "Vehicle 1", "position": [-73.561, 45.507], "battery_count": 10}
+        ],
+    }
+
+    strategy = JsonParseStrategy(scenario_json=scenario_json)
+
+    with pytest.raises(ScenarioParseError) as exc_info:
+        strategy.parse()
+
+    assert "traffic_level" in str(exc_info.value)
+    assert "rando" in str(exc_info.value)
+
+
+def test_validate_catches_invalid_traffic_level_before_save() -> None:
+    """Test that validate() catches invalid traffic_level so bad scenarios
+    cannot be saved to the database."""
+    scenario_json = {
+        "start_time": "day1:08:00",
+        "end_time": "day1:12:00",
+        "vehicle_battery_capacity": 999,
+        "traffic": {"traffic_level": "rando"},
+        "stations": [
+            {
+                "name": "Station 1",
+                "initial_task_count": 1,
+                "scheduled_tasks": [],
+                "position": [-73.5, 45.5],
+            }
+        ],
+        "drivers": [
+            {
+                "name": "Driver 1",
+                "shift": {"start_time": "day1:08:00", "end_time": "day1:12:00"},
+            }
+        ],
+        "vehicles": [
+            {"name": "Vehicle 1", "position": [-73.561, 45.507], "battery_count": 10}
+        ],
+    }
+
+    strategy = JsonParseStrategy(scenario_json=scenario_json)
+    errors = strategy.validate()
+
+    assert len(errors) > 0
+    assert any(e.get("field") == "traffic_level" for e in errors)
+    assert any("rando" in e.get("message", "") for e in errors)
+
+
+def test_validate_accepts_valid_traffic_levels() -> None:
+    """Test that all supported traffic levels pass validation."""
+    supported = [
+        "high_congestion",
+        "medium_congestion",
+        "low_congestion",
+        "default",
+        "no_traffic",
+    ]
+    base_scenario = {
+        "start_time": "day1:08:00",
+        "end_time": "day1:12:00",
+        "vehicle_battery_capacity": 999,
+        "stations": [
+            {
+                "name": "Station 1",
+                "initial_task_count": 1,
+                "scheduled_tasks": [],
+                "position": [-73.5, 45.5],
+            }
+        ],
+        "drivers": [
+            {
+                "name": "Driver 1",
+                "shift": {"start_time": "day1:08:00", "end_time": "day1:12:00"},
+            }
+        ],
+        "vehicles": [
+            {"name": "Vehicle 1", "position": [-73.561, 45.507], "battery_count": 10}
+        ],
+    }
+    for level in supported:
+        scenario = {**base_scenario, "traffic": {"traffic_level": level}}
+        strategy = JsonParseStrategy(scenario_json=scenario)
+        errors = strategy.validate()
+        traffic_errors = [e for e in errors if e.get("field") == "traffic_level"]
+        assert (
+            traffic_errors == []
+        ), f"Unexpected error for level '{level}': {traffic_errors}"
+
+
 def test_scenario_parser_delegates_to_strategy() -> None:
     fake_input_param = InputParameter({}, {}, {})
 
