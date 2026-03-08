@@ -624,6 +624,7 @@ class TestTrafficParser:
         with patch.object(Path, "exists", return_value=True):
             parser = TrafficParser(traffic_config)
 
+            assert parser._path is not None
             actual_path = parser._path.as_posix()
             expected_path = "sim/traffic/traffic_datasets/traffic.csv"
             assert expected_path in actual_path
@@ -638,6 +639,7 @@ class TestTrafficParser:
         with patch.object(Path, "exists", return_value=True):
             parser = TrafficParser(traffic_config)
 
+            assert parser._path is not None
             actual_path = parser._path.as_posix()
             expected_path = f"sim/traffic/traffic_datasets/{test_level}.csv"
             assert expected_path in actual_path
@@ -654,3 +656,112 @@ class TestTrafficParser:
             match=f"Could not find path for unsupported level '{test_level}'",
         ):
             TrafficParser(traffic_config)
+
+
+# =============================================================================
+# TrafficParser In-Memory CSV Tests
+# =============================================================================
+
+
+class TestTrafficParserInMemory:
+    """Tests for TrafficParser with in-memory CSV data."""
+
+    def test_parse_from_in_memory_csv(self) -> None:
+        """Test parsing traffic events from in-memory CSV string."""
+        csv_content = (
+            "TYPE,start_time,segment_key,name,duration,weight\n"
+            'local_traffic,"08:05","((-73.5673,45.5017),(-73.5680,45.5020))",'
+            "rush_hour,50,0.3\n"
+        )
+        traffic_config = TrafficConfig(
+            traffic_csv_data=csv_content,  # In-memory data
+            sim_start_time="day1:08:00",
+            sim_end_time="day1:12:00",
+        )
+        parser = TrafficParser(traffic_config)
+        events = parser.parse()
+
+        assert len(events) == 1
+        assert events[0].event_type == "local_traffic"
+        assert events[0].tick_start == 300  # 5 minutes * 60 seconds
+        assert events[0].name == "rush_hour"
+        assert events[0].duration == 50
+        assert events[0].weight == 0.3
+        assert events[0].state == TrafficEventState.PENDING
+
+    def test_parse_multiple_events_from_in_memory(self) -> None:
+        """Test parsing multiple traffic events from in-memory CSV."""
+        csv_content = (
+            "TYPE,start_time,segment_key,name,duration,weight\n"
+            'local_traffic,"08:00","((-73.5,45.5),(-73.6,45.6))",event1,10,0.5\n'
+            'local_traffic,"08:30","((-73.5,45.5),(-73.6,45.6))",event2,20,0.7\n'
+        )
+        traffic_config = TrafficConfig(
+            traffic_csv_data=csv_content,
+            sim_start_time="day1:08:00",
+            sim_end_time="day1:12:00",
+        )
+        parser = TrafficParser(traffic_config)
+        events = parser.parse()
+
+        assert len(events) == 2
+        assert events[0].name == "event1"
+        assert events[0].tick_start == 0
+        assert events[1].name == "event2"
+        assert events[1].tick_start == 1800
+
+    def test_in_memory_empty_csv(self) -> None:
+        """Test that empty in-memory CSV raises appropriate error."""
+        traffic_config = TrafficConfig(
+            traffic_csv_data="",
+            sim_start_time="day1:08:00",
+            sim_end_time="day1:12:00",
+        )
+        parser = TrafficParser(traffic_config)
+        with pytest.raises(TrafficParseError, match="empty"):
+            parser.parse()
+
+    def test_in_memory_csv_missing_columns(self) -> None:
+        """Test in-memory CSV with missing required columns."""
+        csv_content = "TYPE,start_time\n" 'local_traffic,"08:00"\n'
+        traffic_config = TrafficConfig(
+            traffic_csv_data=csv_content,
+            sim_start_time="day1:08:00",
+            sim_end_time="day1:12:00",
+        )
+        parser = TrafficParser(traffic_config)
+        with pytest.raises(TrafficParseError, match="Missing required columns"):
+            parser.parse()
+
+    def test_no_template_and_no_in_memory_data_raises_error(self) -> None:
+        """Test missing both template and in-memory data raises error."""
+        traffic_config = TrafficConfig(
+            traffic_level="invalid_template",  # Invalid template
+            traffic_csv_data=None,  # No in-memory data
+            sim_start_time="day1:08:00",
+            sim_end_time="day1:12:00",
+        )
+        with pytest.raises(
+            ValueError,
+            match="Could not find path for unsupported level",
+        ):
+            TrafficParser(traffic_config)
+
+    def test_prefers_in_memory_over_template(self) -> None:
+        """Test that in-memory CSV is used when both template and data are provided."""
+        csv_content_memory = (
+            "TYPE,start_time,segment_key,name,duration,weight\n"
+            'local_traffic,"08:00","((-73.5,45.5),(-73.6,45.6))",memory_event,10,0.5\n'
+        )
+        # Even if we specify a traffic level, in-memory data should be used
+        traffic_config = TrafficConfig(
+            traffic_level="high_congestion",  # Template specified
+            traffic_csv_data=csv_content_memory,  # But in-memory data takes priority
+            sim_start_time="day1:08:00",
+            sim_end_time="day1:12:00",
+        )
+        parser = TrafficParser(traffic_config)
+        events = parser.parse()
+
+        assert len(events) == 1
+        assert events[0].name == "memory_event"

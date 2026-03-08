@@ -24,9 +24,10 @@ SOFTWARE.
 
 import ast
 import csv
+import io
 from datetime import datetime
 from pathlib import Path
-from typing import List, Optional
+from typing import List, Optional, TextIO, Union
 
 from sim.entities.traffic_event import TrafficEvent
 from sim.entities.traffic_event_state import TrafficEventState
@@ -70,19 +71,26 @@ class TrafficParser:
             traffic_config: TrafficConfig with traffic settings.
 
         Raises:
-            FileNotFoundError: If the CSV file does not exist.
+            FileNotFoundError: If no traffic data is available
+                (neither template nor in-memory).
         """
-        traffic_level = traffic_config.traffic_level
         self._start_time = traffic_config.sim_start_time
         self._end_time = traffic_config.sim_end_time
         self._window_start: Optional[int] = None
         self._window_end: Optional[int] = None
+        self._csv_data = traffic_config.traffic_csv_data
 
-        csv_path = self._template_path_from_level(traffic_level)
-        if csv_path:
-            self._path = Path(csv_path)
+        # Support template-based traffic OR in-memory traffic
+        # If in-memory data is provided, use it; otherwise use template
+        self._path: Optional[Path] = None
+
+        if self._csv_data is None:
+            # No in-memory data, so use template
+            traffic_level = traffic_config.traffic_level
+            template_path = self._template_path_from_level(traffic_level)
+            self._path = Path(template_path)
             if not self._path.exists():
-                raise FileNotFoundError(f"Traffic CSV file not found: {csv_path}")
+                raise FileNotFoundError(f"Traffic CSV file not found: {template_path}")
 
     def parse(self) -> List[TrafficEvent]:
         """Parse the CSV file and return a list of TrafficEvent objects.
@@ -98,8 +106,19 @@ class TrafficParser:
         events: List[TrafficEvent] = []
         errors: List[str] = []
 
-        with open(self._path, newline="", encoding="utf-8") as f:
-            reader = csv.DictReader(f)
+        # Use in-memory CSV data if available, otherwise read from file
+        if self._csv_data is not None:
+            ctx: Union[io.StringIO, TextIO] = io.StringIO(self._csv_data)
+        else:
+            if self._path is None:
+                raise ValueError(
+                    "TrafficParser has no CSV path and no in-memory data. "
+                    "Check TrafficConfig initialization."
+                )
+            ctx = open(self._path, newline="", encoding="utf-8")
+
+        with ctx as file_handle:
+            reader = csv.DictReader(file_handle)
 
             if reader.fieldnames is None:
                 raise TrafficParseError(["CSV file is empty or has no header row"])

@@ -29,6 +29,7 @@ from typing import Generator, cast
 from sqlalchemy.orm import Session
 from back.exceptions import VelosimPermissionError, ItemNotFoundError
 from back.models.user import User
+from back.models.sim_instance import SimInstance
 from back.schemas.playback_speed import (
     ALLOWED_SPEEDS,
     PlaybackSpeedBase,
@@ -1304,6 +1305,7 @@ class TestSimulationService:
         mock_data_service.get_last_persisted_keyframe.return_value = (
             keyframe_with_user_pause
         )
+        mock_data_service.get_traffic_csv_data.return_value = None
         simulation_service.simulation_data_service = mock_data_service
 
         # Restore simulation
@@ -1485,20 +1487,29 @@ class TestBranchSimulation:
             query_chain = mock_db.query.return_value.filter.return_value
             query_chain.order_by.return_value.first.return_value = mock_keyframe
 
-            # Mock ReplayParser.parse to raise exception
-            mock_replay_parser.parse.side_effect = Exception("Invalid keyframe format")
-
-            # Should raise ValueError wrapping parse exception
-            with pytest.raises(
-                ValueError, match="Failed to parse keyframe 50.*Invalid keyframe format"
+            # Mock traffic CSV data retrieval
+            with patch.object(
+                simulation_service.simulation_data_service,
+                "get_traffic_csv_data",
+                return_value=None,
             ):
-                simulation_service.branch_simulation(
-                    db=mock_db,
-                    sim_id="source-sim-123",
-                    keyframe_seq=50,
-                    name="Test Branch",
-                    requesting_user=test_user.id,
+                # Mock ReplayParser.parse to raise exception
+                mock_replay_parser.parse.side_effect = Exception(
+                    "Invalid keyframe format"
                 )
+
+                # Should raise ValueError wrapping parse exception
+                with pytest.raises(
+                    ValueError,
+                    match="Failed to parse keyframe 50.*Invalid keyframe format",
+                ):
+                    simulation_service.branch_simulation(
+                        db=mock_db,
+                        sim_id="source-sim-123",
+                        keyframe_seq=50,
+                        name="Test Branch",
+                        requesting_user=test_user.id,
+                    )
 
     def test_branch_simulation_initialization_failure_triggers_rollback(
         self,
@@ -1532,43 +1543,141 @@ class TestBranchSimulation:
             query_chain = mock_db.query.return_value.filter.return_value
             query_chain.order_by.return_value.first.return_value = mock_keyframe
 
-            # Mock successful keyframe parsing
-            mock_resume_state = Mock(
-                input_parameters=Mock(start_time=0, sim_time=100),
-                map_controller=Mock(),
-                current_time_seconds=50.0,
+            # Mock traffic CSV data retrieval
+            with patch.object(
+                simulation_service.simulation_data_service,
+                "get_traffic_csv_data",
+                return_value=None,
+            ):
+                # Mock successful keyframe parsing
+                mock_resume_state = Mock(
+                    input_parameters=Mock(start_time=0, sim_time=100),
+                    current_time_seconds=50.0,
+                )
+                mock_replay_parser.parse.return_value = mock_resume_state
+
+                # Mock new sim creation
+                new_sim = Mock(
+                    id=200,
+                    uuid="new-sim-456",
+                    name="Test Branch",
+                )
+                mock_sim_instance_crud.create.return_value = new_sim
+
+                # Mock frame copying
+                mock_sim_frame_crud.copy_frames_to_new_instance.return_value = 10
+
+                # Mock SimulationEnvironment creation
+                mock_env_instance = Mock()
+                mock_simulation_environment.return_value = mock_env_instance
+
+                # Mock FramePersistenceSubscriber
+                mock_subscriber_instance = Mock()
+                mock_frame_subscriber.return_value = mock_subscriber_instance
+
+                # Mock simulator to raise exception during initialize
+                mock_simulator = Mock()
+                mock_simulator.initialize.side_effect = Exception(
+                    "Simulator initialization failed"
+                )
+                simulation_service.simulator = mock_simulator
+
+                # Should raise exception and trigger rollback
+                with pytest.raises(Exception, match="Simulator initialization failed"):
+                    simulation_service.branch_simulation(
+                        db=mock_db,
+                        sim_id="source-sim-123",
+                        keyframe_seq=50,
+                        name="Test Branch",
+                        requesting_user=test_user.id,
+                    )
+
+                # Verify rollback was called
+                mock_db.rollback.assert_called_once()
+
+                # Verify commit was NOT called after rollback
+                # (initialization failed)
+                # Note: copy_frames_to_new_instance is mocked
+                mock_db.commit.assert_not_called()
+
+                # Verify refresh was NOT called
+                mock_db.refresh.assert_not_called()
+
+    def test_branch_simulation_copies_traffic_csv_data(
+        self,
+        simulation_service: SimulationService,
+        mock_db: Mock,
+        mock_sim_instance_crud: Mock,
+        mock_sim_frame_crud: Mock,
+        mock_replay_parser: Mock,
+        mock_simulation_environment: Mock,
+        mock_frame_subscriber: Mock,
+        test_user: User,
+    ) -> None:
+        """Test that traffic CSV data is copied to branched simulation."""
+        # Setup: source sim with traffic CSV data
+        traffic_csv_content = (
+            "TYPE,start_time,segment_key,name,duration,weight\n"
+            'local_traffic,"08:00","((-73.5,45.5),(-73.6,45.6))",event,10,0.5\n'
+        )
+        source_sim = Mock(
+            id=100,
+            uuid="source-sim-123",
+            user_id=test_user.id,
+            scenario_payload={"valid": "scenario"},
+            traffic_csv_data=traffic_csv_content,
+        )
+        mock_sim_instance_crud.get_by_uuid.return_value = source_sim
+
+        # Mock verify_access to pass
+        with patch.object(simulation_service, "verify_access", return_value=True):
+            # Mock finding a keyframe
+            mock_keyframe = Mock(
+                seq_number=50,
+                frame_data={"test": "data"},
+                is_key=True,
             )
-            mock_replay_parser.parse.return_value = mock_resume_state
+            query_chain = mock_db.query.return_value.filter.return_value
+            query_chain.order_by.return_value.first.return_value = mock_keyframe
 
-            # Mock new sim creation
-            new_sim = Mock(
-                id=200,
-                uuid="new-sim-456",
-                name="Test Branch",
-            )
-            mock_sim_instance_crud.create.return_value = new_sim
+            # Mock traffic CSV data retrieval
+            with patch.object(
+                simulation_service.simulation_data_service,
+                "get_traffic_csv_data",
+                return_value=traffic_csv_content,
+            ) as mock_get_traffic_csv_data:
+                # Mock successful keyframe parsing
+                mock_resume_state = Mock(
+                    input_parameters=Mock(start_time=0, sim_time=100),
+                    current_time_seconds=50.0,
+                )
+                mock_replay_parser.parse.return_value = mock_resume_state
 
-            # Mock frame copying
-            mock_sim_frame_crud.copy_frames_to_new_instance.return_value = 10
+                # Mock new sim creation
+                new_sim = Mock(spec=SimInstance)
+                new_sim.id = 200
+                new_sim.uuid = "new-sim-456"
+                new_sim.name = "Test Branch"
+                mock_sim_instance_crud.create.return_value = new_sim
 
-            # Mock SimulationEnvironment creation
-            mock_env_instance = Mock()
-            mock_simulation_environment.return_value = mock_env_instance
+                # Mock frame copying
+                mock_sim_frame_crud.copy_frames_to_new_instance.return_value = 10
 
-            # Mock FramePersistenceSubscriber
-            mock_subscriber_instance = Mock()
-            mock_frame_subscriber.return_value = mock_subscriber_instance
+                # Mock SimulationEnvironment
+                mock_env = Mock()
+                mock_simulation_environment.return_value = mock_env
 
-            # Mock simulator to raise exception during initialize
-            mock_simulator = Mock()
-            mock_simulator.initialize.side_effect = Exception(
-                "Simulator initialization failed"
-            )
-            simulation_service.simulator = mock_simulator
+                # Mock FramePersistenceSubscriber
+                mock_subscriber = Mock()
+                mock_frame_subscriber.return_value = mock_subscriber
 
-            # Should raise exception and trigger rollback
-            with pytest.raises(Exception, match="Simulator initialization failed"):
-                simulation_service.branch_simulation(
+                # Mock simulator
+                mock_simulator = Mock()
+                mock_simulator.initialize.return_value = "new-sim-456"
+                simulation_service.simulator = mock_simulator
+
+                # Call branch_simulation
+                result = simulation_service.branch_simulation(
                     db=mock_db,
                     sim_id="source-sim-123",
                     keyframe_seq=50,
@@ -1576,13 +1685,20 @@ class TestBranchSimulation:
                     requesting_user=test_user.id,
                 )
 
-            # Verify rollback was called
-            mock_db.rollback.assert_called_once()
+                # Verify get_traffic_csv_data was called
+                mock_get_traffic_csv_data.assert_called_once_with(
+                    mock_db, "source-sim-123"
+                )
 
-            # Verify commit was NOT called after rollback
-            # (initialization failed)
-            # Note: copy_frames_to_new_instance is mocked
-            mock_db.commit.assert_not_called()
+                # Verify ReplayParser.parse was called with traffic CSV data
+                mock_replay_parser.parse.assert_called_once()
+                call_kwargs = mock_replay_parser.parse.call_args[1]
+                assert call_kwargs["traffic_csv_data"] == traffic_csv_content
 
-            # Verify refresh was NOT called
-            mock_db.refresh.assert_not_called()
+                # Verify new SimInstance was created with traffic CSV data
+                mock_sim_instance_crud.create.assert_called_once()
+                create_call_args = mock_sim_instance_crud.create.call_args[0]
+                sim_instance_data = create_call_args[1]
+                assert sim_instance_data.traffic_csv_data == traffic_csv_content
+
+                assert result.sim_id == "new-sim-456"

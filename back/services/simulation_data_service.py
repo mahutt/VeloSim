@@ -133,6 +133,31 @@ class SimulationDataService:
 
         return cast(dict[str, Any], keyframe.frame_data)
 
+    def get_traffic_csv_data(
+        self,
+        db: Session,
+        sim_id: str,
+    ) -> str | None:
+        """
+        Retrieve the persisted traffic CSV data for a simulation instance.
+
+        Args:
+            db: Active database session.
+            sim_id: UUID of the simulation instance.
+
+        Returns:
+            The traffic CSV data as a string, or None if no traffic data exists.
+
+        Raises:
+            ItemNotFoundError: If the simulation instance does not exist.
+        """
+        sim_instance = db.query(SimInstance).filter(SimInstance.uuid == sim_id).first()
+
+        if not sim_instance:
+            raise ItemNotFoundError(f"Simulation instance {sim_id} not found")
+
+        return sim_instance.traffic_csv_data
+
     def get_last_persisted_keyframe_by_id(
         self,
         db: Session,

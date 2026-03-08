@@ -23,7 +23,6 @@ SOFTWARE.
 """
 
 from datetime import datetime
-from pathlib import Path
 from typing import Dict, List, Any, Set, Optional
 import re
 from pydantic import (
@@ -43,8 +42,9 @@ from sim.entities.vehicle import Vehicle
 from sim.entities.battery_swap_task import BatterySwapTask
 from sim.entities.shift import Shift
 from sim.entities.position import Position
-from sim.entities.map_payload import MapPayload, TrafficConfig
+from sim.entities.map_payload import MapPayload
 from sim.utils.base_parse_strategy import BaseParseStrategy
+from sim.utils.traffic_config_extractor import extract_traffic_config
 
 
 # ==============================================================================
@@ -910,27 +910,28 @@ class _ScenarioValidator:
         Returns:
             List of validation errors related to traffic configuration.
         """
-        errors: List[Dict[str, Any]] = []
+        supported_templates = {
+            "high_congestion",
+            "medium_congestion",
+            "low_congestion",
+            "default",
+            "no_traffic",
+        }
         traffic_raw = content.get("traffic", None)
-        if traffic_raw is not None and isinstance(traffic_raw, dict):
-            traffic_path = traffic_raw.get("traffic_path", "")
-            if traffic_path:
-                path_obj = Path(traffic_path)
-                if not path_obj.exists():
-                    errors.append(
-                        {
-                            "field": "traffic.traffic_path",
-                            "message": f"Traffic file not found: {traffic_path}",
-                        }
-                    )
-                elif not path_obj.is_file():
-                    errors.append(
-                        {
-                            "field": "traffic.traffic_path",
-                            "message": f"Traffic path is not a file: {traffic_path}",
-                        }
-                    )
-        return errors
+        if traffic_raw is None or not isinstance(traffic_raw, dict):
+            return []
+        traffic_level = traffic_raw.get("traffic_level", "default")
+        if traffic_level not in supported_templates:
+            return [
+                {
+                    "field": "traffic_level",
+                    "message": (
+                        f"Unsupported traffic_level '{traffic_level}'. "
+                        f"Supported: {', '.join(sorted(supported_templates))}"
+                    ),
+                }
+            ]
+        return []
 
     def validate_all(self, scenario_content: Dict[str, Any]) -> List[Dict[str, Any]]:
         """Validate all aspects of scenario content.
@@ -1127,35 +1128,24 @@ class JsonParseStrategy(BaseParseStrategy):
         sim_time = end_time - start_time
 
         # Extract traffic configuration (optional param)
+        # New sims default to "default" traffic when no traffic block is specified
+        # (per stakeholder request in #465). We inject the default here rather than
+        # in extract_traffic_config so that the resume path (ReplayParser) is
+        # unaffected — older sims without a traffic block should stay traffic-free.
+        content_with_traffic = (
+            content
+            if "traffic" in content
+            else {**content, "traffic": {"traffic_level": "default"}}
+        )
         map_payload = None
-        supported_templates = {
-            "high_congestion",
-            "medium_congestion",
-            "low_congestion",
-            "default",
-            "no_traffic",
-        }
-        traffic_raw = content.get("traffic", None)
-        if traffic_raw is not None and isinstance(traffic_raw, dict):
-            traffic_level = traffic_raw.get("traffic_level", "default")
-        else:
-            traffic_level = "default"
-
-        if traffic_level not in supported_templates:
-            raise ValueError(
-                f"Unsupported traffic_level '{traffic_level}'. "
-                f"Supported: {', '.join(supported_templates)}"
-            )
-        if traffic_level != "no_traffic":
-            start_daytime = str(content.get("start_time", "day1:00:00"))
-            end_daytime = str(content.get("end_time", "day1:00:00"))
-            map_payload = MapPayload(
-                traffic=TrafficConfig(
-                    traffic_level=traffic_level,
-                    sim_start_time=start_daytime,
-                    sim_end_time=end_daytime,
-                )
-            )
+        try:
+            traffic_config = extract_traffic_config(content_with_traffic)
+            if traffic_config is not None:
+                map_payload = MapPayload(traffic=traffic_config)
+        except ValueError as e:
+            raise ScenarioParseError(
+                [{"field": "traffic_level", "message": str(e)}]
+            ) from e
 
         # Entity Counters
         task_id_counter = 1

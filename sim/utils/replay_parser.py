@@ -22,7 +22,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 """
 
-from typing import Any
+from typing import Any, Optional
 from sim.entities.battery_swap_task import BatterySwapTask
 from sim.entities.input_parameter import InputParameter
 from sim.entities.position import Position
@@ -32,7 +32,9 @@ from sim.entities.station import Station
 from sim.entities.driver import Driver, DriverState
 from sim.entities.task_state import State
 from sim.entities.vehicle import Vehicle
+from sim.entities.map_payload import MapPayload
 from sim.map.map_controller import MapController
+from sim.utils.traffic_config_extractor import extract_traffic_config
 from grafana_logging.logger import get_logger
 
 logger = get_logger(__name__)
@@ -92,6 +94,7 @@ class ReplayParser:
         cls,
         scenario_json: dict,
         keyframe_json: dict,
+        traffic_csv_data: Optional[str] = None,
     ) -> SimulationRuntimeState:
         """
         Reconstruct simulation input parameters from scenario and keyframe data.
@@ -102,6 +105,7 @@ class ReplayParser:
         Args:
             scenario_json: Serialized scenario configuration.
             keyframe_json: Serialized keyframe snapshot of simulation state.
+            traffic_csv_data: Optional persisted traffic CSV content for replay.
 
         Returns:
             A tuple containing:
@@ -117,6 +121,10 @@ class ReplayParser:
         real_time_factor = keyframe_json["clock"].get("realTimeFactor", 1.0)
         paused_by_user = keyframe_json["clock"].get("pausedByUser", False)
 
+        # Extract traffic config from scenario + persisted CSV data
+        traffic_config = extract_traffic_config(scenario_json, traffic_csv_data)
+        map_payload = MapPayload(traffic=traffic_config) if traffic_config else None
+
         input_param = InputParameter(
             station_entities={},
             driver_entities={},
@@ -124,6 +132,7 @@ class ReplayParser:
             task_entities={},
             sim_time=scenario_end,
             start_time=keyframe_json["clock"]["startTime"],
+            map_payload=map_payload,
         )
 
         # Entity lookup tables

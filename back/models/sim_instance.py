@@ -23,7 +23,7 @@ SOFTWARE.
 """
 
 from typing import TYPE_CHECKING, Any, List, Optional
-from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String, func
+from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String, Text, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from back.database.session import Base
 from back.models.scenario import JSONBCompatible
@@ -66,6 +66,9 @@ class SimInstance(Base):
     scenario_payload: Mapped[Optional[Any]] = mapped_column(
         JSONBCompatible, nullable=True
     )
+
+    # Persisted traffic CSV data (to ensure deterministic replay even if file changes)
+    traffic_csv_data: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
 
     # User-provided name for the simulation instance
     name: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
