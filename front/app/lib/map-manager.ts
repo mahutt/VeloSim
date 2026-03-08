@@ -332,18 +332,12 @@ export default class MapManager {
       const route = routes.get(selectedResourceId);
       const position = currentPositions.get(selectedResourceId);
       if (route && position) {
-        updateRouteDisplay(
-          route.coordinates,
-          position,
-          route.nextStopIndex,
-          map,
-          route.trafficRanges
-        );
+        updateRouteDisplay(route, position, map);
       } else {
-        updateRouteDisplay(null, [0, 0], 0, map);
+        updateRouteDisplay(null, [0, 0], map);
       }
     } else {
-      updateRouteDisplay(null, [0, 0], 0, map);
+      updateRouteDisplay(null, [0, 0], map);
     }
   }
 

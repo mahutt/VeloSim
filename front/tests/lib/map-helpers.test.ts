@@ -270,7 +270,6 @@ test('updateRouteDisplay clears display when routeGeometry is null', () => {
   updateRouteDisplay(
     null,
     [0, 0],
-    0,
     MockMap.instance! as unknown as mapboxgl.Map
   );
 
@@ -292,9 +291,8 @@ test('updateRouteDisplay clears display when routeGeometry has less than 2 point
   MockMap.instance!.getSource = vi.fn().mockReturnValue(mockGeoJSONSource);
 
   updateRouteDisplay(
-    [[-73.5, 45.5]],
+    { coordinates: [[-73.5, 45.5]], nextStopIndex: 0 },
     [0, 0],
-    0,
     MockMap.instance! as unknown as mapboxgl.Map
   );
 
@@ -319,9 +317,8 @@ test('updateRouteDisplay splits route at nextStopIndex', () => {
   ];
 
   updateRouteDisplay(
-    routeGeometry,
+    { coordinates: routeGeometry, nextStopIndex: 2 },
     [0, 0],
-    2,
     MockMap.instance! as unknown as mapboxgl.Map
   );
 
@@ -361,9 +358,8 @@ test('updateRouteDisplay handles nextStopIndex at start (0)', () => {
 
   // nextStopIndex = 1 means split at first task
   updateRouteDisplay(
-    routeGeometry,
+    { coordinates: routeGeometry, nextStopIndex: 1 },
     [-73.5, 45.5],
-    1,
     MockMap.instance! as unknown as mapboxgl.Map
   );
 
@@ -391,9 +387,8 @@ test('updateRouteDisplay handles nextStopIndex at end of route', () => {
 
   // nextStopIndex = 2 is at the last valid index
   updateRouteDisplay(
-    routeGeometry,
+    { coordinates: routeGeometry, nextStopIndex: 2 },
     [-73.5, 45.5],
-    2,
     MockMap.instance! as unknown as mapboxgl.Map
   );
 
@@ -442,9 +437,9 @@ test('setMapLayers adds route layers with correct configuration', () => {
         ['linear'],
         ['zoom'],
         10,
-        1.5,
+        1,
         13,
-        2.5,
+        2,
         15,
         3,
         17,
@@ -490,9 +485,9 @@ test('setMapLayers adds route layers with correct configuration', () => {
         ['linear'],
         ['zoom'],
         10,
-        1.5,
+        1,
         13,
-        2.5,
+        2,
         15,
         3,
         17,
@@ -771,11 +766,9 @@ test('updateRouteDisplay passes traffic ranges through to route features', () =>
   ];
 
   updateRouteDisplay(
-    routeGeometry,
+    { coordinates: routeGeometry, nextStopIndex: 3, trafficRanges },
     [-73.5, 45.5],
-    3,
-    MockMap.instance! as unknown as mapboxgl.Map,
-    trafficRanges
+    MockMap.instance! as unknown as mapboxgl.Map
   );
 
   const nextTaskCall = mockGeoJSONSource.setData.mock.calls[0][0];

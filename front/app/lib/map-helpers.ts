@@ -22,7 +22,12 @@
  * SOFTWARE.
  */
 
-import type { Position, Route, TrafficRange } from '~/types';
+import {
+  FREE_FLOW_COLOR,
+  ROUTE_LINE_OFFSET,
+  ROUTE_LINE_WIDTH,
+} from '~/constants';
+import type { Position, Route } from '~/types';
 import { adaptRouteToGeoJSON } from './geojson-adapters';
 
 export enum MapSource {
@@ -145,42 +150,10 @@ export function setMapLayers(map: mapboxgl.Map) {
       'line-cap': 'round',
     },
     paint: {
-      'line-color': ['coalesce', ['get', 'color'], '#22c55e'],
-      'line-width': [
-        'interpolate',
-        ['linear'],
-        ['zoom'],
-        10,
-        1,
-        13,
-        2,
-        15,
-        3,
-        17,
-        4,
-        20,
-        6,
-        22,
-        8,
-      ],
+      'line-color': ['coalesce', ['get', 'color'], FREE_FLOW_COLOR],
+      'line-width': ROUTE_LINE_WIDTH,
       'line-opacity': 0.35,
-      'line-offset': [
-        'interpolate',
-        ['linear'],
-        ['zoom'],
-        10,
-        0,
-        13,
-        1,
-        15,
-        2,
-        17,
-        4,
-        20,
-        6,
-        22,
-        8,
-      ],
+      'line-offset': ROUTE_LINE_OFFSET,
     },
   });
 
@@ -194,42 +167,10 @@ export function setMapLayers(map: mapboxgl.Map) {
       'line-cap': 'round',
     },
     paint: {
-      'line-color': ['coalesce', ['get', 'color'], '#22c55e'],
-      'line-width': [
-        'interpolate',
-        ['linear'],
-        ['zoom'],
-        10,
-        1.5,
-        13,
-        2.5,
-        15,
-        3,
-        17,
-        4,
-        20,
-        6,
-        22,
-        8,
-      ],
+      'line-color': ['coalesce', ['get', 'color'], FREE_FLOW_COLOR],
+      'line-width': ROUTE_LINE_WIDTH,
       'line-opacity': ['coalesce', ['get', 'opacity'], 0.9],
-      'line-offset': [
-        'interpolate',
-        ['linear'],
-        ['zoom'],
-        10,
-        0,
-        13,
-        1,
-        15,
-        2,
-        17,
-        4,
-        20,
-        6,
-        22,
-        8,
-      ],
+      'line-offset': ROUTE_LINE_OFFSET,
     },
   });
 
@@ -242,46 +183,14 @@ export function setMapLayers(map: mapboxgl.Map) {
       'line-cap': 'round',
     },
     paint: {
-      'line-color': ['coalesce', ['get', 'color'], '#22c55e'],
-      'line-width': [
-        'interpolate',
-        ['linear'],
-        ['zoom'],
-        10,
-        1.5,
-        13,
-        2.5,
-        15,
-        3,
-        17,
-        4,
-        20,
-        6,
-        22,
-        8,
-      ],
+      'line-color': ['coalesce', ['get', 'color'], FREE_FLOW_COLOR],
+      'line-width': ROUTE_LINE_WIDTH,
       'line-opacity': [
         'number',
         ['*', ['coalesce', ['get', 'opacity'], 0.9], 0.45],
         0.4,
       ],
-      'line-offset': [
-        'interpolate',
-        ['linear'],
-        ['zoom'],
-        10,
-        0,
-        13,
-        1,
-        15,
-        2,
-        17,
-        4,
-        20,
-        6,
-        22,
-        8,
-      ],
+      'line-offset': ROUTE_LINE_OFFSET,
     },
   });
 
@@ -402,23 +311,20 @@ export function setMapSource(
 
 /**
  * Update route visualization for a selected resource
- * @param routeGeometry - Full route coordinates (raw OSRM linestring)
- * @param progress - Current progress through route (0-1 fractional)
- * @param nextStopIndex - Index where first task in task queue ends within route
+ * @param route - Route object containing coordinates, nextStopIndex, and optional trafficRanges (or null to clear)
+ * @param position - Current driver position
  * @param map - Mapbox map instance
  */
 export function updateRouteDisplay(
-  routeGeometry: Position[] | null,
+  route: Route | null,
   position: Position,
-  nextStopIndex: number,
-  map: mapboxgl.Map,
-  trafficRanges?: TrafficRange[]
+  map: mapboxgl.Map
 ) {
   const { nextTask, futureTasks } = adaptRouteToGeoJSON(
-    routeGeometry,
+    route?.coordinates ?? null,
     position,
-    nextStopIndex,
-    trafficRanges
+    route?.nextStopIndex ?? 0,
+    route?.trafficRanges
   );
 
   setMapSource(MapSource.RouteNextTask, nextTask, map);
@@ -429,7 +335,7 @@ export function updateRouteDisplay(
  * Clear route visualization
  */
 export function clearRouteDisplay(map: mapboxgl.Map) {
-  updateRouteDisplay(null, [0, 0], 0, map);
+  updateRouteDisplay(null, [0, 0], map);
 }
 
 /**

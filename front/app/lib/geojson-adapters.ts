@@ -24,6 +24,14 @@
 
 import { lineString, point } from '@turf/helpers';
 import lineSlice from '@turf/line-slice';
+import {
+  FREE_FLOW_COLOR,
+  MODERATE_COLOR,
+  SEVERE_COLOR,
+  FREE_FLOW_OPACITY,
+  MODERATE_OPACITY,
+  SEVERE_OPACITY,
+} from '~/constants';
 import type {
   Driver,
   Station,
@@ -112,12 +120,12 @@ function splitByTraffic(
   trafficRanges: TrafficRange[],
   segmentLabel: string
 ): GeoJSON.Feature[] {
-  if (!coords || coords.length < 2) return [];
+  if (coords.length < 2) return [];
 
-  const defaultColor = '#22c55e';
-  const defaultOpacity = 0.9;
+  const defaultColor = FREE_FLOW_COLOR;
+  const defaultOpacity = FREE_FLOW_OPACITY;
 
-  if (!trafficRanges || trafficRanges.length === 0) {
+  if (trafficRanges.length === 0) {
     return [
       {
         type: 'Feature',
@@ -165,8 +173,12 @@ function splitByTraffic(
     }
   }
 
-  const severityToColor = [defaultColor, '#fbb83c', '#f87171'];
-  const severityToOpacity = [defaultOpacity, 0.95, 1.0];
+  const severityToColor = [FREE_FLOW_COLOR, MODERATE_COLOR, SEVERE_COLOR];
+  const severityToOpacity = [
+    FREE_FLOW_OPACITY,
+    MODERATE_OPACITY,
+    SEVERE_OPACITY,
+  ];
   const colors = severity.map((s) => severityToColor[s]);
   const opacities = severity.map((s) => severityToOpacity[s]);
 
