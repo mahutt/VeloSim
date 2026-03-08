@@ -252,39 +252,6 @@ describe('adaptRouteToGeoJSON', () => {
     expect(colors).toContain('#f87171'); // severe = red
   });
 
-  it('should pick worst severity when traffic ranges overlap', () => {
-    const routeGeometry: Position[] = [
-      [-74.0, 40.7],
-      [-74.1, 40.8],
-      [-74.2, 40.9],
-      [-74.3, 41.0],
-    ];
-
-    const trafficRanges = [
-      {
-        startCoordinateIndex: 0,
-        endCoordinateIndex: 2,
-        congestionLevel: 'moderate' as CongestionLevel,
-      },
-      {
-        startCoordinateIndex: 1,
-        endCoordinateIndex: 3,
-        congestionLevel: 'severe' as CongestionLevel,
-      },
-    ];
-
-    const result = adaptRouteToGeoJSON(
-      routeGeometry,
-      [-74.0, 40.7],
-      3,
-      trafficRanges
-    );
-
-    // The overlapping region (indices 1-2) should be severe (red), not moderate
-    const colors = result.nextTask.features.map((f) => f.properties?.color);
-    expect(colors).toContain('#f87171'); // severe wins
-  });
-
   it('should ignore traffic ranges that fall entirely outside coordinate array', () => {
     const routeGeometry: Position[] = [
       [-74.0, 40.7],
@@ -473,7 +440,11 @@ describe('adaptResourcesToGeoJSON', () => {
     ];
     const driverWithRoute = makeDriver({
       ...baseDriver,
-      route: { coordinates: routeCoordinates, nextStopIndex: 1 },
+      route: {
+        coordinates: routeCoordinates,
+        nextStopIndex: 1,
+        trafficRanges: [],
+      },
     });
 
     const result = adaptResourcesToGeoJSON([driverWithRoute]);

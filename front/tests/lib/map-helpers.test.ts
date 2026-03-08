@@ -291,7 +291,7 @@ test('updateRouteDisplay clears display when routeGeometry has less than 2 point
   MockMap.instance!.getSource = vi.fn().mockReturnValue(mockGeoJSONSource);
 
   updateRouteDisplay(
-    { coordinates: [[-73.5, 45.5]], nextStopIndex: 0 },
+    { coordinates: [[-73.5, 45.5]], nextStopIndex: 0, trafficRanges: [] },
     [0, 0],
     MockMap.instance! as unknown as mapboxgl.Map
   );
@@ -317,7 +317,7 @@ test('updateRouteDisplay splits route at nextStopIndex', () => {
   ];
 
   updateRouteDisplay(
-    { coordinates: routeGeometry, nextStopIndex: 2 },
+    { coordinates: routeGeometry, nextStopIndex: 2, trafficRanges: [] },
     [0, 0],
     MockMap.instance! as unknown as mapboxgl.Map
   );
@@ -358,7 +358,7 @@ test('updateRouteDisplay handles nextStopIndex at start (0)', () => {
 
   // nextStopIndex = 1 means split at first task
   updateRouteDisplay(
-    { coordinates: routeGeometry, nextStopIndex: 1 },
+    { coordinates: routeGeometry, nextStopIndex: 1, trafficRanges: [] },
     [-73.5, 45.5],
     MockMap.instance! as unknown as mapboxgl.Map
   );
@@ -387,7 +387,7 @@ test('updateRouteDisplay handles nextStopIndex at end of route', () => {
 
   // nextStopIndex = 2 is at the last valid index
   updateRouteDisplay(
-    { coordinates: routeGeometry, nextStopIndex: 2 },
+    { coordinates: routeGeometry, nextStopIndex: 2, trafficRanges: [] },
     [-73.5, 45.5],
     MockMap.instance! as unknown as mapboxgl.Map
   );
@@ -555,13 +555,14 @@ test('updateAllRoutesDisplay displays next task for all routes except selected',
 
   const routes = new Map<
     number,
-    { coordinates: Position[]; nextStopIndex: number }
+    { coordinates: Position[]; nextStopIndex: number; trafficRanges: [] }
   >([
     [
       1,
       {
         coordinates: [[-73.5, 45.5] as Position, [-73.6, 45.6] as Position],
         nextStopIndex: 1,
+        trafficRanges: [],
       },
     ],
     [
@@ -569,6 +570,7 @@ test('updateAllRoutesDisplay displays next task for all routes except selected',
       {
         coordinates: [[-73.7, 45.7] as Position, [-73.8, 45.8] as Position],
         nextStopIndex: 1,
+        trafficRanges: [],
       },
     ],
     [
@@ -576,6 +578,7 @@ test('updateAllRoutesDisplay displays next task for all routes except selected',
       {
         coordinates: [[-73.9, 45.9] as Position, [-74.0, 46.0] as Position],
         nextStopIndex: 1,
+        trafficRanges: [],
       },
     ],
   ]);
@@ -612,13 +615,14 @@ test('updateAllRoutesDisplay skips routes without positions', () => {
 
   const routes = new Map<
     number,
-    { coordinates: Position[]; nextStopIndex: number }
+    { coordinates: Position[]; nextStopIndex: number; trafficRanges: [] }
   >([
     [
       1,
       {
         coordinates: [[-73.5, 45.5] as Position, [-73.6, 45.6] as Position],
         nextStopIndex: 1,
+        trafficRanges: [],
       },
     ],
     [
@@ -626,6 +630,7 @@ test('updateAllRoutesDisplay skips routes without positions', () => {
       {
         coordinates: [[-73.7, 45.7] as Position, [-73.8, 45.8] as Position],
         nextStopIndex: 1,
+        trafficRanges: [],
       },
     ],
   ]);
@@ -655,14 +660,15 @@ test('updateAllRoutesDisplay handles empty coordinates gracefully', () => {
 
   const routes = new Map<
     number,
-    { coordinates: Position[]; nextStopIndex: number }
+    { coordinates: Position[]; nextStopIndex: number; trafficRanges: [] }
   >([
-    [1, { coordinates: [], nextStopIndex: 0 }],
+    [1, { coordinates: [], nextStopIndex: 0, trafficRanges: [] }],
     [
       2,
       {
         coordinates: [[-73.7, 45.7] as Position, [-73.8, 45.8] as Position],
         nextStopIndex: 1,
+        trafficRanges: [],
       },
     ],
   ]);
@@ -692,13 +698,14 @@ test('updateAllRoutesDisplay displays all routes when no driver is selected', ()
 
   const routes = new Map<
     number,
-    { coordinates: Position[]; nextStopIndex: number }
+    { coordinates: Position[]; nextStopIndex: number; trafficRanges: [] }
   >([
     [
       1,
       {
         coordinates: [[-73.5, 45.5] as Position, [-73.6, 45.6] as Position],
         nextStopIndex: 1,
+        trafficRanges: [],
       },
     ],
     [
@@ -706,6 +713,7 @@ test('updateAllRoutesDisplay displays all routes when no driver is selected', ()
       {
         coordinates: [[-73.7, 45.7] as Position, [-73.8, 45.8] as Position],
         nextStopIndex: 1,
+        trafficRanges: [],
       },
     ],
   ]);

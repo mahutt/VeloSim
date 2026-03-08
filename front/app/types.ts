@@ -146,7 +146,7 @@ export interface TrafficRange {
 export interface Route {
   coordinates: Position[];
   nextStopIndex: number;
-  trafficRanges?: TrafficRange[];
+  trafficRanges: TrafficRange[];
 }
 
 export enum DriverState {
