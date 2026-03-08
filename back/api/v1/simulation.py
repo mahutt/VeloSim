@@ -65,6 +65,7 @@ from back.schemas.sim_keyframe import (
 from back.schemas.sim_state import (
     SimStateResponse,
 )
+from back.schemas.simulation_report import SimulationReportResponse
 from back.schemas.task_list import (
     TaskListResponse,
     TaskItem,
@@ -992,6 +993,34 @@ def get_simulation_keyframe_at_time(
 
         return SimKeyframeResponse.model_validate(keyframe)
 
+    except (ItemNotFoundError, VelosimPermissionError):
+        raise
+    except Exception as e:
+        logger.exception("Unexpected error: %s", e)
+        raise UnexpectedError() from e
+
+
+@router.get("/{sim_id}/report", response_model=SimulationReportResponse)
+def get_simulation_report(
+    sim_id: str,
+    db: Session = Depends(get_db),
+    requesting_user: int = Depends(get_user_id),
+) -> SimulationReportResponse:
+    """Get aggregate report metrics for a simulation.
+
+    Args:
+        sim_id: Simulation UUID.
+        db: Database session.
+        requesting_user: user ID.
+
+    Returns:
+        SimulationReportResponse containing report metrics.
+    """
+    try:
+        report = simulation_service.get_simulation_report(
+            db=db, sim_id=sim_id, requesting_user=requesting_user
+        )
+        return SimulationReportResponse(**report)
     except (ItemNotFoundError, VelosimPermissionError):
         raise
     except Exception as e:
