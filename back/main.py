@@ -23,7 +23,8 @@ SOFTWARE.
 """
 
 import time
-from typing import Annotated, AsyncIterator, Callable, Dict
+from collections.abc import Callable
+from typing import Annotated, AsyncIterator, Dict
 from fastapi.middleware.cors import CORSMiddleware
 from uvicorn.middleware.proxy_headers import ProxyHeadersMiddleware
 from contextlib import asynccontextmanager
@@ -48,7 +49,7 @@ from back.exceptions import (
     UnexpectedError,
     VelosimPermissionError,
 )
-from back.api.v1.metrics import router as metrics_router
+from back.api.v1.metrics import router as metrics_router, METRICS_PATH
 from back.services.simulation_service import simulation_service
 from back.auth import Token, authenticate_user
 from back.database.session import get_db
@@ -95,6 +96,11 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+EXCLUDED_LOG_PATHS = {
+    METRICS_PATH,  # Prometheus scrapes every 5 s
+    "/health",  # Health probes from load balancer / Docker
+}
+
 
 @app.middleware("http")
 async def http_logging_middleware(request: Request, call_next: Callable) -> Response:
@@ -110,10 +116,16 @@ async def http_logging_middleware(request: Request, call_next: Callable) -> Resp
         The HTTP response from the next handler.
     """
     start = time.perf_counter()
-    response: Response = await call_next(request)
-    if request.url.path != "/api/v1/metric/metrics":
+    try:
+        response: Response = await call_next(request)
+    except Exception:
         duration_ms = (time.perf_counter() - start) * 1000
-        log_request(request.method, request.url.path, response.status_code, duration_ms)
+        if request.url.path not in EXCLUDED_LOG_PATHS:
+            log_request(request.method, str(request.url), 500, duration_ms)
+        raise
+    if request.url.path not in EXCLUDED_LOG_PATHS:
+        duration_ms = (time.perf_counter() - start) * 1000
+        log_request(request.method, str(request.url), response.status_code, duration_ms)
     return response
 
 
