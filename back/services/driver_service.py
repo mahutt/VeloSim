@@ -111,6 +111,13 @@ class DriverService:
                 # The error is internal
                 raise RuntimeError(f"Failed operation: {err}") from err
 
+        logger.info(
+            "Task assigned: sim_id=%s, driver_id=%s, task_id=%s, user_id=%s",
+            sim_id,
+            task_assign_data.driver_id,
+            task_assign_data.task_id,
+            requesting_user,
+        )
         # Return a confirmation message upon successful assignment
         return DriverTaskAssignResponse(
             driver_id=task_assign_data.driver_id,
@@ -180,6 +187,13 @@ class DriverService:
                 # The error is internal
                 raise RuntimeError(f"Failed operation: {err}") from err
 
+        logger.info(
+            "Task unassigned: sim_id=%s, driver_id=%s, task_id=%s, user_id=%s",
+            sim_id,
+            task_unassign_data.driver_id,
+            task_unassign_data.task_id,
+            requesting_user,
+        )
         # Return a confirmation message upon successful unassignment
         return DriverTaskUnassignResponse(
             driver_id=task_unassign_data.driver_id,
@@ -254,6 +268,15 @@ class DriverService:
                 # The error is internal
                 raise RuntimeError(f"Failed operation: {err}") from err
 
+        logger.info(
+            "Task reassigned: sim_id=%s, task_id=%s, "
+            "old_driver_id=%s, new_driver_id=%s, user_id=%s",
+            sim_id,
+            task_reassign_data.task_id,
+            task_reassign_data.old_driver_id,
+            task_reassign_data.new_driver_id,
+            requesting_user,
+        )
         # Return a confirmation message upon successful reassignment
         return DriverTaskReassignResponse(
             task_id=task_reassign_data.task_id,
@@ -347,6 +370,13 @@ class DriverService:
                 )
             )
 
+        logger.info(
+            "Batch assign: sim_id=%s, driver_id=%s, task_ids=%s, user_id=%s",
+            sim_id,
+            driver_id,
+            task_ids,
+            requesting_user,
+        )
         return DriverTaskBatchAssignResponse(items=items)
 
     def reorder_tasks(
@@ -412,6 +442,13 @@ class DriverService:
                 # The error is internal
                 raise RuntimeError(f"Failed operation: {err}") from err
 
+        logger.info(
+            "Tasks reordered: sim_id=%s, driver_id=%s, task_ids=%s, user_id=%s",
+            sim_id,
+            reorder_data.driver_id,
+            reorder_data.task_ids,
+            requesting_user,
+        )
         # Return a confirmation message with the new task order
         return DriverTaskReorderResponse(
             driver_id=reorder_data.driver_id,
