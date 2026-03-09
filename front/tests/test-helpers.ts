@@ -42,6 +42,7 @@ import {
   type Driver,
   type Headquarters,
   type PendingAssignment,
+  type Route,
   type Simulation,
   type Station,
   type StationTask,
@@ -260,5 +261,13 @@ export function makeSimulation(
     resource_count: overrides.resource_count ?? 99,
     station_count: overrides.station_count ?? 99,
     task_count: overrides.task_count ?? 99,
+  };
+}
+
+export function makeRoute(overrides: Partial<Route> = {}): Route {
+  return {
+    coordinates: overrides.coordinates ?? [],
+    nextStopIndex: overrides.nextStopIndex ?? 0,
+    trafficRanges: overrides.trafficRanges ?? [],
   };
 }

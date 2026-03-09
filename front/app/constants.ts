@@ -71,6 +71,14 @@ const ROUTE_LINE_OFFSET: ExpressionSpecification =
 const ROUTE_LINE_WIDTH: ExpressionSpecification =
   ['interpolate', ['linear'], ['zoom'], 10, 1, 13, 2, 15, 3, 17, 4, 20, 6, 22, 8];
 
+/**
+ * Empty feature collection, usually used for clearing Mapbox map sources
+ */
+export const EMPTY_FEATURE_COLLECTION: GeoJSON.FeatureCollection = {
+  type: 'FeatureCollection',
+  features: [],
+};
+
 export {
   APP_NAME,
   GBFS_STATION_INFORMATION_URL,

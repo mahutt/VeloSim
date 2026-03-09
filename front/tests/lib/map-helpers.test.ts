@@ -261,29 +261,6 @@ test('loadMapImages handles image load failure gracefully', () => {
   expect(MockMap.instance?.addImage).not.toHaveBeenCalled();
 });
 
-test('updateRouteDisplay clears display when routeGeometry is null', () => {
-  MockMap.createRandomInstance();
-
-  const mockGeoJSONSource = { setData: vi.fn() };
-  MockMap.instance!.getSource = vi.fn().mockReturnValue(mockGeoJSONSource);
-
-  updateRouteDisplay(
-    null,
-    [0, 0],
-    MockMap.instance! as unknown as mapboxgl.Map
-  );
-
-  expect(MockMap.instance?.getSource).toHaveBeenCalledWith('route-next-task');
-  expect(MockMap.instance?.getSource).toHaveBeenCalledWith(
-    'route-future-tasks'
-  );
-  expect(mockGeoJSONSource.setData).toHaveBeenCalledTimes(2);
-  expect(mockGeoJSONSource.setData).toHaveBeenCalledWith({
-    type: 'FeatureCollection',
-    features: [],
-  });
-});
-
 test('updateRouteDisplay clears display when routeGeometry has less than 2 points', () => {
   MockMap.createRandomInstance();
 

@@ -31,6 +31,7 @@ import {
   FREE_FLOW_OPACITY,
   MODERATE_OPACITY,
   SEVERE_OPACITY,
+  EMPTY_FEATURE_COLLECTION,
 } from '~/constants';
 import type {
   Driver,
@@ -38,6 +39,7 @@ import type {
   Position,
   Headquarters,
   TrafficRange,
+  Route,
 } from '~/types';
 
 export function adaptHeadquartersToGeoJSON(
@@ -205,36 +207,27 @@ function addSegment(
 }
 
 export function adaptRouteToGeoJSON(
-  routeGeometry: Position[] | null,
-  position: Position | null,
-  nextStopIndex: number,
-  trafficRanges?: TrafficRange[]
+  route: Route,
+  position: Position
 ): {
   nextTask: GeoJSON.FeatureCollection;
   futureTasks: GeoJSON.FeatureCollection;
 } {
-  const emptyFeatureCollection: GeoJSON.FeatureCollection = {
-    type: 'FeatureCollection',
-    features: [],
-  };
-
-  if (!position || !routeGeometry || routeGeometry.length < 2) {
+  const { coordinates, nextStopIndex, trafficRanges } = route;
+  if (
+    coordinates.length < 2 ||
+    nextStopIndex < 0 ||
+    nextStopIndex > coordinates.length - 1
+  ) {
     return {
-      nextTask: emptyFeatureCollection,
-      futureTasks: emptyFeatureCollection,
-    };
-  }
-
-  if (nextStopIndex < 0 || nextStopIndex > routeGeometry.length - 1) {
-    return {
-      nextTask: emptyFeatureCollection,
-      futureTasks: emptyFeatureCollection,
+      nextTask: EMPTY_FEATURE_COLLECTION,
+      futureTasks: EMPTY_FEATURE_COLLECTION,
     };
   }
 
   // Split at nextStopIndex to avoid snapping to incorrect segment on double-back
-  const preNextTaskSegment = routeGeometry.slice(0, nextStopIndex + 1);
-  const postNextTaskSegment = routeGeometry.slice(nextStopIndex);
+  const preNextTaskSegment = coordinates.slice(0, nextStopIndex + 1);
+  const postNextTaskSegment = coordinates.slice(nextStopIndex);
 
   // Trim already-travelled portion: snap driver position onto the route
   // and slice from that point forward. nearestPointOnLine gives us the
@@ -249,28 +242,24 @@ export function adaptRouteToGeoJSON(
     ...preNextTaskSegment.slice(snapIndex + 1),
   ];
 
-  if (trimmedCoords.length < 2) {
-    return {
-      nextTask: emptyFeatureCollection,
-      futureTasks: emptyFeatureCollection,
-    };
-  }
-
   const nextTaskGlobalOffset = snapIndex;
 
-  const nextTaskFeatures = splitByTraffic(
-    trimmedCoords,
-    nextTaskGlobalOffset,
-    trafficRanges ?? [],
-    'next-task'
-  );
+  const nextTaskFeatures =
+    trimmedCoords.length >= 2
+      ? splitByTraffic(
+          trimmedCoords,
+          nextTaskGlobalOffset,
+          trafficRanges,
+          'next-task'
+        )
+      : [];
 
   const futureTaskFeatures =
     postNextTaskSegment.length >= 2
       ? splitByTraffic(
           postNextTaskSegment,
           nextStopIndex,
-          trafficRanges ?? [],
+          trafficRanges,
           'future-tasks'
         )
       : [];

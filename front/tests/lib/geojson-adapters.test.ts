@@ -30,7 +30,7 @@ import {
   adaptHeadquartersToGeoJSON,
 } from '~/lib/geojson-adapters';
 import type { Station, Position, CongestionLevel } from '~/types';
-import { makeDriver } from 'tests/test-helpers';
+import { makeDriver, makeRoute } from 'tests/test-helpers';
 
 describe('adaptStationsToGeoJSON', () => {
   it('should convert an array of stations to a GeoJSON FeatureCollection', () => {
@@ -103,22 +103,20 @@ describe('adaptRouteToGeoJSON', () => {
     features: [],
   };
 
-  it('should return empty collection when routeGeometry is null', () => {
-    const result = adaptRouteToGeoJSON(null, [0, 0], 0);
-
-    expect(result.nextTask).toEqual(emptyFeatureCollection);
-    expect(result.futureTasks).toEqual(emptyFeatureCollection);
-  });
-
   it('should return empty collection when routeGeometry has fewer than 2 points', () => {
-    const result = adaptRouteToGeoJSON([[0, 0]], [0, 0], 0);
+    const result = adaptRouteToGeoJSON(
+      makeRoute({
+        coordinates: [[0, 0]],
+      }),
+      [0, 0]
+    );
 
     expect(result.nextTask).toEqual(emptyFeatureCollection);
     expect(result.futureTasks).toEqual(emptyFeatureCollection);
   });
 
   it('should split route into next-task and future-tasks segments based on nextStopIndex', () => {
-    const routeGeometry: Position[] = [
+    const coordinates: Position[] = [
       [-74.0, 40.7],
       [-74.1, 40.8],
       [-74.2, 40.9],
@@ -127,9 +125,11 @@ describe('adaptRouteToGeoJSON', () => {
     const nextStopIndex = 2;
 
     const result = adaptRouteToGeoJSON(
-      routeGeometry,
-      [-74.0, 40.7],
-      nextStopIndex
+      makeRoute({
+        coordinates,
+        nextStopIndex,
+      }),
+      [-74.0, 40.7]
     );
 
     const nextTaskFeatures = result.nextTask.features.filter(
@@ -155,16 +155,18 @@ describe('adaptRouteToGeoJSON', () => {
   });
 
   it('should handle nextStopIndex beyond route length', () => {
-    const routeGeometry: Position[] = [
+    const coordinates: Position[] = [
       [-74.0, 40.7],
       [-74.1, 40.8],
     ];
     const nextStopIndex = 100;
 
     const result = adaptRouteToGeoJSON(
-      routeGeometry,
-      [-74.0, 40.7],
-      nextStopIndex
+      makeRoute({
+        coordinates,
+        nextStopIndex,
+      }),
+      [-74.0, 40.7]
     );
 
     const nextTaskFeatures = result.nextTask.features.filter(
@@ -178,39 +180,34 @@ describe('adaptRouteToGeoJSON', () => {
     expect(futureTasksFeatures).toHaveLength(0);
   });
 
-  it('should return empty collection when position is null', () => {
-    const result = adaptRouteToGeoJSON(
-      [
-        [-74.0, 40.7],
-        [-74.1, 40.8],
-      ],
-      null,
-      1
-    );
-    expect(result.nextTask).toEqual(emptyFeatureCollection);
-    expect(result.futureTasks).toEqual(emptyFeatureCollection);
-  });
-
   it('should return empty collection when nextStopIndex is negative', () => {
     const result = adaptRouteToGeoJSON(
-      [
-        [-74.0, 40.7],
-        [-74.1, 40.8],
-      ],
-      [-74.0, 40.7],
-      -1
+      makeRoute({
+        coordinates: [
+          [-74.0, 40.7],
+          [-74.1, 40.8],
+        ],
+        nextStopIndex: -1,
+      }),
+      [-74.0, 40.7]
     );
     expect(result.nextTask).toEqual(emptyFeatureCollection);
     expect(result.futureTasks).toEqual(emptyFeatureCollection);
   });
 
   it('should produce green default color when no trafficRanges are provided', () => {
-    const routeGeometry: Position[] = [
+    const coordinates: Position[] = [
       [-74.0, 40.7],
       [-74.1, 40.8],
       [-74.2, 40.9],
     ];
-    const result = adaptRouteToGeoJSON(routeGeometry, [-74.0, 40.7], 2);
+    const result = adaptRouteToGeoJSON(
+      makeRoute({
+        coordinates,
+        nextStopIndex: 2,
+      }),
+      [-74.0, 40.7]
+    );
 
     const feature = result.nextTask.features[0];
     expect(feature.properties?.color).toBe('#22c55e');
@@ -218,7 +215,7 @@ describe('adaptRouteToGeoJSON', () => {
   });
 
   it('should color route segments by congestion level', () => {
-    const routeGeometry: Position[] = [
+    const coordinates: Position[] = [
       [-74.0, 40.7],
       [-74.1, 40.8],
       [-74.2, 40.9],
@@ -240,10 +237,12 @@ describe('adaptRouteToGeoJSON', () => {
     ];
 
     const result = adaptRouteToGeoJSON(
-      routeGeometry,
-      [-74.0, 40.7],
-      4,
-      trafficRanges
+      makeRoute({
+        coordinates,
+        nextStopIndex: 4,
+        trafficRanges,
+      }),
+      [-74.0, 40.7]
     );
 
     const colors = result.nextTask.features.map((f) => f.properties?.color);
@@ -253,7 +252,7 @@ describe('adaptRouteToGeoJSON', () => {
   });
 
   it('should ignore traffic ranges that fall entirely outside coordinate array', () => {
-    const routeGeometry: Position[] = [
+    const coordinates: Position[] = [
       [-74.0, 40.7],
       [-74.1, 40.8],
       [-74.2, 40.9],
@@ -268,10 +267,12 @@ describe('adaptRouteToGeoJSON', () => {
     ];
 
     const result = adaptRouteToGeoJSON(
-      routeGeometry,
-      [-74.0, 40.7],
-      2,
-      trafficRanges
+      makeRoute({
+        coordinates,
+        nextStopIndex: 2,
+        trafficRanges,
+      }),
+      [-74.0, 40.7]
     );
 
     // Should be all default green since the range doesn't overlap
@@ -280,7 +281,7 @@ describe('adaptRouteToGeoJSON', () => {
   });
 
   it('should apply traffic to future-tasks segment', () => {
-    const routeGeometry: Position[] = [
+    const coordinates: Position[] = [
       [-74.0, 40.7],
       [-74.1, 40.8],
       [-74.2, 40.9],
@@ -298,10 +299,12 @@ describe('adaptRouteToGeoJSON', () => {
     ];
 
     const result = adaptRouteToGeoJSON(
-      routeGeometry,
-      [-74.0, 40.7],
-      2,
-      trafficRanges
+      makeRoute({
+        coordinates,
+        nextStopIndex: 2,
+        trafficRanges,
+      }),
+      [-74.0, 40.7]
     );
 
     expect(result.futureTasks.features.length).toBeGreaterThanOrEqual(1);

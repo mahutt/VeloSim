@@ -23,6 +23,7 @@
  */
 
 import {
+  EMPTY_FEATURE_COLLECTION,
   FREE_FLOW_COLOR,
   ROUTE_LINE_OFFSET,
   ROUTE_LINE_WIDTH,
@@ -310,23 +311,17 @@ export function setMapSource(
 }
 
 /**
- * Update route visualization for a selected resource
- * @param route - Route object containing coordinates, nextStopIndex, and optional trafficRanges (or null to clear)
+ * Render provided route on the provided Mapbox map instance
+ * @param route - Route object containing coordinates, nextStopIndex, and optional trafficRanges
  * @param position - Current driver position
  * @param map - Mapbox map instance
  */
 export function updateRouteDisplay(
-  route: Route | null,
+  route: Route,
   position: Position,
   map: mapboxgl.Map
 ) {
-  const { nextTask, futureTasks } = adaptRouteToGeoJSON(
-    route?.coordinates ?? null,
-    position,
-    route?.nextStopIndex ?? 0,
-    route?.trafficRanges
-  );
-
+  const { nextTask, futureTasks } = adaptRouteToGeoJSON(route, position);
   setMapSource(MapSource.RouteNextTask, nextTask, map);
   setMapSource(MapSource.RouteFutureTasks, futureTasks, map);
 }
@@ -335,7 +330,8 @@ export function updateRouteDisplay(
  * Clear route visualization
  */
 export function clearRouteDisplay(map: mapboxgl.Map) {
-  updateRouteDisplay(null, [0, 0], map);
+  setMapSource(MapSource.RouteNextTask, EMPTY_FEATURE_COLLECTION, map);
+  setMapSource(MapSource.RouteFutureTasks, EMPTY_FEATURE_COLLECTION, map);
 }
 
 /**
@@ -366,12 +362,7 @@ export function updateAllRoutesDisplay(
     // Validate route data
     if (!route.coordinates || route.coordinates.length === 0) return;
 
-    const { nextTask } = adaptRouteToGeoJSON(
-      route.coordinates,
-      position,
-      route.nextStopIndex,
-      route.trafficRanges
-    );
+    const { nextTask } = adaptRouteToGeoJSON(route, position);
 
     // Only show next task for background routes (reduces visual clutter)
     allNextTaskFeatures.push(...nextTask.features);
@@ -394,9 +385,5 @@ export function updateAllRoutesDisplay(
  * @param map - Mapbox map instance
  */
 export function clearAllRoutesDisplay(map: mapboxgl.Map) {
-  setMapSource(
-    MapSource.AllRoutesNextTask,
-    { type: 'FeatureCollection', features: [] },
-    map
-  );
+  setMapSource(MapSource.AllRoutesNextTask, EMPTY_FEATURE_COLLECTION, map);
 }
