@@ -149,6 +149,7 @@ class TrafficController:
                     strategy = TrafficStateFactory.get_strategy(event.event_type)
                     road.set_point_strategy(strategy)
                     event.affected_roads.add(road)
+                    self._notify_routes_for_road(road)
                     logger.debug(f"Applied event '{event.name}' to new road {road.id}")
 
     def _on_road_deallocated(self, road: Road) -> None:
@@ -199,6 +200,15 @@ class TrafficController:
         event.route_geometry = self._resolve_event_geometry(event)
         if event.route_geometry:
             self._registry.register_event(event, event.route_geometry)
+            logger.info(
+                f"Event '{event.name}': resolved {len(event.route_geometry)} "
+                f"geometry positions"
+            )
+        else:
+            logger.warning(
+                f"Event '{event.name}': geometry resolution failed — "
+                f"event will not match any roads"
+            )
 
         # -- TRIGGERED: WaitUntilServed (acquire sync resource) --
         with self._sync_resource.request() as req:
@@ -220,6 +230,10 @@ class TrafficController:
         event.state = TrafficEventState.EXPIRED
         logger.info(f"Event '{event.name}' EXPIRED at tick {int(self._env.now)}")
 
+        # Save affected roads before sync clears them — needed to notify
+        # routes after the GPS delay so the overlay persists until DONE
+        roads_to_notify = set(event.affected_roads)
+
         # -- WaitUntilServed again for removal --
         with self._sync_resource.request() as req:
             yield req
@@ -229,6 +243,11 @@ class TrafficController:
         # -- DONE: checkForSimilarEvent, deleteEvent --
         event.state = TrafficEventState.DONE
         logger.info(f"Event '{event.name}' DONE at tick {int(self._env.now)}")
+
+        # Now clear the traffic overlay — after GPS delay has passed
+        for road in roads_to_notify:
+            self._notify_routes_for_road(road)
+
         self._check_for_similar_event(event)
         self._delete_event(event)
 
@@ -253,15 +272,29 @@ class TrafficController:
         """
         assert self._env is not None
         is_allocated = self._check_allocation(event)
+        logger.info(
+            f"Event '{event.name}': allocation check = {is_allocated} "
+            f"(apply={is_apply})"
+        )
 
         if is_apply:
             if is_allocated:
                 # [Triggered && Allocated]: Sim -> Delay -> RoutingProvider
+                # Traffic affects the road immediately (car slows down),
+                # but route notification is delayed until after GPS_SYNC_DELAY
+                # so the driver visually slows before traffic colors appear.
+                # This mirrors the removal path (overlay persists through delay).
                 self._set_traffic_in_simulation(event)
                 yield self._env.timeout(GPS_SYNC_DELAY)
                 self._set_traffic_in_routing_provider(event)
+                for road in event.affected_roads:
+                    self._notify_routes_for_road(road)
             else:
                 # [Triggered && Unallocated]: RoutingProvider only
+                logger.warning(
+                    f"Event '{event.name}': no roads overlap event geometry — "
+                    f"traffic will only affect routing provider, not simulation"
+                )
                 self._set_traffic_in_routing_provider(event)
         else:
             if is_allocated:
@@ -360,7 +393,13 @@ class TrafficController:
         self._update_routing_provider(event, apply=True)
 
     def _reset_traffic_in_simulation(self, event: TrafficEvent) -> None:
-        """Remove traffic from simulation roads and clean up."""
+        """Remove traffic from simulation roads and clean up.
+
+        Does NOT notify routes here — the traffic overlay should persist
+        through the GPS_SYNC_DELAY to model the real-world lag between
+        actual road conditions and GPS/map data. Routes are notified
+        later when the event reaches DONE state.
+        """
         for road in event.affected_roads:
             road.remove_traffic(event.segment_key)
             if not road._traffic_ranges:
@@ -430,6 +469,11 @@ class TrafficController:
         except ValueError:
             pass
 
+    def _notify_routes_for_road(self, road: Road) -> None:
+        """Notify all routes using this road to rebuild their traffic triples."""
+        for route in self._route_controller.get_routes_for_road(road):
+            route.notify_traffic_changed()
+
     # =========================================================================
     # Legacy / Manual Traffic API (backward compatible)
     # =========================================================================
@@ -498,7 +542,8 @@ class TrafficController:
             road_geom_set = set(road.geometry) if road.geometry else set()
             overlap = list(segment_positions & road_geom_set)
             if overlap:
-                road.apply_traffic_for_overlap(overlap, clamped, segment_key)
+                if road.apply_traffic_for_overlap(overlap, clamped, segment_key):
+                    self._notify_routes_for_road(road)
 
         return bool(affected_roads)
 
@@ -517,6 +562,7 @@ class TrafficController:
         for road in affected_roads:
             if road.remove_traffic(segment_key):
                 updated.add(road)
+                self._notify_routes_for_road(road)
 
         self._active_traffic.pop(segment_key, None)
         return bool(updated)

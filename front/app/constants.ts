@@ -22,6 +22,8 @@
  * SOFTWARE.
  */
 
+import type { ExpressionSpecification } from 'mapbox-gl';
+
 const APP_NAME = 'VeloSim';
 const GBFS_STATION_INFORMATION_URL = `https://gbfs.velobixi.com/gbfs/2-2/en/station_information.json`;
 const GBFS_STATION_INFORMATION_STORAGE_KEY = 'gbfs_station_information';
@@ -49,6 +51,26 @@ const SCHEDULED_TASK_PATTERN = /^day\d+:\d{2}:\d{2}$/;
  */
 const SIMULATION_FRAMES_PER_KEY_FRAME = 20;
 
+// Traffic congestion display colors (green → amber → red)
+const FREE_FLOW_COLOR = '#22c55e';
+const MODERATE_COLOR = '#fbb83c';
+const SEVERE_COLOR = '#f87171';
+
+// Opacity per congestion level (higher severity = more opaque)
+const FREE_FLOW_OPACITY = 0.9;
+const MODERATE_OPACITY = 0.95;
+const SEVERE_OPACITY = 1.0;
+
+// Zoom-scaled line-offset to separate two-way route directions
+// prettier-ignore
+const ROUTE_LINE_OFFSET: ExpressionSpecification =
+  ['interpolate', ['linear'], ['zoom'], 10, 0, 13, 1, 15, 2, 17, 4, 20, 6, 22, 8];
+
+// Zoom-scaled line-width for route layers
+// prettier-ignore
+const ROUTE_LINE_WIDTH: ExpressionSpecification =
+  ['interpolate', ['linear'], ['zoom'], 10, 1, 13, 2, 15, 3, 17, 4, 20, 6, 22, 8];
+
 export {
   APP_NAME,
   GBFS_STATION_INFORMATION_URL,
@@ -57,4 +79,12 @@ export {
   MONTREAL_BOUNDS,
   SCHEDULED_TASK_PATTERN,
   SIMULATION_FRAMES_PER_KEY_FRAME,
+  FREE_FLOW_COLOR,
+  MODERATE_COLOR,
+  SEVERE_COLOR,
+  FREE_FLOW_OPACITY,
+  MODERATE_OPACITY,
+  SEVERE_OPACITY,
+  ROUTE_LINE_OFFSET,
+  ROUTE_LINE_WIDTH,
 };

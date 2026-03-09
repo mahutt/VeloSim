@@ -160,6 +160,7 @@ describe('updateDriverPositions', () => {
             [1, 1],
           ],
           nextStopIndex: 3,
+          trafficRanges: [],
         },
       ],
     ]);

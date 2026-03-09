@@ -94,3 +94,45 @@ class TrafficRange:
     end_index: int  # Last affected node index (inclusive)
     multiplier: float  # Speed multiplier (0.01-1.0), 1.0 = free flow
     segment_key: "SegmentKey"  # Original segment_key that created this range
+    geom_start_index: int = 0  # Geometry-space start index (inclusive)
+    geom_end_index: int = 0  # Geometry-space end index (inclusive)
+
+
+@dataclass
+class TrafficTriple:
+    """Traffic congestion triple for a contiguous range of route coordinates.
+
+    Used to communicate traffic state to the frontend for route overlay rendering.
+    Indices refer to the route's raw coordinate array.
+    """
+
+    start_index: int  # Route coordinate index (inclusive)
+    end_index: int  # Route coordinate index (inclusive)
+    congestion_level: CongestionLevel
+
+    def to_json(self) -> dict:
+        """Serialize to a dict matching the frontend TrafficRange interface.
+
+        Returns:
+            Dict with startCoordinateIndex, endCoordinateIndex, congestionLevel.
+        """
+        return {
+            "startCoordinateIndex": self.start_index,
+            "endCoordinateIndex": self.end_index,
+            "congestionLevel": self.congestion_level.value,
+        }
+
+    def to_json_with_offset(self, offset: int) -> dict:
+        """Serialize with a coordinate offset for multi-route assembly.
+
+        Args:
+            offset: Coordinate index offset to add to start/end indices.
+
+        Returns:
+            Dict with startCoordinateIndex, endCoordinateIndex, congestionLevel.
+        """
+        return {
+            "startCoordinateIndex": self.start_index + offset,
+            "endCoordinateIndex": self.end_index + offset,
+            "congestionLevel": self.congestion_level.value,
+        }

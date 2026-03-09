@@ -501,6 +501,8 @@ class Driver:
         """
         self.has_updated = False
         self.route_changed = False
+        for route in self.routes:
+            route.has_traffic_changed = False
 
     def reorder_tasks(
         self, task_ids_to_reorder: list[int], apply_from_top: bool
@@ -690,6 +692,15 @@ class Driver:
             "coordinates": combined_raw_coordinates,
             "nextStopIndex": len(self.routes[0].get_raw_coordinates()) - 1,
         }
+
+    @property
+    def traffic_changed(self) -> bool:
+        """Check if any route's traffic triples have changed.
+
+        Returns:
+            True if any route has pending traffic changes.
+        """
+        return any(route.has_traffic_changed for route in self.routes)
 
     def compute_routes(self) -> list[Route]:
         """

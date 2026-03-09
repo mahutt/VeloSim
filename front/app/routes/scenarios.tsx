@@ -568,6 +568,7 @@ export default function ScenarioEditor() {
           drivers: c.drivers,
           vehicles: c.vehicles,
           stations: c.stations,
+          traffic: c.traffic,
         };
         const content = JSON.stringify(ordered, null, 2);
         setScenarioContent(content);

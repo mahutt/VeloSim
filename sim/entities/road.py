@@ -333,6 +333,8 @@ class Road:
             end_index=end_idx,
             multiplier=multiplier,
             segment_key=segment_key,
+            geom_start_index=min_geom_idx,
+            geom_end_index=max_geom_idx,
         )
         self._traffic_pointcollection = None
         return True
@@ -369,6 +371,21 @@ class Road:
             self._traffic_pointcollection = None  # Invalidate cache
             return True
         return False
+
+    def get_traffic_geometry_ranges(self) -> list[tuple[int, int, CongestionLevel]]:
+        """Get traffic ranges in geometry index space.
+
+        Returns (geom_start, geom_end, congestion_level) for each non-FREE_FLOW range.
+
+        Returns:
+            List of tuples with geometry start index, end index, and congestion level.
+        """
+        ranges: list[tuple[int, int, CongestionLevel]] = []
+        for tr in self._traffic_ranges.values():
+            level = multiplier_to_congestion_level(tr.multiplier)
+            if level != CongestionLevel.FREE_FLOW:
+                ranges.append((tr.geom_start_index, tr.geom_end_index, level))
+        return ranges
 
     def _generate_traffic_points(self) -> List[Position]:
         """Generate traffic-adjusted points with per-segment multipliers.

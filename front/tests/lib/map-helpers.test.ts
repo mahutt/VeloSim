@@ -35,7 +35,7 @@ import {
   MapSource,
 } from '~/lib/map-helpers';
 import { MockMap } from 'tests/mocks';
-import type { Position } from '~/types';
+import type { Position, CongestionLevel } from '~/types';
 
 test('loadMapImages loads all necessary images', () => {
   MockMap.createRandomInstance();
@@ -270,7 +270,6 @@ test('updateRouteDisplay clears display when routeGeometry is null', () => {
   updateRouteDisplay(
     null,
     [0, 0],
-    0,
     MockMap.instance! as unknown as mapboxgl.Map
   );
 
@@ -292,9 +291,8 @@ test('updateRouteDisplay clears display when routeGeometry has less than 2 point
   MockMap.instance!.getSource = vi.fn().mockReturnValue(mockGeoJSONSource);
 
   updateRouteDisplay(
-    [[-73.5, 45.5]],
+    { coordinates: [[-73.5, 45.5]], nextStopIndex: 0, trafficRanges: [] },
     [0, 0],
-    0,
     MockMap.instance! as unknown as mapboxgl.Map
   );
 
@@ -319,9 +317,8 @@ test('updateRouteDisplay splits route at nextStopIndex', () => {
   ];
 
   updateRouteDisplay(
-    routeGeometry,
+    { coordinates: routeGeometry, nextStopIndex: 2, trafficRanges: [] },
     [0, 0],
-    2,
     MockMap.instance! as unknown as mapboxgl.Map
   );
 
@@ -330,7 +327,7 @@ test('updateRouteDisplay splits route at nextStopIndex', () => {
   const nextTaskCall = mockGeoJSONSource.setData.mock.calls[0][0];
   expect(nextTaskCall.type).toBe('FeatureCollection');
   expect(nextTaskCall.features).toHaveLength(1);
-  expect(nextTaskCall.features[0].properties.segment).toBe('next-task');
+  expect(nextTaskCall.features[0].properties.segmentLabel).toBe('next-task');
   const nextTaskCoords = nextTaskCall.features[0].geometry.coordinates;
   expect(nextTaskCoords[0][0]).toBeCloseTo(-73.5, 3);
   expect(nextTaskCoords[0][1]).toBeCloseTo(45.5, 3);
@@ -338,7 +335,9 @@ test('updateRouteDisplay splits route at nextStopIndex', () => {
   const futureTasksCall = mockGeoJSONSource.setData.mock.calls[1][0];
   expect(futureTasksCall.type).toBe('FeatureCollection');
   expect(futureTasksCall.features).toHaveLength(1);
-  expect(futureTasksCall.features[0].properties.segment).toBe('future-tasks');
+  expect(futureTasksCall.features[0].properties.segmentLabel).toBe(
+    'future-tasks'
+  );
   const futureTasksCoords = futureTasksCall.features[0].geometry.coordinates;
   const lastFuture = futureTasksCoords[futureTasksCoords.length - 1];
   expect(lastFuture[0]).toBeCloseTo(-73.8, 3);
@@ -359,15 +358,14 @@ test('updateRouteDisplay handles nextStopIndex at start (0)', () => {
 
   // nextStopIndex = 1 means split at first task
   updateRouteDisplay(
-    routeGeometry,
+    { coordinates: routeGeometry, nextStopIndex: 1, trafficRanges: [] },
     [-73.5, 45.5],
-    1,
     MockMap.instance! as unknown as mapboxgl.Map
   );
 
   const nextTaskCall = mockGeoJSONSource.setData.mock.calls[0][0];
   expect(nextTaskCall.features).toHaveLength(1);
-  expect(nextTaskCall.features[0].properties.segment).toBe('next-task');
+  expect(nextTaskCall.features[0].properties.segmentLabel).toBe('next-task');
   const nextTaskCoords = nextTaskCall.features[0].geometry.coordinates;
   expect(nextTaskCoords.length).toBeGreaterThanOrEqual(2);
 
@@ -389,15 +387,14 @@ test('updateRouteDisplay handles nextStopIndex at end of route', () => {
 
   // nextStopIndex = 2 is at the last valid index
   updateRouteDisplay(
-    routeGeometry,
+    { coordinates: routeGeometry, nextStopIndex: 2, trafficRanges: [] },
     [-73.5, 45.5],
-    2,
     MockMap.instance! as unknown as mapboxgl.Map
   );
 
   const nextTaskCall = mockGeoJSONSource.setData.mock.calls[0][0];
   expect(nextTaskCall.features).toHaveLength(1);
-  expect(nextTaskCall.features[0].properties.segment).toBe('next-task');
+  expect(nextTaskCall.features[0].properties.segmentLabel).toBe('next-task');
   const nextTaskCoords = nextTaskCall.features[0].geometry.coordinates;
   expect(nextTaskCoords.length).toBeGreaterThanOrEqual(2);
 
@@ -434,9 +431,42 @@ test('setMapLayers adds route layers with correct configuration', () => {
       'line-cap': 'round',
     },
     paint: {
-      'line-color': '#3b82f6',
-      'line-width': 4,
-      'line-opacity': 0.8,
+      'line-color': ['coalesce', ['get', 'color'], '#22c55e'],
+      'line-width': [
+        'interpolate',
+        ['linear'],
+        ['zoom'],
+        10,
+        1,
+        13,
+        2,
+        15,
+        3,
+        17,
+        4,
+        20,
+        6,
+        22,
+        8,
+      ],
+      'line-opacity': ['coalesce', ['get', 'opacity'], 0.9],
+      'line-offset': [
+        'interpolate',
+        ['linear'],
+        ['zoom'],
+        10,
+        0,
+        13,
+        1,
+        15,
+        2,
+        17,
+        4,
+        20,
+        6,
+        22,
+        8,
+      ],
     },
   });
 
@@ -449,9 +479,46 @@ test('setMapLayers adds route layers with correct configuration', () => {
       'line-cap': 'round',
     },
     paint: {
-      'line-color': '#3b82f6',
-      'line-width': 4,
-      'line-opacity': 0.3,
+      'line-color': ['coalesce', ['get', 'color'], '#22c55e'],
+      'line-width': [
+        'interpolate',
+        ['linear'],
+        ['zoom'],
+        10,
+        1,
+        13,
+        2,
+        15,
+        3,
+        17,
+        4,
+        20,
+        6,
+        22,
+        8,
+      ],
+      'line-opacity': [
+        'number',
+        ['*', ['coalesce', ['get', 'opacity'], 0.9], 0.45],
+        0.4,
+      ],
+      'line-offset': [
+        'interpolate',
+        ['linear'],
+        ['zoom'],
+        10,
+        0,
+        13,
+        1,
+        15,
+        2,
+        17,
+        4,
+        20,
+        6,
+        22,
+        8,
+      ],
     },
   });
 });
@@ -488,13 +555,14 @@ test('updateAllRoutesDisplay displays next task for all routes except selected',
 
   const routes = new Map<
     number,
-    { coordinates: Position[]; nextStopIndex: number }
+    { coordinates: Position[]; nextStopIndex: number; trafficRanges: [] }
   >([
     [
       1,
       {
         coordinates: [[-73.5, 45.5] as Position, [-73.6, 45.6] as Position],
         nextStopIndex: 1,
+        trafficRanges: [],
       },
     ],
     [
@@ -502,6 +570,7 @@ test('updateAllRoutesDisplay displays next task for all routes except selected',
       {
         coordinates: [[-73.7, 45.7] as Position, [-73.8, 45.8] as Position],
         nextStopIndex: 1,
+        trafficRanges: [],
       },
     ],
     [
@@ -509,6 +578,7 @@ test('updateAllRoutesDisplay displays next task for all routes except selected',
       {
         coordinates: [[-73.9, 45.9] as Position, [-74.0, 46.0] as Position],
         nextStopIndex: 1,
+        trafficRanges: [],
       },
     ],
   ]);
@@ -545,13 +615,14 @@ test('updateAllRoutesDisplay skips routes without positions', () => {
 
   const routes = new Map<
     number,
-    { coordinates: Position[]; nextStopIndex: number }
+    { coordinates: Position[]; nextStopIndex: number; trafficRanges: [] }
   >([
     [
       1,
       {
         coordinates: [[-73.5, 45.5] as Position, [-73.6, 45.6] as Position],
         nextStopIndex: 1,
+        trafficRanges: [],
       },
     ],
     [
@@ -559,6 +630,7 @@ test('updateAllRoutesDisplay skips routes without positions', () => {
       {
         coordinates: [[-73.7, 45.7] as Position, [-73.8, 45.8] as Position],
         nextStopIndex: 1,
+        trafficRanges: [],
       },
     ],
   ]);
@@ -588,14 +660,15 @@ test('updateAllRoutesDisplay handles empty coordinates gracefully', () => {
 
   const routes = new Map<
     number,
-    { coordinates: Position[]; nextStopIndex: number }
+    { coordinates: Position[]; nextStopIndex: number; trafficRanges: [] }
   >([
-    [1, { coordinates: [], nextStopIndex: 0 }],
+    [1, { coordinates: [], nextStopIndex: 0, trafficRanges: [] }],
     [
       2,
       {
         coordinates: [[-73.7, 45.7] as Position, [-73.8, 45.8] as Position],
         nextStopIndex: 1,
+        trafficRanges: [],
       },
     ],
   ]);
@@ -625,13 +698,14 @@ test('updateAllRoutesDisplay displays all routes when no driver is selected', ()
 
   const routes = new Map<
     number,
-    { coordinates: Position[]; nextStopIndex: number }
+    { coordinates: Position[]; nextStopIndex: number; trafficRanges: [] }
   >([
     [
       1,
       {
         coordinates: [[-73.5, 45.5] as Position, [-73.6, 45.6] as Position],
         nextStopIndex: 1,
+        trafficRanges: [],
       },
     ],
     [
@@ -639,6 +713,7 @@ test('updateAllRoutesDisplay displays all routes when no driver is selected', ()
       {
         coordinates: [[-73.7, 45.7] as Position, [-73.8, 45.8] as Position],
         nextStopIndex: 1,
+        trafficRanges: [],
       },
     ],
   ]);
@@ -675,4 +750,39 @@ test('clearAllRoutesDisplay clears the all-routes layer', () => {
     type: 'FeatureCollection',
     features: [],
   });
+});
+
+test('updateRouteDisplay passes traffic ranges through to route features', () => {
+  MockMap.createRandomInstance();
+
+  const mockGeoJSONSource = { setData: vi.fn() };
+  MockMap.instance!.getSource = vi.fn().mockReturnValue(mockGeoJSONSource);
+
+  const routeGeometry: Position[] = [
+    [-73.5, 45.5],
+    [-73.6, 45.6],
+    [-73.7, 45.7],
+    [-73.8, 45.8],
+  ];
+
+  const trafficRanges = [
+    {
+      startCoordinateIndex: 1,
+      endCoordinateIndex: 2,
+      congestionLevel: 'severe' as CongestionLevel,
+    },
+  ];
+
+  updateRouteDisplay(
+    { coordinates: routeGeometry, nextStopIndex: 3, trafficRanges },
+    [-73.5, 45.5],
+    MockMap.instance! as unknown as mapboxgl.Map
+  );
+
+  const nextTaskCall = mockGeoJSONSource.setData.mock.calls[0][0];
+  const colors = nextTaskCall.features.map(
+    (f: GeoJSON.Feature) => f.properties?.color
+  );
+  // Should include severe red for the traffic range
+  expect(colors).toContain('#f87171');
 });

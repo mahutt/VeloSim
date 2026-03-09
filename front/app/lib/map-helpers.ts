@@ -22,6 +22,11 @@
  * SOFTWARE.
  */
 
+import {
+  FREE_FLOW_COLOR,
+  ROUTE_LINE_OFFSET,
+  ROUTE_LINE_WIDTH,
+} from '~/constants';
 import type { Position, Route } from '~/types';
 import { adaptRouteToGeoJSON } from './geojson-adapters';
 
@@ -145,9 +150,10 @@ export function setMapLayers(map: mapboxgl.Map) {
       'line-cap': 'round',
     },
     paint: {
-      'line-color': '#3b82f6',
-      'line-width': 3,
+      'line-color': ['coalesce', ['get', 'color'], FREE_FLOW_COLOR],
+      'line-width': ROUTE_LINE_WIDTH,
       'line-opacity': 0.35,
+      'line-offset': ROUTE_LINE_OFFSET,
     },
   });
 
@@ -161,9 +167,10 @@ export function setMapLayers(map: mapboxgl.Map) {
       'line-cap': 'round',
     },
     paint: {
-      'line-color': '#3b82f6',
-      'line-width': 4,
-      'line-opacity': 0.8,
+      'line-color': ['coalesce', ['get', 'color'], FREE_FLOW_COLOR],
+      'line-width': ROUTE_LINE_WIDTH,
+      'line-opacity': ['coalesce', ['get', 'opacity'], 0.9],
+      'line-offset': ROUTE_LINE_OFFSET,
     },
   });
 
@@ -176,9 +183,14 @@ export function setMapLayers(map: mapboxgl.Map) {
       'line-cap': 'round',
     },
     paint: {
-      'line-color': '#3b82f6',
-      'line-width': 4,
-      'line-opacity': 0.3,
+      'line-color': ['coalesce', ['get', 'color'], FREE_FLOW_COLOR],
+      'line-width': ROUTE_LINE_WIDTH,
+      'line-opacity': [
+        'number',
+        ['*', ['coalesce', ['get', 'opacity'], 0.9], 0.45],
+        0.4,
+      ],
+      'line-offset': ROUTE_LINE_OFFSET,
     },
   });
 
@@ -299,21 +311,20 @@ export function setMapSource(
 
 /**
  * Update route visualization for a selected resource
- * @param routeGeometry - Full route coordinates (raw OSRM linestring)
- * @param progress - Current progress through route (0-1 fractional)
- * @param nextStopIndex - Index where first task in task queue ends within route
+ * @param route - Route object containing coordinates, nextStopIndex, and optional trafficRanges (or null to clear)
+ * @param position - Current driver position
  * @param map - Mapbox map instance
  */
 export function updateRouteDisplay(
-  routeGeometry: Position[] | null,
+  route: Route | null,
   position: Position,
-  nextStopIndex: number,
   map: mapboxgl.Map
 ) {
   const { nextTask, futureTasks } = adaptRouteToGeoJSON(
-    routeGeometry,
+    route?.coordinates ?? null,
     position,
-    nextStopIndex
+    route?.nextStopIndex ?? 0,
+    route?.trafficRanges
   );
 
   setMapSource(MapSource.RouteNextTask, nextTask, map);
@@ -324,7 +335,7 @@ export function updateRouteDisplay(
  * Clear route visualization
  */
 export function clearRouteDisplay(map: mapboxgl.Map) {
-  updateRouteDisplay(null, [0, 0], 0, map);
+  updateRouteDisplay(null, [0, 0], map);
 }
 
 /**
@@ -358,7 +369,8 @@ export function updateAllRoutesDisplay(
     const { nextTask } = adaptRouteToGeoJSON(
       route.coordinates,
       position,
-      route.nextStopIndex
+      route.nextStopIndex,
+      route.trafficRanges
     );
 
     // Only show next task for background routes (reduces visual clutter)

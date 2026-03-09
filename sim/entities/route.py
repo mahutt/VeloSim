@@ -26,6 +26,7 @@ import math
 from typing import TYPE_CHECKING
 from sim.entities.position import Position
 from sim.entities.road import Road
+from sim.entities.traffic_data import TrafficTriple
 from sim.map.routing_provider import RoutingProvider, RouteResult
 from shapely.geometry import LineString
 from grafana_logging.logger import get_logger
@@ -34,36 +35,6 @@ logger = get_logger(__name__)
 
 if TYPE_CHECKING:
     from sim.map.route_controller import RouteController
-
-
-def map_index_forward(current_idx: int, old_count: int, new_count: int) -> int:
-    """Map index from old collection to new, ensuring forward-only progress.
-
-    When traffic changes reduce the number of points mid-traversal, this function
-    maps the current index to the new collection such that the driver is placed
-    at or ahead of their current progress - never behind.
-
-    Uses ceil() to guarantee forward-only mapping.
-
-    Args:
-        current_idx: Current index in the old collection
-        old_count: Number of points in the old (original) collection
-        new_count: Number of points in the new (active) collection
-
-    Returns:
-        Mapped index in the new collection, guaranteed to represent
-        progress >= current progress. O(1) time complexity.
-
-    Example:
-        >>> map_index_forward(7, 10, 4)  # 78% through, maps to index 3 (100%)
-        3
-        >>> map_index_forward(3, 10, 4)  # 33% through, maps to index 1 (33%)
-        1
-    """
-    if old_count <= 1 or new_count <= 1:
-        return min(current_idx, new_count - 1)
-    progress = current_idx / (old_count - 1)
-    return min(math.ceil(progress * (new_count - 1)), new_count - 1)
 
 
 class Route:
@@ -76,6 +47,64 @@ class Route:
     """
 
     _route_counter = 0  # Unique ID generation.
+
+    @staticmethod
+    def map_index_forward(current_idx: int, old_count: int, new_count: int) -> int:
+        """Map index from old collection to new, ensuring forward-only progress.
+
+        When traffic changes reduce the number of points mid-traversal, this function
+        maps the current index to the new collection such that the driver is placed
+        at or ahead of their current progress - never behind.
+
+        Uses ceil() to guarantee forward-only mapping.
+
+        Args:
+            current_idx: Current index in the old collection
+            old_count: Number of points in the old (original) collection
+            new_count: Number of points in the new (active) collection
+
+        Returns:
+            Mapped index in the new collection, guaranteed to represent
+            progress >= current progress. O(1) time complexity.
+
+        Example:
+            >>> Route.map_index_forward(7, 10, 4)  # 78% through, maps to index 3 (100%)
+            3
+            >>> Route.map_index_forward(3, 10, 4)  # 33% through, maps to index 1 (33%)
+            1
+        """
+        if old_count <= 1 or new_count <= 1:
+            return min(current_idx, new_count - 1)
+        progress = current_idx / (old_count - 1)
+        return min(math.ceil(progress * (new_count - 1)), new_count - 1)
+
+    @staticmethod
+    def find_nearest_index(points: list[Position], target: Position) -> int:
+        """Find the index of the point nearest to target in geographic space.
+
+        Used when traffic changes a road's pointcollection mid-traversal.
+        Geographic proximity prevents the position jump (rubber-banding) caused
+        by ratio-based mapping on non-uniform point distributions.
+
+        Args:
+            points: The new pointcollection to search.
+            target: The driver's last known geographic position.
+
+        Returns:
+            Index of the nearest point. O(n) — only called on traffic changes.
+        """
+        target_pos = target.get_position()
+        best_idx = 0
+        best_dist_sq = float("inf")
+        for i, pt in enumerate(points):
+            pos = pt.get_position()
+            dx = pos[0] - target_pos[0]
+            dy = pos[1] - target_pos[1]
+            dist_sq = dx * dx + dy * dy
+            if dist_sq < best_dist_sq:
+                best_dist_sq = dist_sq
+                best_idx = i
+        return best_idx
 
     def __init__(
         self,
@@ -141,6 +170,10 @@ class Route:
                 "Use RouteController.create_route() to create routes."
             )
         self.roads = roads
+
+        # Cached traffic triples (eagerly updated via notify_traffic_changed)
+        self._traffic_triples_cache: list[TrafficTriple] = []
+        self._has_traffic_changed: bool = False
 
         # If no roads were created, the route was finished from the start
         if not self.roads:
@@ -211,14 +244,29 @@ class Route:
         return success
 
     def _handle_traffic_point_change(self, active_count: int) -> None:
-        """Detect and remap index when traffic changes point count."""
+        """Detect and remap index when traffic changes point count.
+
+        Uses geographic proximity when the driver's last position is known.
+        This prevents rubber-banding caused by ratio-based mapping on
+        non-uniform point distributions (traffic creates dense points in
+        affected zones and normal spacing elsewhere).
+        """
         if (
             self._last_point_count is not None
             and self._last_point_count != active_count
         ):
-            self.current_point_index = map_index_forward(
-                self.current_point_index, self._last_point_count, active_count
-            )
+            if self._last_returned_position is not None:
+                current_road = self.roads[self.current_road_index]
+                active_points = current_road.active_pointcollection
+                self.current_point_index = Route.find_nearest_index(
+                    active_points, self._last_returned_position
+                )
+            else:
+                self.current_point_index = Route.map_index_forward(
+                    self.current_point_index,
+                    self._last_point_count,
+                    active_count,
+                )
         self._last_point_count = active_count
 
     def _get_current_position(self) -> Position | None:
@@ -296,6 +344,69 @@ class Route:
             List of [lon, lat] coordinate pairs from routing provider.
         """
         return [pos.get_position() for pos in self.coordinates]
+
+    @property
+    def has_traffic_changed(self) -> bool:
+        """Whether traffic triples have changed since last clear.
+
+        Returns:
+            True if traffic triples have been updated since the last reset.
+        """
+        return self._has_traffic_changed
+
+    @has_traffic_changed.setter
+    def has_traffic_changed(self, value: bool) -> None:
+        """Set the traffic changed flag.
+
+        Args:
+            value: New flag state.
+
+        Returns:
+            None
+        """
+        self._has_traffic_changed = value
+
+    def get_traffic_triples(self) -> list[TrafficTriple]:
+        """Get cached traffic triples in route coordinate index space.
+
+        Returns the eagerly-maintained cache. Updated via notify_traffic_changed()
+        when traffic is applied/removed on any road in this route.
+
+        Returns:
+            List of TrafficTriple objects for non-FREE_FLOW segments.
+        """
+        return self._traffic_triples_cache
+
+    def notify_traffic_changed(self) -> None:
+        """Rebuild cached traffic triples after a road's traffic changed.
+
+        Called by TrafficController when traffic is applied/removed on a road
+        belonging to this route. Rebuilds the full triple list from all roads.
+
+        Returns:
+            None
+        """
+        triples: list[TrafficTriple] = []
+        coord_offset = 0
+        for r in self.roads:
+            if not r.geometry:
+                continue
+            geom_len = len(r.geometry)
+            for geom_start, geom_end, level in r.get_traffic_geometry_ranges():
+                abs_start = coord_offset + geom_start
+                abs_end = coord_offset + geom_end
+                # Merge with previous if adjacent + same level
+                if (
+                    triples
+                    and triples[-1].congestion_level == level
+                    and triples[-1].end_index >= abs_start
+                ):
+                    triples[-1].end_index = max(triples[-1].end_index, abs_end)
+                else:
+                    triples.append(TrafficTriple(abs_start, abs_end, level))
+            coord_offset += geom_len - 1  # shared boundary point
+        self._traffic_triples_cache = triples
+        self._has_traffic_changed = True
 
     def next(self) -> Position | None:
         """Return the next position in the route traversal.

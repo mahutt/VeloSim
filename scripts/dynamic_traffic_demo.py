@@ -121,6 +121,23 @@ def get_event_segment_key(road):
     return road.segment_key
 
 
+def tick_to_start_time(tick_seconds, base_hour=8, base_minute=0):
+    """Convert a tick offset (seconds from sim start) to HH:MM time string.
+
+    Args:
+        tick_seconds: Tick offset in seconds from simulation start.
+        base_hour: Hour component of simulation start time.
+        base_minute: Minute component of simulation start time.
+
+    Returns:
+        Time-of-day string in HH:MM format.
+    """
+    total_minutes = (base_hour * 60 + base_minute) + (tick_seconds // 60)
+    hours = (total_minutes // 60) % 24
+    minutes = total_minutes % 60
+    return f"{hours:02d}:{minutes:02d}"
+
+
 def generate_traffic_csv(path, segment_key, tick_start, duration, weight, name):
     """Write a valid traffic CSV matching TrafficParser format.
 
@@ -132,17 +149,134 @@ def generate_traffic_csv(path, segment_key, tick_start, duration, weight, name):
         weight: Speed multiplier (0.0-1.0).
         name: Human-readable event name.
     """
+    start_time = tick_to_start_time(tick_start)
     with open(path, "w", newline="", encoding="utf-8") as f:
         writer = csv.writer(f)
-        writer.writerow(["TYPE", "tick_start", "segment_key", "name", "duration", "weight"])
+        writer.writerow(["TYPE", "start_time", "segment_key", "name", "duration", "weight"])
         writer.writerow([
             "local_traffic",
-            tick_start,
+            start_time,
             format_segment_key_for_csv(segment_key),
             name,
             duration,
             weight,
         ])
+
+
+def generate_staggered_traffic_csv(path, road_info):
+    """Generate a staggered traffic CSV from actual route geometry.
+
+    Creates traffic events at different times on different road segments,
+    plus off-route events that should NOT appear on the route overlay.
+
+    Segment keys use road.geometry endpoints (registered in PositionRegistry
+    by RouteController), ensuring exact Position hash matching.
+
+    Args:
+        path: Output file path.
+        road_info: List of road info dicts from analyze_route().
+    """
+    total_roads = len(road_info)
+    if total_roads < 8:
+        print(f"   WARNING: Route only has {total_roads} roads, need 8+ for staggered demo")
+        return
+
+    # Pick 4 groups spread across the route
+    groups = [
+        {
+            "name_prefix": "early_severe",
+            "start_frac": 0.05,  # Near start
+            "count": 3,
+            "start_time": "08:01",
+            "duration": 300,
+            "weight": 0.15,
+        },
+        {
+            "name_prefix": "mid_moderate",
+            "start_frac": 0.25,  # Quarter way
+            "count": 3,
+            "start_time": "08:03",
+            "duration": 500,
+            "weight": 0.5,
+        },
+        {
+            "name_prefix": "mid_severe",
+            "start_frac": 0.50,  # Half way
+            "count": 4,
+            "start_time": "08:07",
+            "duration": 400,
+            "weight": 0.15,
+        },
+        {
+            "name_prefix": "late_moderate",
+            "start_frac": 0.75,  # Three quarters
+            "count": 4,
+            "start_time": "08:10",
+            "duration": 500,
+            "weight": 0.5,
+        },
+    ]
+
+    rows = []
+    used_indices = set()
+
+    for group in groups:
+        start_idx = max(1, int(total_roads * group["start_frac"]))
+        count = min(group["count"], total_roads - start_idx)
+
+        for i in range(count):
+            road_idx = start_idx + i
+            if road_idx >= total_roads or road_idx in used_indices:
+                continue
+            used_indices.add(road_idx)
+
+            road = road_info[road_idx]["road"]
+            seg_key = get_event_segment_key(road)
+            rows.append({
+                "type": "local_traffic",
+                "start_time": group["start_time"],
+                "segment_key": format_segment_key_for_csv(seg_key),
+                "name": f"{group['name_prefix']}_{i}",
+                "duration": group["duration"],
+                "weight": group["weight"],
+            })
+
+    # Add off-route events (coordinates that are NOT on the route)
+    off_route = [
+        ((-73.5718, 45.5048), (-73.5682, 45.5035), "offroute_sherbrooke"),
+        ((-73.5802, 45.5145), (-73.5773, 45.5120), "offroute_parc"),
+        ((-73.5614, 45.5152), (-73.5590, 45.5128), "offroute_stdenis"),
+        ((-73.5595, 45.5072), (-73.5571, 45.5051), "offroute_stlaurent"),
+    ]
+    for start, end, name in off_route:
+        rows.append({
+            "type": "local_traffic",
+            "start_time": "08:00",
+            "segment_key": format_segment_key_for_csv((start, end)),
+            "name": name,
+            "duration": 3000,
+            "weight": 0.15,
+        })
+
+    with open(path, "w", newline="", encoding="utf-8") as f:
+        writer = csv.writer(f)
+        writer.writerow(["TYPE", "start_time", "segment_key", "name", "duration", "weight"])
+        for row in rows:
+            writer.writerow([
+                row["type"],
+                row["start_time"],
+                row["segment_key"],
+                row["name"],
+                row["duration"],
+                row["weight"],
+            ])
+
+    print(f"   Generated {len(rows)} events ({len(rows) - len(off_route)} on-route, "
+          f"{len(off_route)} off-route)")
+    for group in groups:
+        print(f"     {group['name_prefix']}: start_time={group['start_time']}, "
+              f"weight={group['weight']}, duration={group['duration']}")
+    print(f"     off-route: start_time=08:00, weight=0.15, duration=3000 (should NOT appear)")
 
 
 def generate_scenario_json(json_path, csv_path, start_pos, end_pos):
@@ -759,6 +893,11 @@ def parse_args():
         help="Skip pass 2 (pipeline simulation) for quick runs",
     )
     parser.add_argument(
+        "--staggered", action="store_true",
+        help="Generate staggered traffic CSV (events at different ticks on "
+             "different road segments, plus off-route events)",
+    )
+    parser.add_argument(
         "--verbose", action="store_true",
         help="Enable DEBUG logging for traffic pipeline",
     )
@@ -812,6 +951,24 @@ def main():
 
         total_ticks = sum(r["points"] for r in road_info)
         print(f"\n   Total estimated ticks: {total_ticks}")
+
+        # ── Staggered mode: generate CSV + scenario and exit ─────────────
+        if args.staggered:
+            scripts_dir = Path(__file__).parent
+            csv_path = scripts_dir / "dynamic_traffic_output.csv"
+            json_path = scripts_dir / "dynamic_traffic_scenario.json"
+
+            print(f"\n4. Generating staggered traffic scenario...")
+            generate_staggered_traffic_csv(csv_path, road_info)
+            generate_scenario_json(json_path, csv_path, start_pos, end_pos)
+            print(f"\n   CSV:      {csv_path}")
+            print(f"   Scenario: {json_path}")
+            print(f"\n   Import the scenario JSON into the editor to test.")
+            mc.close()
+            print(f"\n{'='*70}")
+            print("Staggered scenario generated!")
+            print(f"{'='*70}")
+            return
 
         # ── Phase 2: Pick Target & Plan Scenario ─────────────────────────
         target_idx = int(len(road_info) * target_frac)
@@ -893,7 +1050,11 @@ def main():
 
             # Create fresh SimPy env + MapController with traffic config
             env2 = simpy.Environment()
-            traffic_config = TrafficConfig(traffic_path=str(csv_path))
+            traffic_config = TrafficConfig(
+                traffic_path=str(csv_path),
+                sim_start_time="day1:08:00",
+                sim_end_time="day1:09:00",
+            )
             map_payload2 = MapPayload(env=env2, traffic=traffic_config)
             mc2 = MapController(map_payload2)
 
@@ -981,7 +1142,11 @@ def main():
             traffic_state_store._reset()  # start clean
 
             env3 = simpy.Environment()
-            traffic_config3 = TrafficConfig(traffic_path=str(csv_path))
+            traffic_config3 = TrafficConfig(
+                traffic_path=str(csv_path),
+                sim_start_time="day1:08:00",
+                sim_end_time="day1:09:00",
+            )
             map_payload3 = MapPayload(env=env3, traffic=traffic_config3)
             mc3 = MapController(map_payload3)
 

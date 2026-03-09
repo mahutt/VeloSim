@@ -39,6 +39,7 @@ def create_mock_route_controller() -> Mock:
     """Create a mock RouteController with callback registration."""
     rc = Mock()
     rc.get_all_active_roads = Mock(return_value=set())
+    rc.get_routes_for_road = Mock(return_value=set())
 
     # Store registered callbacks
     rc._on_road_created_callbacks = []

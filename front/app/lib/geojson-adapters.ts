@@ -23,8 +23,22 @@
  */
 
 import { lineString, point } from '@turf/helpers';
-import lineSlice from '@turf/line-slice';
-import type { Driver, Station, Position, Headquarters } from '~/types';
+import nearestPointOnLine from '@turf/nearest-point-on-line';
+import {
+  FREE_FLOW_COLOR,
+  MODERATE_COLOR,
+  SEVERE_COLOR,
+  FREE_FLOW_OPACITY,
+  MODERATE_OPACITY,
+  SEVERE_OPACITY,
+} from '~/constants';
+import type {
+  Driver,
+  Station,
+  Position,
+  Headquarters,
+  TrafficRange,
+} from '~/types';
 
 export function adaptHeadquartersToGeoJSON(
   headquarters: Headquarters
@@ -96,10 +110,105 @@ export function adaptResourcesToGeoJSON(
   };
 }
 
+/**
+ * Split a coordinate array into colored sub-segments based on traffic ranges.
+ * Ranges are assumed non-overlapping (resolved server-side). O(m log m + n).
+ */
+function splitByTraffic(
+  coords: Position[],
+  globalOffset: number,
+  trafficRanges: TrafficRange[],
+  segmentLabel: string
+): GeoJSON.Feature[] {
+  if (coords.length < 2) return [];
+
+  if (trafficRanges.length === 0) {
+    return [
+      {
+        type: 'Feature',
+        properties: {
+          segmentLabel,
+          color: FREE_FLOW_COLOR,
+          opacity: FREE_FLOW_OPACITY,
+        },
+        geometry: { type: 'LineString', coordinates: coords },
+      },
+    ];
+  }
+
+  const len = coords.length;
+
+  const congestionStyle: Record<string, { color: string; opacity: number }> = {
+    moderate: { color: MODERATE_COLOR, opacity: MODERATE_OPACITY },
+    severe: { color: SEVERE_COLOR, opacity: SEVERE_OPACITY },
+  };
+
+  // Convert to local indices, filter out-of-bounds / free-flow, sort by start
+  const localRanges = trafficRanges
+    .map((r) => ({
+      start: Math.max(r.startCoordinateIndex - globalOffset, 0),
+      end: Math.min(r.endCoordinateIndex - globalOffset, len - 1),
+      ...(congestionStyle[r.congestionLevel] ?? {
+        color: FREE_FLOW_COLOR,
+        opacity: FREE_FLOW_OPACITY,
+      }),
+    }))
+    .filter((r) => r.start < len && r.end >= 0 && r.end > r.start)
+    .sort((a, b) => a.start - b.start);
+
+  const features: GeoJSON.Feature[] = [];
+  let cursor = 0;
+
+  for (const range of localRanges) {
+    // Free-flow gap before this range
+    if (range.start > cursor) {
+      addSegment(features, coords, cursor, range.start, segmentLabel);
+    }
+    // Colored traffic segment
+    addSegment(
+      features,
+      coords,
+      range.start,
+      range.end,
+      segmentLabel,
+      range.color,
+      range.opacity
+    );
+    cursor = range.end;
+  }
+
+  // Trailing free-flow after last range
+  if (cursor < len - 1) {
+    addSegment(features, coords, cursor, len - 1, segmentLabel);
+  }
+
+  return features;
+}
+
+/** Push a LineString feature from coords[startIdx..endIdx]. Defaults to free-flow style. */
+function addSegment(
+  features: GeoJSON.Feature[],
+  coords: Position[],
+  startIdx: number,
+  endIdx: number,
+  segmentLabel: string,
+  color: string = FREE_FLOW_COLOR,
+  opacity: number = FREE_FLOW_OPACITY
+) {
+  const slice = coords.slice(startIdx, endIdx + 1);
+  if (slice.length < 2) return;
+  features.push({
+    type: 'Feature',
+    properties: { segmentLabel, color, opacity },
+    geometry: { type: 'LineString', coordinates: slice },
+  });
+}
+
 export function adaptRouteToGeoJSON(
   routeGeometry: Position[] | null,
   position: Position | null,
-  nextStopIndex: number
+  nextStopIndex: number,
+  trafficRanges?: TrafficRange[]
 ): {
   nextTask: GeoJSON.FeatureCollection;
   futureTasks: GeoJSON.FeatureCollection;
@@ -123,54 +232,51 @@ export function adaptRouteToGeoJSON(
     };
   }
 
-  // 1. split the route at nextStopIndex to avoid snapping to the incorrect part of a line (due to double-backing)
+  // Split at nextStopIndex to avoid snapping to incorrect segment on double-back
   const preNextTaskSegment = routeGeometry.slice(0, nextStopIndex + 1);
   const postNextTaskSegment = routeGeometry.slice(nextStopIndex);
 
-  // 2. remove points already travelled on preNextTaskSegment (using position)
-  const nextTaskLine = lineSlice(
-    point(position),
-    point(routeGeometry[nextStopIndex]),
-    lineString(preNextTaskSegment)
-  );
+  // Trim already-travelled portion: snap driver position onto the route
+  // and slice from that point forward. nearestPointOnLine gives us the
+  // segment index for free, replacing the previous brute-force offset search.
+  const preNextTaskLine = lineString(preNextTaskSegment);
+  const snapped = nearestPointOnLine(preNextTaskLine, point(position));
+  const snapIndex = snapped.properties.index;
+  const snapCoord = snapped.geometry.coordinates as Position;
 
-  if (
-    !nextTaskLine.geometry.coordinates ||
-    nextTaskLine.geometry.coordinates.length < 2
-  ) {
+  const trimmedCoords: Position[] = [
+    snapCoord,
+    ...preNextTaskSegment.slice(snapIndex + 1),
+  ];
+
+  if (trimmedCoords.length < 2) {
     return {
       nextTask: emptyFeatureCollection,
       futureTasks: emptyFeatureCollection,
     };
   }
 
-  const result: {
-    nextTask: GeoJSON.FeatureCollection;
-    futureTasks: GeoJSON.FeatureCollection;
-  } = {
-    nextTask: {
-      type: 'FeatureCollection',
-      features: [
-        {
-          type: 'Feature',
-          properties: { segment: 'next-task' },
-          geometry: nextTaskLine.geometry,
-        },
-      ],
-    },
-    futureTasks: {
-      type: 'FeatureCollection',
-      features:
-        postNextTaskSegment.length >= 2
-          ? [
-              {
-                type: 'Feature',
-                properties: { segment: 'future-tasks' },
-                geometry: lineString(postNextTaskSegment).geometry,
-              },
-            ]
-          : [],
-    },
+  const nextTaskGlobalOffset = snapIndex;
+
+  const nextTaskFeatures = splitByTraffic(
+    trimmedCoords,
+    nextTaskGlobalOffset,
+    trafficRanges ?? [],
+    'next-task'
+  );
+
+  const futureTaskFeatures =
+    postNextTaskSegment.length >= 2
+      ? splitByTraffic(
+          postNextTaskSegment,
+          nextStopIndex,
+          trafficRanges ?? [],
+          'future-tasks'
+        )
+      : [];
+
+  return {
+    nextTask: { type: 'FeatureCollection', features: nextTaskFeatures },
+    futureTasks: { type: 'FeatureCollection', features: futureTaskFeatures },
   };
-  return result;
 }

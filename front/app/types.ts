@@ -138,9 +138,22 @@ interface StationInformation {
   has_kiosk: boolean;
 }
 
+export enum CongestionLevel {
+  FreeFlow = 'free_flow',
+  Moderate = 'moderate',
+  Severe = 'severe',
+}
+
+export interface TrafficRange {
+  startCoordinateIndex: number;
+  endCoordinateIndex: number;
+  congestionLevel: CongestionLevel;
+}
+
 export interface Route {
   coordinates: Position[];
   nextStopIndex: number;
+  trafficRanges: TrafficRange[];
 }
 
 export enum DriverState {

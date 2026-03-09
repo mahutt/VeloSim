@@ -29,7 +29,7 @@ from typing import List
 from unittest.mock import Mock
 from shapely.geometry import LineString
 
-from sim.entities.route import Route, map_index_forward
+from sim.entities.route import Route
 from sim.entities.road import Road
 from sim.entities.position import Position
 from sim.entities.traffic_data import TrafficRange
@@ -1922,33 +1922,40 @@ class TestRouteIndexClampingOnTrafficChange:
         assert point is not None
         assert point.get_position() == traffic_points[3].get_position()
 
-    def test_ratio_mapping_at_various_positions(
+    def test_geographic_proximity_at_various_positions(
         self, mock_routing_provider: Mock, test_config: dict
     ) -> None:
-        """Test ratio mapping at various progress percentages."""
-        import math
+        """Test geographic proximity mapping at various progress percentages.
+
+        When traffic changes point density on a road, the driver should stay
+        at their geographic position rather than jumping (rubber-banding).
+        Traffic points span the same range as original (realistic).
+        """
+        # Original: 10 points [0.0, 0.000] to [0.0, 0.009]
+        original_points = [Position([0.0, i * 0.001]) for i in range(10)]
+        # Traffic: 20 points [0.0, 0.000] to [0.0, 0.009] (2x denser, same range)
+        traffic_points = [Position([0.0, i * 0.0009 / 2]) for i in range(20)]
+        # Recompute to span same range:
+        traffic_points = [Position([0.0, i * 0.009 / 19]) for i in range(20)]
 
         test_cases = [
-            # (original_count, traffic_count, current_idx, expected_idx)
-            (10, 4, 4, math.ceil((4 / 9) * 3)),  # 44% -> ceil(1.33) = 2
-            (10, 4, 6, math.ceil((6 / 9) * 3)),  # 67% -> ceil(2.0) = 2
-            (10, 4, 8, math.ceil((8 / 9) * 3)),  # 89% -> ceil(2.67) = 3
-            (10, 2, 5, math.ceil((5 / 9) * 1)),  # 56% -> ceil(0.56) = 1
+            # (advance_count, last_returned_y, expected_nearest_y_approx)
+            (3, 0.002, 0.002),  # 22% through — should stay near 0.002
+            (5, 0.004, 0.004),  # 44% through — should stay near 0.004
+            (7, 0.006, 0.006),  # 67% through — should stay near 0.006
         ]
 
-        for orig_count, traffic_count, curr_idx, expected_idx in test_cases:
-            # Create road
-            original_points = [Position([0.0, i * 0.001]) for i in range(orig_count)]
+        for advance_count, last_y, expected_approx_y in test_cases:
             step = RouteStep(
                 name="Test Road",
                 distance=100.0,
                 duration=10.0,
-                geometry=original_points,
+                geometry=list(original_points),
                 speed=10.0,
             )
 
             route_result = RouteResult(
-                coordinates=original_points,
+                coordinates=list(original_points),
                 distance=100.0,
                 duration=10.0,
                 steps=[step],
@@ -1958,23 +1965,20 @@ class TestRouteIndexClampingOnTrafficChange:
             roads = build_roads_from_route_result(route_result)
             route = Route(route_result, mock_routing_provider, test_config, roads=roads)
 
-            # Advance to target index
-            for _ in range(curr_idx):
+            for _ in range(advance_count):
                 route.next()
 
-            # Apply traffic
-            traffic_points = [Position([0.0, i * 0.001]) for i in range(traffic_count)]
-            apply_test_traffic(roads[0], traffic_points)
+            apply_test_traffic(roads[0], list(traffic_points))
 
-            # Get mapped point
             point = route.next()
+            assert point is not None, f"None at advance={advance_count}"
 
-            assert (
-                point is not None
-            ), f"Failed for {orig_count}->{traffic_count} at {curr_idx}"
-            assert (
-                point.get_position() == traffic_points[expected_idx].get_position()
-            ), f"Expected index {expected_idx} for {orig_count}->{traffic_count}"
+            # Driver should be at/near their geographic position, not ratio-jumped
+            returned_y = point.get_position()[1]
+            assert abs(returned_y - expected_approx_y) < 0.001, (
+                f"advance={advance_count}: expected ~{expected_approx_y}, "
+                f"got {returned_y}"
+            )
 
     def test_ratio_mapping_single_point_fallback(
         self, mock_routing_provider: Mock, test_config: dict
@@ -2015,18 +2019,16 @@ class TestRouteIndexClampingOnTrafficChange:
         assert point is not None
         assert point.get_position() == traffic_points[0].get_position()
 
-    def test_ratio_mapping_when_traffic_increases_points(
+    def test_geographic_proximity_when_traffic_increases_points(
         self, mock_routing_provider: Mock, test_config: dict
     ) -> None:
-        """Test that ratio mapping works when traffic INCREASES point count.
+        """Test geographic proximity when traffic INCREASES point count.
 
-        When traffic gives MORE points than default, the driver's progress
-        percentage should be preserved. Without this fix, the driver would
-        stay at the same index (going backward in progress).
+        When traffic gives MORE points over the SAME road extent, the
+        driver should stay at their geographic position. Geographic
+        proximity finds the nearest point in the denser collection.
         """
-        import math
-
-        # Create road with 5 points
+        # Create road with 5 points spanning [0, 0.004]
         original_points = [Position([0.0, i * 0.001]) for i in range(5)]
         step = RouteStep(
             name="Test Road",
@@ -2047,40 +2049,38 @@ class TestRouteIndexClampingOnTrafficChange:
         roads = build_roads_from_route_result(route_result)
         route = Route(route_result, mock_routing_provider, test_config, roads=roads)
 
-        # Advance to index 2 (50% through: 2/4 = 0.5)
+        # Advance to index 2 (returns points 0,1; _last_returned=[0.0, 0.001])
         for _ in range(2):
             route.next()
 
         assert route.current_point_index == 2
 
-        # Traffic INCREASES to 10 points
-        traffic_points = [Position([0.0, i * 0.001]) for i in range(10)]
+        # Traffic INCREASES to 10 points spanning same range [0, 0.004]
+        traffic_points = [Position([0.0, i * 0.004 / 9]) for i in range(10)]
         apply_test_traffic(roads[0], traffic_points)
 
-        # Expected mapping with ceil():
-        # progress = 2 / (5-1) = 0.5
-        # new_index = ceil(0.5 * (10-1)) = ceil(4.5) = 5
-        expected_index = math.ceil((2 / 4) * 9)
-        assert expected_index == 5  # Sanity check
-
-        # Call next() to trigger the mapping
+        # Geographic proximity: nearest to [0.0, 0.001] in denser collection
+        # The first point >= 0.001 is the closest match
         point = route.next()
 
-        # Should map to index 5 (50% - ceil gives 56%), not stay at index 2 (22%)
+        # Driver should continue from near their geographic position (~0.001),
+        # not jump to 56% progress (which would be ~0.002)
         assert point is not None
-        assert point.get_position() == traffic_points[5].get_position()
+        returned_y = point.get_position()[1]
+        assert (
+            abs(returned_y - 0.001) < 0.001
+        ), f"Expected position near 0.001, got {returned_y}"
 
-    def test_ratio_mapping_when_traffic_clears(
+    def test_geographic_proximity_when_traffic_clears(
         self, mock_routing_provider: Mock, test_config: dict
     ) -> None:
-        """Test that ratio mapping works when traffic is cleared.
+        """Test geographic proximity when traffic is cleared.
 
-        When traffic is cleared, the point count changes back to original.
-        The driver's progress should be preserved using ratio mapping.
+        When traffic is cleared, the point count reverts to original.
+        Geographic proximity ensures the driver stays at their position
+        rather than jumping to a ratio-mapped index.
         """
-        import math
-
-        # Create road with 10 original points
+        # Create road with 10 original points spanning [0, 0.009]
         original_points = [Position([0.0, i * 0.001]) for i in range(10)]
         step = RouteStep(
             name="Test Road",
@@ -2101,35 +2101,33 @@ class TestRouteIndexClampingOnTrafficChange:
         roads = build_roads_from_route_result(route_result)
         route = Route(route_result, mock_routing_provider, test_config, roads=roads)
 
-        # Start traversal (establishes initial point count tracking)
-        route.next()  # Returns point 0, index becomes 1, stores count 10
+        # Start traversal (returns point 0, index=1, count=10)
+        route.next()
 
-        # Apply traffic with 4 points
+        # Apply traffic with 4 points spanning same range [0, 0.009]
         traffic_points = [Position([0.0, i * 0.003]) for i in range(4)]
         apply_test_traffic(roads[0], traffic_points)
 
-        # This next() call detects traffic change (10 -> 4)
-        # Maps index 1 -> ceil(1/9 * 3) = ceil(0.33) = 1
-        # Returns point 1, index becomes 2, stores count 4
-        route.next()
-
-        # Now current_point_index = 2 in a 4-point collection (2/3 = 67% progress)
+        # next() detects traffic change (10 -> 4)
+        # Geographic proximity: nearest to [0.0, 0.0] in [0, 0.003, 0.006, 0.009]
+        # → index 0, but equals _last_returned → skips, returns index 1 = [0.0, 0.003]
+        p1 = route.next()
+        assert p1 is not None
+        # _last_returned is now [0.0, 0.003], current_point_index=2
 
         # Clear traffic (back to 10 points)
         roads[0].clear_traffic()
 
-        # Expected mapping with ceil():
-        # progress = 2 / (4-1) = 0.67
-        # new_index = ceil(0.67 * (10-1)) = ceil(6.0) = 6
-        expected_index = math.ceil((2 / 3) * 9)
-        assert expected_index == 6  # Sanity check
-
-        # Call next() to trigger the mapping
+        # Geographic proximity: nearest to [0.0, 0.003] in original 10 points
+        # → index 3 (exact match at [0.0, 0.003]), equals _last_returned → skips
+        # → returns index 4 = [0.0, 0.004]
         point = route.next()
 
-        # Should map to index 6 (67%), not stay at index 2 (22%)
+        # Driver should continue from near [0.0, 0.003] in original collection,
+        # returning the next point after their position
         assert point is not None
-        assert point.get_position() == original_points[6].get_position()
+        returned_y = point.get_position()[1]
+        assert abs(returned_y - 0.004) < 0.001, f"Expected ~0.004, got {returned_y}"
 
     def test_no_mapping_on_first_call(
         self, mock_routing_provider: Mock, test_config: dict
@@ -2226,57 +2224,127 @@ class TestMapIndexForward:
     def test_basic_forward_mapping(self):
         """Test basic ratio-based mapping."""
         # 78% through (index 7 of 10), maps to index 3 of 4 (100% - ceil)
-        assert map_index_forward(7, 10, 4) == 3
+        assert Route.map_index_forward(7, 10, 4) == 3
 
     def test_exact_progress_mapping(self):
         """Test mapping when progress is exactly representable."""
         # 50% through (index 4 of 9), maps to index 2 of 5 (50% exactly)
         # progress = 4/8 = 0.5, ceil(0.5 * 4) = ceil(2.0) = 2
-        assert map_index_forward(4, 9, 5) == 2
+        assert Route.map_index_forward(4, 9, 5) == 2
 
     def test_uses_ceil_for_forward_only(self):
         """Test that ceil() is used to ensure forward-only progress."""
         # 33% through (index 3 of 10), would round to 1 but ceil gives 2
         # progress = 3/9 = 0.333, ceil(0.333 * 3) = ceil(1.0) = 1
-        assert map_index_forward(3, 10, 4) == 1
+        assert Route.map_index_forward(3, 10, 4) == 1
 
         # 44% through (index 4 of 10), round would give 1, ceil gives 2
         # progress = 4/9 = 0.444, ceil(0.444 * 3) = ceil(1.33) = 2
-        assert map_index_forward(4, 10, 4) == 2
+        assert Route.map_index_forward(4, 10, 4) == 2
 
     def test_at_start(self):
         """Test mapping at the start of the route."""
-        assert map_index_forward(0, 10, 4) == 0
+        assert Route.map_index_forward(0, 10, 4) == 0
 
     def test_at_end(self):
         """Test mapping at the end of the route."""
-        assert map_index_forward(9, 10, 4) == 3
+        assert Route.map_index_forward(9, 10, 4) == 3
 
     def test_beyond_bounds_clamps_to_max(self):
         """Test that index beyond bounds is clamped to max."""
         # Index 15 in a 10-point collection, mapping to 4 points
         # progress = 15/9 = 1.67, ceil(1.67 * 3) = ceil(5.0) = 5
         # But clamped to max valid index 3
-        assert map_index_forward(15, 10, 4) == 3
+        assert Route.map_index_forward(15, 10, 4) == 3
 
     def test_single_point_old_collection(self):
         """Test fallback when old collection has single point."""
-        assert map_index_forward(0, 1, 4) == 0
-        assert map_index_forward(5, 1, 4) == 3  # Clamps to max
+        assert Route.map_index_forward(0, 1, 4) == 0
+        assert Route.map_index_forward(5, 1, 4) == 3  # Clamps to max
 
     def test_single_point_new_collection(self):
         """Test fallback when new collection has single point."""
-        assert map_index_forward(5, 10, 1) == 0
-        assert map_index_forward(0, 10, 1) == 0
+        assert Route.map_index_forward(5, 10, 1) == 0
+        assert Route.map_index_forward(0, 10, 1) == 0
 
     def test_same_size_collections(self):
         """Test mapping between same-sized collections."""
-        assert map_index_forward(5, 10, 10) == 5
-        assert map_index_forward(0, 10, 10) == 0
-        assert map_index_forward(9, 10, 10) == 9
+        assert Route.map_index_forward(5, 10, 10) == 5
+        assert Route.map_index_forward(0, 10, 10) == 0
+        assert Route.map_index_forward(9, 10, 10) == 9
 
     def test_larger_new_collection(self):
         """Test mapping to a larger collection."""
         # 50% through (index 2 of 5), maps to 50% of 10 = index 5
         # progress = 2/4 = 0.5, ceil(0.5 * 9) = ceil(4.5) = 5
-        assert map_index_forward(2, 5, 10) == 5
+        assert Route.map_index_forward(2, 5, 10) == 5
+
+
+class TestFindNearestIndex:
+    """Tests for the find_nearest_index geographic proximity function."""
+
+    def test_exact_match(self) -> None:
+        """Target position exists in the collection."""
+        points = [
+            Position([-73.58, 45.49]),
+            Position([-73.57, 45.50]),
+            Position([-73.56, 45.51]),
+        ]
+        assert Route.find_nearest_index(points, Position([-73.57, 45.50])) == 1
+
+    def test_nearest_to_middle(self) -> None:
+        """Target between two points selects the closer one."""
+        points = [
+            Position([0.0, 0.0]),
+            Position([1.0, 0.0]),
+            Position([2.0, 0.0]),
+            Position([3.0, 0.0]),
+        ]
+        # Closest to (1.1, 0.0) is index 1 at (1.0, 0.0)
+        assert Route.find_nearest_index(points, Position([1.1, 0.0])) == 1
+
+    def test_nearest_to_start(self) -> None:
+        """Target near the start selects index 0."""
+        points = [
+            Position([0.0, 0.0]),
+            Position([10.0, 0.0]),
+            Position([20.0, 0.0]),
+        ]
+        assert Route.find_nearest_index(points, Position([0.1, 0.0])) == 0
+
+    def test_nearest_to_end(self) -> None:
+        """Target near the end selects last index."""
+        points = [
+            Position([0.0, 0.0]),
+            Position([10.0, 0.0]),
+            Position([20.0, 0.0]),
+        ]
+        assert Route.find_nearest_index(points, Position([19.9, 0.0])) == 2
+
+    def test_single_point(self) -> None:
+        """Single-point collection always returns 0."""
+        points = [Position([5.0, 5.0])]
+        assert Route.find_nearest_index(points, Position([99.0, 99.0])) == 0
+
+    def test_non_uniform_distribution(self) -> None:
+        """Non-uniform spacing (like traffic-affected roads) finds correct point.
+
+        Simulates a road where the first half has sparse points (normal speed)
+        and the second half has dense points (traffic zone). Geographic proximity
+        correctly finds the nearest point instead of ratio-mapping to a wrong index.
+        """
+        # Normal zone: 3 points at 0m, 50m, 100m
+        # Traffic zone: 5 dense points at 100m, 110m, 120m, 130m, 140m
+        points = [
+            Position([0.0, 0.0]),  # 0: 0m
+            Position([50.0, 0.0]),  # 1: 50m
+            Position([100.0, 0.0]),  # 2: 100m (traffic boundary)
+            Position([110.0, 0.0]),  # 3: 110m
+            Position([120.0, 0.0]),  # 4: 120m
+            Position([130.0, 0.0]),  # 5: 130m
+            Position([140.0, 0.0]),  # 6: 140m
+        ]
+        # Driver at ~50m — should get index 1, not a ratio-mapped index
+        assert Route.find_nearest_index(points, Position([52.0, 0.0])) == 1
+        # Driver at ~100m — should get index 2 (traffic boundary)
+        assert Route.find_nearest_index(points, Position([99.0, 0.0])) == 2
