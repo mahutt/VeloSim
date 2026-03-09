@@ -991,11 +991,6 @@ class TestRoadDistance:
         assert traffic_increment < free_flow_increment
         assert traffic_increment == pytest.approx(200.0 / (n - 1))
 
-    def test_total_distance_equals_length(self) -> None:
-        """Test that total_distance property equals road length."""
-        road = self._create_road(length=150.0)
-        assert road.total_distance == 150.0
-
     def test_distance_out_of_bounds_clamped(self) -> None:
         """Test that out-of-bounds indices are clamped to valid range."""
         road = self._create_road(num_points=5, length=40.0)

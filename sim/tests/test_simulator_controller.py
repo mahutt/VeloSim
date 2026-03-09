@@ -250,6 +250,7 @@ def test_create_key_frame(simulator_controller: SimulatorController) -> None:
     assert "drivers" in payload
     assert "vehicles" in payload
     assert "clock" in payload
+    assert "reporting" in payload
 
     # Check that all entities are included in key frame
     assert len(payload["tasks"]) == 2
@@ -276,6 +277,11 @@ def test_create_key_frame(simulator_controller: SimulatorController) -> None:
     assert "position" in driver
     assert "taskIds" in driver
     assert "inProgressTaskId" in driver
+
+    reporting = payload["reporting"]
+    assert reporting["vehicleDistanceTraveled"] == pytest.approx(
+        simulator_controller.sim_env.report.get_vehicle_distance_traveled()
+    )
 
 
 def test_create_diff_frame(simulator_controller: SimulatorController) -> None:

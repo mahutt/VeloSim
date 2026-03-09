@@ -249,6 +249,7 @@ class TestSimulationService:
                     "vehicleUtilizationRatio": 0.8,
                     "averageTasksServicedPerShift": 3.0,
                     "averageTaskResponseTime": 120.0,
+                    "vehicleDistanceTraveled": 450.5,
                 }
             },
         ):
@@ -261,6 +262,7 @@ class TestSimulationService:
             "vehicleUtilizationRatio": 0.8,
             "averageTasksServicedPerShift": 3.0,
             "averageTaskResponseTime": 120.0,
+            "vehicleDistanceTraveled": 450.5,
         }
 
     def test_get_simulation_report_returns_nulls_for_missing_metrics(
@@ -288,6 +290,7 @@ class TestSimulationService:
             "vehicleUtilizationRatio": None,
             "averageTasksServicedPerShift": None,
             "averageTaskResponseTime": None,
+            "vehicleDistanceTraveled": None,
         }
 
     def test_get_simulation_report_unauthorized(

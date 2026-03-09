@@ -68,6 +68,7 @@ class SimulatorController:
         map_payload = MapPayload(
             traffic=existing_payload.traffic if existing_payload else None,
             env=sim_env,
+            report=sim_env.report,
             sim_id=sim_id,
         )
         self.map_controller = map_controller or MapController(map_payload=map_payload)
@@ -730,8 +731,8 @@ class SimulatorController:
             "averageTaskResponseTime": round(
                 self.sim_env.report.get_average_service_time_for_tasks(), 4
             ),
-            "vehicleDistanceTravelled": round(
-                self.map_controller.route_controller.get_total_vehicle_distance(), 2
+            "vehicleDistanceTraveled": round(
+                self.sim_env.report.get_vehicle_distance_traveled(), 2
             ),
         }
 

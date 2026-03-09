@@ -652,6 +652,7 @@ class SimulationService:
             "vehicleUtilizationRatio": None,
             "averageTasksServicedPerShift": None,
             "averageTaskResponseTime": None,
+            "vehicleDistanceTraveled": None,
         }
 
         try:

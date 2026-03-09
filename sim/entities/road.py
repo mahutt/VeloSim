@@ -211,15 +211,6 @@ class Road:
         """
         return multiplier_to_congestion_level(self.traffic_multiplier)
 
-    @property
-    def total_distance(self) -> float:
-        """Total road distance in meters (alias for length).
-
-        Returns:
-            Road length in meters.
-        """
-        return self.length
-
     def get_distance_at_index(self, index: int) -> float:
         """Get cumulative distance from road start to a point index.
 

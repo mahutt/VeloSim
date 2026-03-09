@@ -408,8 +408,9 @@ class Route:
             coord_offset += geom_len - 1  # shared boundary point
         self._traffic_triples_cache = triples
         self._has_traffic_changed = True
-    def get_distance_travelled(self) -> float:
-        """Get total distance travelled along the route so far.
+
+    def get_distance_traveled(self) -> float:
+        """Get total distance traveled along the route so far.
 
         Sums the length of all completed roads plus partial distance
         on the current road using speed-based distance computation.

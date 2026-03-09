@@ -2348,11 +2348,11 @@ class TestFindNearestIndex:
         assert Route.find_nearest_index(points, Position([52.0, 0.0])) == 1
         # Driver at ~100m — should get index 2 (traffic boundary)
         assert Route.find_nearest_index(points, Position([99.0, 0.0])) == 2
-        assert map_index_forward(2, 5, 10) == 5
+        assert Route.map_index_forward(2, 5, 10) == 5
 
 
-class TestRouteDistanceTravelled:
-    """Tests for Route.get_distance_travelled()."""
+class TestRouteDistanceTraveled:
+    """Tests for Route.get_distance_traveled()."""
 
     def test_distance_at_start_is_zero(
         self, mock_routing_provider: Mock, test_config: dict
@@ -2375,7 +2375,7 @@ class TestRouteDistanceTravelled:
         roads = build_roads_from_route_result(route_result)
         route = Route(route_result, mock_routing_provider, test_config, roads=roads)
 
-        assert route.get_distance_travelled() == 0.0
+        assert route.get_distance_traveled() == 0.0
 
     def test_distance_increases_during_traversal(
         self, mock_routing_provider: Mock, test_config: dict
@@ -2402,7 +2402,7 @@ class TestRouteDistanceTravelled:
         prev_distance = 0.0
         while not route.is_finished:
             route.next()
-            d = route.get_distance_travelled()
+            d = route.get_distance_traveled()
             assert d >= prev_distance
             prev_distance = d
 
@@ -2444,7 +2444,7 @@ class TestRouteDistanceTravelled:
 
         # After completing first road, distance should be >= first road's length
         if not route.is_finished:
-            d = route.get_distance_travelled()
+            d = route.get_distance_traveled()
             assert d >= 100.0
 
     def test_distance_when_route_finished(
@@ -2484,7 +2484,7 @@ class TestRouteDistanceTravelled:
             pass
 
         assert route.is_finished
-        d = route.get_distance_travelled()
+        d = route.get_distance_traveled()
         # Should be approximately the total route distance (sum of road lengths)
         total = sum(r.length for r in route.roads)
         assert d == pytest.approx(total)
@@ -2504,4 +2504,4 @@ class TestRouteDistanceTravelled:
         route = Route(route_result, mock_routing_provider, test_config, roads=roads)
 
         assert route.is_finished
-        assert route.get_distance_travelled() == 0.0
+        assert route.get_distance_traveled() == 0.0
