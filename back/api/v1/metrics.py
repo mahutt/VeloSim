@@ -29,6 +29,8 @@ from prometheus_client import generate_latest, CONTENT_TYPE_LATEST
 # `api_router`) so the metrics endpoint remains public for Prometheus scrapes.
 router = APIRouter(prefix="/metric", tags=["metrics"])
 
+METRICS_PATH = "/api/v1/metric/metrics"
+
 
 @router.get("/metrics")
 def metrics() -> Response:

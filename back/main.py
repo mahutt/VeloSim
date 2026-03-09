@@ -22,11 +22,13 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 """
 
+import time
+from collections.abc import Callable
 from typing import Annotated, AsyncIterator, Dict
 from fastapi.middleware.cors import CORSMiddleware
 from uvicorn.middleware.proxy_headers import ProxyHeadersMiddleware
 from contextlib import asynccontextmanager
-from fastapi import Depends, FastAPI, HTTPException
+from fastapi import Depends, FastAPI, HTTPException, Request, Response
 from fastapi.security import OAuth2PasswordRequestForm
 
 from back.auth.dependency import get_user_id
@@ -47,11 +49,11 @@ from back.exceptions import (
     UnexpectedError,
     VelosimPermissionError,
 )
-from back.api.v1.metrics import router as metrics_router
+from back.api.v1.metrics import router as metrics_router, METRICS_PATH
 from back.services.simulation_service import simulation_service
 from back.auth import Token, authenticate_user
 from back.database.session import get_db
-from grafana_logging.logger import get_logger
+from grafana_logging.logger import get_logger, log_request
 
 logger = get_logger(__name__)
 
@@ -93,6 +95,39 @@ app = FastAPI(
     redoc_url="/api/redoc" if settings.ENVIRONMENT != "production" else None,
     lifespan=lifespan,
 )
+
+EXCLUDED_LOG_PATHS = {
+    METRICS_PATH,  # Prometheus scrapes every 5 s
+    "/health",  # Health probes from load balancer / Docker
+}
+
+
+@app.middleware("http")
+async def http_logging_middleware(request: Request, call_next: Callable) -> Response:
+    """Log HTTP method, path, status code, and response time for every request.
+
+    Excludes the Prometheus metrics scrape endpoint to avoid log noise.
+
+    Args:
+        request: The incoming HTTP request.
+        call_next: The next middleware or route handler in the chain.
+
+    Returns:
+        The HTTP response from the next handler.
+    """
+    start = time.perf_counter()
+    try:
+        response: Response = await call_next(request)
+    except Exception:
+        duration_ms = (time.perf_counter() - start) * 1000
+        if request.url.path not in EXCLUDED_LOG_PATHS:
+            log_request(request.method, str(request.url), 500, duration_ms)
+        raise
+    if request.url.path not in EXCLUDED_LOG_PATHS:
+        duration_ms = (time.perf_counter() - start) * 1000
+        log_request(request.method, str(request.url), response.status_code, duration_ms)
+    return response
+
 
 # Add metrics middleware to track all endpoint calls
 app.add_middleware(MetricsMiddleware)
