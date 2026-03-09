@@ -1264,8 +1264,10 @@ class TestSimulationService:
 
         assert result is existing_sim_data
 
+    @patch("back.services.simulation_service.sim_frame_crud")
     def test_restore_user_paused_simulation_preserves_paused_by_user_flag(
         self: "TestSimulationService",
+        mock_sim_frame_crud: Mock,
         mock_user_crud: Mock,
         mock_sim_crud: Mock,
         mock_db: Mock,
@@ -1281,6 +1283,7 @@ class TestSimulationService:
             scenario_payload='{"start_time": "08:00", "end_time": "10:00"}',
         )
         mock_sim_crud.get_by_uuid.return_value = mock_sim
+        mock_sim_frame_crud.get_max_seq_number.return_value = 99
 
         # Mock keyframe with pausedByUser=True
         keyframe_with_user_pause = {

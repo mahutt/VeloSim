@@ -43,6 +43,9 @@ class Clock:
 
     def __init__(self, env: simpy.Environment) -> None:
         self.env = env
+        sim_seconds = self.env.now
+        self.sim_time_seconds = sim_seconds
+        self.sim_time_minutes = sim_seconds / 60
 
     def clock(self) -> Generator[Any, Any, None]:
         """Clock generator that tracks sim and real time progression.
