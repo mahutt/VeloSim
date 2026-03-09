@@ -42,6 +42,7 @@ import {
   updateAllRoutesDisplay,
   clearAllRoutesDisplay,
   updateRouteDisplay,
+  clearRouteDisplay,
 } from './map-helpers';
 import {
   setupMapClickHandlers,
@@ -323,21 +324,21 @@ export default class MapManager {
   }
 
   private updateSelectedRouteDisplay(
-    selectedResourceId: number | undefined,
+    selectedDriverId: number | undefined,
     map: mapboxgl.Map,
     routes: Map<number, Route>,
     currentPositions: Map<number, Position>
   ) {
-    if (selectedResourceId !== undefined) {
-      const route = routes.get(selectedResourceId);
-      const position = currentPositions.get(selectedResourceId);
-      if (route && position) {
-        updateRouteDisplay(route, position, map);
-      } else {
-        updateRouteDisplay(null, [0, 0], map);
-      }
+    if (selectedDriverId === undefined) {
+      clearRouteDisplay(map);
+      return;
+    }
+    const route = routes.get(selectedDriverId);
+    const position = currentPositions.get(selectedDriverId);
+    if (route && position) {
+      updateRouteDisplay(route, position, map);
     } else {
-      updateRouteDisplay(null, [0, 0], map);
+      clearRouteDisplay(map);
     }
   }
 
