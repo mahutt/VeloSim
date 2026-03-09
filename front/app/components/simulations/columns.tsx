@@ -26,6 +26,10 @@ import { type ColumnDef } from '@tanstack/react-table';
 import { useNavigate } from 'react-router';
 import type { Simulation } from '~/types';
 import { Button } from '../ui/button';
+import { Download } from 'lucide-react';
+import api from '~/api';
+import useError from '~/hooks/use-error';
+import type { GetSimulationReportResponse } from '~/types';
 
 export const columns: ColumnDef<Simulation>[] = [
   {
@@ -53,13 +57,14 @@ export const columns: ColumnDef<Simulation>[] = [
     },
   },
   {
-    id: 'resume',
+    id: 'resumeOrReport',
     header: 'Action',
     cell: ({ row }) => {
       const sim_id = row.original.uuid;
       const isCompleted = row.original.completed;
 
       const navigate = useNavigate();
+      const { displayError } = useError();
 
       const handleSimulationClick = () => {
         if (isCompleted) {
@@ -68,14 +73,45 @@ export const columns: ColumnDef<Simulation>[] = [
         navigate(`/simulations/${sim_id}`);
       };
 
-      if (isCompleted) {
-        return <span>N/A</span>;
-      }
+      const handleReportClick = async () => {
+        try {
+          const response = await api.get<GetSimulationReportResponse>(
+            `/simulation/${sim_id}/report`
+          );
+
+          const header = Object.keys(response.data).join(',');
+          const rows = Object.values(response.data).join(',');
+
+          const csvDataString = [header, rows].join('\n');
+          const blob = new Blob([csvDataString], {
+            type: 'text/csv;charset=utf-8;',
+          });
+          const url = URL.createObjectURL(blob);
+
+          const link = document.createElement('a');
+          link.href = url;
+          link.setAttribute('download', `sim_${sim_id}.csv`);
+          document.body.appendChild(link);
+          link.click();
+
+          document.body.removeChild(link);
+          URL.revokeObjectURL(url);
+        } catch {
+          displayError('Error downloading simulation report');
+        }
+      };
 
       return (
-        <Button size="sm" onClick={handleSimulationClick}>
-          Resume
-        </Button>
+        <div className="flex gap-2">
+          {!isCompleted && (
+            <Button size="sm" onClick={handleSimulationClick}>
+              Resume
+            </Button>
+          )}
+          <Button size="sm" variant="outline" onClick={handleReportClick}>
+            <Download /> Report
+          </Button>
+        </div>
       );
     },
   },

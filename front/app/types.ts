@@ -105,6 +105,13 @@ export interface BatchAssignTasksToDriverResponseItem {
   success: boolean;
 }
 
+export interface GetSimulationReportResponse {
+  servicingToDrivingRatio: number | null;
+  vehicleUtilizationRatio: number | null;
+  averageTasksServicedPerShift: number | null;
+  averageTaskResponseTime: number | null;
+}
+
 // GBFS Response Types
 
 export interface GBFSStationInformationResponse {
