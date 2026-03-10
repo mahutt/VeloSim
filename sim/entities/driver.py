@@ -644,7 +644,7 @@ class Driver:
                     self.state == DriverState.ON_ROUTE
                     and not self.get_in_progress_task()
                 ):
-                    break
+                    return
                 # Handle case where route.next() returns tuple (position, geometry)
                 if isinstance(next_position, tuple):
                     next_position = next_position[0]
@@ -658,11 +658,10 @@ class Driver:
                 self.env.report.increment_driving_time()
 
                 next_position = self.current_route.next()
+            self.routes.pop(0)  # Remove the completed route
         # Allows a traveling drivers to be interrupted by other simpy entities
         except simpy.Interrupt:
             # TODO Implement interrupt logic
-            pass
-        finally:
             self.compute_routes()
 
     def get_route_json(self) -> dict | None:
@@ -735,19 +734,20 @@ class Driver:
 
             for task in self.get_visible_task_list():
                 station = task.get_station()
-                if station is not None:
-                    stops.append(station.get_position())
-                    local_battery_count -= 1
-                    # add HQ to route if battery will deplete
-                    if local_battery_count == 0 and self.state not in [
-                        DriverState.SEEKING_HQ_FOR_INVENTORY,
-                        DriverState.ON_BREAK,
-                        DriverState.ENDING_SHIFT,
-                    ]:
-                        stops.append(self.env.hq.position)
-                        local_battery_count = (
-                            self.vehicle.max_battery_count if self.vehicle else 0
-                        )
+                if station is None or task.get_state() == State.IN_SERVICE:
+                    continue
+                stops.append(station.get_position())
+                local_battery_count -= 1
+                # add HQ to route if battery will deplete
+                if local_battery_count == 0 and self.state not in [
+                    DriverState.SEEKING_HQ_FOR_INVENTORY,
+                    DriverState.ON_BREAK,
+                    DriverState.ENDING_SHIFT,
+                ]:
+                    stops.append(self.env.hq.position)
+                    local_battery_count = (
+                        self.vehicle.max_battery_count if self.vehicle else 0
+                    )
 
         new_routes: list[Route] = []
 
