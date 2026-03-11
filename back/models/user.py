@@ -22,8 +22,9 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 """
 
-from typing import TYPE_CHECKING, List
-from sqlalchemy import Boolean, DateTime, String, func
+from typing import TYPE_CHECKING, Dict, List, Optional
+from sqlalchemy import Boolean, DateTime, JSON, String, func
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from back.database.session import Base
 
@@ -48,6 +49,11 @@ class User(Base):
     )
     date_updated: Mapped[DateTime] = mapped_column(
         DateTime, nullable=False, server_default=func.now(), onupdate=func.now()
+    )
+
+    preferences: Mapped[Optional[Dict]] = mapped_column(
+        JSON().with_variant(JSONB(), "postgresql"),
+        nullable=True,
     )
 
     # Use string to avoid circular import of back-populated field

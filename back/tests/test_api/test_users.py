@@ -877,3 +877,417 @@ class TestUsersAPI:
         data = response.json()
         assert "Requesting user cannot access this user." in str(data["detail"])
         mock_get_if_permission.assert_called_once()
+
+
+class TestPreferencesAPI:
+    """Test the user preferences endpoints."""
+
+    # ------------------------------------------------------------------
+    # GET /users/{user_id}/preferences  (canonical implementation)
+    # ------------------------------------------------------------------
+
+    @patch("back.api.v1.users.user_crud.get_if_permission")
+    def test_get_user_preferences_success_admin(
+        self,
+        mock_get: MagicMock,
+        authenticated_client: TestClient,
+        db: Session,
+    ) -> None:
+        """Admin can read another user's preferences."""
+        mock_user = MagicMock()
+        mock_user.preferences = {"language": "fr", "front_theme": "dark"}
+        mock_get.return_value = mock_user
+
+        response = authenticated_client.get("/api/v1/users/2/preferences")
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["language"] == "fr"
+        assert data["front_theme"] == "dark"
+        mock_get.assert_called_once()
+
+    @patch("back.api.v1.users.user_crud.get_if_permission")
+    def test_get_user_preferences_success_self(
+        self,
+        mock_get: MagicMock,
+        non_admin_client: TestClient,
+        db: Session,
+    ) -> None:
+        """A non-admin user can read their own preferences via the /{id} endpoint."""
+        mock_user = MagicMock()
+        mock_user.preferences = {"language": "en"}
+        mock_get.return_value = mock_user
+
+        # non_admin_client authenticates as user 2
+        response = non_admin_client.get("/api/v1/users/2/preferences")
+
+        assert response.status_code == 200
+        assert response.json()["language"] == "en"
+
+    @patch("back.api.v1.users.user_crud.get_if_permission")
+    def test_get_user_preferences_none_stored(
+        self,
+        mock_get: MagicMock,
+        authenticated_client: TestClient,
+        db: Session,
+    ) -> None:
+        """When preferences is null in DB, returns an object with language: null."""
+        mock_user = MagicMock()
+        mock_user.preferences = None
+        mock_get.return_value = mock_user
+
+        response = authenticated_client.get("/api/v1/users/1/preferences")
+
+        assert response.status_code == 200
+        assert response.json()["language"] is None
+
+    @patch("back.api.v1.users.user_crud.get_if_permission")
+    def test_get_user_preferences_not_found(
+        self,
+        mock_get: MagicMock,
+        authenticated_client: TestClient,
+        db: Session,
+    ) -> None:
+        """Returns 404 when the target user does not exist."""
+        mock_get.return_value = None
+
+        response = authenticated_client.get("/api/v1/users/999/preferences")
+
+        assert response.status_code == 404
+
+    @patch("back.api.v1.users.user_crud.get_if_permission")
+    def test_get_user_preferences_permission_error(
+        self,
+        mock_get: MagicMock,
+        non_admin_client: TestClient,
+        db: Session,
+    ) -> None:
+        """A non-admin cannot read another user's preferences."""
+        mock_get.side_effect = VelosimPermissionError(
+            "Requesting user cannot access this user."
+        )
+
+        response = non_admin_client.get("/api/v1/users/1/preferences")
+
+        assert response.status_code == 403
+        data = response.json()
+        assert "Requesting user cannot access this user." in str(data["detail"])
+
+    def test_get_user_preferences_no_authentication(
+        self, client: TestClient, db: Session
+    ) -> None:
+        """Unauthenticated request is rejected."""
+        response = client.get("/api/v1/users/1/preferences")
+        assert response.status_code == 401
+
+    # ------------------------------------------------------------------
+    # GET /users/me/preferences  (wrapper → /{user_id}/preferences)
+    # ------------------------------------------------------------------
+
+    @patch("back.api.v1.users.user_crud.get_if_permission")
+    def test_get_my_preferences_no_prefs(
+        self,
+        mock_get: MagicMock,
+        authenticated_client: TestClient,
+        db: Session,
+    ) -> None:
+        """Preferences is null in DB → response contains language: null."""
+        mock_user = MagicMock()
+        mock_user.preferences = None
+        mock_get.return_value = mock_user
+
+        response = authenticated_client.get("/api/v1/users/me/preferences")
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["language"] is None
+
+    @patch("back.api.v1.users.user_crud.get_if_permission")
+    def test_get_my_preferences_with_language(
+        self,
+        mock_get: MagicMock,
+        authenticated_client: TestClient,
+        db: Session,
+    ) -> None:
+        """Stored language preference is returned correctly."""
+        mock_user = MagicMock()
+        mock_user.preferences = {"language": "fr", "front_theme": "dark"}
+        mock_get.return_value = mock_user
+
+        response = authenticated_client.get("/api/v1/users/me/preferences")
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["language"] == "fr"
+        assert data["front_theme"] == "dark"
+
+    def test_get_my_preferences_no_authentication(
+        self, client: TestClient, db: Session
+    ) -> None:
+        """Unauthenticated request is rejected."""
+        response = client.get("/api/v1/users/me/preferences")
+        assert response.status_code == 401
+
+    @patch("back.api.v1.users.user_crud.get_if_permission")
+    def test_get_my_preferences_user_not_found(
+        self,
+        mock_get: MagicMock,
+        authenticated_client: TestClient,
+        db: Session,
+    ) -> None:
+        """Returns 404 when the user cannot be found."""
+        mock_get.return_value = None
+
+        response = authenticated_client.get("/api/v1/users/me/preferences")
+
+        assert response.status_code == 404
+
+    # ------------------------------------------------------------------
+    # PATCH /{user_id}/preferences
+    # ------------------------------------------------------------------
+
+    @patch("back.api.v1.users.user_crud.update_preferences")
+    def test_update_preferences_set_language(
+        self,
+        mock_update: MagicMock,
+        authenticated_client: TestClient,
+        db: Session,
+    ) -> None:
+        """Setting language to 'fr' succeeds and returns the merged blob."""
+        mock_user = MagicMock()
+        mock_user.preferences = {"language": "fr"}
+        mock_update.return_value = mock_user
+
+        response = authenticated_client.patch(
+            "/api/v1/users/1/preferences", json={"language": "fr"}
+        )
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["language"] == "fr"
+        mock_update.assert_called_once()
+
+    @patch("back.api.v1.users.user_crud.update_preferences")
+    def test_update_preferences_clear_language(
+        self,
+        mock_update: MagicMock,
+        authenticated_client: TestClient,
+        db: Session,
+    ) -> None:
+        """Setting language to null clears the preference."""
+        mock_user = MagicMock()
+        mock_user.preferences = {"language": None}
+        mock_update.return_value = mock_user
+
+        response = authenticated_client.patch(
+            "/api/v1/users/1/preferences", json={"language": None}
+        )
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["language"] is None
+        mock_update.assert_called_once()
+
+    @patch("back.api.v1.users.user_crud.update_preferences")
+    def test_update_preferences_front_only_key(
+        self,
+        mock_update: MagicMock,
+        authenticated_client: TestClient,
+        db: Session,
+    ) -> None:
+        """Front-end-only keys (front_*) are stored transparently."""
+        mock_user = MagicMock()
+        mock_user.preferences = {"front_theme": "dark", "front_sidebar": False}
+        mock_update.return_value = mock_user
+
+        response = authenticated_client.patch(
+            "/api/v1/users/1/preferences",
+            json={"front_theme": "dark", "front_sidebar": False},
+        )
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["front_theme"] == "dark"
+        assert data["front_sidebar"] is False
+        mock_update.assert_called_once()
+
+    @patch("back.api.v1.users.user_crud.update_preferences")
+    def test_update_preferences_mixed_keys(
+        self,
+        mock_update: MagicMock,
+        authenticated_client: TestClient,
+        db: Session,
+    ) -> None:
+        """A mix of back-end and front-end keys is accepted."""
+        mock_user = MagicMock()
+        mock_user.preferences = {"language": "en", "front_theme": "light"}
+        mock_update.return_value = mock_user
+
+        response = authenticated_client.patch(
+            "/api/v1/users/1/preferences",
+            json={"language": "en", "front_theme": "light"},
+        )
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["language"] == "en"
+        assert data["front_theme"] == "light"
+
+    def test_update_preferences_invalid_language(
+        self,
+        authenticated_client: TestClient,
+        db: Session,
+    ) -> None:
+        """An unrecognised language value is rejected by Pydantic validation."""
+        response = authenticated_client.patch(
+            "/api/v1/users/1/preferences", json={"language": "de"}
+        )
+        assert response.status_code == 422
+
+    def test_update_preferences_unknown_key_rejected(
+        self,
+        authenticated_client: TestClient,
+        db: Session,
+    ) -> None:
+        """An unknown key without the front_ prefix is rejected with 400."""
+        response = authenticated_client.patch(
+            "/api/v1/users/1/preferences", json={"theme": "dark"}
+        )
+
+        assert response.status_code == 400
+
+    @patch("back.api.v1.users.user_crud.update_preferences")
+    def test_update_preferences_permission_error(
+        self,
+        mock_update: MagicMock,
+        non_admin_client: TestClient,
+        db: Session,
+    ) -> None:
+        """A non-admin cannot update another user's preferences."""
+        mock_update.side_effect = VelosimPermissionError(
+            "Requesting user cannot update these preferences."
+        )
+
+        response = non_admin_client.patch(
+            "/api/v1/users/1/preferences", json={"language": "en"}
+        )
+
+        assert response.status_code == 403
+        data = response.json()
+        assert "Requesting user cannot update these preferences." in str(data["detail"])
+
+    @patch("back.api.v1.users.user_crud.update_preferences")
+    def test_update_preferences_admin_can_update_other_user(
+        self,
+        mock_update: MagicMock,
+        authenticated_client: TestClient,
+        db: Session,
+    ) -> None:
+        """An admin can update another user's preferences."""
+        mock_user = MagicMock()
+        mock_user.preferences = {"language": "fr"}
+        mock_update.return_value = mock_user
+
+        response = authenticated_client.patch(
+            "/api/v1/users/2/preferences", json={"language": "fr"}
+        )
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["language"] == "fr"
+        mock_update.assert_called_once()
+
+    def test_update_preferences_no_authentication(
+        self, client: TestClient, db: Session
+    ) -> None:
+        """Unauthenticated request is rejected."""
+        response = client.patch("/api/v1/users/1/preferences", json={"language": "en"})
+        assert response.status_code == 401
+
+    @patch("back.api.v1.users.user_crud.update_preferences")
+    def test_update_preferences_user_not_found(
+        self,
+        mock_update: MagicMock,
+        authenticated_client: TestClient,
+        db: Session,
+    ) -> None:
+        """Returns 400 when target user does not exist."""
+        mock_update.side_effect = BadRequestError("User not found")
+
+        response = authenticated_client.patch(
+            "/api/v1/users/999/preferences", json={"language": "en"}
+        )
+
+        assert response.status_code == 400
+        data = response.json()
+        assert "User not found" in str(data["detail"])
+
+    @patch("back.api.v1.users.user_crud.update_preferences")
+    def test_update_preferences_self_non_admin(
+        self,
+        mock_update: MagicMock,
+        non_admin_client: TestClient,
+        db: Session,
+    ) -> None:
+        """A non-admin user can update their own preferences via the /{id} endpoint."""
+        mock_user = MagicMock()
+        mock_user.preferences = {"language": "fr"}
+        mock_update.return_value = mock_user
+
+        # non_admin_client authenticates as user 2
+        response = non_admin_client.patch(
+            "/api/v1/users/2/preferences", json={"language": "fr"}
+        )
+
+        assert response.status_code == 200
+        assert response.json()["language"] == "fr"
+        mock_update.assert_called_once()
+
+    # ------------------------------------------------------------------
+    # PATCH /users/me/preferences  (wrapper → /{user_id}/preferences)
+    # ------------------------------------------------------------------
+
+    @patch("back.api.v1.users.user_crud.update_preferences")
+    def test_update_my_preferences_success(
+        self,
+        mock_update: MagicMock,
+        authenticated_client: TestClient,
+        db: Session,
+    ) -> None:
+        """PATCH /me/preferences delegates to the /{id} handler."""
+        mock_user = MagicMock()
+        mock_user.preferences = {"language": "fr", "front_theme": "dark"}
+        mock_update.return_value = mock_user
+
+        response = authenticated_client.patch(
+            "/api/v1/users/me/preferences",
+            json={"language": "fr", "front_theme": "dark"},
+        )
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["language"] == "fr"
+        assert data["front_theme"] == "dark"
+        mock_update.assert_called_once()
+
+    @patch("back.api.v1.users.user_crud.update_preferences")
+    def test_update_my_preferences_invalid_language(
+        self,
+        mock_update: MagicMock,
+        authenticated_client: TestClient,
+        db: Session,
+    ) -> None:
+        """Invalid language is rejected by Pydantic before hitting CRUD."""
+        response = authenticated_client.patch(
+            "/api/v1/users/me/preferences", json={"language": "de"}
+        )
+
+        assert response.status_code == 422
+        mock_update.assert_not_called()
+
+    def test_update_my_preferences_no_authentication(
+        self, client: TestClient, db: Session
+    ) -> None:
+        """Unauthenticated request to /me/preferences is rejected."""
+        response = client.patch("/api/v1/users/me/preferences", json={"language": "en"})
+        assert response.status_code == 401

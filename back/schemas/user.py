@@ -22,14 +22,95 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 """
 
-from typing import List, Optional
+from typing import Any, Dict, List, Literal, Optional
 from pydantic import BaseModel, ConfigDict, Field
+from back.exceptions.bad_request_error import BadRequestError
 
 
 class UserBase(BaseModel):
     """Base schema for users."""
 
     pass
+
+
+# Languages explicitly understood by the back-end (e.g. for email notifications).
+# null means "use the client OS default".
+SupportedLanguage = Optional[Literal["en", "fr"]]
+
+# Prefix that marks a preference as front-end-only. The back-end stores it
+# transparently without inspecting the value.
+_FRONT_PREFIX = "front_"
+
+
+class UserPreferencesUpdate(UserBase):
+    """Schema for a preferences PATCH.
+
+    Every field is optional; missing keys are left unchanged in the stored blob
+    (shallow-merge semantics). Back-end-typed keys (``language``) are validated
+    strictly. Any key whose name starts with ``front_`` is accepted without
+    inspection and stored as-is. All other unknown top-level keys are rejected to
+    catch typos early.
+    """
+
+    language: SupportedLanguage = Field(
+        None,
+        description='Preferred UI/notification language. "en", "fr", or null to '
+        "use the OS default.",
+    )
+
+    model_config = ConfigDict(extra="allow")
+
+    def validate_extra_keys(self) -> None:
+        """Raise BadRequestError if any extra key does not start with 'front_'.
+
+        Returns:
+            None
+        """
+        for key in (self.model_extra or {}).keys():
+            if not key.startswith(_FRONT_PREFIX):
+                raise BadRequestError(
+                    f"Unknown preference key '{key}'. "
+                    f"Front-end-only keys must be prefixed with '{_FRONT_PREFIX}'."
+                )
+
+    @property
+    def as_patch_dict(self) -> Dict[str, Any]:
+        """Return only the explicitly-supplied fields as a plain dict.
+
+        Returns:
+            Dict containing only fields that were present in the PATCH payload,
+            including both typed back-end keys and extra front_* keys.
+        """
+        result: Dict[str, Any] = {}
+        for field_name in self.model_fields_set:
+            result[field_name] = getattr(self, field_name)
+        for key, val in (self.model_extra or {}).items():
+            result[key] = val
+        return result
+
+
+class UserPreferencesResponse(UserBase):
+    """Schema for the full preferences blob returned to the caller."""
+
+    language: SupportedLanguage = Field(
+        None,
+        description="Preferred language, or null if not set.",
+    )
+
+    model_config = ConfigDict(extra="allow", from_attributes=False)
+
+    @classmethod
+    def from_blob(cls, blob: Optional[Dict[str, Any]]) -> "UserPreferencesResponse":
+        """Construct a response from the raw preferences blob stored in the database.
+
+        Args:
+            blob: The preferences dict from the user model, or None if not set.
+
+        Returns:
+            UserPreferencesResponse populated from the blob, with defaults for
+            any missing keys.
+        """
+        return cls(**(blob or {}))
 
 
 class UserCreate(UserBase):
