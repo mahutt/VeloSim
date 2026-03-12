@@ -33,6 +33,8 @@ from back.schemas import (
     UserRoleUpdate,
     UserResponse,
     UsersResponse,
+    UserPreferencesUpdate,
+    UserPreferencesResponse,
 )
 from back.crud.user import user_crud
 from sqlalchemy.orm import Session
@@ -201,3 +203,98 @@ def role_update(
     """
     updated_user = user_crud.update_role(db, user_id, role_data, requesting_user)
     return UserResponse.model_validate(updated_user)
+
+
+@router.get("/me/preferences", response_model=UserPreferencesResponse)
+def get_my_preferences(
+    db: Session = Depends(get_db),
+    requesting_user: int = Depends(get_user_id),
+) -> UserPreferencesResponse:
+    """Get the requesting user's own preferences.
+
+    Args:
+        db: Database session dependency.
+        requesting_user: ID of the user making the request.
+
+    Returns:
+        UserPreferencesResponse: The preferences blob.
+    """
+    return get_user_preferences(
+        user_id=requesting_user, db=db, requesting_user=requesting_user
+    )
+
+
+@router.get("/{user_id}/preferences", response_model=UserPreferencesResponse)
+def get_user_preferences(
+    user_id: int,
+    db: Session = Depends(get_db),
+    requesting_user: int = Depends(get_user_id),
+) -> UserPreferencesResponse:
+    """Get a user's preferences.
+
+    The requesting user must be the user themselves or an admin.
+
+    Args:
+        user_id: The ID of the user whose preferences to retrieve.
+        db: Database session dependency.
+        requesting_user: ID of the user making the request.
+
+    Returns:
+        UserPreferencesResponse: The preferences blob.
+    """
+    user = user_crud.get_if_permission(db, user_id, requesting_user)
+    if not user:
+        raise ItemNotFoundError("User not found")
+    return UserPreferencesResponse.from_blob(user.preferences)
+
+
+@router.patch("/me/preferences", response_model=UserPreferencesResponse)
+def update_my_preferences(
+    preferences_data: UserPreferencesUpdate,
+    db: Session = Depends(get_db),
+    requesting_user: int = Depends(get_user_id),
+) -> UserPreferencesResponse:
+    """Merge the supplied keys into the requesting user's own preferences.
+
+    Args:
+        preferences_data: Partial preferences to merge.
+        db: Database session dependency.
+        requesting_user: ID of the user making the request.
+
+    Returns:
+        UserPreferencesResponse: The full updated preferences blob.
+    """
+    return update_preferences(
+        user_id=requesting_user,
+        preferences_data=preferences_data,
+        db=db,
+        requesting_user=requesting_user,
+    )
+
+
+@router.patch("/{user_id}/preferences", response_model=UserPreferencesResponse)
+def update_preferences(
+    user_id: int,
+    preferences_data: UserPreferencesUpdate,
+    db: Session = Depends(get_db),
+    requesting_user: int = Depends(get_user_id),
+) -> UserPreferencesResponse:
+    """Merge the supplied keys into a user's preferences.
+
+    The requesting user must be the user themselves or an admin.
+    Only the keys present in the request body are modified; other stored keys are
+    left untouched. Front-end-only keys must be prefixed with ``front_``.
+
+    Args:
+        user_id: The ID of the user whose preferences to update.
+        preferences_data: Partial preferences to merge.
+        db: Database session dependency.
+        requesting_user: ID of the user making the request.
+
+    Returns:
+        UserPreferencesResponse: The full updated preferences blob.
+    """
+    updated_user = user_crud.update_preferences(
+        db, user_id, preferences_data, requesting_user
+    )
+    return UserPreferencesResponse.from_blob(updated_user.preferences)

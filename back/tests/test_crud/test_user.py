@@ -26,6 +26,7 @@ import pytest
 from unittest.mock import Mock
 from back.crud.user import user_crud
 from back.schemas import UserCreate, UserPasswordUpdate, UserRoleUpdate
+from back.schemas.user import UserPreferencesUpdate, UserPreferencesResponse
 from back.models.user import User
 from back.exceptions.bad_request_error import BadRequestError
 from back.exceptions.velosim_permission_error import VelosimPermissionError
@@ -1016,3 +1017,193 @@ class TestUserCRUD:
         # Disabled user should not be able to access themselves either
         with pytest.raises(VelosimPermissionError):
             user_crud.get_if_permission(mock_db, disabled_user.id, disabled_user.id)
+
+
+class TestUserPreferencesSchemas:
+    """Unit tests for UserPreferencesUpdate and UserPreferencesResponse schemas."""
+
+    def test_validate_extra_keys_allows_front_prefix(self) -> None:
+        """Extra keys prefixed with front_ pass validation without raising."""
+        prefs = UserPreferencesUpdate.model_validate(
+            {"language": "en", "front_theme": "dark"}
+        )
+        prefs.validate_extra_keys()  # Should not raise
+
+    def test_validate_extra_keys_rejects_unknown_key(self) -> None:
+        """Extra keys without front_ prefix raise BadRequestError."""
+        prefs = UserPreferencesUpdate.model_validate({"theme": "dark"})
+        with pytest.raises(BadRequestError):
+            prefs.validate_extra_keys()
+
+    def test_as_patch_dict_includes_set_backend_field(self) -> None:
+        """An explicitly supplied back-end field appears in the patch dict."""
+        prefs = UserPreferencesUpdate(language="fr")
+        assert prefs.as_patch_dict == {"language": "fr"}
+
+    def test_as_patch_dict_includes_front_extras(self) -> None:
+        """Extra front_ keys are included in the patch dict."""
+        prefs = UserPreferencesUpdate.model_validate(
+            {"front_theme": "light", "front_sidebar": True}
+        )
+        assert prefs.as_patch_dict == {"front_theme": "light", "front_sidebar": True}
+
+    def test_as_patch_dict_omits_unset_fields(self) -> None:
+        """Fields absent from the payload produce an empty patch dict."""
+        prefs = UserPreferencesUpdate.model_validate({})
+        assert prefs.as_patch_dict == {}
+
+    def test_from_blob_with_none_returns_defaults(self) -> None:
+        """from_blob(None) returns an instance with all-None defaults."""
+        response = UserPreferencesResponse.from_blob(None)
+        assert response.language is None
+
+    def test_from_blob_with_data_populates_fields(self) -> None:
+        """from_blob populates typed and front_ fields from the stored blob."""
+        blob = {"language": "en", "front_theme": "dark"}
+        response = UserPreferencesResponse.from_blob(blob)
+        assert response.language == "en"
+        assert (response.model_extra or {}).get("front_theme") == "dark"
+
+
+class TestUpdatePreferencesCRUD:
+    """Unit tests for UserCRUD.update_preferences."""
+
+    def test_self_updates_own_preferences(self, mock_db: Mock) -> None:
+        """A user can update their own preferences."""
+        user = User(
+            id=1,
+            username="self_user",
+            password_hash=user_crud.hash_password("password"),
+            is_admin=False,
+            is_enabled=True,
+            preferences=None,
+        )
+        mock_db.query.return_value.filter.return_value.first.return_value = user
+
+        prefs = UserPreferencesUpdate(language="fr")
+        result = user_crud.update_preferences(mock_db, 1, prefs, 1)
+
+        assert result.preferences == {"language": "fr"}
+        mock_db.add.assert_called_once()
+
+    def test_admin_updates_another_users_preferences(
+        self, mock_db: Mock, admin_user: User
+    ) -> None:
+        """Admin can update another user's preferences."""
+        target = User(
+            id=2,
+            username="target_user",
+            password_hash=user_crud.hash_password("password"),
+            is_admin=False,
+            is_enabled=True,
+            preferences={"language": "en"},
+        )
+        mock_db.query.return_value.filter.return_value.first.side_effect = [
+            admin_user,
+            target,
+        ]
+
+        prefs = UserPreferencesUpdate(language="fr")
+        result = user_crud.update_preferences(mock_db, 2, prefs, admin_user.id)
+
+        assert result.preferences == {"language": "fr"}
+        mock_db.add.assert_called_once()
+
+    def test_merge_preserves_unset_keys(self, mock_db: Mock) -> None:
+        """Keys absent from the patch are preserved in the stored blob."""
+        user = User(
+            id=1,
+            username="self_user",
+            password_hash=user_crud.hash_password("password"),
+            is_admin=False,
+            is_enabled=True,
+            preferences={"language": "en", "front_theme": "dark"},
+        )
+        mock_db.query.return_value.filter.return_value.first.return_value = user
+
+        prefs = UserPreferencesUpdate.model_validate({"front_sidebar": True})
+        result = user_crud.update_preferences(mock_db, 1, prefs, 1)
+
+        assert result.preferences is not None
+        assert result.preferences["language"] == "en"
+        assert result.preferences["front_theme"] == "dark"
+        assert result.preferences["front_sidebar"] is True
+
+    def test_null_stored_preferences_treated_as_empty(self, mock_db: Mock) -> None:
+        """A null stored blob is treated as {} before the merge."""
+        user = User(
+            id=1,
+            username="self_user",
+            password_hash=user_crud.hash_password("password"),
+            is_admin=False,
+            is_enabled=True,
+            preferences=None,
+        )
+        mock_db.query.return_value.filter.return_value.first.return_value = user
+
+        prefs = UserPreferencesUpdate.model_validate({"front_theme": "light"})
+        result = user_crud.update_preferences(mock_db, 1, prefs, 1)
+
+        assert result.preferences == {"front_theme": "light"}
+
+    def test_permission_error_requesting_user_not_found(self, mock_db: Mock) -> None:
+        """Nonexistent requesting user raises VelosimPermissionError."""
+        mock_db.query.return_value.filter.return_value.first.return_value = None
+
+        prefs = UserPreferencesUpdate(language="en")
+        with pytest.raises(VelosimPermissionError):
+            user_crud.update_preferences(mock_db, 2, prefs, 99999)
+
+    def test_permission_error_disabled_requesting_user(self, mock_db: Mock) -> None:
+        """Disabled requesting user raises VelosimPermissionError."""
+        disabled = User(
+            id=1,
+            username="disabled_user",
+            password_hash=user_crud.hash_password("password"),
+            is_admin=True,
+            is_enabled=False,
+        )
+        mock_db.query.return_value.filter.return_value.first.return_value = disabled
+
+        prefs = UserPreferencesUpdate(language="en")
+        with pytest.raises(VelosimPermissionError):
+            user_crud.update_preferences(mock_db, 2, prefs, disabled.id)
+
+    def test_permission_error_non_admin_updates_other_user(self, mock_db: Mock) -> None:
+        """Non-admin cannot update another user's preferences."""
+        non_admin = User(
+            id=1,
+            username="regular_user",
+            password_hash=user_crud.hash_password("password"),
+            is_admin=False,
+            is_enabled=True,
+        )
+        mock_db.query.return_value.filter.return_value.first.return_value = non_admin
+
+        prefs = UserPreferencesUpdate(language="en")
+        with pytest.raises(VelosimPermissionError):
+            user_crud.update_preferences(mock_db, 2, prefs, non_admin.id)
+
+    def test_user_not_found_raises_bad_request(
+        self, mock_db: Mock, admin_user: User
+    ) -> None:
+        """Updating preferences for a nonexistent user raises BadRequestError."""
+        mock_db.query.return_value.filter.return_value.first.side_effect = [
+            admin_user,
+            None,
+        ]
+
+        prefs = UserPreferencesUpdate(language="en")
+        with pytest.raises(BadRequestError):
+            user_crud.update_preferences(mock_db, 99999, prefs, admin_user.id)
+
+    def test_invalid_extra_key_raises_bad_request_before_db(
+        self, mock_db: Mock
+    ) -> None:
+        """Unknown (non-front_) extra key raises BadRequestError before any DB query."""
+        prefs = UserPreferencesUpdate.model_validate({"unknown_key": "value"})
+
+        with pytest.raises(BadRequestError):
+            user_crud.update_preferences(mock_db, 1, prefs, 1)
+
+        mock_db.query.assert_not_called()

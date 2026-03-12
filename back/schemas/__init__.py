@@ -49,6 +49,8 @@ from .user import (
     UserRoleUpdate,
     UserResponse,
     UsersResponse,
+    UserPreferencesUpdate,
+    UserPreferencesResponse,
 )
 from .playback_speed import (
     PlaybackSpeedBase,
@@ -104,6 +106,8 @@ __all__ = [
     "UserRoleUpdate",
     "UserResponse",
     "UsersResponse",
+    "UserPreferencesUpdate",
+    "UserPreferencesResponse",
     "PlaybackSpeedBase",
     "SimulationPlaybackStatus",
     "PlaybackSpeedResponse",

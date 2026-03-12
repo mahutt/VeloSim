@@ -31,7 +31,12 @@ from sqlalchemy.orm import Session
 from back.exceptions.bad_request_error import BadRequestError
 from back.exceptions.velosim_permission_error import VelosimPermissionError
 from back.models.user import User
-from back.schemas import UserCreate, UserPasswordUpdate, UserRoleUpdate
+from back.schemas import (
+    UserCreate,
+    UserPasswordUpdate,
+    UserRoleUpdate,
+    UserPreferencesUpdate,
+)
 
 ph = PasswordHasher.from_parameters(RFC_9106_LOW_MEMORY)
 
@@ -239,6 +244,57 @@ class UserCRUD:
             user.is_admin = role_data.is_admin
         if role_data.is_enabled is not None:
             user.is_enabled = role_data.is_enabled
+
+        db.add(user)
+        db.flush()
+        db.refresh(user)
+        return user
+
+    def update_preferences(
+        self,
+        db: Session,
+        user_id: int,
+        preferences_data: UserPreferencesUpdate,
+        requesting_user_id: int,
+    ) -> User:
+        """Merges the supplied preferences into the user's stored preferences blob.
+
+        The requesting user must be the user themselves or an admin.
+        Only keys present in the PATCH payload are modified; other stored keys are
+        left untouched (shallow-merge semantics).
+
+        Args:
+            db: Database session.
+            user_id: The ID of the user whose preferences to update.
+            preferences_data: Validated (and extra-key-checked) preferences patch.
+            requesting_user_id: The ID of the user making the request.
+
+        Returns:
+            User: The user with updated preferences.
+        """
+        # Validate that extra keys are all front_-prefixed before any DB access
+        preferences_data.validate_extra_keys()
+
+        requesting_user = self.get(db, requesting_user_id)
+        if not requesting_user or not requesting_user.is_enabled:
+            raise VelosimPermissionError(
+                "Requesting user cannot update these preferences."
+            )
+        if requesting_user.id != user_id and not requesting_user.is_admin:
+            raise VelosimPermissionError(
+                "Requesting user cannot update these preferences."
+            )
+
+        user = (
+            requesting_user if user_id == requesting_user_id else self.get(db, user_id)
+        )
+        if not user:
+            raise BadRequestError("User not found")
+
+        # Shallow-merge: start from stored blob (or empty dict) and apply patch
+        current: dict = dict(user.preferences or {})
+        current.update(preferences_data.as_patch_dict)
+        user.preferences = current
 
         db.add(user)
         db.flush()
