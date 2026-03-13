@@ -216,6 +216,7 @@ class ReplayParser:
                 position=Position(d["position"]),
                 route=route,
                 shift=shift,
+                name=d["name"],
             )
 
             driver.set_map_controller(map_controller)

@@ -60,6 +60,7 @@ def test_replay_parser_parse_minimal_valid_replay(
         "drivers": [
             {
                 "id": 10,
+                "name": "alfa",
                 "position": [1.0, 1.0],
                 "state": "idle",
                 "vehicleId": 100,
