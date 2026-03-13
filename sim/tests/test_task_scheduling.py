@@ -63,8 +63,6 @@ def resource(env: simpy.Environment) -> Driver:
             end_time=86400.0,
             lunch_break=None,
             sim_start_time=0.0,
-            sim_end_time=86400.0,
-            sim_lunch_break=None,
         ),
     )
     vehicle = Vehicle(vehicle_id=1, battery_count=10)
@@ -90,8 +88,6 @@ def driver(env: simpy.Environment) -> Driver:
             end_time=86400.0,
             lunch_break=None,
             sim_start_time=0.0,
-            sim_end_time=86400.0,
-            sim_lunch_break=None,
         ),
     )
     vehicle = Vehicle(vehicle_id=1, battery_count=10)
@@ -170,8 +166,6 @@ def test_resource_scheduled_dispatch(env: simpy.Environment, station: Station) -
             end_time=86400.0,
             lunch_break=None,
             sim_start_time=0.0,
-            sim_end_time=86400.0,
-            sim_lunch_break=None,
         ),
     )
     # Mock the sim_behaviour and map_controller to avoid AttributeError
@@ -285,8 +279,6 @@ def test_resource_get_in_progress_task(
             end_time=86400.0,
             lunch_break=None,
             sim_start_time=0.0,
-            sim_end_time=86400.0,
-            sim_lunch_break=None,
         ),
     )
     vehicle = Vehicle(vehicle_id=1, battery_count=10)
@@ -340,8 +332,6 @@ def test_dispatch_multiple_tasks_same_station(
             end_time=86400.0,
             lunch_break=None,
             sim_start_time=0.0,
-            sim_end_time=86400.0,
-            sim_lunch_break=None,
         ),
     )
     task1 = BatterySwapTask(task_id=1, station=station)
@@ -376,8 +366,6 @@ def test_dispatch_task_different_station_raises_exception(
             end_time=86400.0,
             lunch_break=None,
             sim_start_time=0.0,
-            sim_end_time=86400.0,
-            sim_lunch_break=None,
         ),
     )
     station2 = Station(station_id=2, name="Station 2", position=Position([1.0, 1.0]))
@@ -415,8 +403,6 @@ def test_resource_with_initial_task_list(
             end_time=86400.0,
             lunch_break=None,
             sim_start_time=0.0,
-            sim_end_time=86400.0,
-            sim_lunch_break=None,
         ),
         task_list=[task1, task2],
     )
@@ -441,8 +427,6 @@ def test_zero_dispatch_delay_keeps_task_assigned(
             end_time=86400.0,
             lunch_break=None,
             sim_start_time=0.0,
-            sim_end_time=86400.0,
-            sim_lunch_break=None,
         ),
     )
 
@@ -484,8 +468,6 @@ def test_task_state_string_conversions(
             end_time=86400.0,
             lunch_break=None,
             sim_start_time=0.0,
-            sim_end_time=86400.0,
-            sim_lunch_break=None,
         ),
     )
     vehicle = Vehicle(vehicle_id=1, battery_count=10)

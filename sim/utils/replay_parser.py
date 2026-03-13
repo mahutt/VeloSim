@@ -55,7 +55,7 @@ class ReplayParser:
         Converts:
         - HH:MM
         - dayN:HH:MM
-        into seconds since sim start
+        into seconds since day start
         """
         parts = time_str.split(":")
 
@@ -116,6 +116,7 @@ class ReplayParser:
         scenario_end = cls._time_str_to_seconds(scenario_json["end_time"])
 
         current_time_seconds = int(keyframe_json["clock"]["simSecondsPassed"])
+        sim_start_time = keyframe_json["clock"]["startTime"]
         # Old keyframes persisted might not have values for these fields, hence fallback
         was_running = keyframe_json["clock"].get("running", True)
         real_time_factor = keyframe_json["clock"].get("realTimeFactor", 1.0)
@@ -131,7 +132,7 @@ class ReplayParser:
             vehicle_entities={},
             task_entities={},
             sim_time=scenario_end,
-            start_time=keyframe_json["clock"]["startTime"],
+            start_time=sim_start_time,
             map_payload=map_payload,
         )
 
@@ -206,9 +207,7 @@ class ReplayParser:
                 start_time=shift_data["startTime"],
                 end_time=shift_data["endTime"],
                 lunch_break=shift_data.get("lunchBreak"),
-                sim_start_time=shift_data["startTime"],
-                sim_end_time=shift_data["endTime"],
-                sim_lunch_break=shift_data.get("lunchBreak"),
+                sim_start_time=sim_start_time,
             )
 
             driver = Driver(

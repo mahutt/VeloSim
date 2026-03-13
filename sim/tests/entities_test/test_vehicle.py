@@ -72,7 +72,7 @@ class TestVehicle:
 
     @pytest.fixture
     def default_shift(self) -> Shift:
-        return Shift(0.0, 24.0, None, 0.0, 24.0, None)
+        return Shift(0.0, 24.0, None, 0.0)
 
     @pytest.fixture
     def driver(self, default_position: Position, default_shift: Shift) -> Driver:

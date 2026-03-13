@@ -812,9 +812,9 @@ class Driver:
             DriverState: The computed initial state for the driver.
         """
         current_sim_time = self.env.now
-        start_time = self.shift.get_sim_start_time()
-        end_time = self.shift.get_sim_end_time()
-        lunch_time = self.shift.get_sim_lunch_break()
+        start_time = self.shift.get_relative_start_time()
+        end_time = self.shift.get_relative_end_time()
+        lunch_time = self.shift.get_relative_lunch_break()
 
         # Before shift
         if current_sim_time < start_time - 2 * 60 * 60:
@@ -857,20 +857,20 @@ class Driver:
 
     def _off_shift(self, current_sim_time: float) -> None:
         """Handle OFF_SHIFT transitions."""
-        time_to_shift = self.shift.get_sim_start_time() - current_sim_time
+        time_to_shift = self.shift.get_relative_start_time() - current_sim_time
         if 0 < time_to_shift <= 60 * 60 * 2:
             self.set_state(DriverState.PENDING_SHIFT)
 
     def _pending_shift(self, current_sim_time: float) -> None:
         """Handle PENDING_SHIFT transitions."""
-        time_to_shift = self.shift.get_sim_start_time() - current_sim_time
+        time_to_shift = self.shift.get_relative_start_time() - current_sim_time
         if time_to_shift <= 0:
             self.set_state(DriverState.IDLE)
 
     def _idle(self, current_sim_time: float) -> None:
         """Handle IDLE transitions and task dispatch decisions."""
-        time_to_shift_end = self.shift.get_sim_end_time() - current_sim_time
-        lunch_break = self.shift.get_sim_lunch_break()
+        time_to_shift_end = self.shift.get_relative_end_time() - current_sim_time
+        lunch_break = self.shift.get_relative_lunch_break()
 
         if self.vehicle is None and self.env.hq.has_vehicles():
             vehicle_to_assign = self.env.hq.pop_vehicle()

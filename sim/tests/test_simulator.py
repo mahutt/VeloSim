@@ -143,17 +143,13 @@ def input_params(simpy_env: SimulationEnvironment) -> InputParameter:
         start_time=28800,
         end_time=43200,
         lunch_break=36000,
-        sim_start_time=28800,
-        sim_end_time=43200,
-        sim_lunch_break=36000,
+        sim_start_time=0,
     )
     shift2 = Shift(
         start_time=28900,
         end_time=43200,
         lunch_break=38000,
-        sim_start_time=28900,
-        sim_end_time=43200,
-        sim_lunch_break=38000,
+        sim_start_time=0,
     )
     # Ensure Driver.env is set before instantiation
     Driver.env = simpy_env

@@ -89,7 +89,7 @@ class FakeTask(Task):
 
 
 # Default shift for drivers in these tests (use seconds)
-DEFAULT_SHIFT = Shift(0.0, 24.0 * 60 * 60, None, 0.0, 24.0 * 60 * 60, None)
+DEFAULT_SHIFT = Shift(0.0, 24.0 * 60 * 60, None, 0.0)
 
 
 def test_travel_to_next_stop_handles_tuple_return_from_route_next() -> None:

@@ -35,7 +35,7 @@ from sim.entities.input_parameter import InputParameter
 from sim.entities.shift import Shift
 
 # Default shift used for creating drivers in this module
-DEFAULT_SHIFT = Shift(0.0, 24.0, None, 0.0, 24.0, None)
+DEFAULT_SHIFT = Shift(0.0, 24.0, None, 0.0)
 
 
 @pytest.fixture()

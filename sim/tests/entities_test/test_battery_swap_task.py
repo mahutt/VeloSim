@@ -74,7 +74,7 @@ class TestBatterySwapTask:
         assert task.get_assigned_driver() is None
 
     # Default shift for drivers in this test module
-    DEFAULT_SHIFT = Shift(0.0, 24.0, None, 0.0, 24.0, None)
+    DEFAULT_SHIFT = Shift(0.0, 24.0, None, 0.0)
 
     def test_get_and_set_state(self, simpy_env: simpy.Environment) -> None:
         task = BatterySwapTask(1)
