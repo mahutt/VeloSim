@@ -22,6 +22,16 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 """
 
+from typing import TYPE_CHECKING
+
+from grafana_logging.logger import get_logger
+
+if TYPE_CHECKING:
+    from sim.entities.route import Route
+
+
+logger = get_logger(__name__)
+
 
 class SimulationReport:
     """
@@ -35,6 +45,8 @@ class SimulationReport:
         self.response_times: list[float] = []
         self.vehicle_idle_time = 0
         self.vehicle_active_time = 0
+        self._active_vehicle_routes: set["Route"] = set()
+        self._completed_vehicle_distance = 0.0
 
     def reset(self) -> None:
         """Reset all metrics to zero.
@@ -48,6 +60,7 @@ class SimulationReport:
         self.response_times = []
         self.vehicle_idle_time = 0
         self.vehicle_active_time = 0
+        self.reset_vehicle_distance_traveled()
 
     def increment_driving_time(self) -> None:
         """
@@ -109,6 +122,47 @@ class SimulationReport:
 
         self.response_times.append(service_time)
 
+    def register_vehicle_route(self, route: "Route") -> None:
+        """Register an active route for distance aggregation.
+
+        Args:
+            route: The route to register for distance tracking.
+
+        Returns:
+            None
+        """
+
+        self._active_vehicle_routes.add(route)
+
+    def unregister_vehicle_route(self, route: "Route") -> None:
+        """Finalize an active route's traveled distance and remove it.
+
+        Args:
+            route: The route to unregister and finalize.
+
+        Returns:
+            None
+        """
+
+        if route not in self._active_vehicle_routes:
+            logger.debug(
+                "unregister_vehicle_route called for untracked route; ignoring."
+            )
+            return
+
+        self._completed_vehicle_distance += route.get_distance_traveled()
+        self._active_vehicle_routes.discard(route)
+
+    def reset_vehicle_distance_traveled(self) -> None:
+        """Clear all vehicle-distance tracking state.
+
+        Returns:
+            None
+        """
+
+        self._active_vehicle_routes.clear()
+        self._completed_vehicle_distance = 0.0
+
     def get_servicing_to_driving_ratio(self) -> float:
         """
         Compute the ratio of servicing time to driving time.
@@ -157,3 +211,15 @@ class SimulationReport:
             return 0.0
 
         return sum(self.response_times) / len(self.response_times)
+
+    def get_vehicle_distance_traveled(self) -> float:
+        """Return aggregate distance across active and completed routes.
+
+        Returns:
+            float: Total distance traveled by all vehicles in meters.
+        """
+
+        active_distance = sum(
+            route.get_distance_traveled() for route in self._active_vehicle_routes
+        )
+        return self._completed_vehicle_distance + active_distance

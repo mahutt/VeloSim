@@ -110,6 +110,7 @@ export interface GetSimulationReportResponse {
   vehicleUtilizationRatio: number | null;
   averageTasksServicedPerShift: number | null;
   averageTaskResponseTime: number | null;
+  vehicleDistanceTraveled: number | null;
 }
 
 // GBFS Response Types

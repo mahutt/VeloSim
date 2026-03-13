@@ -35,6 +35,7 @@ if TYPE_CHECKING:
     from sim.entities.route import Route
     from sim.map.map_controller import MapController
     from sim.map.position_registry import PositionRegistry
+    from sim.core.simulation_report import SimulationReport
 
 logger = get_logger(__name__)
 
@@ -58,6 +59,7 @@ class RouteController:
         self,
         map_controller: "MapController",
         registry: "PositionRegistry",
+        report: "SimulationReport | None" = None,
     ) -> None:
         """
         Initialize the RouteController.
@@ -65,9 +67,20 @@ class RouteController:
         Args:
             map_controller: Parent MapController for road management
             registry: PositionRegistry for geometry indexing
+            report: Optional SimulationReport used for route registration and
+                distance metrics. When omitted, RouteController falls back to
+                local distance aggregation.
         """
         self.map_controller = map_controller
         self._registry = registry
+        self._report = report
+        self._distance_fallback_logged = False
+
+        if self._report is None:
+            logger.warning(
+                "RouteController initialized without SimulationReport; "
+                "using internal vehicle-distance tracking."
+            )
 
         # Road -> Set of Routes using that road
         self.roads_to_routes: Dict[Road, Set["Route"]] = {}
@@ -80,6 +93,9 @@ class RouteController:
 
         # All active routes
         self.routes: Set["Route"] = set()
+
+        # Accumulated distance from completed (unregistered) routes
+        self._total_completed_distance: float = 0.0
 
         # Callbacks for road lifecycle events
         self._on_road_created_callbacks: List[Callable[[Road], None]] = []
@@ -156,6 +172,8 @@ class RouteController:
 
         # Register the route
         self.routes.add(route)
+        if self._report is not None:
+            self._report.register_vehicle_route(route)
 
         # Register road-to-route mappings
         for road in roads:
@@ -347,6 +365,10 @@ class RouteController:
         """
         if route not in self.routes:
             return
+        if self._report is not None:
+            self._report.unregister_vehicle_route(route)
+        else:
+            self._total_completed_distance += route.get_distance_traveled()
         self.routes.discard(route)
         roads_to_check = [
             road for road, routes in self.roads_to_routes.items() if route in routes
@@ -410,6 +432,8 @@ class RouteController:
 
             # Re-register route and road mappings
             self.routes.add(route)
+            if self._report is not None:
+                self._report.register_vehicle_route(route)
             for road in new_roads:
                 self._register_road_to_route(road, route)
 
@@ -561,6 +585,28 @@ class RouteController:
         """
         return len(self.roads_to_routes)
 
+    def get_total_vehicle_distance(self) -> float:
+        """Get total distance traveled by all service vehicles.
+
+        Combines distance from completed (unregistered) routes with
+        in-progress distance from currently active routes.
+
+        Returns:
+            Total distance in meters.
+        """
+        if self._report is not None:
+            return self._report.get_vehicle_distance_traveled()
+
+        if not self._distance_fallback_logged:
+            logger.warning(
+                "No SimulationReport in RouteController.get_total_vehicle_distance();"
+                "returning distance from internal route tracking."
+            )
+            self._distance_fallback_logged = True
+
+        active = sum(route.get_distance_traveled() for route in self.routes)
+        return self._total_completed_distance + active
+
     def clear(self) -> None:
         """Clear all route and road registrations (called during simulation reset).
 
@@ -571,5 +617,9 @@ class RouteController:
         self.segment_key_to_road.clear()
         self.road_id_to_road.clear()
         self.routes.clear()
+        if self._report is not None:
+            self._report.reset_vehicle_distance_traveled()
+        else:
+            self._total_completed_distance = 0.0
         self._on_road_created_callbacks.clear()
         self._on_road_deallocated_callbacks.clear()

@@ -47,3 +47,6 @@ class SimulationReportResponse(BaseModel):
     average_task_response_time: float | None = Field(
         None, description="Average task response time"
     )
+    vehicle_distance_traveled: float | None = Field(
+        None, description="Vehicle Distance Traveled"
+    )

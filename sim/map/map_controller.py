@@ -64,15 +64,20 @@ class MapController:
         with open(config_path, "r") as f:
             self.config = json.load(f)
 
+        # Extract config from payload
+        traffic_config = map_payload.traffic if map_payload else None
+        env = map_payload.env if map_payload else None
+        report = map_payload.report if map_payload else None
+
         # Create shared PositionRegistry
         self.position_registry = PositionRegistry()
 
         # Initialize RouteController for road/route management
-        self.route_controller = RouteController(self, registry=self.position_registry)
-
-        # Extract config from payload
-        traffic_config = map_payload.traffic if map_payload else None
-        env = map_payload.env if map_payload else None
+        self.route_controller = RouteController(
+            self,
+            registry=self.position_registry,
+            report=report,
+        )
 
         # Initialize TrafficController for traffic layer management
         self.traffic_controller = TrafficController(

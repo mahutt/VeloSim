@@ -833,6 +833,7 @@ class TestSimulationAPI:
             "vehicleUtilizationRatio": 0.75,
             "averageTasksServicedPerShift": 2.5,
             "averageTaskResponseTime": 577.0,
+            "vehicleDistanceTraveled": 2450.25,
         }
 
         response = authenticated_client.get("/api/v1/simulation/sim123/report")
@@ -842,6 +843,7 @@ class TestSimulationAPI:
         assert data["vehicleUtilizationRatio"] == 0.75
         assert data["averageTasksServicedPerShift"] == 2.5
         assert data["averageTaskResponseTime"] == 577.0
+        assert data["vehicleDistanceTraveled"] == 2450.25
         mock_get_report.assert_called_once_with(
             db=ANY, sim_id="sim123", requesting_user=1
         )
@@ -869,6 +871,7 @@ class TestSimulationAPI:
         assert data["vehicleUtilizationRatio"] is None
         assert data["averageTasksServicedPerShift"] is None
         assert data["averageTaskResponseTime"] is None
+        assert data["vehicleDistanceTraveled"] is None
 
     @patch("back.services.simulation_service.simulation_service.get_simulation_report")
     def test_get_simulation_report_permission_error(

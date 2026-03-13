@@ -27,6 +27,7 @@ from typing import TYPE_CHECKING, Optional
 
 if TYPE_CHECKING:
     import simpy
+    from sim.core.simulation_report import SimulationReport
 
 
 @dataclass
@@ -53,9 +54,11 @@ class MapPayload:
     Attributes:
         traffic: Optional traffic configuration.
         env: Optional SimPy environment for time-based operations.
+        report: Optional simulation report for route metrics.
         sim_id: Simulation ID.
     """
 
     traffic: Optional[TrafficConfig] = field(default=None)
     env: Optional["simpy.Environment"] = field(default=None)
+    report: Optional["SimulationReport"] = field(default=None)
     sim_id: str = field(default="")

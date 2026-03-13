@@ -23,6 +23,7 @@ SOFTWARE.
 """
 
 import pytest
+from unittest.mock import Mock
 
 from sim.core.simulation_report import SimulationReport
 
@@ -39,6 +40,7 @@ def test_initial_state() -> None:
     assert metrics.total_driving_time == 0
     assert metrics.total_servicing_time == 0
     assert metrics.tasks_completed_per_shift == []
+    assert metrics.get_vehicle_distance_traveled() == 0.0
 
 
 def test_increment_driving_time() -> None:
@@ -245,6 +247,32 @@ def test_get_average_service_time_for_tasks_empty() -> None:
     assert metrics.get_average_service_time_for_tasks() == 0.0
 
 
+def test_get_vehicle_distance_traveled_sums_active_routes() -> None:
+    """Active routes should contribute their current traveled distance."""
+    metrics = SimulationReport()
+    route1 = Mock()
+    route2 = Mock()
+    route1.get_distance_traveled.return_value = 123.4
+    route2.get_distance_traveled.return_value = 56.6
+
+    metrics.register_vehicle_route(route1)
+    metrics.register_vehicle_route(route2)
+
+    assert metrics.get_vehicle_distance_traveled() == pytest.approx(180.0)
+
+
+def test_unregister_vehicle_route_preserves_completed_distance() -> None:
+    """Completed route distance should remain after unregistering the route."""
+    metrics = SimulationReport()
+    route = Mock()
+    route.get_distance_traveled.return_value = 321.0
+
+    metrics.register_vehicle_route(route)
+    metrics.unregister_vehicle_route(route)
+
+    assert metrics.get_vehicle_distance_traveled() == pytest.approx(321.0)
+
+
 def test_add_task_count_for_shift_allows_zero() -> None:
     """
     add_task_count_for_shift should correctly store zero
@@ -350,3 +378,16 @@ def test_get_vehicle_utilization_ratio_all_active() -> None:
     metrics.increment_vehicle_active_time()
 
     assert metrics.get_vehicle_utilization_ratio() == 1.0
+
+
+def test_reset_clears_vehicle_distance_traveled() -> None:
+    """reset should clear the stored aggregate vehicle distance."""
+    metrics = SimulationReport()
+    route = Mock()
+    route.get_distance_traveled.return_value = 321.0
+    metrics.register_vehicle_route(route)
+    metrics.unregister_vehicle_route(route)
+
+    metrics.reset()
+
+    assert metrics.get_vehicle_distance_traveled() == 0.0
