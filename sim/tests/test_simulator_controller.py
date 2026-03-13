@@ -46,8 +46,8 @@ from types import SimpleNamespace
 
 
 class FakeTPUStrategy:
-    def check_for_new_task(self, station: Station) -> bool:
-        return False
+    def check_for_new_task(self, station: Station) -> List[BatterySwapTask]:
+        return []
 
 
 class FakeRCNTStrategy:
