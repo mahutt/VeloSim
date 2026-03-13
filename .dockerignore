@@ -1,0 +1,55 @@
+﻿# Version control
+
+.git/
+.gitattributes
+.gitignore
+
+# Python virtual environment and caches
+
+.venv/
+**/__pycache__/
+*.pyc
+*.pyo
+.mypy_cache/
+.pytest_cache/
+*.egg-info/
+
+# Test and coverage artifacts
+
+.coverage
+coverage.xml
+coverage_html/
+htmlcov/
+back/htmlcov/
+back/coverage.xml
+back/.coverage
+
+# Local databases
+
+*.db
+
+# Node
+
+node_modules/
+
+# Environment / secrets (never in the image)
+
+.env
+.secrets
+
+# Large data directories not needed at build time
+
+osrm-data/
+
+# Dev tooling / docs not needed in the image
+
+docs/
+ansible/
+apidemo/
+
+# CI / editor
+
+.github/
+.pre-commit-config.yaml
+.flake8
+codecov.yml
