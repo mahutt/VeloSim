@@ -136,11 +136,7 @@ export default class SimulationEngine {
   }
 
   public clearSelection(): void {
-    this.state.setSelectedItem(null);
-  }
-
-  public clearMultiSelection(): void {
-    this.state.clearMultiSelectedStations();
+    this.state.clearSelection();
   }
 
   private async assignTasks(
@@ -504,7 +500,6 @@ export default class SimulationEngine {
         );
       }
       this.selectItem(SelectedItemType.Driver, pendingAssignment.driverId);
-      this.state.clearMultiSelectedStations();
     } catch (error) {
       console.error('Failed to complete task assignment action:', error);
     } finally {

@@ -400,7 +400,8 @@ export function setupStationDragHandlers(
   map: MapboxMap,
   onDrop: StationDragDropCallback,
   onHighlight?: (stationId: number | null) => void,
-  getMultiSelectedStationIds?: () => number[]
+  getMultiSelectedStationIds?: () => number[],
+  onDragStart?: (stationId: number, draggedStationIds: number[]) => void
 ) {
   let dragging = false;
   let stationId: number | null = null;
@@ -490,6 +491,7 @@ export function setupStationDragHandlers(
       map.getCanvas().style.cursor = 'grabbing';
       // Create the DOM ghost so it floats above sidebar/overlays
       domGhost = createDomGhost(draggedStationIds.length);
+      onDragStart?.(stationId!, draggedStationIds);
     }
 
     // Move the DOM ghost to follow the cursor

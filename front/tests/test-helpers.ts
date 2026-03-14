@@ -26,7 +26,7 @@ import {
   SelectedItemType,
   type PopulatedDriver,
   type PopulatedStation,
-  type SelectedItemBarElement,
+  type SelectedItem,
 } from '~/components/map/selected-item-bar';
 import SimulationEngine from '~/lib/simulation-engine';
 import {
@@ -164,9 +164,9 @@ export function makeReactiveSimulationState(
   };
 }
 
-export function makeSelectedItemBarElement(
-  overrides: Partial<SelectedItemBarElement> = {}
-): SelectedItemBarElement {
+export function makeSelectedItem(
+  overrides: Partial<SelectedItem> = {}
+): SelectedItem {
   if (overrides.type === SelectedItemType.Driver) {
     return {
       type: SelectedItemType.Driver,

@@ -35,7 +35,7 @@ import {
   type ReactiveSimulationState,
 } from './reactive-simulation-state';
 import { SelectedItemType } from '~/components/map/selected-item-bar';
-import type { PopulatedStation } from '~/components/map/selected-item-bar';
+import type { SelectedItem } from '~/components/map/selected-item-bar';
 import {
   driverResourceHasUpdated,
   vehicleResourceHasUpdated,
@@ -64,12 +64,13 @@ export interface SimulationStateManagerInterface {
   setTask: (task: StationTask) => void;
 
   getSelectedItem: () => Driver | Station | null;
+  getSelectedItems: () => SelectedItem[];
   setSelectedItem: (item: Driver | Station | null) => void;
-
-  getMultiSelectedStationIds: () => Set<number>;
-  toggleMultiSelectedStation: (stationId: number) => void;
-  setMultiSelectedStations: (stationIds: number[]) => void;
-  clearMultiSelectedStations: () => void;
+  addSelectedStation: (stationId: number) => void;
+  removeSelectedStation: (stationId: number) => void;
+  toggleSelectedStation: (stationId: number) => void;
+  setSelectedStations: (stationIds: number[]) => void;
+  clearSelection: () => void;
 
   getHeadquarters: () => Headquarters | null;
   setHeadquarters: (hq: Headquarters) => void;
@@ -122,7 +123,7 @@ export default class SimulationStateManager implements SimulationStateManagerInt
   private stations: Map<number, Station> = new Map();
   private tasks: Map<number, StationTask> = new Map();
   private selectedItem: Driver | Station | null = null;
-  private multiSelectedStationIds: Set<number> = new Set();
+  private selectedStationIds: Set<number> = new Set();
   private headquarters: Headquarters | null = null;
   private mapShouldRefresh: boolean = false;
 
@@ -193,8 +194,8 @@ export default class SimulationStateManager implements SimulationStateManagerInt
     }
 
     // If this station is in multi-selection, update the reactive state
-    if (this.multiSelectedStationIds.has(station.id)) {
-      this.updateMultiSelectedStationsElement();
+    if (this.selectedStationIds.has(station.id)) {
+      this.syncSelectedItemsFromStations();
     }
 
     this.setMapShouldRefresh(true);
@@ -242,12 +243,18 @@ export default class SimulationStateManager implements SimulationStateManagerInt
     return this.selectedItem;
   }
 
+  public getSelectedItems(): SelectedItem[] {
+    return this.reactiveState.selectedItems;
+  }
+
   public setSelectedItem(item: Driver | Station | null) {
     this.selectedItem = item;
+    this.selectedStationIds = new Set();
+    this.setPendingAssignment(null);
     this.setMapShouldRefresh(true);
 
     if (!item) {
-      this.updateReactiveState({ selectedItemBarElement: null });
+      this.updateReactiveState({ selectedItems: [] });
       return;
     }
 
@@ -255,86 +262,131 @@ export default class SimulationStateManager implements SimulationStateManagerInt
       // it's a driver
       const driver = item as Driver;
       this.updateReactiveState({
-        selectedItemBarElement: {
-          type: SelectedItemType.Driver,
-          value: {
-            ...driver,
-            tasks: driver.taskIds.map(
-              (taskId: number) => this.tasks.get(taskId)!
-            ),
-            inProgressTask: driver.inProgressTaskId
-              ? this.tasks.get(driver.inProgressTaskId)!
-              : null,
+        selectedItems: [
+          {
+            type: SelectedItemType.Driver,
+            value: {
+              ...driver,
+              tasks: driver.taskIds.map(
+                (taskId: number) => this.tasks.get(taskId)!
+              ),
+              inProgressTask: driver.inProgressTaskId
+                ? this.tasks.get(driver.inProgressTaskId)!
+                : null,
+            },
           },
-        },
+        ],
       });
     } else {
       const station = item as Station;
       this.updateReactiveState({
-        selectedItemBarElement: {
-          type: SelectedItemType.Station,
-          value: {
-            id: station.id,
-            name: station.name,
-            position: station.position,
-            tasks: station.taskIds.map(
-              (taskId: number) => this.tasks.get(taskId)!
-            ),
+        selectedItems: [
+          {
+            type: SelectedItemType.Station,
+            value: {
+              id: station.id,
+              name: station.name,
+              position: station.position,
+              tasks: station.taskIds.map(
+                (taskId: number) => this.tasks.get(taskId)!
+              ),
+            },
           },
-        },
+        ],
       });
     }
   }
 
   public getMultiSelectedStationIds(): Set<number> {
-    return this.multiSelectedStationIds;
+    return this.selectedStationIds;
+  }
+
+  public addSelectedStation(stationId: number): void {
+    const next = new Set(this.selectedStationIds);
+    next.add(stationId);
+    this.selectedItem = null;
+    this.selectedStationIds = next;
+    this.syncSelectedItemsFromStations();
+    this.setMapShouldRefresh(true);
+  }
+
+  public removeSelectedStation(stationId: number): void {
+    const next = new Set(this.selectedStationIds);
+    next.delete(stationId);
+    this.selectedItem = null;
+    this.selectedStationIds = next;
+    this.syncSelectedItemsFromStations();
+    this.setMapShouldRefresh(true);
   }
 
   public toggleMultiSelectedStation(stationId: number): void {
-    const next = new Set(this.multiSelectedStationIds);
+    this.toggleSelectedStation(stationId);
+  }
+
+  public toggleSelectedStation(stationId: number): void {
+    const next = new Set(this.selectedStationIds);
     if (next.has(stationId)) {
       next.delete(stationId);
     } else {
       next.add(stationId);
     }
-    this.multiSelectedStationIds = next;
-    this.updateMultiSelectedStationsElement();
+    this.selectedItem = null;
+    this.selectedStationIds = next;
+    this.syncSelectedItemsFromStations();
     this.setMapShouldRefresh(true);
   }
 
   public setMultiSelectedStations(stationIds: number[]): void {
-    this.multiSelectedStationIds = new Set(stationIds);
-    this.updateMultiSelectedStationsElement();
+    this.setSelectedStations(stationIds);
+  }
+
+  public setSelectedStations(stationIds: number[]): void {
+    this.selectedItem = null;
+    this.selectedStationIds = new Set(stationIds);
+    this.syncSelectedItemsFromStations();
     this.setMapShouldRefresh(true);
   }
 
   public clearMultiSelectedStations(): void {
-    if (this.multiSelectedStationIds.size === 0) return;
-    this.multiSelectedStationIds = new Set();
-    this.updateMultiSelectedStationsElement();
+    this.clearSelection();
+  }
+
+  public clearSelection(): void {
+    if (this.selectedItem === null && this.selectedStationIds.size === 0)
+      return;
+    this.selectedItem = null;
+    this.selectedStationIds = new Set();
+    this.updateReactiveState({ selectedItems: [] });
+    this.setPendingAssignment(null);
     this.setMapShouldRefresh(true);
   }
 
-  private updateMultiSelectedStationsElement(): void {
-    const ids = this.multiSelectedStationIds;
+  private syncSelectedItemsFromStations(): void {
+    this.setPendingAssignment(null);
+    const ids = this.selectedStationIds;
     if (ids.size === 0) {
-      this.updateReactiveState({ multiSelectedStations: null });
+      this.updateReactiveState({ selectedItems: [] });
       return;
     }
 
-    const populatedStations: PopulatedStation[] = [];
+    const selectedItems: SelectedItem[] = [];
     for (const id of ids) {
       const station = this.stations.get(id);
       if (!station) continue;
-      populatedStations.push({
-        id: station.id,
-        name: station.name,
-        position: station.position,
-        tasks: station.taskIds.map((taskId: number) => this.tasks.get(taskId)!),
+      selectedItems.push({
+        type: SelectedItemType.Station,
+        value: {
+          id: station.id,
+          name: station.name,
+          position: station.position,
+          tasks: station.taskIds.map(
+            (taskId: number) => this.tasks.get(taskId)!
+          ),
+        },
       });
     }
 
-    this.updateReactiveState({ multiSelectedStations: populatedStations });
+    this.updateReactiveState({ selectedItems });
   }
 
   public getStartTime() {

@@ -59,33 +59,39 @@ export interface PopulatedDriver {
   inProgressTask: StationTask | null;
 }
 
-export type SelectedItemBarElement =
+export type SelectedItem =
   | { type: SelectedItemType.Station; value: PopulatedStation }
   | { type: SelectedItemType.Driver; value: PopulatedDriver };
 
 export default function SelectedItemBar() {
   const { state, engine } = useSimulation();
-  const { selectedItemBarElement: selectedItem, multiSelectedStations } = state;
+  const { selectedItems } = state;
 
-  // Multi-selection takes priority over single selection
-  if (multiSelectedStations && multiSelectedStations.length > 0) {
-    const totalTasks = multiSelectedStations.reduce(
-      (sum, s) => sum + s.tasks.length,
-      0
-    );
+  if (selectedItems.length === 0) return null;
+
+  // Multi-selection (2+ items, currently only stations)
+  if (selectedItems.length > 1) {
+    const stations = selectedItems
+      .filter(
+        (item): item is SelectedItem & { type: SelectedItemType.Station } =>
+          item.type === SelectedItemType.Station
+      )
+      .map((item) => item.value);
+
+    const totalTasks = stations.reduce((sum, s) => sum + s.tasks.length, 0);
 
     return (
       <div className="bg-gray-50 flex flex-col gap-2 rounded-lg border py-4 shadow-sm w-full min-w-0">
         <div className="px-5 flex flex-row justify-between items-start gap-1">
           <div className="flex flex-col min-w-0">
             <span className="text-xl font-bold">
-              {multiSelectedStations.length} Stations ({totalTasks} tasks)
+              {stations.length} Stations ({totalTasks} tasks)
             </span>
           </div>
           <Button
             variant="ghost"
             size="icon"
-            onClick={() => engine.clearMultiSelection()}
+            onClick={() => engine.clearSelection()}
             className="h-7 w-7"
           >
             <X className="h-4 w-4" />
@@ -93,7 +99,7 @@ export default function SelectedItemBar() {
         </div>
         <ScrollArea className="relative w-full">
           <div className="max-h-50 px-5 space-y-1">
-            {multiSelectedStations.map((station) => (
+            {stations.map((station) => (
               <div
                 key={station.id}
                 className="flex flex-row items-center gap-2 rounded-md py-1.5"
@@ -113,7 +119,8 @@ export default function SelectedItemBar() {
     );
   }
 
-  if (!selectedItem) return null;
+  // Single selection
+  const selectedItem = selectedItems[0];
 
   const handleClose = () => {
     engine.clearSelection();

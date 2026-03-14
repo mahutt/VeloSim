@@ -102,7 +102,7 @@ export default class MapManager {
     setupMapClickHandlers(map, (item, modifiers) => {
       if (!item) {
         clearSelection();
-        this.state.clearMultiSelectedStations();
+        this.state.clearSelection();
         return;
       }
 
@@ -114,18 +114,16 @@ export default class MapManager {
           const singleStationId = currentSingle.id;
           clearSelection();
           if (!this.state.getMultiSelectedStationIds().has(singleStationId)) {
-            this.state.toggleMultiSelectedStation(singleStationId);
+            this.state.addSelectedStation(singleStationId);
           }
-        } else {
-          clearSelection();
         }
-        this.state.toggleMultiSelectedStation(item.id);
+        this.state.toggleSelectedStation(item.id);
 
         // If only 1 station left, demote back to single selection
         const remaining = this.state.getMultiSelectedStationIds();
         if (remaining.size <= 1) {
           const lastId = remaining.values().next().value;
-          this.state.clearMultiSelectedStations();
+          this.state.clearSelection();
           if (remaining.size === 1 && lastId !== undefined) {
             selectItem(SelectedItemType.Station, lastId);
           }
@@ -134,7 +132,7 @@ export default class MapManager {
       }
 
       // Regular click clears multi-selection and selects single item
-      this.state.clearMultiSelectedStations();
+      this.state.clearSelection();
       const { type, id } = item;
       selectItem(type, id);
     });
@@ -160,9 +158,9 @@ export default class MapManager {
       (stationIds) => {
         if (stationIds.length > 1) {
           clearSelection();
-          this.state.setMultiSelectedStations(stationIds);
+          this.state.setSelectedStations(stationIds);
         } else if (stationIds.length === 1) {
-          this.state.clearMultiSelectedStations();
+          this.state.clearSelection();
           selectItem(SelectedItemType.Station, stationIds[0]);
         }
       }
@@ -228,7 +226,14 @@ export default class MapManager {
           this.updateHoverState(null, null);
         }
       },
-      () => Array.from(this.state.getMultiSelectedStationIds())
+      () => Array.from(this.state.getMultiSelectedStationIds()),
+      (stationId) => {
+        // When drag actually starts, select the dragged station if it
+        // wasn't already part of the current selection.
+        if (!this.state.getMultiSelectedStationIds().has(stationId)) {
+          this.state.setSelectedItem(this.state.getStation(stationId) ?? null);
+        }
+      }
     );
 
     this.animationFrame = requestAnimationFrame(() => this.animateResources());

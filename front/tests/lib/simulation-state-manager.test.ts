@@ -173,14 +173,14 @@ describe('SimulationStateManager', () => {
   });
 
   // Selected item — null
-  it('setSelectedItem(null) clears selectedItemBarElement', () => {
+  it('setSelectedItem(null) clears selectedItems', () => {
     manager.setSelectedItem(null);
     expect(manager.getSelectedItem()).toBeNull();
     expect(setState).not.toHaveBeenCalled();
   });
 
   // Selected item — driver with tasks and inProgressTask
-  it('setSelectedItem with driver builds Driver selectedItemBarElement', () => {
+  it('setSelectedItem with driver builds Driver selectedItems entry', () => {
     manager.setTask(makeStationTask({ id: 1000 }));
     manager.setTask(makeStationTask({ id: 2000 }));
     const driver = makeDriver({
@@ -191,12 +191,14 @@ describe('SimulationStateManager', () => {
     manager.setSelectedItem(driver);
     expect(setState).toHaveBeenCalledWith(
       expect.objectContaining({
-        selectedItemBarElement: expect.objectContaining({
-          type: SelectedItemType.Driver,
-          value: expect.objectContaining({
-            inProgressTask: expect.objectContaining({ id: 2000 }),
+        selectedItems: [
+          expect.objectContaining({
+            type: SelectedItemType.Driver,
+            value: expect.objectContaining({
+              inProgressTask: expect.objectContaining({ id: 2000 }),
+            }),
           }),
-        }),
+        ],
       })
     );
   });
@@ -329,10 +331,13 @@ describe('SimulationStateManager', () => {
       expect(manager.getMultiSelectedStationIds()).toEqual(new Set([1]));
       expect(setState).toHaveBeenCalledWith(
         expect.objectContaining({
-          multiSelectedStations: [
+          selectedItems: [
             expect.objectContaining({
-              id: 1,
-              tasks: [expect.objectContaining({ id: 100 })],
+              type: SelectedItemType.Station,
+              value: expect.objectContaining({
+                id: 1,
+                tasks: [expect.objectContaining({ id: 100 })],
+              }),
             }),
           ],
         })
@@ -349,7 +354,7 @@ describe('SimulationStateManager', () => {
 
       expect(manager.getMultiSelectedStationIds().size).toBe(0);
       expect(setState).toHaveBeenCalledWith(
-        expect.objectContaining({ multiSelectedStations: null })
+        expect.objectContaining({ selectedItems: [] })
       );
     });
 
@@ -374,9 +379,15 @@ describe('SimulationStateManager', () => {
       expect(manager.getMultiSelectedStationIds()).toEqual(new Set([1, 2]));
       expect(setState).toHaveBeenCalledWith(
         expect.objectContaining({
-          multiSelectedStations: expect.arrayContaining([
-            expect.objectContaining({ id: 1 }),
-            expect.objectContaining({ id: 2 }),
+          selectedItems: expect.arrayContaining([
+            expect.objectContaining({
+              type: SelectedItemType.Station,
+              value: expect.objectContaining({ id: 1 }),
+            }),
+            expect.objectContaining({
+              type: SelectedItemType.Station,
+              value: expect.objectContaining({ id: 2 }),
+            }),
           ]),
         })
       );
@@ -388,11 +399,11 @@ describe('SimulationStateManager', () => {
       manager.setMultiSelectedStations([1, 999]);
 
       const state = manager.getReactiveState();
-      expect(state.multiSelectedStations).toHaveLength(1);
-      expect(state.multiSelectedStations![0].id).toBe(1);
+      expect(state.selectedItems).toHaveLength(1);
+      expect(state.selectedItems[0].value.id).toBe(1);
     });
 
-    it('clearMultiSelectedStations resets selection to null', () => {
+    it('clearMultiSelectedStations resets selection to empty', () => {
       manager.setStation(makeStation({ id: 1 }));
       manager.setMultiSelectedStations([1]);
 
@@ -401,7 +412,7 @@ describe('SimulationStateManager', () => {
 
       expect(manager.getMultiSelectedStationIds().size).toBe(0);
       expect(setState).toHaveBeenCalledWith(
-        expect.objectContaining({ multiSelectedStations: null })
+        expect.objectContaining({ selectedItems: [] })
       );
     });
 
@@ -418,16 +429,20 @@ describe('SimulationStateManager', () => {
       manager.setMultiSelectedStations([1]);
 
       // Verify initial multi-selection has the old name
-      expect(manager.getReactiveState().multiSelectedStations).toEqual([
-        expect.objectContaining({ id: 1, name: 'Old' }),
+      expect(manager.getReactiveState().selectedItems).toEqual([
+        expect.objectContaining({
+          value: expect.objectContaining({ id: 1, name: 'Old' }),
+        }),
       ]);
 
       const updated = makeStation({ id: 1, name: 'New', taskIds: [10] });
       manager.setStation(updated);
 
       // After updating the station, the reactive multi-selection should reflect the new name
-      expect(manager.getReactiveState().multiSelectedStations).toEqual([
-        expect.objectContaining({ id: 1, name: 'New' }),
+      expect(manager.getReactiveState().selectedItems).toEqual([
+        expect.objectContaining({
+          value: expect.objectContaining({ id: 1, name: 'New' }),
+        }),
       ]);
     });
 
