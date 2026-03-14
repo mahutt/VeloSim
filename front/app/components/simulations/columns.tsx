@@ -49,14 +49,6 @@ export const columns: ColumnDef<Simulation>[] = [
     },
   },
   {
-    accessorKey: 'date_updated',
-    header: 'Updated',
-    cell: ({ row }) => {
-      const date = new Date(row.original.date_updated);
-      return <span>{date.toLocaleDateString()}</span>;
-    },
-  },
-  {
     id: 'resumeOrReport',
     header: 'Action',
     cell: ({ row }) => {
