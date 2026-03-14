@@ -280,7 +280,7 @@ test('simulations page downloads a simulation report as csv', async () => {
     expect(screen.getByText('Test Simulation 1')).toBeInTheDocument();
   });
 
-  fireEvent.click(screen.getByRole('button', { name: /report/i }));
+  fireEvent.click(screen.getByRole('button', { name: /download/i }));
 
   await waitFor(() => {
     expect(api.get).toHaveBeenLastCalledWith(
@@ -314,9 +314,9 @@ test('simulations page displays an error when report download fails', async () =
       data: {
         simulations: [
           makeSimulation({
-            id: 1001,
-            uuid: 'sim-uuid-1001',
-            name: 'Test Simulation 1',
+            id: 1002,
+            uuid: 'sim-uuid-1002',
+            name: 'Test Simulation 2',
             completed: false,
           }),
         ],
@@ -338,10 +338,10 @@ test('simulations page displays an error when report download fails', async () =
   render(<Stub initialEntries={['/simulations']} />);
 
   await waitFor(() => {
-    expect(screen.getByText('Test Simulation 1')).toBeInTheDocument();
+    expect(screen.getByText('Test Simulation 2')).toBeInTheDocument();
   });
 
-  fireEvent.click(screen.getByRole('button', { name: /report/i }));
+  fireEvent.click(screen.getByRole('button', { name: /download/i }));
 
   await waitFor(() => {
     expect(mockDisplayError).toHaveBeenCalledWith(
