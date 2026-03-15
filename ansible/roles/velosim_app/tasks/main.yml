@@ -12,6 +12,7 @@
     - "{{ app_dir }}"
     - "{{ app_dir }}/scripts"
     - "{{ app_dir }}/osrm-data"
+    - "{{ app_dir }}/graphhopper-data"
     - "{{ app_dir }}/logs"
     - "{{ app_dir }}/backups"
     - "{{ app_dir }}/grafana_logging"
@@ -230,6 +231,31 @@
       To enable OSRM data setup, set setup_osrm_data: true in group_vars
       {% endif %}
 
+- name: Copy GraphHopper data preparation script
+  ansible.builtin.template:
+    src: prepare-graphhopper-data.sh.j2
+    dest: "{{ app_dir }}/scripts/prepare-graphhopper-data.sh"
+    owner: "{{ app_user }}"
+    group: "{{ app_user }}"
+    mode: '0755'
+
+- name: Prepare GraphHopper data if not exists
+  ansible.builtin.command: "{{ app_dir }}/scripts/prepare-graphhopper-data.sh"
+  become_user: "{{ app_user }}"
+  args:
+    creates: "{{ app_dir }}/graphhopper-data/montreal-latest.osm.pbf"
+  when: setup_graphhopper_data | default(false)
+  ignore_errors: true
+  register: graphhopper_result
+
+- name: Display GraphHopper preparation result
+  ansible.builtin.debug:
+    msg: |
+      GraphHopper Data Preparation: {{ 'Completed' if graphhopper_result.rc == 0 else 'Failed or Skipped' }}
+      {% if not (setup_graphhopper_data | default(false)) %}
+      To enable GraphHopper data setup, set setup_graphhopper_data: true in group_vars
+      {% endif %}
+
 - name: Create application management scripts
   ansible.builtin.template:
     src: velosim-app.sh.j2
@@ -385,6 +411,7 @@
          sudo docker logs velosim-frontend
          sudo docker logs velosim-postgres
          sudo docker logs velosim-osrm
+        sudo docker logs velosim-graphhopper
 
       3. Check if services are building:
          sudo docker compose -f {{ app_dir }}/docker-compose.prod.yml build --progress=plain
@@ -393,7 +420,7 @@
          sudo {{ app_dir }}/scripts/velosim-app.sh restart
 
       5. Check if ports are blocked:
-         sudo netstat -tlnp | grep -E ':(3000|8000|5432)'
+        sudo netstat -tlnp | grep -E ':(3000|8000|5432|5001|8989)'
 
       6. Force rebuild and restart:
          sudo docker compose -f {{ app_dir }}/docker-compose.prod.yml down

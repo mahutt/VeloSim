@@ -38,6 +38,26 @@ case "$1" in
             sleep 2
         done
 
+        echo "Waiting for GraphHopper to be healthy..."
+        for i in $(seq 1 180); do
+            if docker compose --project-name "$COMPOSE_PROJECT" -f "$COMPOSE_FILE" ps graphhopper | grep -q "healthy"; then
+                echo "GraphHopper is healthy!"
+                break
+            fi
+            if docker compose --project-name "$COMPOSE_PROJECT" -f "$COMPOSE_FILE" ps graphhopper | grep -q "unhealthy"; then
+                echo "ERROR: GraphHopper is unhealthy"
+                docker compose --project-name "$COMPOSE_PROJECT" -f "$COMPOSE_FILE" logs graphhopper
+                exit 1
+            fi
+            if [ $i -eq 180 ]; then
+                echo "ERROR: GraphHopper failed to become healthy within 6 minutes"
+                docker compose --project-name "$COMPOSE_PROJECT" -f "$COMPOSE_FILE" logs graphhopper
+                exit 1
+            fi
+            echo "Waiting for GraphHopper... ($i/180)"
+            sleep 2
+        done
+
         echo "Waiting for backend to be healthy..."
         for i in $(seq 1 90); do
             if docker compose --project-name "$COMPOSE_PROJECT" -f "$COMPOSE_FILE" ps backend | grep -q "healthy"; then
@@ -112,7 +132,7 @@ case "$1" in
         docker compose --project-name "$COMPOSE_PROJECT" -f "$COMPOSE_FILE" ps
         echo ""
         echo "Port Status:"
-        netstat -tlnp | grep -E ':(3000|8000|5432|5001)' || echo "No application ports listening"
+        netstat -tlnp | grep -E ':(3000|8000|5432|5001|8989)' || echo "No application ports listening"
         echo ""
         echo "Backend Health Check:"
         curl -s http://localhost:8000/health || echo "Backend health check failed"
