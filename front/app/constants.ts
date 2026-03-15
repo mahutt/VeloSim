@@ -79,6 +79,33 @@ export const EMPTY_FEATURE_COLLECTION: GeoJSON.FeatureCollection = {
   features: [],
 };
 
+/**
+ * Station task-count color thresholds
+ */
+const STATION_COLOR_LOW = '#0796dd';
+const STATION_COLOR_MEDIUM = '#890eba';
+const STATION_COLOR_HIGH = '#ed2b09';
+
+/**
+ * Station task-count hover state colors
+ */
+const STATION_COLOR_LOW_HOVERED = '#0886c5';
+const STATION_COLOR_MEDIUM_HOVERED = '#6a0990';
+const STATION_COLOR_HIGH_HOVERED = '#b32107';
+
+/**
+ * Partial-assignment ring colors
+ */
+const STATION_RING_COLOR_LOW = 'rgba(7, 150, 221, 0.55)';
+const STATION_RING_COLOR_MEDIUM = 'rgba(137, 14, 186, 0.55)';
+const STATION_RING_COLOR_HIGH = 'rgba(237, 43, 9, 0.55)';
+
+/**
+ * Task-count thresholds for station colors
+ */
+const STATION_TASK_COUNT_MEDIUM_THRESHOLD = 2;
+const STATION_TASK_COUNT_HIGH_THRESHOLD = 3;
+
 export {
   APP_NAME,
   GBFS_STATION_INFORMATION_URL,
@@ -95,4 +122,15 @@ export {
   SEVERE_OPACITY,
   ROUTE_LINE_OFFSET,
   ROUTE_LINE_WIDTH,
+  STATION_COLOR_LOW,
+  STATION_COLOR_MEDIUM,
+  STATION_COLOR_HIGH,
+  STATION_COLOR_LOW_HOVERED,
+  STATION_COLOR_MEDIUM_HOVERED,
+  STATION_COLOR_HIGH_HOVERED,
+  STATION_RING_COLOR_LOW,
+  STATION_RING_COLOR_MEDIUM,
+  STATION_RING_COLOR_HIGH,
+  STATION_TASK_COUNT_MEDIUM_THRESHOLD,
+  STATION_TASK_COUNT_HIGH_THRESHOLD,
 };

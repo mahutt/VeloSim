@@ -69,7 +69,7 @@ export function TaskItem({
     if (draggedTaskIds.length > 1) {
       const dragPreview = document.createElement('div');
       dragPreview.className = 'px-2 bg-blue-500 text-white rounded-lg';
-      dragPreview.innerHTML = `<span>${draggedTaskIds.length} tasks</span>`;
+      dragPreview.textContent = `${draggedTaskIds.length} tasks`;
       dragPreview.style.position = 'absolute';
       document.body.appendChild(dragPreview);
       e.dataTransfer.setDragImage(dragPreview, 0, 0);

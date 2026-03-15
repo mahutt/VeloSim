@@ -66,7 +66,8 @@ export function adaptHeadquartersToGeoJSON(
 export function adaptStationsToGeoJSON(
   stations: Station[],
   selectedStationIds: Set<number>,
-  hoveredStationId: number | null
+  hoveredStationId: number | null,
+  partiallyAssignedStationIds: ReadonlySet<number> = new Set<number>()
 ): GeoJSON.FeatureCollection {
   return {
     type: 'FeatureCollection',
@@ -77,6 +78,7 @@ export function adaptStationsToGeoJSON(
         name: station.name,
         taskCount: station.taskIds.length,
         selected: selectedStationIds.has(station.id),
+        hasPartialAssignment: partiallyAssignedStationIds.has(station.id),
         hover: station.id === hoveredStationId,
       },
       geometry: {

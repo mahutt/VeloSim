@@ -218,6 +218,9 @@ describe('MapManager', () => {
     (
       mockSimulationStateManager.getMultiSelectedStationIds as Mock
     ).mockReturnValue(new Set());
+    (
+      mockSimulationStateManager.getPartialAssignmentStationIds as Mock
+    ).mockReturnValue(new Set());
     (mockSimulationStateManager.getMapShouldRefresh as Mock).mockReturnValue(
       false
     );
@@ -848,7 +851,8 @@ describe('MapManager', () => {
       expect(mockAdaptStationsToGeoJSON).toHaveBeenCalledWith(
         stations,
         new Set([7]),
-        null
+        null,
+        new Set()
       );
     });
   });

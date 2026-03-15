@@ -34,19 +34,28 @@ import {
   clearAllRoutesDisplay,
   MapSource,
 } from '~/lib/map-helpers';
+import { ROUTE_LINE_OFFSET, ROUTE_LINE_WIDTH } from '~/constants';
 import { MockMap } from 'tests/mocks';
 import type { Position, CongestionLevel } from '~/types';
 
 test('loadMapImages loads all necessary images', () => {
   MockMap.createRandomInstance();
   loadMapImages(MockMap.instance! as unknown as mapboxgl.Map);
-  expect(MockMap.instance?.loadImage).toHaveBeenCalledTimes(7);
+  expect(MockMap.instance?.loadImage).toHaveBeenCalledTimes(4);
   expect(MockMap.instance?.loadImage).toHaveBeenCalledWith(
-    '/station.png',
+    '/resource.png',
     expect.any(Function)
   );
   expect(MockMap.instance?.loadImage).toHaveBeenCalledWith(
-    '/resource.png',
+    '/resource-selected.png',
+    expect.any(Function)
+  );
+  expect(MockMap.instance?.loadImage).toHaveBeenCalledWith(
+    '/resource-hover.png',
+    expect.any(Function)
+  );
+  expect(MockMap.instance?.loadImage).toHaveBeenCalledWith(
+    '/hq.png',
     expect.any(Function)
   );
 });
@@ -83,22 +92,53 @@ test('setMapLayers adds stations layer with correct configuration', () => {
   MockMap.createRandomInstance();
   setMapLayers(MockMap.instance! as unknown as mapboxgl.Map);
 
-  expect(MockMap.instance?.addLayer).toHaveBeenCalledTimes(8);
+  expect(MockMap.instance?.addLayer).toHaveBeenCalledTimes(9);
   expect(MockMap.instance?.addLayer).toHaveBeenCalledWith({
     id: 'stations',
-    type: 'symbol',
+    type: 'circle',
     source: 'stations',
-    layout: {
-      'icon-image': [
+    paint: {
+      'circle-radius': [
+        'interpolate',
+        ['linear'],
+        ['zoom'],
+        13,
+        [
+          'case',
+          [
+            'any',
+            ['boolean', ['get', 'hover'], false],
+            ['boolean', ['get', 'selected'], false],
+          ],
+          12,
+          11,
+        ],
+        17,
+        [
+          'case',
+          [
+            'any',
+            ['boolean', ['get', 'hover'], false],
+            ['boolean', ['get', 'selected'], false],
+          ],
+          16,
+          15,
+        ],
+      ],
+      'circle-color': [
         'case',
         ['boolean', ['get', 'selected'], false],
-        'station-marker-selected',
-        ['boolean', ['get', 'hover'], false],
-        'station-marker-hover',
-        'station-marker',
+        [
+          'step',
+          ['get', 'taskCount'],
+          '#0796dd',
+          2,
+          '#890eba',
+          3,
+          '#ed2b09',
+        ],
+        'rgba(0, 0, 0, 0)',
       ],
-      'icon-allow-overlap': true,
-      'icon-size': ['interpolate', ['linear'], ['zoom'], 10, 0.4, 15, 1.0],
     },
     minzoom: 13,
     filter: ['>', ['get', 'taskCount'], 0],
@@ -160,7 +200,7 @@ test('loadMapImages handles image loading with async callbacks', async () => {
   // Wait for async callbacks
   await new Promise((resolve) => setTimeout(resolve, 10));
 
-  expect(MockMap.instance?.loadImage).toHaveBeenCalledTimes(7);
+  expect(MockMap.instance?.loadImage).toHaveBeenCalledTimes(4);
 });
 
 test('setMapSource updates source data correctly', () => {
@@ -218,22 +258,22 @@ test('loadMapImages successfully adds images when loaded', () => {
 
   loadMapImages(MockMap.instance! as unknown as mapboxgl.Map);
 
-  expect(MockMap.instance?.loadImage).toHaveBeenCalledTimes(7);
-  expect(MockMap.instance?.addImage).toHaveBeenCalledTimes(7);
-  expect(MockMap.instance?.addImage).toHaveBeenCalledWith(
-    'station-marker',
-    mockImage
-  );
-  expect(MockMap.instance?.addImage).toHaveBeenCalledWith(
-    'station-marker-selected',
-    mockImage
-  );
+  expect(MockMap.instance?.loadImage).toHaveBeenCalledTimes(4);
+  expect(MockMap.instance?.addImage).toHaveBeenCalledTimes(4);
   expect(MockMap.instance?.addImage).toHaveBeenCalledWith(
     'resource-marker',
     mockImage
   );
   expect(MockMap.instance?.addImage).toHaveBeenCalledWith(
     'resource-marker-selected',
+    mockImage
+  );
+  expect(MockMap.instance?.addImage).toHaveBeenCalledWith(
+    'resource-marker-hover',
+    mockImage
+  );
+  expect(MockMap.instance?.addImage).toHaveBeenCalledWith(
+    'hq-marker',
     mockImage
   );
 });
@@ -256,7 +296,7 @@ test('loadMapImages handles image load failure gracefully', () => {
 
   loadMapImages(MockMap.instance! as unknown as mapboxgl.Map);
 
-  expect(MockMap.instance?.loadImage).toHaveBeenCalledTimes(7);
+  expect(MockMap.instance?.loadImage).toHaveBeenCalledTimes(4);
   // Should not call addImage if loadImage fails
   expect(MockMap.instance?.addImage).not.toHaveBeenCalled();
 });
@@ -409,41 +449,9 @@ test('setMapLayers adds route layers with correct configuration', () => {
     },
     paint: {
       'line-color': ['coalesce', ['get', 'color'], '#22c55e'],
-      'line-width': [
-        'interpolate',
-        ['linear'],
-        ['zoom'],
-        10,
-        1,
-        13,
-        2,
-        15,
-        3,
-        17,
-        4,
-        20,
-        6,
-        22,
-        8,
-      ],
+      'line-width': ROUTE_LINE_WIDTH,
       'line-opacity': ['coalesce', ['get', 'opacity'], 0.9],
-      'line-offset': [
-        'interpolate',
-        ['linear'],
-        ['zoom'],
-        10,
-        0,
-        13,
-        1,
-        15,
-        2,
-        17,
-        4,
-        20,
-        6,
-        22,
-        8,
-      ],
+      'line-offset': ROUTE_LINE_OFFSET,
     },
   });
 
@@ -457,45 +465,13 @@ test('setMapLayers adds route layers with correct configuration', () => {
     },
     paint: {
       'line-color': ['coalesce', ['get', 'color'], '#22c55e'],
-      'line-width': [
-        'interpolate',
-        ['linear'],
-        ['zoom'],
-        10,
-        1,
-        13,
-        2,
-        15,
-        3,
-        17,
-        4,
-        20,
-        6,
-        22,
-        8,
-      ],
+      'line-width': ROUTE_LINE_WIDTH,
       'line-opacity': [
         'number',
         ['*', ['coalesce', ['get', 'opacity'], 0.9], 0.45],
         0.4,
       ],
-      'line-offset': [
-        'interpolate',
-        ['linear'],
-        ['zoom'],
-        10,
-        0,
-        13,
-        1,
-        15,
-        2,
-        17,
-        4,
-        20,
-        6,
-        22,
-        8,
-      ],
+      'line-offset': ROUTE_LINE_OFFSET,
     },
   });
 });

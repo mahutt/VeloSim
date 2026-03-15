@@ -232,6 +232,10 @@ export default class MapManager {
         if (!this.state.getMultiSelectedStationIds().has(stationId)) {
           this.state.setSelectedItem(this.state.getStation(stationId) ?? null);
         }
+      },
+      (stationId) => {
+        const station = this.state.getStation(stationId);
+        return station?.taskIds.length ?? 0;
       }
     );
 
@@ -344,7 +348,8 @@ export default class MapManager {
       const geojson = adaptStationsToGeoJSON(
         stations,
         this.state.getMultiSelectedStationIds(),
-        this.hoveredStationId
+        this.hoveredStationId,
+        this.state.getPartialAssignmentStationIds()
       );
       setMapSource(MapSource.Stations, geojson, map);
     }

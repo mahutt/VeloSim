@@ -61,6 +61,7 @@ describe('adaptStationsToGeoJSON', () => {
             name: 'Central Station',
             taskCount: 0,
             hover: false,
+            hasPartialAssignment: false,
             selected: false,
           },
           geometry: {
@@ -75,6 +76,7 @@ describe('adaptStationsToGeoJSON', () => {
             name: 'Park Station',
             taskCount: 0,
             hover: false,
+            hasPartialAssignment: false,
             selected: false,
           },
           geometry: {
