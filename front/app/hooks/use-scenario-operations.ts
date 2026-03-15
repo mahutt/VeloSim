@@ -24,6 +24,7 @@
 
 import useError from '~/hooks/use-error';
 import { log, LogContext, LogLevel } from '~/lib/logger';
+import usePreferences from '~/hooks/use-preferences';
 import api from '~/api';
 import { toast } from 'sonner';
 
@@ -32,6 +33,7 @@ import { toast } from 'sonner';
  */
 export function useScenarioOperations() {
   const { displayError } = useError();
+  const { t } = usePreferences();
 
   /**
    * Formats backend error responses into user-friendly messages
@@ -88,8 +90,8 @@ export function useScenarioOperations() {
   const validateContent = async (content: string) => {
     if (!content.trim()) {
       displayError(
-        'No content to process',
-        'Please enter or load a scenario first.'
+        t.scenario.error.noContentToProcessTitle,
+        t.scenario.error.noContentToProcessDescription
       );
       return null;
     }
@@ -100,8 +102,8 @@ export function useScenarioOperations() {
       parsedContent = JSON.parse(content);
     } catch {
       displayError(
-        'Invalid JSON format',
-        'The scenario content is not valid JSON. Please fix the formatting.'
+        t.scenario.error.invalidJsonTitle,
+        t.scenario.error.invalidJsonDescription
       );
       return null;
     }
@@ -132,7 +134,7 @@ export function useScenarioOperations() {
           : [result.errors].filter(Boolean);
 
         displayError(
-          'Scenario validation failed',
+          t.scenario.error.validationFailedTitle,
           errors
             .map((e: { field?: string; message: string; line?: number }) => {
               const fieldInfo = e.field ? `[${e.field}]: ` : '';
@@ -167,7 +169,7 @@ export function useScenarioOperations() {
         message =
           errorObj.response?.data?.detail || errorObj.message || message;
       }
-      displayError('Validation error', message);
+      displayError(t.scenario.error.validationTitle, message);
       return null;
     }
   };
@@ -194,8 +196,8 @@ export function useScenarioOperations() {
     } catch (error) {
       console.error('Download error:', error);
       displayError(
-        'Download failed',
-        'An unexpected error occurred while downloading the file. Please try again.'
+        t.scenario.error.downloadFailedTitle,
+        t.scenario.error.downloadFailedDescription
       );
       log({
         message: 'Scenario download failed',
@@ -228,7 +230,10 @@ export function useScenarioOperations() {
   ) => {
     // Just validate JSON format locally - backend will do full validation
     if (!content.trim()) {
-      displayError('No content to save', 'Please enter a scenario first.');
+      displayError(
+        t.scenario.error.noContentToSaveTitle,
+        t.scenario.error.noContentToSaveDescription
+      );
       return null;
     }
 
@@ -237,8 +242,8 @@ export function useScenarioOperations() {
       parsedContent = JSON.parse(content);
     } catch {
       displayError(
-        'Invalid JSON format',
-        'The scenario content is not valid JSON. Please fix the formatting.'
+        t.scenario.error.invalidJsonTitle,
+        t.scenario.error.invalidJsonDescription
       );
       return null;
     }
@@ -253,7 +258,7 @@ export function useScenarioOperations() {
       toast.success('Scenario saved successfully!');
       return response.data?.id ?? null;
     } catch (error: unknown) {
-      displayError('Failed to save scenario', formatBackendError(error));
+      displayError(t.scenario.error.saveFailedTitle, formatBackendError(error));
       return null;
     }
   };
@@ -267,7 +272,10 @@ export function useScenarioOperations() {
   ) => {
     // Just validate JSON format locally - backend will do full validation
     if (!content.trim()) {
-      displayError('No content to save', 'Please enter a scenario first.');
+      displayError(
+        t.scenario.error.noContentToSaveTitle,
+        t.scenario.error.noContentToSaveDescription
+      );
       return null;
     }
 
@@ -276,8 +284,8 @@ export function useScenarioOperations() {
       parsedContent = JSON.parse(content);
     } catch {
       displayError(
-        'Invalid JSON format',
-        'The scenario content is not valid JSON. Please fix the formatting.'
+        t.scenario.error.invalidJsonTitle,
+        t.scenario.error.invalidJsonDescription
       );
       return null;
     }
@@ -291,7 +299,10 @@ export function useScenarioOperations() {
       toast.success('Scenario overwritten successfully!');
       return response.data?.id ?? scenarioId;
     } catch (error: unknown) {
-      displayError('Failed to overwrite scenario', formatBackendError(error));
+      displayError(
+        t.scenario.error.overwriteFailedTitle,
+        formatBackendError(error)
+      );
       return null;
     }
   };
@@ -307,7 +318,10 @@ export function useScenarioOperations() {
       });
       return true;
     } catch (error: unknown) {
-      displayError('Failed to delete scenario', formatBackendError(error));
+      displayError(
+        t.scenario.error.deleteFailedTitle,
+        formatBackendError(error)
+      );
       return false;
     }
   };

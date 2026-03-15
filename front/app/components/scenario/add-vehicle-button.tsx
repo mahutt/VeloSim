@@ -32,6 +32,7 @@ import { DropdownMenuItem } from '../ui/dropdown-menu';
 import { toast } from 'sonner';
 import AddVehicleDialog from './add-vehicle-dialog';
 import type { ScenarioContentVehicle } from '~/types';
+import usePreferences from '~/hooks/use-preferences';
 
 interface AddVehicleButtonProps {
   scenarioContent: string;
@@ -46,6 +47,7 @@ export default function AddVehicleButton({
   onEdit,
   icon,
 }: AddVehicleButtonProps) {
+  const { t } = usePreferences();
   const [dialogOpen, setDialogOpen] = useState(false);
 
   const handleAddVehicle = (vehicleData: ScenarioContentVehicle) => {
@@ -89,7 +91,9 @@ export default function AddVehicleButton({
       return JSON.stringify(jsonNew, null, 2);
     });
 
-    toast.success(`Vehicle "${vehicleData.name}" added successfully`);
+    toast.success(
+      `${t.scenario.toast.vehicle} "${vehicleData.name}" ${t.scenario.toast.addedSuccessfully}`
+    );
     setDialogOpen(false);
   };
 
@@ -102,7 +106,7 @@ export default function AddVehicleButton({
         }}
       >
         {icon}
-        Add Vehicle
+        {t.scenario.option.addVehicle}
       </DropdownMenuItem>
       <AddVehicleDialog
         open={dialogOpen}

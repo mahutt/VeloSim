@@ -24,6 +24,7 @@
 
 import { Input } from '~/components/ui/input';
 import { Button } from '~/components/ui/button';
+import usePreferences from '~/hooks/use-preferences';
 
 interface ScenarioToolbarProps {
   scenarioName: string;
@@ -42,22 +43,24 @@ export default function ScenarioToolbar({
   isEditMode,
   isExistingScenario,
 }: ScenarioToolbarProps) {
+  const { t } = usePreferences();
+
   return (
     <div className="flex flex-col gap-4 mb-6 sm:flex-row sm:items-end sm:gap-6">
       <div className="flex gap-2 w-full mb-2 sm:mb-0 sm:w-64 sm:order-2">
         <Button onClick={onImport} variant="outline" className="flex-1">
-          Import
+          {t.scenario.import}
         </Button>
         <Button onClick={onNew} className="flex-1">
-          New
+          {t.scenario.new}
         </Button>
       </div>
       <Input
         value={scenarioName}
         onChange={(e) => onNameChange(e.target.value)}
-        placeholder="Scenario name"
+        placeholder={t.scenario.name}
         className="flex-1 sm:order-1"
-        aria-label="Scenario name"
+        aria-label={t.scenario.name}
         disabled={isExistingScenario && !isEditMode}
       />
     </div>

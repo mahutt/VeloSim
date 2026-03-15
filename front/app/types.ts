@@ -36,6 +36,19 @@ export interface User {
   is_enabled: boolean;
 }
 
+export enum UILanguage {
+  English = 'en',
+  French = 'fr',
+}
+
+export interface UserPreferences {
+  language: UILanguage;
+}
+
+export interface UserPreferencesPatch {
+  language?: UILanguage;
+}
+
 // Simulation types
 
 export type Position = [number, number]; // [longitude, latitude]

@@ -36,6 +36,7 @@ import './app.css';
 import { AuthProvider } from './providers/auth-provider';
 import { ErrorProvider } from './providers/error-provider';
 import { FeatureToggleProvider } from './providers/feature-toggle-provider';
+import { PreferencesProvider } from './providers/preferences-provider';
 import { Toaster } from '~/components/ui/sonner';
 
 export const links: Route.LinksFunction = () => [
@@ -75,7 +76,9 @@ export default function App() {
     <ErrorProvider>
       <FeatureToggleProvider>
         <AuthProvider>
-          <Outlet />
+          <PreferencesProvider>
+            <Outlet />
+          </PreferencesProvider>
         </AuthProvider>
       </FeatureToggleProvider>
     </ErrorProvider>

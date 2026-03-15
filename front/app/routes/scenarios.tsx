@@ -46,6 +46,7 @@ import useError from '~/hooks/use-error';
 import api from '~/api';
 import { log, LogContext, LogLevel } from '~/lib/logger';
 import SimulationNameDialog from '~/components/scenario/simulation-name-dialog';
+import usePreferences from '~/hooks/use-preferences';
 
 export default function ScenarioEditor() {
   // Refs
@@ -81,6 +82,7 @@ export default function ScenarioEditor() {
   // Hooks
   const navigate = useNavigate();
   const { displayError } = useError();
+  const { t } = usePreferences();
   const {
     validateContent,
     exportScenario,
@@ -125,10 +127,10 @@ export default function ScenarioEditor() {
 
     if (failureOccurred) {
       displayError(
-        'Failure loading scenarios',
+        t.scenario.error.loadScenariosTitle,
         scenarios.length > 0
-          ? 'Some scenarios may be missing from the list.'
-          : 'All scenarios failed to load.',
+          ? t.scenario.error.loadScenariosPartial
+          : t.scenario.error.loadScenariosAll,
         scenarios.length > 0 ? undefined : loadSavedScenarios
       );
     }
@@ -236,7 +238,10 @@ export default function ScenarioEditor() {
           setSavedScenarios(scenarios);
         }
       } catch {
-        displayError('Import Failed', 'The file is not a valid JSON scenario.');
+        displayError(
+          t.scenario.error.importTitle,
+          t.scenario.error.importDescription
+        );
       } finally {
         setPendingImport(false);
         setPendingImportFile(null);
@@ -320,8 +325,8 @@ export default function ScenarioEditor() {
     // Validate content first
     if (!scenarioContent.trim()) {
       displayError(
-        'No Scenario',
-        'Please create or load a scenario before starting simulation.'
+        t.scenario.error.noScenarioTitle,
+        t.scenario.error.noScenarioDescription
       );
       setStartingSimulation(false);
       return;
@@ -332,7 +337,10 @@ export default function ScenarioEditor() {
     try {
       parsedContent = JSON.parse(scenarioContent);
     } catch {
-      displayError('Invalid Scenario', 'Invalid JSON format');
+      displayError(
+        t.scenario.error.invalidTitle,
+        t.scenario.error.invalidDescription
+      );
       setStartingSimulation(false);
       return;
     }
@@ -351,7 +359,7 @@ export default function ScenarioEditor() {
       navigate(`/simulations/${response.data.sim_id}`);
     } catch (error: unknown) {
       console.error('Error starting simulation:', error);
-      displayError('Initialization Failed', formatBackendError(error));
+      displayError(t.scenario.error.initializeTitle, formatBackendError(error));
       setStartingSimulation(false);
     }
   };
@@ -581,8 +589,8 @@ export default function ScenarioEditor() {
         setIsEditMode(false);
       } catch {
         displayError(
-          'Unable to load scenario',
-          'The scenario could not be parsed as JSON.'
+          t.scenario.error.unableToLoadTitle,
+          t.scenario.error.unableToLoadDescription
         );
       }
     },
@@ -642,10 +650,10 @@ export default function ScenarioEditor() {
     >
       {isDraggingFile && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm pointer-events-none">
-          <p className="text-2xl font-bold">Drop to import scenario</p>
+          <p className="text-2xl font-bold">{t.scenario.dropToImport}</p>
         </div>
       )}
-      <h1 className="text-2xl font-bold mb-6">Scenario Editor</h1>
+      <h1 className="text-2xl font-bold mb-6">{t.scenario.editorTitle}</h1>
 
       {/* Hidden file input for import */}
       <input

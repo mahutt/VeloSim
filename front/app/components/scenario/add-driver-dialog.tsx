@@ -36,6 +36,7 @@ import { Input } from '~/components/ui/input';
 import { Label } from '~/components/ui/label';
 import type { ScenarioContentDriver } from '~/types';
 import { log, LogContext, LogLevel } from '~/lib/logger';
+import usePreferences from '~/hooks/use-preferences';
 
 interface AddDriverDialogProps {
   open: boolean;
@@ -48,6 +49,7 @@ export default function AddDriverDialog({
   onOpenChange,
   onSubmit,
 }: AddDriverDialogProps) {
+  const { t } = usePreferences();
   const [name, setName] = useState('');
   const [startTime, setStartTime] = useState('');
   const [endTime, setEndTime] = useState('');
@@ -207,21 +209,21 @@ export default function AddDriverDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Add Driver</DialogTitle>
+          <DialogTitle>{t.scenario.dialog.addDriverTitle}</DialogTitle>
           <DialogDescription>
-            Configure a new driver to insert into the scenario.
+            {t.scenario.dialog.addDriverDescription}
           </DialogDescription>
         </DialogHeader>
 
         <form onSubmit={handleSubmit}>
           <div className="grid gap-4 py-4">
             <div className="grid gap-2">
-              <Label htmlFor="name">Driver Name</Label>
+              <Label htmlFor="name">{t.scenario.dialog.driverNameLabel}</Label>
               <Input
                 id="name"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                placeholder="e.g., Driver 1"
+                placeholder={t.scenario.dialog.driverNamePlaceholder}
                 aria-invalid={!!errors.name}
                 aria-describedby={errors.name ? 'name-error' : undefined}
               />
@@ -233,12 +235,14 @@ export default function AddDriverDialog({
             </div>
 
             <div className="grid gap-2">
-              <Label htmlFor="startTime">Shift Start Time</Label>
+              <Label htmlFor="startTime">
+                {t.scenario.dialog.shiftStartTimeLabel}
+              </Label>
               <Input
                 id="startTime"
                 value={startTime}
                 onChange={(e) => setStartTime(e.target.value)}
-                placeholder="e.g., day1:08:00"
+                placeholder={t.scenario.dialog.shiftStartTimePlaceholder}
                 aria-invalid={!!errors.startTime}
                 aria-describedby={
                   errors.startTime ? 'startTime-error' : undefined
@@ -252,12 +256,14 @@ export default function AddDriverDialog({
             </div>
 
             <div className="grid gap-2">
-              <Label htmlFor="endTime">Shift End Time</Label>
+              <Label htmlFor="endTime">
+                {t.scenario.dialog.shiftEndTimeLabel}
+              </Label>
               <Input
                 id="endTime"
                 value={endTime}
                 onChange={(e) => setEndTime(e.target.value)}
-                placeholder="e.g., day1:17:00"
+                placeholder={t.scenario.dialog.shiftEndTimePlaceholder}
                 aria-invalid={!!errors.endTime}
                 aria-describedby={errors.endTime ? 'endTime-error' : undefined}
               />
@@ -269,12 +275,14 @@ export default function AddDriverDialog({
             </div>
 
             <div className="grid gap-2">
-              <Label htmlFor="lunchBreak">Lunch Break (optional)</Label>
+              <Label htmlFor="lunchBreak">
+                {t.scenario.dialog.lunchBreakOptionalLabel}
+              </Label>
               <Input
                 id="lunchBreak"
                 value={lunchBreak}
                 onChange={(e) => setLunchBreak(e.target.value)}
-                placeholder="e.g., day1:12:00"
+                placeholder={t.scenario.dialog.lunchBreakPlaceholder}
                 aria-invalid={!!errors.lunchBreak}
                 aria-describedby={
                   errors.lunchBreak ? 'lunchBreak-error' : undefined
@@ -290,9 +298,9 @@ export default function AddDriverDialog({
 
           <DialogFooter>
             <Button type="button" variant="outline" onClick={handleCancel}>
-              Cancel
+              {t.common.cancel}
             </Button>
-            <Button type="submit">Add Driver</Button>
+            <Button type="submit">{t.scenario.dialog.addDriverAction}</Button>
           </DialogFooter>
         </form>
       </DialogContent>

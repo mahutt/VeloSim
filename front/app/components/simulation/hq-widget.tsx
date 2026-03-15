@@ -30,6 +30,7 @@ import {
   UsersRound,
 } from 'lucide-react';
 import { useState } from 'react';
+import usePreferences from '~/hooks/use-preferences';
 import Nested from '~/icons/nested';
 import { useSimulation } from '~/providers/simulation-provider';
 export interface HQEntitiesState {
@@ -45,11 +46,23 @@ export interface HQWidgetProps {
 
 export default function HQWidget() {
   const { state } = useSimulation();
+  const { t } = usePreferences();
   const { driversAtHQ, driversPendingShift, entities } = state.HQWidgetState;
   const [open, setOpen] = useState<boolean>(false);
   const drivers = [...driversAtHQ, ...driversPendingShift].sort(
     (a, b) => a.minutesTillShift - b.minutesTillShift
   );
+
+  const driverLabel =
+    entities && entities.count > 1
+      ? t.simulation.hqWidget.driverPlural
+      : t.simulation.hqWidget.driverSingular;
+
+  const vehicleLabel =
+    entities && entities.count > 1
+      ? t.simulation.hqWidget.vehiclePlural
+      : t.simulation.hqWidget.vehicleSingular;
+
   return (
     <div className="w-full bg-gray-50 border shadow rounded-lg">
       {/* header */}
@@ -60,20 +73,20 @@ export default function HQWidget() {
         {!entities ? (
           <>
             <CircleDashed size={20} />
-            <p className="flex-1 text-left">All quiet at HQ</p>
+            <p className="flex-1 text-left">{t.simulation.hqWidget.allQuiet}</p>
           </>
         ) : entities.type === 'driver' ? (
           <>
             <UsersRound size={20} className="text-red-500" />
             <p className="flex-1 text-left">
-              {entities.count} driver{entities.count > 1 ? 's' : ''} at HQ
+              {entities.count} {driverLabel} {t.simulation.hqWidget.atHQ}
             </p>
           </>
         ) : (
           <>
             <Car size={20} className="text-green-500" />
             <p className="flex-1 text-left">
-              {entities.count} vehicle{entities.count > 1 ? 's' : ''} at HQ
+              {entities.count} {vehicleLabel} {t.simulation.hqWidget.atHQ}
             </p>
           </>
         )}
@@ -88,7 +101,7 @@ export default function HQWidget() {
           {drivers.length === 0 ? (
             <p className="w-full h-full flex items-center justify-center text-muted-foreground text-sm">
               {/* <CircleDashed size={20} /> */}
-              No pending shifts
+              {t.simulation.hqWidget.noPendingShifts}
             </p>
           ) : (
             drivers.map((driver) => (

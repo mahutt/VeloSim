@@ -35,6 +35,7 @@ import {
 import { Label } from '~/components/ui/label';
 import { Input } from '~/components/ui/input';
 import { Loader2 } from 'lucide-react';
+import usePreferences from '~/hooks/use-preferences';
 
 interface SimulationNameDialogProps {
   open: boolean;
@@ -51,6 +52,7 @@ export default function SimulationNameDialog({
   onStartSimulation,
   startingSimulation,
 }: SimulationNameDialogProps) {
+  const { t } = usePreferences();
   const [name, setName] = useState(scenarioName);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -65,18 +67,20 @@ export default function SimulationNameDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Name your simulation</DialogTitle>
+          <DialogTitle>{t.scenario.dialog.simulationNameTitle}</DialogTitle>
           <DialogDescription>
-            Give this simulation a name to help you identify it later.
+            {t.scenario.dialog.simulationNameDescription}
           </DialogDescription>
         </DialogHeader>
         <div className="grid gap-4 py-4">
           <div className="grid gap-2">
-            <Label htmlFor="simulation-name">Simulation name</Label>
+            <Label htmlFor="simulation-name">
+              {t.scenario.dialog.simulationNameLabel}
+            </Label>
             <Input
               ref={inputRef}
               id="simulation-name"
-              placeholder="Enter simulation name"
+              placeholder={t.scenario.dialog.simulationNamePlaceholder}
               value={name}
               onChange={(e) => setName(e.target.value)}
               onFocus={(e) => e.currentTarget.select()}
@@ -89,7 +93,7 @@ export default function SimulationNameDialog({
         </div>
         <DialogFooter>
           <Button onClick={() => onOpenChange(false)} variant="outline">
-            Cancel
+            {t.common.cancel}
           </Button>
           <Button
             onClick={() => onStartSimulation(name)}
@@ -97,7 +101,7 @@ export default function SimulationNameDialog({
             data-testid="start-simulation-button"
           >
             {startingSimulation && <Loader2 className="animate-spin" />}
-            Start
+            {t.scenario.dialog.start}
           </Button>
         </DialogFooter>
       </DialogContent>

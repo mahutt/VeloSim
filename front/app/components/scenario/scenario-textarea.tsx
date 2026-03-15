@@ -30,6 +30,7 @@ import type { Dispatch, SetStateAction } from 'react';
 import CodeMirror from '@uiw/react-codemirror';
 import { json } from '@codemirror/lang-json';
 import { EditorView, placeholder } from '@codemirror/view';
+import usePreferences from '~/hooks/use-preferences';
 
 interface ScenarioTextAreaProps {
   scenarioData: string;
@@ -56,6 +57,7 @@ export default function ScenarioTextArea({
   isExistingScenario,
   onEdit,
 }: ScenarioTextAreaProps) {
+  const { t } = usePreferences();
   const isDisabled = isExistingScenario && !isEditMode;
 
   // Custom theme to fix line number gutter width
@@ -71,12 +73,14 @@ export default function ScenarioTextArea({
   return (
     <div className="flex-1 flex flex-col h-[40rem]">
       <Field data-disabled={isDisabled}>
-        <FieldLabel htmlFor="scenario-description">Description</FieldLabel>
+        <FieldLabel htmlFor="scenario-description">
+          {t.scenario.description}
+        </FieldLabel>
         <Textarea
           id="scenario-description"
           value={scenarioDescription}
           onChange={(e) => onDescriptionChange(e.target.value)}
-          placeholder="Enter scenario description"
+          placeholder={t.scenario.descriptionPlaceholder}
           className="h-20 resize-none font-mono"
           disabled={isDisabled}
         />
@@ -84,7 +88,9 @@ export default function ScenarioTextArea({
 
       <Field data-disabled={isDisabled} className="mt-4">
         <div className="flex items-center justify-between">
-          <FieldLabel htmlFor="scenario-json">Scenario JSON</FieldLabel>
+          <FieldLabel htmlFor="scenario-json">
+            {t.scenario.jsonLabel}
+          </FieldLabel>
           <ScenarioContentOptions
             scenarioContent={scenarioData}
             setScenarioContent={onChange}
@@ -101,7 +107,7 @@ export default function ScenarioTextArea({
               json(),
               EditorView.lineWrapping,
               fixedGutterTheme,
-              placeholder('Paste or type your JSON scenario here...'),
+              placeholder(t.scenario.jsonPlaceholder),
             ]}
             editable={!isDisabled}
             basicSetup={{
@@ -140,11 +146,11 @@ export default function ScenarioTextArea({
         <div className="flex flex-col gap-2 w-full sm:flex-row sm:w-auto">
           {isExistingScenario && !isEditMode ? (
             <Button onClick={onEdit} className="w-full sm:w-32">
-              Edit
+              {t.scenario.edit}
             </Button>
           ) : (
             <Button onClick={onSave} className="w-full sm:w-32">
-              Save
+              {t.common.save}
             </Button>
           )}
           <Button
@@ -152,11 +158,14 @@ export default function ScenarioTextArea({
             variant="outline"
             className="w-full sm:w-32"
           >
-            Export
+            {t.scenario.export}
           </Button>
         </div>
-        <Button onClick={onStart} className="w-full sm:w-32">
-          Start Simulation
+        <Button
+          onClick={onStart}
+          className="w-full sm:w-auto whitespace-nowrap"
+        >
+          {t.scenario.startSimulation}
         </Button>
       </div>
     </div>

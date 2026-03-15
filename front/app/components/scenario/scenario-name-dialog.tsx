@@ -34,6 +34,7 @@ import {
 import { Button } from '~/components/ui/button';
 import { Input } from '~/components/ui/input';
 import { Label } from '~/components/ui/label';
+import usePreferences from '~/hooks/use-preferences';
 
 interface ScenarioNameDialogProps {
   open: boolean;
@@ -48,6 +49,7 @@ export default function ScenarioNameDialog({
   currentName,
   onConfirm,
 }: ScenarioNameDialogProps) {
+  const { t } = usePreferences();
   const [name, setName] = useState(currentName);
 
   // Update name when dialog opens or current name changes
@@ -74,17 +76,21 @@ export default function ScenarioNameDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[500px]">
         <DialogHeader>
-          <DialogTitle>Scenario Name Required</DialogTitle>
+          <DialogTitle>
+            {t.scenario.dialog.scenarioNameRequiredTitle}
+          </DialogTitle>
           <DialogDescription>
-            Please enter a name for your scenario to continue.
+            {t.scenario.dialog.scenarioNameRequiredDescription}
           </DialogDescription>
         </DialogHeader>
         <div className="grid gap-4 py-4">
           <div className="grid gap-2">
-            <Label htmlFor="scenario-name">Scenario Name</Label>
+            <Label htmlFor="scenario-name">
+              {t.scenario.dialog.scenarioNameLabel}
+            </Label>
             <Input
               id="scenario-name"
-              placeholder="Enter scenario name"
+              placeholder={t.scenario.dialog.scenarioNamePlaceholder}
               value={name}
               onChange={(e) => setName(e.target.value)}
               onKeyDown={(e) => {
@@ -100,10 +106,10 @@ export default function ScenarioNameDialog({
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={handleCancel}>
-            Cancel
+            {t.common.cancel}
           </Button>
           <Button onClick={handleConfirm} disabled={!name.trim()}>
-            Continue
+            {t.scenario.dialog.continue}
           </Button>
         </DialogFooter>
       </DialogContent>

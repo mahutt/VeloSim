@@ -27,6 +27,7 @@ import { Button } from '~/components/ui/button';
 import { Trash2 } from 'lucide-react';
 import type { Scenario } from '~/types';
 import DeleteScenarioDialog from './delete-scenario-dialog';
+import usePreferences from '~/hooks/use-preferences';
 
 interface ScenarioSidebarProps {
   scenarios: Scenario[];
@@ -43,14 +44,20 @@ export default function ScenarioSidebar({
   onDelete,
   onDeleteDialogChange,
 }: ScenarioSidebarProps) {
+  const { t } = usePreferences();
+
   return (
     <div className="w-full lg:w-64">
       <div className="bg-gray-50 border rounded-md p-4 h-[41rem] flex flex-col">
-        <h2 className="text-lg font-semibold mb-3">Saved Scenarios</h2>
+        <h2 className="text-lg font-semibold mb-3">
+          {t.scenario.savedScenarios}
+        </h2>
 
         <div className="flex-1 overflow-y-auto space-y-2">
           {scenarios.length === 0 && (
-            <p className="text-gray-400 italic text-sm">No saved scenarios</p>
+            <p className="text-gray-400 italic text-sm">
+              {t.scenario.noSavedScenarios}
+            </p>
           )}
 
           {scenarios.map((scenario) => {
@@ -86,7 +93,7 @@ export default function ScenarioSidebar({
                           size="icon"
                           className="opacity-0 group-hover:opacity-100 transition-opacity shrink-0 hover:bg-destructive/10 h-8 w-8 -mt-1"
                           onClick={(e) => e.stopPropagation()}
-                          aria-label={`Delete ${scenario.name}`}
+                          aria-label={`${t.scenario.deleteAriaPrefix} ${scenario.name}`}
                         >
                           <Trash2 className="h-4 w-4 text-destructive" />
                         </Button>

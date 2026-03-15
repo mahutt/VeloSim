@@ -42,6 +42,7 @@ import {
 } from '~/components/ui/table';
 import { Button } from '../ui/button';
 import { useState } from 'react';
+import usePreferences from '~/hooks/use-preferences';
 
 interface DataTableProps<TData, TValue> {
   columns: ColumnDef<TData, TValue>[];
@@ -54,6 +55,7 @@ export function DataTable<TData, TValue>({
   data,
   getRowId,
 }: DataTableProps<TData, TValue>) {
+  const { t } = usePreferences();
   const [pagination, setPagination] = useState<PaginationState>({
     pageIndex: 0,
     pageSize: 10,
@@ -116,7 +118,7 @@ export function DataTable<TData, TValue>({
                   colSpan={columns.length}
                   className="h-24 text-center"
                 >
-                  No results.
+                  {t.simulations.noResults}
                 </TableCell>
               </TableRow>
             )}
@@ -130,7 +132,7 @@ export function DataTable<TData, TValue>({
           onClick={() => table.previousPage()}
           disabled={!table.getCanPreviousPage()}
         >
-          Previous
+          {t.simulations.previous}
         </Button>
         <Button
           variant="outline"
@@ -138,7 +140,7 @@ export function DataTable<TData, TValue>({
           onClick={() => table.nextPage()}
           disabled={!table.getCanNextPage()}
         >
-          Next
+          {t.simulations.next}
         </Button>
       </div>
     </div>

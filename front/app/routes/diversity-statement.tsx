@@ -28,12 +28,22 @@ import { Card, CardHeader, CardContent } from '~/components/ui/card';
 import { Badge } from '~/components/ui/badge';
 import { Separator } from '~/components/ui/separator';
 import { ArrowLeft } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import usePreferences from '~/hooks/use-preferences';
+import { UILanguage } from '~/types';
 
 export function meta() {
   return [{ title: 'Diversity Statement' }];
 }
 
 export default function DiversityStatement() {
+  const { language, t } = usePreferences();
+  const [activeLanguage, setActiveLanguage] = useState<UILanguage>(language);
+
+  useEffect(() => {
+    setActiveLanguage(language);
+  }, [language]);
+
   const configContent = {
     en: (
       <>
@@ -173,14 +183,14 @@ export default function DiversityStatement() {
             className="inline-flex items-center text-blue-800 hover:text-blue-600 hover:underline"
           >
             <ArrowLeft className="w-4 h-4 mr-1" />
-            Back to Home
+            {t.diversity.backToHome}
           </Link>
         </div>
       </div>
 
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-6 gap-4">
         <h1 className="text-3xl font-bold mb-2 sm:mb-0 break-words">
-          Diversity Statement
+          {t.diversity.pageTitle}
         </h1>
         <div className="flex flex-wrap gap-2">
           {configKeyPoints.map((point) => (
@@ -196,7 +206,11 @@ export default function DiversityStatement() {
 
       <Separator className="mb-6" />
 
-      <Tabs defaultValue="en" className="w-full">
+      <Tabs
+        value={activeLanguage}
+        onValueChange={(value) => setActiveLanguage(value as UILanguage)}
+        className="w-full"
+      >
         <TabsList className="overflow-x-auto">
           <TabsTrigger value="en">English</TabsTrigger>
           <TabsTrigger value="fr">Français</TabsTrigger>

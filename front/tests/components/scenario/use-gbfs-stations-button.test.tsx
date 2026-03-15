@@ -52,7 +52,27 @@ vi.mock('~/components/ui/dropdown-menu', async (importActual) => {
   };
 });
 
-vi.mock('axios');
+vi.mock('axios', () => {
+  const instance = {
+    get: vi.fn(),
+    patch: vi.fn(),
+    interceptors: {
+      request: {
+        use: vi.fn(),
+      },
+    },
+  };
+
+  const mockedAxios = {
+    get: vi.fn(),
+    create: vi.fn(() => instance),
+  };
+
+  return {
+    default: mockedAxios,
+    ...mockedAxios,
+  };
+});
 
 describe('UseGbfsStationsButton', () => {
   const mockSetScenarioContent = vi.fn();

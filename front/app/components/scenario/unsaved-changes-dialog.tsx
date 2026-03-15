@@ -31,6 +31,7 @@ import {
   DialogTitle,
 } from '~/components/ui/dialog';
 import { Button } from '~/components/ui/button';
+import usePreferences from '~/hooks/use-preferences';
 
 interface UnsavedChangesDialogProps {
   open: boolean;
@@ -45,22 +46,23 @@ export default function UnsavedChangesDialog({
   onCancel,
   onLeave,
 }: UnsavedChangesDialogProps) {
+  const { t } = usePreferences();
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Unsaved Changes</DialogTitle>
+          <DialogTitle>{t.scenario.dialog.unsavedChangesTitle}</DialogTitle>
           <DialogDescription>
-            You have unsaved changes. Are you sure you want to leave? Your
-            changes will be lost.
+            {t.scenario.dialog.unsavedChangesDescription}
           </DialogDescription>
         </DialogHeader>
         <DialogFooter>
           <Button variant="outline" onClick={onCancel}>
-            Cancel
+            {t.common.cancel}
           </Button>
           <Button variant="destructive" onClick={onLeave}>
-            Discard
+            {t.scenario.dialog.discard}
           </Button>
         </DialogFooter>
       </DialogContent>

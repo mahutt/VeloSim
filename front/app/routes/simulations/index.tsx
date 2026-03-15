@@ -23,13 +23,14 @@
  */
 
 import { Loader2 } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import api from '~/api';
 import Page from '~/components/page';
 import { useFeature } from '~/hooks/use-feature';
-import { columns } from '~/components/simulations/columns';
+import { getColumns } from '~/components/simulations/columns';
 import { DataTable } from '~/components/simulations/data-table';
 import useError from '~/hooks/use-error';
+import usePreferences from '~/hooks/use-preferences';
 import type { ListMySimulationsResponse, Simulation } from '~/types';
 
 export function meta() {
@@ -39,6 +40,8 @@ export function meta() {
 export default function Simulations() {
   const showSimulationsPage = useFeature('simulationsPage');
   const { displayError } = useError();
+  const { t } = usePreferences();
+  const columns = useMemo(() => getColumns(t), [t]);
   const [loading, setLoading] = useState(true);
   const [simulations, setSimulations] = useState<Simulation[]>([]);
 
@@ -76,10 +79,10 @@ export default function Simulations() {
     }
     if (failureOccurred) {
       displayError(
-        'Failure loading simulations',
+        t.simulations.error.loadTitle,
         simulations.length > 0
-          ? 'Some simulations may be missing from the list.'
-          : 'All simulations failed to load.',
+          ? t.simulations.error.loadPartial
+          : t.simulations.error.loadAll,
         simulations.length > 0 ? undefined : fetchAllSimulations
       );
     }
@@ -102,7 +105,7 @@ export default function Simulations() {
   return (
     <Page>
       <div className="flex flex-col gap-2">
-        <div className="text-xl">Simulations</div>
+        <div className="text-xl">{t.simulations.title}</div>
         <DataTable
           columns={columns}
           data={simulations}

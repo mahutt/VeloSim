@@ -23,22 +23,23 @@
  */
 
 import { type ColumnDef } from '@tanstack/react-table';
+import type { TranslationSchema } from '~/lib/i18n';
 import type { Simulation } from '~/types';
 import { PlaybackCell, ReportCell, ReportSummaryCell } from './report-cells';
 import ReportSummaryLegendTooltip from './report-summary-legend-tooltip';
 
-export const columns: ColumnDef<Simulation>[] = [
+export const getColumns = (t: TranslationSchema): ColumnDef<Simulation>[] => [
   {
     accessorKey: 'id',
-    header: 'ID',
+    header: t.simulations.column.id,
   },
   {
     accessorKey: 'name',
-    header: 'Name',
+    header: t.simulations.column.name,
   },
   {
     accessorKey: 'date_created',
-    header: 'Created',
+    header: t.simulations.column.created,
     cell: ({ row }) => {
       const date = new Date(row.original.date_created);
       return <span>{date.toLocaleDateString()}</span>;
@@ -48,7 +49,7 @@ export const columns: ColumnDef<Simulation>[] = [
     id: 'reportSummary',
     header: () => (
       <div className="flex items-center gap-1">
-        <span>Report summary</span>
+        <span>{t.simulations.column.reportSummary}</span>
         <ReportSummaryLegendTooltip />
       </div>
     ),
@@ -58,7 +59,7 @@ export const columns: ColumnDef<Simulation>[] = [
   },
   {
     id: 'playback',
-    header: 'Playback',
+    header: t.simulations.column.playback,
     cell: ({ row }) => {
       return (
         <PlaybackCell
@@ -70,7 +71,7 @@ export const columns: ColumnDef<Simulation>[] = [
   },
   {
     id: 'report',
-    header: 'Report',
+    header: t.simulations.column.report,
     cell: ({ row }) => {
       return (
         <ReportCell simId={row.original.uuid} simName={row.original.name} />

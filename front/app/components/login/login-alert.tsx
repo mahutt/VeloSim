@@ -25,6 +25,7 @@
 import { AlertCircleIcon } from 'lucide-react';
 
 import { Alert, AlertTitle } from '~/components/ui/alert';
+import usePreferences from '~/hooks/use-preferences';
 
 export enum LoginErrorMessage {
   InvalidCredentials = 'Invalid credentials',
@@ -33,13 +34,14 @@ export enum LoginErrorMessage {
 }
 
 export default function LoginAlert({ code }: { code: number }) {
-  let message: LoginErrorMessage;
+  const { t } = usePreferences();
+  let message: string;
   if (code >= 500) {
-    message = LoginErrorMessage.ServerError;
+    message = t.login.error.serverError;
   } else if (code === 400) {
-    message = LoginErrorMessage.InvalidCredentials;
+    message = t.login.error.invalidCredentials;
   } else {
-    message = LoginErrorMessage.UnknownError;
+    message = t.login.error.unknown;
   }
   return (
     <Alert variant="destructive">

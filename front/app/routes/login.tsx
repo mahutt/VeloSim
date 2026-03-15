@@ -36,24 +36,30 @@ import { Input } from '~/components/ui/input';
 import type { LoginForAccessTokenResponse } from '~/types';
 import axios from 'axios';
 import LoginAlert from '~/components/login/login-alert';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import useAuth from '~/hooks/use-auth';
+import usePreferences from '~/hooks/use-preferences';
 
 export function meta() {
   return [{ title: 'Login' }];
 }
 
-const loginFormSchema = z.object({
-  username: z
-    .string()
-    .min(1, 'Username must be at least 1 character.')
-    .max(100, 'Username must be at most 100 characters.'),
-  password: z.string().min(1, 'Password must be at least 1 character.'),
-});
-
 export default function Signin() {
   const { refreshUser, setToken } = useAuth();
+  const { t } = usePreferences();
   const [responseCode, setResponseCode] = useState<number | null>(null);
+
+  const loginFormSchema = useMemo(
+    () =>
+      z.object({
+        username: z
+          .string()
+          .min(1, t.login.validation.usernameMin)
+          .max(100, t.login.validation.usernameMax),
+        password: z.string().min(1, t.login.validation.passwordMin),
+      }),
+    [t]
+  );
 
   const loginForm = useForm<z.infer<typeof loginFormSchema>>({
     resolver: zodResolver(loginFormSchema),
@@ -99,13 +105,13 @@ export default function Signin() {
               render={({ field, fieldState }) => (
                 <Field data-invalid={fieldState.invalid}>
                   <FieldLabel htmlFor="form-login-username">
-                    Username
+                    {t.login.username}
                   </FieldLabel>
                   <Input
                     {...field}
                     id="form-login-username"
                     aria-invalid={fieldState.invalid}
-                    placeholder="Username"
+                    placeholder={t.login.usernamePlaceholder}
                     autoComplete="off"
                   />
                   {fieldState.invalid && (
@@ -120,13 +126,13 @@ export default function Signin() {
               render={({ field, fieldState }) => (
                 <Field data-invalid={fieldState.invalid}>
                   <FieldLabel htmlFor="form-login-password">
-                    Password
+                    {t.login.password}
                   </FieldLabel>
                   <Input
                     {...field}
                     id="form-login-password"
                     aria-invalid={fieldState.invalid}
-                    placeholder="Password"
+                    placeholder={t.login.passwordPlaceholder}
                     autoComplete="off"
                     type="password"
                   />
@@ -138,7 +144,7 @@ export default function Signin() {
             />
             <Field orientation="horizontal">
               <Button type="submit" form="form-login" className="w-full">
-                Log in
+                {t.login.submit}
               </Button>
             </Field>
           </FieldGroup>

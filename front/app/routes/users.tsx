@@ -23,11 +23,12 @@
  */
 
 import { Loader2 } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import api from '~/api';
 import Page from '~/components/page';
-import { columns } from '~/components/users/columns';
+import { getColumns } from '~/components/users/columns';
 import { DataTable } from '~/components/users/data-table';
+import usePreferences from '~/hooks/use-preferences';
 import type { GetUsersResponse, User } from '~/types';
 
 export function meta() {
@@ -63,6 +64,8 @@ async function fetchAllUsers(): Promise<User[]> {
 }
 
 export default function Users() {
+  const { t } = usePreferences();
+  const columns = useMemo(() => getColumns(t), [t]);
   const [loading, setLoading] = useState(true);
   const [users, setUsers] = useState<User[]>([]);
 
@@ -84,7 +87,7 @@ export default function Users() {
   return (
     <Page>
       <div className="flex flex-col gap-2">
-        <div className="text-xl">Users</div>
+        <div className="text-xl">{t.users.title}</div>
         <DataTable
           columns={columns}
           data={users}

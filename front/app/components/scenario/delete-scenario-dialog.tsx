@@ -35,6 +35,7 @@ import {
 import { Button } from '~/components/ui/button';
 import { Trash2 } from 'lucide-react';
 import type { ReactNode } from 'react';
+import usePreferences from '~/hooks/use-preferences';
 
 interface DeleteScenarioDialogProps {
   scenarioName: string;
@@ -49,6 +50,8 @@ export default function DeleteScenarioDialog({
   trigger,
   onOpenChange,
 }: DeleteScenarioDialogProps) {
+  const { t } = usePreferences();
+
   return (
     <Dialog onOpenChange={onOpenChange}>
       <DialogTrigger asChild>
@@ -57,7 +60,7 @@ export default function DeleteScenarioDialog({
             variant="ghost"
             size="icon"
             className="opacity-0 group-hover:opacity-100 transition-opacity shrink-0 hover:bg-destructive/10 h-8 w-8"
-            aria-label={`Delete ${scenarioName}`}
+            aria-label={`${t.scenario.deleteAriaPrefix} ${scenarioName}`}
           >
             <Trash2 className="h-4 w-4 text-destructive" />
           </Button>
@@ -65,21 +68,21 @@ export default function DeleteScenarioDialog({
       </DialogTrigger>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Delete Scenario</DialogTitle>
+          <DialogTitle>{t.scenario.dialog.deleteTitle}</DialogTitle>
           <DialogDescription>
-            Are you sure you want to delete &quot;{scenarioName}&quot;? This
-            action cannot be undone.
+            {t.scenario.dialog.deleteDescriptionPrefix} &quot;{scenarioName}
+            &quot;? {t.scenario.dialog.deleteDescriptionSuffix}
           </DialogDescription>
         </DialogHeader>
         <DialogFooter>
           <DialogClose asChild>
             <Button variant="outline" type="button">
-              Cancel
+              {t.common.cancel}
             </Button>
           </DialogClose>
           <DialogClose asChild>
             <Button variant="destructive" onClick={onConfirm}>
-              Delete
+              {t.scenario.dialog.delete}
             </Button>
           </DialogClose>
         </DialogFooter>

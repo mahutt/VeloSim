@@ -23,6 +23,7 @@
  */
 
 import api from '~/api';
+import type { TranslationSchema } from '~/lib/i18n';
 import type { GetSimulationReportResponse } from '~/types';
 
 /**
@@ -56,7 +57,24 @@ export const SIMULATION_REPORT_METRIC_KEYS: Array<
 ];
 
 /**
- * Human-readable labels matching `SIMULATION_REPORT_METRIC_KEYS` by index.
+ * Translation selectors matching `SIMULATION_REPORT_METRIC_KEYS` by index.
+ *
+ * This keeps i18n access fully typed/direct while still
+ * allowing indexed iteration over metric metadata.
+ */
+export const SIMULATION_REPORT_SUMMARY_LEGEND_SELECTORS = [
+  (t: TranslationSchema) => t.simulations.report.legend.serviceToDrivingRatio,
+  (t: TranslationSchema) => t.simulations.report.legend.vehicleUtilizationRatio,
+  (t: TranslationSchema) =>
+    t.simulations.report.legend.averageTasksServicedPerShift,
+  (t: TranslationSchema) => t.simulations.report.legend.averageTaskResponseTime,
+  (t: TranslationSchema) =>
+    t.simulations.report.legend.totalVehicleDistanceTravelled,
+] as const;
+
+/**
+ * Backward-compatible static labels used by tests and CSV-adjacent UI assertions.
+ * UI rendering should prefer `SIMULATION_REPORT_SUMMARY_LEGEND_SELECTORS` with i18n.
  */
 export const SIMULATION_REPORT_SUMMARY_LEGEND = [
   'Service to Driving Ratio',

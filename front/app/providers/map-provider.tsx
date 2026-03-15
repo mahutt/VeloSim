@@ -39,6 +39,7 @@ import {
   loadMapImages,
   setMapLayers,
 } from '~/lib/map-helpers';
+import usePreferences from '~/hooks/use-preferences';
 import type { Position } from '~/types';
 import { logSimulationError } from '~/utils/simulation-error-utils';
 
@@ -55,18 +56,21 @@ const MapContext = createContext<MapContextType | undefined>(undefined);
 
 export const MapProvider = ({ children }: { children: ReactNode }) => {
   const { displayError } = useError();
+  const { t } = usePreferences();
   const mapRef = useRef<mapboxgl.Map | null>(null);
   const mapContainerRef = useRef<HTMLDivElement | null>(null);
   const [mapLoaded, setMapLoaded] = useState(false);
 
   useEffect(() => {
     if (!mapContainerRef.current) return;
+
     mapboxgl.accessToken = import.meta.env.VITE_MAPBOX_ACCESS_TOKEN;
     mapRef.current = new mapboxgl.Map({
       container: mapContainerRef.current,
       center: INITIAL_CENTER,
       zoom: INITIAL_ZOOM,
       style: 'mapbox://styles/mahutt/cmfzpcwen001q01sd8d645h3b',
+      language: 'fr',
     });
 
     mapRef.current.on('load', () => {
@@ -86,13 +90,9 @@ export const MapProvider = ({ children }: { children: ReactNode }) => {
         sourceId,
         originalError: event.error,
       });
-      displayError(
-        'Failed to load map',
-        'An error occurred while loading the map. Please try again later.',
-        () => {
-          window.location.reload();
-        }
-      );
+      displayError(t.map.error.loadTitle, t.map.error.loadDescription, () => {
+        window.location.reload();
+      });
     });
 
     // Force the map to resize when the container size changes

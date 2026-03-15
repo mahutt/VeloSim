@@ -22,7 +22,12 @@
  * SOFTWARE.
  */
 
-import { EllipsisVertical, KeyRound, LogOut } from 'lucide-react';
+import {
+  EllipsisVertical,
+  KeyRound,
+  LogOut,
+  SlidersHorizontal,
+} from 'lucide-react';
 
 import { default as AvatarOld } from '~/components/sidebar/avatar';
 import {
@@ -38,12 +43,16 @@ import {
   SidebarMenuItem,
 } from '~/components/ui/sidebar';
 import useAuth from '~/hooks/use-auth';
+import usePreferences from '~/hooks/use-preferences';
+import PreferencesDialog from '../preferences-dialog';
 import ResetPasswordDialog from '../reset-password-dialog';
 import { useState } from 'react';
 
 export function NavUser() {
   const { user, logout } = useAuth();
+  const { t } = usePreferences();
   const [showResetPasswordDialog, setShowResetPasswordDialog] = useState(false);
+  const [showPreferencesDialog, setShowPreferencesDialog] = useState(false);
 
   if (!user) return null;
 
@@ -61,7 +70,7 @@ export function NavUser() {
                 <div className="grid flex-1 text-left text-sm leading-tight">
                   <span className="truncate font-medium">{user.username}</span>
                   <span className="text-muted-foreground truncate text-xs">
-                    {user.is_admin ? 'Admin' : 'User'}
+                    {user.is_admin ? t.user.role.admin : t.user.role.user}
                   </span>
                 </div>
                 <EllipsisVertical className="ml-auto size-4" />
@@ -73,21 +82,29 @@ export function NavUser() {
               align="end"
               sideOffset={4}
             >
+              <DropdownMenuItem onClick={() => setShowPreferencesDialog(true)}>
+                <SlidersHorizontal />
+                {t.user.menu.preferences}
+              </DropdownMenuItem>
               <DropdownMenuItem
                 onClick={() => setShowResetPasswordDialog(true)}
               >
                 <KeyRound />
-                Change password
+                {t.user.menu.changePassword}
               </DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem onClick={logout}>
                 <LogOut />
-                Log out
+                {t.user.menu.logout}
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
         </SidebarMenuItem>
       </SidebarMenu>
+      <PreferencesDialog
+        open={showPreferencesDialog}
+        onOpenChange={setShowPreferencesDialog}
+      />
       <ResetPasswordDialog
         open={showResetPasswordDialog}
         onOpenChange={setShowResetPasswordDialog}

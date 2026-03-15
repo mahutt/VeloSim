@@ -40,19 +40,26 @@ import { Controller, useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import api from '~/api';
 import { Field, FieldError, FieldGroup, FieldLabel } from './ui/field';
-import { useRef, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { Alert, AlertTitle } from './ui/alert';
 import { AlertCircleIcon, CheckCircle2Icon, Loader2 } from 'lucide-react';
+import usePreferences from '~/hooks/use-preferences';
+import type { TranslationSchema } from '~/lib/i18n';
 
-const updatePasswordFormSchema = z
-  .object({
-    password: z.string().min(1, 'Password must be at least 1 character.'),
-    confirm: z.string(),
-  })
-  .refine((data) => data.password === data.confirm, {
-    message: "Passwords don't match",
-    path: ['confirm'],
-  });
+const createUpdatePasswordFormSchema = (t: TranslationSchema) =>
+  z
+    .object({
+      password: z.string().min(1, t.resetPassword.validation.passwordMin),
+      confirm: z.string(),
+    })
+    .refine((data) => data.password === data.confirm, {
+      message: t.resetPassword.validation.passwordsDontMatch,
+      path: ['confirm'],
+    });
+
+type UpdatePasswordFormData = z.infer<
+  ReturnType<typeof createUpdatePasswordFormSchema>
+>;
 
 export default function ResetPasswordDialog({
   open,
@@ -64,6 +71,7 @@ export default function ResetPasswordDialog({
   targetUser: User;
 }) {
   const { user } = useAuth();
+  const { t } = usePreferences();
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState<UpdatePasswordFormMessage | null>(
     null
@@ -72,14 +80,19 @@ export default function ResetPasswordDialog({
 
   const title =
     user?.id === targetUser.id
-      ? 'Update your password'
-      : `Update password for ${targetUser.username}`;
+      ? t.resetPassword.title.self
+      : `${t.resetPassword.title.other} ${targetUser.username}`;
+
+  const updatePasswordFormSchema = useMemo(
+    () => createUpdatePasswordFormSchema(t),
+    [t]
+  );
 
   const formId = `form-update-password-${targetUser.id}`;
   const passwordFieldId = `${formId}-password`;
   const confirmFieldId = `${formId}-confirm`;
 
-  const updatePasswordForm = useForm<z.infer<typeof updatePasswordFormSchema>>({
+  const updatePasswordForm = useForm<UpdatePasswordFormData>({
     resolver: zodResolver(updatePasswordFormSchema),
     defaultValues: {
       password: '',
@@ -87,14 +100,14 @@ export default function ResetPasswordDialog({
     },
   });
 
-  async function onSubmit(data: z.infer<typeof updatePasswordFormSchema>) {
+  async function onSubmit(data: UpdatePasswordFormData) {
     setMessage(null);
     setLoading(true);
     try {
       await api.put<User>(`/users/${targetUser.id}/password`, {
         password: data.password,
       });
-      setMessage(UpdatePasswordFormMessage.Success);
+      setMessage('success');
       updatePasswordForm.reset();
       closeDialogTimeoutRef.current = setTimeout(() => {
         onOpenChange(false);
@@ -102,7 +115,7 @@ export default function ResetPasswordDialog({
       }, 2000);
     } catch (e) {
       console.error('Reset password error', e);
-      setMessage(UpdatePasswordFormMessage.Error);
+      setMessage('error');
     } finally {
       setLoading(false);
     }
@@ -131,8 +144,7 @@ export default function ResetPasswordDialog({
           <DialogHeader>
             <DialogTitle>{title}</DialogTitle>
             <DialogDescription>
-              Enter the same (new) password twice. Click update when you&apos;re
-              done.
+              {t.resetPassword.description}
               <br />
             </DialogDescription>
           </DialogHeader>
@@ -143,12 +155,14 @@ export default function ResetPasswordDialog({
               control={updatePasswordForm.control}
               render={({ field, fieldState }) => (
                 <Field data-invalid={fieldState.invalid}>
-                  <FieldLabel htmlFor={passwordFieldId}>Password</FieldLabel>
+                  <FieldLabel htmlFor={passwordFieldId}>
+                    {t.resetPassword.password}
+                  </FieldLabel>
                   <Input
                     {...field}
                     id={passwordFieldId}
                     aria-invalid={fieldState.invalid}
-                    placeholder="New password"
+                    placeholder={t.resetPassword.newPasswordPlaceholder}
                     autoComplete="off"
                     type="password"
                     disabled={loading}
@@ -165,13 +179,13 @@ export default function ResetPasswordDialog({
               render={({ field, fieldState }) => (
                 <Field data-invalid={fieldState.invalid}>
                   <FieldLabel htmlFor={confirmFieldId}>
-                    Confirm password
+                    {t.resetPassword.confirmPassword}
                   </FieldLabel>
                   <Input
                     {...field}
                     id={confirmFieldId}
                     aria-invalid={fieldState.invalid}
-                    placeholder="Confirm new password"
+                    placeholder={t.resetPassword.confirmPasswordPlaceholder}
                     autoComplete="off"
                     type="password"
                     disabled={loading}
@@ -186,11 +200,11 @@ export default function ResetPasswordDialog({
           <DialogFooter>
             <DialogClose asChild>
               <Button variant="outline" disabled={loading}>
-                Cancel
+                {t.common.cancel}
               </Button>
             </DialogClose>
             <Button type="submit" form={formId} disabled={loading}>
-              Update
+              {t.common.update}
               {loading && <Loader2 className="ml-2 h-4 w-4 animate-spin" />}
             </Button>
           </DialogFooter>
@@ -200,21 +214,21 @@ export default function ResetPasswordDialog({
   );
 }
 
-enum UpdatePasswordFormMessage {
-  Success = 'Password updated successfully',
-  Error = 'Something went wrong',
-}
+type UpdatePasswordFormMessage = 'success' | 'error';
 
 function UpdatePasswordFormAlert({
   message,
 }: {
   message: UpdatePasswordFormMessage;
 }) {
-  const success = message === UpdatePasswordFormMessage.Success;
+  const { t } = usePreferences();
+  const success = message === 'success';
   return (
     <Alert variant={success ? 'default' : 'destructive'}>
       {success ? <CheckCircle2Icon /> : <AlertCircleIcon />}
-      <AlertTitle>{message}</AlertTitle>
+      <AlertTitle>
+        {success ? t.resetPassword.success : t.resetPassword.error}
+      </AlertTitle>
     </Alert>
   );
 }
