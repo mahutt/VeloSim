@@ -9,8 +9,11 @@ set -euo pipefail
 
 APP_DIR="{{ app_dir }}"
 COMPOSE_FILE="{{ app_dir }}/docker-compose.prod.yml"
+COMPOSE_PROJECT="{{ app_name }}"
 ENV_FILE="{{ app_dir }}/.env.prod"
 MODE="${1:-full}"
+BACKUP_DIR="{{ app_dir }}/backups/postgresql"
+ALLOW_EMPTY_DATABASE_DEPLOY="{{ (allow_empty_database_deploy | default(false)) | string | lower }}"
 
 echo "=== VeloSim Database Migration ==="
 echo "Working directory: $APP_DIR"
@@ -26,19 +29,19 @@ find "$APP_DIR/source" -name ".DS_Store" -type f -delete 2>/dev/null || true
 
 # Ensure PostgreSQL is running (does not stop existing containers)
 echo "Ensuring PostgreSQL container is running..."
-docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" up -d postgres
+docker compose --project-name "$COMPOSE_PROJECT" -f "$COMPOSE_FILE" --env-file "$ENV_FILE" up -d postgres
 
 # Check if containers are running
-if ! docker compose -f "$COMPOSE_FILE" ps postgres | grep -q "Up"; then
+if ! docker compose --project-name "$COMPOSE_PROJECT" -f "$COMPOSE_FILE" ps postgres | grep -q "Up"; then
     echo "ERROR: PostgreSQL container failed to start!"
-    docker compose -f "$COMPOSE_FILE" logs postgres
+    docker compose --project-name "$COMPOSE_PROJECT" -f "$COMPOSE_FILE" logs postgres
     exit 1
 fi
 
 # Wait for PostgreSQL to be ready
 echo "Waiting for PostgreSQL to be ready..."
 for i in {1..30}; do
-    if docker compose -f "$COMPOSE_FILE" exec -T postgres pg_isready -U {{ postgres_user }} -d {{ postgres_db }} >/dev/null 2>&1; then
+    if docker compose --project-name "$COMPOSE_PROJECT" -f "$COMPOSE_FILE" exec -T postgres pg_isready -U {{ postgres_user }} -d {{ postgres_db }} >/dev/null 2>&1; then
         echo "PostgreSQL is ready!"
         break
     fi
@@ -62,16 +65,45 @@ if [ "$MODE" = "prepare" ]; then
 fi
 
 # Check if this is the first deployment (database is empty)
-TABLES_COUNT=$(docker compose -f "$COMPOSE_FILE" exec -T postgres psql -U {{ postgres_user }} -d {{ postgres_db }} -t -c "SELECT count(*) FROM information_schema.tables WHERE table_schema = 'public';" 2>/dev/null | xargs || echo "0")
+if ! TABLES_COUNT=$(docker compose --project-name "$COMPOSE_PROJECT" -f "$COMPOSE_FILE" exec -T postgres psql -U {{ postgres_user }} -d {{ postgres_db }} -t -c "SELECT count(*) FROM information_schema.tables WHERE table_schema = 'public';" | xargs); then
+    echo "ERROR: Could not determine database state (table count query failed)."
+    exit 1
+fi
+
+if ! [[ "$TABLES_COUNT" =~ ^[0-9]+$ ]]; then
+    echo "ERROR: Unexpected table count value: '$TABLES_COUNT'"
+    exit 1
+fi
 
 echo "Found $TABLES_COUNT tables in database"
+
+if [ "$TABLES_COUNT" = "0" ] && [ "$ALLOW_EMPTY_DATABASE_DEPLOY" != "true" ]; then
+    echo "ERROR: Database has 0 tables. Aborting to prevent accidental first-deploy initialization on an empty volume."
+    echo "If this is intentional, re-run with: -e allow_empty_database_deploy=true"
+    exit 1
+fi
+
+# Always create a backup on every code deployment, even when Alembic has no schema changes.
+TIMESTAMP=$(date +%Y%m%d_%H%M%S)
+BACKUP_FILE="velosim_predeploy_${TIMESTAMP}.sql"
+
+echo "Creating pre-deployment database backup..."
+mkdir -p "$BACKUP_DIR"
+
+if docker compose --project-name "$COMPOSE_PROJECT" -f "$COMPOSE_FILE" exec -T postgres pg_dump -U {{ postgres_user }} -d {{ postgres_db }} > "${BACKUP_DIR}/${BACKUP_FILE}"; then
+    gzip "${BACKUP_DIR}/${BACKUP_FILE}"
+    echo "✓ Pre-deployment backup created: ${BACKUP_FILE}.gz"
+else
+    echo "✗ Failed to create pre-deployment backup. Aborting deployment to protect data."
+    exit 1
+fi
 
 if [ "$TABLES_COUNT" = "0" ]; then
     echo "=== FIRST DEPLOYMENT: Creating database schema with Alembic ==="
 
     # Start backend container for Alembic operations
     echo "Starting backend container for database operations..."
-    docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" up -d backend
+    docker compose --project-name "$COMPOSE_PROJECT" -f "$COMPOSE_FILE" --env-file "$ENV_FILE" up -d backend
 
     # Wait for backend to be ready
     echo "Waiting for backend container to be ready..."
@@ -79,31 +111,31 @@ if [ "$TABLES_COUNT" = "0" ]; then
 
     # Run basic database setup (extensions only)
     echo "Setting up database extensions..."
-    docker compose -f "$COMPOSE_FILE" exec -T postgres psql -U {{ postgres_user }} -d {{ postgres_db }} -f /docker-entrypoint-initdb.d/init.sql >/dev/null 2>&1 || echo "Extensions setup completed"
+    docker compose --project-name "$COMPOSE_PROJECT" -f "$COMPOSE_FILE" exec -T postgres psql -U {{ postgres_user }} -d {{ postgres_db }} -f /docker-entrypoint-initdb.d/init.sql >/dev/null 2>&1 || echo "Extensions setup completed"
 
     # Clean up any remaining resource fork files inside container
     echo "Cleaning resource fork files in backend container..."
-    docker compose -f "$COMPOSE_FILE" exec -T backend sh -c "find /app -name '._*' -delete 2>/dev/null || true"
+    docker compose --project-name "$COMPOSE_PROJECT" -f "$COMPOSE_FILE" exec -T backend sh -c "find /app -name '._*' -delete 2>/dev/null || true"
 
     # Verify Alembic environment
     echo "Verifying Alembic configuration..."
-    docker compose -f "$COMPOSE_FILE" exec -T backend sh -c "cd /app/back && ls -la alembic.ini alembic/" || echo "Alembic files check completed"
+    docker compose --project-name "$COMPOSE_PROJECT" -f "$COMPOSE_FILE" exec -T backend sh -c "cd /app/back && ls -la alembic.ini alembic/" || echo "Alembic files check completed"
 
     # Create all tables using Alembic upgrade
     echo "Creating database schema using Alembic upgrade head..."
-    if docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" exec -T backend sh -c "cd /app/back && alembic upgrade head"; then
+    if docker compose --project-name "$COMPOSE_PROJECT" -f "$COMPOSE_FILE" --env-file "$ENV_FILE" exec -T backend sh -c "cd /app/back && alembic upgrade head"; then
         echo "✓ Database schema created successfully with Alembic"
     else
         echo "✗ Alembic upgrade failed, trying alternative approach..."
         # Fallback: at least create the basic structure
-        docker compose -f "$COMPOSE_FILE" logs --tail 20 backend
+        docker compose --project-name "$COMPOSE_PROJECT" -f "$COMPOSE_FILE" logs --tail 20 backend
         exit 1
     fi
 
     # Seed database if seeding script exists
     if [ -f "$APP_DIR/source/back/alembic/seeds/seed.sql" ]; then
         echo "Seeding database with initial data..."
-        if docker compose -f "$COMPOSE_FILE" exec -T postgres psql -U {{ postgres_user }} -d {{ postgres_db }} -f /docker-entrypoint-initdb.d/seed.sql >/dev/null 2>&1; then
+        if docker compose --project-name "$COMPOSE_PROJECT" -f "$COMPOSE_FILE" exec -T postgres psql -U {{ postgres_user }} -d {{ postgres_db }} -f /docker-entrypoint-initdb.d/seed.sql >/dev/null 2>&1; then
             echo "✓ Database seeded successfully"
         else
             echo "⚠️ Database seeding failed, but continuing (may be expected if tables don't match seed file)"
@@ -117,7 +149,7 @@ else
 
     # Start backend container for Alembic operations
     echo "Starting backend container for migration operations..."
-    docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" up -d backend
+    docker compose --project-name "$COMPOSE_PROJECT" -f "$COMPOSE_FILE" --env-file "$ENV_FILE" up -d backend
 
     # Wait for backend to be ready
     echo "Waiting for backend container to be ready..."
@@ -125,16 +157,17 @@ else
 
     # Clean up any resource fork files
     echo "Cleaning resource fork files in backend container..."
-    docker compose -f "$COMPOSE_FILE" exec -T backend sh -c "find /app -name '._*' -delete 2>/dev/null || true"
+    docker compose --project-name "$COMPOSE_PROJECT" -f "$COMPOSE_FILE" exec -T backend sh -c "find /app -name '._*' -delete 2>/dev/null || true"
 
     # Run Alembic migrations for schema updates
     echo "Running Alembic migrations..."
-    if docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" exec -T backend sh -c "cd /app/back && alembic upgrade head"; then
+    if docker compose --project-name "$COMPOSE_PROJECT" -f "$COMPOSE_FILE" --env-file "$ENV_FILE" exec -T backend sh -c "cd /app/back && alembic upgrade head"; then
         echo "✓ Database migrations completed successfully"
     else
-        echo "⚠️ Alembic migrations failed, but continuing deployment"
+        echo "✗ Alembic migrations failed. Aborting deployment."
         echo "Backend container logs:"
-        docker compose -f "$COMPOSE_FILE" logs --tail 20 backend
+        docker compose --project-name "$COMPOSE_PROJECT" -f "$COMPOSE_FILE" logs --tail 20 backend
+        exit 1
     fi
 fi
 

@@ -6,6 +6,7 @@ set -e
 
 APP_DIR="{{ app_dir }}"
 COMPOSE_FILE="$APP_DIR/docker-compose.prod.yml"
+COMPOSE_PROJECT="{{ app_name }}"
 
 cd "$APP_DIR"
 
@@ -13,24 +14,24 @@ case "$1" in
     start)
         echo "Starting VeloSim application..."
         echo "Pulling latest images..."
-        docker compose -f "$COMPOSE_FILE" pull
+        docker compose --project-name "$COMPOSE_PROJECT" -f "$COMPOSE_FILE" pull
         echo "Building application containers..."
         # Force rebuild frontend to pick up environment changes
-        docker compose -f "$COMPOSE_FILE" build --no-cache frontend
-        docker compose -f "$COMPOSE_FILE" build backend
+        docker compose --project-name "$COMPOSE_PROJECT" -f "$COMPOSE_FILE" build --no-cache frontend
+        docker compose --project-name "$COMPOSE_PROJECT" -f "$COMPOSE_FILE" build backend
 
         echo "Starting all services (will recreate changed containers)..."
-        docker compose -f "$COMPOSE_FILE" up -d --remove-orphans
+        docker compose --project-name "$COMPOSE_PROJECT" -f "$COMPOSE_FILE" up -d --remove-orphans
 
         echo "Waiting for PostgreSQL to be healthy..."
         for i in $(seq 1 60); do
-            if docker compose -f "$COMPOSE_FILE" ps postgres | grep -q "healthy"; then
+            if docker compose --project-name "$COMPOSE_PROJECT" -f "$COMPOSE_FILE" ps postgres | grep -q "healthy"; then
                 echo "PostgreSQL is healthy!"
                 break
             fi
             if [ $i -eq 60 ]; then
                 echo "ERROR: PostgreSQL failed to become healthy"
-                docker compose -f "$COMPOSE_FILE" logs postgres
+                docker compose --project-name "$COMPOSE_PROJECT" -f "$COMPOSE_FILE" logs postgres
                 exit 1
             fi
             echo "Waiting for PostgreSQL... ($i/60)"
@@ -39,18 +40,18 @@ case "$1" in
 
         echo "Waiting for backend to be healthy..."
         for i in $(seq 1 90); do
-            if docker compose -f "$COMPOSE_FILE" ps backend | grep -q "healthy"; then
+            if docker compose --project-name "$COMPOSE_PROJECT" -f "$COMPOSE_FILE" ps backend | grep -q "healthy"; then
                 echo "Backend is healthy!"
                 break
             fi
-            if docker compose -f "$COMPOSE_FILE" ps backend | grep -q "unhealthy"; then
+            if docker compose --project-name "$COMPOSE_PROJECT" -f "$COMPOSE_FILE" ps backend | grep -q "unhealthy"; then
                 echo "ERROR: Backend is unhealthy"
-                docker compose -f "$COMPOSE_FILE" logs backend
+                docker compose --project-name "$COMPOSE_PROJECT" -f "$COMPOSE_FILE" logs backend
                 exit 1
             fi
             if [ $i -eq 90 ]; then
                 echo "ERROR: Backend failed to become healthy within 3 minutes"
-                docker compose -f "$COMPOSE_FILE" logs backend
+                docker compose --project-name "$COMPOSE_PROJECT" -f "$COMPOSE_FILE" logs backend
                 exit 1
             fi
             echo "Waiting for backend... ($i/90)"
@@ -61,27 +62,27 @@ case "$1" in
         sleep 10
         echo ""
         echo "=== Container Status ==="
-        docker compose -f "$COMPOSE_FILE" ps
+        docker compose --project-name "$COMPOSE_PROJECT" -f "$COMPOSE_FILE" ps
         ;;
     stop)
         echo "Stopping VeloSim application..."
-        docker compose -f "$COMPOSE_FILE" down
+        docker compose --project-name "$COMPOSE_PROJECT" -f "$COMPOSE_FILE" down
         ;;
     restart)
         echo "Restarting VeloSim application..."
-        docker compose -f "$COMPOSE_FILE" restart
+        docker compose --project-name "$COMPOSE_PROJECT" -f "$COMPOSE_FILE" restart
         ;;
     status)
         echo "VeloSim application status:"
-        docker compose -f "$COMPOSE_FILE" ps
+        docker compose --project-name "$COMPOSE_PROJECT" -f "$COMPOSE_FILE" ps
         ;;
     logs)
         if [ -n "$2" ]; then
             echo "Following logs for $2..."
-            docker compose -f "$COMPOSE_FILE" logs -f "$2"
+            docker compose --project-name "$COMPOSE_PROJECT" -f "$COMPOSE_FILE" logs -f "$2"
         else
             echo "Following all application logs..."
-            docker compose -f "$COMPOSE_FILE" logs -f
+            docker compose --project-name "$COMPOSE_PROJECT" -f "$COMPOSE_FILE" logs -f
         fi
         ;;
     errors)
@@ -108,7 +109,7 @@ case "$1" in
         echo "=== VeloSim Debug Information ==="
         echo ""
         echo "Container Status:"
-        docker compose -f "$COMPOSE_FILE" ps
+        docker compose --project-name "$COMPOSE_PROJECT" -f "$COMPOSE_FILE" ps
         echo ""
         echo "Port Status:"
         netstat -tlnp | grep -E ':(3000|8000|5432|5001)' || echo "No application ports listening"
@@ -152,8 +153,8 @@ case "$1" in
     update)
         echo "Updating VeloSim application..."
         echo "Note: Code deployment is managed by Ansible"
-        docker compose -f "$COMPOSE_FILE" build --no-cache
-        docker compose -f "$COMPOSE_FILE" up -d
+        docker compose --project-name "$COMPOSE_PROJECT" -f "$COMPOSE_FILE" build --no-cache
+        docker compose --project-name "$COMPOSE_PROJECT" -f "$COMPOSE_FILE" up -d
         ;;
     backup)
         echo "Creating application backup..."

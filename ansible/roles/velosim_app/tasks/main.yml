@@ -258,13 +258,36 @@
     mode: '0755'
 
 - name: Ensure PostgreSQL container is running
-  ansible.builtin.command: docker compose -f "{{ app_dir }}/docker-compose.prod.yml" up -d postgres
+  ansible.builtin.command: docker compose --project-name "{{ app_name }}" -f "{{ app_dir }}/docker-compose.prod.yml" up -d postgres
   become_user: "{{ app_user }}"
   args:
     chdir: "{{ app_dir }}"
 
+- name: Get PostgreSQL data volume name
+  ansible.builtin.command: >-
+    docker inspect velosim-postgres
+    --format "{{ '{{' }} range .Mounts {{ '}}' }}{{ '{{' }} if eq .Destination \"/var/lib/postgresql/data\" {{ '}}' }}{{ '{{' }} .Name {{ '}}' }}{{ '{{' }} end {{ '}}' }}{{ '{{' }} end {{ '}}' }}"
+  become_user: "{{ app_user }}"
+  register: postgres_data_volume
+  changed_when: false
+
+- name: Display PostgreSQL data volume
+  ansible.builtin.debug:
+    msg: "PostgreSQL data volume: {{ postgres_data_volume.stdout | trim }}"
+
+- name: Ensure PostgreSQL is using expected persistent volume
+  ansible.builtin.assert:
+    that:
+      - postgres_data_volume.stdout | trim == app_name + '_postgres_data'
+    fail_msg: >-
+      PostgreSQL is using unexpected data volume '{{ postgres_data_volume.stdout | trim }}'
+      (expected '{{ app_name }}_postgres_data'). Aborting to prevent accidental
+      deployment against an empty/new database volume.
+    success_msg: >-
+      PostgreSQL data volume matches expected persistent volume '{{ app_name }}_postgres_data'.
+
 - name: Debug - Check container status
-  ansible.builtin.command: docker compose -f "{{ app_dir }}/docker-compose.prod.yml" ps
+  ansible.builtin.command: docker compose --project-name "{{ app_name }}" -f "{{ app_dir }}/docker-compose.prod.yml" ps
   become_user: "{{ app_user }}"
   args:
     chdir: "{{ app_dir }}"
@@ -277,7 +300,7 @@
       {{ container_debug.stdout }}
 
 - name: Wait for PostgreSQL container to be healthy
-  ansible.builtin.command: docker compose -f "{{ app_dir }}/docker-compose.prod.yml" ps postgres
+  ansible.builtin.command: docker compose --project-name "{{ app_name }}" -f "{{ app_dir }}/docker-compose.prod.yml" ps postgres
   become_user: "{{ app_user }}"
   args:
     chdir: "{{ app_dir }}"
@@ -298,7 +321,6 @@
     cmd: "{{ app_dir }}/scripts/migrate-database.sh"
   become_user: "{{ app_user }}"
   register: migration_result
-  failed_when: false
   changed_when: migration_result.stdout is search('Database schema created|Database migrations completed')
 
 - name: Display migration results

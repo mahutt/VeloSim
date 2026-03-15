@@ -1,14 +1,18 @@
 # VeloSim Production Docker Compose Configuration
 # This file is managed by Ansible - do not edit manually
 
+name: "{{ app_name }}"
+
 networks:
   velosim-net:
     driver: bridge
 
 volumes:
   postgres_data:
+    name: "{{ app_name }}_postgres_data"
     driver: local
   osrm_data:
+    name: "{{ app_name }}_osrm_data"
     driver: local
 
 services:
