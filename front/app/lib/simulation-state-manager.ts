@@ -122,8 +122,6 @@ export default class SimulationStateManager implements SimulationStateManagerInt
   private vehicles: Map<number, Vehicle> = new Map();
   private stations: Map<number, Station> = new Map();
   private tasks: Map<number, StationTask> = new Map();
-  private selectedItem: Driver | Station | null = null;
-  private selectedStationIds: Set<number> = new Set();
   private headquarters: Headquarters | null = null;
   private mapShouldRefresh: boolean = false;
 
@@ -163,9 +161,9 @@ export default class SimulationStateManager implements SimulationStateManagerInt
     const previousDriver = this.drivers.get(driver.id);
     this.drivers.set(driver.id, driver);
 
-    // If the previous version of this driver was the selected item, update the selected item
-    if (this.selectedItem === previousDriver) {
-      this.setSelectedItem(driver);
+    // If this driver is in the selection, refresh selected items
+    if (this.isSelectedById(SelectedItemType.Driver, driver.id)) {
+      this.refreshSelectedItems();
     }
 
     // Possibily update resource bar
@@ -185,17 +183,11 @@ export default class SimulationStateManager implements SimulationStateManagerInt
   }
 
   public setStation(station: Station) {
-    const prevStation = this.stations.get(station.id);
     this.stations.set(station.id, station);
 
-    // If the previous version of this station was the selected item, update the selected item
-    if (this.selectedItem === prevStation) {
-      this.setSelectedItem(station);
-    }
-
-    // If this station is in multi-selection, update the reactive state
-    if (this.selectedStationIds.has(station.id)) {
-      this.syncSelectedItemsFromStations();
+    // If this station is in the selection, refresh selected items
+    if (this.isSelectedById(SelectedItemType.Station, station.id)) {
+      this.refreshSelectedItems();
     }
 
     this.setMapShouldRefresh(true);
@@ -228,8 +220,15 @@ export default class SimulationStateManager implements SimulationStateManagerInt
   public setTask(task: StationTask) {
     this.tasks.set(task.id, task);
 
-    if (this.selectedItem && this.selectedItem.taskIds.includes(task.id)) {
-      this.setSelectedItem(this.selectedItem);
+    // If any selected item references this task, refresh the selection
+    const needsRefresh = this.reactiveState.selectedItems.some((item) => {
+      if (item.type === SelectedItemType.Driver) {
+        return this.drivers.get(item.value.id)!.taskIds.includes(task.id);
+      }
+      return this.stations.get(item.value.id)!.taskIds.includes(task.id);
+    });
+    if (needsRefresh) {
+      this.refreshSelectedItems();
     }
 
     this.setMapShouldRefresh(true);
@@ -239,8 +238,13 @@ export default class SimulationStateManager implements SimulationStateManagerInt
     return this.tasks.get(taskId);
   }
 
-  public getSelectedItem() {
-    return this.selectedItem;
+  public getSelectedItem(): Driver | Station | null {
+    if (this.reactiveState.selectedItems.length !== 1) return null;
+    const item = this.reactiveState.selectedItems[0];
+    if (item.type === SelectedItemType.Driver) {
+      return this.drivers.get(item.value.id)!;
+    }
+    return this.stations.get(item.value.id)!;
   }
 
   public getSelectedItems(): SelectedItem[] {
@@ -248,75 +252,39 @@ export default class SimulationStateManager implements SimulationStateManagerInt
   }
 
   public setSelectedItem(item: Driver | Station | null) {
-    this.selectedItem = item;
-    this.selectedStationIds = new Set();
     this.setPendingAssignment(null);
     this.setMapShouldRefresh(true);
 
     if (!item) {
-      this.updateReactiveState({ selectedItems: [] });
+      this.setSelectedItems([]);
       return;
     }
 
     if ('shift' in item) {
-      // it's a driver
-      const driver = item as Driver;
-      this.updateReactiveState({
-        selectedItems: [
-          {
-            type: SelectedItemType.Driver,
-            value: {
-              ...driver,
-              tasks: driver.taskIds.map(
-                (taskId: number) => this.tasks.get(taskId)!
-              ),
-              inProgressTask: driver.inProgressTaskId
-                ? this.tasks.get(driver.inProgressTaskId)!
-                : null,
-            },
-          },
-        ],
-      });
+      this.setSelectedItems([this.populateDriverItem(item as Driver)]);
     } else {
-      const station = item as Station;
-      this.updateReactiveState({
-        selectedItems: [
-          {
-            type: SelectedItemType.Station,
-            value: {
-              id: station.id,
-              name: station.name,
-              position: station.position,
-              tasks: station.taskIds.map(
-                (taskId: number) => this.tasks.get(taskId)!
-              ),
-            },
-          },
-        ],
-      });
+      this.setSelectedItems([this.populateStationItem(item as Station)]);
     }
   }
 
   public getMultiSelectedStationIds(): Set<number> {
-    return this.selectedStationIds;
+    const ids = new Set<number>();
+    for (const item of this.reactiveState.selectedItems) {
+      if (item.type === SelectedItemType.Station) ids.add(item.value.id);
+    }
+    return ids;
   }
 
   public addSelectedStation(stationId: number): void {
-    const next = new Set(this.selectedStationIds);
-    next.add(stationId);
-    this.selectedItem = null;
-    this.selectedStationIds = next;
-    this.syncSelectedItemsFromStations();
-    this.setMapShouldRefresh(true);
+    const ids = this.getMultiSelectedStationIds();
+    ids.add(stationId);
+    this.updateSelectedStations(ids);
   }
 
   public removeSelectedStation(stationId: number): void {
-    const next = new Set(this.selectedStationIds);
-    next.delete(stationId);
-    this.selectedItem = null;
-    this.selectedStationIds = next;
-    this.syncSelectedItemsFromStations();
-    this.setMapShouldRefresh(true);
+    const ids = this.getMultiSelectedStationIds();
+    ids.delete(stationId);
+    this.updateSelectedStations(ids);
   }
 
   public toggleMultiSelectedStation(stationId: number): void {
@@ -324,16 +292,13 @@ export default class SimulationStateManager implements SimulationStateManagerInt
   }
 
   public toggleSelectedStation(stationId: number): void {
-    const next = new Set(this.selectedStationIds);
-    if (next.has(stationId)) {
-      next.delete(stationId);
+    const ids = this.getMultiSelectedStationIds();
+    if (ids.has(stationId)) {
+      ids.delete(stationId);
     } else {
-      next.add(stationId);
+      ids.add(stationId);
     }
-    this.selectedItem = null;
-    this.selectedStationIds = next;
-    this.syncSelectedItemsFromStations();
-    this.setMapShouldRefresh(true);
+    this.updateSelectedStations(ids);
   }
 
   public setMultiSelectedStations(stationIds: number[]): void {
@@ -341,10 +306,7 @@ export default class SimulationStateManager implements SimulationStateManagerInt
   }
 
   public setSelectedStations(stationIds: number[]): void {
-    this.selectedItem = null;
-    this.selectedStationIds = new Set(stationIds);
-    this.syncSelectedItemsFromStations();
-    this.setMapShouldRefresh(true);
+    this.updateSelectedStations(new Set(stationIds));
   }
 
   public clearMultiSelectedStations(): void {
@@ -352,41 +314,71 @@ export default class SimulationStateManager implements SimulationStateManagerInt
   }
 
   public clearSelection(): void {
-    if (this.selectedItem === null && this.selectedStationIds.size === 0)
-      return;
-    this.selectedItem = null;
-    this.selectedStationIds = new Set();
-    this.updateReactiveState({ selectedItems: [] });
+    if (this.reactiveState.selectedItems.length === 0) return;
+    this.setSelectedItems([]);
     this.setPendingAssignment(null);
     this.setMapShouldRefresh(true);
   }
 
-  private syncSelectedItemsFromStations(): void {
+  private updateSelectedStations(ids: Set<number>): void {
     this.setPendingAssignment(null);
-    const ids = this.selectedStationIds;
-    if (ids.size === 0) {
-      this.updateReactiveState({ selectedItems: [] });
-      return;
-    }
-
-    const selectedItems: SelectedItem[] = [];
+    const items: SelectedItem[] = [];
     for (const id of ids) {
       const station = this.stations.get(id);
-      if (!station) continue;
-      selectedItems.push({
-        type: SelectedItemType.Station,
-        value: {
-          id: station.id,
-          name: station.name,
-          position: station.position,
-          tasks: station.taskIds.map(
-            (taskId: number) => this.tasks.get(taskId)!
-          ),
-        },
-      });
+      if (station) items.push(this.populateStationItem(station));
     }
+    this.setSelectedItems(items);
+    this.setMapShouldRefresh(true);
+  }
 
-    this.updateReactiveState({ selectedItems });
+  private setSelectedItems(items: SelectedItem[]): void {
+    this.updateReactiveState({ selectedItems: items });
+  }
+
+  private isSelectedById(type: SelectedItemType, id: number): boolean {
+    return this.reactiveState.selectedItems.some(
+      (item) => item.type === type && item.value.id === id
+    );
+  }
+
+  private refreshSelectedItems(): void {
+    if (this.reactiveState.selectedItems.length === 0) return;
+    const refreshed: SelectedItem[] = [];
+    for (const item of this.reactiveState.selectedItems) {
+      if (item.type === SelectedItemType.Driver) {
+        const driver = this.drivers.get(item.value.id);
+        if (driver) refreshed.push(this.populateDriverItem(driver));
+      } else {
+        const station = this.stations.get(item.value.id);
+        if (station) refreshed.push(this.populateStationItem(station));
+      }
+    }
+    this.setSelectedItems(refreshed);
+  }
+
+  private populateDriverItem(driver: Driver): SelectedItem {
+    return {
+      type: SelectedItemType.Driver,
+      value: {
+        ...driver,
+        tasks: driver.taskIds.map((id) => this.tasks.get(id)!),
+        inProgressTask: driver.inProgressTaskId
+          ? this.tasks.get(driver.inProgressTaskId)!
+          : null,
+      },
+    };
+  }
+
+  private populateStationItem(station: Station): SelectedItem {
+    return {
+      type: SelectedItemType.Station,
+      value: {
+        id: station.id,
+        name: station.name,
+        position: station.position,
+        tasks: station.taskIds.map((id) => this.tasks.get(id)!),
+      },
+    };
   }
 
   public getStartTime() {
