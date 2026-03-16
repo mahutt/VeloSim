@@ -282,37 +282,6 @@ describe('areReactiveSimulationStatesEqual', () => {
       ).toBe(true);
     });
 
-    it('returns true for multi-selection with same ids in different order', () => {
-      expect(
-        areReactiveSimulationStatesEqual(
-          makeReactiveSimulationState({
-            selectedItems: [
-              makeSelectedItem({
-                type: SelectedItemType.Station,
-                value: { id: 1, name: 'A', position: [0, 0], tasks: [] },
-              }),
-              makeSelectedItem({
-                type: SelectedItemType.Station,
-                value: { id: 2, name: 'B', position: [0, 0], tasks: [] },
-              }),
-            ],
-          }),
-          makeReactiveSimulationState({
-            selectedItems: [
-              makeSelectedItem({
-                type: SelectedItemType.Station,
-                value: { id: 2, name: 'B', position: [0, 0], tasks: [] },
-              }),
-              makeSelectedItem({
-                type: SelectedItemType.Station,
-                value: { id: 1, name: 'A', position: [0, 0], tasks: [] },
-              }),
-            ],
-          })
-        )
-      ).toBe(true);
-    });
-
     it('returns false for multi-selection with different lengths', () => {
       expect(
         areReactiveSimulationStatesEqual(

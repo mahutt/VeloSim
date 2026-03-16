@@ -97,8 +97,8 @@ export default function SelectedItemBar() {
             <X className="h-4 w-4" />
           </Button>
         </div>
-        <ScrollArea className="relative w-full">
-          <div className="max-h-50 px-5 space-y-1">
+        <ScrollArea className="mx-2">
+          <div className="max-h-50 px-3 space-y-1">
             {stations.map((station) => (
               <div
                 key={station.id}

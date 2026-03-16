@@ -161,16 +161,14 @@ const mockMap = {
 
 function makeManager() {
   const selectItem = vi.fn();
-  const clearSelection = vi.fn();
   const requestAssignment = vi.fn();
   const manager = new MapManager(
     mockMap,
     mockSimulationStateManager as SimulationStateManager,
     selectItem,
-    clearSelection,
     requestAssignment
   );
-  return { manager, selectItem, clearSelection, requestAssignment };
+  return { manager, selectItem, requestAssignment };
 }
 
 function getClickHandler() {
@@ -212,7 +210,6 @@ function getStationDragIdsGetter() {
 describe('MapManager', () => {
   let manager: MapManager;
   let selectItem: ReturnType<typeof vi.fn>;
-  let clearSelection: ReturnType<typeof vi.fn>;
   let requestAssignment: ReturnType<typeof vi.fn>;
 
   beforeEach(() => {
@@ -232,8 +229,7 @@ describe('MapManager', () => {
     (mockSimulationStateManager.getHeadquarters as Mock).mockReturnValue(null);
     (mockSimulationStateManager.getNonZeroSpeed as Mock).mockReturnValue(1);
     (mockMap.isStyleLoaded as Mock).mockReturnValue(true);
-    ({ manager, selectItem, clearSelection, requestAssignment } =
-      makeManager());
+    ({ manager, selectItem, requestAssignment } = makeManager());
   });
 
   afterEach(() => {
@@ -365,17 +361,19 @@ describe('MapManager', () => {
   // ── click handler ─────────────────────────────────────────
 
   describe('click handler', () => {
-    test('clicking empty space calls clearSelection and state.clearSelection', () => {
+    test('clicking empty space calls state.clearSelection', () => {
       const clickHandler = getClickHandler();
       clickHandler(null);
 
-      expect(clearSelection).toHaveBeenCalled();
       expect(mockSimulationStateManager.clearSelection).toHaveBeenCalled();
     });
 
     test('regular click on station clears multi-selection and selects item', () => {
       const clickHandler = getClickHandler();
-      clickHandler({ type: SelectedItemType.Station, id: 7 });
+      clickHandler(
+        { type: SelectedItemType.Station, id: 7 },
+        { ctrlKey: false }
+      );
 
       expect(mockSimulationStateManager.clearSelection).toHaveBeenCalled();
       expect(selectItem).toHaveBeenCalledWith(SelectedItemType.Station, 7);
@@ -383,7 +381,10 @@ describe('MapManager', () => {
 
     test('regular click on driver clears multi-selection and selects item', () => {
       const clickHandler = getClickHandler();
-      clickHandler({ type: SelectedItemType.Driver, id: 3 });
+      clickHandler(
+        { type: SelectedItemType.Driver, id: 3 },
+        { ctrlKey: false }
+      );
 
       expect(mockSimulationStateManager.clearSelection).toHaveBeenCalled();
       expect(selectItem).toHaveBeenCalledWith(SelectedItemType.Driver, 3);
@@ -597,7 +598,7 @@ describe('MapManager', () => {
       const boxSelectHandler = getBoxSelectHandler();
       boxSelectHandler([1, 2, 3]);
 
-      expect(clearSelection).toHaveBeenCalled();
+      expect(mockSimulationStateManager.clearSelection).toHaveBeenCalled();
       expect(
         mockSimulationStateManager.setSelectedStations
       ).toHaveBeenCalledWith([1, 2, 3]);
@@ -615,7 +616,7 @@ describe('MapManager', () => {
       const boxSelectHandler = getBoxSelectHandler();
       boxSelectHandler([]);
 
-      expect(clearSelection).not.toHaveBeenCalled();
+      expect(mockSimulationStateManager.clearSelection).not.toHaveBeenCalled();
       expect(selectItem).not.toHaveBeenCalled();
     });
   });

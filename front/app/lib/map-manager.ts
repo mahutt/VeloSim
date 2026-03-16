@@ -81,7 +81,6 @@ export default class MapManager {
     map: MapboxGLMap,
     state: SimulationStateManager,
     selectItem: (type: SelectedItemType, id: number) => void,
-    clearSelection: () => void,
     requestAssignment: (resourceId: number, taskIds: number[]) => void
   ) {
     this.map = map;
@@ -101,18 +100,17 @@ export default class MapManager {
 
     setupMapClickHandlers(map, (item, modifiers) => {
       if (!item) {
-        clearSelection();
         this.state.clearSelection();
         return;
       }
 
       // Ctrl+click on a station toggles multi-selection
-      if (modifiers?.ctrlKey && item.type === SelectedItemType.Station) {
+      if (modifiers!.ctrlKey && item.type === SelectedItemType.Station) {
         // If a single station was selected, promote it into the multi-selection
         const currentSingle = this.state.getSelectedItem();
-        if (currentSingle && !('shift' in currentSingle)) {
+        if (this.isStation(currentSingle)) {
           const singleStationId = currentSingle.id;
-          clearSelection();
+          this.state.clearSelection();
           if (!this.state.getMultiSelectedStationIds().has(singleStationId)) {
             this.state.addSelectedStation(singleStationId);
           }
@@ -157,7 +155,7 @@ export default class MapManager {
       [MapLayer.Stations, MapLayer.StationCircle, MapLayer.StationTaskCounts],
       (stationIds) => {
         if (stationIds.length > 1) {
-          clearSelection();
+          this.state.clearSelection();
           this.state.setSelectedStations(stationIds);
         } else if (stationIds.length === 1) {
           this.state.clearSelection();

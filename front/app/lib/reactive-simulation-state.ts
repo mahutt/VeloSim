@@ -113,10 +113,11 @@ export function areReactiveSimulationStatesEqual(
 function areSelectedItemsEqual(a: SelectedItem[], b: SelectedItem[]): boolean {
   if (a === b) return true;
   if (a.length !== b.length) return false;
-  const toKey = (item: SelectedItem) => `${item.type}:${item.value.id}`;
-  const aKeys = a.map(toKey).sort();
-  const bKeys = b.map(toKey).sort();
-  return aKeys.every((k, i) => k === bKeys[i]);
+  for (let i = 0; i < a.length; i++) {
+    if (a[i].type !== b[i].type || a[i].value.id !== b[i].value.id)
+      return false;
+  }
+  return true;
 }
 
 function arePendingAssignmentsEqual(

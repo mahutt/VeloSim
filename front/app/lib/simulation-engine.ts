@@ -73,7 +73,6 @@ export default class SimulationEngine {
       map,
       this.stateManager,
       (type, id) => this.selectItem(type, id),
-      () => this.clearSelection(),
       (resourceId, taskIds) => this.requestAssignment(resourceId, taskIds)
     );
     this.mode = SimulationMode.Server;
