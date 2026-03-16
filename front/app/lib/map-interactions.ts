@@ -48,7 +48,7 @@ type ItemSelectCallback = (
     id: number;
     coordinates: Position;
   } | null,
-  modifiers?: { ctrlKey: boolean }
+  modifiers: { ctrlKey: boolean }
 ) => void;
 
 type ItemHoverCallback = (
@@ -196,7 +196,7 @@ const DRAG_THRESHOLD = 5;
 const GHOST_WIDTH = 28;
 
 function createDomGhost(stationCount = 1): HTMLElement {
-  if (stationCount <= 1) {
+  if (stationCount === 1) {
     const img = document.createElement('img');
     img.src = '/station-selected.png';
     img.setAttribute('data-testid', 'station-drag-ghost');
@@ -270,8 +270,8 @@ export type StationDragDropCallback = (
 ) => void;
 
 /**
- * Set up box-select for stations via Shift+drag.
- * Disables Mapbox's built-in boxZoom and draws a selection rectangle.
+ * Set up box-select for stations via Shift+drag or right-click+drag.
+ * Disables Mapbox's built-in boxZoom and dragRotate, and draws a selection rectangle.
  * On release, queries all station features within the rectangle.
  */
 export function setupBoxSelectHandlers(
@@ -280,6 +280,7 @@ export function setupBoxSelectHandlers(
   onBoxSelect: (stationIds: number[]) => void
 ) {
   map.boxZoom.disable();
+  map.dragRotate.disable();
 
   let boxSelectActive = false;
   let startPoint: { x: number; y: number } | null = null;
@@ -327,14 +328,27 @@ export function setupBoxSelectHandlers(
     map.getCanvas().style.cursor = '';
   }
 
+  // Suppress context menu when right-click was used for box select
+  function onContextMenu(e: MouseEvent) {
+    e.preventDefault();
+  }
+
   function onMouseDown(e: MapMouseEvent) {
-    if (!e.originalEvent?.shiftKey) return;
+    const isShiftDrag = !!e.originalEvent?.shiftKey;
+    const isRightClick = e.originalEvent?.button === 2;
+    if (!isShiftDrag && !isRightClick) return;
 
     e.preventDefault();
     startPoint = { x: e.point.x, y: e.point.y };
     boxSelectActive = true;
     map.dragPan.disable();
     map.getCanvas().style.cursor = 'crosshair';
+
+    if (isRightClick) {
+      map
+        .getCanvas()
+        .addEventListener('contextmenu', onContextMenu, { once: true });
+    }
   }
 
   function onMouseMove(e: MapMouseEvent) {
@@ -386,6 +400,7 @@ export function setupBoxSelectHandlers(
     map.off('mousedown', onMouseDown);
     map.off('mousemove', onMouseMove);
     map.off('mouseup', onMouseUp);
+    map.getCanvas().removeEventListener('contextmenu', onContextMenu);
     cleanup();
   };
 }
@@ -399,9 +414,9 @@ export function setupBoxSelectHandlers(
 export function setupStationDragHandlers(
   map: MapboxMap,
   onDrop: StationDragDropCallback,
-  onHighlight?: (stationId: number | null) => void,
-  getMultiSelectedStationIds?: () => number[],
-  onDragStart?: (stationId: number, draggedStationIds: number[]) => void
+  onHighlight: (stationId: number | null) => void,
+  getMultiSelectedStationIds: () => number[],
+  onDragStart: (stationId: number, draggedStationIds: number[]) => void
 ) {
   let dragging = false;
   let stationId: number | null = null;
@@ -425,7 +440,7 @@ export function setupStationDragHandlers(
     hoveredDriverId = null;
     removeDomGhost(domGhost);
     domGhost = null;
-    onHighlight?.(null);
+    onHighlight(null);
     if (wasDragPanEnabled !== null) {
       if (wasDragPanEnabled) {
         map.dragPan.enable();
@@ -438,8 +453,9 @@ export function setupStationDragHandlers(
   }
 
   function onMouseDown(e: MapMouseEvent) {
-    // Shift+drag is reserved for box select
+    // Shift+drag and right-click+drag are reserved for box select
     if (e.originalEvent?.shiftKey) return;
+    if (e.originalEvent?.button === 2) return;
 
     const features = map.queryRenderedFeatures(e.point, {
       layers: stationLayers,
@@ -454,14 +470,14 @@ export function setupStationDragHandlers(
 
     // Determine which stations to drag: if the clicked station is part of
     // multi-selection, drag all selected stations; otherwise just this one.
-    const multiIds = getMultiSelectedStationIds?.() ?? [];
+    const multiIds = getMultiSelectedStationIds();
     if (multiIds.length > 1 && multiIds.includes(stationId)) {
       draggedStationIds = multiIds;
     } else {
       draggedStationIds = [stationId];
     }
 
-    onHighlight?.(stationId);
+    onHighlight(stationId);
     const coords = (feature.geometry as GeoJSON.Point).coordinates as [
       number,
       number,
@@ -491,7 +507,7 @@ export function setupStationDragHandlers(
       map.getCanvas().style.cursor = 'grabbing';
       // Create the DOM ghost so it floats above sidebar/overlays
       domGhost = createDomGhost(draggedStationIds.length);
-      onDragStart?.(stationId!, draggedStationIds);
+      onDragStart(stationId!, draggedStationIds);
     }
 
     // Move the DOM ghost to follow the cursor
