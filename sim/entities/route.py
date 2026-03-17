@@ -24,6 +24,7 @@ SOFTWARE.
 
 import math
 from typing import TYPE_CHECKING, Optional
+from sim.entities.map_payload import MapPayload
 from sim.entities.position import Position
 from sim.entities.road import Road
 from sim.entities.traffic_data import TrafficTriple
@@ -114,6 +115,7 @@ class Route:
         config: dict,
         roads: list[Road],
         route_controller: "RouteController | None" = None,
+        route_recalculation_interval_seconds: int | None = None,
     ) -> None:
         """
         Initialize a Route from routing result.
@@ -126,6 +128,10 @@ class Route:
             routing_provider: RoutingProvider instance for recalculation
             config: Configuration dictionary with simulation settings
             roads: List of Road objects built by RouteController. Required.
+            route_recalculation_interval_seconds: Elapsed route time in seconds
+                between automatic route refresh attempts. Defaults to
+                MapPayload default interval when omitted.
+                RouteController normally provides this value.
             route_controller: RouteController for road/route management.
                 Handles road allocation, recalculation, and subscriptions.
         """
@@ -153,6 +159,17 @@ class Route:
 
         # Store RouteController reference for road management
         self.route_controller: "RouteController | None" = route_controller
+        if route_recalculation_interval_seconds is None:
+            route_recalculation_interval_seconds = (
+                MapPayload.default_route_recalculation_interval_seconds()
+            )
+
+        self._route_recalculation_interval_seconds = (
+            MapPayload.normalize_route_recalculation_interval_seconds(
+                route_recalculation_interval_seconds
+            )
+        )
+        self._elapsed_seconds_since_recalculation = 0
 
         # Extract route data from RouteResult
         self.coordinates = route_data.coordinates
@@ -249,8 +266,26 @@ class Route:
         success = self.route_controller.recalculate_route(self, current_position)
         if not success:
             self.is_finished = True
+        else:
+            self._elapsed_seconds_since_recalculation = 0
 
         return success
+
+    def _maybe_recalculate_for_elapsed_time(self) -> None:
+        """Refresh route after a configurable elapsed time threshold."""
+        if self.is_finished or not self.route_controller:
+            return
+
+        self._elapsed_seconds_since_recalculation += 1
+        if (
+            self._elapsed_seconds_since_recalculation
+            < self._route_recalculation_interval_seconds
+        ):
+            return
+
+        # Keep going on success; failed recalculation marks route as finished.
+        self.recalculate()
+        return
 
     def _handle_traffic_point_change(self, active_count: int) -> None:
         """Detect and remap index when traffic changes point count.
@@ -588,6 +623,8 @@ class Route:
         """
         if self.is_finished:
             return None
+
+        self._maybe_recalculate_for_elapsed_time()
 
         point_to_return: Position | None = None
 

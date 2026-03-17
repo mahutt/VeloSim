@@ -690,6 +690,137 @@ class TestRouteRecalculation:
         assert success is False
 
 
+class TestRouteTimedRecalculation:
+    """Tests for elapsed-time based automatic route refresh."""
+
+    @pytest.mark.parametrize("invalid_interval", [0, -1])
+    def test_non_positive_interval_defaults_to_30_minutes(
+        self,
+        invalid_interval: int,
+        test_config,
+        mock_routing_provider,
+        sample_route_result,
+    ) -> None:
+        """Non-positive interval values should fall back to 30 minutes."""
+        roads = build_roads_from_route_result(sample_route_result)
+        mock_route_controller = Mock()
+        mock_route_controller.recalculate_route.return_value = True
+
+        route = Route(
+            sample_route_result,
+            mock_routing_provider,
+            test_config,
+            roads=roads,
+            route_controller=mock_route_controller,
+            route_recalculation_interval_seconds=invalid_interval,
+        )
+
+        assert route._route_recalculation_interval_seconds == 1800
+
+        route.next()
+        assert mock_route_controller.recalculate_route.call_count == 0
+
+    def test_next_triggers_recalculation_after_interval(
+        self, test_config, mock_routing_provider, sample_route_result
+    ) -> None:
+        """Route.next should trigger refresh when interval threshold is reached."""
+        roads = build_roads_from_route_result(sample_route_result)
+        mock_route_controller = Mock()
+        mock_route_controller.recalculate_route.return_value = True
+
+        route = Route(
+            sample_route_result,
+            mock_routing_provider,
+            test_config,
+            roads=roads,
+            route_controller=mock_route_controller,
+            route_recalculation_interval_seconds=2,
+        )
+
+        route.next()
+        assert mock_route_controller.recalculate_route.call_count == 0
+
+        route.next()
+        assert mock_route_controller.recalculate_route.call_count == 1
+
+    def test_successful_recalculation_resets_elapsed_counter(
+        self, test_config, mock_routing_provider
+    ) -> None:
+        """A successful refresh should reset the internal elapsed timer."""
+        long_route_result = RouteResult(
+            coordinates=[
+                Position([0.0, 0.0]),
+                Position([0.001, 0.0]),
+                Position([0.002, 0.0]),
+                Position([0.003, 0.0]),
+                Position([0.004, 0.0]),
+            ],
+            distance=500.0,
+            duration=100.0,
+            steps=[
+                RouteStep(
+                    name="Long Test Road",
+                    distance=500.0,
+                    duration=100.0,
+                    geometry=[
+                        Position([0.0, 0.0]),
+                        Position([0.001, 0.0]),
+                        Position([0.002, 0.0]),
+                        Position([0.003, 0.0]),
+                        Position([0.004, 0.0]),
+                    ],
+                )
+            ],
+            segments=[],
+        )
+
+        roads = build_roads_from_route_result(long_route_result)
+        mock_route_controller = Mock()
+        mock_route_controller.recalculate_route.return_value = True
+
+        route = Route(
+            long_route_result,
+            mock_routing_provider,
+            test_config,
+            roads=roads,
+            route_controller=mock_route_controller,
+            route_recalculation_interval_seconds=2,
+        )
+
+        route.next()
+        route.next()
+        assert mock_route_controller.recalculate_route.call_count == 1
+
+        route.next()
+        assert mock_route_controller.recalculate_route.call_count == 1
+
+        route.next()
+        assert mock_route_controller.recalculate_route.call_count == 2
+
+    def test_route_finishes_when_timed_recalculation_fails(
+        self, test_config, mock_routing_provider, sample_route_result
+    ) -> None:
+        """A failed timed refresh should mark the route as finished."""
+        roads = build_roads_from_route_result(sample_route_result)
+        mock_route_controller = Mock()
+        mock_route_controller.recalculate_route.return_value = False
+
+        route = Route(
+            sample_route_result,
+            mock_routing_provider,
+            test_config,
+            roads=roads,
+            route_controller=mock_route_controller,
+            route_recalculation_interval_seconds=1,
+        )
+
+        result = route.next()
+
+        assert result is None
+        assert route.is_finished is True
+        assert mock_route_controller.recalculate_route.call_count == 1
+
+
 class TestRouteEdgeCases:
     """Tests for edge cases and error handling with coordinate-based routing."""
 

@@ -28,6 +28,7 @@ import pytest
 from sim.map import route_controller as route_controller_module
 from sim.map.route_controller import RouteController
 from sim.map.position_registry import PositionRegistry
+from sim.entities.map_payload import MapPayload
 from sim.entities.road import Road
 from sim.entities.position import Position
 from sim.map.routing_provider import RouteSegment, RouteResult, RouteStep
@@ -80,6 +81,52 @@ class TestRouteControllerInitialization:
         assert len(controller.segment_key_to_road) == 0
         assert len(controller.road_id_to_road) == 0
         assert len(controller.routes) == 0
+
+    def test_route_controller_uses_map_payload_for_route_interval(self) -> None:
+        """Route interval should be resolved from MapPayload runtime settings."""
+        mock_map_controller = Mock()
+        map_payload = MapPayload(route_recalculation_interval_minutes=1)
+
+        controller = RouteController(
+            mock_map_controller,
+            PositionRegistry(),
+            map_payload=map_payload,
+        )
+
+        mock_routing_provider = Mock()
+        route_result = RouteResult(
+            coordinates=[Position([0.0, 0.0]), Position([1.0, 1.0])],
+            distance=100.0,
+            duration=10.0,
+            steps=[],
+            segments=[],
+        )
+
+        first_route = controller.create_route(
+            route_result,
+            mock_routing_provider,
+            {"simulation": {"route_recalculation_interval_minutes": 999}},
+        )
+
+        assert first_route._route_recalculation_interval_seconds == 60
+
+    def test_route_controller_defaults_interval_when_payload_missing(self) -> None:
+        """Route interval should default to 30 minutes when payload is absent."""
+        mock_map_controller = Mock()
+        controller = RouteController(mock_map_controller, PositionRegistry())
+
+        mock_routing_provider = Mock()
+        route_result = RouteResult(
+            coordinates=[Position([0.0, 0.0]), Position([1.0, 1.0])],
+            distance=100.0,
+            duration=10.0,
+            steps=[],
+            segments=[],
+        )
+
+        route = controller.create_route(route_result, mock_routing_provider, {})
+
+        assert route._route_recalculation_interval_seconds == 1800
 
 
 class TestRouteControllerRoadLookup:
