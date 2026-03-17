@@ -35,19 +35,22 @@ class Shift:
     time and real time. Real time is used in frame payloads. Sim time is used
     for internal sim calculations
 
-    Args:
-        start_time: Real-time shift start in seconds.
-        end_time: Real-time shift end in seconds.
-        lunch_break: Optional real-time lunch break duration in seconds.
-            Use None if no lunch.
-        sim_start_time: Optional sim-time start in seconds.
-            Defaults to start_time if not provided.
-        sim_end_time: Optional sim-time end in seconds.
-            Defaults to end_time if not provided.
-        sim_lunch_break: Optional sim-time lunch break duration in seconds.
-            Defaults to lunch_break if not provided.
-
+    Attributes:
+        start_time: absolute shift start time in seconds.
+        end_time: absolute shift end time in seconds.
+        lunch_break: Optional absolute lunch break start time in seconds.
+        relative_start_time: shift start time in seconds after sim start time.
+        relative_end_time: shift end time in seconds after sim start time.
+        relative_lunch_break: Optional lunch break start time in seconds
+          after sim start time.
     """
+
+    start_time: float
+    end_time: float
+    lunch_break: float | None
+    relative_start_time: float
+    relative_end_time: float
+    relative_lunch_break: float | None
 
     def __init__(
         self,
@@ -55,130 +58,75 @@ class Shift:
         end_time: float,
         lunch_break: Optional[float],
         sim_start_time: float,
-        sim_end_time: float,
-        sim_lunch_break: Optional[float] = None,
     ):
+        """
+        Args:
+            start_time: Absolute shift start time in seconds.
+            end_time: Absolute shift end time in seconds.
+            lunch_break: Optional absolute lunch break start time,
+              or None.
+            sim_start_time: Absolute simulation start time used
+              to compute relative times.
+        """
 
         self.start_time = start_time
         self.end_time = end_time
         self.lunch_break = lunch_break
 
-        # Duplicate attributes for simulation-prefixed access (with fallback defaults)
-        self.sim_start_time = (
-            sim_start_time if sim_start_time is not None else start_time
-        )
-        self.sim_end_time = sim_end_time if sim_end_time is not None else end_time
-        self.sim_lunch_break = (
-            sim_lunch_break if sim_lunch_break is not None else lunch_break
+        # Duplicate attributes for values relative to the simulation's start time
+        self.relative_start_time = start_time - sim_start_time
+        self.relative_end_time = end_time - sim_start_time
+        self.relative_lunch_break = (
+            (lunch_break - sim_start_time) if lunch_break is not None else None
         )
 
     def get_start_time(self) -> float:
         """Get the shift start time.
 
         Returns:
-            float: The start time of the shift in seconds.
+            float: The absolute start time of the shift in seconds.
         """
         return self.start_time
-
-    def set_start_time(self, value: float) -> None:
-        """Set the shift start time.
-
-        Args:
-            value: The new start time in seconds.
-        Returns:
-            None
-        """
-        self.start_time = value
 
     def get_end_time(self) -> float:
         """Get the shift end time.
 
         Returns:
-            float: The end time of the shift in seconds.
+            float: The absolute end time of the shift in seconds.
         """
         return self.end_time
 
-    def set_end_time(self, value: float) -> None:
-        """Set the shift end time.
-
-        Args:
-            value: The new end time in seconds.
-        Returns:
-            None
-        """
-        self.end_time = value
-
     def get_lunch_break(self) -> float | None:
-        """Get the lunch break duration.
+        """Get the lunch break start time".
 
         Returns:
-            float | None: Lunch break duration in seconds, or None if not set.
+            float | None: The absolute lunch break start time in seconds,
+              or None if not set.
         """
         return self.lunch_break
 
-    def set_lunch_break(self, value: float) -> None:
-        """Set the lunch break duration.
-
-        Args:
-            value: Lunch break duration in seconds.
+    # --- relative duplicates ---
+    def get_relative_start_time(self) -> float:
+        """Get the relative shift start time.
 
         Returns:
-            None
+            float: The shift start time in seconds after sim start time.
         """
-        self.lunch_break = value
+        return self.relative_start_time
 
-    # --- sim-prefixed duplicates ---
-    def get_sim_start_time(self) -> float:
-        """Get the simulation-prefixed shift start time.
+    def get_relative_end_time(self) -> float:
+        """Get the relative shift end time.
 
         Returns:
-            float: The sim-prefixed start time of the shift in seconds.
+            float: The shift end time in seconds after sim start time.
         """
-        return self.sim_start_time
+        return self.relative_end_time
 
-    def set_sim_start_time(self, value: float) -> None:
-        """Set the simulation-prefixed shift start time.
-
-        Args:
-            value: The new start time in seconds.
-        Returns:
-            None
-        """
-        self.sim_start_time = value
-
-    def get_sim_end_time(self) -> float:
-        """Get the simulation-prefixed shift end time.
+    def get_relative_lunch_break(self) -> float | None:
+        """Get the relative lunch break start time.
 
         Returns:
-            float: The sim-prefixed end time of the shift in seconds.
+            float | None: The lunch break start time in seconds after
+              sim start time, or None if not set.
         """
-        return self.sim_end_time
-
-    def set_sim_end_time(self, value: float) -> None:
-        """Set the simulation-prefixed shift end time.
-
-        Args:
-            value: The new end time in seconds.
-        Returns:
-            None
-        """
-        self.sim_end_time = value
-
-    def get_sim_lunch_break(self) -> float | None:
-        """Get the simulation-prefixed lunch break duration.
-
-        Returns:
-            float | None: Lunch break duration in seconds, or None if not set.
-        """
-        return self.sim_lunch_break
-
-    def set_sim_lunch_break(self, value: float) -> None:
-        """Set the simulation-prefixed lunch break duration.
-
-        Args:
-            value: Lunch break duration in seconds.
-
-        Returns:
-            None
-        """
-        self.sim_lunch_break = value
+        return self.relative_lunch_break

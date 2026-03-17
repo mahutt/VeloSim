@@ -70,9 +70,7 @@ def make_shift(
         start_time=sim_start,
         end_time=sim_end,
         lunch_break=sim_lunch,
-        sim_start_time=sim_start,
-        sim_end_time=sim_end,
-        sim_lunch_break=sim_lunch,
+        sim_start_time=0,
     )
 
 

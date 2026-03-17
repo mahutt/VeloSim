@@ -238,10 +238,10 @@ def test_json_parse_with_no_lunch_break_and_long_shift() -> None:
     driver = drivers[first_driver_key]
 
     lunch_break = driver.get_driver_shift().get_lunch_break()
-    sim_lunch_break = driver.get_driver_shift().get_sim_lunch_break()
+    relative_lunch_break = driver.get_driver_shift().get_relative_lunch_break()
     calculated_lunch = round((st_sec + et_sec) / 2)
     assert lunch_break == calculated_lunch
-    assert sim_lunch_break == calculated_lunch - sim_start
+    assert relative_lunch_break == calculated_lunch - sim_start
 
 
 def test_json_parse_with_lunch_break_assigned_before_sim_time() -> None:

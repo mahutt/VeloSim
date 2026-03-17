@@ -349,7 +349,7 @@ class TestRouteGetTrafficTriples:
 
 class TestDriverTrafficChanged:
     def _make_driver(self, routes: list[Route] | None = None) -> Driver:
-        shift = Shift(0.0, 24.0, None, 0.0, 24.0, None)
+        shift = Shift(0.0, 24.0, None, 0.0)
         driver = Driver(
             driver_id=1,
             position=Position([0, 0]),

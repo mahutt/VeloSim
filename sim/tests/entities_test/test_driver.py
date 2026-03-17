@@ -52,7 +52,7 @@ class TestDriver:
         return env
 
     # Default shift used across tests
-    DEFAULT_SHIFT = Shift(0.0, 24.0, None, 0.0, 24.0, None)
+    DEFAULT_SHIFT = Shift(0.0, 24.0, None, 0.0)
 
     @pytest.fixture
     def driver(
@@ -684,7 +684,7 @@ class TestDriver:
         station2 = Station(2, "Station 2", Position([-73.6, 45.6]))
         task1 = BatterySwapTask(1, station=station1)
         task2 = BatterySwapTask(2, station=station2)
-        shift = Shift(0.0, 24.0, None, 0.0, 24.0, None)
+        shift = Shift(0.0, 24.0, None, 0.0)
 
         driver = Driver(1, default_position, shift, [task1, task2])
 
@@ -742,7 +742,7 @@ class TestDriver:
         station2 = Station(2, "Station 2", Position([-73.6, 45.6]))
         task1 = BatterySwapTask(1, station=station1)
         task2 = BatterySwapTask(2, station=station2)
-        shift = Shift(0.0, 24.0, None, 0.0, 24.0, None)
+        shift = Shift(0.0, 24.0, None, 0.0)
 
         driver = Driver(1, default_position, shift, [task1, task2])
 
@@ -813,7 +813,7 @@ class TestDriver:
         station2 = Station(2, "Station 2", Position([-73.6, 45.6]))
         task1 = BatterySwapTask(1, station=station1)
         task2 = BatterySwapTask(2, station=station2)
-        shift = Shift(0.0, 24.0, None, 0.0, 24.0, None)
+        shift = Shift(0.0, 24.0, None, 0.0)
 
         driver = Driver(1, default_position, shift, [task1, task2])
         driver.set_vehicle(vehicle)
@@ -877,7 +877,7 @@ class TestDriver:
         station2 = Station(2, "Station 2", Position([-73.6, 45.6]))
         task1 = BatterySwapTask(1, station=station1)
         task2 = BatterySwapTask(2, station=station2)
-        shift = Shift(0.0, 24.0, None, 0.0, 24.0, None)
+        shift = Shift(0.0, 24.0, None, 0.0)
 
         driver = Driver(1, default_position, shift, [task1, task2])
         driver.set_vehicle(vehicle)
