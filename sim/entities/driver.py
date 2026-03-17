@@ -51,6 +51,7 @@ LUNCH_BREAK_DURATION = 1800  # 30 minutes for lunch
 LUNCH_DISTANCE_METERS = 1000  # Lunch location ~1km away
 METERS_PER_DEGREE = 111111  # conversion factor for lunch location calculation
 SHIFT_END_BUFFER_TIME = 1200  # Start Heading back to HQ 20 min before shifts
+PENDING_SHIFT_THRESHOLD = 7200  # a driver is pending shift 2 hours before shift start
 
 
 class DriverState(Enum):
@@ -817,7 +818,7 @@ class Driver:
         lunch_time = self.shift.get_relative_lunch_break()
 
         # Before shift
-        if current_sim_time < start_time - 2 * 60 * 60:
+        if current_sim_time < start_time - PENDING_SHIFT_THRESHOLD:
             self.state = DriverState.OFF_SHIFT
             return self.state
 
@@ -858,7 +859,7 @@ class Driver:
     def _off_shift(self, current_sim_time: float) -> None:
         """Handle OFF_SHIFT transitions."""
         time_to_shift = self.shift.get_relative_start_time() - current_sim_time
-        if 0 < time_to_shift <= 60 * 60 * 2:
+        if 0 < time_to_shift <= PENDING_SHIFT_THRESHOLD:
             self.set_state(DriverState.PENDING_SHIFT)
 
     def _pending_shift(self, current_sim_time: float) -> None:
