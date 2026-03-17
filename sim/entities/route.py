@@ -548,7 +548,7 @@ class Route:
             if offset <= global_idx < offset + geom_len:
                 local_idx = global_idx - offset  # exact distance within that road
                 # Map geometry index to road distance
-                total_dist += (local_idx / geom_len - 1) * road.length
+                total_dist += (local_idx / (geom_len - 1)) * road.length
                 break
             total_dist += road.length
             offset += geom_len - 1
