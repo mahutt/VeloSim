@@ -23,7 +23,7 @@ SOFTWARE.
 """
 
 import math
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Optional
 from sim.entities.position import Position
 from sim.entities.road import Road
 from sim.entities.traffic_data import TrafficTriple
@@ -175,6 +175,14 @@ class Route:
         # Cached traffic triples (eagerly updated via notify_traffic_changed)
         self._traffic_triples_cache: list[TrafficTriple] = []
         self._has_traffic_changed: bool = False
+
+        # Global traffic event indices for a route
+        self._event_indices: list[tuple[int, int]] = (
+            []
+        )  # Global (start, end) index pairs
+        self._next_event_idx: int = (
+            0  # Pointer (index) to next upcoming index in global range
+        )
 
         # If no roads were created, the route was finished from the start
         if not self.roads:
@@ -379,10 +387,12 @@ class Route:
         return self._traffic_triples_cache
 
     def notify_traffic_changed(self) -> None:
-        """Rebuild cached traffic triples after a road's traffic changed.
+        """Rebuild cached traffic triples and global event indices after a
+        road's traffic changed.
 
         Called by TrafficController when traffic is applied/removed on a road
-        belonging to this route. Rebuilds the full triple list from all roads.
+        belonging to this route. Rebuilds the full triple list from all roads,
+        as well as the global event indices.
 
         Returns:
             None
@@ -390,9 +400,8 @@ class Route:
         triples: list[TrafficTriple] = []
         coord_offset = 0
         for r in self.roads:
-            if not r.geometry:
-                continue
-            geom_len = len(r.geometry)
+            # Use geometry length if available. Otherwise, fallback to pointcollection
+            geom_len = len(r.geometry) if r.geometry else len(r.pointcollection)
             for geom_start, geom_end, level in r.get_traffic_geometry_ranges():
                 abs_start = coord_offset + geom_start
                 abs_end = coord_offset + geom_end
@@ -407,6 +416,7 @@ class Route:
                     triples.append(TrafficTriple(abs_start, abs_end, level))
             coord_offset += geom_len - 1  # shared boundary point
         self._traffic_triples_cache = triples
+        self._rebuild_global_event_indices()
         self._has_traffic_changed = True
 
     def get_distance_traveled(self) -> float:
@@ -425,6 +435,125 @@ class Route:
             distance += current_road.get_distance_at_index(self.current_point_index)
 
         return distance
+
+    def _rebuild_global_event_indices(self) -> None:
+        """Rebuilds the global event list in O(N) linear time.
+
+        Returns:
+            None
+        """
+        self._event_indices = []
+        coord_offset = 0
+
+        for road in self.roads:
+            # Get length of road segment. Fallback to pointcollection length
+            geom_len = (
+                len(road.geometry) if road.geometry else len(road.pointcollection)
+            )
+
+            # Get sorted ranges from the road
+            for geom_start, geom_end, level in road.get_traffic_geometry_ranges():
+                self._event_indices.append(
+                    (geom_start + coord_offset, geom_end + coord_offset)
+                )
+
+            coord_offset += geom_len - 1
+
+        self._next_event_idx = 0
+        self._update_next_event_index()
+
+    def _update_next_event_index(self) -> None:
+        """Advances pointer/index if the driver has passed the end of an event.
+
+        Returns:
+            None
+        """
+        current_global_idx = self._get_current_global_geometry_index()
+
+        while (
+            self._next_event_idx < len(self._event_indices)
+            and current_global_idx > self._event_indices[self._next_event_idx][1]
+        ):
+            self._next_event_idx += 1
+
+    def _get_current_global_geometry_index(self) -> int:
+        """Maps current road/point index to the global geometry indices.
+
+        Returns:
+            Current point index of the driver according to the global geometry indices.
+        """
+        offset = 0
+        for road in self.roads[: self.current_road_index]:
+            # if geometry is missing, fallback to length of pointcollection
+            geom_len = (
+                len(road.geometry) if road.geometry else len(road.pointcollection)
+            )
+            offset += geom_len - 1
+
+        # Map interpolated point index back to geometry index ratio
+        current_road = self.roads[self.current_road_index]
+        point_collection_len = len(current_road.active_pointcollection)
+        geom_len = (
+            len(current_road.geometry)
+            if current_road.geometry
+            else len(current_road.pointcollection)
+        )
+
+        if point_collection_len <= 1:
+            return offset
+
+        progress = self.current_point_index / (point_collection_len - 1)
+        return offset + int(progress * (geom_len - 1))
+
+    def get_distance_to_next_event(self) -> Optional[float]:
+        """Gets the distance from the current index to the next traffic event by
+        calculating Distance(Next Event Start) - Distance(Current Position)
+
+        Returns:
+            Distance from current index to the next traffic event in the route.
+            Otherwise, None if there are no next events.
+        """
+        self._update_next_event_index()
+
+        if self._next_event_idx >= len(self._event_indices):
+            return None
+
+        next_start_idx = self._event_indices[self._next_event_idx][0]
+
+        # Calculate distance to the start of the event
+        dist_to_event = self.get_distance_at_global_coordinate_index(next_start_idx)
+        current_dist = self.get_distance_traveled()
+
+        return max(0.0, dist_to_event - current_dist)
+
+    def get_distance_at_global_coordinate_index(self, global_idx: int) -> float:
+        """Helper function to get the total distance till global_idx in the
+        global ruler. Sums road lengths up to a specific global geometry index.
+
+        Args:
+            global_idx: Start index of the next traffic event in the global ruler.
+
+        Returns:
+            Sum of road lengths up to global_idx
+        """
+        total_dist = 0.0
+        offset = 0
+
+        for road in self.roads:
+            geom_len = (
+                len(road.geometry) if road.geometry else len(road.pointcollection)
+            )
+            # Checks if global_idx is between the start and end of the current road
+            # If true, found the target point and break from loop
+            if offset <= global_idx < offset + geom_len:
+                local_idx = global_idx - offset  # exact distance within that road
+                # Map geometry index to road distance
+                total_dist += (local_idx / geom_len - 1) * road.length
+                break
+            total_dist += road.length
+            offset += geom_len - 1
+
+        return total_dist
 
     def next(self) -> Position | None:
         """Return the next position in the route traversal.
