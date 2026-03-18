@@ -620,7 +620,7 @@ test('updateAllRoutesDisplay skips routes without positions', () => {
   updateAllRoutesDisplay(
     routes,
     positions,
-    undefined,
+    null,
     MockMap.instance! as unknown as mapboxgl.Map
   );
 
@@ -658,7 +658,7 @@ test('updateAllRoutesDisplay handles empty coordinates gracefully', () => {
   updateAllRoutesDisplay(
     routes,
     positions,
-    undefined,
+    null,
     MockMap.instance! as unknown as mapboxgl.Map
   );
 
@@ -703,7 +703,7 @@ test('updateAllRoutesDisplay displays all routes when no driver is selected', ()
   updateAllRoutesDisplay(
     routes,
     positions,
-    undefined,
+    null,
     MockMap.instance! as unknown as mapboxgl.Map
   );
 

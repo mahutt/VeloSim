@@ -347,7 +347,7 @@ export function clearRouteDisplay(map: mapboxgl.Map) {
 export function updateAllRoutesDisplay(
   routes: Map<number, Route>,
   positions: Map<number, Position>,
-  selectedDriverId: number | undefined,
+  selectedDriverId: number | null,
   map: mapboxgl.Map
 ) {
   const allNextTaskFeatures: GeoJSON.Feature[] = [];

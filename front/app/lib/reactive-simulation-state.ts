@@ -22,7 +22,7 @@
  * SOFTWARE.
  */
 
-import type { SelectedItemBarElement } from '~/components/map/selected-item-bar';
+import type { SelectedItem } from '~/components/map/selected-item-bar';
 import type { ResourceBarElement } from '~/components/resource/resource-bar';
 import type { ResourceItemElement } from '~/components/resource/resource-item';
 import type { HQWidgetProps } from '~/components/simulation/hq-widget';
@@ -35,7 +35,7 @@ export interface ReactiveSimulationState {
   isLoading: boolean;
 
   // selected item bar
-  selectedItemBarElement: SelectedItemBarElement | null;
+  selectedItems: SelectedItem[];
   blockAssignments: boolean;
 
   // task assignment banner
@@ -67,7 +67,7 @@ export interface ReactiveSimulationState {
 
 export const DEFAULT_REACTIVE_SIMULATION_STATE: ReactiveSimulationState = {
   isLoading: true,
-  selectedItemBarElement: null,
+  selectedItems: [],
   blockAssignments: false,
   pendingAssignment: null,
   pendingAssignmentLoading: false,
@@ -93,10 +93,7 @@ export function areReactiveSimulationStatesEqual(
 ): boolean {
   return (
     a.isLoading === b.isLoading &&
-    areSelectedItemBarElementsEqual(
-      a.selectedItemBarElement,
-      b.selectedItemBarElement
-    ) &&
+    areSelectedItemsEqual(a.selectedItems, b.selectedItems) &&
     a.blockAssignments === b.blockAssignments &&
     arePendingAssignmentsEqual(a.pendingAssignment, b.pendingAssignment) &&
     a.pendingAssignmentLoading === b.pendingAssignmentLoading &&
@@ -113,14 +110,14 @@ export function areReactiveSimulationStatesEqual(
   );
 }
 
-function areSelectedItemBarElementsEqual(
-  a: SelectedItemBarElement | null,
-  b: SelectedItemBarElement | null
-): boolean {
-  if (a === b) return true; // covers case where both are null or same reference
-  if (!a || !b) return false; // one is null and the other isn't
-  if (a.type !== b.type) return false; // different types
-  return a.value.id === b.value.id; // same type, compare by id
+function areSelectedItemsEqual(a: SelectedItem[], b: SelectedItem[]): boolean {
+  if (a === b) return true;
+  if (a.length !== b.length) return false;
+  for (let i = 0; i < a.length; i++) {
+    if (a[i].type !== b[i].type || a[i].value.id !== b[i].value.id)
+      return false;
+  }
+  return true;
 }
 
 function arePendingAssignmentsEqual(

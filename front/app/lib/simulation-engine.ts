@@ -73,7 +73,6 @@ export default class SimulationEngine {
       map,
       this.stateManager,
       (type, id) => this.selectItem(type, id),
-      () => this.clearSelection(),
       (resourceId, taskIds) => this.requestAssignment(resourceId, taskIds)
     );
     this.mode = SimulationMode.Server;
@@ -136,7 +135,7 @@ export default class SimulationEngine {
   }
 
   public clearSelection(): void {
-    this.state.setSelectedItem(null);
+    this.state.clearSelection();
   }
 
   private async assignTasks(
@@ -405,11 +404,18 @@ export default class SimulationEngine {
 
     // obtain valid task objects from taskIds param
     const uniqueTaskIds = Array.from(new Set(taskIds));
-    const tasks = uniqueTaskIds
+    const allTasks = uniqueTaskIds
       .map((id) => this.state.getTask(id))
-      .filter((t): t is StationTask => t !== undefined) // filter out non-existent tasks
-      .filter((t) => t.assignedDriverId !== driverId); // filter out tasks already assigned to this resource
-    if (tasks.length === 0) return;
+      .filter((t): t is StationTask => t !== undefined); // filter out non-existent tasks
+    const tasks = allTasks.filter((t) => t.assignedDriverId !== driverId); // filter out tasks already assigned to this resource
+    if (tasks.length === 0) {
+      if (allTasks.length > 0) {
+        toast.info(
+          `All ${allTasks.length === 1 ? 'task is' : `${allTasks.length} tasks are`} already assigned to ${targetDriver.name}.`
+        );
+      }
+      return;
+    }
 
     // determine if all tasks are assigned to the same resource
     const assignedIds = tasks.map((t) => t.assignedDriverId);

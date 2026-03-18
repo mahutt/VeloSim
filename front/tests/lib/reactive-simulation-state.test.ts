@@ -24,7 +24,7 @@
 
 import {
   makePopulatedDriver,
-  makeSelectedItemBarElement,
+  makeSelectedItem,
   makeReactiveSimulationState,
   makePendingAssignment,
   makeResourceItemElement,
@@ -66,18 +66,20 @@ describe('areReactiveSimulationStatesEqual', () => {
         unassignedTaskIds: [10],
       },
       pendingAssignmentLoading: false,
-      selectedItemBarElement: {
-        type: SelectedItemType.Driver,
-        value: {
-          id: 5,
-          name: 'Bob',
-          state: DriverState.Idle,
-          position: [0, 0],
-          tasks: [],
-          route: null,
-          inProgressTask: null,
+      selectedItems: [
+        {
+          type: SelectedItemType.Driver,
+          value: {
+            id: 5,
+            name: 'Bob',
+            state: DriverState.Idle,
+            position: [0, 0],
+            tasks: [],
+            route: null,
+            inProgressTask: null,
+          },
         },
-      },
+      ],
       blockAssignments: false,
       HQWidgetState: {
         entities: { type: SelectedItemType.Driver, count: 2 },
@@ -192,22 +194,22 @@ describe('areReactiveSimulationStatesEqual', () => {
     });
   });
 
-  describe('selectedItemBarElement', () => {
-    it('returns true when both are null', () => {
+  describe('selectedItems', () => {
+    it('returns true when both are empty', () => {
       expect(
         areReactiveSimulationStatesEqual(
-          makeReactiveSimulationState({ selectedItemBarElement: null }),
-          makeReactiveSimulationState({ selectedItemBarElement: null })
+          makeReactiveSimulationState({ selectedItems: [] }),
+          makeReactiveSimulationState({ selectedItems: [] })
         )
       ).toBe(true);
     });
 
-    it('returns false when one is null and the other is not', () => {
+    it('returns false when one is empty and the other is not', () => {
       expect(
         areReactiveSimulationStatesEqual(
-          makeReactiveSimulationState({ selectedItemBarElement: null }),
+          makeReactiveSimulationState({ selectedItems: [] }),
           makeReactiveSimulationState({
-            selectedItemBarElement: makeSelectedItemBarElement(),
+            selectedItems: [makeSelectedItem()],
           })
         )
       ).toBe(false);
@@ -217,14 +219,18 @@ describe('areReactiveSimulationStatesEqual', () => {
       expect(
         areReactiveSimulationStatesEqual(
           makeReactiveSimulationState({
-            selectedItemBarElement: makeSelectedItemBarElement({
-              type: SelectedItemType.Driver,
-            }),
+            selectedItems: [
+              makeSelectedItem({
+                type: SelectedItemType.Driver,
+              }),
+            ],
           }),
           makeReactiveSimulationState({
-            selectedItemBarElement: makeSelectedItemBarElement({
-              type: SelectedItemType.Station,
-            }),
+            selectedItems: [
+              makeSelectedItem({
+                type: SelectedItemType.Station,
+              }),
+            ],
           })
         )
       ).toBe(false);
@@ -234,16 +240,20 @@ describe('areReactiveSimulationStatesEqual', () => {
       expect(
         areReactiveSimulationStatesEqual(
           makeReactiveSimulationState({
-            selectedItemBarElement: makeSelectedItemBarElement({
-              type: SelectedItemType.Driver,
-              value: makePopulatedDriver({ id: 1 }),
-            }),
+            selectedItems: [
+              makeSelectedItem({
+                type: SelectedItemType.Driver,
+                value: makePopulatedDriver({ id: 1 }),
+              }),
+            ],
           }),
           makeReactiveSimulationState({
-            selectedItemBarElement: makeSelectedItemBarElement({
-              type: SelectedItemType.Driver,
-              value: makePopulatedDriver({ id: 2 }),
-            }),
+            selectedItems: [
+              makeSelectedItem({
+                type: SelectedItemType.Driver,
+                value: makePopulatedDriver({ id: 2 }),
+              }),
+            ],
           })
         )
       ).toBe(false);
@@ -253,19 +263,50 @@ describe('areReactiveSimulationStatesEqual', () => {
       expect(
         areReactiveSimulationStatesEqual(
           makeReactiveSimulationState({
-            selectedItemBarElement: makeSelectedItemBarElement({
-              type: SelectedItemType.Driver,
-              value: makePopulatedDriver({ id: 42 }),
-            }),
+            selectedItems: [
+              makeSelectedItem({
+                type: SelectedItemType.Driver,
+                value: makePopulatedDriver({ id: 42 }),
+              }),
+            ],
           }),
           makeReactiveSimulationState({
-            selectedItemBarElement: makeSelectedItemBarElement({
-              type: SelectedItemType.Driver,
-              value: makePopulatedDriver({ id: 42 }),
-            }),
+            selectedItems: [
+              makeSelectedItem({
+                type: SelectedItemType.Driver,
+                value: makePopulatedDriver({ id: 42 }),
+              }),
+            ],
           })
         )
       ).toBe(true);
+    });
+
+    it('returns false for multi-selection with different lengths', () => {
+      expect(
+        areReactiveSimulationStatesEqual(
+          makeReactiveSimulationState({
+            selectedItems: [
+              makeSelectedItem({
+                type: SelectedItemType.Station,
+                value: { id: 1, name: 'A', position: [0, 0], tasks: [] },
+              }),
+            ],
+          }),
+          makeReactiveSimulationState({
+            selectedItems: [
+              makeSelectedItem({
+                type: SelectedItemType.Station,
+                value: { id: 1, name: 'A', position: [0, 0], tasks: [] },
+              }),
+              makeSelectedItem({
+                type: SelectedItemType.Station,
+                value: { id: 2, name: 'B', position: [0, 0], tasks: [] },
+              }),
+            ],
+          })
+        )
+      ).toBe(false);
     });
   });
 

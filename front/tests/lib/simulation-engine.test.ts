@@ -121,11 +121,9 @@ describe('SimulationEngine', () => {
   });
 
   describe('clearSelection', () => {
-    it("calls state manager's setSelectedItem with null", () => {
+    it("calls state manager's clearSelection", () => {
       engine.clearSelection();
-      expect(mockSimulationStateManager.setSelectedItem).toHaveBeenCalledWith(
-        null
-      );
+      expect(mockSimulationStateManager.clearSelection).toHaveBeenCalled();
     });
   });
 

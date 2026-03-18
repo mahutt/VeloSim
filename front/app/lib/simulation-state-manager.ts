@@ -35,6 +35,7 @@ import {
   type ReactiveSimulationState,
 } from './reactive-simulation-state';
 import { SelectedItemType } from '~/components/map/selected-item-bar';
+import type { SelectedItem } from '~/components/map/selected-item-bar';
 import {
   driverResourceHasUpdated,
   vehicleResourceHasUpdated,
@@ -62,8 +63,13 @@ export interface SimulationStateManagerInterface {
   getTask: (taskId: number) => StationTask | undefined;
   setTask: (task: StationTask) => void;
 
-  getSelectedItem: () => Driver | Station | null;
+  getSelectedItems: () => SelectedItem[];
   setSelectedItem: (item: Driver | Station | null) => void;
+  addSelectedStation: (stationId: number) => void;
+  removeSelectedStation: (stationId: number) => void;
+  toggleSelectedStation: (stationId: number) => void;
+  setSelectedStations: (stationIds: number[]) => void;
+  clearSelection: () => void;
 
   getHeadquarters: () => Headquarters | null;
   setHeadquarters: (hq: Headquarters) => void;
@@ -115,7 +121,6 @@ export default class SimulationStateManager implements SimulationStateManagerInt
   private vehicles: Map<number, Vehicle> = new Map();
   private stations: Map<number, Station> = new Map();
   private tasks: Map<number, StationTask> = new Map();
-  private selectedItem: Driver | Station | null = null;
   private headquarters: Headquarters | null = null;
   private mapShouldRefresh: boolean = false;
 
@@ -155,9 +160,9 @@ export default class SimulationStateManager implements SimulationStateManagerInt
     const previousDriver = this.drivers.get(driver.id);
     this.drivers.set(driver.id, driver);
 
-    // If the previous version of this driver was the selected item, update the selected item
-    if (this.selectedItem === previousDriver) {
-      this.setSelectedItem(driver);
+    // If this driver is in the selection, refresh selected items
+    if (this.isSelectedById(SelectedItemType.Driver, driver.id)) {
+      this.refreshSelectedItems();
     }
 
     // Possibily update resource bar
@@ -177,13 +182,13 @@ export default class SimulationStateManager implements SimulationStateManagerInt
   }
 
   public setStation(station: Station) {
-    const prevStation = this.stations.get(station.id);
     this.stations.set(station.id, station);
 
-    // If the previous version of this station was the selected item, update the selected item
-    if (this.selectedItem === prevStation) {
-      this.setSelectedItem(station);
+    // If this station is in the selection, refresh selected items
+    if (this.isSelectedById(SelectedItemType.Station, station.id)) {
+      this.refreshSelectedItems();
     }
+
     this.setMapShouldRefresh(true);
   }
 
@@ -213,11 +218,6 @@ export default class SimulationStateManager implements SimulationStateManagerInt
 
   public setTask(task: StationTask) {
     this.tasks.set(task.id, task);
-
-    if (this.selectedItem && this.selectedItem.taskIds.includes(task.id)) {
-      this.setSelectedItem(this.selectedItem);
-    }
-
     this.setMapShouldRefresh(true);
   }
 
@@ -225,52 +225,126 @@ export default class SimulationStateManager implements SimulationStateManagerInt
     return this.tasks.get(taskId);
   }
 
-  public getSelectedItem() {
-    return this.selectedItem;
+  public getSelectedItems(): SelectedItem[] {
+    return this.reactiveState.selectedItems;
   }
 
   public setSelectedItem(item: Driver | Station | null) {
-    this.selectedItem = item;
+    this.setPendingAssignment(null);
     this.setMapShouldRefresh(true);
 
     if (!item) {
-      this.updateReactiveState({ selectedItemBarElement: null });
+      this.setSelectedItems([]);
       return;
     }
 
     if ('shift' in item) {
-      // it's a driver
-      const driver = item as Driver;
-      this.updateReactiveState({
-        selectedItemBarElement: {
-          type: SelectedItemType.Driver,
-          value: {
-            ...driver,
-            tasks: driver.taskIds.map(
-              (taskId: number) => this.tasks.get(taskId)!
-            ),
-            inProgressTask: driver.inProgressTaskId
-              ? this.tasks.get(driver.inProgressTaskId)!
-              : null,
-          },
-        },
-      });
+      this.setSelectedItems([this.populateDriverItem(item as Driver)]);
     } else {
-      const station = item as Station;
-      this.updateReactiveState({
-        selectedItemBarElement: {
-          type: SelectedItemType.Station,
-          value: {
-            id: station.id,
-            name: station.name,
-            position: station.position,
-            tasks: station.taskIds.map(
-              (taskId: number) => this.tasks.get(taskId)!
-            ),
-          },
-        },
-      });
+      this.setSelectedItems([this.populateStationItem(item as Station)]);
     }
+  }
+
+  public getMultiSelectedStationIds(): Set<number> {
+    const ids = new Set<number>();
+    for (const item of this.reactiveState.selectedItems) {
+      if (item.type === SelectedItemType.Station) ids.add(item.value.id);
+    }
+    return ids;
+  }
+
+  public addSelectedStation(stationId: number): void {
+    const ids = this.getMultiSelectedStationIds();
+    ids.add(stationId);
+    this.updateSelectedStations(ids);
+  }
+
+  public removeSelectedStation(stationId: number): void {
+    const ids = this.getMultiSelectedStationIds();
+    ids.delete(stationId);
+    this.updateSelectedStations(ids);
+  }
+
+  public toggleSelectedStation(stationId: number): void {
+    const ids = this.getMultiSelectedStationIds();
+    if (ids.has(stationId)) {
+      ids.delete(stationId);
+    } else {
+      ids.add(stationId);
+    }
+    this.updateSelectedStations(ids);
+  }
+
+  public setSelectedStations(stationIds: number[]): void {
+    this.updateSelectedStations(new Set(stationIds));
+  }
+
+  public clearSelection(): void {
+    if (this.reactiveState.selectedItems.length === 0) return;
+    this.setSelectedItems([]);
+    this.setPendingAssignment(null);
+    this.setMapShouldRefresh(true);
+  }
+
+  private updateSelectedStations(ids: Set<number>): void {
+    this.setPendingAssignment(null);
+    const items: SelectedItem[] = [];
+    for (const id of ids) {
+      const station = this.stations.get(id);
+      if (station) items.push(this.populateStationItem(station));
+    }
+    this.setSelectedItems(items);
+    this.setMapShouldRefresh(true);
+  }
+
+  private setSelectedItems(items: SelectedItem[]): void {
+    this.updateReactiveState({ selectedItems: items });
+  }
+
+  private isSelectedById(type: SelectedItemType, id: number): boolean {
+    return this.reactiveState.selectedItems.some(
+      (item) => item.type === type && item.value.id === id
+    );
+  }
+
+  private refreshSelectedItems(): void {
+    if (this.reactiveState.selectedItems.length === 0) return;
+    const refreshed: SelectedItem[] = [];
+    for (const item of this.reactiveState.selectedItems) {
+      if (item.type === SelectedItemType.Driver) {
+        const driver = this.drivers.get(item.value.id);
+        if (driver) refreshed.push(this.populateDriverItem(driver));
+      } else {
+        const station = this.stations.get(item.value.id);
+        if (station) refreshed.push(this.populateStationItem(station));
+      }
+    }
+    this.setSelectedItems(refreshed);
+  }
+
+  private populateDriverItem(driver: Driver): SelectedItem {
+    return {
+      type: SelectedItemType.Driver,
+      value: {
+        ...driver,
+        tasks: driver.taskIds.map((id) => this.tasks.get(id)!),
+        inProgressTask: driver.inProgressTaskId
+          ? this.tasks.get(driver.inProgressTaskId)!
+          : null,
+      },
+    };
+  }
+
+  private populateStationItem(station: Station): SelectedItem {
+    return {
+      type: SelectedItemType.Station,
+      value: {
+        id: station.id,
+        name: station.name,
+        position: station.position,
+        tasks: station.taskIds.map((id) => this.tasks.get(id)!),
+      },
+    };
   }
 
   public getStartTime() {

@@ -32,7 +32,7 @@ export type ResourceBarElement = ResourceItemElement[];
 
 export default function ResourceBar() {
   const { state, engine } = useSimulation();
-  const { resourceBarElement, selectedItemBarElement: selectedItem } = state;
+  const { resourceBarElement, selectedItems } = state;
 
   const handleSelect = (resourceId: number) => {
     engine.selectItem(SelectedItemType.Driver, resourceId);
@@ -41,8 +41,9 @@ export default function ResourceBar() {
   // Check if a resource is currently selected
   const isResourceSelected = (resourceId: number) => {
     return (
-      selectedItem?.type === SelectedItemType.Driver &&
-      selectedItem.value.id === resourceId
+      selectedItems.length === 1 &&
+      selectedItems[0].type === SelectedItemType.Driver &&
+      selectedItems[0].value.id === resourceId
     );
   };
 
