@@ -65,9 +65,8 @@ export function adaptHeadquartersToGeoJSON(
 
 export function adaptStationsToGeoJSON(
   stations: Station[],
-  selectedStationId?: number,
-  hoveredStationId?: number,
-  multiSelectedStationIds?: Set<number>
+  selectedStationIds: Set<number>,
+  hoveredStationId: number | null
 ): GeoJSON.FeatureCollection {
   return {
     type: 'FeatureCollection',
@@ -77,9 +76,7 @@ export function adaptStationsToGeoJSON(
         id: station.id,
         name: station.name,
         taskCount: station.taskIds.length,
-        selected:
-          station.id === selectedStationId ||
-          (multiSelectedStationIds?.has(station.id) ?? false),
+        selected: selectedStationIds.has(station.id),
         hover: station.id === hoveredStationId,
       },
       geometry: {
@@ -92,8 +89,8 @@ export function adaptStationsToGeoJSON(
 
 export function adaptResourcesToGeoJSON(
   resources: Driver[],
-  selectedId?: number,
-  hoveredId?: number
+  selectedId: number | null,
+  hoveredId: number | null
 ): GeoJSON.FeatureCollection {
   return {
     type: 'FeatureCollection',

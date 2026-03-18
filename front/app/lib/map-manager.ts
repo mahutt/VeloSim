@@ -107,9 +107,12 @@ export default class MapManager {
       // Ctrl+click on a station toggles multi-selection
       if (modifiers!.ctrlKey && item.type === SelectedItemType.Station) {
         // If a single station was selected, promote it into the multi-selection
-        const currentSingle = this.state.getSelectedItem();
-        if (this.isStation(currentSingle)) {
-          const singleStationId = currentSingle.id;
+        const selectedItems = this.state.getSelectedItems();
+        if (
+          selectedItems.length === 1 &&
+          selectedItems[0].type === SelectedItemType.Station
+        ) {
+          const singleStationId = selectedItems[0].value.id;
           this.state.clearSelection();
           if (!this.state.getMultiSelectedStationIds().has(singleStationId)) {
             this.state.addSelectedStation(singleStationId);
@@ -179,7 +182,6 @@ export default class MapManager {
         }
 
         const allTaskIds: number[] = [];
-        const stationNames: string[] = [];
 
         for (const sid of stationIds) {
           const station = this.state.getStation(sid);
@@ -193,7 +195,6 @@ export default class MapManager {
             continue;
           }
           allTaskIds.push(...station.taskIds);
-          stationNames.push(station.name);
         }
 
         if (allTaskIds.length === 0) {
@@ -342,20 +343,27 @@ export default class MapManager {
     if (stations.length > 0) {
       const geojson = adaptStationsToGeoJSON(
         stations,
-        this.getSelectedStationId(),
-        this.hoveredStationId ?? undefined,
-        this.state.getMultiSelectedStationIds()
+        this.state.getMultiSelectedStationIds(),
+        this.hoveredStationId
       );
       setMapSource(MapSource.Stations, geojson, map);
     }
+
+    // Derive selected resource (driver) ID from selection state
+    const selectedItems = this.state.getSelectedItems();
+    const selectedResourceId =
+      selectedItems.length === 1 &&
+      selectedItems[0].type === SelectedItemType.Driver
+        ? selectedItems[0].value.id
+        : null;
 
     // Update resources - drivers with an assigned vehicle
     if (drivers.length > 0) {
       const resources = drivers.filter((driver) => driver.vehicleId !== null);
       const geojson = adaptResourcesToGeoJSON(
         resources,
-        this.getSelectedResourceId(),
-        this.hoveredResourceId ?? undefined
+        selectedResourceId,
+        this.hoveredResourceId
       );
       setMapSource(MapSource.Resources, geojson, map);
     }
@@ -366,7 +374,7 @@ export default class MapManager {
       updateAllRoutesDisplay(
         routesMap,
         currentPositionsMap,
-        this.getSelectedResourceId(),
+        selectedResourceId,
         map
       );
     } else {
@@ -375,7 +383,7 @@ export default class MapManager {
     }
     // Always show selected route prominently if one is selected
     this.updateSelectedRouteDisplay(
-      this.getSelectedResourceId(),
+      selectedResourceId,
       map,
       routesMap,
       currentPositionsMap
@@ -389,12 +397,12 @@ export default class MapManager {
   }
 
   private updateSelectedRouteDisplay(
-    selectedDriverId: number | undefined,
+    selectedDriverId: number | null,
     map: mapboxgl.Map,
     routes: Map<number, Route>,
     currentPositions: Map<number, Position>
   ) {
-    if (selectedDriverId === undefined) {
+    if (selectedDriverId === null) {
       clearRouteDisplay(map);
       return;
     }
@@ -421,23 +429,5 @@ export default class MapManager {
     this.hoverDebounceTimeout = setTimeout(() => {
       this.state.setMapShouldRefresh(true);
     }, 16); // ~60fps
-  }
-
-  private getSelectedStationId(): number | undefined {
-    const selectedItem = this.state.getSelectedItem();
-    return this.isStation(selectedItem) ? selectedItem.id : undefined;
-  }
-
-  private getSelectedResourceId(): number | undefined {
-    const selectedItem = this.state.getSelectedItem();
-    return this.isDriver(selectedItem) ? selectedItem.id : undefined;
-  }
-
-  private isStation(item: Driver | Station | null): item is Station {
-    return item !== null && !('shift' in item);
-  }
-
-  private isDriver(item: Driver | Station | null): item is Driver {
-    return item !== null && 'shift' in item;
   }
 }

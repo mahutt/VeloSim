@@ -148,7 +148,6 @@ export const mockSimulationStateManager: Partial<SimulationStateManager> = {
   getTask: vi.fn(),
   setTask: vi.fn(),
 
-  getSelectedItem: vi.fn().mockReturnValue(null),
   getSelectedItems: vi.fn().mockReturnValue([]),
   setSelectedItem: vi.fn(),
 
@@ -158,11 +157,7 @@ export const mockSimulationStateManager: Partial<SimulationStateManager> = {
   setSelectedStations: vi.fn(),
   clearSelection: vi.fn(),
 
-  // Backward-compatible aliases
   getMultiSelectedStationIds: vi.fn().mockReturnValue(new Set()),
-  toggleMultiSelectedStation: vi.fn(),
-  setMultiSelectedStations: vi.fn(),
-  clearMultiSelectedStations: vi.fn(),
 
   getHeadquarters: vi.fn(),
   setHeadquarters: vi.fn(),

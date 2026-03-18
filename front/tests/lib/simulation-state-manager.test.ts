@@ -107,13 +107,16 @@ describe('SimulationStateManager', () => {
     expect(manager.getAllDrivers()).toContain(driver);
   });
 
-  it('setDriver updates selectedItem when it was the previous driver', () => {
+  it('setDriver updates selectedItems when it was the previous driver', () => {
     const driver = makeDriver({ id: 1, name: 'Alice' });
     manager.setDriver(driver);
     manager.setSelectedItem(driver);
     const updated = makeDriver({ id: 1, name: 'Alice Updated' });
     manager.setDriver(updated);
-    expect(manager.getSelectedItem()).toBe(updated);
+    const items = manager.getSelectedItems();
+    expect(items).toHaveLength(1);
+    expect(items[0].type).toBe(SelectedItemType.Driver);
+    expect(items[0].value.id).toBe(1);
   });
 
   it('setDriver triggers resource bar update when driver state changes', () => {
@@ -156,13 +159,16 @@ describe('SimulationStateManager', () => {
     expect(manager.getAllStations()).toContain(station);
   });
 
-  it('setStation updates selectedItem when it was the previous station', () => {
+  it('setStation updates selectedItems when it was the previous station', () => {
     const station = makeStation({ id: 1, name: 'Station A' });
     manager.setStation(station);
     manager.setSelectedItem(station);
     const updated = makeStation({ id: 1, name: 'Station B' });
     manager.setStation(updated);
-    expect(manager.getSelectedItem()).toBe(updated);
+    const items = manager.getSelectedItems();
+    expect(items).toHaveLength(1);
+    expect(items[0].type).toBe(SelectedItemType.Station);
+    expect(items[0].value.id).toBe(1);
   });
 
   // Tasks
@@ -175,7 +181,7 @@ describe('SimulationStateManager', () => {
   // Selected item — null
   it('setSelectedItem(null) clears selectedItems', () => {
     manager.setSelectedItem(null);
-    expect(manager.getSelectedItem()).toBeNull();
+    expect(manager.getSelectedItems()).toHaveLength(0);
     expect(setState).not.toHaveBeenCalled();
   });
 
@@ -319,14 +325,14 @@ describe('SimulationStateManager', () => {
       expect(manager.getMultiSelectedStationIds().size).toBe(0);
     });
 
-    it('toggleMultiSelectedStation adds a station', () => {
+    it('toggleSelectedStation adds a station', () => {
       const station = makeStation({ id: 1, taskIds: [100] });
       const task = makeStationTask({ id: 100, stationId: 1 });
       manager.setStation(station);
       manager.setTask(task);
 
       setState.mockClear();
-      manager.toggleMultiSelectedStation(1);
+      manager.toggleSelectedStation(1);
 
       expect(manager.getMultiSelectedStationIds()).toEqual(new Set([1]));
       expect(setState).toHaveBeenCalledWith(
@@ -344,13 +350,13 @@ describe('SimulationStateManager', () => {
       );
     });
 
-    it('toggleMultiSelectedStation removes a station that is already selected', () => {
+    it('toggleSelectedStation removes a station that is already selected', () => {
       const station = makeStation({ id: 1 });
       manager.setStation(station);
-      manager.toggleMultiSelectedStation(1);
+      manager.toggleSelectedStation(1);
 
       setState.mockClear();
-      manager.toggleMultiSelectedStation(1);
+      manager.toggleSelectedStation(1);
 
       expect(manager.getMultiSelectedStationIds().size).toBe(0);
       expect(setState).toHaveBeenCalledWith(
@@ -358,14 +364,14 @@ describe('SimulationStateManager', () => {
       );
     });
 
-    it('toggleMultiSelectedStation sets mapShouldRefresh', () => {
+    it('toggleSelectedStation sets mapShouldRefresh', () => {
       manager.setStation(makeStation({ id: 1 }));
       manager.setMapShouldRefresh(false);
-      manager.toggleMultiSelectedStation(1);
+      manager.toggleSelectedStation(1);
       expect(manager.getMapShouldRefresh()).toBe(true);
     });
 
-    it('setMultiSelectedStations replaces the selection', () => {
+    it('setSelectedStations replaces the selection', () => {
       const s1 = makeStation({ id: 1, taskIds: [10] });
       const s2 = makeStation({ id: 2, taskIds: [20] });
       manager.setStation(s1);
@@ -374,7 +380,7 @@ describe('SimulationStateManager', () => {
       manager.setTask(makeStationTask({ id: 20, stationId: 2 }));
 
       setState.mockClear();
-      manager.setMultiSelectedStations([1, 2]);
+      manager.setSelectedStations([1, 2]);
 
       expect(manager.getMultiSelectedStationIds()).toEqual(new Set([1, 2]));
       expect(setState).toHaveBeenCalledWith(
@@ -393,22 +399,22 @@ describe('SimulationStateManager', () => {
       );
     });
 
-    it('setMultiSelectedStations skips unknown station ids', () => {
+    it('setSelectedStations skips unknown station ids', () => {
       manager.setStation(makeStation({ id: 1 }));
 
-      manager.setMultiSelectedStations([1, 999]);
+      manager.setSelectedStations([1, 999]);
 
       const state = manager.getReactiveState();
       expect(state.selectedItems).toHaveLength(1);
       expect(state.selectedItems[0].value.id).toBe(1);
     });
 
-    it('clearMultiSelectedStations resets selection to empty', () => {
+    it('clearSelection resets selection to empty', () => {
       manager.setStation(makeStation({ id: 1 }));
-      manager.setMultiSelectedStations([1]);
+      manager.setSelectedStations([1]);
 
       setState.mockClear();
-      manager.clearMultiSelectedStations();
+      manager.clearSelection();
 
       expect(manager.getMultiSelectedStationIds().size).toBe(0);
       expect(setState).toHaveBeenCalledWith(
@@ -416,9 +422,9 @@ describe('SimulationStateManager', () => {
       );
     });
 
-    it('clearMultiSelectedStations is a no-op when already empty', () => {
+    it('clearSelection is a no-op when already empty', () => {
       setState.mockClear();
-      manager.clearMultiSelectedStations();
+      manager.clearSelection();
       expect(setState).not.toHaveBeenCalled();
     });
 
@@ -426,7 +432,7 @@ describe('SimulationStateManager', () => {
       const station = makeStation({ id: 1, name: 'Old', taskIds: [10] });
       manager.setStation(station);
       manager.setTask(makeStationTask({ id: 10, stationId: 1 }));
-      manager.setMultiSelectedStations([1]);
+      manager.setSelectedStations([1]);
 
       // Verify initial multi-selection has the old name
       expect(manager.getReactiveState().selectedItems).toEqual([
@@ -446,17 +452,17 @@ describe('SimulationStateManager', () => {
       ]);
     });
 
-    it('setMultiSelectedStations sets mapShouldRefresh', () => {
+    it('setSelectedStations sets mapShouldRefresh', () => {
       manager.setMapShouldRefresh(false);
-      manager.setMultiSelectedStations([]);
+      manager.setSelectedStations([]);
       expect(manager.getMapShouldRefresh()).toBe(true);
     });
 
-    it('clearMultiSelectedStations sets mapShouldRefresh when clearing non-empty set', () => {
+    it('clearSelection sets mapShouldRefresh when clearing non-empty set', () => {
       manager.setStation(makeStation({ id: 1 }));
-      manager.setMultiSelectedStations([1]);
+      manager.setSelectedStations([1]);
       manager.setMapShouldRefresh(false);
-      manager.clearMultiSelectedStations();
+      manager.clearSelection();
       expect(manager.getMapShouldRefresh()).toBe(true);
     });
   });

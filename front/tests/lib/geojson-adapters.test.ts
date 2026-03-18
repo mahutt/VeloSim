@@ -49,7 +49,7 @@ describe('adaptStationsToGeoJSON', () => {
       },
     ];
 
-    const result = adaptStationsToGeoJSON(stations);
+    const result = adaptStationsToGeoJSON(stations, new Set(), null);
 
     expect(result).toEqual({
       type: 'FeatureCollection',
@@ -88,7 +88,7 @@ describe('adaptStationsToGeoJSON', () => {
 
   it('should return an empty FeatureCollection when given an empty array', () => {
     const stations: Station[] = [];
-    const result = adaptStationsToGeoJSON(stations);
+    const result = adaptStationsToGeoJSON(stations, new Set(), null);
 
     expect(result).toEqual({
       type: 'FeatureCollection',
@@ -104,25 +104,20 @@ describe('adaptStationsToGeoJSON', () => {
     ];
 
     const multiSelectedIds = new Set([1, 3]);
-    const result = adaptStationsToGeoJSON(
-      stations,
-      undefined,
-      undefined,
-      multiSelectedIds
-    );
+    const result = adaptStationsToGeoJSON(stations, multiSelectedIds, null);
 
     expect(result.features[0].properties?.selected).toBe(true);
     expect(result.features[1].properties?.selected).toBe(false);
     expect(result.features[2].properties?.selected).toBe(true);
   });
 
-  it('should mark both single-selected and multi-selected stations as selected', () => {
+  it('should mark all selected stations as selected', () => {
     const stations: Station[] = [
       { id: 1, name: 'Station A', position: [-74.0, 40.7], taskIds: [] },
       { id: 2, name: 'Station B', position: [-73.9, 40.8], taskIds: [] },
     ];
 
-    const result = adaptStationsToGeoJSON(stations, 1, undefined, new Set([2]));
+    const result = adaptStationsToGeoJSON(stations, new Set([1, 2]), null);
 
     expect(result.features[0].properties?.selected).toBe(true);
     expect(result.features[1].properties?.selected).toBe(true);
@@ -378,19 +373,19 @@ describe('adaptStationsToGeoJSON — selection and hover', () => {
   ];
 
   it('should set selected flag for the matching station', () => {
-    const result = adaptStationsToGeoJSON(stations, 2);
+    const result = adaptStationsToGeoJSON(stations, new Set([2]), null);
     expect(result.features[0].properties?.selected).toBe(false);
     expect(result.features[1].properties?.selected).toBe(true);
   });
 
   it('should set hover flag for the matching station', () => {
-    const result = adaptStationsToGeoJSON(stations, undefined, 1);
+    const result = adaptStationsToGeoJSON(stations, new Set(), 1);
     expect(result.features[0].properties?.hover).toBe(true);
     expect(result.features[1].properties?.hover).toBe(false);
   });
 
   it('should include the correct taskCount', () => {
-    const result = adaptStationsToGeoJSON(stations);
+    const result = adaptStationsToGeoJSON(stations, new Set(), null);
     expect(result.features[0].properties?.taskCount).toBe(2);
     expect(result.features[1].properties?.taskCount).toBe(1);
   });
@@ -406,7 +401,7 @@ describe('adaptResourcesToGeoJSON', () => {
   });
 
   it('should include driver name in GeoJSON properties', () => {
-    const result = adaptResourcesToGeoJSON([baseDriver]);
+    const result = adaptResourcesToGeoJSON([baseDriver], null, null);
 
     expect(result.features).toHaveLength(1);
     expect(result.features[0].properties).toEqual(
@@ -415,7 +410,7 @@ describe('adaptResourcesToGeoJSON', () => {
   });
 
   it('should convert drivers to a GeoJSON FeatureCollection with all properties', () => {
-    const result = adaptResourcesToGeoJSON([baseDriver]);
+    const result = adaptResourcesToGeoJSON([baseDriver], null, null);
 
     expect(result).toEqual({
       type: 'FeatureCollection',
@@ -440,7 +435,7 @@ describe('adaptResourcesToGeoJSON', () => {
   });
 
   it('should mark the selected resource', () => {
-    const result = adaptResourcesToGeoJSON([baseDriver], baseDriver.id);
+    const result = adaptResourcesToGeoJSON([baseDriver], baseDriver.id, null);
 
     expect(result.features[0].properties).toEqual(
       expect.objectContaining({ selected: true, hover: false })
@@ -448,11 +443,7 @@ describe('adaptResourcesToGeoJSON', () => {
   });
 
   it('should mark the hovered resource', () => {
-    const result = adaptResourcesToGeoJSON(
-      [baseDriver],
-      undefined,
-      baseDriver.id
-    );
+    const result = adaptResourcesToGeoJSON([baseDriver], null, baseDriver.id);
 
     expect(result.features[0].properties).toEqual(
       expect.objectContaining({ selected: false, hover: true })
@@ -460,7 +451,7 @@ describe('adaptResourcesToGeoJSON', () => {
   });
 
   it('should return an empty FeatureCollection when given an empty array', () => {
-    const result = adaptResourcesToGeoJSON([]);
+    const result = adaptResourcesToGeoJSON([], null, null);
 
     expect(result).toEqual({
       type: 'FeatureCollection',
@@ -482,7 +473,7 @@ describe('adaptResourcesToGeoJSON', () => {
       },
     });
 
-    const result = adaptResourcesToGeoJSON([driverWithRoute]);
+    const result = adaptResourcesToGeoJSON([driverWithRoute], null, null);
 
     expect(result.features[0].properties).toEqual(
       expect.objectContaining({ route: routeCoordinates })

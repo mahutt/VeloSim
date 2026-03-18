@@ -214,7 +214,7 @@ describe('MapManager', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    (mockSimulationStateManager.getSelectedItem as Mock).mockReturnValue(null);
+    (mockSimulationStateManager.getSelectedItems as Mock).mockReturnValue([]);
     (
       mockSimulationStateManager.getMultiSelectedStationIds as Mock
     ).mockReturnValue(new Set());
@@ -401,9 +401,9 @@ describe('MapManager', () => {
 
     test('ctrl+click promotes single-selected station into multi-selection', () => {
       const station = makeStation({ id: 5, name: 'Station 5' });
-      (mockSimulationStateManager.getSelectedItem as Mock).mockReturnValue(
-        station
-      );
+      (mockSimulationStateManager.getSelectedItems as Mock).mockReturnValue([
+        { type: SelectedItemType.Station, value: { id: station.id } },
+      ]);
       // First call: check if station 5 is already in set (no)
       // Second call: after toggle, check remaining size
       (mockSimulationStateManager.getMultiSelectedStationIds as Mock)
@@ -425,9 +425,7 @@ describe('MapManager', () => {
     });
 
     test('ctrl+click without existing single selection just toggles', () => {
-      (mockSimulationStateManager.getSelectedItem as Mock).mockReturnValue(
-        null
-      );
+      (mockSimulationStateManager.getSelectedItems as Mock).mockReturnValue([]);
       (
         mockSimulationStateManager.getMultiSelectedStationIds as Mock
       ).mockReturnValue(new Set([10]));
@@ -448,9 +446,9 @@ describe('MapManager', () => {
 
     test('ctrl+click does not re-promote station already in multi-selection', () => {
       const station = makeStation({ id: 5, name: 'Station 5' });
-      (mockSimulationStateManager.getSelectedItem as Mock).mockReturnValue(
-        station
-      );
+      (mockSimulationStateManager.getSelectedItems as Mock).mockReturnValue([
+        { type: SelectedItemType.Station, value: { id: station.id } },
+      ]);
       (
         mockSimulationStateManager.getMultiSelectedStationIds as Mock
       ).mockReturnValue(new Set([5]));
@@ -475,9 +473,7 @@ describe('MapManager', () => {
     });
 
     test('ctrl+click demotes to single selection when only 1 station remains', () => {
-      (mockSimulationStateManager.getSelectedItem as Mock).mockReturnValue(
-        null
-      );
+      (mockSimulationStateManager.getSelectedItems as Mock).mockReturnValue([]);
       // After toggle, only 1 station remains
       (
         mockSimulationStateManager.getMultiSelectedStationIds as Mock
@@ -494,9 +490,7 @@ describe('MapManager', () => {
     });
 
     test('ctrl+click demotes to empty selection when 0 stations remain', () => {
-      (mockSimulationStateManager.getSelectedItem as Mock).mockReturnValue(
-        null
-      );
+      (mockSimulationStateManager.getSelectedItems as Mock).mockReturnValue([]);
       // After toggle, 0 stations remain
       (
         mockSimulationStateManager.getMultiSelectedStationIds as Mock
@@ -514,9 +508,9 @@ describe('MapManager', () => {
 
     test('ctrl+click with single-selected driver does not promote (driver has shift)', () => {
       const driver = makeDriver({ id: 3 });
-      (mockSimulationStateManager.getSelectedItem as Mock).mockReturnValue(
-        driver
-      );
+      (mockSimulationStateManager.getSelectedItems as Mock).mockReturnValue([
+        { type: SelectedItemType.Driver, value: { id: driver.id } },
+      ]);
       (
         mockSimulationStateManager.getMultiSelectedStationIds as Mock
       ).mockReturnValue(new Set([10]));
@@ -751,8 +745,8 @@ describe('MapManager', () => {
 
       expect(mockAdaptResourcesToGeoJSON).toHaveBeenCalledWith(
         [expect.objectContaining({ id: 1 })],
-        undefined,
-        undefined
+        null,
+        null
       );
     });
 
@@ -764,7 +758,7 @@ describe('MapManager', () => {
       expect(mockUpdateAllRoutesDisplay).toHaveBeenCalledWith(
         routesMap,
         positionsMap,
-        undefined,
+        null,
         mockMap
       );
     });
@@ -789,9 +783,9 @@ describe('MapManager', () => {
 
     test('shows selected route when a driver is selected', () => {
       const driver = makeDriver({ id: 1 });
-      (mockSimulationStateManager.getSelectedItem as Mock).mockReturnValue(
-        driver
-      );
+      (mockSimulationStateManager.getSelectedItems as Mock).mockReturnValue([
+        { type: SelectedItemType.Driver, value: { id: driver.id } },
+      ]);
 
       const route: Route = {
         coordinates: [
@@ -821,9 +815,7 @@ describe('MapManager', () => {
     });
 
     test('clears route display when no driver is selected', () => {
-      (mockSimulationStateManager.getSelectedItem as Mock).mockReturnValue(
-        null
-      );
+      (mockSimulationStateManager.getSelectedItems as Mock).mockReturnValue([]);
 
       manager.updateMapSources(false, [], [], new Map(), new Map(), null);
 
@@ -832,29 +824,31 @@ describe('MapManager', () => {
 
     test('clears route display when selected driver has no route', () => {
       const driver = makeDriver({ id: 1 });
-      (mockSimulationStateManager.getSelectedItem as Mock).mockReturnValue(
-        driver
-      );
+      (mockSimulationStateManager.getSelectedItems as Mock).mockReturnValue([
+        { type: SelectedItemType.Driver, value: { id: driver.id } },
+      ]);
 
       manager.updateMapSources(false, [driver], [], new Map(), new Map(), null);
 
       expect(mockClearRouteDisplay).toHaveBeenCalled();
     });
 
-    test('returns selected station id when a station is selected', () => {
+    test('passes multi-selected station ids when a station is selected', () => {
       const station = makeStation({ id: 7 });
-      (mockSimulationStateManager.getSelectedItem as Mock).mockReturnValue(
-        station
-      );
+      (mockSimulationStateManager.getSelectedItems as Mock).mockReturnValue([
+        { type: SelectedItemType.Station, value: { id: station.id } },
+      ]);
+      (
+        mockSimulationStateManager.getMultiSelectedStationIds as Mock
+      ).mockReturnValue(new Set([7]));
 
       const stations = [station];
       manager.updateMapSources(false, [], stations, new Map(), new Map(), null);
 
       expect(mockAdaptStationsToGeoJSON).toHaveBeenCalledWith(
         stations,
-        7,
-        undefined,
-        expect.anything()
+        new Set([7]),
+        null
       );
     });
   });

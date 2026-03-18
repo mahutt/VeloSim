@@ -63,7 +63,6 @@ export interface SimulationStateManagerInterface {
   getTask: (taskId: number) => StationTask | undefined;
   setTask: (task: StationTask) => void;
 
-  getSelectedItem: () => Driver | Station | null;
   getSelectedItems: () => SelectedItem[];
   setSelectedItem: (item: Driver | Station | null) => void;
   addSelectedStation: (stationId: number) => void;
@@ -219,32 +218,11 @@ export default class SimulationStateManager implements SimulationStateManagerInt
 
   public setTask(task: StationTask) {
     this.tasks.set(task.id, task);
-
-    // If any selected item references this task, refresh the selection
-    const needsRefresh = this.reactiveState.selectedItems.some((item) => {
-      if (item.type === SelectedItemType.Driver) {
-        return this.drivers.get(item.value.id)!.taskIds.includes(task.id);
-      }
-      return this.stations.get(item.value.id)!.taskIds.includes(task.id);
-    });
-    if (needsRefresh) {
-      this.refreshSelectedItems();
-    }
-
     this.setMapShouldRefresh(true);
   }
 
   public getTask(taskId: number) {
     return this.tasks.get(taskId);
-  }
-
-  public getSelectedItem(): Driver | Station | null {
-    if (this.reactiveState.selectedItems.length !== 1) return null;
-    const item = this.reactiveState.selectedItems[0];
-    if (item.type === SelectedItemType.Driver) {
-      return this.drivers.get(item.value.id)!;
-    }
-    return this.stations.get(item.value.id)!;
   }
 
   public getSelectedItems(): SelectedItem[] {
@@ -287,10 +265,6 @@ export default class SimulationStateManager implements SimulationStateManagerInt
     this.updateSelectedStations(ids);
   }
 
-  public toggleMultiSelectedStation(stationId: number): void {
-    this.toggleSelectedStation(stationId);
-  }
-
   public toggleSelectedStation(stationId: number): void {
     const ids = this.getMultiSelectedStationIds();
     if (ids.has(stationId)) {
@@ -301,16 +275,8 @@ export default class SimulationStateManager implements SimulationStateManagerInt
     this.updateSelectedStations(ids);
   }
 
-  public setMultiSelectedStations(stationIds: number[]): void {
-    this.setSelectedStations(stationIds);
-  }
-
   public setSelectedStations(stationIds: number[]): void {
     this.updateSelectedStations(new Set(stationIds));
-  }
-
-  public clearMultiSelectedStations(): void {
-    this.clearSelection();
   }
 
   public clearSelection(): void {
