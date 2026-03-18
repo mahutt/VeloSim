@@ -414,7 +414,7 @@ class Route:
                     triples[-1].end_index = max(triples[-1].end_index, abs_end)
                 else:
                     triples.append(TrafficTriple(abs_start, abs_end, level))
-            coord_offset += geom_len - 1  # shared boundary point
+            coord_offset += max(geom_len - 1, 0)  # shared boundary point
         self._traffic_triples_cache = triples
         self._rebuild_global_event_indices()
         self._has_traffic_changed = True
@@ -457,7 +457,7 @@ class Route:
                     (geom_start + coord_offset, geom_end + coord_offset)
                 )
 
-            coord_offset += geom_len - 1
+            coord_offset += max(geom_len - 1, 0)
 
         self._next_event_idx = 0
         self._update_next_event_index()
@@ -482,13 +482,26 @@ class Route:
         Returns:
             Current point index of the driver according to the global geometry indices.
         """
+        if not self.roads:
+            return 0
+
+        # When route is finished, clamp to the last global index.
+        if self.current_road_index >= len(self.roads):
+            last_idx = 0
+            for road in self.roads:
+                geom_len = (
+                    len(road.geometry) if road.geometry else len(road.pointcollection)
+                )
+                last_idx += max(geom_len - 1, 0)
+            return last_idx
+
         offset = 0
         for road in self.roads[: self.current_road_index]:
             # if geometry is missing, fallback to length of pointcollection
             geom_len = (
                 len(road.geometry) if road.geometry else len(road.pointcollection)
             )
-            offset += geom_len - 1
+            offset += max(geom_len - 1, 0)
 
         # Map interpolated point index back to geometry index ratio
         current_road = self.roads[self.current_road_index]
@@ -503,7 +516,7 @@ class Route:
             return offset
 
         progress = self.current_point_index / (point_collection_len - 1)
-        return offset + int(progress * (geom_len - 1))
+        return offset + int(progress * max(geom_len - 1, 0))
 
     def get_distance_to_next_event(self) -> Optional[float]:
         """Gets the distance from the current index to the next traffic event by
@@ -545,13 +558,18 @@ class Route:
             )
             # Checks if global_idx is between the start and end of the current road
             # If true, found the target point and break from loop
-            if offset <= global_idx < offset + geom_len:
+            if offset <= global_idx < offset + max(geom_len, 1):
                 local_idx = global_idx - offset  # exact distance within that road
-                # Map geometry index to road distance
-                total_dist += (local_idx / (geom_len - 1)) * road.length
+
+                # If the road only has 1 point, progress is effectively 0
+                if geom_len > 1:
+                    # Map geometry index to road distance
+                    total_dist += (local_idx / (geom_len - 1)) * road.length
+                # else: total_dist stays the same (we are at the start of this point)
                 break
+
             total_dist += road.length
-            offset += geom_len - 1
+            offset += max(geom_len - 1, 0)
 
         return total_dist
 

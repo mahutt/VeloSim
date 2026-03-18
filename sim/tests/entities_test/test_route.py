@@ -2628,6 +2628,31 @@ class TestRouteEventIndex:
 
         assert route._get_current_global_geometry_index() == 3
 
+    def test_get_current_global_geometry_index_route_finished(
+        self, test_config, mock_routing_provider, sample_route_result
+    ):
+        """
+        Tests that the index is clamped to the last global index
+        when route is finished.
+        """
+        road0 = Mock()
+        road0.geometry = [None] * 5
+
+        road1 = Mock()
+        road1.geometry = [None] * 3
+
+        route = Route(
+            sample_route_result,
+            mock_routing_provider,
+            test_config,
+            roads=[road0, road1],
+        )
+        route.current_road_index = 2
+
+        # (5-1) + (3-1) = 6
+        global_idx = route._get_current_global_geometry_index()
+        assert global_idx == 6
+
     def test_event_at_exact_junction(
         self, test_config, mock_routing_provider, sample_route_result
     ):
