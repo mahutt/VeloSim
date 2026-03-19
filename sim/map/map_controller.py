@@ -56,6 +56,7 @@ class MapController:
                 configuration and other map-related settings.
         """
         # Initialize the routing provider (using OSRM adapter by default)
+        self.map_payload = map_payload
         sim_id = map_payload.sim_id if map_payload else ""
         self.routing_provider: RoutingProvider = OSRMAdapter(sim_id=sim_id)
 
@@ -77,6 +78,7 @@ class MapController:
             self,
             registry=self.position_registry,
             report=report,
+            map_payload=map_payload,
         )
 
         # Initialize TrafficController for traffic layer management

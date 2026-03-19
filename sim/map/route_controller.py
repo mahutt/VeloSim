@@ -27,6 +27,7 @@ from grafana_logging.logger import get_logger
 
 from shapely.geometry import LineString
 
+from sim.entities.map_payload import MapPayload
 from sim.entities.road import Road
 from sim.entities.position import Position
 from sim.map.routing_provider import RoutingProvider, RouteResult, SegmentKey
@@ -60,6 +61,7 @@ class RouteController:
         map_controller: "MapController",
         registry: "PositionRegistry",
         report: "SimulationReport | None" = None,
+        map_payload: "MapPayload | None" = None,
     ) -> None:
         """
         Initialize the RouteController.
@@ -70,10 +72,13 @@ class RouteController:
             report: Optional SimulationReport used for route registration and
                 distance metrics. When omitted, RouteController falls back to
                 local distance aggregation.
+            map_payload: Optional MapPayload used for map-level runtime
+                settings such as route recalculation interval.
         """
         self.map_controller = map_controller
         self._registry = registry
         self._report = report
+        self._map_payload = map_payload
         self._distance_fallback_logged = False
 
         if self._report is None:
@@ -160,6 +165,12 @@ class RouteController:
 
         # Create roads from steps (logical road segments with proper turn penalties)
         roads = self.create_roads_from_steps(route_result) if route_result.steps else []
+        if self._map_payload is not None:
+            interval_seconds = (
+                self._map_payload.get_route_recalculation_interval_seconds()
+            )
+        else:
+            interval_seconds = MapPayload.default_route_recalculation_interval_seconds()
 
         # Create the route with the prepared roads
         route = Route(
@@ -168,6 +179,7 @@ class RouteController:
             config,
             roads=roads,
             route_controller=self,
+            route_recalculation_interval_seconds=interval_seconds,
         )
 
         # Register the route
