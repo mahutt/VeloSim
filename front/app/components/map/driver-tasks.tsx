@@ -34,6 +34,7 @@ import {
   TooltipTrigger,
 } from '~/components/ui/tooltip';
 import { useTaskMassSelect } from '~/hooks/use-task-mass-select';
+import { useAutoScroll } from '~/hooks/use-auto-scroll';
 import type { PopulatedDriver } from './selected-item-bar';
 import { ScrollArea } from '~/components/ui/scroll-area';
 
@@ -105,26 +106,40 @@ function DriverTaskGroupItem({
   showDropIndicator,
   isDraggingDown,
   isDraggedGroup,
+  isSelected,
   onDragStart,
   onDragOver,
   onDrop,
   onDragEnd,
+  onClick,
+  onContextMenu,
+  onMouseDown,
+  onMouseEnter,
 }: {
   group: DriverTaskStationGroup;
   index: number;
   showDropIndicator: boolean;
   isDraggingDown: boolean;
   isDraggedGroup: boolean;
+  isSelected: boolean;
   onDragStart: (e: React.DragEvent<HTMLDivElement>, index: number) => void;
   onDragOver: (e: React.DragEvent<HTMLDivElement>, index: number) => void;
   onDrop: (e: React.DragEvent<HTMLDivElement>, index: number) => void;
   onDragEnd: () => void;
+  onClick: (e: React.MouseEvent<HTMLDivElement>) => void;
+  onContextMenu: (e: React.MouseEvent) => void;
+  onMouseDown: (e: React.MouseEvent) => void;
+  onMouseEnter: () => void;
 }) {
   return (
     <div
       onDragOver={(e) => onDragOver(e, index)}
       onDrop={(e) => onDrop(e, index)}
       onDragEnd={onDragEnd}
+      onClick={onClick}
+      onContextMenu={onContextMenu}
+      onMouseDown={onMouseDown}
+      onMouseEnter={onMouseEnter}
       className={
         showDropIndicator
           ? isDraggingDown
@@ -137,7 +152,7 @@ function DriverTaskGroupItem({
         draggable
         onDragStart={(e) => onDragStart(e, index)}
         className={`rounded-lg px-3 py-2 border h-10 text-sm flex items-center gap-2 w-full min-w-0 overflow-hidden cursor-grab active:cursor-grabbing active:opacity-50 ${
-          isDraggedGroup
+          isDraggedGroup || isSelected
             ? 'border-blue-500 bg-blue-50'
             : 'border-gray-200 bg-white'
         }`}
@@ -162,11 +177,30 @@ function DriverTaskGroupItem({
 
 function DriverTasksCollapsed({
   groupedTasks,
+  selectedTaskIds,
+  handleTaskSelect,
+  startDragSelect,
+  dragSelectEnter,
   onReorder,
 }: {
   groupedTasks: DriverTaskStationGroup[];
+  selectedTaskIds: number[];
+  handleTaskSelect: (
+    taskId: number,
+    index: number,
+    event: React.MouseEvent<HTMLDivElement>
+  ) => void;
+  startDragSelect: (taskId: number, ctrlKey: boolean) => void;
+  dragSelectEnter: (taskId: number) => void;
   onReorder: (taskIds: number[]) => Promise<void>;
 }) {
+  const selectedGroupIndices = new Set(
+    groupedTasks
+      .map((g, i) =>
+        g.tasks.some((t) => selectedTaskIds.includes(t.id)) ? i : -1
+      )
+      .filter((i) => i !== -1)
+  );
   const [dropTargetIndex, setDropTargetIndex] = useState<number | null>(null);
   const [draggedGroupIndex, setDraggedGroupIndex] = useState<number | null>(
     null
@@ -198,11 +232,32 @@ function DriverTasksCollapsed({
     if (sourceIndex === null || sourceIndex === targetIndex) return;
 
     const groupTaskIds = groupedTasks.map((g) => g.tasks.map((t) => t.id));
-    const [movedGroup] = groupTaskIds.splice(sourceIndex, 1);
-    if (!movedGroup) return;
-    groupTaskIds.splice(targetIndex, 0, movedGroup);
 
-    await onReorder(groupTaskIds.flat());
+    // Multi-group reorder: if the dragged group is selected, move all selected groups
+    const movingIndices = selectedGroupIndices.has(sourceIndex)
+      ? [...selectedGroupIndices].sort((a, b) => a - b)
+      : [sourceIndex];
+
+    if (movingIndices.some((i) => i === targetIndex)) return;
+
+    const movingSet = new Set(movingIndices);
+    const movedGroups = movingIndices.map((i) => {
+      const group = groupTaskIds[i];
+      if (!group) throw new Error(`Invalid group index ${i}`);
+      return group;
+    });
+    const remaining = groupTaskIds.filter((_, i) => !movingSet.has(i));
+
+    // Calculate where to insert in the remaining array
+    // targetIndex in the original array maps to a position in `remaining`
+    const adjustedTarget =
+      targetIndex - movingIndices.filter((mi) => mi < targetIndex).length;
+    const insertAt =
+      sourceIndex < targetIndex ? adjustedTarget + 1 : adjustedTarget;
+
+    remaining.splice(insertAt, 0, ...movedGroups);
+
+    await onReorder(remaining.flat());
   };
 
   const handleDragEnd = () => {
@@ -224,10 +279,28 @@ function DriverTasksCollapsed({
             draggedGroupIndex !== null && index > draggedGroupIndex
           }
           isDraggedGroup={draggedGroupIndex === index}
+          isSelected={selectedGroupIndices.has(index)}
           onDragStart={handleDragStart}
           onDragOver={handleDragOver}
           onDrop={handleDrop}
           onDragEnd={handleDragEnd}
+          onClick={(e) => {
+            const firstTaskId = group.tasks[0].id;
+            const flatIndex = groupedTasks
+              .slice(0, index)
+              .reduce((sum, g) => sum + g.tasks.length, 0);
+            handleTaskSelect(firstTaskId, flatIndex, e);
+          }}
+          onContextMenu={(e) => e.preventDefault()}
+          onMouseDown={(e) => {
+            if (e.button === 2) {
+              e.preventDefault();
+              startDragSelect(group.tasks[0].id, e.ctrlKey || e.metaKey);
+            }
+          }}
+          onMouseEnter={() =>
+            dragSelectEnter(group.tasks[group.tasks.length - 1].id)
+          }
         />
       ))}
     </>
@@ -240,6 +313,8 @@ function DriverTasksExpanded({
   selectedTaskIds,
   handleTaskSelect,
   selectForDrag,
+  startDragSelect,
+  dragSelectEnter,
   onReorder,
   onUnassign,
 }: {
@@ -251,7 +326,9 @@ function DriverTasksExpanded({
     index: number,
     event: React.MouseEvent<HTMLDivElement>
   ) => void;
-  selectForDrag: (taskId: number, index: number) => void;
+  selectForDrag: (taskId: number) => void;
+  startDragSelect: (taskId: number, ctrlKey: boolean) => void;
+  dragSelectEnter: (taskId: number) => void;
   onReorder: (taskIds: number[]) => Promise<void>;
   onUnassign: (taskId: number) => void;
 }) {
@@ -262,8 +339,8 @@ function DriverTasksExpanded({
     ? driver.tasks.findIndex((t) => t.id === draggedTaskId)
     : -1;
 
-  const handleDragStart = (taskId: number, taskIndex: number) => {
-    selectForDrag(taskId, taskIndex);
+  const handleDragStart = (taskId: number) => {
+    selectForDrag(taskId);
     setDraggedTaskId(taskId);
   };
 
@@ -285,10 +362,28 @@ function DriverTasksExpanded({
     if (draggedIndex === -1 || draggedIndex === targetIndex) return;
 
     const taskIds = driver.tasks.map((t) => t.id);
-    taskIds.splice(draggedIndex, 1);
-    taskIds.splice(targetIndex, 0, draggedTaskId);
+    const draggingSet = new Set(
+      selectedTaskIds.includes(draggedTaskId)
+        ? selectedTaskIds
+        : [draggedTaskId]
+    );
 
-    await onReorder(taskIds);
+    // Exit if the drop target is one of the tasks being moved
+    if (draggingSet.has(driver.tasks[targetIndex]?.id)) return;
+
+    const remaining = taskIds.filter((id) => !draggingSet.has(id));
+    const movedIds = taskIds.filter((id) => draggingSet.has(id));
+
+    // Calculate insert position in the remaining array
+    const adjustedTarget =
+      targetIndex -
+      taskIds.slice(0, targetIndex).filter((id) => draggingSet.has(id)).length;
+    const insertAt =
+      draggedIndex < targetIndex ? adjustedTarget + 1 : adjustedTarget;
+
+    remaining.splice(insertAt, 0, ...movedIds);
+
+    await onReorder(remaining);
   };
 
   const handleDragEnd = () => {
@@ -304,6 +399,14 @@ function DriverTasksExpanded({
           onDragOver={(e) => handleDragOver(e, index)}
           onDrop={(e) => handleDrop(e, index)}
           onDragEnd={handleDragEnd}
+          onContextMenu={(e) => e.preventDefault()}
+          onMouseDown={(e) => {
+            if (e.button === 2) {
+              e.preventDefault();
+              startDragSelect(task.id, e.ctrlKey || e.metaKey);
+            }
+          }}
+          onMouseEnter={() => dragSelectEnter(task.id)}
           className={
             dropTargetIndex === index && index !== draggedIndex
               ? index > draggedIndex
@@ -317,7 +420,7 @@ function DriverTasksExpanded({
             stationName={resolveStationName(task.stationId)}
             isSelected={selectedTaskIds.includes(task.id)}
             onSelect={(event) => handleTaskSelect(task.id, index, event)}
-            onDragStart={() => handleDragStart(task.id, index)}
+            onDragStart={() => handleDragStart(task.id)}
             getDragTaskIds={() =>
               selectedTaskIds.includes(task.id) ? selectedTaskIds : [task.id]
             }
@@ -334,8 +437,16 @@ export function DriverTasks({ driver }: { driver: PopulatedDriver }) {
   const [isCollapsed, setIsCollapsed] = useState(false);
 
   const taskIds = driver.tasks.map((t) => t.id);
-  const { selectedTaskIds, handleTaskSelect, selectForDrag } =
-    useTaskMassSelect(taskIds, driver.id);
+  const {
+    selectedTaskIds,
+    isDragSelecting,
+    handleTaskSelect,
+    selectForDrag,
+    startDragSelect,
+    dragSelectEnter,
+    clearSelection,
+  } = useTaskMassSelect(taskIds, driver.id);
+  const { containerRef, handleMouseMove } = useAutoScroll(isDragSelecting);
 
   const resolveStationName = (stationId: number) =>
     engine.state?.getStation(stationId)?.name ?? `Station #${stationId}`;
@@ -355,14 +466,25 @@ export function DriverTasks({ driver }: { driver: PopulatedDriver }) {
         </p>
         <CollapseToggle
           isCollapsed={isCollapsed}
-          onToggle={() => setIsCollapsed((prev) => !prev)}
+          onToggle={() => {
+            clearSelection();
+            setIsCollapsed((prev) => !prev);
+          }}
         />
       </div>
       <ScrollArea className="mx-2">
-        <div className="max-h-50 px-3 space-y-1">
+        <div
+          ref={containerRef}
+          onMouseMove={handleMouseMove}
+          className="max-h-50 px-3 space-y-1"
+        >
           {isCollapsed ? (
             <DriverTasksCollapsed
               groupedTasks={groupedTasks}
+              selectedTaskIds={selectedTaskIds}
+              handleTaskSelect={handleTaskSelect}
+              startDragSelect={startDragSelect}
+              dragSelectEnter={dragSelectEnter}
               onReorder={(ids) => engine.reorderTasks(driver.id, ids, true)}
             />
           ) : (
@@ -372,6 +494,8 @@ export function DriverTasks({ driver }: { driver: PopulatedDriver }) {
               selectedTaskIds={selectedTaskIds}
               handleTaskSelect={handleTaskSelect}
               selectForDrag={selectForDrag}
+              startDragSelect={startDragSelect}
+              dragSelectEnter={dragSelectEnter}
               onReorder={(ids) => engine.reorderTasks(driver.id, ids, true)}
               onUnassign={(taskId) =>
                 engine.requestUnassignment(driver.id, taskId)
