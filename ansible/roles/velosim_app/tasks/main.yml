@@ -12,6 +12,7 @@
     - "{{ app_dir }}"
     - "{{ app_dir }}/scripts"
     - "{{ app_dir }}/osrm-data"
+    - "{{ app_dir }}/graphhopper-data"
     - "{{ app_dir }}/logs"
     - "{{ app_dir }}/backups"
     - "{{ app_dir }}/grafana_logging"
@@ -230,6 +231,31 @@
       To enable OSRM data setup, set setup_osrm_data: true in group_vars
       {% endif %}
 
+- name: Copy GraphHopper data preparation script
+  ansible.builtin.template:
+    src: prepare-graphhopper-data.sh.j2
+    dest: "{{ app_dir }}/scripts/prepare-graphhopper-data.sh"
+    owner: "{{ app_user }}"
+    group: "{{ app_user }}"
+    mode: '0755'
+
+- name: Prepare GraphHopper data if not exists
+  ansible.builtin.command: "{{ app_dir }}/scripts/prepare-graphhopper-data.sh"
+  become_user: "{{ app_user }}"
+  args:
+    creates: "{{ app_dir }}/graphhopper-data/montreal-latest.osm.pbf"
+  when: setup_graphhopper_data | default(false)
+  ignore_errors: true
+  register: graphhopper_result
+
+- name: Display GraphHopper preparation result
+  ansible.builtin.debug:
+    msg: |
+      GraphHopper Data Preparation: {{ 'Completed' if graphhopper_result.rc == 0 else 'Failed or Skipped' }}
+      {% if not (setup_graphhopper_data | default(false)) %}
+      To enable GraphHopper data setup, set setup_graphhopper_data: true in group_vars
+      {% endif %}
+
 - name: Create application management scripts
   ansible.builtin.template:
     src: velosim-app.sh.j2
@@ -258,13 +284,36 @@
     mode: '0755'
 
 - name: Ensure PostgreSQL container is running
-  ansible.builtin.command: docker compose -f "{{ app_dir }}/docker-compose.prod.yml" up -d postgres
+  ansible.builtin.command: docker compose --project-name "{{ app_name }}" -f "{{ app_dir }}/docker-compose.prod.yml" up -d postgres
   become_user: "{{ app_user }}"
   args:
     chdir: "{{ app_dir }}"
 
+- name: Get PostgreSQL data volume name
+  ansible.builtin.command: >-
+    docker inspect velosim-postgres
+    --format "{{ '{{' }} range .Mounts {{ '}}' }}{{ '{{' }} if eq .Destination \"/var/lib/postgresql/data\" {{ '}}' }}{{ '{{' }} .Name {{ '}}' }}{{ '{{' }} end {{ '}}' }}{{ '{{' }} end {{ '}}' }}"
+  become_user: "{{ app_user }}"
+  register: postgres_data_volume
+  changed_when: false
+
+- name: Display PostgreSQL data volume
+  ansible.builtin.debug:
+    msg: "PostgreSQL data volume: {{ postgres_data_volume.stdout | trim }}"
+
+- name: Ensure PostgreSQL is using expected persistent volume
+  ansible.builtin.assert:
+    that:
+      - postgres_data_volume.stdout | trim == app_name + '_postgres_data'
+    fail_msg: >-
+      PostgreSQL is using unexpected data volume '{{ postgres_data_volume.stdout | trim }}'
+      (expected '{{ app_name }}_postgres_data'). Aborting to prevent accidental
+      deployment against an empty/new database volume.
+    success_msg: >-
+      PostgreSQL data volume matches expected persistent volume '{{ app_name }}_postgres_data'.
+
 - name: Debug - Check container status
-  ansible.builtin.command: docker compose -f "{{ app_dir }}/docker-compose.prod.yml" ps
+  ansible.builtin.command: docker compose --project-name "{{ app_name }}" -f "{{ app_dir }}/docker-compose.prod.yml" ps
   become_user: "{{ app_user }}"
   args:
     chdir: "{{ app_dir }}"
@@ -277,7 +326,7 @@
       {{ container_debug.stdout }}
 
 - name: Wait for PostgreSQL container to be healthy
-  ansible.builtin.command: docker compose -f "{{ app_dir }}/docker-compose.prod.yml" ps postgres
+  ansible.builtin.command: docker compose --project-name "{{ app_name }}" -f "{{ app_dir }}/docker-compose.prod.yml" ps postgres
   become_user: "{{ app_user }}"
   args:
     chdir: "{{ app_dir }}"
@@ -298,7 +347,6 @@
     cmd: "{{ app_dir }}/scripts/migrate-database.sh"
   become_user: "{{ app_user }}"
   register: migration_result
-  failed_when: false
   changed_when: migration_result.stdout is search('Database schema created|Database migrations completed')
 
 - name: Display migration results
@@ -363,6 +411,7 @@
          sudo docker logs velosim-frontend
          sudo docker logs velosim-postgres
          sudo docker logs velosim-osrm
+        sudo docker logs velosim-graphhopper
 
       3. Check if services are building:
          sudo docker compose -f {{ app_dir }}/docker-compose.prod.yml build --progress=plain
@@ -371,7 +420,7 @@
          sudo {{ app_dir }}/scripts/velosim-app.sh restart
 
       5. Check if ports are blocked:
-         sudo netstat -tlnp | grep -E ':(3000|8000|5432)'
+        sudo netstat -tlnp | grep -E ':(3000|8000|5432|5001|8989)'
 
       6. Force rebuild and restart:
          sudo docker compose -f {{ app_dir }}/docker-compose.prod.yml down
