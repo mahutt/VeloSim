@@ -49,6 +49,7 @@ class Route:
     """
 
     _route_counter = 0  # Unique ID generation.
+    TRANSITION_THRESHOLD = 100  # 100 meters
 
     @staticmethod
     def map_index_forward(current_idx: int, old_count: int, new_count: int) -> int:
@@ -200,6 +201,8 @@ class Route:
         self._next_event_idx: int = (
             0  # Pointer (index) to next upcoming index in global range
         )
+
+        self._transition_buffer: list[Position] = []
 
         # If no roads were created, the route was finished from the start
         if not self.roads:
@@ -452,6 +455,7 @@ class Route:
             coord_offset += max(geom_len - 1, 0)  # shared boundary point
         self._traffic_triples_cache = triples
         self._rebuild_global_event_indices()
+        self._transition_buffer = []
         self._has_traffic_changed = True
 
     def get_distance_traveled(self) -> float:
@@ -608,6 +612,31 @@ class Route:
 
         return total_dist
 
+    def _get_upcoming_traffic_multiplier(self) -> float:
+        """Helper function to retrieve the next traffic event and get its multiplier.
+
+        Returns:
+            The congestion multiplier of the next upcoming event. Defaults to FREE_FLOW.
+        """
+        if self._next_event_idx >= len(self._event_indices):
+            return 1.0  # free flow if no more events
+
+        next_event_start = self._event_indices[self._next_event_idx][0]
+
+        # Get road multiplier of next event
+        offset = 0
+        for road in self.roads:
+            geom_len = (
+                len(road.geometry) if road.geometry else len(road.pointcollection)
+            )
+            if offset <= next_event_start <= offset + max(geom_len - 1, 0):
+                local_idx = next_event_start - offset
+                return road.get_multiplier_at_index(local_idx)
+
+            offset += max(geom_len - 1, 0)
+
+        return 1.0
+
     def next(self) -> Position | None:
         """Return the next position in the route traversal.
 
@@ -624,7 +653,29 @@ class Route:
         if self.is_finished:
             return None
 
+        # If we are transition, use next transition position
+        if self._transition_buffer:
+            pos = self._transition_buffer.pop(0)
+            self._last_returned_position = pos
+
+            # Sync global index to track the movement
+            self.current_point_index = self._get_current_global_geometry_index()
+            return pos
+
         self._maybe_recalculate_for_elapsed_time()
+
+        # Smooth transition if distance to next event < threshold
+        dist_to_event = self.get_distance_to_next_event()
+        if dist_to_event is not None and dist_to_event < self.TRANSITION_THRESHOLD:
+            current_road = self.roads[self.current_road_index]
+            v0 = current_road.current_speed
+            # Determine final speed (maxspeed * upcoming traffic multiplier)
+            vf = current_road.maxspeed * self._get_upcoming_traffic_multiplier()
+
+            self._transition_buffer = current_road.generate_curve(v0, vf, dist_to_event)
+            if self._transition_buffer:
+                return self._transition_buffer.pop(0)
+            # else: traverse normally
 
         point_to_return: Position | None = None
 

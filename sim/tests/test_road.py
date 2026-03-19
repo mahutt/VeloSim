@@ -30,7 +30,7 @@ from pathlib import Path
 from pandas import Series
 from shapely.geometry import LineString
 from typing import Generator, List
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, Mock, patch
 
 from sim.entities.point_generation import PointGenerationStrategy, RoadPointContext
 from sim.entities.road import Road
@@ -1025,3 +1025,61 @@ class TestRoadDistance:
         assert road.get_distance_at_index(0) == 0.0
         # 1 / (2-1) * 50 = 50.0
         assert road.get_distance_at_index(1) == pytest.approx(50.0)
+
+
+class TestRoadTransition:
+    @pytest.fixture
+    def sample_road(self) -> Road:
+        p1 = Position([0, 0])
+        p2 = Position([100, 0])
+        return Road(
+            road_id=1,
+            name="some name",
+            pointcollection=[p1, p2],
+            length=100.0,
+            maxspeed=20.0,
+        )
+
+    @pytest.mark.parametrize(
+        "dist, expected_coords",
+        [
+            (0.0, [0.0, 0.0]),  # Start of road
+            (50.0, [50.0, 0.0]),  # Midpoint
+            (100.0, [100.0, 0.0]),  # End of road
+            (150.0, [100.0, 0.0]),  # Clamping check (should not exceed length)
+        ],
+    )
+    def test_get_position_from_distance(
+        self, sample_road: Road, dist: float, expected_coords: list[float]
+    ) -> None:
+        """Tests get_position_from_distance returns expected coordinates"""
+        position = sample_road.get_position_from_distance(dist)
+        assert position.get_position() == expected_coords
+
+    def test_generate_curve(self, sample_road: Road) -> None:
+        """Tests generate_curve returns a list of positions"""
+        returned_pos = Mock(spec=Position)
+
+        with patch.object(sample_road, "get_position_from_distance") as mock_method:
+            mock_method.return_value = returned_pos
+
+            positions = sample_road.generate_curve(5.0, 5.0, 50.0)
+
+            # total_ticks = (2*50)/(5+5)
+            assert len(positions) == 10
+            assert positions[0] == returned_pos
+
+            mock_method.assert_any_call(5.0)
+
+    def test_generate_curve_zero_distance(self, sample_road: Road) -> None:
+        """Tests that edge case with zero distance should return an empty list"""
+        v0 = 10
+        vf = 8.0
+        assert sample_road.generate_curve(v0, vf, 0) == []
+        assert sample_road.generate_curve(v0, vf, -5) == []
+
+    def test_generate_curve_invalid_speeds(self, sample_road: Road) -> None:
+        """Tests that edge case with speeds summing <= 0 returns empty list"""
+        distance = 10
+        assert sample_road.generate_curve(0, 0, distance) == []
+        assert sample_road.generate_curve(-5, 2, distance) == []

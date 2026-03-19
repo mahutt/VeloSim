@@ -479,3 +479,60 @@ class Road:
             points.append(Position([final[0], final[1]]))
 
         return points if points else list(self.pointcollection)
+
+    def generate_curve(self, v0: float, vf: float, distance: float) -> List[Position]:
+        """Generates a list of positions the driver will take for a smooth transition.
+
+        Args:
+            v0: Initial speed in m/s
+            vf: Final speed in m/s
+            distance: Distance between the changes in speed in meters
+
+        Returns:
+            List of Position objects providing change in speed.
+            Otherwise, returns an empty list if distance is zero or speeds are invalid.
+        """
+        # No distance to cover or no movement
+        if distance <= 0 or (v0 + vf) <= 0:
+            return []
+
+        total_ticks = int(round((2 * distance) / (v0 + vf)))
+        if total_ticks <= 0:
+            return []
+
+        vf_adjust = (2 * distance / total_ticks) - v0
+
+        points: List[Position] = []
+        for tick in range(1, total_ticks + 1):
+            x = (tick * v0) + ((vf_adjust - v0) / (2 * total_ticks)) * (
+                tick * (tick - 1)
+            )
+            # Map distance x to a Position
+            points.append(self.get_position_from_distance(x))
+
+        return points
+
+    def get_position_from_distance(self, d: float) -> Position:
+        """Maps a distance to a position on the road.
+
+        Args:
+            d: A distance in meters
+
+        Returns:
+            Position of the distance d on the road
+        """
+        # If no nodes, return the start position
+        if not self._nodes:
+            return self.pointcollection[0]
+
+        # Calculate progression fraction
+        frac = max(0.0, min(d / self.length, 1.0)) if self.length > 0 else 0.0
+
+        # Get approximate road segment through start-end interpolation
+        start = self._nodes[0].get_position()
+        end = self._nodes[-1].get_position()
+
+        res_x = start[0] + frac * (end[0] - start[0])
+        res_y = start[1] + frac * (end[1] - start[1])
+
+        return Position([res_x, res_y])

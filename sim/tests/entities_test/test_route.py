@@ -2815,3 +2815,57 @@ class TestRouteEventIndex:
         # road0 offset is 4. road1 starts at global index 4.
         # event should be at (4+0, 4+2) = (4, 6)
         assert route._event_indices[0] == (4, 6)
+
+    def test_get_upcoming_traffic_multiplier(
+        self, test_config, mock_routing_provider, sample_route_result
+    ):
+        """Tests that the next event's multiplier is returned"""
+        road0 = Mock()
+        road0.geometry = [None] * 5
+        road0.pointcollection = [None] * 5
+        road0.active_pointcollection = [None] * 5
+        road0.length = 100
+        road0.get_multiplier_at_index = Mock(return_value=1.0)
+        road1 = Mock()
+        road1.geometry = [None] * 3
+        road1.pointcollection = [None] * 3
+        road1.active_pointcollection = [None] * 3
+        road1.length = 50.0
+        road1.get_multiplier_at_index = Mock(return_value=0.5)
+
+        route = Route(
+            sample_route_result,
+            mock_routing_provider,
+            test_config,
+            roads=[road0, road1],
+        )
+
+        route._event_indices = [(5, 6)]
+        route._next_event_idx = 0
+
+        multiplier = route._get_upcoming_traffic_multiplier()
+        assert multiplier == 0.5
+        road1.get_multiplier_at_index.assert_called_once_with(1)
+        road0.get_multiplier_at_index.assert_not_called()
+
+    def test_get_upcoming_traffic_multiplier_finished_route(
+        self, test_config, mock_routing_provider, sample_route_result
+    ):
+        """Tests that the free flow multiplier is returned if no more events"""
+        road0 = Mock()
+        road0.geometry = [None] * 5
+
+        road1 = Mock()
+        road1.geometry = [None] * 3
+
+        route = Route(
+            sample_route_result,
+            mock_routing_provider,
+            test_config,
+            roads=[road0, road1],
+        )
+        route.current_road_index = 2
+
+        multiplier = route._get_upcoming_traffic_multiplier()
+
+        assert multiplier == 1.0
