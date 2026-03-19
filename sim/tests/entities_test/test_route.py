@@ -32,7 +32,7 @@ from shapely.geometry import LineString
 from sim.entities.route import Route
 from sim.entities.road import Road
 from sim.entities.position import Position
-from sim.entities.traffic_data import TrafficRange
+from sim.entities.traffic_data import CongestionLevel, TrafficRange
 from sim.map.routing_provider import RoutingProvider, RouteResult, RouteStep, SegmentKey
 
 
@@ -2505,3 +2505,182 @@ class TestRouteDistanceTraveled:
 
         assert route.is_finished
         assert route.get_distance_traveled() == 0.0
+
+
+class TestRouteEventIndex:
+    def test_get_distance_to_next_event(
+        self, test_config, mock_routing_provider, sample_route_result
+    ):
+        """Test get_distance_to_next_event returns valid distance"""
+        # road 0: 5 points, length 100
+        road0 = Mock()
+        road0.geometry = [None] * 5
+        road0.pointcollection = [None] * 5
+        road0.active_pointcollection = [None] * 5
+        road0.length = 100.0
+        # event at index 2 to 3
+        road0.get_traffic_geometry_ranges.return_value = [
+            (2, 3, CongestionLevel.MODERATE)
+        ]
+
+        # road 1: 3 points, length 50
+        road1 = Mock()
+        road1.geometry = [None] * 3
+        road1.pointcollection = [None] * 3
+        road1.active_pointcollection = [None] * 3
+        road1.length = 50.0
+        road1.get_traffic_geometry_ranges.return_value = []
+
+        route = Route(
+            sample_route_result,
+            mock_routing_provider,
+            test_config,
+            roads=[road0, road1],
+        )
+        route.current_road_index = 0
+        route.current_point_index = 0
+
+        # mock the distance traveled method
+        route.get_distance_traveled = Mock(return_value=0.0)
+        route._rebuild_global_event_indices()
+
+        # check if the global index for the event was built correctly
+        # road 0 event (2,3) + offset 0 = (2, 3)
+        assert route._event_indices[0] == (2, 3)
+
+        # check distance to that event
+        # index 2 is halfway through road0 (indices 0,1,2,3,4)
+        # dist = (2 / 4) * 100 = 50.0
+        dist = route.get_distance_to_next_event()
+        assert dist == pytest.approx(50.0)
+
+    def test_get_distance_to_next_event_at_end_of_route(
+        self, test_config, mock_routing_provider, sample_route_result
+    ):
+        """Test when he driver is at the very last point of route"""
+        road = Mock()
+        road.geometry = [None] * 5
+        road.pointcollection = [None] * 5
+        road.active_pointcollection = [None] * 5
+        road.length = 100
+
+        road.get_traffic_geometry_ranges.return_value = []
+
+        route = Route(
+            sample_route_result, mock_routing_provider, test_config, roads=[road]
+        )
+        route._event_indices = [(1, 2)]
+
+        route.current_road_index - 0
+        route.current_point_index = 4  # at the end
+        route._next_event_idx = 0
+
+        assert route.get_distance_to_next_event() is None
+
+    def test_get_current_global_geometry_index(
+        self, test_config, mock_routing_provider, sample_route_result
+    ):
+        """Tests that the offset accumulates correctly across multiple roads."""
+        road0 = Mock()
+        road0.geometry = [None] * 5
+        road0.pointcollection = [None] * 5
+        road0.active_pointcollection = [None] * 5
+        road0.length = 100
+        road1 = Mock()
+        road1.geometry = [None] * 3
+        road1.pointcollection = [None] * 3
+        road1.active_pointcollection = [None] * 3
+        road1.length = 50.0
+
+        route = Route(
+            sample_route_result,
+            mock_routing_provider,
+            test_config,
+            roads=[road0, road1],
+        )
+        road0.get_traffic_geometry_ranges.return_value = []
+        road1.get_traffic_geometry_ranges.return_value = []
+
+        # when we are at the start of Road 1
+        route.current_road_index = 1
+        route.current_point_index = 0
+
+        # offset should be (len(road0.geometry) - 1) = 4
+        global_idx = route._get_current_global_geometry_index()
+        assert global_idx == 4
+
+    def test_get_current_global_geometry_index_with_no_geometry(
+        self, test_config, mock_routing_provider, sample_route_result
+    ):
+        """Tests that pointcollection is used if geometry is None"""
+        road = Mock()
+        road.geometry = None
+        road.pointcollection = [None] * 10
+        road.active_pointcollection = [None] * 10
+        road.length = 90
+
+        route = Route(
+            sample_route_result, mock_routing_provider, test_config, roads=[road]
+        )
+        route.roads = [road]
+        route.current_road_index = 0
+        route.current_point_index = 3
+
+        assert route._get_current_global_geometry_index() == 3
+
+    def test_get_current_global_geometry_index_route_finished(
+        self, test_config, mock_routing_provider, sample_route_result
+    ):
+        """
+        Tests that the index is clamped to the last global index
+        when route is finished.
+        """
+        road0 = Mock()
+        road0.geometry = [None] * 5
+
+        road1 = Mock()
+        road1.geometry = [None] * 3
+
+        route = Route(
+            sample_route_result,
+            mock_routing_provider,
+            test_config,
+            roads=[road0, road1],
+        )
+        route.current_road_index = 2
+
+        # (5-1) + (3-1) = 6
+        global_idx = route._get_current_global_geometry_index()
+        assert global_idx == 6
+
+    def test_event_at_exact_junction(
+        self, test_config, mock_routing_provider, sample_route_result
+    ):
+        """Tests an event that starts exactly where two roads meet"""
+        road0 = Mock()
+        road0.geometry = [None] * 5
+        road0.pointcollection = [None] * 5
+        road0.active_pointcollection = [None] * 5
+        road0.length = 100
+        road1 = Mock()
+        road1.geometry = [None] * 3
+        road1.pointcollection = [None] * 3
+        road1.active_pointcollection = [None] * 3
+        road1.length = 50.0
+
+        road0.get_traffic_geometry_ranges.return_value = []
+        road1.get_traffic_geometry_ranges.return_value = [
+            (0, 2, CongestionLevel.MODERATE)
+        ]
+
+        route = Route(
+            sample_route_result,
+            mock_routing_provider,
+            test_config,
+            roads=[road0, road1],
+        )
+        route._rebuild_global_event_indices()
+
+        # road0 offset is 4. road1 starts at global index 4.
+        # event should be at (4+0, 4+2) = (4, 6)
+        assert route._event_indices[0] == (4, 6)

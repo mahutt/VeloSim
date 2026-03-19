@@ -393,15 +393,22 @@ class Road:
         return False
 
     def get_traffic_geometry_ranges(self) -> list[tuple[int, int, CongestionLevel]]:
-        """Get traffic ranges in geometry index space.
+        """Get traffic ranges sorted by geometry index for O(N) route rebuilding.
 
-        Returns (geom_start, geom_end, congestion_level) for each non-FREE_FLOW range.
+        Returns sorted (geom_start, geom_end, congestion_level)
+        for each non-FREE_FLOW range.
 
         Returns:
-            List of tuples with geometry start index, end index, and congestion level.
+            Sorted list of tuples with geometry start index, end index,
+            and congestion level.
         """
+        # Sort locally by the geometry index
+        sorted_ranges = sorted(
+            self._traffic_ranges.values(), key=lambda x: x.geom_start_index
+        )
+
         ranges: list[tuple[int, int, CongestionLevel]] = []
-        for tr in self._traffic_ranges.values():
+        for tr in sorted_ranges:
             level = multiplier_to_congestion_level(tr.multiplier)
             if level != CongestionLevel.FREE_FLOW:
                 ranges.append((tr.geom_start_index, tr.geom_end_index, level))
