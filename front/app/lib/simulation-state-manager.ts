@@ -124,7 +124,6 @@ export default class SimulationStateManager implements SimulationStateManagerInt
   private stations: Map<number, Station> = new Map();
   private tasks: Map<number, StationTask> = new Map();
   private partialAssignmentStationIds: Set<number> = new Set();
-  private selectedItem: Driver | Station | null = null;
   private headquarters: Headquarters | null = null;
   private mapShouldRefresh: boolean = false;
 
@@ -234,8 +233,12 @@ export default class SimulationStateManager implements SimulationStateManagerInt
     }
     this.recomputePartialAssignmentForStation(task.stationId);
 
-    if (this.selectedItem && this.selectedItem.taskIds.includes(task.id)) {
-      this.setSelectedItem(this.selectedItem);
+    if (
+      this.reactiveState.selectedItems.some((item) =>
+        item.value.tasks.some((selectedTask) => selectedTask.id === task.id)
+      )
+    ) {
+      this.refreshSelectedItems();
     }
 
     this.setMapShouldRefresh(true);

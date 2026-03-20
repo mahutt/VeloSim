@@ -301,7 +301,7 @@ export function setMapLayers(map: mapboxgl.Map) {
     filter: ['>', ['get', 'taskCount'], 0],
   });
 
-  // Add task count labels above stations (filtered to only show stations with taskCount > 0)
+  // task count labels for stations (filtered to only show stations with taskCount > 0)
   map.addLayer({
     id: MapLayer.StationTaskCounts,
     type: 'symbol',
