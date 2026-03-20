@@ -92,7 +92,8 @@ export function adaptStationsToGeoJSON(
 export function adaptResourcesToGeoJSON(
   resources: Driver[],
   selectedId: number | null,
-  hoveredId: number | null
+  hoveredId: number | null,
+  bearings: Map<number, number>
 ): GeoJSON.FeatureCollection {
   return {
     type: 'FeatureCollection',
@@ -104,6 +105,7 @@ export function adaptResourcesToGeoJSON(
         state: resource.state,
         selected: resource.id === selectedId,
         hover: resource.id === hoveredId,
+        bearing: bearings.get(resource.id) ?? 0,
       },
       geometry: {
         type: 'Point',

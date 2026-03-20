@@ -435,6 +435,9 @@ export function setMapLayers(map: mapboxgl.Map) {
       'text-offset': [0, -1.5],
       'text-anchor': 'bottom',
       'text-allow-overlap': true,
+      'icon-rotate': ['get', 'bearing'],
+      'icon-rotation-alignment': 'map',
+      'icon-pitch-alignment': 'map',
     },
     paint: {
       'icon-opacity': [
@@ -538,4 +541,27 @@ export function updateAllRoutesDisplay(
  */
 export function clearAllRoutesDisplay(map: mapboxgl.Map) {
   setMapSource(MapSource.AllRoutesNextTask, EMPTY_FEATURE_COLLECTION, map);
+}
+
+/**
+ * Compute an entity's bearing (orientation) from it's current and target positions
+ *
+ * Formula adapted from https://www.movable-type.co.uk/scripts/latlong.html
+ *
+ * @param current - current position as [longitude, latitude]
+ * @param target - target position as [longitude, latitude]
+ * @returns bearing in degrees (0-360, where 0/360 is north, 90 is east, etc.)
+ */
+export function computeBearing(current: Position, target: Position): number {
+  const λ1 = (current[0] * Math.PI) / 180;
+  const φ1 = (current[1] * Math.PI) / 180;
+  const λ2 = (target[0] * Math.PI) / 180;
+  const φ2 = (target[1] * Math.PI) / 180;
+
+  const y = Math.sin(λ2 - λ1) * Math.cos(φ2);
+  const x =
+    Math.cos(φ1) * Math.sin(φ2) -
+    Math.sin(φ1) * Math.cos(φ2) * Math.cos(λ2 - λ1);
+  const θ = Math.atan2(y, x);
+  return ((θ * 180) / Math.PI + 360) % 360;
 }

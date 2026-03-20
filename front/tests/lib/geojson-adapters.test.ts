@@ -402,17 +402,8 @@ describe('adaptResourcesToGeoJSON', () => {
     vehicleId: 5,
   });
 
-  it('should include driver name in GeoJSON properties', () => {
-    const result = adaptResourcesToGeoJSON([baseDriver], null, null);
-
-    expect(result.features).toHaveLength(1);
-    expect(result.features[0].properties).toEqual(
-      expect.objectContaining({ name: baseDriver.name })
-    );
-  });
-
   it('should convert drivers to a GeoJSON FeatureCollection with all properties', () => {
-    const result = adaptResourcesToGeoJSON([baseDriver], null, null);
+    const result = adaptResourcesToGeoJSON([baseDriver], null, null, new Map());
 
     expect(result).toEqual({
       type: 'FeatureCollection',
@@ -425,6 +416,7 @@ describe('adaptResourcesToGeoJSON', () => {
             state: baseDriver.state,
             selected: false,
             hover: false,
+            bearing: 0,
           },
           geometry: {
             type: 'Point',
@@ -436,7 +428,12 @@ describe('adaptResourcesToGeoJSON', () => {
   });
 
   it('should mark the selected resource', () => {
-    const result = adaptResourcesToGeoJSON([baseDriver], baseDriver.id, null);
+    const result = adaptResourcesToGeoJSON(
+      [baseDriver],
+      baseDriver.id,
+      null,
+      new Map()
+    );
 
     expect(result.features[0].properties).toEqual(
       expect.objectContaining({ selected: true, hover: false })
@@ -444,7 +441,12 @@ describe('adaptResourcesToGeoJSON', () => {
   });
 
   it('should mark the hovered resource', () => {
-    const result = adaptResourcesToGeoJSON([baseDriver], null, baseDriver.id);
+    const result = adaptResourcesToGeoJSON(
+      [baseDriver],
+      null,
+      baseDriver.id,
+      new Map()
+    );
 
     expect(result.features[0].properties).toEqual(
       expect.objectContaining({ selected: false, hover: true })
@@ -452,7 +454,7 @@ describe('adaptResourcesToGeoJSON', () => {
   });
 
   it('should return an empty FeatureCollection when given an empty array', () => {
-    const result = adaptResourcesToGeoJSON([], null, null);
+    const result = adaptResourcesToGeoJSON([], null, null, new Map());
 
     expect(result).toEqual({
       type: 'FeatureCollection',

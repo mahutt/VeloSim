@@ -22,7 +22,7 @@
  * SOFTWARE.
  */
 
-import { expect, test, vi } from 'vitest';
+import { describe, expect, test, vi } from 'vitest';
 import {
   loadMapImages,
   initializeMapSources,
@@ -33,6 +33,7 @@ import {
   updateAllRoutesDisplay,
   clearAllRoutesDisplay,
   MapSource,
+  computeBearing,
 } from '~/lib/map-helpers';
 import { ROUTE_LINE_OFFSET, ROUTE_LINE_WIDTH } from '~/constants';
 import { MockMap } from 'tests/mocks';
@@ -670,4 +671,25 @@ test('updateRouteDisplay passes traffic ranges through to route features', () =>
   );
   // Should include severe red for the traffic range
   expect(colors).toContain('#f87171');
+});
+
+describe('computeBearing', () => {
+  test('computeBearing returns correct bearing for cardinal directions', () => {
+    expect(computeBearing([0, 0], [0, 1])).toBeCloseTo(0); // North
+    expect(computeBearing([0, 0], [1, 0])).toBeCloseTo(90); // East
+    expect(computeBearing([0, 0], [0, -1])).toBeCloseTo(180); // South
+    expect(computeBearing([0, 0], [-1, 0])).toBeCloseTo(270); // West
+  });
+
+  test('computeBearing returns correct bearing for diagonal directions', () => {
+    expect(computeBearing([0, 0], [1, 1])).toBeCloseTo(45); // Northeast
+    expect(computeBearing([0, 0], [1, -1])).toBeCloseTo(135); // Southeast
+    expect(computeBearing([0, 0], [-1, -1])).toBeCloseTo(225); // Southwest
+    expect(computeBearing([0, 0], [-1, 1])).toBeCloseTo(315); // Northwest
+  });
+
+  test('computeBearing returns correct bearing for non-cardinal directions', () => {
+    expect(computeBearing([0, 0], [1, 2])).toBeCloseTo(26.5545779); // ~North-Northeast
+    expect(computeBearing([0, 0], [-2, 1])).toBeCloseTo(296.5720334); // ~296.57 degrees
+  });
 });
