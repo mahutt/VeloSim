@@ -32,6 +32,8 @@ import type { Position } from '~/types';
 function layerToEntityType(layer: MapLayer): SelectedItemType | null {
   switch (layer) {
     case MapLayer.Stations:
+    case MapLayer.StationCircle:
+    case MapLayer.StationRing:
     case MapLayer.StationTaskCounts:
       return SelectedItemType.Station;
     case MapLayer.Resources:
@@ -192,67 +194,20 @@ export function setupMapDropHandlers(
 // Minimum pixel movement before entering drag mode (so clicks still work)
 const DRAG_THRESHOLD = 5;
 
-// DOM-based drag ghost that floats above all overlays
-const GHOST_WIDTH = 28;
-
-function createDomGhost(stationCount = 1): HTMLElement {
-  if (stationCount === 1) {
-    const img = document.createElement('img');
-    img.src = '/station-selected.png';
-    img.setAttribute('data-testid', 'station-drag-ghost');
-    Object.assign(img.style, {
-      position: 'fixed',
-      width: `${GHOST_WIDTH}px`,
-      height: 'auto',
-      pointerEvents: 'none',
-      zIndex: '9999',
-      opacity: '0.85',
-      transform: 'translate(-50%, -50%)',
-    });
-    document.body.appendChild(img);
-    return img;
-  }
-
-  const container = document.createElement('div');
-  container.setAttribute('data-testid', 'station-drag-ghost');
-  Object.assign(container.style, {
+function createDomGhost(label: string): HTMLDivElement {
+  const preview = document.createElement('div');
+  preview.className = 'px-2 bg-blue-500 text-white rounded-lg';
+  preview.textContent = label;
+  preview.setAttribute('data-testid', 'station-drag-ghost');
+  Object.assign(preview.style, {
     position: 'fixed',
+    height: 'auto',
     pointerEvents: 'none',
     zIndex: '9999',
-    transform: 'translate(-50%, -50%)',
-  });
-
-  const img = document.createElement('img');
-  img.src = '/station-selected.png';
-  Object.assign(img.style, {
-    width: `${GHOST_WIDTH}px`,
-    height: 'auto',
     opacity: '0.85',
   });
-  container.appendChild(img);
-
-  const badge = document.createElement('span');
-  badge.textContent = String(stationCount);
-  badge.setAttribute('data-testid', 'station-drag-badge');
-  Object.assign(badge.style, {
-    position: 'absolute',
-    top: '-6px',
-    right: '-8px',
-    backgroundColor: '#3b82f6',
-    color: 'white',
-    borderRadius: '50%',
-    width: '18px',
-    height: '18px',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    fontSize: '11px',
-    fontWeight: 'bold',
-  });
-  container.appendChild(badge);
-
-  document.body.appendChild(container);
-  return container;
+  document.body.appendChild(preview);
+  return preview;
 }
 
 function moveDomGhost(ghost: HTMLElement, x: number, y: number) {
@@ -416,28 +371,34 @@ export function setupStationDragHandlers(
   onDrop: StationDragDropCallback,
   onHighlight: (stationId: number | null) => void,
   getMultiSelectedStationIds: () => number[],
-  onDragStart: (stationId: number, draggedStationIds: number[]) => void
+  onDragStart: (stationId: number, draggedStationIds: number[]) => void,
+  getTaskCountForStation: (stationId: number) => number
 ) {
   let dragging = false;
   let stationId: number | null = null;
   let draggedStationIds: number[] = [];
-  let originLngLat: [number, number] | null = null;
   let startPoint: { x: number; y: number } | null = null;
   let thresholdMet = false;
   let hoveredDriverId: number | null = null;
   let wasDragPanEnabled: boolean | null = null;
   let domGhost: HTMLElement | null = null;
+  let dragLabel = '';
 
-  const stationLayers = [MapLayer.Stations, MapLayer.StationCircle];
+  const stationLayers = [
+    MapLayer.Stations,
+    MapLayer.StationCircle,
+    MapLayer.StationRing,
+    MapLayer.StationTaskCounts,
+  ];
 
   function cleanup() {
     dragging = false;
     stationId = null;
     draggedStationIds = [];
-    originLngLat = null;
     startPoint = null;
     thresholdMet = false;
     hoveredDriverId = null;
+    dragLabel = '';
     removeDomGhost(domGhost);
     domGhost = null;
     onHighlight(null);
@@ -478,25 +439,22 @@ export function setupStationDragHandlers(
     }
 
     onHighlight(stationId);
-    const coords = (feature.geometry as GeoJSON.Point).coordinates as [
-      number,
-      number,
-    ];
-    originLngLat = coords;
+    const dragCount = draggedStationIds.reduce((sum, draggedId) => {
+      const count = getTaskCountForStation(draggedId);
+      return sum + (Number.isFinite(count) ? Math.max(0, count) : 0);
+    }, 0);
+    dragLabel = `${dragCount} ${dragCount === 1 ? 'task' : 'tasks'}`;
     startPoint = { x: e.point.x, y: e.point.y };
     dragging = true;
     thresholdMet = false;
-    wasDragPanEnabled = map.dragPan.isEnabled();
-    if (wasDragPanEnabled) {
-      map.dragPan.disable();
-    }
+    wasDragPanEnabled = null;
 
     // Don't prevent default click yet — wait for threshold
     e.preventDefault();
   }
 
   function onMouseMove(e: MapMouseEvent) {
-    if (!dragging || !startPoint || !originLngLat) return;
+    if (!dragging || !startPoint) return;
 
     const dx = e.point.x - startPoint.x;
     const dy = e.point.y - startPoint.y;
@@ -504,9 +462,15 @@ export function setupStationDragHandlers(
     if (!thresholdMet) {
       if (Math.sqrt(dx * dx + dy * dy) < DRAG_THRESHOLD) return;
       thresholdMet = true;
+
+      wasDragPanEnabled = map.dragPan.isEnabled();
+      if (wasDragPanEnabled) {
+        map.dragPan.disable();
+      }
+
       map.getCanvas().style.cursor = 'grabbing';
       // Create the DOM ghost so it floats above sidebar/overlays
-      domGhost = createDomGhost(draggedStationIds.length);
+      domGhost = createDomGhost(dragLabel);
       onDragStart(stationId!, draggedStationIds);
     }
 

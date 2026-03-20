@@ -22,7 +22,7 @@
  * SOFTWARE.
  */
 
-import type { Driver, Vehicle } from '~/types';
+import type { Driver, Vehicle, Station, StationTask } from '~/types';
 
 /**
  *
@@ -69,4 +69,28 @@ export function driverResourceHasUpdated(
   )
     return true;
   return false;
+}
+
+/**
+ *
+ * @param station the station to check for partial assignment
+ * @param tasks the current map of tasks in the simulation
+ * @returns boolean indicating whether the station has a mix of assigned and unassigned tasks
+ */
+export function isStationPartiallyAssigned(
+  station: Station,
+  tasks: Map<number, StationTask>
+): boolean {
+  let hasAssigned = false;
+  let hasUnassigned = false;
+
+  for (const taskId of station.taskIds) {
+    const task = tasks.get(taskId);
+    if (!task) continue;
+    if (task.assignedDriverId === null) hasUnassigned = true;
+    else hasAssigned = true;
+    if (hasAssigned && hasUnassigned) break;
+  }
+
+  return hasAssigned && hasUnassigned;
 }

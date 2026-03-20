@@ -158,6 +158,7 @@ export const mockSimulationStateManager: Partial<SimulationStateManager> = {
   clearSelection: vi.fn(),
 
   getMultiSelectedStationIds: vi.fn().mockReturnValue(new Set()),
+  getPartialAssignmentStationIds: vi.fn().mockReturnValue(new Set()),
 
   getHeadquarters: vi.fn(),
   setHeadquarters: vi.fn(),

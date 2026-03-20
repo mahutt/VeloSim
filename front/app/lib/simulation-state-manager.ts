@@ -38,6 +38,7 @@ import { SelectedItemType } from '~/components/map/selected-item-bar';
 import type { SelectedItem } from '~/components/map/selected-item-bar';
 import {
   driverResourceHasUpdated,
+  isStationPartiallyAssigned,
   vehicleResourceHasUpdated,
 } from './simulation-helpers';
 import {
@@ -55,6 +56,7 @@ export interface SimulationStateManagerInterface {
   getStation: (stationId: number) => Station | undefined;
   getAllStations: () => Station[];
   setStation: (station: Station) => void;
+  getPartialAssignmentStationIds: () => ReadonlySet<number>;
 
   getVehicle: (vehicleId: number) => Vehicle | undefined;
   getAllVehicles: () => Vehicle[];
@@ -121,6 +123,7 @@ export default class SimulationStateManager implements SimulationStateManagerInt
   private vehicles: Map<number, Vehicle> = new Map();
   private stations: Map<number, Station> = new Map();
   private tasks: Map<number, StationTask> = new Map();
+  private partialAssignmentStationIds: Set<number> = new Set();
   private headquarters: Headquarters | null = null;
   private mapShouldRefresh: boolean = false;
 
@@ -187,6 +190,7 @@ export default class SimulationStateManager implements SimulationStateManagerInt
     // If this station is in the selection, refresh selected items
     if (this.isSelectedById(SelectedItemType.Station, station.id)) {
       this.refreshSelectedItems();
+      this.recomputePartialAssignmentForStation(station.id);
     }
 
     this.setMapShouldRefresh(true);
@@ -198,6 +202,10 @@ export default class SimulationStateManager implements SimulationStateManagerInt
 
   public getAllStations() {
     return Array.from(this.stations.values());
+  }
+
+  public getPartialAssignmentStationIds() {
+    return this.partialAssignmentStationIds;
   }
 
   public setVehicle(vehicle: Vehicle) {
@@ -217,7 +225,22 @@ export default class SimulationStateManager implements SimulationStateManagerInt
   }
 
   public setTask(task: StationTask) {
+    const previousTask = this.tasks.get(task.id);
     this.tasks.set(task.id, task);
+
+    if (previousTask && previousTask.stationId !== task.stationId) {
+      this.recomputePartialAssignmentForStation(previousTask.stationId);
+    }
+    this.recomputePartialAssignmentForStation(task.stationId);
+
+    if (
+      this.reactiveState.selectedItems.some((item) =>
+        item.value.tasks.some((selectedTask) => selectedTask.id === task.id)
+      )
+    ) {
+      this.refreshSelectedItems();
+    }
+
     this.setMapShouldRefresh(true);
   }
 
@@ -444,6 +467,15 @@ export default class SimulationStateManager implements SimulationStateManagerInt
 
   public setPendingAssignmentLoading(pendingAssignmentLoading: boolean) {
     this.updateReactiveState({ pendingAssignmentLoading });
+  }
+
+  private recomputePartialAssignmentForStation(stationId: number) {
+    const station = this.stations.get(stationId);
+    if (station && isStationPartiallyAssigned(station, this.tasks)) {
+      this.partialAssignmentStationIds.add(stationId);
+    } else {
+      this.partialAssignmentStationIds.delete(stationId);
+    }
   }
 
   private updateResourceBarElement() {

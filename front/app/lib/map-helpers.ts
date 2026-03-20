@@ -27,7 +27,19 @@ import {
   FREE_FLOW_COLOR,
   ROUTE_LINE_OFFSET,
   ROUTE_LINE_WIDTH,
+  STATION_COLOR_LOW,
+  STATION_COLOR_MEDIUM,
+  STATION_COLOR_HIGH,
+  STATION_COLOR_LOW_HOVERED,
+  STATION_COLOR_MEDIUM_HOVERED,
+  STATION_COLOR_HIGH_HOVERED,
+  STATION_RING_COLOR_LOW,
+  STATION_RING_COLOR_MEDIUM,
+  STATION_RING_COLOR_HIGH,
+  STATION_TASK_COUNT_MEDIUM_THRESHOLD,
+  STATION_TASK_COUNT_HIGH_THRESHOLD,
 } from '~/constants';
+import type { ExpressionSpecification } from 'mapbox-gl';
 import type { Position, Route } from '~/types';
 import { adaptRouteToGeoJSON } from './geojson-adapters';
 
@@ -44,6 +56,7 @@ export enum MapLayer {
   Headquarters = 'headquarters',
   Stations = 'stations',
   StationCircle = 'station-circle',
+  StationRing = 'station-ring',
   StationTaskCounts = 'station-task-counts',
   Resources = 'resources',
   RouteNextTask = 'route-next-task',
@@ -53,6 +66,24 @@ export enum MapLayer {
 
 export function isMapLayer(value: string): value is MapLayer {
   return (Object.values(MapLayer) as string[]).includes(value);
+}
+
+const IS_HOVERED_OR_SELECTED: ExpressionSpecification = [
+  'any',
+  ['boolean', ['get', 'hover'], false],
+  ['boolean', ['get', 'selected'], false],
+];
+
+function stationRadius(base: number, active: number): ExpressionSpecification {
+  return [
+    'interpolate',
+    ['linear'],
+    ['zoom'],
+    13,
+    ['case', IS_HOVERED_OR_SELECTED, active, base],
+    17,
+    ['case', IS_HOVERED_OR_SELECTED, active + 4, base + 4],
+  ];
 }
 
 // Setup helpers
@@ -78,23 +109,6 @@ function loadSingleImage(
 export function loadMapImages(map: mapboxgl.Map) {
   // Define image configurations
   const imageConfigs = [
-    // Station images
-    {
-      path: '/station.png',
-      id: 'station-marker',
-      type: 'station marker image',
-    },
-    {
-      path: '/station-selected.png',
-      id: 'station-marker-selected',
-      type: 'station selected marker image',
-    },
-    {
-      path: '/station-hover.png',
-      id: 'station-marker-hover',
-      type: 'station hover marker image',
-    },
-
     // Resource images
     {
       path: '/resource.png',
@@ -195,9 +209,9 @@ export function setMapLayers(map: mapboxgl.Map) {
     },
   });
 
-  // red circles for stations zoomed out
+  // circles for stations zoomed out
   map.addLayer({
-    id: 'station-circle',
+    id: MapLayer.StationCircle,
     type: 'circle',
     source: MapSource.Stations,
     paint: {
@@ -207,37 +221,87 @@ export function setMapLayers(map: mapboxgl.Map) {
         ['get', 'taskCount'],
         0,
         2, // no tasks = 2px radius
-        10,
-        5, // 10+ tasks = 5px radius
+        3,
+        5, // 3+ tasks = 5px radius
       ],
-      'circle-color': '#EE3124',
+      'circle-color': [
+        'step',
+        ['get', 'taskCount'],
+        STATION_COLOR_LOW,
+        STATION_TASK_COUNT_MEDIUM_THRESHOLD,
+        STATION_COLOR_MEDIUM,
+        STATION_TASK_COUNT_HIGH_THRESHOLD,
+        STATION_COLOR_HIGH,
+      ],
     },
     maxzoom: 13,
     filter: ['>', ['get', 'taskCount'], 0],
   });
 
+  // ring for stations that have partial assignment
+  map.addLayer({
+    id: MapLayer.StationRing,
+    type: 'circle',
+    source: MapSource.Stations,
+    paint: {
+      'circle-radius': stationRadius(12, 13),
+      'circle-color': 'rgba(0, 0, 0, 0)',
+      'circle-stroke-color': [
+        'step',
+        ['get', 'taskCount'],
+        STATION_RING_COLOR_LOW,
+        STATION_TASK_COUNT_MEDIUM_THRESHOLD,
+        STATION_RING_COLOR_MEDIUM,
+        STATION_TASK_COUNT_HIGH_THRESHOLD,
+        STATION_RING_COLOR_HIGH,
+      ],
+      'circle-stroke-width': [
+        'interpolate',
+        ['linear'],
+        ['zoom'],
+        8,
+        1.5,
+        13,
+        2,
+        17,
+        2.5,
+      ],
+    },
+    minzoom: 13,
+    filter: [
+      'all',
+      ['>', ['get', 'taskCount'], 0],
+      ['==', ['get', 'hasPartialAssignment'], true],
+    ],
+  });
+
   // Add layers for stations (filtered to only show stations with taskCount > 0)
   map.addLayer({
     id: MapLayer.Stations,
-    type: 'symbol',
+    type: 'circle',
     source: MapSource.Stations,
-    layout: {
-      'icon-image': [
+    paint: {
+      'circle-radius': stationRadius(11, 12),
+      'circle-color': [
         'case',
         ['boolean', ['get', 'selected'], false],
-        'station-marker-selected',
-        ['boolean', ['get', 'hover'], false],
-        'station-marker-hover',
-        'station-marker',
+        [
+          'step',
+          ['get', 'taskCount'],
+          STATION_COLOR_LOW,
+          STATION_TASK_COUNT_MEDIUM_THRESHOLD,
+          STATION_COLOR_MEDIUM,
+          STATION_TASK_COUNT_HIGH_THRESHOLD,
+          STATION_COLOR_HIGH,
+        ],
+        'rgba(0, 0, 0, 0)',
       ],
-      'icon-allow-overlap': true,
-      'icon-size': ['interpolate', ['linear'], ['zoom'], 10, 0.4, 15, 1.0],
     },
     minzoom: 13,
     filter: ['>', ['get', 'taskCount'], 0],
   });
 
-  // Add task count labels above stations (filtered to only show stations with taskCount > 0)
+  // task count labels for stations (filtered to only show stations with taskCount > 0)
   map.addLayer({
     id: MapLayer.StationTaskCounts,
     type: 'symbol',
@@ -245,13 +309,37 @@ export function setMapLayers(map: mapboxgl.Map) {
     layout: {
       'text-field': ['get', 'taskCount'],
       'text-font': ['Open Sans Bold', 'Arial Unicode MS Bold'],
-      'text-size': ['interpolate', ['linear'], ['zoom'], 10, 5, 15, 12],
-      'text-offset': [0, -2],
-      'text-anchor': 'bottom',
+      'text-size': ['interpolate', ['linear'], ['zoom'], 8, 13, 17, 23],
+      'text-anchor': 'center',
       'text-allow-overlap': true,
     },
     paint: {
-      'text-color': '#000000',
+      'text-color': [
+        'case',
+        ['boolean', ['get', 'selected'], false],
+        '#ffffff',
+        ['boolean', ['get', 'hover'], false],
+        [
+          'step',
+          ['get', 'taskCount'],
+          STATION_COLOR_LOW_HOVERED,
+          STATION_TASK_COUNT_MEDIUM_THRESHOLD,
+          STATION_COLOR_MEDIUM_HOVERED,
+          STATION_TASK_COUNT_HIGH_THRESHOLD,
+          STATION_COLOR_HIGH_HOVERED,
+        ],
+        [
+          'step',
+          ['get', 'taskCount'],
+          STATION_COLOR_LOW,
+          STATION_TASK_COUNT_MEDIUM_THRESHOLD,
+          STATION_COLOR_MEDIUM,
+          STATION_TASK_COUNT_HIGH_THRESHOLD,
+          STATION_COLOR_HIGH,
+        ],
+      ],
+      'text-halo-color': 'rgba(0, 0, 0, 0)',
+      'text-halo-width': 0,
     },
     minzoom: 13,
     filter: ['>', ['get', 'taskCount'], 0],
