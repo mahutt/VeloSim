@@ -40,7 +40,7 @@ import {
   STATION_TASK_COUNT_HIGH_THRESHOLD,
 } from '~/constants';
 import type { ExpressionSpecification } from 'mapbox-gl';
-import type { Position, Route } from '~/types';
+import { DriverState, type Position, type Route } from '~/types';
 import { adaptRouteToGeoJSON } from './geojson-adapters';
 
 export enum MapSource {
@@ -111,19 +111,54 @@ export function loadMapImages(map: mapboxgl.Map) {
   const imageConfigs = [
     // Resource images
     {
-      path: '/resource.png',
-      id: 'resource-marker',
-      type: 'resource marker image',
-    },
-    {
-      path: '/resource-selected.png',
+      path: '/resource-icons/resource-selected.png',
       id: 'resource-marker-selected',
       type: 'resource selected marker image',
     },
     {
-      path: '/resource-hover.png',
-      id: 'resource-marker-hover',
-      type: 'resource hover marker image',
+      path: '/resource-icons/resource-off-shift.png',
+      id: 'resource-marker-off-shift',
+      type: 'resource off shift marker image',
+    },
+    {
+      path: '/resource-icons/resource-pending-shift.png',
+      id: 'resource-marker-pending-shift',
+      type: 'resource pending shift marker image',
+    },
+    {
+      path: '/resource-icons/resource-idle.png',
+      id: 'resource-marker-idle',
+      type: 'resource idle marker image',
+    },
+    {
+      path: '/resource-icons/resource-on-route.png',
+      id: 'resource-marker-on-route',
+      type: 'resource on route marker image',
+    },
+    {
+      path: '/resource-icons/resource-servicing.png',
+      id: 'resource-marker-servicing',
+      type: 'resource servicing marker image',
+    },
+    {
+      path: '/resource-icons/resource-on-break.png',
+      id: 'resource-marker-on-break',
+      type: 'resource on break marker image',
+    },
+    {
+      path: '/resource-icons/resource-to-restock.png',
+      id: 'resource-marker-to-restock',
+      type: 'resource to restock marker image',
+    },
+    {
+      path: '/resource-icons/resource-restocking.png',
+      id: 'resource-marker-restocking',
+      type: 'resource restocking marker image',
+    },
+    {
+      path: '/resource-icons/resource-ending-shift.png',
+      id: 'resource-marker-ending-shift',
+      type: 'resource ending shift marker image',
     },
 
     // HQ image
@@ -367,10 +402,31 @@ export function setMapLayers(map: mapboxgl.Map) {
         'case',
         ['boolean', ['get', 'selected'], false],
         'resource-marker-selected',
-        ['boolean', ['get', 'hover'], false],
-        'resource-marker-hover',
-        'resource-marker',
+        [
+          'match',
+          ['get', 'state'],
+          DriverState.OffShift,
+          'resource-marker-off-shift',
+          DriverState.PendingShift,
+          'resource-marker-pending-shift',
+          DriverState.Idle,
+          'resource-marker-idle',
+          DriverState.OnRoute,
+          'resource-marker-on-route',
+          DriverState.ServicingStation,
+          'resource-marker-servicing',
+          DriverState.OnBreak,
+          'resource-marker-on-break',
+          DriverState.SeekingHQForInventory,
+          'resource-marker-to-restock',
+          DriverState.RestockingBatteries,
+          'resource-marker-restocking',
+          DriverState.EndingShift,
+          'resource-marker-ending-shift',
+          'resource-marker-off-shift',
+        ],
       ],
+
       'icon-allow-overlap': true,
       'icon-size': ['interpolate', ['linear'], ['zoom'], 10, 0.5, 13, 1.0],
       'text-field': ['get', 'name'],
@@ -381,6 +437,14 @@ export function setMapLayers(map: mapboxgl.Map) {
       'text-allow-overlap': true,
     },
     paint: {
+      'icon-opacity': [
+        'case',
+        ['boolean', ['get', 'selected'], false],
+        1,
+        ['boolean', ['get', 'hover'], false],
+        0.7,
+        1,
+      ],
       'text-color': '#000000',
       'text-halo-color': '#ffffff',
       'text-halo-width': 1,

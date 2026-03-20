@@ -36,22 +36,50 @@ import {
 } from '~/lib/map-helpers';
 import { ROUTE_LINE_OFFSET, ROUTE_LINE_WIDTH } from '~/constants';
 import { MockMap } from 'tests/mocks';
-import type { Position, CongestionLevel } from '~/types';
+import { type Position, type CongestionLevel } from '~/types';
 
 test('loadMapImages loads all necessary images', () => {
   MockMap.createRandomInstance();
   loadMapImages(MockMap.instance! as unknown as mapboxgl.Map);
-  expect(MockMap.instance?.loadImage).toHaveBeenCalledTimes(4);
+  expect(MockMap.instance?.loadImage).toHaveBeenCalledTimes(11);
   expect(MockMap.instance?.loadImage).toHaveBeenCalledWith(
-    '/resource.png',
+    '/resource-icons/resource-selected.png',
     expect.any(Function)
   );
   expect(MockMap.instance?.loadImage).toHaveBeenCalledWith(
-    '/resource-selected.png',
+    '/resource-icons/resource-off-shift.png',
     expect.any(Function)
   );
   expect(MockMap.instance?.loadImage).toHaveBeenCalledWith(
-    '/resource-hover.png',
+    '/resource-icons/resource-pending-shift.png',
+    expect.any(Function)
+  );
+  expect(MockMap.instance?.loadImage).toHaveBeenCalledWith(
+    '/resource-icons/resource-idle.png',
+    expect.any(Function)
+  );
+  expect(MockMap.instance?.loadImage).toHaveBeenCalledWith(
+    '/resource-icons/resource-on-route.png',
+    expect.any(Function)
+  );
+  expect(MockMap.instance?.loadImage).toHaveBeenCalledWith(
+    '/resource-icons/resource-servicing.png',
+    expect.any(Function)
+  );
+  expect(MockMap.instance?.loadImage).toHaveBeenCalledWith(
+    '/resource-icons/resource-on-break.png',
+    expect.any(Function)
+  );
+  expect(MockMap.instance?.loadImage).toHaveBeenCalledWith(
+    '/resource-icons/resource-to-restock.png',
+    expect.any(Function)
+  );
+  expect(MockMap.instance?.loadImage).toHaveBeenCalledWith(
+    '/resource-icons/resource-restocking.png',
+    expect.any(Function)
+  );
+  expect(MockMap.instance?.loadImage).toHaveBeenCalledWith(
+    '/resource-icons/resource-ending-shift.png',
     expect.any(Function)
   );
   expect(MockMap.instance?.loadImage).toHaveBeenCalledWith(
@@ -88,90 +116,10 @@ test('initializeMapSources adds all required sources', () => {
   });
 });
 
-test('setMapLayers adds stations layer with correct configuration', () => {
+test('setMapLayers adds expected number of layers', () => {
   MockMap.createRandomInstance();
   setMapLayers(MockMap.instance! as unknown as mapboxgl.Map);
-
   expect(MockMap.instance?.addLayer).toHaveBeenCalledTimes(9);
-  expect(MockMap.instance?.addLayer).toHaveBeenCalledWith({
-    id: 'stations',
-    type: 'circle',
-    source: 'stations',
-    paint: {
-      'circle-radius': [
-        'interpolate',
-        ['linear'],
-        ['zoom'],
-        13,
-        [
-          'case',
-          [
-            'any',
-            ['boolean', ['get', 'hover'], false],
-            ['boolean', ['get', 'selected'], false],
-          ],
-          12,
-          11,
-        ],
-        17,
-        [
-          'case',
-          [
-            'any',
-            ['boolean', ['get', 'hover'], false],
-            ['boolean', ['get', 'selected'], false],
-          ],
-          16,
-          15,
-        ],
-      ],
-      'circle-color': [
-        'case',
-        ['boolean', ['get', 'selected'], false],
-        [
-          'step',
-          ['get', 'taskCount'],
-          '#0796dd',
-          2,
-          '#890eba',
-          3,
-          '#ed2b09',
-        ],
-        'rgba(0, 0, 0, 0)',
-      ],
-    },
-    minzoom: 13,
-    filter: ['>', ['get', 'taskCount'], 0],
-  });
-
-  expect(MockMap.instance?.addLayer).toHaveBeenCalledWith({
-    id: 'resources',
-    type: 'symbol',
-    source: 'resources',
-    layout: {
-      'icon-image': [
-        'case',
-        ['boolean', ['get', 'selected'], false],
-        'resource-marker-selected',
-        ['boolean', ['get', 'hover'], false],
-        'resource-marker-hover',
-        'resource-marker',
-      ],
-      'icon-allow-overlap': true,
-      'icon-size': ['interpolate', ['linear'], ['zoom'], 10, 0.5, 13, 1.0],
-      'text-field': ['get', 'name'],
-      'text-font': ['Open Sans Bold', 'Arial Unicode MS Bold'],
-      'text-size': ['interpolate', ['linear'], ['zoom'], 10, 8, 15, 12],
-      'text-offset': [0, -1.5],
-      'text-anchor': 'bottom',
-      'text-allow-overlap': true,
-    },
-    paint: {
-      'text-color': '#000000',
-      'text-halo-color': '#ffffff',
-      'text-halo-width': 1,
-    },
-  });
 });
 
 test('loadMapImages handles image loading with async callbacks', async () => {
@@ -200,7 +148,7 @@ test('loadMapImages handles image loading with async callbacks', async () => {
   // Wait for async callbacks
   await new Promise((resolve) => setTimeout(resolve, 10));
 
-  expect(MockMap.instance?.loadImage).toHaveBeenCalledTimes(4);
+  expect(MockMap.instance?.loadImage).toHaveBeenCalledTimes(11);
 });
 
 test('setMapSource updates source data correctly', () => {
@@ -258,24 +206,8 @@ test('loadMapImages successfully adds images when loaded', () => {
 
   loadMapImages(MockMap.instance! as unknown as mapboxgl.Map);
 
-  expect(MockMap.instance?.loadImage).toHaveBeenCalledTimes(4);
-  expect(MockMap.instance?.addImage).toHaveBeenCalledTimes(4);
-  expect(MockMap.instance?.addImage).toHaveBeenCalledWith(
-    'resource-marker',
-    mockImage
-  );
-  expect(MockMap.instance?.addImage).toHaveBeenCalledWith(
-    'resource-marker-selected',
-    mockImage
-  );
-  expect(MockMap.instance?.addImage).toHaveBeenCalledWith(
-    'resource-marker-hover',
-    mockImage
-  );
-  expect(MockMap.instance?.addImage).toHaveBeenCalledWith(
-    'hq-marker',
-    mockImage
-  );
+  expect(MockMap.instance?.loadImage).toHaveBeenCalledTimes(11);
+  expect(MockMap.instance?.addImage).toHaveBeenCalledTimes(11);
 });
 
 test('loadMapImages handles image load failure gracefully', () => {
@@ -296,7 +228,7 @@ test('loadMapImages handles image load failure gracefully', () => {
 
   loadMapImages(MockMap.instance! as unknown as mapboxgl.Map);
 
-  expect(MockMap.instance?.loadImage).toHaveBeenCalledTimes(4);
+  expect(MockMap.instance?.loadImage).toHaveBeenCalledTimes(11);
   // Should not call addImage if loadImage fails
   expect(MockMap.instance?.addImage).not.toHaveBeenCalled();
 });

@@ -101,6 +101,7 @@ export function adaptResourcesToGeoJSON(
       properties: {
         id: resource.id,
         name: resource.name,
+        state: resource.state,
         selected: resource.id === selectedId,
         hover: resource.id === hoveredId,
       },

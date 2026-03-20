@@ -422,6 +422,7 @@ describe('adaptResourcesToGeoJSON', () => {
           properties: {
             id: baseDriver.id,
             name: baseDriver.name,
+            state: baseDriver.state,
             selected: false,
             hover: false,
           },
