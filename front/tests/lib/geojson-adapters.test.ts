@@ -422,8 +422,6 @@ describe('adaptResourcesToGeoJSON', () => {
           properties: {
             id: baseDriver.id,
             name: baseDriver.name,
-            route: [],
-            taskList: baseDriver.taskIds,
             selected: false,
             hover: false,
           },
@@ -459,26 +457,5 @@ describe('adaptResourcesToGeoJSON', () => {
       type: 'FeatureCollection',
       features: [],
     });
-  });
-
-  it('should include route coordinates when driver has a route', () => {
-    const routeCoordinates: Position[] = [
-      [-73.935, 40.73],
-      [-73.94, 40.74],
-    ];
-    const driverWithRoute = makeDriver({
-      ...baseDriver,
-      route: {
-        coordinates: routeCoordinates,
-        nextStopIndex: 1,
-        trafficRanges: [],
-      },
-    });
-
-    const result = adaptResourcesToGeoJSON([driverWithRoute], null, null);
-
-    expect(result.features[0].properties).toEqual(
-      expect.objectContaining({ route: routeCoordinates })
-    );
   });
 });
