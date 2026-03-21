@@ -44,6 +44,7 @@ import {
   clearAllRoutesDisplay,
   updateRouteDisplay,
   clearRouteDisplay,
+  computeBearing,
 } from './map-helpers';
 import {
   setupMapClickHandlers,
@@ -73,6 +74,7 @@ export default class MapManager {
   private currentPositions: Map<number, Position>;
   private frameStartPositions: Map<number, Position>;
   private targetPositions: Map<number, Position>;
+  private bearings: Map<number, number>;
   private routes: Map<number, Route>;
   private lastDriverUpdates: Map<number, number>;
   private animationFrame: number;
@@ -94,6 +96,7 @@ export default class MapManager {
     this.currentPositions = new Map();
     this.frameStartPositions = new Map();
     this.targetPositions = new Map();
+    this.bearings = new Map();
     this.routes = new Map();
     this.lastDriverUpdates = new Map();
     this.animationFrame = 0;
@@ -264,6 +267,10 @@ export default class MapManager {
       else if (!positionsEqual(currentPosition, newPosition)) {
         this.frameStartPositions.set(resource.id, currentPosition);
         this.targetPositions.set(resource.id, newPosition);
+        this.bearings.set(
+          resource.id,
+          computeBearing(currentPosition, newPosition)
+        );
       }
 
       // Store route geometry if provided (sent in key frames or when route changes)
@@ -368,7 +375,8 @@ export default class MapManager {
       const geojson = adaptResourcesToGeoJSON(
         resources,
         selectedResourceId,
-        this.hoveredResourceId
+        this.hoveredResourceId,
+        this.bearings
       );
       setMapSource(MapSource.Resources, geojson, map);
     }

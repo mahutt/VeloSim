@@ -98,6 +98,7 @@ const {
   mockAdaptHeadquartersToGeoJSON,
   mockAdaptStationsToGeoJSON,
   mockAdaptResourcesToGeoJSON,
+  mockComputeBearing,
 } = vi.hoisted(() => {
   return {
     mockSetMapSource: vi.fn(),
@@ -108,6 +109,7 @@ const {
     mockAdaptHeadquartersToGeoJSON: vi.fn().mockReturnValue({}),
     mockAdaptStationsToGeoJSON: vi.fn().mockReturnValue({}),
     mockAdaptResourcesToGeoJSON: vi.fn().mockReturnValue({}),
+    mockComputeBearing: vi.fn(),
   };
 });
 vi.mock('~/lib/map-helpers', () => {
@@ -127,6 +129,7 @@ vi.mock('~/lib/map-helpers', () => {
     clearAllRoutesDisplay: mockClearAllRoutesDisplay,
     updateRouteDisplay: mockUpdateRouteDisplay,
     clearRouteDisplay: mockClearRouteDisplay,
+    computeBearing: mockComputeBearing,
   };
 });
 vi.mock('~/lib/geojson-adapters', () => {
@@ -749,7 +752,8 @@ describe('MapManager', () => {
       expect(mockAdaptResourcesToGeoJSON).toHaveBeenCalledWith(
         [expect.objectContaining({ id: 1 })],
         null,
-        null
+        null,
+        new Map()
       );
     });
 

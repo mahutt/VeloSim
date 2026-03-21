@@ -40,7 +40,7 @@ import {
   STATION_TASK_COUNT_HIGH_THRESHOLD,
 } from '~/constants';
 import type { ExpressionSpecification } from 'mapbox-gl';
-import type { Position, Route } from '~/types';
+import { DriverState, type Position, type Route } from '~/types';
 import { adaptRouteToGeoJSON } from './geojson-adapters';
 
 export enum MapSource {
@@ -111,19 +111,54 @@ export function loadMapImages(map: mapboxgl.Map) {
   const imageConfigs = [
     // Resource images
     {
-      path: '/resource.png',
-      id: 'resource-marker',
-      type: 'resource marker image',
-    },
-    {
-      path: '/resource-selected.png',
+      path: '/resource-icons/resource-selected.png',
       id: 'resource-marker-selected',
       type: 'resource selected marker image',
     },
     {
-      path: '/resource-hover.png',
-      id: 'resource-marker-hover',
-      type: 'resource hover marker image',
+      path: '/resource-icons/resource-off-shift.png',
+      id: 'resource-marker-off-shift',
+      type: 'resource off shift marker image',
+    },
+    {
+      path: '/resource-icons/resource-pending-shift.png',
+      id: 'resource-marker-pending-shift',
+      type: 'resource pending shift marker image',
+    },
+    {
+      path: '/resource-icons/resource-idle.png',
+      id: 'resource-marker-idle',
+      type: 'resource idle marker image',
+    },
+    {
+      path: '/resource-icons/resource-on-route.png',
+      id: 'resource-marker-on-route',
+      type: 'resource on route marker image',
+    },
+    {
+      path: '/resource-icons/resource-servicing.png',
+      id: 'resource-marker-servicing',
+      type: 'resource servicing marker image',
+    },
+    {
+      path: '/resource-icons/resource-on-break.png',
+      id: 'resource-marker-on-break',
+      type: 'resource on break marker image',
+    },
+    {
+      path: '/resource-icons/resource-to-restock.png',
+      id: 'resource-marker-to-restock',
+      type: 'resource to restock marker image',
+    },
+    {
+      path: '/resource-icons/resource-restocking.png',
+      id: 'resource-marker-restocking',
+      type: 'resource restocking marker image',
+    },
+    {
+      path: '/resource-icons/resource-ending-shift.png',
+      id: 'resource-marker-ending-shift',
+      type: 'resource ending shift marker image',
     },
 
     // HQ image
@@ -367,10 +402,31 @@ export function setMapLayers(map: mapboxgl.Map) {
         'case',
         ['boolean', ['get', 'selected'], false],
         'resource-marker-selected',
-        ['boolean', ['get', 'hover'], false],
-        'resource-marker-hover',
-        'resource-marker',
+        [
+          'match',
+          ['get', 'state'],
+          DriverState.OffShift,
+          'resource-marker-off-shift',
+          DriverState.PendingShift,
+          'resource-marker-pending-shift',
+          DriverState.Idle,
+          'resource-marker-idle',
+          DriverState.OnRoute,
+          'resource-marker-on-route',
+          DriverState.ServicingStation,
+          'resource-marker-servicing',
+          DriverState.OnBreak,
+          'resource-marker-on-break',
+          DriverState.SeekingHQForInventory,
+          'resource-marker-to-restock',
+          DriverState.RestockingBatteries,
+          'resource-marker-restocking',
+          DriverState.EndingShift,
+          'resource-marker-ending-shift',
+          'resource-marker-off-shift',
+        ],
       ],
+
       'icon-allow-overlap': true,
       'icon-size': ['interpolate', ['linear'], ['zoom'], 10, 0.5, 13, 1.0],
       'text-field': ['get', 'name'],
@@ -379,8 +435,19 @@ export function setMapLayers(map: mapboxgl.Map) {
       'text-offset': [0, -1.5],
       'text-anchor': 'bottom',
       'text-allow-overlap': true,
+      'icon-rotate': ['get', 'bearing'],
+      'icon-rotation-alignment': 'map',
+      'icon-pitch-alignment': 'map',
     },
     paint: {
+      'icon-opacity': [
+        'case',
+        ['boolean', ['get', 'selected'], false],
+        1,
+        ['boolean', ['get', 'hover'], false],
+        0.7,
+        1,
+      ],
       'text-color': '#000000',
       'text-halo-color': '#ffffff',
       'text-halo-width': 1,
@@ -474,4 +541,27 @@ export function updateAllRoutesDisplay(
  */
 export function clearAllRoutesDisplay(map: mapboxgl.Map) {
   setMapSource(MapSource.AllRoutesNextTask, EMPTY_FEATURE_COLLECTION, map);
+}
+
+/**
+ * Compute an entity's bearing (orientation) from it's current and target positions
+ *
+ * Formula adapted from https://www.movable-type.co.uk/scripts/latlong.html
+ *
+ * @param current - current position as [longitude, latitude]
+ * @param target - target position as [longitude, latitude]
+ * @returns bearing in degrees (0-360, where 0/360 is north, 90 is east, etc.)
+ */
+export function computeBearing(current: Position, target: Position): number {
+  const λ1 = (current[0] * Math.PI) / 180;
+  const φ1 = (current[1] * Math.PI) / 180;
+  const λ2 = (target[0] * Math.PI) / 180;
+  const φ2 = (target[1] * Math.PI) / 180;
+
+  const y = Math.sin(λ2 - λ1) * Math.cos(φ2);
+  const x =
+    Math.cos(φ1) * Math.sin(φ2) -
+    Math.sin(φ1) * Math.cos(φ2) * Math.cos(λ2 - λ1);
+  const θ = Math.atan2(y, x);
+  return ((θ * 180) / Math.PI + 360) % 360;
 }
