@@ -544,7 +544,7 @@ export function clearAllRoutesDisplay(map: mapboxgl.Map) {
 }
 
 /**
- * Compute an entity's bearing (orientation) from it's current and target positions
+ * Compute an entity's bearing (orientation) from its current and target positions
  *
  * Formula adapted from https://www.movable-type.co.uk/scripts/latlong.html
  *
