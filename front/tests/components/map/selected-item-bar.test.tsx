@@ -40,7 +40,6 @@ import {
 } from 'tests/test-helpers';
 import { mockSimulationEngine } from 'tests/mocks';
 import type SimulationEngine from '~/lib/simulation-engine';
-import { TaskState } from '~/types';
 
 // Mock the useSimulation hook
 vi.mock('~/providers/simulation-provider', () => ({
@@ -125,45 +124,6 @@ describe('SelectedItemBar', () => {
     expect(screen.getByText('Task #1')).toBeInTheDocument();
     expect(screen.getByText('Task #2')).toBeInTheDocument();
     expect(screen.getByText('Task #3')).toBeInTheDocument();
-  });
-
-  it('should render driver in progress task when driver is selected', () => {
-    const inProgressTask = makeStationTask({
-      id: 1,
-      state: TaskState.InProgress,
-    });
-    (useSimulation as unknown as ReturnType<typeof vi.fn>).mockReturnValue(
-      makeSimulationContext({
-        state: makeReactiveSimulationState({
-          selectedItems: [
-            makeSelectedItem({
-              type: SelectedItemType.Driver,
-              value: makePopulatedDriver({
-                id: 5,
-                name: 'Driver 5',
-                inProgressTask,
-                tasks: [
-                  inProgressTask,
-                  makeStationTask({ id: 2 }),
-                  makeStationTask({ id: 3 }),
-                ],
-              }),
-            }),
-          ],
-        }),
-      })
-    );
-
-    render(
-      <FeatureToggleProvider>
-        <SelectedItemBar />
-      </FeatureToggleProvider>
-    );
-
-    expect(screen.getByText('Driver 5')).toBeInTheDocument();
-    expect(screen.getByText('Tasks (3)')).toBeInTheDocument();
-    expect(screen.getByText('Task #1')).toBeInTheDocument();
-    expect(screen.getByText(/in progress/i)).toBeInTheDocument();
   });
 
   it('should call clearSelection when close button is clicked', async () => {

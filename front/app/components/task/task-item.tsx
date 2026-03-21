@@ -27,9 +27,15 @@ import { Button } from '~/components/ui/button';
 import { X } from 'lucide-react';
 import { TaskState, type StationTask } from '~/types';
 import { useSimulation } from '~/providers/simulation-provider';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from '~/components/ui/tooltip';
 
 export function TaskItem({
   task,
+  stationName,
   onUnassign,
   onSelect,
   isSelected = false,
@@ -37,6 +43,7 @@ export function TaskItem({
   getDragTaskIds,
 }: {
   task: StationTask;
+  stationName: string;
   onUnassign?: () => void;
   onSelect?: (event: React.MouseEvent<HTMLDivElement>) => void;
   isSelected?: boolean;
@@ -44,7 +51,6 @@ export function TaskItem({
   getDragTaskIds?: () => number[];
 }) {
   const { state } = useSimulation();
-  const taskIsInProgress = task.state === TaskState.InProgress;
   const taskIsInService = task.state === TaskState.InService;
 
   const assignable = !(state.blockAssignments || taskIsInService);
@@ -94,16 +100,23 @@ export function TaskItem({
             : 'cursor-default opacity-50'
         } ${isSelected ? 'border-blue-500 bg-blue-50' : ''}`}
     >
-      <ItemContent>
-        <ItemTitle>Task #{task.id}</ItemTitle>
+      <ItemContent className="min-w-0 flex-row items-center gap-2">
+        <ItemTitle className="shrink-0">Task #{task.id}</ItemTitle>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <span className="text-xs text-muted-foreground max-w-28 truncate min-w-0">
+              {stationName}
+            </span>
+          </TooltipTrigger>
+          <TooltipContent side="top" sideOffset={6}>
+            {stationName}
+          </TooltipContent>
+        </Tooltip>
       </ItemContent>
       {taskIsInService ? (
-        <span className="text-sm text-gray-500 italic">In Service</span>
+        <span className="text-sm text-gray-500 italic">Servicing</span>
       ) : onUnassign ? (
         <>
-          {taskIsInProgress && (
-            <span className="text-sm text-gray-500 italic">In Progress</span>
-          )}
           <Button
             variant="ghost"
             size="icon"
