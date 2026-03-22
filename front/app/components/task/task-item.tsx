@@ -116,19 +116,17 @@ export function TaskItem({
       {taskIsInService ? (
         <span className="text-sm text-gray-500 italic">Servicing</span>
       ) : onUnassign ? (
-        <>
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={(event) => {
-              event.stopPropagation();
-              onUnassign?.();
-            }}
-            className="h-6 w-6"
-          >
-            <X className="h-4 w-4" />
-          </Button>
-        </>
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={(event) => {
+            event.stopPropagation();
+            onUnassign?.();
+          }}
+          className="h-6 w-6"
+        >
+          <X className="h-4 w-4" />
+        </Button>
       ) : null}
     </Item>
   );

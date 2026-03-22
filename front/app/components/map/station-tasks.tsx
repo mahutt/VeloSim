@@ -41,6 +41,8 @@ export function StationTasks({ station }: { station: PopulatedStation }) {
           : `Tasks (${station.tasks.length})`}
       </p>
       {station.tasks.map((task, index) => {
+        const assignedDriverId = task.assignedDriverId;
+
         return (
           <TaskItem
             key={task.id}
@@ -53,10 +55,9 @@ export function StationTasks({ station }: { station: PopulatedStation }) {
               selectedTaskIds.includes(task.id) ? selectedTaskIds : [task.id]
             }
             onUnassign={
-              task.assignedDriverId
+              assignedDriverId
                 ? () => {
-                    if (!task.assignedDriverId) return;
-                    engine.requestUnassignment(task.assignedDriverId, task.id);
+                    engine.requestUnassignment(assignedDriverId, task.id);
                   }
                 : undefined
             }

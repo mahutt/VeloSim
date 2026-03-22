@@ -22,7 +22,7 @@
  * SOFTWARE.
  */
 
-import { useRef, useState } from 'react';
+import { useState } from 'react';
 import { ChevronDown, ChevronUp } from 'lucide-react';
 import { useSimulation } from '~/providers/simulation-provider';
 import { type StationTask } from '~/types';
@@ -167,19 +167,21 @@ function DriverTasksCollapsed({
   onReorder: (taskIds: number[]) => Promise<void>;
 }) {
   const [dropTargetIndex, setDropTargetIndex] = useState<number | null>(null);
-  const draggedGroupIndexRef = useRef<number | null>(null);
+  const [draggedGroupIndex, setDraggedGroupIndex] = useState<number | null>(
+    null
+  );
 
   const handleDragStart = (
     e: React.DragEvent<HTMLDivElement>,
     groupIndex: number
   ) => {
     e.dataTransfer.effectAllowed = 'move';
-    draggedGroupIndexRef.current = groupIndex;
+    setDraggedGroupIndex(groupIndex);
   };
 
   const handleDragOver = (e: React.DragEvent, targetIndex: number) => {
     e.preventDefault();
-    if (draggedGroupIndexRef.current === null) {
+    if (draggedGroupIndex === null) {
       e.dataTransfer.dropEffect = 'none';
       return;
     }
@@ -191,7 +193,7 @@ function DriverTasksCollapsed({
     e.preventDefault();
     setDropTargetIndex(null);
 
-    const sourceIndex = draggedGroupIndexRef.current;
+    const sourceIndex = draggedGroupIndex;
     if (sourceIndex === null || sourceIndex === targetIndex) return;
 
     const groupTaskIds = groupedTasks.map((g) => g.tasks.map((t) => t.id));
@@ -203,7 +205,7 @@ function DriverTasksCollapsed({
   };
 
   const handleDragEnd = () => {
-    draggedGroupIndexRef.current = null;
+    setDraggedGroupIndex(null);
     setDropTargetIndex(null);
   };
 
@@ -214,12 +216,13 @@ function DriverTasksCollapsed({
           key={`${group.stationId}-${index}`}
           group={group}
           index={index}
-          showDropIndicator={dropTargetIndex === index}
-          isDraggingDown={
-            draggedGroupIndexRef.current !== null &&
-            index > draggedGroupIndexRef.current
+          showDropIndicator={
+            dropTargetIndex === index && draggedGroupIndex !== index
           }
-          isDraggedGroup={draggedGroupIndexRef.current === index}
+          isDraggingDown={
+            draggedGroupIndex !== null && index > draggedGroupIndex
+          }
+          isDraggedGroup={draggedGroupIndex === index}
           onDragStart={handleDragStart}
           onDragOver={handleDragOver}
           onDrop={handleDrop}
@@ -301,7 +304,7 @@ function DriverTasksExpanded({
           onDrop={(e) => handleDrop(e, index)}
           onDragEnd={handleDragEnd}
           className={
-            dropTargetIndex === index
+            dropTargetIndex === index && index !== draggedIndex
               ? index > draggedIndex
                 ? 'border-b-2 border-blue-500 pb-1'
                 : 'border-t-2 border-blue-500 pt-1'
