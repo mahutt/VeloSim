@@ -25,6 +25,7 @@ SOFTWARE.
 import simpy
 import pytest
 from typing import List, Any
+from unittest.mock import Mock
 from sim.core.real_time_driver import RealTimeDriver
 import sim.core.real_time_driver as rtd
 
@@ -112,7 +113,29 @@ def test_set_real_time_factor(env: simpy.Environment, fake_time: MockClock) -> N
 
 def test_strict_true(env: simpy.Environment, fake_time: MockClock) -> None:
     driver = RealTimeDriver(env, real_time_factor=1.0, strict=True)
+    assert driver.strict is True
+
+
+def test_strict_records_lag(env: simpy.Environment, fake_time: MockClock) -> None:
+    lag_reporter = Mock()
+    driver = RealTimeDriver(
+        env, lag_reporter=lag_reporter, real_time_factor=1.0, strict=True
+    )
+    run_env_process(env, 5)
+
+    driver.run_until(until=5)
+
+    lag_reporter.assert_called()
+    assert lag_reporter.call_args.args[0] > 0
+
+
+def test_non_strict_does_not_record_lag(
+    env: simpy.Environment, fake_time: MockClock
+) -> None:
+    lag_reporter = Mock()
+    driver = RealTimeDriver(
+        env, lag_reporter=lag_reporter, real_time_factor=1.0, strict=False
+    )
     run_env_process(env, 5)
     driver.run_until(until=5)
-    lag = driver.lag
-    assert lag is not None
+    lag_reporter.assert_not_called()

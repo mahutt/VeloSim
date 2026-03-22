@@ -55,6 +55,7 @@ class SimulatorController:
         frame_emitter: FrameEmitter,
         input_parameters: InputParameter,
         sim_behaviour: SimBehaviour,
+        lag_reporter: Optional[Callable[[float], None]] = None,
         strict: bool = False,
         map_controller: MapController | None = None,
         on_completed_callback: Optional[Callable[[str], None]] = None,
@@ -79,7 +80,9 @@ class SimulatorController:
         if keyframe_freq is None:
             keyframe_freq = 60
 
-        self.real_time_driver = RealTimeDriver(sim_env, real_time_factor, strict)
+        self.real_time_driver = RealTimeDriver(
+            sim_env, lag_reporter, real_time_factor, strict
+        )
         self.frame_emitter = frame_emitter
         self.keyframe_freq = keyframe_freq
         self.clock = Clock(sim_env)

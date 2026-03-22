@@ -78,12 +78,14 @@ class RealTimeDriver:
     def __init__(
         self,
         sim_env: simpy.Environment,
+        lag_reporter: Optional[Callable[[float], None]] = None,
         # Load defaults from config, allow override
         real_time_factor: Optional[float] = None,
         strict: Optional[bool] = None,
     ) -> None:
         # Load config once and store it
         self.config = self._load_config()
+        self.lag_reporter = lag_reporter
         self.sim_env = sim_env
         self.real_time_factor = (
             real_time_factor
@@ -96,7 +98,6 @@ class RealTimeDriver:
             else self.config.get("default_strict_mode", False)
         )
         self.running = True
-        self.lag: Optional[float] = None
         self.sleep_interval = self.config.get("default_sleep_interval", 0.002)
 
     def reset_pacing_refs(self) -> None:
@@ -196,10 +197,8 @@ class RealTimeDriver:
                     )
                     actual_wall_time = time.perf_counter()
                     lag = expected_wall_time - actual_wall_time
-                    self.lag = lag
                     if lag > 0:
                         self.record_lag(lag)
-                    # TODO: record/report lag metrics if needed
 
     def pause(self) -> None:
         """Pause the simulation execution.
@@ -239,4 +238,5 @@ class RealTimeDriver:
         Returns:
             None
         """
-        pass
+        if self.lag_reporter is not None:
+            self.lag_reporter(lag)
