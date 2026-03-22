@@ -49,6 +49,7 @@ class TrafficConfig:
     traffic_csv_data: Optional[str] = None
     sim_start_time: str = field(default="day1:00:00")
     sim_end_time: str = field(default="day1:00:00")
+    gps_sync_delay: int = 10
 
 
 @dataclass

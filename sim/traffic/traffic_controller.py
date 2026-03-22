@@ -48,9 +48,6 @@ if TYPE_CHECKING:
 
 logger = get_logger(__name__)
 
-# Hardcoded GPS sync delay in ticks between sim and routing provider updates
-GPS_SYNC_DELAY = 10
-
 
 class TrafficController:
     """Manages traffic event lifecycle and road traffic state.
@@ -85,6 +82,7 @@ class TrafficController:
         self._env = env
         self._routing_provider = routing_provider
         self._registry = registry
+        self.traffic_config = traffic_config
 
         self._active_traffic: Dict[SegmentKey, RoadTrafficState] = {}
         self._traffic_events: List[TrafficEvent] = []
@@ -110,6 +108,11 @@ class TrafficController:
         # Start SimPy traffic event processing if env is available
         if self._env and self._traffic_events:
             self._env.process(self._run_traffic_events())
+
+        if traffic_config:
+            self.gps_sync_delay = traffic_config.gps_sync_delay
+        else:
+            self.gps_sync_delay = 10
 
     # =========================================================================
     # Road Lifecycle Callbacks
@@ -285,7 +288,7 @@ class TrafficController:
                 # so the driver visually slows before traffic colors appear.
                 # This mirrors the removal path (overlay persists through delay).
                 self._set_traffic_in_simulation(event)
-                yield self._env.timeout(GPS_SYNC_DELAY)
+                yield self._env.timeout(self.gps_sync_delay)
                 self._set_traffic_in_routing_provider(event)
                 for road in event.affected_roads:
                     self._notify_routes_for_road(road)
@@ -300,7 +303,7 @@ class TrafficController:
             if is_allocated:
                 # [Expired && Allocated]: Sim -> Delay -> RoutingProvider
                 self._reset_traffic_in_simulation(event)
-                yield self._env.timeout(GPS_SYNC_DELAY)
+                yield self._env.timeout(self.gps_sync_delay)
                 self._reset_traffic_in_routing_provider(event)
             else:
                 # [Expired && Unallocated]: RoutingProvider only

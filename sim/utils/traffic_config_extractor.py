@@ -59,6 +59,7 @@ def extract_traffic_config(
     if traffic_raw is not None and isinstance(traffic_raw, dict):
         # Support template-based traffic (traffic_level)
         traffic_level = traffic_raw.get("traffic_level", "default")
+        gps_sync_delay = traffic_raw.get("gps_sync_delay", 10)
 
         # Validate traffic_level if specified
         if traffic_level not in supported_templates:
@@ -76,6 +77,7 @@ def extract_traffic_config(
             traffic_csv_data=traffic_csv_data,
             sim_start_time=str(scenario_content.get("start_time", "day1:00:00")),
             sim_end_time=str(scenario_content.get("end_time", "day1:00:00")),
+            gps_sync_delay=gps_sync_delay,
         )
     # Even without a traffic block in scenario, if we have persisted csv data,
     # we should still create a config (backwards compat for older scenarios)
@@ -84,5 +86,6 @@ def extract_traffic_config(
             traffic_csv_data=traffic_csv_data,
             sim_start_time=str(scenario_content.get("start_time", "day1:00:00")),
             sim_end_time=str(scenario_content.get("end_time", "day1:00:00")),
+            gps_sync_delay=10,
         )
     return None
