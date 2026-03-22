@@ -38,7 +38,7 @@ from sim.map.routing_provider import (
     SegmentKey,
 )
 from sim.map.position_registry import PositionRegistry
-from sim.traffic.traffic_controller import GPS_SYNC_DELAY, TrafficController
+from sim.traffic.traffic_controller import TrafficController
 
 
 # ---------------------------------------------------------------------------
@@ -120,6 +120,7 @@ class MockRoutingProvider(RoutingProvider):
         self._route_result = route_result
         self.set_edge_traffic_calls: list = []
         self.clear_edge_traffic_calls: list = []
+        self.gps_sync_delay: int = 10
 
     def get_route(self, start: Position, end: Position) -> Optional[RouteResult]:
         return self._route_result
@@ -140,6 +141,9 @@ class MockRoutingProvider(RoutingProvider):
     def clear_edge_traffic(self, edge: Any) -> bool:
         self.clear_edge_traffic_calls.append(edge)
         return True
+
+    def get_gps_sync_delay(self) -> int:
+        return self.gps_sync_delay
 
 
 def _build_route_result(positions: List[Position]) -> RouteResult:
@@ -215,12 +219,14 @@ class TestEventLifecycle:
         )
 
         # Run past sync delay: tick_start(10) + GPS_SYNC_DELAY(10) + 1
-        env.run(until=10 + GPS_SYNC_DELAY + 1)
+        gps_sync_delay = provider.get_gps_sync_delay()
+        env.run(until=10 + gps_sync_delay + 1)
         current = event.state
         assert current == TrafficEventState.APPLIED
 
         # Run until expiry: tick + duration + GPS_SYNC_DELAY + 1
-        env.run(until=10 + 50 + GPS_SYNC_DELAY + 1)
+        gps_sync_delay = provider.get_gps_sync_delay()
+        env.run(until=10 + 50 + gps_sync_delay + 1)
         current = event.state
         assert current == TrafficEventState.DONE
 
@@ -244,7 +250,9 @@ class TestEventLifecycle:
         env.process(tc._run_traffic_events())
 
         # Run past everything: trigger(5) + duration(20) + buffer
-        env.run(until=5 + 20 + GPS_SYNC_DELAY + 10)
+        gps_sync_delay = provider.get_gps_sync_delay()
+
+        env.run(until=5 + 20 + gps_sync_delay + 10)
         assert event.state == TrafficEventState.DONE
 
         # Routing provider should have been called for apply and remove
@@ -284,7 +292,8 @@ class TestSynchronization:
         env.process(tc._run_traffic_events())
 
         # Run past sync delay to ensure APPLIED
-        env.run(until=GPS_SYNC_DELAY + 5)
+        gps_sync_delay = provider.get_gps_sync_delay()
+        env.run(until=gps_sync_delay + 5)
 
         assert event.state == TrafficEventState.APPLIED
         assert road in event.affected_roads
@@ -342,7 +351,8 @@ class TestSynchronization:
         env.process(tc._run_traffic_events())
 
         # Run past full lifecycle: duration(30) + GPS_SYNC_DELAY(10) + buffer
-        env.run(until=30 + GPS_SYNC_DELAY * 2 + 10)
+        gps_sync_delay = provider.get_gps_sync_delay()
+        env.run(until=30 + gps_sync_delay * 2 + 10)
 
         assert event.state == TrafficEventState.DONE
         assert len(event.affected_roads) == 0
@@ -370,7 +380,8 @@ class TestSynchronization:
         env.process(tc._run_traffic_events())
 
         # Run past full lifecycle
-        env.run(until=20 + GPS_SYNC_DELAY + 10)
+        gps_sync_delay = provider.get_gps_sync_delay()
+        env.run(until=20 + gps_sync_delay * 2 + 10)
 
         assert event.state == TrafficEventState.DONE
         assert len(event.affected_roads) == 0
@@ -411,7 +422,8 @@ class TestGPSSyncDelay:
         env.process(tc._run_traffic_events())
 
         # Run just past trigger but before GPS delay completes
-        env.run(until=GPS_SYNC_DELAY - 1)
+        gps_sync_delay = provider.get_gps_sync_delay()
+        env.run(until=gps_sync_delay - 1)
 
         # Road should already have traffic (sim update first in allocated path)
         assert road in event.affected_roads
@@ -419,7 +431,8 @@ class TestGPSSyncDelay:
         assert len(provider.set_edge_traffic_calls) == 0
 
         # Now run past the GPS delay
-        env.run(until=GPS_SYNC_DELAY + 1)
+        gps_sync_delay
+        env.run(until=gps_sync_delay + 1)
 
         # Routing provider should now have been called
         assert len(provider.set_edge_traffic_calls) == 1
@@ -452,13 +465,14 @@ class TestGPSSyncDelay:
         env.process(tc._run_traffic_events())
 
         # Get to APPLIED state
-        env.run(until=GPS_SYNC_DELAY + 5)
+        gps_sync_delay = provider.get_gps_sync_delay()
+        env.run(until=gps_sync_delay + 5)
         assert event.state == TrafficEventState.APPLIED
         assert road in event.affected_roads
 
         # Run to just after expiry but before the GPS delay completes
         # Expiry at tick 50, sim cleanup immediate, RP reset after GPS_SYNC_DELAY
-        env.run(until=50 + GPS_SYNC_DELAY - 1)
+        env.run(until=50 + gps_sync_delay - 1)
 
         # Sim should already be cleaned up (affected_roads cleared)
         assert len(event.affected_roads) == 0
@@ -467,7 +481,7 @@ class TestGPSSyncDelay:
         assert len(provider.clear_edge_traffic_calls) == 0
 
         # Now run past the GPS delay
-        env.run(until=50 + GPS_SYNC_DELAY + 1)
+        env.run(until=50 + gps_sync_delay + 1)
 
         # Routing provider should now have been called for clear
         assert len(provider.clear_edge_traffic_calls) == 1
@@ -543,7 +557,8 @@ class TestRoadLifecycleDuringApplied:
         env.process(tc._run_traffic_events())
 
         # Advance to APPLIED state
-        env.run(until=GPS_SYNC_DELAY + 5)
+        gps_sync_delay = provider.get_gps_sync_delay()
+        env.run(until=gps_sync_delay + 5)
         assert event.state == TrafficEventState.APPLIED
         assert road in event.affected_roads
 
@@ -604,7 +619,8 @@ class TestAllocatedToUnallocatedTransition:
         env.process(tc._run_traffic_events())
 
         # Run to APPLIED
-        env.run(until=GPS_SYNC_DELAY + 5)
+        gps_sync_delay = provider.get_gps_sync_delay()
+        env.run(until=gps_sync_delay + 5)
         assert event.state == TrafficEventState.APPLIED
         assert road_a in event.affected_roads
         assert road_b in event.affected_roads
@@ -664,7 +680,8 @@ class TestAllocatedToUnallocatedTransition:
         env.process(tc._run_traffic_events())
 
         # Run to APPLIED — allocated path (sim + provider)
-        env.run(until=GPS_SYNC_DELAY + 5)
+        gps_sync_delay = provider.get_gps_sync_delay()
+        env.run(until=gps_sync_delay + 5)
         assert TrafficEventState(event.state) == TrafficEventState.APPLIED
         assert road in event.affected_roads
         assert len(provider.set_edge_traffic_calls) == 1
@@ -676,7 +693,7 @@ class TestAllocatedToUnallocatedTransition:
         assert len(event.affected_roads) == 0
 
         # Run past expiry — unallocated path (provider only, no GPS delay)
-        env.run(until=50 + GPS_SYNC_DELAY + 5)
+        env.run(until=50 + gps_sync_delay + 5)
         assert TrafficEventState(event.state) == TrafficEventState.DONE
 
         # Provider should have received both set + clear
@@ -721,7 +738,8 @@ class TestAllocatedToUnallocatedTransition:
         env.process(tc._run_traffic_events())
 
         # Run to APPLIED
-        env.run(until=GPS_SYNC_DELAY + 5)
+        gps_sync_delay = provider.get_gps_sync_delay()
+        env.run(until=gps_sync_delay + 5)
         assert TrafficEventState(event.state) == TrafficEventState.APPLIED
         assert len(event.affected_roads) == 3
 
@@ -738,7 +756,7 @@ class TestAllocatedToUnallocatedTransition:
         assert registry.is_event_allocated(event)
 
         # Run past expiry — allocated path (provider -> delay -> sim cleanup)
-        env.run(until=50 + GPS_SYNC_DELAY * 2 + 10)
+        env.run(until=50 + gps_sync_delay * 2 + 10)
         assert TrafficEventState(event.state) == TrafficEventState.DONE
 
         # affected_roads should be cleaned up by _reset_traffic_in_simulation
@@ -799,7 +817,8 @@ class TestAllocatedToUnallocatedTransition:
         assert not registry.is_event_allocated(event)
 
         # Event expires — unallocated path (provider only)
-        env.run(until=200 + GPS_SYNC_DELAY + 5)
+        gps_sync_delay = provider.get_gps_sync_delay()
+        env.run(until=200 + gps_sync_delay + 5)
         assert TrafficEventState(event.state) == TrafficEventState.DONE
         assert len(provider.clear_edge_traffic_calls) == 1
 
@@ -839,7 +858,8 @@ class TestAllocatedToUnallocatedTransition:
         env.process(tc._run_traffic_events())
 
         # Run to APPLIED
-        env.run(until=GPS_SYNC_DELAY + 5)
+        gps_sync_delay = provider.get_gps_sync_delay()
+        env.run(until=gps_sync_delay + 5)
         assert TrafficEventState(event.state) == TrafficEventState.APPLIED
         assert road_a in event.affected_roads
         assert road_b in event.affected_roads
@@ -859,7 +879,7 @@ class TestAllocatedToUnallocatedTransition:
         assert road_b in event.affected_roads
 
         # Run to expiry — road_b still there, so allocated path
-        env.run(until=50 + GPS_SYNC_DELAY * 2 + 10)
+        env.run(until=50 + gps_sync_delay * 2 + 10)
         assert TrafficEventState(event.state) == TrafficEventState.DONE
 
         # road_b was cleaned up via _reset_traffic_in_simulation
@@ -903,7 +923,9 @@ class TestRoutingProviderGracefulNoOp:
         env.process(tc._run_traffic_events())
 
         # Should not raise — completes full lifecycle
-        env.run(until=20 + GPS_SYNC_DELAY + 10)
+        gps_sync_delay = provider.get_gps_sync_delay()
+
+        env.run(until=20 + gps_sync_delay + 10)
         assert event.state == TrafficEventState.DONE
 
 
@@ -939,7 +961,8 @@ class TestSyncResourceSerialization:
         env.process(tc._run_traffic_events())
 
         # Run until both are in APPLIED state
-        env.run(until=5 + GPS_SYNC_DELAY + 5)
+        gps_sync_delay = provider.get_gps_sync_delay()
+        env.run(until=5 + gps_sync_delay + 5)
 
         # Both events should reach APPLIED — sync resource serializes, not blocks
         assert event_a.state == TrafficEventState.APPLIED
@@ -967,7 +990,7 @@ class TestNoRoutingProvider:
         tc._traffic_events = [event]
         env.process(tc._run_traffic_events())
 
-        env.run(until=20 + GPS_SYNC_DELAY + 10)
+        env.run(until=20 + 10 + 10)
 
         # Event should still complete lifecycle
         assert event.state == TrafficEventState.DONE
@@ -1009,7 +1032,7 @@ class TestCheckForSimilarEvent:
         env.process(tc._run_traffic_events())
 
         # Run until first event is DONE
-        env.run(until=10 + GPS_SYNC_DELAY + 5)
+        env.run(until=10 + 10 + 5)
 
         assert event_first.state == TrafficEventState.DONE
         # Second event should still be PENDING
@@ -1044,7 +1067,7 @@ class TestDeleteEvent:
         env.process(tc._run_traffic_events())
 
         # Run past full lifecycle
-        env.run(until=10 + GPS_SYNC_DELAY + 10)
+        env.run(until=10 + 10 + 10)
 
         assert event.state == TrafficEventState.DONE
         assert event not in tc._traffic_events
