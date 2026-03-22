@@ -25,6 +25,7 @@ SOFTWARE.
 from back.database.session import SessionLocal
 from back.crud.sim_instance import sim_instance_crud
 from grafana_logging.logger import get_logger
+from back.core.simulation_lag_monitor import simulation_lag_histogram
 
 logger = get_logger(__name__)
 
@@ -62,3 +63,16 @@ def on_simulation_completed(sim_id: str) -> None:
             "Simulation completion callback failed (uuid=%s)",
             sim_id,
         )
+
+
+def report_simulation_lag(lag: float) -> None:
+    """
+    Used to report simulation lag
+
+    Args:
+        lag: seconds for which the simulation is lagging
+
+    Returns:
+        None
+    """
+    simulation_lag_histogram.record(lag)

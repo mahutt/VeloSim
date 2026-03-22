@@ -25,7 +25,10 @@ SOFTWARE.
 from typing import TYPE_CHECKING, Dict, List, NotRequired, TypedDict
 import asyncio
 from sqlalchemy.orm import Session
-from back.core.simulation_callbacks import on_simulation_completed
+from back.core.simulation_callbacks import (
+    on_simulation_completed,
+    report_simulation_lag,
+)
 from back.models import User
 from back.models.sim_instance import SimInstance
 from back.models.sim_frame import SimFrame
@@ -273,6 +276,7 @@ class SimulationService:
         restore_sim_id = sim.initialize(
             input_params,
             subscribers=[frame_subscriber],
+            lag_reporter=report_simulation_lag,
             run_id=sim_id,
             env=env,
             initial_running=should_auto_resume,
@@ -337,6 +341,7 @@ class SimulationService:
         sim_id = sim.initialize(
             params,
             subscribers=[frame_subscriber],
+            lag_reporter=report_simulation_lag,
             on_completed_callback=on_simulation_completed,
         )
 
@@ -1226,6 +1231,7 @@ class SimulationService:
             branch_sim_id = sim.initialize(
                 input_params,
                 subscribers=[frame_subscriber],
+                lag_reporter=report_simulation_lag,
                 run_id=new_sim.uuid,
                 env=env,
                 initial_running=False,
