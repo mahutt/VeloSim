@@ -99,6 +99,21 @@ class TrafficRange:
 
 
 @dataclass
+class TrafficData:
+    """Provider-agnostic traffic payload for routing provider updates."""
+
+    segment_key: "SegmentKey"
+    speed_factor: float
+    source_event: Optional[str] = None
+    congestion_level: Optional[CongestionLevel] = None
+
+    def __post_init__(self) -> None:
+        self.speed_factor = max(0.0, min(1.0, self.speed_factor))
+        if self.congestion_level is None:
+            self.congestion_level = multiplier_to_congestion_level(self.speed_factor)
+
+
+@dataclass
 class TrafficTriple:
     """Traffic congestion triple for a contiguous range of route coordinates.
 

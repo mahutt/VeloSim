@@ -55,14 +55,15 @@ subList: List[Subscriber] = []
 
 
 @pytest.fixture(autouse=True)
-def mock_osrm_connection(monkeypatch: Any) -> Any:
-    """Mock OSRM connection for all tests."""
-    # Set environment variable for OSRM URL
-    monkeypatch.setenv("OSRM_URL", "http://localhost:5000")
+def mock_graphhopper_connection(monkeypatch: Any) -> Any:
+    """Mock GraphHopper connection for all tests."""
+    # Set environment variable for GraphHopper URL
+    monkeypatch.setenv("GRAPHHOPPER_URL", "http://localhost:8989")
 
-    # Mock the OSRM connection verification
+    # Mock the GraphHopper connection verification
     with patch(
-        "sim.osm.osrm_connection.OSRMConnection._verify_osrm_connection",
+        "sim.osm.graphhopper_connection.GraphHopperConnection"
+        "._verify_graphhopper_connection",
         return_value=True,
     ):
         yield

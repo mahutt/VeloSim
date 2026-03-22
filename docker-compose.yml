@@ -104,20 +104,37 @@ services:
     networks:
       - velosim-net
 
-  # --- OSRM Routing Server ---
-  osrm:
-    # Architecture-specific OSRM v6.0.0 image
-    # Defaults to arm64 if not set (most common for Mac M1/M2)
-    image: ${OSRM_IMAGE:-ghcr.io/project-osrm/osrm-backend:v6.0.0@sha256:733da1be48587358a417750655cc4748bbae9af60e3ace610db68d4febe038d8}
-    container_name: velosim-osrm
+  # --- GraphHopper Routing Server ---
+  graphhopper:
+    image: israelhikingmap/graphhopper:10.2
+    container_name: velosim-graphhopper
+    command: >-
+      --input /data/montreal-latest.osm.pbf
     ports:
-      - "5001:5000"
+      - "8989:8989"
     volumes:
-      - ./osrm-data:/data:ro
-    command: osrm-routed --algorithm mld /data/montreal.osrm
+      - ./graphhopper-data:/data
+    environment:
+      - JAVA_OPTS=${GRAPHHOPPER_JAVA_OPTS:--Xmx2g -Xms2g}
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "wget --quiet --tries=1 --spider http://localhost:8989/health || exit 1"]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+      start_period: 180s
     networks:
       - velosim-net
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    deploy:
+      resources:
+        limits:
+          memory: 3g
+          cpus: '2'
 
   # --- Backend API ---
   backend:
@@ -135,16 +152,16 @@ services:
     environment:
       # Database connection
       - DATABASE_URL=postgresql://velosim:velosim@postgres:5432/velosim
-      # OSRM connection - use service name for Docker networking
-      - OSRM_URL=http://osrm:5000
+      # GraphHopper connection - use service name for Docker networking
+      - GRAPHHOPPER_URL=http://graphhopper:8989
     env_file:
       - path: .env
         required: false
     depends_on:
       postgres:
         condition: service_healthy
-      osrm:
-        condition: service_started # Changed from service_healthy since health check is disabled
+      graphhopper:
+        condition: service_healthy
     restart: unless-stopped
     networks:
       - velosim-net

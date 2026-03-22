@@ -95,7 +95,7 @@ Map and Routing
    :undoc-members:
    :show-inheritance:
 
-.. automodule:: sim.osm.osrm_connection
+.. automodule:: sim.osm.graphhopper_connection
    :members:
    :undoc-members:
    :show-inheritance:

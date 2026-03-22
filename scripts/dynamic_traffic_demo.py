@@ -37,9 +37,9 @@ Three-pass demo that validates the full traffic pipeline end-to-end:
       → road.apply_traffic_for_overlap()).
 
   Pass 3 (Routing Provider): Verifies that the TrafficController's
-      _update_routing_provider() call stores traffic state in the OSRMAdapter's
-      TrafficStateStore (no longer raises NotImplementedError). Checks set, get,
-      expiry cleanup, and close() cleanup.
+      _update_routing_provider() call stores traffic state in the routing
+      provider's TrafficStateStore. Checks set, get, expiry cleanup, and
+      close() cleanup.
 
   Outputs a traffic CSV + scenario JSON importable into the scenario editor, plus
   a GeoJSON preview for https://geojson.io.
@@ -933,7 +933,7 @@ def main():
         mc = MapController(map_payload)
         print("   SimPy env ready, PositionRegistry active")
 
-        print("\n2. Generating route via OSRM...")
+        print("\n2. Generating route via GraphHopper...")
         print(f"   Start: ({start_pos.get_position()})")
         print(f"   End:   ({end_pos.get_position()})")
         route = mc.get_route(start_pos, end_pos)
@@ -1067,8 +1067,8 @@ def main():
                       f"weight={evt.weight}, duration={evt.duration}, "
                       f"state={evt.state}")
 
-            # Generate the same route (same OSRM endpoints = same roads)
-            print(f"   Generating same route via OSRM...")
+            # Generate the same route (same GraphHopper endpoints = same roads)
+            print(f"   Generating same route via GraphHopper...")
             route2 = mc2.get_route(start_pos, end_pos)
             print(f"   Route {route2.id}: {len(route2.roads)} road segments")
 
@@ -1137,7 +1137,7 @@ def main():
             print(f"\n{rp_step}. Pass 3 — Routing provider traffic store verification...")
 
             # Create a fresh MapController wired with the same traffic CSV
-            # but this time we inspect the TrafficStateStore that OSRMAdapter
+            # but this time we inspect the TrafficStateStore that the routing adapter
             # delegates to, proving the CRUD methods work end-to-end.
             traffic_state_store._reset()  # start clean
 

@@ -30,7 +30,7 @@ import simpy
 from sim.entities.map_payload import TrafficConfig
 from sim.entities.position import Position
 from sim.entities.road import Road
-from sim.entities.traffic_data import RoadTrafficState
+from sim.entities.traffic_data import RoadTrafficState, TrafficData
 from sim.entities.traffic_event import TrafficEvent
 from sim.entities.traffic_event_state import TrafficEventState
 from sim.map.route_controller import RouteController
@@ -431,13 +431,21 @@ class TrafficController:
             return
 
         start_coords, end_coords = event.segment_key
+        traffic_data = TrafficData(
+            segment_key=event.segment_key,
+            speed_factor=event.weight,
+            source_event=event.name,
+        )
+
         start_pos = Position([start_coords[0], start_coords[1]])
         end_pos = Position([end_coords[0], end_coords[1]])
         edge = EdgeIdentifier(start_position=start_pos, end_position=end_pos)
 
         try:
             if apply:
-                update = TrafficUpdate(edge=edge, speed_factor=event.weight)
+                update = TrafficUpdate(
+                    edge=edge, speed_factor=traffic_data.speed_factor
+                )
                 self._routing_provider.set_edge_traffic(update)
             else:
                 self._routing_provider.clear_edge_traffic(edge)

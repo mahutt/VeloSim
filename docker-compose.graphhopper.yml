@@ -1,0 +1,37 @@
+# Docker Compose configuration for VeloSim with GraphHopper routing
+#
+# Container present supports both ARM and x64.
+#
+# Usage:
+#   1. Start GraphHopper (downloads OSM data on first run):
+#      docker-compose -f docker-compose.graphhopper.yml up -d
+#      OR: npm run graphhopper:up
+#
+#   2. Stop:
+#      docker-compose -f docker-compose.graphhopper.yml down
+
+services:
+  graphhopper:
+    image: israelhikingmap/graphhopper:10.2
+    container_name: velosim-graphhopper
+    command: >-
+      --input /data/montreal-latest.osm.pbf
+    ports:
+      - "${GRAPHHOPPER_PORT:-8989}:8989"
+    volumes:
+      - ./graphhopper-data:/data
+    environment:
+      - JAVA_OPTS=${GRAPHHOPPER_JAVA_OPTS:--Xmx2g -Xms2g}
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "wget --quiet --tries=1 --spider http://localhost:8989/health || exit 1"]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+      start_period: 180s
+    networks:
+      - velosim-net
+
+networks:
+  velosim-net:
+    driver: bridge

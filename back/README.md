@@ -51,7 +51,7 @@ VeloSim uses PostgreSQL with Alembic for database migrations. These commands can
 #### Quick Start
 
 ```bash
-# From project root - Start development services (PostgreSQL, OSRM)
+# From project root - Start development services (PostgreSQL, GraphHopper)
 npm run dev:services
 
 # Check current migration status

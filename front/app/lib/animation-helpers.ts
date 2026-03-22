@@ -49,7 +49,7 @@ function getLocationOnRoute(
  * Interpolate a position along the route geometry between start and target positions.
  * Uses Turf.js to project positions onto the route and interpolate along the road.
  *
- * @param routeGeometry - Raw OSRM coordinates (sparse points defining the road)
+ * @param routeGeometry - Raw route coordinates (sparse points defining the road)
  * @param startPosition - The position at the start of this animation frame
  * @param targetPosition - The position to reach by end of frame (from backend)
  * @param progress - Interpolation factor from 0 to 1

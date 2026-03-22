@@ -180,13 +180,10 @@ sim/osm/OSMData
 sim/traffic/traffic_datasets
 sim/traffic/montreal_data
 
-# OSRM preprocessed data files (large binary files, regenerate locally)
+# Routing data files (large binary files, regenerate locally)
+graphhopper-data/
 osrm-data/
 route_output.txt
-
-# Legacy patterns (keep for backward compatibility)
-osrm-data/*.osrm*
-osrm-data/*.pbf
 
 # npm
 npm-debug.log*
@@ -351,3 +348,9 @@ grafana_logging/alloy/data/
 back/grafana_logging/
 
 docs/_build/
+
+# Script-generated outputs
+scripts/dynamic_traffic_output.csv
+scripts/dynamic_traffic_output.geojson
+scripts/dynamic_traffic_scenario.json
+scripts/benchmark_outputs/

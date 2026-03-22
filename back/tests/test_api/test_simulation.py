@@ -144,11 +144,13 @@ def make_sim_instance(
 def mock_heavy_sim_operations() -> Generator[None, None, None]:
     """
     Mock heavy simulation operations at the session level to prevent
-    OSRM connection checks during tests.
+    GraphHopper connection checks during tests.
     """
     with (
         patch(
-            "sim.osm.osrm_connection.OSRMConnection._verify_osrm_connection",
+            "sim.osm.graphhopper_connection"
+            ".GraphHopperConnection"
+            "._verify_graphhopper_connection",
             return_value=True,
         ),
         patch("sim.core.simulator_controller.SimulatorController.start") as mock_start,

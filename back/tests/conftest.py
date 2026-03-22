@@ -52,10 +52,10 @@ from back.tests.mock_utils import create_mock_db_session
 os.environ["LOG_TO_LOKI"] = "false"
 os.environ["LOG_TO_CONSOLE"] = "false"
 
-# Set dummy OSRM URL for tests to prevent connection errors
-# This must be set before any simulation code tries to initialize OSRMConnection
-if "OSRM_URL" not in os.environ:
-    os.environ["OSRM_URL"] = "http://localhost:5000"
+# Set dummy GraphHopper URL for tests to prevent connection errors
+# This must be set before any simulation code tries to initialize GraphHopperConnection
+if "GRAPHHOPPER_URL" not in os.environ:
+    os.environ["GRAPHHOPPER_URL"] = "http://localhost:8989"
 
 # Add the back directory to Python path for relative imports
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
