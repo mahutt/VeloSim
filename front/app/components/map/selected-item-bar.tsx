@@ -22,7 +22,6 @@
  * SOFTWARE.
  */
 
-import { useState } from 'react';
 import { X, MapPin } from 'lucide-react';
 import { useSimulation } from '~/providers/simulation-provider';
 import {
@@ -31,11 +30,11 @@ import {
   type Route,
   type StationTask,
 } from '~/types';
-import { TaskItem } from '../task/task-item';
 import { ScrollArea } from '~/components/ui/scroll-area';
 import { Button } from '../ui/button';
 import DriverStateBadge from './driver-state-badge';
-import { useTaskMassSelect } from '~/hooks/use-task-mass-select';
+import { StationTasks } from './station-tasks';
+import { DriverTasks } from './driver-tasks';
 
 export enum SelectedItemType {
   Station = 'station',
@@ -168,140 +167,5 @@ export default function SelectedItemBar() {
         <p className="text-sm text-muted-foreground px-5">No tasks</p>
       )}
     </div>
-  );
-}
-
-function StationTasks({ station }: { station: PopulatedStation }) {
-  const { engine } = useSimulation();
-  const taskIds = station.tasks.map((task) => task.id);
-  const { selectedTaskIds, handleTaskSelect, selectForDrag } =
-    useTaskMassSelect(taskIds, station.id);
-
-  return (
-    <>
-      <p className="text-sm text-muted-foreground">
-        {selectedTaskIds.length > 0
-          ? `Tasks (${selectedTaskIds.length}/${station.tasks.length} selected)`
-          : `Tasks (${station.tasks.length})`}
-      </p>
-      {station.tasks.map((task, index) => {
-        return (
-          <TaskItem
-            key={task.id}
-            task={task}
-            isSelected={selectedTaskIds.includes(task.id)}
-            onSelect={(event) => handleTaskSelect(task.id, index, event)}
-            onDragStart={() => selectForDrag(task.id, index)}
-            getDragTaskIds={() =>
-              selectedTaskIds.includes(task.id) ? selectedTaskIds : [task.id]
-            }
-            onUnassign={
-              task.assignedDriverId
-                ? () => {
-                    if (!task.assignedDriverId) return;
-                    engine.requestUnassignment(task.assignedDriverId, task.id);
-                  }
-                : undefined
-            }
-          />
-        );
-      })}
-    </>
-  );
-}
-
-function DriverTasks({ driver }: { driver: PopulatedDriver }) {
-  const { engine } = useSimulation();
-  const [dropTargetIndex, setDropTargetIndex] = useState<number | null>(null);
-  // Track which task is being dragged to distinguish reordering (within same driver)
-  // from reassignment (to different driver). Null when dragging from a station.
-  const [draggedTaskId, setDraggedTaskId] = useState<number | null>(null);
-  const taskIds = driver.tasks.map((task) => task.id);
-  const { selectedTaskIds, handleTaskSelect, selectForDrag } =
-    useTaskMassSelect(taskIds, driver.id);
-
-  const handleDragStart = (taskId: number, taskIndex: number) => {
-    selectForDrag(taskId, taskIndex);
-    setDraggedTaskId(taskId);
-  };
-
-  const handleDragEnd = () => {
-    setDraggedTaskId(null);
-    setDropTargetIndex(null);
-  };
-
-  const handleDragOver = (e: React.DragEvent, targetIndex: number) => {
-    e.preventDefault();
-
-    // Only allow reordering if dragging from within this driver's list
-    if (draggedTaskId) {
-      e.dataTransfer.dropEffect = 'move';
-      setDropTargetIndex(targetIndex);
-    } else {
-      e.dataTransfer.dropEffect = 'none';
-    }
-  };
-
-  const handleDrop = async (e: React.DragEvent, targetIndex: number) => {
-    e.preventDefault();
-    setDropTargetIndex(null);
-
-    // Prevent reordering if not dragging from this list
-    if (!draggedTaskId) return;
-
-    const draggedIndex = driver.tasks.findIndex((t) => t.id === draggedTaskId);
-    // Exit if task not found or dropped at same position
-    if (draggedIndex === -1 || draggedIndex === targetIndex) return;
-
-    // Calculate new task order by removing task from old position and inserting at new position
-    const taskIds = driver.tasks.map((t) => t.id);
-    taskIds.splice(draggedIndex, 1);
-    taskIds.splice(targetIndex, 0, draggedTaskId);
-
-    await engine.reorderTasks(driver.id, taskIds, true);
-  };
-
-  return (
-    <>
-      <p className="text-sm text-muted-foreground">
-        {selectedTaskIds.length > 0
-          ? `Tasks (${selectedTaskIds.length}/${driver.tasks.length} selected)`
-          : `Tasks (${driver.tasks.length})`}
-      </p>
-      {driver.tasks.map((task, index) => {
-        const draggedIndex = draggedTaskId
-          ? driver.tasks.findIndex((t) => t.id === draggedTaskId)
-          : -1;
-        const showDropIndicator = dropTargetIndex === index;
-        const isDraggingDown = index > draggedIndex;
-
-        return (
-          <div
-            key={task.id}
-            onDragOver={(e) => handleDragOver(e, index)}
-            onDrop={(e) => handleDrop(e, index)}
-            onDragEnd={handleDragEnd}
-            className={
-              showDropIndicator
-                ? isDraggingDown
-                  ? 'border-b-2 border-blue-500 pb-1'
-                  : 'border-t-2 border-blue-500 pt-1'
-                : ''
-            }
-          >
-            <TaskItem
-              task={task}
-              isSelected={selectedTaskIds.includes(task.id)}
-              onSelect={(event) => handleTaskSelect(task.id, index, event)}
-              onDragStart={() => handleDragStart(task.id, index)}
-              getDragTaskIds={() =>
-                selectedTaskIds.includes(task.id) ? selectedTaskIds : [task.id]
-              }
-              onUnassign={() => engine.requestUnassignment(driver.id, task.id)}
-            />
-          </div>
-        );
-      })}
-    </>
   );
 }
