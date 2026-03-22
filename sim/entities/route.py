@@ -637,6 +637,45 @@ class Route:
 
         return 1.0
 
+    def _sync_indices_after_transition(self, final_pos: Position) -> None:
+        """Finds the road and index that best matches the final position of
+        the smooth transition.
+
+        Args:
+            final_pos: Final position of a smooth transition curve
+
+        Returns:
+            None
+        """
+        best_road_idx = self.current_road_index
+        best_point_idx = 0
+        min_dist = float("inf")
+
+        # Search from the last current road index
+        for road_idx in range(self.current_road_index, len(self.roads)):
+            road = self.roads[road_idx]
+            points = road.active_pointcollection
+
+            local_idx = self.find_nearest_index(points, final_pos)
+
+            # Calculate distance from candidate posiition to the final position
+            candidate_pos = points[local_idx].get_position()
+            target_pos = final_pos.get_position()
+            dx = candidate_pos[0] - target_pos[0]
+            dy = candidate_pos[1] - target_pos[1]
+            dist = dx * dx + dy * dy
+
+            # If new  distance smaller than last best, better match
+            if dist < min_dist:
+                min_dist = dist
+                best_road_idx = road_idx
+                best_point_idx = local_idx
+
+        # Update indices with best match to continue traversal
+        self.current_road_index = best_road_idx
+        self.current_point_index = best_point_idx
+        self._last_point_count = len(self.roads[best_road_idx].active_pointcollection)
+
     def next(self) -> Position | None:
         """Return the next position in the route traversal.
 
@@ -658,8 +697,11 @@ class Route:
             pos = self._transition_buffer.pop(0)
             self._last_returned_position = pos
 
-            # Sync global index to track the movement
-            self.current_point_index = self._get_current_global_geometry_index()
+            # Sync if last point in the buffer
+            if not self._transition_buffer:
+                self._sync_indices_after_transition(pos)
+                self._update_next_event_index()  # Advance event pointer
+
             return pos
 
         self._maybe_recalculate_for_elapsed_time()
