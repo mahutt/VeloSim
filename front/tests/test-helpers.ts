@@ -70,6 +70,13 @@ export function makePayload(
       realMinutesPassed: 0,
       startTime: Date.now(),
     },
+    reporting: overrides.reporting ?? {
+      servicingToDrivingRatio: 0,
+      vehicleUtilizationRatio: 0,
+      averageTasksServicedPerShift: 0,
+      averageTaskResponseTime: 0,
+      vehicleDistanceTraveled: 0,
+    },
   };
 }
 

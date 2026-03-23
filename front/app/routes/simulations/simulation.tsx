@@ -40,6 +40,7 @@ import HQWidget from '~/components/simulation/hq-widget';
 import Scrubber from '~/components/map/scrubber';
 import useFeature from '~/hooks/use-feature';
 import { TaskAssignmentBanner } from '~/components/task/task-assignment-banner';
+import ReportingWidget from '~/components/simulation/reporting-widget';
 
 export function meta() {
   return [{ title: 'Simulation' }];
@@ -100,6 +101,7 @@ function SimulationContent() {
             </div>
             <ResourceBar />
             <HQWidget />
+            <ReportingWidget />
           </div>
           {showScrubber && (
             <div className="absolute bottom-10 left-1/2 -translate-x-1/2 w-2xl max-w-full px-2">

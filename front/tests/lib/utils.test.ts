@@ -23,7 +23,7 @@
  */
 
 import { describe, expect, it } from 'vitest';
-import { positionsEqual } from '~/lib/utils';
+import { formatDistance, formatDuration, positionsEqual } from '~/lib/utils';
 import type { Position } from '~/types';
 
 describe('positionsEqual', () => {
@@ -50,5 +50,26 @@ describe('positionsEqual', () => {
     const otherPosition: Position = [11, 21];
     const result = positionsEqual(basePosition, otherPosition);
     expect(result).toBe(false);
+  });
+});
+
+describe('formatDuration', () => {
+  it('formats seconds less than 60 as seconds', () => {
+    expect(formatDuration(30)).toBe('30s');
+  });
+  it('formats seconds between 60 and 3600 as minutes', () => {
+    expect(formatDuration(120)).toBe('2m');
+  });
+  it('formats seconds greater than or equal to 3600 as hours', () => {
+    expect(formatDuration(3600)).toBe('1h');
+  });
+});
+
+describe('formatDistance', () => {
+  it('formats meters less than 1000 as meters', () => {
+    expect(formatDistance(500)).toBe('500m');
+  });
+  it('formats meters greater than or equal to 1000 as kilometers', () => {
+    expect(formatDistance(1500)).toBe('1km');
   });
 });
