@@ -56,15 +56,13 @@ vi.mock('~/api', () => {
 });
 
 // Mock logger
-vi.mock('~/lib/logger', () => ({
-  log: vi.fn(),
-  LogLevel: {
-    DEBUG: 'debug',
-    INFO: 'info',
-    WARNING: 'warning',
-    ERROR: 'error',
-  },
-}));
+vi.mock(import('~/lib/logger'), async (importOriginal) => {
+  const actual = await importOriginal();
+  return {
+    ...actual,
+    log: vi.fn(),
+  };
+});
 
 // Mock react-router useNavigate
 const mockNavigate = vi.fn();

@@ -23,12 +23,12 @@
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { LogContext } from '~/lib/logger';
 import {
   logSimulationError,
   logMissingEntityError,
   logSimulationErrorWithContext,
   logFrameProcessingError,
-  logStateSyncError,
   SimulationStateLayer,
 } from '~/utils/simulation-error-utils';
 
@@ -41,10 +41,9 @@ describe('simulation-error-utils', () => {
   describe('logSimulationError', () => {
     it('should log error with all details to console', () => {
       const error = new Error('Test error');
-      const context = 'Test context';
       const additionalData = { entityId: 123, entityType: 'station' };
 
-      logSimulationError(error, context, additionalData);
+      logSimulationError(error, LogContext.MapLoading, additionalData);
 
       expect(console.error).toHaveBeenCalledWith(
         '[SIMULATION_ERROR]',
@@ -52,7 +51,7 @@ describe('simulation-error-utils', () => {
       );
       expect(console.error).toHaveBeenCalledWith(
         '[SIMULATION_ERROR]',
-        expect.stringContaining('Test context')
+        expect.stringContaining(LogContext.MapLoading)
       );
       expect(console.error).toHaveBeenCalledWith(
         '[SIMULATION_ERROR]',
@@ -61,7 +60,7 @@ describe('simulation-error-utils', () => {
     });
 
     it('should handle string errors', () => {
-      logSimulationError('String error', 'Context');
+      logSimulationError('String error', LogContext.MapLoading);
 
       expect(console.error).toHaveBeenCalledWith(
         '[SIMULATION_ERROR]',
@@ -69,13 +68,13 @@ describe('simulation-error-utils', () => {
       );
       expect(console.error).toHaveBeenCalledWith(
         '[SIMULATION_ERROR]',
-        expect.stringContaining('Context')
+        expect.stringContaining(LogContext.MapLoading)
       );
     });
 
     it('should not produce [object Event] when passed a DOM Event', () => {
       const event = new Event('error');
-      logSimulationError(event, 'WebSocket error');
+      logSimulationError(event, LogContext.WebSocketConnection);
 
       const mockConsoleError = console.error as unknown as ReturnType<
         typeof vi.fn
@@ -102,9 +101,7 @@ describe('simulation-error-utils', () => {
       expect(loggedData.message).toBe(
         'station with ID 123 not found in frontend state'
       );
-      expect(loggedData.context).toBe(
-        'State sync issue: station exists in mapbox but not in frontend'
-      );
+      expect(loggedData.context).toBe(LogContext.MissingEntityData);
       expect(loggedData.entityType).toBe('station');
       expect(loggedData.entityId).toBe(123);
       expect(loggedData.errorType).toBe('MISSING_ENTITY_DATA');
@@ -122,9 +119,7 @@ describe('simulation-error-utils', () => {
       expect(loggedData.message).toBe(
         'resource with ID 456 not found in frontend state'
       );
-      expect(loggedData.context).toBe(
-        'State sync issue: resource exists in mapbox but not in frontend'
-      );
+      expect(loggedData.context).toBe(LogContext.MissingEntityData);
       expect(loggedData.entityType).toBe('resource');
       expect(loggedData.entityId).toBe(456);
       expect(loggedData.errorType).toBe('MISSING_ENTITY_DATA');
@@ -150,24 +145,24 @@ describe('simulation-error-utils', () => {
   describe('logSimulationErrorWithContext', () => {
     it('should log error with context', () => {
       const error = new Error('Context test error');
-      const context = 'WebSocket connection';
+      const context = LogContext.WebSocketConnection;
       const additionalData = { attempt: 1 };
 
       logSimulationErrorWithContext(error, context, additionalData);
 
       expect(console.error).toHaveBeenCalledWith(
         '[SIMULATION_ERROR]',
-        expect.stringContaining('Context test error')
+        expect.stringContaining(LogContext.WebSocketConnection)
       );
       expect(console.error).toHaveBeenCalledWith(
         '[SIMULATION_ERROR]',
-        expect.stringContaining('WebSocket connection')
+        expect.stringContaining(LogContext.WebSocketConnection)
       );
     });
 
     it('should handle errors without additional data', () => {
       const error = new Error('Simple error');
-      logSimulationErrorWithContext(error, 'Simple context');
+      logSimulationErrorWithContext(error, LogContext.WebSocketConnection);
 
       expect(console.error).toHaveBeenCalledWith(
         '[SIMULATION_ERROR]',
@@ -190,7 +185,7 @@ describe('simulation-error-utils', () => {
       const loggedData = JSON.parse(call);
 
       expect(loggedData.message).toBe('Frame parse error');
-      expect(loggedData.context).toBe('WebSocket frame processing');
+      expect(loggedData.context).toBe(LogContext.WebSocketFrameProcessing);
       expect(loggedData.frameNumber).toBe(42);
       expect(loggedData.errorType).toBe('FRAME_PROCESSING_ERROR');
       expect(loggedData.stateLayer).toBe(SimulationStateLayer.Frontend);
@@ -223,64 +218,6 @@ describe('simulation-error-utils', () => {
     });
   });
 
-  describe('logStateSyncError', () => {
-    it('should log state sync error between server and frontend', () => {
-      const error = new Error('State mismatch');
-      logStateSyncError(
-        error,
-        SimulationStateLayer.Server,
-        SimulationStateLayer.Frontend
-      );
-
-      const mockConsoleError = console.error as unknown as ReturnType<
-        typeof vi.fn
-      >;
-      const call = mockConsoleError.mock.calls[0][1] as string;
-      const loggedData = JSON.parse(call);
-
-      expect(loggedData.message).toBe('State mismatch');
-      expect(loggedData.context).toBe('State sync between server and frontend');
-      expect(loggedData.errorType).toBe('STATE_SYNC_ERROR');
-      expect(loggedData.sourceLayer).toBe(SimulationStateLayer.Server);
-      expect(loggedData.targetLayer).toBe(SimulationStateLayer.Frontend);
-    });
-
-    it('should log state sync error between frontend and mapbox', () => {
-      const error = new Error('Mapbox sync failed');
-      logStateSyncError(
-        error,
-        SimulationStateLayer.Frontend,
-        SimulationStateLayer.Mapbox
-      );
-
-      const mockConsoleError = console.error as unknown as ReturnType<
-        typeof vi.fn
-      >;
-      const call = mockConsoleError.mock.calls[0][1] as string;
-      const loggedData = JSON.parse(call);
-
-      expect(loggedData.context).toBe('State sync between frontend and mapbox');
-      expect(loggedData.sourceLayer).toBe(SimulationStateLayer.Frontend);
-      expect(loggedData.targetLayer).toBe(SimulationStateLayer.Mapbox);
-    });
-
-    it('should handle string errors', () => {
-      logStateSyncError(
-        'String sync error',
-        SimulationStateLayer.Server,
-        SimulationStateLayer.Mapbox
-      );
-
-      const mockConsoleError = console.error as unknown as ReturnType<
-        typeof vi.fn
-      >;
-      const call = mockConsoleError.mock.calls[0][1] as string;
-      const loggedData = JSON.parse(call);
-
-      expect(loggedData.message).toBe('String sync error');
-    });
-  });
-
   describe('SimulationStateLayer enum', () => {
     it('should have correct layer values', () => {
       expect(SimulationStateLayer.Server).toBe('server');
@@ -292,7 +229,7 @@ describe('simulation-error-utils', () => {
   describe('Error logging integration', () => {
     it('should log errors in correct format for Grafana/Loki scraping', () => {
       const error = new Error('Integration test');
-      logSimulationError(error, 'Integration context', {
+      logSimulationError(error, LogContext.MapLoading, {
         userId: 'user123',
         sessionId: 'session456',
       });
@@ -310,43 +247,22 @@ describe('simulation-error-utils', () => {
       expect(loggedData).toHaveProperty('userId');
       expect(loggedData).toHaveProperty('sessionId');
     });
-
-    it('should maintain error context through multiple layers', () => {
-      // Simulate error flowing through layers
-      const originalError = new Error('Original error');
-
-      // Server layer
-      logStateSyncError(
-        originalError,
-        SimulationStateLayer.Server,
-        SimulationStateLayer.Frontend
-      );
-
-      expect(console.error).toHaveBeenCalled();
-
-      vi.clearAllMocks();
-
-      // Frontend layer
-      logFrameProcessingError(originalError, 100);
-
-      expect(console.error).toHaveBeenCalled();
-    });
   });
 
   describe('Edge cases', () => {
     it('should handle null/undefined errors gracefully', () => {
-      logSimulationError(null as unknown as Error, 'Null error');
+      logSimulationError(null as unknown as Error, LogContext.MapLoading);
       expect(console.error).toHaveBeenCalled();
 
       vi.clearAllMocks();
 
-      logSimulationError(undefined as unknown as Error, 'Undefined error');
+      logSimulationError(undefined as unknown as Error, LogContext.MapLoading);
       expect(console.error).toHaveBeenCalled();
     });
 
     it('should handle errors without stack traces', () => {
       const customError = { message: 'Custom error' };
-      logSimulationError(customError as Error, 'Custom context');
+      logSimulationError(customError as Error, LogContext.MapLoading);
 
       const mockConsoleError = console.error as unknown as ReturnType<
         typeof vi.fn
@@ -365,7 +281,11 @@ describe('simulation-error-utils', () => {
       };
 
       expect(() => {
-        logSimulationError(new Error('Large data'), 'Context', largeData);
+        logSimulationError(
+          new Error('Large data'),
+          LogContext.MapLoading,
+          largeData
+        );
       }).not.toThrow();
     });
 
@@ -377,7 +297,11 @@ describe('simulation-error-utils', () => {
       // The error will be caught by the logging system but not propagated
       const consoleSpy = vi.spyOn(console, 'error');
 
-      logSimulationError(new Error('Circular'), 'Context', circularData);
+      logSimulationError(
+        new Error('Circular'),
+        LogContext.MapLoading,
+        circularData
+      );
 
       // Console.error should still be called even if JSON.stringify fails
       expect(consoleSpy).toHaveBeenCalled();

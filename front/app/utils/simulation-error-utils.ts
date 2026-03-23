@@ -22,7 +22,7 @@
  * SOFTWARE.
  */
 
-import { log, LogLevel } from '~/lib/logger';
+import { log, LogContext, LogLevel } from '~/lib/logger';
 
 /**
  * Represents the three states of simulation data:
@@ -47,7 +47,7 @@ export enum SimulationStateLayer {
  */
 export function logSimulationError(
   error: unknown,
-  context?: string,
+  context?: LogContext,
   additionalData?: Record<string, unknown>
 ) {
   let errorMessage: string;
@@ -98,7 +98,7 @@ export function logSimulationError(
  */
 export function logSimulationErrorWithContext(
   error: unknown,
-  context: string,
+  context: LogContext,
   additionalData?: Record<string, unknown>
 ): void {
   logSimulationError(error, context, additionalData);
@@ -116,13 +116,12 @@ export function logMissingEntityError(
   entityType: string,
   entityId: number
 ): void {
-  const context = `State sync issue: ${entityType} exists in ${SimulationStateLayer.Mapbox} but not in ${SimulationStateLayer.Frontend}`;
   const error = new Error(
     `${entityType} with ID ${entityId} not found in frontend state`
   );
 
   // Log the error with structured data
-  logSimulationError(error, context, {
+  logSimulationError(error, LogContext.MissingEntityData, {
     entityType,
     entityId,
     errorType: 'MISSING_ENTITY_DATA',
@@ -142,33 +141,9 @@ export function logFrameProcessingError(
   error: unknown,
   frameNumber: number
 ): void {
-  logSimulationError(error, 'WebSocket frame processing', {
+  logSimulationError(error, LogContext.WebSocketFrameProcessing, {
     frameNumber,
     errorType: 'FRAME_PROCESSING_ERROR',
     stateLayer: SimulationStateLayer.Frontend,
   });
-}
-
-/**
- * Logs state synchronization errors between different layers.
- * This is called when there's a mismatch between server, frontend, and mapbox states.
- *
- * @param error Error object
- * @param sourceLayer The layer where the error originated
- * @param targetLayer The layer that was expected to have the data
- */
-export function logStateSyncError(
-  error: unknown,
-  sourceLayer: SimulationStateLayer,
-  targetLayer: SimulationStateLayer
-): void {
-  logSimulationError(
-    error,
-    `State sync between ${sourceLayer} and ${targetLayer}`,
-    {
-      errorType: 'STATE_SYNC_ERROR',
-      sourceLayer,
-      targetLayer,
-    }
-  );
 }

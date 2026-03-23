@@ -58,7 +58,7 @@ import { positionsEqual } from './utils';
 import type SimulationStateManager from './simulation-state-manager';
 import { updateDriverPositions } from './animation-helpers';
 import { toast } from 'sonner';
-import { log, LogLevel } from './logger';
+import { log, LogContext, LogLevel } from './logger';
 
 export default class MapManager {
   private map: MapboxGLMap;
@@ -179,7 +179,7 @@ export default class MapManager {
           log({
             message: `Failed to drag stations onto driver #${driverId} because driver was not found`,
             level: LogLevel.ERROR,
-            context: 'station_drag_drop',
+            context: LogContext.StationDragDrop,
           });
           return;
         }
@@ -193,7 +193,7 @@ export default class MapManager {
             log({
               message: `Failed to drag station #${sid} onto driver because station was not found`,
               level: LogLevel.ERROR,
-              context: 'station_drag_drop',
+              context: LogContext.StationDragDrop,
             });
             continue;
           }
@@ -216,7 +216,7 @@ export default class MapManager {
         log({
           message: `Dragged ${stationIds.length} station(s) onto driver #${driverId} to assign ${allTaskIds.length} tasks`,
           level: LogLevel.INFO,
-          context: 'station_drag_drop',
+          context: LogContext.StationDragDrop,
         });
       },
       (stationId) => {

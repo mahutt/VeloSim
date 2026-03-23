@@ -149,10 +149,13 @@ vi.mock('sonner', () => ({
   },
 }));
 
-vi.mock('~/lib/logger', () => ({
-  log: vi.fn(),
-  LogLevel: { ERROR: 'error', INFO: 'info' },
-}));
+vi.mock(import('~/lib/logger'), async (importOriginal) => {
+  const actual = await importOriginal();
+  return {
+    ...actual,
+    log: vi.fn(),
+  };
+});
 
 const mockMap = {
   isStyleLoaded: vi.fn(() => true),

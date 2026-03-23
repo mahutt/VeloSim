@@ -32,13 +32,36 @@ export enum LogLevel {
   ERROR = 'error',
 }
 
+export enum LogContext {
+  AddDriverDialog = 'AddDriverDialog',
+  AddStationDialog = 'AddStationDialog',
+  AddVehicleDialog = 'AddVehicleDialog',
+  ScenarioExport = 'scenario_export',
+  ScenarioImportDrag = 'scenario_import_drag',
+  ScenarioImportButton = 'scenario_import_button',
+  ScenarioSaveImported = 'scenario_save_imported',
+  ScenarioSaveNew = 'scenario_save_new',
+  ScenarioSaveAsNew = 'scenario_save_as_new',
+  ScenarioSaveNameDialog = 'scenario_save_name_dialog',
+  UnsavedScenarioChangesPreserved = 'unsaved_scenario_changes_preserved',
+  UnsavedScenarioChangesDiscarded = 'unsaved_scenario_changes_discarded',
+  StationDragDrop = 'station_drag_drop',
+  UserLogout = 'user_logout',
+  MissingEntityData = 'missing_entity_data',
+  WebSocketFrameProcessing = 'websocket_frame_processing',
+  WebSocketConnection = 'websocket_connection',
+  InitialFrameError = 'initial_frame_error',
+  UpdateFrameError = 'update_frame_error',
+  MapLoading = 'map_loading',
+}
+
 // Define the structure of a log entry as the backend logs/frontend endpoint expects.
 interface LogEntry {
   message: string;
   timestamp: string;
   level?: LogLevel;
   stack?: string;
-  context?: string;
+  context?: LogContext;
   userAgent?: string;
   url?: string;
   entityType?: string;
@@ -51,7 +74,7 @@ export interface PartialLogEntry {
   message: string;
   level?: LogLevel;
   stack?: string;
-  context?: string;
+  context?: LogContext;
   entityType?: string;
   entityId?: number;
   errorType?: string;

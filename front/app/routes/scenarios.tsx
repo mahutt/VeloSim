@@ -44,7 +44,7 @@ import UnsavedChangesDialog from '~/components/scenario/unsaved-changes-dialog';
 import { useScenarioOperations } from '~/hooks/use-scenario-operations';
 import useError from '~/hooks/use-error';
 import api from '~/api';
-import { log, LogLevel } from '~/lib/logger';
+import { log, LogContext, LogLevel } from '~/lib/logger';
 import SimulationNameDialog from '~/components/scenario/simulation-name-dialog';
 
 export default function ScenarioEditor() {
@@ -199,7 +199,9 @@ export default function ScenarioEditor() {
         message: 'Scenario import via ' + source,
         level: LogLevel.INFO,
         context:
-          source === 'drag' ? 'scenario_import_drag' : 'scenario_import_button',
+          source === 'drag'
+            ? LogContext.ScenarioImportDrag
+            : LogContext.ScenarioImportButton,
       });
 
       try {
@@ -227,7 +229,7 @@ export default function ScenarioEditor() {
           log({
             message: 'Scenario saved after import',
             level: LogLevel.INFO,
-            context: 'scenario_save_imported',
+            context: LogContext.ScenarioSaveImported,
           });
           // Refresh sidebar after successful import
           const scenarios = await loadSavedScenarios();
@@ -378,7 +380,7 @@ export default function ScenarioEditor() {
         log({
           message: 'New scenario saved',
           level: LogLevel.INFO,
-          context: 'scenario_save_new',
+          context: LogContext.ScenarioSaveNew,
         });
       }
       // Refresh sidebar after save
@@ -442,7 +444,7 @@ export default function ScenarioEditor() {
       log({
         message: 'Scenario saved as new',
         level: LogLevel.INFO,
-        context: 'scenario_save_as_new',
+        context: LogContext.ScenarioSaveAsNew,
       });
     }
     // Refresh sidebar after save as new
@@ -498,7 +500,7 @@ export default function ScenarioEditor() {
           log({
             message: 'Scenario saved after name dialog',
             level: LogLevel.INFO,
-            context: 'scenario_save_name_dialog',
+            context: LogContext.ScenarioSaveNameDialog,
           });
           // Refresh sidebar after save
           const scenarios = await loadSavedScenarios();
@@ -717,7 +719,7 @@ export default function ScenarioEditor() {
           log({
             message: 'Loss of unsaved changes prevented',
             level: LogLevel.INFO,
-            context: 'unsaved_scenario_changes_preserved',
+            context: LogContext.UnsavedScenarioChangesPreserved,
           });
           setShowUnsavedDialog(false);
           setPendingScenario(null);
@@ -730,7 +732,7 @@ export default function ScenarioEditor() {
           log({
             message: 'Unsaved changes explicitly discarded',
             level: LogLevel.INFO,
-            context: 'unsaved_scenario_changes_discarded',
+            context: LogContext.UnsavedScenarioChangesDiscarded,
           });
           setShowUnsavedDialog(false);
           if (pendingScenario) {
