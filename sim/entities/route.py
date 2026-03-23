@@ -460,12 +460,10 @@ class Route:
                     triples.append(TrafficTriple(abs_start, abs_end, level))
             coord_offset += max(geom_len - 1, 0)  # shared boundary point
         self._traffic_triples_cache = triples
-        # NOTE: If a transition buffer is active, we do NOT sync or clear it
-        # here. The buffer contains geographic positions that remain valid
-        # regardless of traffic changes. Syncing with buffer[0] (first remaining
-        # point instead of final destination) caused backward teleportation.
-        # The buffer drains naturally through next(), which syncs correctly
-        # with the final position when the buffer is exhausted.
+        if self._transition_buffer:
+            if self._last_returned_position:
+                self._sync_indices_after_transition(self._last_returned_position)
+            self._transition_buffer = []
         self._rebuild_global_event_indices()
         self._has_traffic_changed = True
 
@@ -778,9 +776,6 @@ class Route:
         if dist_to_event is not None and dist_to_event < self.TRANSITION_THRESHOLD:
             current_road = self.roads[self.current_road_index]
             # v0 = effective speed at the driver's current position.
-            # current_road.current_speed uses the road-wide min multiplier,
-            # which is wrong when the driver is in a free-flow section of a
-            # road that has traffic only on part of it.
             progress = current_road.get_progress_at_index(self.current_point_index)
             pc_len = len(current_road.pointcollection)
             if pc_len > 1:
