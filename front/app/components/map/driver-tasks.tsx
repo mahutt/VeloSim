@@ -35,6 +35,7 @@ import {
 } from '~/components/ui/tooltip';
 import { useTaskMassSelect } from '~/hooks/use-task-mass-select';
 import type { PopulatedDriver } from './selected-item-bar';
+import { ScrollArea } from '~/components/ui/scroll-area';
 
 interface DriverTaskStationGroup {
   stationId: number;
@@ -346,7 +347,7 @@ export function DriverTasks({ driver }: { driver: PopulatedDriver }) {
 
   return (
     <>
-      <div className="flex items-center justify-between gap-2">
+      <div className="px-5 flex items-center justify-between gap-2">
         <p className="text-sm text-muted-foreground">
           {selectedTaskIds.length > 0
             ? `Tasks (${selectedTaskIds.length}/${driver.tasks.length} selected)`
@@ -357,22 +358,28 @@ export function DriverTasks({ driver }: { driver: PopulatedDriver }) {
           onToggle={() => setIsCollapsed((prev) => !prev)}
         />
       </div>
-      {isCollapsed ? (
-        <DriverTasksCollapsed
-          groupedTasks={groupedTasks}
-          onReorder={(ids) => engine.reorderTasks(driver.id, ids, true)}
-        />
-      ) : (
-        <DriverTasksExpanded
-          driver={driver}
-          resolveStationName={resolveStationName}
-          selectedTaskIds={selectedTaskIds}
-          handleTaskSelect={handleTaskSelect}
-          selectForDrag={selectForDrag}
-          onReorder={(ids) => engine.reorderTasks(driver.id, ids, true)}
-          onUnassign={(taskId) => engine.requestUnassignment(driver.id, taskId)}
-        />
-      )}
+      <ScrollArea className="mx-2">
+        <div className="max-h-50 px-3 space-y-1">
+          {isCollapsed ? (
+            <DriverTasksCollapsed
+              groupedTasks={groupedTasks}
+              onReorder={(ids) => engine.reorderTasks(driver.id, ids, true)}
+            />
+          ) : (
+            <DriverTasksExpanded
+              driver={driver}
+              resolveStationName={resolveStationName}
+              selectedTaskIds={selectedTaskIds}
+              handleTaskSelect={handleTaskSelect}
+              selectForDrag={selectForDrag}
+              onReorder={(ids) => engine.reorderTasks(driver.id, ids, true)}
+              onUnassign={(taskId) =>
+                engine.requestUnassignment(driver.id, taskId)
+              }
+            />
+          )}
+        </div>
+      </ScrollArea>
     </>
   );
 }

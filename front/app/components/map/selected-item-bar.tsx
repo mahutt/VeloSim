@@ -154,15 +154,13 @@ export default function SelectedItemBar() {
         </Button>
       </div>
       {selectedItem.value.tasks.length > 0 ? (
-        <ScrollArea className="mx-2">
-          <div className="max-h-50 px-3 space-y-1">
-            {selectedItem.type === SelectedItemType.Station ? (
-              <StationTasks station={selectedItem.value} />
-            ) : (
-              <DriverTasks driver={selectedItem.value} />
-            )}
-          </div>
-        </ScrollArea>
+        <>
+          {selectedItem.type === SelectedItemType.Station ? (
+            <StationTasks station={selectedItem.value} />
+          ) : (
+            <DriverTasks driver={selectedItem.value} />
+          )}
+        </>
       ) : (
         <p className="text-sm text-muted-foreground px-5">No tasks</p>
       )}
