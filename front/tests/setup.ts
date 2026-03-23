@@ -2,12 +2,29 @@ import '@testing-library/jest-dom/vitest';
 import { beforeEach, vi } from 'vitest';
 import { mockDisplayError, MockMap } from './mocks';
 import React from 'react';
+import { EN_TRANSLATIONS } from '~/lib/i18n';
+import { UILanguage } from '~/types';
 
 // We mock useError to prevent actual error dialogs during tests - global error handling tests are in error-provider.test.tsx
 vi.mock('~/hooks/use-error', () => {
   return {
     default: () => ({
       displayError: mockDisplayError,
+    }),
+  };
+});
+
+vi.mock('~/hooks/use-preferences', () => {
+  return {
+    default: () => ({
+      language: UILanguage.English,
+      preferences: { language: UILanguage.English },
+      loading: false,
+      saving: false,
+      refreshPreferences: async () => undefined,
+      updatePreferences: async () => undefined,
+      setLanguagePreference: async () => undefined,
+      t: EN_TRANSLATIONS,
     }),
   };
 });

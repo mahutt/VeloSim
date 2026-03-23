@@ -32,6 +32,7 @@ import { DropdownMenuItem } from '../ui/dropdown-menu';
 import { toast } from 'sonner';
 import AddStationDialog from './add-station-dialog';
 import type { ScenarioContentStation } from '~/types';
+import usePreferences from '~/hooks/use-preferences';
 
 interface AddStationButtonProps {
   setScenarioContent: Dispatch<SetStateAction<string>>;
@@ -44,6 +45,7 @@ export default function AddStationButton({
   onEdit,
   icon,
 }: AddStationButtonProps) {
+  const { t } = usePreferences();
   const [dialogOpen, setDialogOpen] = useState(false);
 
   const handleAddStation = (stationData: {
@@ -85,7 +87,9 @@ export default function AddStationButton({
       return JSON.stringify(jsonNew, null, 2);
     });
 
-    toast.success(`Station "${stationData.name}" added successfully`);
+    toast.success(
+      `${t.scenario.toast.station} "${stationData.name}" ${t.scenario.toast.addedSuccessfully}`
+    );
     setDialogOpen(false);
   };
 
@@ -98,7 +102,7 @@ export default function AddStationButton({
         }}
       >
         {icon}
-        Add Station
+        {t.scenario.option.addStation}
       </DropdownMenuItem>
       <AddStationDialog
         open={dialogOpen}

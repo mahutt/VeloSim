@@ -26,11 +26,12 @@ import { Download, Eye } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router';
 import useError from '~/hooks/use-error';
+import usePreferences from '~/hooks/use-preferences';
 import type { GetSimulationReportResponse } from '~/types';
 import {
   DEFAULT_SIMULATION_REPORT,
   SIMULATION_REPORT_METRIC_KEYS,
-  SIMULATION_REPORT_SUMMARY_LEGEND,
+  SIMULATION_REPORT_SUMMARY_LEGEND_SELECTORS,
   downloadSimulationReportCsv,
   formatSimulationReportMetricValue,
   getSimulationReport,
@@ -45,6 +46,7 @@ import {
 } from '../ui/dialog';
 
 export function ReportSummaryCell({ simId }: { simId: string }) {
+  const { t } = usePreferences();
   const [report, setReport] = useState<GetSimulationReportResponse | null>(
     null
   );
@@ -73,7 +75,9 @@ export function ReportSummaryCell({ simId }: { simId: string }) {
   }, [simId]);
 
   if (!report) {
-    return <span className="text-muted-foreground text-sm">Loading...</span>;
+    return (
+      <span className="text-muted-foreground text-sm">{t.common.loading}</span>
+    );
   }
 
   return (
@@ -92,6 +96,7 @@ export function PlaybackCell({
   simId: string;
   isCompleted: boolean;
 }) {
+  const { t } = usePreferences();
   const navigate = useNavigate();
 
   if (isCompleted) {
@@ -100,7 +105,7 @@ export function PlaybackCell({
 
   return (
     <Button size="sm" onClick={() => navigate(`/simulations/${simId}`)}>
-      Resume
+      {t.simulations.action.resume}
     </Button>
   );
 }
@@ -112,6 +117,7 @@ export function ReportCell({
   simId: string;
   simName: string;
 }) {
+  const { t } = usePreferences();
   const { displayError } = useError();
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
   const [loadingPreview, setLoadingPreview] = useState(false);
@@ -124,7 +130,7 @@ export function ReportCell({
       const data = await getSimulationReport(simId);
       downloadSimulationReportCsv(simId, data);
     } catch {
-      displayError('Error downloading simulation report');
+      displayError(t.simulations.error.downloadReport);
     }
   };
 
@@ -136,7 +142,7 @@ export function ReportCell({
       const data = await getSimulationReport(simId);
       setReport(data);
     } catch {
-      displayError('Error loading simulation report preview');
+      displayError(t.simulations.error.previewReport);
       setReport(DEFAULT_SIMULATION_REPORT);
     } finally {
       setLoadingPreview(false);
@@ -147,10 +153,10 @@ export function ReportCell({
     <>
       <div className="flex gap-2">
         <Button size="sm" variant="outline" onClick={handleDownloadClick}>
-          <Download className="h-4 w-4" /> Download
+          <Download className="h-4 w-4" /> {t.simulations.action.download}
         </Button>
         <Button size="sm" variant="outline" onClick={handlePreviewClick}>
-          <Eye className="h-4 w-4" /> Preview
+          <Eye className="h-4 w-4" /> {t.simulations.action.preview}
         </Button>
       </div>
 
@@ -158,12 +164,14 @@ export function ReportCell({
         <DialogContent>
           <DialogHeader>
             <DialogTitle>{simName}</DialogTitle>
-            <DialogDescription>Report Overview</DialogDescription>
+            <DialogDescription>
+              {t.simulations.report.overview}
+            </DialogDescription>
           </DialogHeader>
 
           {loadingPreview && (
             <div className="text-muted-foreground text-sm">
-              Loading report...
+              {t.simulations.report.loading}
             </div>
           )}
 
@@ -171,7 +179,7 @@ export function ReportCell({
             <div className="space-y-3 text-sm">
               {SIMULATION_REPORT_METRIC_KEYS.map((key, index) => (
                 <div key={key}>
-                  {SIMULATION_REPORT_SUMMARY_LEGEND[index]}:{' '}
+                  {SIMULATION_REPORT_SUMMARY_LEGEND_SELECTORS[index](t)}:{' '}
                   {formatSimulationReportMetricValue(report[key])}
                 </div>
               ))}

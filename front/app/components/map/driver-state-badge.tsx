@@ -23,6 +23,7 @@
  */
 
 import { DriverState } from '~/types';
+import usePreferences from '~/hooks/use-preferences';
 import { Badge } from '../ui/badge';
 import { useState } from 'react';
 
@@ -35,6 +36,7 @@ export default function DriverStateBadge({
   state,
   shortened = false,
 }: DriverStateBadgeProps) {
+  const { t } = usePreferences();
   const [isHovering, setIsHovering] = useState(false);
   let className = '';
   let label = '';
@@ -42,48 +44,48 @@ export default function DriverStateBadge({
   switch (state) {
     case DriverState.OffShift:
       className = 'bg-gray-200';
-      label = 'Off shift';
-      shortenedLabel = 'Off';
+      label = t.driverStateBadge.offShift.label;
+      shortenedLabel = t.driverStateBadge.offShift.short;
       break;
     case DriverState.PendingShift:
       className = 'bg-blue-200';
-      label = 'Pending shift';
-      shortenedLabel = 'Pending';
+      label = t.driverStateBadge.pendingShift.label;
+      shortenedLabel = t.driverStateBadge.pendingShift.short;
       break;
     case DriverState.Idle:
       className = 'bg-green-200';
-      label = 'Idle';
-      shortenedLabel = 'Idle';
+      label = t.driverStateBadge.idle.label;
+      shortenedLabel = t.driverStateBadge.idle.short;
       break;
     case DriverState.OnRoute:
       className = 'bg-yellow-200';
-      label = 'On route';
-      shortenedLabel = 'On route';
+      label = t.driverStateBadge.onRoute.label;
+      shortenedLabel = t.driverStateBadge.onRoute.short;
       break;
     case DriverState.ServicingStation:
       className = 'bg-purple-200';
-      label = 'Servicing';
-      shortenedLabel = 'Servicing';
+      label = t.driverStateBadge.servicing.label;
+      shortenedLabel = t.driverStateBadge.servicing.short;
       break;
     case DriverState.OnBreak:
       className = 'bg-orange-200';
-      label = 'On break';
-      shortenedLabel = 'Break';
+      label = t.driverStateBadge.onBreak.label;
+      shortenedLabel = t.driverStateBadge.onBreak.short;
       break;
     case DriverState.EndingShift:
       className = 'bg-red-200';
-      label = 'Ending shift';
-      shortenedLabel = 'Ending';
+      label = t.driverStateBadge.endingShift.label;
+      shortenedLabel = t.driverStateBadge.endingShift.short;
       break;
     case DriverState.SeekingHQForInventory:
       className = 'bg-indigo-200';
-      label = 'Returning for restock';
-      shortenedLabel = 'Return';
+      label = t.driverStateBadge.seekingHQForInventory.label;
+      shortenedLabel = t.driverStateBadge.seekingHQForInventory.short;
       break;
     case DriverState.RestockingBatteries:
       className = 'bg-teal-200';
-      label = 'Restocking';
-      shortenedLabel = 'Restock';
+      label = t.driverStateBadge.restockingBatteries.label;
+      shortenedLabel = t.driverStateBadge.restockingBatteries.short;
       break;
   }
 

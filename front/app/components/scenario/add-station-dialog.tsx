@@ -36,6 +36,7 @@ import { Input } from '~/components/ui/input';
 import { Label } from '~/components/ui/label';
 import { log, LogContext, LogLevel } from '~/lib/logger';
 import { MONTREAL_BOUNDS, SCHEDULED_TASK_PATTERN } from '~/constants';
+import usePreferences from '~/hooks/use-preferences';
 
 interface AddStationDialogProps {
   open: boolean;
@@ -54,6 +55,7 @@ export default function AddStationDialog({
   onOpenChange,
   onSubmit,
 }: AddStationDialogProps) {
+  const { t } = usePreferences();
   const [name, setName] = useState('');
   const [latitude, setLatitude] = useState('');
   const [longitude, setLongitude] = useState('');
@@ -180,20 +182,20 @@ export default function AddStationDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[425px]">
         <DialogHeader>
-          <DialogTitle>Add Station</DialogTitle>
+          <DialogTitle>{t.scenario.dialog.addStationTitle}</DialogTitle>
           <DialogDescription>
-            Configure a new station to insert into the scenario.
+            {t.scenario.dialog.addStationDescription}
           </DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit}>
           <div className="grid gap-4 py-4">
             <div className="grid gap-2">
-              <Label htmlFor="name">Station Name</Label>
+              <Label htmlFor="name">{t.scenario.dialog.stationNameLabel}</Label>
               <Input
                 id="name"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                placeholder="e.g., Main Street Station"
+                placeholder={t.scenario.dialog.stationNamePlaceholder}
                 aria-invalid={!!errors.name}
                 aria-describedby={errors.name ? 'name-error' : undefined}
               />
@@ -205,14 +207,16 @@ export default function AddStationDialog({
             </div>
 
             <div className="grid gap-2">
-              <Label htmlFor="latitude">Latitude</Label>
+              <Label htmlFor="latitude">
+                {t.scenario.dialog.latitudeLabel}
+              </Label>
               <Input
                 id="latitude"
                 type="number"
                 step="any"
                 value={latitude}
                 onChange={(e) => setLatitude(e.target.value)}
-                placeholder="e.g., 45.5017"
+                placeholder={t.scenario.dialog.latitudePlaceholder}
                 aria-invalid={!!errors.latitude}
                 aria-describedby={
                   errors.latitude ? 'latitude-error' : undefined
@@ -226,14 +230,16 @@ export default function AddStationDialog({
             </div>
 
             <div className="grid gap-2">
-              <Label htmlFor="longitude">Longitude</Label>
+              <Label htmlFor="longitude">
+                {t.scenario.dialog.longitudeLabel}
+              </Label>
               <Input
                 id="longitude"
                 type="number"
                 step="any"
                 value={longitude}
                 onChange={(e) => setLongitude(e.target.value)}
-                placeholder="e.g., -73.5673"
+                placeholder={t.scenario.dialog.longitudePlaceholder}
                 aria-invalid={!!errors.longitude}
                 aria-describedby={
                   errors.longitude ? 'longitude-error' : undefined
@@ -247,12 +253,14 @@ export default function AddStationDialog({
             </div>
 
             <div className="grid gap-2">
-              <Label htmlFor="scheduledTasks">Scheduled Tasks (optional)</Label>
+              <Label htmlFor="scheduledTasks">
+                {t.scenario.dialog.scheduledTasksOptionalLabel}
+              </Label>
               <Input
                 id="scheduledTasks"
                 value={scheduledTasks}
                 onChange={(e) => setScheduledTasks(e.target.value)}
-                placeholder="e.g., day1:09:30, day1:14:00, day2:10:15"
+                placeholder={t.scenario.dialog.scheduledTasksPlaceholder}
                 aria-invalid={!!errors.scheduledTasks}
                 aria-describedby={
                   errors.scheduledTasks
@@ -272,7 +280,7 @@ export default function AddStationDialog({
 
             <div className="grid gap-2">
               <Label htmlFor="initialTaskCount">
-                Initial Task Count (optional)
+                {t.scenario.dialog.initialTaskCountOptionalLabel}
               </Label>
               <Input
                 id="initialTaskCount"
@@ -280,7 +288,7 @@ export default function AddStationDialog({
                 min="0"
                 value={initialTaskCount}
                 onChange={(e) => setInitialTaskCount(e.target.value)}
-                placeholder="e.g., 5"
+                placeholder={t.scenario.dialog.initialTaskCountPlaceholder}
                 aria-invalid={!!errors.initialTaskCount}
                 aria-describedby={
                   errors.initialTaskCount ? 'initialTaskCount-error' : undefined
@@ -299,9 +307,9 @@ export default function AddStationDialog({
 
           <DialogFooter>
             <Button type="button" variant="outline" onClick={handleCancel}>
-              Cancel
+              {t.common.cancel}
             </Button>
-            <Button type="submit">Add Station</Button>
+            <Button type="submit">{t.scenario.dialog.addStationAction}</Button>
           </DialogFooter>
         </form>
       </DialogContent>

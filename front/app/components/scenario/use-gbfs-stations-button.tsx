@@ -39,6 +39,7 @@ import {
 import { DropdownMenuItem } from '../ui/dropdown-menu';
 import axios from 'axios';
 import { toast } from 'sonner';
+import usePreferences from '~/hooks/use-preferences';
 
 async function getGbfsStations(): Promise<ScenarioContentStation[]> {
   // Check session storage for cached GBFS station information
@@ -82,6 +83,7 @@ export default function UseGbfsStationsButton({
   onEdit,
   icon,
 }: UseGbfsStationsButtonProps) {
+  const { t } = usePreferences();
   const [loading, setLoading] = useState(false);
   return (
     <DropdownMenuItem
@@ -94,7 +96,7 @@ export default function UseGbfsStationsButton({
           stations = await getGbfsStations();
         } catch {
           setLoading(false);
-          toast.error('Failed to fetch GBFS station information');
+          toast.error(t.scenario.toast.gbfsFetchFailed);
           return;
         }
         setScenarioContent((prev) => {
@@ -113,11 +115,11 @@ export default function UseGbfsStationsButton({
           return JSON.stringify(jsonNew, null, 2);
         });
         setLoading(false);
-        toast.success('GBFS stations loaded successfully');
+        toast.success(t.scenario.toast.gbfsLoaded);
       }}
     >
       {icon}
-      Use GBFS Stations
+      {t.scenario.option.useGbfsStations}
     </DropdownMenuItem>
   );
 }

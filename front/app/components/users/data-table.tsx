@@ -44,6 +44,7 @@ import { Input } from '~/components/ui/input';
 import { Button } from '../ui/button';
 import ResetPasswordDialog from '../reset-password-dialog';
 import { useState } from 'react';
+import usePreferences from '~/hooks/use-preferences';
 import type { User } from '~/types';
 import NewUserDialog from '~/components/users/new-user-dialog';
 
@@ -71,6 +72,7 @@ export function DataTable<TData, TValue>({
   onUpdateUser,
   getRowId,
 }: DataTableProps<TData, TValue>) {
+  const { t } = usePreferences();
   const [showUserForm, setShowUserForm] = useState(false);
   const [showResetPasswordDialog, setShowResetPasswordDialog] = useState(false);
   const [resetPasswordUser, setResetPasswordUser] = useState<User | null>(null);
@@ -101,7 +103,7 @@ export function DataTable<TData, TValue>({
     <div>
       <div className="flex justify-between items-center gap-4 py-4">
         <Input
-          placeholder="Filter usernames..."
+          placeholder={t.users.filterPlaceholder}
           value={
             (table.getColumn('username')?.getFilterValue() as string) ?? ''
           }
@@ -111,7 +113,7 @@ export function DataTable<TData, TValue>({
           className="max-w-sm"
         />
         <Button variant="outline" onClick={() => setShowUserForm(true)}>
-          New user
+          {t.users.newUser}
         </Button>
       </div>
       <div className="overflow-hidden rounded-md border">
@@ -157,7 +159,7 @@ export function DataTable<TData, TValue>({
                   colSpan={columns.length}
                   className="h-24 text-center"
                 >
-                  No results.
+                  {t.users.noResults}
                 </TableCell>
               </TableRow>
             )}
@@ -171,7 +173,7 @@ export function DataTable<TData, TValue>({
           onClick={() => table.previousPage()}
           disabled={!table.getCanPreviousPage()}
         >
-          Previous
+          {t.users.previous}
         </Button>
         <Button
           variant="outline"
@@ -179,7 +181,7 @@ export function DataTable<TData, TValue>({
           onClick={() => table.nextPage()}
           disabled={!table.getCanNextPage()}
         >
-          Next
+          {t.users.next}
         </Button>
       </div>
       {resetPasswordUser && (

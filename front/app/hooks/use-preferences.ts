@@ -22,48 +22,20 @@
  * SOFTWARE.
  */
 
-import { Users2 } from 'lucide-react';
-import { Link } from 'react-router';
+import { useContext } from 'react';
 import {
-  SidebarGroup,
-  SidebarGroupLabel,
-  SidebarMenu,
-  SidebarMenuButton,
-  SidebarMenuItem,
-} from '~/components/ui/sidebar';
-import usePreferences from '~/hooks/use-preferences';
-import type { TranslationSchema } from '~/lib/i18n';
+  PreferencesContext,
+  type PreferencesState,
+} from '~/providers/preferences-provider';
 
-const adminNavItems = [
-  {
-    name: (t: TranslationSchema) => t.nav.users,
-    url: '/users',
-    icon: Users2,
-  },
-] satisfies Array<{
-  name: (t: TranslationSchema) => string;
-  url: string;
-  icon: typeof Users2;
-}>;
+const usePreferences = (): PreferencesState => {
+  const context = useContext(PreferencesContext);
 
-export function NavAdmin() {
-  const { t } = usePreferences();
+  if (context === undefined) {
+    throw new Error('usePreferences must be used within a PreferencesProvider');
+  }
 
-  return (
-    <SidebarGroup className="group-data-[collapsible=icon]:hidden">
-      <SidebarGroupLabel>{t.nav.section.admin}</SidebarGroupLabel>
-      <SidebarMenu>
-        {adminNavItems.map((item) => (
-          <SidebarMenuItem key={item.url}>
-            <SidebarMenuButton asChild>
-              <Link to={item.url}>
-                <item.icon />
-                <span>{item.name(t)}</span>
-              </Link>
-            </SidebarMenuButton>
-          </SidebarMenuItem>
-        ))}
-      </SidebarMenu>
-    </SidebarGroup>
-  );
-}
+  return context;
+};
+
+export default usePreferences;

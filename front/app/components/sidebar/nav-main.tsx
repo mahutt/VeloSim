@@ -32,22 +32,29 @@ import {
   SidebarMenuItem,
 } from '~/components/ui/sidebar';
 import { useFeature } from '~/hooks/use-feature';
+import usePreferences from '~/hooks/use-preferences';
+import type { TranslationSchema } from '~/lib/i18n';
 
 const mainNavItems = [
   {
-    title: 'Simulations',
+    title: (t: TranslationSchema) => t.nav.simulations,
     url: '/simulations',
     icon: Gauge,
   },
   {
-    title: 'Scenarios',
+    title: (t: TranslationSchema) => t.nav.scenarios,
     url: '/',
     icon: FileSliders,
   },
-];
+] satisfies Array<{
+  title: (t: TranslationSchema) => string;
+  url: string;
+  icon: typeof Gauge;
+}>;
 
 export function NavMain() {
   const showSimulations = useFeature('simulationsPage');
+  const { t } = usePreferences();
 
   const items = mainNavItems.filter((i) => {
     if (i.url === '/simulations' && !showSimulations) return false;
@@ -56,14 +63,14 @@ export function NavMain() {
 
   return (
     <SidebarGroup>
-      <SidebarGroupLabel>Main</SidebarGroupLabel>
+      <SidebarGroupLabel>{t.nav.section.main}</SidebarGroupLabel>
       <SidebarMenu>
         {items.map((item) => (
-          <SidebarMenuItem key={item.title}>
-            <SidebarMenuButton tooltip={item.title} asChild>
+          <SidebarMenuItem key={item.url}>
+            <SidebarMenuButton tooltip={item.title(t)} asChild>
               <Link to={item.url}>
                 {item.icon && <item.icon />}
-                <span>{item.title}</span>
+                <span>{item.title(t)}</span>
               </Link>
             </SidebarMenuButton>
           </SidebarMenuItem>

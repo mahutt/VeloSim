@@ -23,6 +23,7 @@
  */
 
 import { type ColumnDef } from '@tanstack/react-table';
+import type { TranslationSchema } from '~/lib/i18n';
 import type { User } from '~/types';
 import { Badge } from '../ui/badge';
 import {
@@ -36,34 +37,34 @@ import { Button } from '../ui/button';
 import api from '~/api';
 import useAuth from '~/hooks/use-auth';
 
-export const columns: ColumnDef<User>[] = [
+export const getColumns = (t: TranslationSchema): ColumnDef<User>[] => [
   {
     accessorKey: 'id',
-    header: 'Id',
+    header: t.users.column.id,
   },
   {
     accessorKey: 'username',
-    header: 'Username',
+    header: t.users.column.username,
   },
   {
     accessorKey: 'is_admin',
-    header: 'Type',
+    header: t.users.column.type,
     cell: ({ row }) => {
       const user = row.original;
-      const label = user.is_admin ? 'Admin' : 'User';
+      const label = user.is_admin ? t.user.role.admin : t.user.role.user;
       const variant = user.is_admin ? 'default' : 'secondary';
       return <Badge variant={variant}>{label}</Badge>;
     },
   },
   {
     accessorKey: 'is_enabled',
-    header: 'Status',
+    header: t.users.column.status,
     cell: ({ row }) => {
       const user = row.original;
 
       return (
         <span className="text-muted-foreground">
-          {user.is_enabled ? 'Enabled' : 'Disabled'}
+          {user.is_enabled ? t.users.status.enabled : t.users.status.disabled}
         </span>
       );
     },
@@ -83,7 +84,7 @@ export const columns: ColumnDef<User>[] = [
                 variant="ghost"
                 className="h-8 w-8 p-0"
               >
-                <span className="sr-only">Open menu</span>
+                <span className="sr-only">{t.users.actions.openMenu}</span>
                 <MoreHorizontal />
               </Button>
             </DropdownMenuTrigger>
@@ -94,7 +95,7 @@ export const columns: ColumnDef<User>[] = [
                   table.options.meta?.setShowResetPasswordDialog(true);
                 }}
               >
-                Change password
+                {t.user.menu.changePassword}
               </DropdownMenuItem>
               <DropdownMenuItem
                 disabled={authenticatedUser?.id === user.id}
@@ -116,7 +117,9 @@ export const columns: ColumnDef<User>[] = [
                   }
                 }}
               >
-                {user.is_admin ? 'Revoke admin' : 'Make admin'}
+                {user.is_admin
+                  ? t.users.actions.revokeAdmin
+                  : t.users.actions.makeAdmin}
               </DropdownMenuItem>
               <DropdownMenuItem
                 onClick={async () => {
@@ -134,7 +137,9 @@ export const columns: ColumnDef<User>[] = [
                   }
                 }}
               >
-                {user.is_enabled ? 'Disable user' : 'Enable user'}
+                {user.is_enabled
+                  ? t.users.actions.disableUser
+                  : t.users.actions.enableUser}
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>

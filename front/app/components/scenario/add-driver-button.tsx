@@ -32,6 +32,7 @@ import { DropdownMenuItem } from '../ui/dropdown-menu';
 import { toast } from 'sonner';
 import AddDriverDialog from './add-driver-dialog';
 import type { ScenarioContentDriver } from '~/types';
+import usePreferences from '~/hooks/use-preferences';
 
 interface AddDriverButtonProps {
   setScenarioContent: Dispatch<SetStateAction<string>>;
@@ -44,6 +45,7 @@ export default function AddDriverButton({
   onEdit,
   icon,
 }: AddDriverButtonProps) {
+  const { t } = usePreferences();
   const [dialogOpen, setDialogOpen] = useState(false);
 
   const handleAddDriver = (driverData: ScenarioContentDriver) => {
@@ -75,7 +77,9 @@ export default function AddDriverButton({
       return JSON.stringify(jsonNew, null, 2);
     });
 
-    toast.success(`Driver "${driverData.name}" added successfully`);
+    toast.success(
+      `${t.scenario.toast.driver} "${driverData.name}" ${t.scenario.toast.addedSuccessfully}`
+    );
     setDialogOpen(false);
     setDialogOpen(false);
   };
@@ -89,7 +93,7 @@ export default function AddDriverButton({
         }}
       >
         {icon}
-        Add Driver
+        {t.scenario.option.addDriver}
       </DropdownMenuItem>
       <AddDriverDialog
         open={dialogOpen}

@@ -37,6 +37,7 @@ import { Label } from '~/components/ui/label';
 import { MONTREAL_BOUNDS } from '~/constants';
 import type { ScenarioContentVehicle } from '~/types';
 import { log, LogContext, LogLevel } from '~/lib/logger';
+import usePreferences from '~/hooks/use-preferences';
 
 interface AddVehicleDialogProps {
   open: boolean;
@@ -51,6 +52,7 @@ export default function AddVehicleDialog({
   onSubmit,
   scenarioContent,
 }: AddVehicleDialogProps) {
+  const { t } = usePreferences();
   const [name, setName] = useState('');
   const [latitude, setLatitude] = useState('');
   const [longitude, setLongitude] = useState('');
@@ -196,21 +198,21 @@ export default function AddVehicleDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Add Vehicle</DialogTitle>
+          <DialogTitle>{t.scenario.dialog.addVehicleTitle}</DialogTitle>
           <DialogDescription>
-            Configure a new vehicle to insert into the scenario.
+            {t.scenario.dialog.addVehicleDescription}
           </DialogDescription>
         </DialogHeader>
 
         <form onSubmit={handleSubmit}>
           <div className="grid gap-4 py-4">
             <div className="grid gap-2">
-              <Label htmlFor="name">Vehicle Name</Label>
+              <Label htmlFor="name">{t.scenario.dialog.vehicleNameLabel}</Label>
               <Input
                 id="name"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                placeholder="e.g., Vehicle 1"
+                placeholder={t.scenario.dialog.vehicleNamePlaceholder}
                 aria-invalid={!!errors.name}
                 aria-describedby={errors.name ? 'name-error' : undefined}
               />
@@ -222,14 +224,16 @@ export default function AddVehicleDialog({
             </div>
 
             <div className="grid gap-2">
-              <Label htmlFor="latitude">Latitude (optional)</Label>
+              <Label htmlFor="latitude">
+                {t.scenario.dialog.latitudeOptionalLabel}
+              </Label>
               <Input
                 id="latitude"
                 type="number"
                 step="any"
                 value={latitude}
                 onChange={(e) => setLatitude(e.target.value)}
-                placeholder="e.g., 45.5017"
+                placeholder={t.scenario.dialog.latitudePlaceholder}
                 aria-invalid={!!errors.latitude}
                 aria-describedby={
                   errors.latitude ? 'latitude-error' : undefined
@@ -243,14 +247,16 @@ export default function AddVehicleDialog({
             </div>
 
             <div className="grid gap-2">
-              <Label htmlFor="longitude">Longitude (optional)</Label>
+              <Label htmlFor="longitude">
+                {t.scenario.dialog.longitudeOptionalLabel}
+              </Label>
               <Input
                 id="longitude"
                 type="number"
                 step="any"
                 value={longitude}
                 onChange={(e) => setLongitude(e.target.value)}
-                placeholder="e.g., -73.5673"
+                placeholder={t.scenario.dialog.longitudePlaceholder}
                 aria-invalid={!!errors.longitude}
                 aria-describedby={
                   errors.longitude ? 'longitude-error' : undefined
@@ -264,14 +270,16 @@ export default function AddVehicleDialog({
             </div>
 
             <div className="grid gap-2">
-              <Label htmlFor="batteryCount">Battery Count (optional)</Label>
+              <Label htmlFor="batteryCount">
+                {t.scenario.dialog.batteryCountOptionalLabel}
+              </Label>
               <Input
                 id="batteryCount"
                 type="number"
                 min="0"
                 value={batteryCount}
                 onChange={(e) => setBatteryCount(e.target.value)}
-                placeholder="e.g., 5"
+                placeholder={t.scenario.dialog.batteryCountPlaceholder}
                 aria-invalid={!!errors.batteryCount}
                 aria-describedby={
                   errors.batteryCount
@@ -283,8 +291,7 @@ export default function AddVehicleDialog({
                 id="batteryCount-hint"
                 className="text-xs text-muted-foreground"
               >
-                Leave empty to start at HQ with 0 batteries. If position is
-                provided, vehicle starts at that location.
+                {t.scenario.dialog.batteryCountHint}
               </p>
               {errors.batteryCount && (
                 <p id="batteryCount-error" className="text-sm text-destructive">
@@ -296,9 +303,9 @@ export default function AddVehicleDialog({
 
           <DialogFooter>
             <Button type="button" variant="outline" onClick={handleCancel}>
-              Cancel
+              {t.common.cancel}
             </Button>
-            <Button type="submit">Add Vehicle</Button>
+            <Button type="submit">{t.scenario.dialog.addVehicleAction}</Button>
           </DialogFooter>
         </form>
       </DialogContent>

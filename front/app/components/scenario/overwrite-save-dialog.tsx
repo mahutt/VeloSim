@@ -32,6 +32,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '~/components/ui/dialog';
+import usePreferences from '~/hooks/use-preferences';
 
 interface OverwriteSaveDialogProps {
   open: boolean;
@@ -47,33 +48,37 @@ const OverwriteSaveDialog: React.FC<OverwriteSaveDialogProps> = ({
   onOverwrite,
   onSaveAsNew,
   scenarioName,
-}) => (
-  <Dialog open={open} onOpenChange={onOpenChange}>
-    <DialogContent>
-      <DialogHeader>
-        <DialogTitle>Overwrite or Save As New?</DialogTitle>
-        <DialogDescription>
-          You are editing the scenario <strong>{scenarioName}</strong>.
-          <br />
-          Would you like to overwrite the existing scenario or save as a new
-          one?
-        </DialogDescription>
-      </DialogHeader>
-      <DialogFooter className="sm:justify-between">
-        <Button onClick={() => onOpenChange(false)} variant="outline">
-          Cancel
-        </Button>
-        <div className="flex gap-2">
-          <Button onClick={onSaveAsNew} variant="outline">
-            Save As New
+}) => {
+  const { t } = usePreferences();
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>{t.scenario.dialog.overwriteTitle}</DialogTitle>
+          <DialogDescription>
+            {t.scenario.dialog.overwriteDescriptionPrefix}{' '}
+            <strong>{scenarioName}</strong>.
+            <br />
+            {t.scenario.dialog.overwriteDescriptionSuffix}
+          </DialogDescription>
+        </DialogHeader>
+        <DialogFooter className="sm:justify-between">
+          <Button onClick={() => onOpenChange(false)} variant="outline">
+            {t.common.cancel}
           </Button>
-          <Button onClick={onOverwrite} variant="default">
-            Overwrite
-          </Button>
-        </div>
-      </DialogFooter>
-    </DialogContent>
-  </Dialog>
-);
+          <div className="flex gap-2">
+            <Button onClick={onSaveAsNew} variant="outline">
+              {t.scenario.dialog.saveAsNew}
+            </Button>
+            <Button onClick={onOverwrite} variant="default">
+              {t.scenario.dialog.overwrite}
+            </Button>
+          </div>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+};
 
 export default OverwriteSaveDialog;

@@ -28,16 +28,22 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from '~/components/ui/tooltip';
-import { SIMULATION_REPORT_SUMMARY_LEGEND } from '~/utils/simulation-report';
+import usePreferences from '~/hooks/use-preferences';
+import {
+  SIMULATION_REPORT_METRIC_KEYS,
+  SIMULATION_REPORT_SUMMARY_LEGEND_SELECTORS,
+} from '~/utils/simulation-report';
 
 export default function ReportSummaryLegendTooltip() {
+  const { t } = usePreferences();
+
   return (
     <Tooltip>
       <TooltipTrigger asChild>
         <button
           type="button"
           className="inline-flex rounded-full text-foreground/80 hover:text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-          aria-label="Report summary legend"
+          aria-label={t.simulations.report.legend.title}
         >
           <Info className="h-4 w-4" />
         </button>
@@ -49,10 +55,11 @@ export default function ReportSummaryLegendTooltip() {
         sideOffset={8}
       >
         <div className="space-y-1 text-xs">
-          <p className="font-medium">Report summary legend</p>
-          {SIMULATION_REPORT_SUMMARY_LEGEND.map((label, index) => (
-            <p key={label}>
-              {index + 1}. {label}
+          <p className="font-medium">{t.simulations.report.legend.title}</p>
+          {SIMULATION_REPORT_METRIC_KEYS.map((key, index) => (
+            <p key={key}>
+              {index + 1}.{' '}
+              {SIMULATION_REPORT_SUMMARY_LEGEND_SELECTORS[index](t)}
             </p>
           ))}
         </div>
