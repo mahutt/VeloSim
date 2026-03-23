@@ -34,7 +34,7 @@ import {
 import { Button } from '~/components/ui/button';
 import { Input } from '~/components/ui/input';
 import { Label } from '~/components/ui/label';
-import { log, LogLevel } from '~/lib/logger';
+import { log, LogContext, LogLevel } from '~/lib/logger';
 import { MONTREAL_BOUNDS, SCHEDULED_TASK_PATTERN } from '~/constants';
 
 interface AddStationDialogProps {
@@ -126,7 +126,7 @@ export default function AddStationDialog({
       log({
         message: 'Station form validation failed',
         level: LogLevel.WARNING,
-        context: 'AddStationDialog',
+        context: LogContext.AddStationDialog,
         entityType: 'station',
       });
       return;
@@ -150,7 +150,7 @@ export default function AddStationDialog({
     log({
       message: `Station form submitted: ${stationData.name}`,
       level: LogLevel.INFO,
-      context: 'AddStationDialog',
+      context: LogContext.AddStationDialog,
       entityType: 'station',
     });
 

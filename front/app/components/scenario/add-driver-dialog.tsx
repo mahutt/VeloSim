@@ -35,7 +35,7 @@ import { Button } from '~/components/ui/button';
 import { Input } from '~/components/ui/input';
 import { Label } from '~/components/ui/label';
 import type { ScenarioContentDriver } from '~/types';
-import { log, LogLevel } from '~/lib/logger';
+import { log, LogContext, LogLevel } from '~/lib/logger';
 
 interface AddDriverDialogProps {
   open: boolean;
@@ -157,7 +157,7 @@ export default function AddDriverDialog({
       log({
         message: 'Driver form validation failed',
         level: LogLevel.WARNING,
-        context: 'AddDriverDialog',
+        context: LogContext.AddDriverDialog,
         entityType: 'driver',
       });
       return;
@@ -180,7 +180,7 @@ export default function AddDriverDialog({
     log({
       message: `Driver form submitted: ${driverData.name}`,
       level: LogLevel.INFO,
-      context: 'AddDriverDialog',
+      context: LogContext.AddDriverDialog,
       entityType: 'driver',
     });
 

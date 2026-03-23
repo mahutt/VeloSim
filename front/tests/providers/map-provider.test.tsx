@@ -32,6 +32,7 @@ import {
   setMapLayers,
 } from '~/lib/map-helpers';
 import { logSimulationError } from '~/utils/simulation-error-utils';
+import { LogContext } from '~/lib/logger';
 
 // Mock useAuth hook
 vi.mock('~/hooks/use-auth', () => ({
@@ -164,7 +165,7 @@ test('on-error callback logs error, calls logSimulationError and displayError, a
 
   expect(logSimulationError).toHaveBeenCalledWith(
     'Map failed to load tiles',
-    'Map loading',
+    LogContext.MapLoading,
     {
       errorType: 'MAP_LOAD_FAILED',
       sourceId: 'mapbox-streets',

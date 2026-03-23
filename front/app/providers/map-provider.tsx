@@ -33,6 +33,7 @@ import {
   type RefObject,
 } from 'react';
 import useError from '~/hooks/use-error';
+import { LogContext } from '~/lib/logger';
 import {
   initializeMapSources,
   loadMapImages,
@@ -80,7 +81,7 @@ export const MapProvider = ({ children }: { children: ReactNode }) => {
       const errorMessage = event.error?.message || 'Unknown map error';
       const sourceId = (event as { sourceId?: string }).sourceId;
 
-      logSimulationError(errorMessage, 'Map loading', {
+      logSimulationError(errorMessage, LogContext.MapLoading, {
         errorType: 'MAP_LOAD_FAILED',
         sourceId,
         originalError: event.error,

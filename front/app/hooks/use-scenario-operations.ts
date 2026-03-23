@@ -23,7 +23,7 @@
  */
 
 import useError from '~/hooks/use-error';
-import { log, LogLevel } from '~/lib/logger';
+import { log, LogContext, LogLevel } from '~/lib/logger';
 import api from '~/api';
 import { toast } from 'sonner';
 
@@ -214,7 +214,7 @@ export function useScenarioOperations() {
     log({
       message: 'Scenario exported',
       level: LogLevel.INFO,
-      context: 'scenario_export',
+      context: LogContext.ScenarioExport,
     });
     downloadJSON(contentToExport, scenarioName);
     return true;

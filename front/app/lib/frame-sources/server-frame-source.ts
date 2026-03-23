@@ -30,6 +30,7 @@ import {
   logSimulationError,
 } from '~/utils/simulation-error-utils';
 import type FrameSource from './frame-source';
+import { LogContext } from '../logger';
 
 export default class ServerFrameSource implements FrameSource {
   private simulationId: string;
@@ -120,7 +121,7 @@ export default class ServerFrameSource implements FrameSource {
           try {
             this.onFrame(payload);
           } catch (error) {
-            logSimulationError(error, 'Failed to process initial frame', {
+            logSimulationError(error, LogContext.InitialFrameError, {
               errorType: 'INITIAL_FRAME_ERROR',
               payloadKeys: Object.keys(payload),
             });
@@ -137,7 +138,7 @@ export default class ServerFrameSource implements FrameSource {
           try {
             this.onFrame(payload);
           } catch (error) {
-            logSimulationError(error, 'Failed to process frame update', {
+            logSimulationError(error, LogContext.UpdateFrameError, {
               errorType: 'FRAME_UPDATE_ERROR',
               payloadKeys: Object.keys(payload),
             });
@@ -162,7 +163,7 @@ export default class ServerFrameSource implements FrameSource {
 
       logSimulationError(
         new Error('WebSocket connection failed'),
-        'WebSocket connection error',
+        LogContext.WebSocketConnection,
         {
           errorType: 'WEBSOCKET_ERROR',
           simId: this.simulationId,
@@ -204,7 +205,7 @@ export default class ServerFrameSource implements FrameSource {
 
         logSimulationError(
           new Error('WebSocket authentication failed'),
-          'WebSocket closed due to authentication failure',
+          LogContext.WebSocketConnection,
           {
             errorType: 'WEBSOCKET_AUTH_FAILURE',
             simId: this.simulationId,
