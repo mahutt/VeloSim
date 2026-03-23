@@ -31,11 +31,15 @@ export function useAutoScroll(isDragSelecting: React.RefObject<boolean>) {
   const containerRef = useRef<HTMLDivElement>(null);
   const rafRef = useRef<number | null>(null);
   const directionRef = useRef<number>(0);
+  const viewportRef = useRef<HTMLElement | null>(null);
 
   const getViewport = useCallback(() => {
-    return containerRef.current?.closest(
-      '[data-slot="scroll-area-viewport"]'
-    ) as HTMLElement | null;
+    if (!viewportRef.current?.isConnected) {
+      viewportRef.current = containerRef.current?.closest(
+        '[data-slot="scroll-area-viewport"]'
+      ) as HTMLElement | null;
+    }
+    return viewportRef.current;
   }, []);
 
   const tick = useCallback(() => {
