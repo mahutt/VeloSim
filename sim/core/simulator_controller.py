@@ -90,7 +90,6 @@ class SimulatorController:
         self.frame_counter: int = initial_frame_counter
         self.start_time: int = input_parameters.get_start_time()
         self.on_completed_callback = on_completed_callback
-        self.last_reporting: dict | None = None
 
         # Unpack InputParameter object to populate entity lists
         self.station_entities: Dict[int, Station] = (
@@ -699,6 +698,24 @@ class SimulatorController:
                     }
                 )
 
+        current_reporting = {
+            "servicingToDrivingRatio": round(
+                self.sim_env.report.get_servicing_to_driving_ratio(), 4
+            ),
+            "vehicleUtilizationRatio": round(
+                self.sim_env.report.get_vehicle_utilization_ratio(), 4
+            ),
+            "averageTasksServicedPerShift": round(
+                self.sim_env.report.get_average_tasks_per_shift(), 4
+            ),
+            "averageTaskResponseTime": round(
+                self.sim_env.report.get_average_service_time_for_tasks(), 4
+            ),
+            "vehicleDistanceTraveled": round(
+                self.sim_env.report.get_vehicle_distance_traveled(), 2
+            ),
+        }
+
         payload = {
             "simId": self.frame_emitter.sim_id,
             "headquarters": {
@@ -718,31 +735,8 @@ class SimulatorController:
                 "realTimeFactor": self.real_time_driver.real_time_factor,
                 "pausedByUser": paused_by_user,
             },
-            "reporting": {},
+            "reporting": current_reporting,
         }
-
-        current_reporting = {
-            "servicingToDrivingRatio": round(
-                self.sim_env.report.get_servicing_to_driving_ratio(), 4
-            ),
-            "vehicleUtilizationRatio": round(
-                self.sim_env.report.get_vehicle_utilization_ratio(), 4
-            ),
-            "averageTasksServicedPerShift": round(
-                self.sim_env.report.get_average_tasks_per_shift(), 4
-            ),
-            "averageTaskResponseTime": round(
-                self.sim_env.report.get_average_service_time_for_tasks(), 4
-            ),
-            "vehicleDistanceTraveled": round(
-                self.sim_env.report.get_vehicle_distance_traveled(), 2
-            ),
-        }
-
-        # Only include metrics on keyframe and on change.
-        if is_key or current_reporting != self.last_reporting:
-            payload["reporting"] = current_reporting
-            self.last_reporting = current_reporting
 
         frame = Frame(seq_numb=self.frame_counter, payload=payload, is_key=is_key)
         return frame

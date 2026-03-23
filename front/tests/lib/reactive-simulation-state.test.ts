@@ -96,6 +96,13 @@ describe('areReactiveSimulationStatesEqual', () => {
           state: DriverState.Idle,
         },
       ],
+      reporting: {
+        servicingToDrivingRatio: 1.5,
+        vehicleUtilizationRatio: 0.75,
+        averageTasksServicedPerShift: 4.2,
+        averageTaskResponseTime: 120,
+        vehicleDistanceTraveled: 2500,
+      },
     };
 
     const b = JSON.parse(JSON.stringify(a));

@@ -29,6 +29,7 @@ import type {
   StationTask,
   Headquarters,
   PendingAssignment,
+  SimulationReport,
 } from '~/types';
 import {
   areReactiveSimulationStatesEqual,
@@ -116,6 +117,9 @@ export interface SimulationStateManagerInterface {
 
   getScrubSimulationSecond: () => number;
   setScrubSimulationSecond: (second: number) => void;
+
+  getReporting: () => SimulationReport;
+  setReporting: (reporting: SimulationReport) => void;
 }
 
 export default class SimulationStateManager implements SimulationStateManagerInterface {
@@ -408,6 +412,14 @@ export default class SimulationStateManager implements SimulationStateManagerInt
 
   public setScrubSimulationSecond(second: number) {
     this.updateReactiveState({ scrubSimulationSecond: second });
+  }
+
+  public getReporting() {
+    return this.reactiveState.reporting;
+  }
+
+  public setReporting(reporting: SimulationReport) {
+    this.updateReactiveState({ reporting });
   }
 
   public getPaused() {

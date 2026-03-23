@@ -203,6 +203,9 @@ export const mockSimulationStateManager: Partial<SimulationStateManager> = {
   setScrubSimulationSecond: vi.fn(),
 
   updateHQWidgetState: vi.fn(),
+
+  getReporting: vi.fn(),
+  setReporting: vi.fn(),
 };
 export const MockSimulationStateManager = vi
   .fn()

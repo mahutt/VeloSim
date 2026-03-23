@@ -373,6 +373,7 @@ export default class SimulationEngine {
       )
     );
     this.state.setHeadquarters(payload.headquarters);
+    this.state.setReporting(payload.reporting);
 
     payload.tasks.forEach((task) => {
       this.state.setTask(task);

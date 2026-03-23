@@ -260,6 +260,14 @@ export interface Simulation {
   task_count: number;
 }
 
+export interface SimulationReport {
+  servicingToDrivingRatio: number;
+  vehicleUtilizationRatio: number;
+  averageTasksServicedPerShift: number;
+  averageTaskResponseTime: number;
+  vehicleDistanceTraveled: number;
+}
+
 export interface BackendPayload {
   simId: string;
   headquarters: Headquarters;
@@ -274,6 +282,7 @@ export interface BackendPayload {
     realMinutesPassed: number;
     startTime: number;
   };
+  reporting: SimulationReport;
 }
 
 // Task assignment types

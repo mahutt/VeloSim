@@ -27,7 +27,7 @@ import type { ResourceBarElement } from '~/components/resource/resource-bar';
 import type { ResourceItemElement } from '~/components/resource/resource-item';
 import type { HQWidgetProps } from '~/components/simulation/hq-widget';
 import type { NonZeroSpeed } from '~/providers/simulation-provider';
-import type { PendingAssignment } from '~/types';
+import type { PendingAssignment, SimulationReport } from '~/types';
 import { areHQWidgetStatesEqual } from './hq-widget-helpers';
 
 export interface ReactiveSimulationState {
@@ -63,6 +63,9 @@ export interface ReactiveSimulationState {
   startTime: number;
   simulationSecondsPassed: number;
   scrubSimulationSecond: number;
+
+  // reporting widget
+  reporting: SimulationReport;
 }
 
 export const DEFAULT_REACTIVE_SIMULATION_STATE: ReactiveSimulationState = {
@@ -85,6 +88,13 @@ export const DEFAULT_REACTIVE_SIMULATION_STATE: ReactiveSimulationState = {
   startTime: 0,
   simulationSecondsPassed: 0,
   scrubSimulationSecond: 0,
+  reporting: {
+    servicingToDrivingRatio: 0,
+    vehicleUtilizationRatio: 0,
+    averageTasksServicedPerShift: 0,
+    averageTaskResponseTime: 0,
+    vehicleDistanceTraveled: 0,
+  },
 };
 
 export function areReactiveSimulationStatesEqual(
@@ -106,7 +116,8 @@ export function areReactiveSimulationStatesEqual(
     areHQWidgetStatesEqual(a.HQWidgetState, b.HQWidgetState) &&
     a.startTime === b.startTime &&
     a.simulationSecondsPassed === b.simulationSecondsPassed &&
-    a.scrubSimulationSecond === b.scrubSimulationSecond
+    a.scrubSimulationSecond === b.scrubSimulationSecond &&
+    areSimulationReportsEqual(a.reporting, b.reporting)
   );
 }
 
@@ -164,5 +175,18 @@ function areResourceItemElementsEqual(
     a.batteryCount === b.batteryCount &&
     a.batteryCapacity === b.batteryCapacity &&
     a.state === b.state
+  );
+}
+
+function areSimulationReportsEqual(
+  a: SimulationReport,
+  b: SimulationReport
+): boolean {
+  return (
+    a.servicingToDrivingRatio === b.servicingToDrivingRatio &&
+    a.vehicleUtilizationRatio === b.vehicleUtilizationRatio &&
+    a.averageTasksServicedPerShift === b.averageTasksServicedPerShift &&
+    a.averageTaskResponseTime === b.averageTaskResponseTime &&
+    a.vehicleDistanceTraveled === b.vehicleDistanceTraveled
   );
 }

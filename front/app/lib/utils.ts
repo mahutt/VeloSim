@@ -33,3 +33,21 @@ export function cn(...inputs: ClassValue[]) {
 export function positionsEqual(base: Position, other: Position): boolean {
   return base[0] === other[0] && base[1] === other[1];
 }
+
+export function formatDuration(seconds: number): string {
+  if (seconds < 60) {
+    return `${seconds.toFixed(0)}s`;
+  } else if (seconds < 60 * 60) {
+    return `${Math.floor(seconds / 60).toFixed(0)}m`;
+  } else {
+    return `${Math.floor(seconds / (60 * 60)).toFixed(0)}h`;
+  }
+}
+
+export function formatDistance(meters: number): string {
+  if (meters < 1000) {
+    return `${meters.toFixed(0)}m`;
+  } else {
+    return `${Math.floor(meters / 1000).toFixed(0)}km`;
+  }
+}
