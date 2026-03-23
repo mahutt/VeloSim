@@ -211,13 +211,48 @@ class Road:
         """
         return multiplier_to_congestion_level(self.traffic_multiplier)
 
+    def get_progress_at_index(self, index: int) -> float:
+        """Get the road progress fraction [0,1] at a point index.
+
+        When traffic creates non-uniform point spacing, index-based linear
+        mapping (index / (n-1)) gives incorrect progress.  This method uses
+        geographic projection onto the road's start→end chord, which is
+        consistent with ``get_position_from_distance``.
+
+        Falls back to uniform ``index / (n-1)`` when there is no traffic
+        (points are uniformly spaced) or when the road has < 2 nodes.
+
+        Args:
+            index: Point index in active_pointcollection.
+
+        Returns:
+            Progress fraction in [0.0, 1.0].
+        """
+        n = len(self.active_pointcollection)
+        if n <= 1:
+            return 0.0
+        clamped = max(0, min(index, n - 1))
+
+        if self._traffic_ranges and len(self._nodes) >= 2:
+            pos = self.active_pointcollection[clamped].get_position()
+            start = self._nodes[0].get_position()
+            end = self._nodes[-1].get_position()
+            dx = end[0] - start[0]
+            dy = end[1] - start[1]
+            road_len_sq = dx * dx + dy * dy
+            if road_len_sq > 0:
+                progress = (
+                    (pos[0] - start[0]) * dx + (pos[1] - start[1]) * dy
+                ) / road_len_sq
+                return max(0.0, min(progress, 1.0))
+
+        return clamped / (n - 1)
+
     def get_distance_at_index(self, index: int) -> float:
         """Get cumulative distance from road start to a point index.
 
-        Since the total road length is fixed and traffic only changes the
-        number of points (more points = slower speed = less distance per point),
-        distance is simply proportional to progress through the point collection:
-        ``index / (n - 1) * length``.
+        Uses geographic projection to handle non-uniform point spacing
+        caused by traffic.  See ``get_progress_at_index`` for details.
 
         Args:
             index: Point index in active_pointcollection.
@@ -225,11 +260,7 @@ class Road:
         Returns:
             Cumulative distance in meters from road start.
         """
-        n = len(self.active_pointcollection)
-        if n <= 1:
-            return 0.0
-        clamped = max(0, min(index, n - 1))
-        return (clamped / (n - 1)) * self.length
+        return self.get_progress_at_index(index) * self.length
 
     @property
     def active_pointcollection(self) -> List[Position]:
@@ -480,13 +511,18 @@ class Road:
 
         return points if points else list(self.pointcollection)
 
-    def generate_curve(self, v0: float, vf: float, distance: float) -> List[Position]:
+    def generate_curve(
+        self, v0: float, vf: float, distance: float, distance_offset: float = 0.0
+    ) -> List[Position]:
         """Generates a list of positions the driver will take for a smooth transition.
 
         Args:
             v0: Initial speed in m/s
             vf: Final speed in m/s
             distance: Distance between the changes in speed in meters
+            distance_offset: Distance from road start to the driver's current
+                position in meters. Curve positions are offset by this amount
+                so they map to the correct location on the road.
 
         Returns:
             List of Position objects providing change in speed.
@@ -503,12 +539,12 @@ class Road:
         vf_adjust = (2 * distance / total_ticks) - v0
 
         points: List[Position] = []
-        for tick in range(1, total_ticks + 1):
+        for tick in range(0, total_ticks + 1):
             x = (tick * v0) + ((vf_adjust - v0) / (2 * total_ticks)) * (
                 tick * (tick - 1)
             )
-            # Map distance x to a Position
-            points.append(self.get_position_from_distance(x))
+            # Map distance x to a Position, offset by driver's current distance
+            points.append(self.get_position_from_distance(distance_offset + x))
 
         return points
 

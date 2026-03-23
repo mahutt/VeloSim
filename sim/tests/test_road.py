@@ -1065,11 +1065,12 @@ class TestRoadTransition:
 
             positions = sample_road.generate_curve(5.0, 5.0, 50.0)
 
-            # total_ticks = (2*50)/(5+5)
-            assert len(positions) == 10
+            # total_ticks = (2*50)/(5+5) = 10, plus tick=0 starting point = 11
+            assert len(positions) == 11
             assert positions[0] == returned_pos
 
-            mock_method.assert_any_call(5.0)
+            # tick=0 produces x=0, so first call uses distance_offset (0.0)
+            mock_method.assert_any_call(0.0)
 
     def test_generate_curve_zero_distance(self, sample_road: Road) -> None:
         """Tests that edge case with zero distance should return an empty list"""
