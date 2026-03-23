@@ -81,7 +81,9 @@ describe('ReportingWidget', () => {
     expect(screen.getByText('7.5')).toBeInTheDocument();
     expect(screen.getByText('Average Task Response Time')).toBeInTheDocument();
     expect(screen.getByText('59s')).toBeInTheDocument();
-    expect(screen.getByText('Vehicle Distance Traveled')).toBeInTheDocument();
+    expect(
+      screen.getByText('Total Vehicle Distance Travelled')
+    ).toBeInTheDocument();
     expect(screen.getByText('999m')).toBeInTheDocument();
   });
 

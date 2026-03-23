@@ -24,6 +24,7 @@
 
 import { ChevronLeft, Gauge } from 'lucide-react';
 import { useState } from 'react';
+import usePreferences from '~/hooks/use-preferences';
 import { formatDistance, formatDuration } from '~/lib/utils';
 import { useSimulation } from '~/providers/simulation-provider';
 import type { SimulationReport } from '~/types';
@@ -41,6 +42,7 @@ function summarize(report: SimulationReport): string {
 }
 
 export default function ReportingWidget() {
+  const { t } = usePreferences();
   const { state } = useSimulation();
   const { reporting } = state;
   const [open, setOpen] = useState(false);
@@ -66,23 +68,23 @@ export default function ReportingWidget() {
       <div className={`${open ? 'h-32' : 'h-0'} duration-200 overflow-hidden`}>
         <div className="overflow-y-auto h-32">
           <ReportingMetricRow
-            label="Servicing to Driving Ratio"
+            label={t.simulations.report.legend.servicingToDrivingRatio}
             value={reporting.servicingToDrivingRatio.toFixed(1)}
           />
           <ReportingMetricRow
-            label="Vehicle Utilization Ratio"
+            label={t.simulations.report.legend.vehicleUtilizationRatio}
             value={reporting.vehicleUtilizationRatio.toFixed(1)}
           />
           <ReportingMetricRow
-            label="Average Tasks Serviced Per Shift"
+            label={t.simulations.report.legend.averageTasksServicedPerShift}
             value={reporting.averageTasksServicedPerShift.toFixed(1)}
           />
           <ReportingMetricRow
-            label="Average Task Response Time"
+            label={t.simulations.report.legend.averageTaskResponseTime}
             value={formatDuration(reporting.averageTaskResponseTime)}
           />
           <ReportingMetricRow
-            label="Vehicle Distance Traveled"
+            label={t.simulations.report.legend.totalVehicleDistanceTravelled}
             value={formatDistance(reporting.vehicleDistanceTraveled)}
           />
         </div>

@@ -63,7 +63,7 @@ export const SIMULATION_REPORT_METRIC_KEYS: Array<
  * allowing indexed iteration over metric metadata.
  */
 export const SIMULATION_REPORT_SUMMARY_LEGEND_SELECTORS = [
-  (t: TranslationSchema) => t.simulations.report.legend.serviceToDrivingRatio,
+  (t: TranslationSchema) => t.simulations.report.legend.servicingToDrivingRatio,
   (t: TranslationSchema) => t.simulations.report.legend.vehicleUtilizationRatio,
   (t: TranslationSchema) =>
     t.simulations.report.legend.averageTasksServicedPerShift,
@@ -77,7 +77,7 @@ export const SIMULATION_REPORT_SUMMARY_LEGEND_SELECTORS = [
  * UI rendering should prefer `SIMULATION_REPORT_SUMMARY_LEGEND_SELECTORS` with i18n.
  */
 export const SIMULATION_REPORT_SUMMARY_LEGEND = [
-  'Service to Driving Ratio',
+  'Servicing to Driving Ratio',
   'Vehicle Utilization Ratio',
   'Average Tasks Serviced Per Shift',
   'Average Task Response Time',

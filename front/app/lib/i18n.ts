@@ -147,7 +147,7 @@ export const EN_TRANSLATIONS = {
       loading: 'Loading report...',
       legend: {
         title: 'Report summary legend',
-        serviceToDrivingRatio: 'Service to Driving Ratio',
+        servicingToDrivingRatio: 'Servicing to Driving Ratio',
         vehicleUtilizationRatio: 'Vehicle Utilization Ratio',
         averageTasksServicedPerShift: 'Average Tasks Serviced Per Shift',
         averageTaskResponseTime: 'Average Task Response Time',
@@ -481,7 +481,7 @@ export const FR_TRANSLATIONS = {
       loading: 'Chargement du rapport...',
       legend: {
         title: 'Légende du résumé du rapport',
-        serviceToDrivingRatio: 'Ratio service/conduite',
+        servicingToDrivingRatio: 'Ratio service/conduite',
         vehicleUtilizationRatio: "Taux d'utilisation des véhicules",
         averageTasksServicedPerShift: 'Moyenne des tâches effectuées par quart',
         averageTaskResponseTime: 'Temps moyen de réponse aux tâches',
