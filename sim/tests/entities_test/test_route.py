@@ -26,7 +26,7 @@ SOFTWARE.
 
 import pytest
 from typing import List
-from unittest.mock import Mock
+from unittest.mock import Mock, patch
 from shapely.geometry import LineString
 
 from sim.entities.route import Route
@@ -2815,3 +2815,119 @@ class TestRouteEventIndex:
         # road0 offset is 4. road1 starts at global index 4.
         # event should be at (4+0, 4+2) = (4, 6)
         assert route._event_indices[0] == (4, 6)
+
+    def test_get_upcoming_traffic_multiplier(
+        self, test_config, mock_routing_provider, sample_route_result
+    ):
+        """Tests that the next event's multiplier is returned"""
+        road0 = Mock()
+        road0.geometry = [None] * 5
+        road0.pointcollection = [None] * 5
+        road0.active_pointcollection = [None] * 5
+        road0.length = 100
+        road0.get_multiplier_at_index = Mock(return_value=1.0)
+        road1 = Mock()
+        road1.geometry = [None] * 3
+        road1.pointcollection = [None] * 3
+        road1.active_pointcollection = [None] * 3
+        road1.length = 50.0
+        road1.get_multiplier_at_index = Mock(return_value=0.5)
+
+        route = Route(
+            sample_route_result,
+            mock_routing_provider,
+            test_config,
+            roads=[road0, road1],
+        )
+
+        route._event_indices = [(5, 6)]
+        route._next_event_idx = 0
+
+        multiplier = route._get_upcoming_traffic_multiplier()
+        assert multiplier == 0.5
+        road1.get_multiplier_at_index.assert_called_once_with(1)
+        road0.get_multiplier_at_index.assert_not_called()
+
+    def test_get_upcoming_traffic_multiplier_finished_route(
+        self, test_config, mock_routing_provider, sample_route_result
+    ):
+        """Tests that the free flow multiplier is returned if no more events"""
+        road0 = Mock()
+        road0.geometry = [None] * 5
+
+        road1 = Mock()
+        road1.geometry = [None] * 3
+
+        route = Route(
+            sample_route_result,
+            mock_routing_provider,
+            test_config,
+            roads=[road0, road1],
+        )
+        route.current_road_index = 2
+
+        multiplier = route._get_upcoming_traffic_multiplier()
+
+        assert multiplier == 1.0
+
+    def test_sync_indices_after_transition(
+        self, test_config, mock_routing_provider, sample_route_result
+    ):
+        """Tests that the route indices sync to the closest road and point."""
+        mock_final_pos = Mock()
+        mock_final_pos.get_position.return_value = (10, 10)
+
+        point_far = Mock()
+        point_far.get_position.return_value = (0, 0)
+
+        point_near = Mock()
+        point_near.get_position.return_value = (10.1, 10.1)
+
+        road0 = Mock()
+        road0.active_pointcollection = [point_far]
+
+        road1 = Mock()
+        road1.active_pointcollection = [point_near]
+
+        route = Route(
+            sample_route_result,
+            mock_routing_provider,
+            test_config,
+            roads=[road0, road1],
+        )
+        route.current_road_index = 0
+
+        with patch.object(Route, "find_nearest_index", side_effect=[0, 0]):
+            route._sync_indices_after_transition(mock_final_pos)
+
+        assert route.current_road_index == 1
+        assert route.current_point_index == 0
+        assert route._last_point_count == 1
+
+    def test_sync_indices_after_transition_on_same_road(
+        self, test_config, mock_routing_provider, sample_route_result
+    ):
+        """Tests that the best point is selected within a single road."""
+        mock_final_pos = Mock()
+        mock_final_pos.get_position.return_value = (10, 10)
+
+        point1 = Mock()
+        point1.get_position.return_value = (9, 9)
+
+        point2 = Mock()
+        point2.get_position.return_value = (10.1, 10.1)
+
+        road0 = Mock()
+        road0.active_pointcollection = [point1, point2]
+
+        route = Route(
+            sample_route_result, mock_routing_provider, test_config, roads=[road0]
+        )
+        route.current_road_index = 0
+
+        with patch.object(Route, "find_nearest_index", return_value=1):
+            route._sync_indices_after_transition(mock_final_pos)
+
+        assert route.current_road_index == 0
+        assert route.current_point_index == 1
+        assert route._last_point_count == 2

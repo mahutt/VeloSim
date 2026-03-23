@@ -49,6 +49,7 @@ class Route:
     """
 
     _route_counter = 0  # Unique ID generation.
+    TRANSITION_THRESHOLD = 100  # 100 meters
 
     @staticmethod
     def map_index_forward(current_idx: int, old_count: int, new_count: int) -> int:
@@ -81,7 +82,9 @@ class Route:
         return min(math.ceil(progress * (new_count - 1)), new_count - 1)
 
     @staticmethod
-    def find_nearest_index(points: list[Position], target: Position) -> int:
+    def find_nearest_index(
+        points: list[Position], target: Position, min_idx: int = 0
+    ) -> int:
         """Find the index of the point nearest to target in geographic space.
 
         Used when traffic changes a road's pointcollection mid-traversal.
@@ -91,15 +94,19 @@ class Route:
         Args:
             points: The new pointcollection to search.
             target: The driver's last known geographic position.
+            min_idx: Minimum index to consider (inclusive). Enforces
+                forward-only search to prevent backward mapping.
 
         Returns:
-            Index of the nearest point. O(n) — only called on traffic changes.
+            Index of the nearest point (>= min_idx). O(n) — only called on
+            traffic changes.
         """
         target_pos = target.get_position()
-        best_idx = 0
+        start = max(0, min_idx)
+        best_idx = start
         best_dist_sq = float("inf")
-        for i, pt in enumerate(points):
-            pos = pt.get_position()
+        for i in range(start, len(points)):
+            pos = points[i].get_position()
             dx = pos[0] - target_pos[0]
             dy = pos[1] - target_pos[1]
             dist_sq = dx * dx + dy * dy
@@ -200,6 +207,8 @@ class Route:
         self._next_event_idx: int = (
             0  # Pointer (index) to next upcoming index in global range
         )
+
+        self._transition_buffer: list[Position] = []
 
         # If no roads were created, the route was finished from the start
         if not self.roads:
@@ -451,6 +460,10 @@ class Route:
                     triples.append(TrafficTriple(abs_start, abs_end, level))
             coord_offset += max(geom_len - 1, 0)  # shared boundary point
         self._traffic_triples_cache = triples
+        if self._transition_buffer:
+            if self._last_returned_position:
+                self._sync_indices_after_transition(self._last_returned_position)
+            self._transition_buffer = []
         self._rebuild_global_event_indices()
         self._has_traffic_changed = True
 
@@ -507,7 +520,7 @@ class Route:
 
         while (
             self._next_event_idx < len(self._event_indices)
-            and current_global_idx > self._event_indices[self._next_event_idx][1]
+            and current_global_idx >= self._event_indices[self._next_event_idx][1]
         ):
             self._next_event_idx += 1
 
@@ -550,8 +563,14 @@ class Route:
         if point_collection_len <= 1:
             return offset
 
-        progress = self.current_point_index / (point_collection_len - 1)
-        return offset + int(progress * max(geom_len - 1, 0))
+        # Use geographic projection for correct progress when traffic
+        # creates non-uniform point spacing.
+        try:
+            progress = current_road.get_progress_at_index(self.current_point_index)
+            return offset + int(progress * max(geom_len - 1, 0))
+        except (TypeError, AttributeError):
+            progress = self.current_point_index / (point_collection_len - 1)
+            return offset + int(progress * max(geom_len - 1, 0))
 
     def get_distance_to_next_event(self) -> Optional[float]:
         """Gets the distance from the current index to the next traffic event by
@@ -608,6 +627,116 @@ class Route:
 
         return total_dist
 
+    def _get_upcoming_traffic_multiplier(self) -> float:
+        """Helper function to retrieve the next traffic event and get its multiplier.
+
+        Returns:
+            The congestion multiplier of the next upcoming event. Defaults to FREE_FLOW.
+        """
+        if self._next_event_idx >= len(self._event_indices):
+            return 1.0  # free flow if no more events
+
+        next_event_start = self._event_indices[self._next_event_idx][0]
+
+        # Get road multiplier of next event
+        offset = 0
+        for road in self.roads:
+            geom_len = (
+                len(road.geometry) if road.geometry else len(road.pointcollection)
+            )
+            if offset <= next_event_start <= offset + max(geom_len - 1, 0):
+                local_geom_idx = next_event_start - offset
+                # Convert geometry-space index to node-space index.
+                # get_multiplier_at_index expects pointcollection indices,
+                # not geometry indices — these are different coordinate spaces.
+                if geom_len > 1:
+                    frac = local_geom_idx / (geom_len - 1)
+                    pc_len = len(road.pointcollection)
+                    node_idx = min(int(frac * max(pc_len - 1, 0)), pc_len - 1)
+                    return road.get_multiplier_at_index(node_idx)
+                return road.get_multiplier_at_index(local_geom_idx)
+
+            offset += max(geom_len - 1, 0)
+
+        return 1.0
+
+    def _sync_indices_after_transition(self, final_pos: Position) -> None:
+        """Finds the road and index that best matches the final position of
+        the smooth transition, searching forward-only to prevent backward jumps.
+
+        Args:
+            final_pos: Final position of a smooth transition curve
+
+        Returns:
+            None
+        """
+        best_road_idx = self.current_road_index
+        best_point_idx = self.current_point_index
+        min_dist = float("inf")
+        target_pos = final_pos.get_position()
+
+        # Search from the last current road index
+        for road_idx in range(self.current_road_index, len(self.roads)):
+            road = self.roads[road_idx]
+            points = road.active_pointcollection
+
+            # On the current road, only search forward from current position
+            # to prevent backward mapping. On subsequent roads, search all.
+            search_start = (
+                self.current_point_index if road_idx == self.current_road_index else 0
+            )
+            local_idx = self.find_nearest_index(points, final_pos, min_idx=search_start)
+
+            # Calculate distance from candidate position to the final position
+            candidate_pos = points[local_idx].get_position()
+            dx = candidate_pos[0] - target_pos[0]
+            dy = candidate_pos[1] - target_pos[1]
+            dist = dx * dx + dy * dy
+
+            # If new distance smaller than last best, better match
+            if dist < min_dist:
+                min_dist = dist
+                best_road_idx = road_idx
+                best_point_idx = local_idx
+
+        # Ensure the synced point is not behind the curve endpoint.
+        # The nearest active_pc point may be slightly before the curve's
+        # final position due to grid misalignment.  Advancing by one
+        # guarantees normal traversal resumes at or past the curve endpoint.
+        road = self.roads[best_road_idx]
+        active_pts = road.active_pointcollection
+        synced_dist = road.get_distance_at_index(best_point_idx)
+        if self._last_returned_position is not None and best_point_idx + 1 < len(
+            active_pts
+        ):
+            # Estimate the curve endpoint's road distance via projection
+            lrp = self._last_returned_position.get_position()
+            nodes = road.pointcollection
+            if len(nodes) >= 2:
+                s = nodes[0].get_position()
+                e = nodes[-1].get_position()
+                dx = e[0] - s[0]
+                dy = e[1] - s[1]
+                rd2 = dx * dx + dy * dy
+                if rd2 > 0:
+                    last_dist = (
+                        max(
+                            0.0,
+                            min(
+                                ((lrp[0] - s[0]) * dx + (lrp[1] - s[1]) * dy) / rd2,
+                                1.0,
+                            ),
+                        )
+                        * road.length
+                    )
+                    if synced_dist < last_dist:
+                        best_point_idx += 1
+
+        # Update indices with best match to continue traversal
+        self.current_road_index = best_road_idx
+        self.current_point_index = best_point_idx
+        self._last_point_count = len(road.active_pointcollection)
+
     def next(self) -> Position | None:
         """Return the next position in the route traversal.
 
@@ -624,7 +753,60 @@ class Route:
         if self.is_finished:
             return None
 
+        # If we are transition, use next transition position
+        if self._transition_buffer:
+            pos = self._transition_buffer.pop(0)
+            self._last_returned_position = pos
+
+            # Sync if last point in the buffer
+            if not self._transition_buffer:
+                self._sync_indices_after_transition(pos)
+                self._update_next_event_index()  # Advance event pointer
+
+                # Prevent normal traversal from remapping
+                current_road = self.roads[self.current_road_index]
+                self._last_point_count = len(current_road.active_pointcollection)
+
+            return pos
+
         self._maybe_recalculate_for_elapsed_time()
+
+        # Smooth transition if distance to next event < threshold
+        dist_to_event = self.get_distance_to_next_event()
+        if dist_to_event is not None and dist_to_event < self.TRANSITION_THRESHOLD:
+            current_road = self.roads[self.current_road_index]
+            # v0 = effective speed at the driver's current position.
+            progress = current_road.get_progress_at_index(self.current_point_index)
+            pc_len = len(current_road.pointcollection)
+            if pc_len > 1:
+                node_idx = min(int(progress * (pc_len - 1)), pc_len - 1)
+                v0 = current_road.maxspeed * current_road.get_multiplier_at_index(
+                    node_idx
+                )
+            else:
+                v0 = current_road.current_speed
+            # Determine final speed (maxspeed * upcoming traffic multiplier)
+            vf = current_road.maxspeed * self._get_upcoming_traffic_multiplier()
+
+            current_distance_on_road = current_road.get_distance_at_index(
+                self.current_point_index
+            )
+            self._transition_buffer = current_road.generate_curve(
+                v0, vf, dist_to_event, distance_offset=current_distance_on_road
+            )
+            if self._transition_buffer:
+                pos = self._transition_buffer.pop(0)
+                self._last_returned_position = pos
+                # Sync if last point in the buffer
+                if not self._transition_buffer:
+                    self._sync_indices_after_transition(pos)
+                    self._update_next_event_index()  # Advance event pointer
+
+                    # Prevent normal traversal from remapping
+                    current_road = self.roads[self.current_road_index]
+                    self._last_point_count = len(current_road.active_pointcollection)
+                return pos
+            # else: traverse normally
 
         point_to_return: Position | None = None
 
