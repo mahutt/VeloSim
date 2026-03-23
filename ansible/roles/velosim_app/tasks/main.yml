@@ -359,9 +359,47 @@
       {% endif %}
 
 - name: Build and start VeloSim application
-  ansible.builtin.command: "{{ app_dir }}/scripts/velosim-app.sh start"
-  become_user: "{{ app_user }}"
-  register: app_start_result
+  block:
+    - name: Start VeloSim application (attempt 1)
+      ansible.builtin.command: "{{ app_dir }}/scripts/velosim-app.sh start"
+      become_user: "{{ app_user }}"
+      async: "{{ app_start_timeout_seconds | default(720) }}"
+      poll: 0
+      register: app_start_job
+
+    - name: Wait for VeloSim application start to finish (attempt 1)
+      ansible.builtin.async_status:
+        jid: "{{ app_start_job.ansible_job_id }}"
+      register: app_start_result
+      until: app_start_result.finished
+      retries: "{{ ((app_start_timeout_seconds | default(720)) // 15) | int }}"
+      delay: 15
+      failed_when: app_start_result.rc is not defined or app_start_result.rc != 0
+
+  rescue:
+    - name: Retry VeloSim application start once after failed first attempt
+      ansible.builtin.debug:
+        msg: "First VeloSim start attempt failed or timed out; retrying once."
+
+    - name: Start VeloSim application (retry attempt)
+      ansible.builtin.command: "{{ app_dir }}/scripts/velosim-app.sh start"
+      become_user: "{{ app_user }}"
+      async: "{{ app_start_timeout_seconds | default(720) }}"
+      poll: 0
+      register: app_start_job_retry
+
+    - name: Wait for VeloSim application start to finish (retry attempt)
+      ansible.builtin.async_status:
+        jid: "{{ app_start_job_retry.ansible_job_id }}"
+      register: app_start_result_retry
+      until: app_start_result_retry.finished
+      retries: "{{ ((app_start_timeout_seconds | default(720)) // 15) | int }}"
+      delay: 15
+      failed_when: app_start_result_retry.rc is not defined or app_start_result_retry.rc != 0
+
+    - name: Promote retry result for downstream tasks
+      ansible.builtin.set_fact:
+        app_start_result: "{{ app_start_result_retry }}"
 
 - name: Check Docker container status
   ansible.builtin.command: docker ps -a --filter "name=velosim" --format "table {{ '{{.Names}}' }}\t{{ '{{.Status}}' }}\t{{ '{{.Ports}}' }}"
