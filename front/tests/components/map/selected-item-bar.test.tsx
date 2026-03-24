@@ -121,9 +121,8 @@ describe('SelectedItemBar', () => {
 
     expect(screen.getByText('Driver 5')).toBeInTheDocument();
     expect(screen.getByText('Tasks (3)')).toBeInTheDocument();
-    expect(screen.getByText('Task #1')).toBeInTheDocument();
-    expect(screen.getByText('Task #2')).toBeInTheDocument();
-    expect(screen.getByText('Task #3')).toBeInTheDocument();
+    expect(screen.getByText(/Station\s*#1/)).toBeInTheDocument();
+    expect(screen.getByText(/3\s*tasks/)).toBeInTheDocument();
   });
 
   it('should call clearSelection when close button is clicked', async () => {
@@ -179,7 +178,7 @@ describe('SelectedItemBar', () => {
     );
 
     expect(screen.getByText('Tasks (2)')).toBeInTheDocument();
-    const taskItems = screen.getAllByText(/^Task #/);
+    const taskItems = screen.getAllByText(/^#/);
     expect(taskItems).toHaveLength(2);
   });
 
@@ -213,9 +212,11 @@ describe('SelectedItemBar', () => {
         </FeatureToggleProvider>
       );
 
+      fireEvent.click(screen.getByRole('button', { name: 'Expand task list' }));
+
       // Get the task wrappers
       const taskElements = screen
-        .getAllByText(/^Task #/)
+        .getAllByText(/^#/)
         .map((el) => el.closest('[data-slot="item"]'))
         .filter(Boolean) as HTMLElement[];
       const taskWrappers = taskElements.map(
@@ -265,8 +266,10 @@ describe('SelectedItemBar', () => {
         </FeatureToggleProvider>
       );
 
+      fireEvent.click(screen.getByRole('button', { name: 'Expand task list' }));
+
       const taskElements = screen
-        .getAllByText(/^Task #/)
+        .getAllByText(/^#/)
         .map((el) => el.closest('[data-slot="item"]'))
         .filter(Boolean) as HTMLElement[];
       const taskWrappers = taskElements.map(
@@ -424,7 +427,7 @@ describe('SelectedItemBar', () => {
       );
 
       // Ctrl+click to select a station task
-      const taskItems = screen.getAllByText(/^Task #/);
+      const taskItems = screen.getAllByText(/^#/);
       const firstItem = taskItems[0].closest(
         '[data-slot="item"]'
       ) as HTMLElement;
@@ -463,7 +466,7 @@ describe('SelectedItemBar', () => {
         </FeatureToggleProvider>
       );
 
-      const taskItems = screen.getAllByText(/^Task #/);
+      const taskItems = screen.getAllByText(/^#/);
       const firstItem = taskItems[0].closest(
         '[data-slot="item"]'
       ) as HTMLElement;
@@ -554,8 +557,10 @@ describe('SelectedItemBar', () => {
         </FeatureToggleProvider>
       );
 
+      fireEvent.click(screen.getByRole('button', { name: 'Expand task list' }));
+
       // Ctrl+click to select a driver task
-      const taskItems = screen.getAllByText(/^Task #/);
+      const taskItems = screen.getAllByText(/^#/);
       const firstItem = taskItems[0].closest(
         '[data-slot="item"]'
       ) as HTMLElement;
@@ -594,7 +599,9 @@ describe('SelectedItemBar', () => {
         </FeatureToggleProvider>
       );
 
-      const taskItems = screen.getAllByText(/^Task #/);
+      fireEvent.click(screen.getByRole('button', { name: 'Expand task list' }));
+
+      const taskItems = screen.getAllByText(/^#/);
       const firstItem = taskItems[0].closest(
         '[data-slot="item"]'
       ) as HTMLElement;
@@ -633,6 +640,8 @@ describe('SelectedItemBar', () => {
           <SelectedItemBar />
         </FeatureToggleProvider>
       );
+
+      fireEvent.click(screen.getByRole('button', { name: 'Expand task list' }));
 
       const unassignButton = screen
         .getAllByRole('button')
@@ -675,8 +684,10 @@ describe('SelectedItemBar', () => {
         </FeatureToggleProvider>
       );
 
+      fireEvent.click(screen.getByRole('button', { name: 'Expand task list' }));
+
       const taskElements = screen
-        .getAllByText(/^Task #/)
+        .getAllByText(/^#/)
         .map((el) => el.closest('[data-slot="item"]'))
         .filter(Boolean) as HTMLElement[];
 
@@ -685,7 +696,7 @@ describe('SelectedItemBar', () => {
 
       // Re-query after dragStart re-render (state updates make old refs stale)
       const freshWrappers1 = screen
-        .getAllByText(/^Task #/)
+        .getAllByText(/^#/)
         .map(
           (el) => el.closest('[data-slot="item"]')!.parentElement as HTMLElement
         );
@@ -697,7 +708,7 @@ describe('SelectedItemBar', () => {
 
       // Re-query after dragOver re-render
       const freshWrappers2 = screen
-        .getAllByText(/^Task #/)
+        .getAllByText(/^#/)
         .map(
           (el) => el.closest('[data-slot="item"]')!.parentElement as HTMLElement
         );
@@ -708,7 +719,7 @@ describe('SelectedItemBar', () => {
 
       // Re-query after dragEnd re-render
       const freshWrappers3 = screen
-        .getAllByText(/^Task #/)
+        .getAllByText(/^#/)
         .map(
           (el) => el.closest('[data-slot="item"]')!.parentElement as HTMLElement
         );
@@ -747,8 +758,10 @@ describe('SelectedItemBar', () => {
         </FeatureToggleProvider>
       );
 
+      fireEvent.click(screen.getByRole('button', { name: 'Expand task list' }));
+
       const taskElements = screen
-        .getAllByText(/^Task #/)
+        .getAllByText(/^#/)
         .map((el) => el.closest('[data-slot="item"]'))
         .filter(Boolean) as HTMLElement[];
 
@@ -757,7 +770,7 @@ describe('SelectedItemBar', () => {
 
       // Re-query after dragStart re-render
       const freshWrappers = screen
-        .getAllByText(/^Task #/)
+        .getAllByText(/^#/)
         .map(
           (el) => el.closest('[data-slot="item"]')!.parentElement as HTMLElement
         );
@@ -769,7 +782,7 @@ describe('SelectedItemBar', () => {
 
       // Re-query after dragOver re-render
       const freshWrappers2 = screen
-        .getAllByText(/^Task #/)
+        .getAllByText(/^#/)
         .map(
           (el) => el.closest('[data-slot="item"]')!.parentElement as HTMLElement
         );
@@ -805,8 +818,10 @@ describe('SelectedItemBar', () => {
         </FeatureToggleProvider>
       );
 
+      fireEvent.click(screen.getByRole('button', { name: 'Expand task list' }));
+
       const taskElements = screen
-        .getAllByText(/^Task #/)
+        .getAllByText(/^#/)
         .map((el) => el.closest('[data-slot="item"]'))
         .filter(Boolean) as HTMLElement[];
       const taskWrappers = taskElements.map(

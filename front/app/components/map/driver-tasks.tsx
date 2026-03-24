@@ -331,7 +331,7 @@ function DriverTasksExpanded({
 
 export function DriverTasks({ driver }: { driver: PopulatedDriver }) {
   const { engine } = useSimulation();
-  const [isCollapsed, setIsCollapsed] = useState(false);
+  const [isCollapsed, setIsCollapsed] = useState(true);
 
   const taskIds = driver.tasks.map((t) => t.id);
   const { selectedTaskIds, handleTaskSelect, selectForDrag } =

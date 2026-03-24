@@ -93,23 +93,20 @@ describe('DriverTasks', () => {
       stationNames: { 1: 'Station A' },
     });
 
-    expect(screen.getByText('Task #11')).toBeInTheDocument();
-
-    const collapseToggle = screen.getByRole('button', {
-      name: 'Collapse task list',
+    expect(screen.getByText('Station A')).toBeInTheDocument();
+    const expandToggle = screen.getByRole('button', {
+      name: 'Expand task list',
     });
-    await user.click(collapseToggle);
+    await user.click(expandToggle);
 
-    expect(screen.queryByText('Task #11')).not.toBeInTheDocument();
+    expect(screen.getByText(/^#\s*11$/)).toBeInTheDocument();
     expect(screen.getByText('Station A')).toBeInTheDocument();
     expect(
-      screen.getByRole('button', { name: 'Expand task list' })
+      screen.getByRole('button', { name: 'Collapse task list' })
     ).toBeInTheDocument();
   });
 
-  it('groups contiguous station runs in collapsed mode', async () => {
-    const user = userEvent.setup();
-
+  it('groups contiguous station runs in collapsed mode', () => {
     setupDriverTasks({
       driver: makePopulatedDriver({
         id: 9,
@@ -123,21 +120,13 @@ describe('DriverTasks', () => {
       stationNames: { 1: 'Station A', 2: 'Station B' },
     });
 
-    await user.click(
-      screen.getByRole('button', {
-        name: 'Collapse task list',
-      })
-    );
-
     expect(screen.getAllByText('Station A')).toHaveLength(2);
     expect(screen.getAllByText('Station B')).toHaveLength(1);
     expect(screen.getAllByText('1 task')).toHaveLength(2);
     expect(screen.getByText('2 tasks')).toBeInTheDocument();
   });
 
-  it('uses Station #ID fallback when station name is missing', async () => {
-    const user = userEvent.setup();
-
+  it('uses Station #ID fallback when station name is missing', () => {
     setupDriverTasks({
       driver: makePopulatedDriver({
         id: 10,
@@ -145,18 +134,10 @@ describe('DriverTasks', () => {
       }),
     });
 
-    await user.click(
-      screen.getByRole('button', {
-        name: 'Collapse task list',
-      })
-    );
-
     expect(screen.getByText('Station #99')).toBeInTheDocument();
   });
 
   it('reorders collapsed groups and sends flattened task IDs', async () => {
-    const user = userEvent.setup();
-
     setupDriverTasks({
       driver: makePopulatedDriver({
         id: 12,
@@ -168,12 +149,6 @@ describe('DriverTasks', () => {
       }),
       stationNames: { 1: 'Station A', 2: 'Station B' },
     });
-
-    await user.click(
-      screen.getByRole('button', {
-        name: 'Collapse task list',
-      })
-    );
 
     const stationADraggable = screen
       .getAllByText('Station A')[0]
@@ -199,9 +174,7 @@ describe('DriverTasks', () => {
     });
   });
 
-  it('does not reorder collapsed groups when dropped on same index', async () => {
-    const user = userEvent.setup();
-
+  it('does not reorder collapsed groups when dropped on same index', () => {
     setupDriverTasks({
       driver: makePopulatedDriver({
         id: 13,
@@ -212,12 +185,6 @@ describe('DriverTasks', () => {
       }),
       stationNames: { 1: 'Station A', 2: 'Station B' },
     });
-
-    await user.click(
-      screen.getByRole('button', {
-        name: 'Collapse task list',
-      })
-    );
 
     const stationADraggable = screen
       .getByText('Station A')

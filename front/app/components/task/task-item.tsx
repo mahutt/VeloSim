@@ -101,10 +101,10 @@ export function TaskItem({
         } ${isSelected ? 'border-blue-500 bg-blue-50' : ''}`}
     >
       <ItemContent className="min-w-0 flex-row items-center gap-2">
-        <ItemTitle className="shrink-0">Task #{task.id}</ItemTitle>
+        <ItemTitle className="shrink-0">#{task.id}</ItemTitle>
         <Tooltip>
           <TooltipTrigger asChild>
-            <span className="text-xs text-muted-foreground max-w-28 truncate min-w-0">
+            <span className="text-xs text-muted-foreground max-w-36 truncate min-w-0">
               {stationName}
             </span>
           </TooltipTrigger>
