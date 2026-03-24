@@ -370,6 +370,7 @@
     - name: Wait for VeloSim application start to finish (attempt 1)
       ansible.builtin.async_status:
         jid: "{{ app_start_job.ansible_job_id }}"
+      become_user: "{{ app_user }}"
       register: app_start_result
       until: app_start_result.finished
       retries: "{{ ((app_start_timeout_seconds | default(720)) // 15) | int }}"
@@ -391,6 +392,7 @@
     - name: Wait for VeloSim application start to finish (retry attempt)
       ansible.builtin.async_status:
         jid: "{{ app_start_job_retry.ansible_job_id }}"
+      become_user: "{{ app_user }}"
       register: app_start_result_retry
       until: app_start_result_retry.finished
       retries: "{{ ((app_start_timeout_seconds | default(720)) // 15) | int }}"
