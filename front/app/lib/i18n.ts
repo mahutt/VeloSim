@@ -49,6 +49,8 @@ export const EN_TRANSLATIONS = {
   },
   common: {
     cancel: 'Cancel',
+    close: 'Close',
+    retry: 'Retry',
     save: 'Save',
     update: 'Update',
     loading: 'Loading...',
@@ -120,6 +122,25 @@ export const EN_TRANSLATIONS = {
     },
     filterPlaceholder: 'Filter usernames...',
     newUser: 'New user',
+    dialog: {
+      createTitle: 'Create new user',
+      createDescription: 'Create a new user by filling out the form below.',
+      usernameLabel: 'Username',
+      usernamePlaceholder: 'Username',
+      passwordLabel: 'Password',
+      passwordPlaceholder: 'Password',
+      adminLabel: 'Admin',
+      enabledLabel: 'Enabled',
+      close: 'Close',
+      create: 'Create',
+      success: 'User created successfully',
+      genericError: 'Something went wrong',
+    },
+    validation: {
+      usernameMin: 'Username must be at least 1 character.',
+      usernameMax: 'Username must be at most 100 characters.',
+      passwordMin: 'Password must be at least 1 character.',
+    },
     noResults: 'No results.',
     previous: 'Previous',
     next: 'Next',
@@ -170,6 +191,44 @@ export const EN_TRANSLATIONS = {
       loadTitle: 'Failed to load map',
       loadDescription:
         'An error occurred while loading the map. Please try again later.',
+    },
+    labels: {
+      day: 'Day',
+      showAllRoutes: 'Show All Routes',
+      tasksCount: 'Tasks ({{count}})',
+      tasksSelectedCount: 'Tasks ({{selected}}/{{total}} selected)',
+      taskSingular: 'task',
+      taskPlural: 'tasks',
+      stationsCount: '{{count}} Stations ({{tasks}} tasks)',
+      driverId: 'Driver #{{id}}',
+      stationId: 'Station #{{id}}',
+      stationFallback: 'Station #{{id}}',
+      noTasks: 'No tasks',
+      taskId: 'Task #{{id}}',
+      servicing: 'Servicing',
+    },
+    assignment: {
+      assign: 'Assign',
+      reassign: 'Re-assign',
+      unassign: 'Un-assign',
+      confirm: 'Confirm',
+      confirming: 'Confirming...',
+      assigning: 'Assigning...',
+      remaining: 'Remaining ({{count}})',
+      all: 'All ({{count}})',
+      batterySingular: 'battery',
+      batteryPlural: 'batteries',
+      driverHasBatteries: '{{driver}} has {{count}} {{batteryWord}} remaining.',
+      assignTasksAnyway: '{{action}} {{count}} {{taskWord}} anyway?',
+      alreadyAssigned:
+        '({{count}} {{taskWord}} already assigned to other drivers)',
+      unassignSingle: 'Un-assign task #{{taskId}} from {{driver}}?',
+      reassignMultiFromTo: 'Re-assign {{count}} tasks from {{from}} to {{to}}?',
+      reassignSingleFromTo:
+        'Re-assign task #{{taskId}} from {{from}} to {{to}}?',
+      reassignMultiTo: 'Re-assign {{count}} tasks to {{to}}?',
+      assignMultiTo: 'Assign {{count}} tasks to {{to}}?',
+      assignSingleTo: 'Assign task #{{taskId}} to {{to}}?',
     },
   },
   driverStateBadge: {
@@ -224,6 +283,10 @@ export const EN_TRANSLATIONS = {
   diversity: {
     backToHome: 'Back to Home',
     pageTitle: 'Diversity Statement',
+    englishTab: 'English',
+    frenchTab: 'Français',
+    commitmentTitleEn: 'Our Commitment',
+    commitmentTitleFr: 'Notre Engagement',
   },
   scenario: {
     editorTitle: 'Scenario Editor',
@@ -321,6 +384,41 @@ export const EN_TRANSLATIONS = {
         'Leave empty to start at HQ with 0 batteries. If position is provided, vehicle starts at that location.',
       addVehicleAction: 'Add Vehicle',
     },
+    validation: {
+      driver: {
+        nameRequired: 'Driver name is required',
+        startTimeRequired: 'Start time is required',
+        startTimeFormat: 'Invalid format. Use dayN:HH:MM (e.g., day1:08:00)',
+        endTimeRequired: 'End time is required',
+        endTimeFormat: 'Invalid format. Use dayN:HH:MM (e.g., day1:17:00)',
+        endAfterStart: 'End time must be after start time',
+        lunchFormat: 'Invalid format. Use dayN:HH:MM (e.g., day1:12:00)',
+        lunchBetween: 'Lunch break must be between start and end time',
+      },
+      station: {
+        nameRequired: 'Station name is required',
+        latitudeRequired: 'Valid latitude is required',
+        latitudeRange: 'must be between {{min}} and {{max}}',
+        longitudeRequired: 'Valid longitude is required',
+        longitudeRange: 'must be between {{min}} and {{max}}',
+        initialTaskNonNegative: 'Must be a non-negative number',
+        scheduledTaskFormat:
+          'Invalid format: "{{task}}". Must be dayN:HH:MM (e.g., day1:09:30)',
+      },
+      vehicle: {
+        nameRequired: 'Vehicle name is required',
+        insufficientDrivers: 'Insufficient drivers for positioned vehicle',
+        latitudeRequiredWhenLongitude:
+          'Latitude is required when longitude is provided',
+        latitudeRequired: 'Valid latitude is required',
+        latitudeRange: 'must be between {{min}} and {{max}}',
+        longitudeRequiredWhenLatitude:
+          'Longitude is required when latitude is provided',
+        longitudeRequired: 'Valid longitude is required',
+        longitudeRange: 'must be between {{min}} and {{max}}',
+        batteryNonNegative: 'Must be a non-negative number',
+      },
+    },
     error: {
       loadScenariosTitle: 'Failure loading scenarios',
       loadScenariosPartial: 'Some scenarios may be missing from the list.',
@@ -360,6 +458,15 @@ type DeepStringSchema<T> = {
 
 export type TranslationSchema = DeepStringSchema<typeof EN_TRANSLATIONS>;
 
+export function formatTranslation(
+  template: string,
+  values: Record<string, string | number>
+): string {
+  return Object.entries(values).reduce((result, [key, value]) => {
+    return result.replaceAll(`{{${key}}}`, String(value));
+  }, template);
+}
+
 export const FR_TRANSLATIONS = {
   nav: {
     section: {
@@ -383,6 +490,8 @@ export const FR_TRANSLATIONS = {
   },
   common: {
     cancel: 'Annuler',
+    close: 'Fermer',
+    retry: 'Réessayer',
     save: 'Enregistrer',
     update: 'Mettre à jour',
     loading: 'Chargement...',
@@ -454,6 +563,26 @@ export const FR_TRANSLATIONS = {
     },
     filterPlaceholder: "Filtrer les noms d'utilisateur...",
     newUser: 'Nouvel utilisateur',
+    dialog: {
+      createTitle: 'Créer un nouvel utilisateur',
+      createDescription:
+        'Créez un nouvel utilisateur en remplissant le formulaire ci-dessous.',
+      usernameLabel: "Nom d'utilisateur",
+      usernamePlaceholder: "Nom d'utilisateur",
+      passwordLabel: 'Mot de passe',
+      passwordPlaceholder: 'Mot de passe',
+      adminLabel: 'Admin',
+      enabledLabel: 'Activé',
+      close: 'Fermer',
+      create: 'Créer',
+      success: 'Utilisateur créé avec succès',
+      genericError: "Une erreur s'est produite",
+    },
+    validation: {
+      usernameMin: "Le nom d'utilisateur doit contenir au moins 1 caractère.",
+      usernameMax: "Le nom d'utilisateur doit contenir au plus 100 caractères.",
+      passwordMin: 'Le mot de passe doit contenir au moins 1 caractère.',
+    },
     noResults: 'Aucun résultat.',
     previous: 'Précédent',
     next: 'Suivant',
@@ -506,6 +635,44 @@ export const FR_TRANSLATIONS = {
       loadTitle: 'Échec du chargement de la carte',
       loadDescription:
         'Une erreur est survenue lors du chargement de la carte. Veuillez réessayer plus tard.',
+    },
+    labels: {
+      day: 'Jour',
+      showAllRoutes: 'Afficher tous les trajets',
+      tasksCount: 'Tâches ({{count}})',
+      tasksSelectedCount: 'Tâches ({{selected}}/{{total}} sélectionnées)',
+      taskSingular: 'tâche',
+      taskPlural: 'tâches',
+      stationsCount: '{{count}} stations ({{tasks}} tâches)',
+      driverId: 'Chauffeur #{{id}}',
+      stationId: 'Station #{{id}}',
+      stationFallback: 'Station #{{id}}',
+      noTasks: 'Aucune tâche',
+      taskId: 'Tâche #{{id}}',
+      servicing: 'En service',
+    },
+    assignment: {
+      assign: 'Assigner',
+      reassign: 'Réassigner',
+      unassign: 'Désassigner',
+      confirm: 'Confirmer',
+      confirming: 'Confirmation...',
+      assigning: 'Attribution...',
+      remaining: 'Restantes ({{count}})',
+      all: 'Toutes ({{count}})',
+      batterySingular: 'batterie',
+      batteryPlural: 'batteries',
+      driverHasBatteries: '{{driver}} a {{count}} {{batteryWord}} restante(s).',
+      assignTasksAnyway: '{{action}} {{count}} {{taskWord}} quand même?',
+      alreadyAssigned:
+        "({{count}} {{taskWord}} déjà assignée(s) à d'autres chauffeurs)",
+      unassignSingle: 'Désassigner la tâche #{{taskId}} de {{driver}}?',
+      reassignMultiFromTo: 'Réassigner {{count}} tâches de {{from}} à {{to}}?',
+      reassignSingleFromTo:
+        'Réassigner la tâche #{{taskId}} de {{from}} à {{to}}?',
+      reassignMultiTo: 'Réassigner {{count}} tâches à {{to}}?',
+      assignMultiTo: 'Assigner {{count}} tâches à {{to}}?',
+      assignSingleTo: 'Assigner la tâche #{{taskId}} à {{to}}?',
     },
   },
   driverStateBadge: {
@@ -560,6 +727,10 @@ export const FR_TRANSLATIONS = {
   diversity: {
     backToHome: "Retour à l'accueil",
     pageTitle: 'Déclaration sur la diversité',
+    englishTab: 'Anglais',
+    frenchTab: 'Français',
+    commitmentTitleEn: 'Notre engagement',
+    commitmentTitleFr: 'Notre engagement',
   },
   scenario: {
     editorTitle: 'Éditeur de scénario',
@@ -657,6 +828,46 @@ export const FR_TRANSLATIONS = {
       batteryCountHint:
         'Laissez vide pour démarrer au QG avec 0 batterie. Si une position est fournie, le véhicule démarre à cet emplacement.',
       addVehicleAction: 'Ajouter un véhicule',
+    },
+    validation: {
+      driver: {
+        nameRequired: 'Le nom du chauffeur est requis',
+        startTimeRequired: "L'heure de début est requise",
+        startTimeFormat:
+          'Format invalide. Utilisez dayN:HH:MM (ex. : day1:08:00)',
+        endTimeRequired: "L'heure de fin est requise",
+        endTimeFormat:
+          'Format invalide. Utilisez dayN:HH:MM (ex. : day1:17:00)',
+        endAfterStart:
+          "L'heure de fin doit être postérieure à l'heure de début",
+        lunchFormat: 'Format invalide. Utilisez dayN:HH:MM (ex. : day1:12:00)',
+        lunchBetween:
+          'La pause repas doit être comprise entre le début et la fin du quart',
+      },
+      station: {
+        nameRequired: 'Le nom de la station est requis',
+        latitudeRequired: 'Une latitude valide est requise',
+        latitudeRange: 'doit être comprise entre {{min}} et {{max}}',
+        longitudeRequired: 'Une longitude valide est requise',
+        longitudeRange: 'doit être comprise entre {{min}} et {{max}}',
+        initialTaskNonNegative: 'Doit être un nombre non négatif',
+        scheduledTaskFormat:
+          'Format invalide : "{{task}}". Doit être dayN:HH:MM (ex. : day1:09:30)',
+      },
+      vehicle: {
+        nameRequired: 'Le nom du véhicule est requis',
+        insufficientDrivers:
+          'Nombre insuffisant de chauffeurs pour un véhicule positionné',
+        latitudeRequiredWhenLongitude:
+          'La latitude est requise lorsque la longitude est fournie',
+        latitudeRequired: 'Une latitude valide est requise',
+        latitudeRange: 'doit être comprise entre {{min}} et {{max}}',
+        longitudeRequiredWhenLatitude:
+          'La longitude est requise lorsque la latitude est fournie',
+        longitudeRequired: 'Une longitude valide est requise',
+        longitudeRange: 'doit être comprise entre {{min}} et {{max}}',
+        batteryNonNegative: 'Doit être un nombre non négatif',
+      },
     },
     error: {
       loadScenariosTitle: 'Échec du chargement des scénarios',

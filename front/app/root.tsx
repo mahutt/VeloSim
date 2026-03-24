@@ -73,15 +73,15 @@ export function Layout({ children }: { children: React.ReactNode }) {
 
 export default function App() {
   return (
-    <ErrorProvider>
-      <FeatureToggleProvider>
-        <AuthProvider>
-          <PreferencesProvider>
+    <FeatureToggleProvider>
+      <AuthProvider>
+        <PreferencesProvider>
+          <ErrorProvider>
             <Outlet />
-          </PreferencesProvider>
-        </AuthProvider>
-      </FeatureToggleProvider>
-    </ErrorProvider>
+          </ErrorProvider>
+        </PreferencesProvider>
+      </AuthProvider>
+    </FeatureToggleProvider>
   );
 }
 

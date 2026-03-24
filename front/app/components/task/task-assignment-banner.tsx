@@ -27,9 +27,12 @@ import { AlertCircle } from 'lucide-react';
 import { Button } from '~/components/ui/button';
 import { useSimulation } from '~/providers/simulation-provider';
 import { TaskAction, type ReassignTaskAction } from '~/types';
+import usePreferences from '~/hooks/use-preferences';
+import { formatTranslation } from '~/lib/i18n';
 
 export function TaskAssignmentBanner() {
   const { state, engine } = useSimulation();
+  const { t } = usePreferences();
   const { pendingAssignment, pendingAssignmentLoading: isLoading } = state;
 
   const [loadingAction, setLoadingAction] = useState<
@@ -63,7 +66,9 @@ export function TaskAssignmentBanner() {
 
   // Derive a display label from the action + reassign state
   const actionLabel =
-    isAllReassign || action === TaskAction.Reassign ? 'Re-assign' : 'Assign';
+    isAllReassign || action === TaskAction.Reassign
+      ? t.map.assignment.reassign
+      : t.map.assignment.assign;
 
   const exceedsBattery =
     count > pendingAssignment.driverBatteryCount &&
@@ -76,22 +81,39 @@ export function TaskAssignmentBanner() {
 
   const renderMessage = () => {
     if (!count) return null;
+    const taskWord =
+      count === 1 ? t.map.labels.taskSingular : t.map.labels.taskPlural;
+    const reassignTaskWord =
+      reassignCount === 1 ? t.map.labels.taskSingular : t.map.labels.taskPlural;
 
     // Battery warning (assign / reassign only)
     if (exceedsBattery) {
+      const batteryWord =
+        remainingBatteryCount === 1
+          ? t.map.assignment.batterySingular
+          : t.map.assignment.batteryPlural;
       return (
         <>
           <span className="block">
-            {driverName} has {remainingBatteryCount}{' '}
-            {remainingBatteryCount === 1 ? 'battery' : 'batteries'} remaining.
+            {formatTranslation(t.map.assignment.driverHasBatteries, {
+              driver: driverName,
+              count: remainingBatteryCount,
+              batteryWord,
+            })}
           </span>
           <span className="block">
-            {actionLabel} {count} {count === 1 ? 'task' : 'tasks'} anyway?
+            {formatTranslation(t.map.assignment.assignTasksAnyway, {
+              action: actionLabel,
+              count,
+              taskWord,
+            })}
           </span>
           {hasMixedTasks && (
             <span className="block text-muted-foreground">
-              ({reassignCount} {reassignCount === 1 ? 'task' : 'tasks'} already
-              assigned to other drivers)
+              {formatTranslation(t.map.assignment.alreadyAssigned, {
+                count: reassignCount,
+                taskWord: reassignTaskWord,
+              })}
             </span>
           )}
         </>
@@ -100,19 +122,33 @@ export function TaskAssignmentBanner() {
 
     // Unassign
     if (action === TaskAction.Unassign) {
-      return `Un-assign task #${firstTaskId} from ${driverName}?`;
+      return formatTranslation(t.map.assignment.unassignSingle, {
+        taskId: firstTaskId,
+        driver: driverName,
+      });
     }
 
     // Reassign from a single known driver
     if (action === TaskAction.Reassign && prevDriverName !== undefined) {
       return isMulti
-        ? `Re-assign ${count} tasks from ${prevDriverName} to ${driverName}?`
-        : `Re-assign task #${firstTaskId} from ${prevDriverName} to ${driverName}?`;
+        ? formatTranslation(t.map.assignment.reassignMultiFromTo, {
+            count,
+            from: prevDriverName,
+            to: driverName,
+          })
+        : formatTranslation(t.map.assignment.reassignSingleFromTo, {
+            taskId: firstTaskId,
+            from: prevDriverName,
+            to: driverName,
+          });
     }
 
     // All tasks already assigned (multiple source drivers)
     if (isAllReassign) {
-      return `Re-assign ${count} tasks to ${driverName}?`;
+      return formatTranslation(t.map.assignment.reassignMultiTo, {
+        count,
+        to: driverName,
+      });
     }
 
     // Mixed batch (some assigned, some not)
@@ -120,11 +156,16 @@ export function TaskAssignmentBanner() {
       return (
         <>
           <span className="block">
-            Assign {count} tasks to {driverName}?
+            {formatTranslation(t.map.assignment.assignMultiTo, {
+              count,
+              to: driverName,
+            })}
           </span>
           <span className="block text-muted-foreground">
-            ({reassignCount} {reassignCount === 1 ? 'task' : 'tasks'} already
-            assigned to other drivers)
+            {formatTranslation(t.map.assignment.alreadyAssigned, {
+              count: reassignCount,
+              taskWord: reassignTaskWord,
+            })}
           </span>
         </>
       );
@@ -132,8 +173,14 @@ export function TaskAssignmentBanner() {
 
     // Pure assign
     return isMulti
-      ? `Assign ${count} tasks to ${driverName}?`
-      : `Assign task #${firstTaskId} to ${driverName}?`;
+      ? formatTranslation(t.map.assignment.assignMultiTo, {
+          count,
+          to: driverName,
+        })
+      : formatTranslation(t.map.assignment.assignSingleTo, {
+          taskId: firstTaskId,
+          to: driverName,
+        });
   };
 
   return (
@@ -151,7 +198,7 @@ export function TaskAssignmentBanner() {
             disabled={isLoading}
             aria-busy={isLoading}
           >
-            Cancel
+            {t.common.cancel}
           </Button>
           {hasMixedTasks ? (
             <>
@@ -166,8 +213,10 @@ export function TaskAssignmentBanner() {
                 className="bg-blue-500 hover:bg-blue-400 text-white"
               >
                 {isLoading && loadingAction === 'remaining'
-                  ? 'Assigning...'
-                  : `Remaining (${unassignedCount})`}
+                  ? t.map.assignment.assigning
+                  : formatTranslation(t.map.assignment.remaining, {
+                      count: unassignedCount,
+                    })}
               </Button>
               <Button
                 onClick={() => {
@@ -179,8 +228,10 @@ export function TaskAssignmentBanner() {
                 aria-busy={isLoading && loadingAction === 'all'}
               >
                 {isLoading && loadingAction === 'all'
-                  ? 'Assigning...'
-                  : `All (${taskIds.length})`}
+                  ? t.map.assignment.assigning
+                  : formatTranslation(t.map.assignment.all, {
+                      count: taskIds.length,
+                    })}
               </Button>
             </>
           ) : (
@@ -190,7 +241,9 @@ export function TaskAssignmentBanner() {
               disabled={isLoading}
               aria-busy={isLoading}
             >
-              {isLoading ? 'Confirming...' : 'Confirm'}
+              {isLoading
+                ? t.map.assignment.confirming
+                : t.map.assignment.confirm}
             </Button>
           )}
         </div>

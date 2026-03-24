@@ -38,6 +38,7 @@ import { MONTREAL_BOUNDS } from '~/constants';
 import type { ScenarioContentVehicle } from '~/types';
 import { log, LogContext, LogLevel } from '~/lib/logger';
 import usePreferences from '~/hooks/use-preferences';
+import { formatTranslation } from '~/lib/i18n';
 
 interface AddVehicleDialogProps {
   open: boolean;
@@ -74,7 +75,7 @@ export default function AddVehicleDialog({
     const newErrors: Record<string, string> = {};
 
     if (!name.trim()) {
-      newErrors.name = 'Vehicle name is required';
+      newErrors.name = t.scenario.validation.vehicle.nameRequired;
     }
 
     // If latitude or longitude is provided, both must be provided and valid
@@ -95,38 +96,54 @@ export default function AddVehicleDialog({
 
         // Check if adding this vehicle with position would exceed available drivers
         if (vehiclesWithPosition >= drivers.length) {
-          newErrors.latitude = 'Insufficient drivers for positioned vehicle';
-          newErrors.longitude = 'Insufficient drivers for positioned vehicle';
+          newErrors.latitude =
+            t.scenario.validation.vehicle.insufficientDrivers;
+          newErrors.longitude =
+            t.scenario.validation.vehicle.insufficientDrivers;
         }
       } catch {
         // Ignore JSON parsing errors
       }
 
       if (!hasLat) {
-        newErrors.latitude = 'Latitude is required when longitude is provided';
+        newErrors.latitude =
+          t.scenario.validation.vehicle.latitudeRequiredWhenLongitude;
       } else {
         const lat = parseFloat(latitude);
         if (isNaN(lat)) {
-          newErrors.latitude = 'Valid latitude is required';
+          newErrors.latitude = t.scenario.validation.vehicle.latitudeRequired;
         } else if (
           lat < MONTREAL_BOUNDS.LAT_MIN ||
           lat > MONTREAL_BOUNDS.LAT_MAX
         ) {
-          newErrors.latitude = `must be between ${MONTREAL_BOUNDS.LAT_MIN} and ${MONTREAL_BOUNDS.LAT_MAX}`;
+          newErrors.latitude = formatTranslation(
+            t.scenario.validation.vehicle.latitudeRange,
+            {
+              min: MONTREAL_BOUNDS.LAT_MIN,
+              max: MONTREAL_BOUNDS.LAT_MAX,
+            }
+          );
         }
       }
 
       if (!hasLon) {
-        newErrors.longitude = 'Longitude is required when latitude is provided';
+        newErrors.longitude =
+          t.scenario.validation.vehicle.longitudeRequiredWhenLatitude;
       } else {
         const lon = parseFloat(longitude);
         if (isNaN(lon)) {
-          newErrors.longitude = 'Valid longitude is required';
+          newErrors.longitude = t.scenario.validation.vehicle.longitudeRequired;
         } else if (
           lon < MONTREAL_BOUNDS.LON_MIN ||
           lon > MONTREAL_BOUNDS.LON_MAX
         ) {
-          newErrors.longitude = `must be between ${MONTREAL_BOUNDS.LON_MIN} and ${MONTREAL_BOUNDS.LON_MAX}`;
+          newErrors.longitude = formatTranslation(
+            t.scenario.validation.vehicle.longitudeRange,
+            {
+              min: MONTREAL_BOUNDS.LON_MIN,
+              max: MONTREAL_BOUNDS.LON_MAX,
+            }
+          );
         }
       }
     }
@@ -134,7 +151,8 @@ export default function AddVehicleDialog({
     if (batteryCount.trim()) {
       const count = parseInt(batteryCount, 10);
       if (isNaN(count) || count < 0) {
-        newErrors.batteryCount = 'Must be a non-negative number';
+        newErrors.batteryCount =
+          t.scenario.validation.vehicle.batteryNonNegative;
       }
     }
 

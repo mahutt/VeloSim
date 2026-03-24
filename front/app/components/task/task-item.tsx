@@ -32,6 +32,7 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from '~/components/ui/tooltip';
+import usePreferences from '~/hooks/use-preferences';
 
 export function TaskItem({
   task,
@@ -51,6 +52,7 @@ export function TaskItem({
   getDragTaskIds?: () => number[];
 }) {
   const { state } = useSimulation();
+  const { t } = usePreferences();
   const taskIsInService = task.state === TaskState.InService;
 
   const assignable = !(state.blockAssignments || taskIsInService);
@@ -75,7 +77,11 @@ export function TaskItem({
     if (draggedTaskIds.length > 1) {
       const dragPreview = document.createElement('div');
       dragPreview.className = 'px-2 bg-blue-500 text-white rounded-lg';
-      dragPreview.textContent = `${draggedTaskIds.length} tasks`;
+      const taskLabel =
+        draggedTaskIds.length === 1
+          ? t.map.labels.taskSingular
+          : t.map.labels.taskPlural;
+      dragPreview.textContent = `${draggedTaskIds.length} ${taskLabel}`;
       dragPreview.style.position = 'absolute';
       document.body.appendChild(dragPreview);
       e.dataTransfer.setDragImage(dragPreview, 0, 0);
@@ -114,7 +120,9 @@ export function TaskItem({
         </Tooltip>
       </ItemContent>
       {taskIsInService ? (
-        <span className="text-sm text-gray-500 italic">Servicing</span>
+        <span className="text-sm text-gray-500 italic">
+          {t.map.labels.servicing}
+        </span>
       ) : onUnassign ? (
         <Button
           variant="ghost"

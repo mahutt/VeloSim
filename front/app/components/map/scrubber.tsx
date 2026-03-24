@@ -32,9 +32,11 @@ import {
 } from '~/utils/clock-utils';
 import { useSimulation } from '~/providers/simulation-provider';
 import { SIMULATION_FRAMES_PER_KEY_FRAME } from '~/constants';
+import usePreferences from '~/hooks/use-preferences';
 
 export default function Scrubber() {
   const { state, engine } = useSimulation();
+  const { t } = usePreferences();
   const { startTime, simulationSecondsPassed, scrubSimulationSecond } = state;
 
   const [open, setOpen] = useState(false);
@@ -95,7 +97,8 @@ export default function Scrubber() {
           </TooltipTrigger>
           <TooltipContent>
             <p>
-              Day {calculateDayFromSeconds(scrubSimulationSecond, startTime)} -{' '}
+              {t.map.labels.day}{' '}
+              {calculateDayFromSeconds(scrubSimulationSecond, startTime)} -{' '}
               {formatSecondsToHHMM(scrubSimulationSecond, startTime)}
             </p>
           </TooltipContent>

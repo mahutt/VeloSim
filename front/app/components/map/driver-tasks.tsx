@@ -36,6 +36,8 @@ import {
 import { useTaskMassSelect } from '~/hooks/use-task-mass-select';
 import type { PopulatedDriver } from './selected-item-bar';
 import { ScrollArea } from '~/components/ui/scroll-area';
+import usePreferences from '~/hooks/use-preferences';
+import { formatTranslation } from '~/lib/i18n';
 
 interface DriverTaskStationGroup {
   stationId: number;
@@ -120,6 +122,8 @@ function DriverTaskGroupItem({
   onDrop: (e: React.DragEvent<HTMLDivElement>, index: number) => void;
   onDragEnd: () => void;
 }) {
+  const { t } = usePreferences();
+
   return (
     <div
       onDragOver={(e) => onDragOver(e, index)}
@@ -153,7 +157,10 @@ function DriverTaskGroupItem({
           </TooltipContent>
         </Tooltip>
         <span className="text-xs text-muted-foreground whitespace-nowrap shrink-0 ml-auto">
-          {group.tasks.length} {group.tasks.length === 1 ? 'task' : 'tasks'}
+          {group.tasks.length}{' '}
+          {group.tasks.length === 1
+            ? t.map.labels.taskSingular
+            : t.map.labels.taskPlural}
         </span>
       </div>
     </div>
@@ -331,6 +338,7 @@ function DriverTasksExpanded({
 
 export function DriverTasks({ driver }: { driver: PopulatedDriver }) {
   const { engine } = useSimulation();
+  const { t } = usePreferences();
   const [isCollapsed, setIsCollapsed] = useState(true);
 
   const taskIds = driver.tasks.map((t) => t.id);
@@ -338,7 +346,10 @@ export function DriverTasks({ driver }: { driver: PopulatedDriver }) {
     useTaskMassSelect(taskIds, driver.id);
 
   const resolveStationName = (stationId: number) =>
-    engine.state?.getStation(stationId)?.name ?? `Station #${stationId}`;
+    engine.state?.getStation(stationId)?.name ??
+    formatTranslation(t.map.labels.stationFallback, {
+      id: stationId,
+    });
 
   const groupedTasks = groupDriverTasksByStation(
     driver.tasks,
@@ -350,8 +361,13 @@ export function DriverTasks({ driver }: { driver: PopulatedDriver }) {
       <div className="px-5 flex items-center justify-between gap-2">
         <p className="text-sm text-muted-foreground">
           {selectedTaskIds.length > 0
-            ? `Tasks (${selectedTaskIds.length}/${driver.tasks.length} selected)`
-            : `Tasks (${driver.tasks.length})`}
+            ? formatTranslation(t.map.labels.tasksSelectedCount, {
+                selected: selectedTaskIds.length,
+                total: driver.tasks.length,
+              })
+            : formatTranslation(t.map.labels.tasksCount, {
+                count: driver.tasks.length,
+              })}
         </p>
         <CollapseToggle
           isCollapsed={isCollapsed}

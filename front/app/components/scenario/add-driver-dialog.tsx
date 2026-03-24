@@ -99,19 +99,19 @@ export default function AddDriverDialog({
     const newErrors: Record<string, string> = {};
 
     if (!name.trim()) {
-      newErrors.name = 'Driver name is required';
+      newErrors.name = t.scenario.validation.driver.nameRequired;
     }
 
     if (!startTime.trim()) {
-      newErrors.startTime = 'Start time is required';
+      newErrors.startTime = t.scenario.validation.driver.startTimeRequired;
     } else if (!validateTimeFormat(startTime.trim())) {
-      newErrors.startTime = 'Invalid format. Use dayN:HH:MM (e.g., day1:08:00)';
+      newErrors.startTime = t.scenario.validation.driver.startTimeFormat;
     }
 
     if (!endTime.trim()) {
-      newErrors.endTime = 'End time is required';
+      newErrors.endTime = t.scenario.validation.driver.endTimeRequired;
     } else if (!validateTimeFormat(endTime.trim())) {
-      newErrors.endTime = 'Invalid format. Use dayN:HH:MM (e.g., day1:17:00)';
+      newErrors.endTime = t.scenario.validation.driver.endTimeFormat;
     }
 
     // Check if end time is after start time
@@ -122,14 +122,13 @@ export default function AddDriverDialog({
       validateTimeFormat(endTime.trim())
     ) {
       if (compareTime(endTime.trim(), startTime.trim()) <= 0) {
-        newErrors.endTime = 'End time must be after start time';
+        newErrors.endTime = t.scenario.validation.driver.endAfterStart;
       }
     }
 
     if (lunchBreak.trim()) {
       if (!validateTimeFormat(lunchBreak.trim())) {
-        newErrors.lunchBreak =
-          'Invalid format. Use dayN:HH:MM (e.g., day1:12:00)';
+        newErrors.lunchBreak = t.scenario.validation.driver.lunchFormat;
       } else if (
         startTime.trim() &&
         endTime.trim() &&
@@ -142,8 +141,7 @@ export default function AddDriverDialog({
           compareTime(lunchTrimmed, startTime.trim()) <= 0 ||
           compareTime(lunchTrimmed, endTime.trim()) >= 0
         ) {
-          newErrors.lunchBreak =
-            'Lunch break must be between start and end time';
+          newErrors.lunchBreak = t.scenario.validation.driver.lunchBetween;
         }
       }
     }
