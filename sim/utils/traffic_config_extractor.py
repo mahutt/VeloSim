@@ -51,6 +51,7 @@ def extract_traffic_config(
         "high_congestion",
         "medium_congestion",
         "low_congestion",
+        "stop_events_test",
         "default",
         "no_traffic",
     }

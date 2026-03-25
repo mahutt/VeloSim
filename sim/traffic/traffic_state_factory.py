@@ -36,8 +36,8 @@ from sim.traffic.strategies.local_traffic_strategy import LocalTrafficPointStrat
 class TrafficStateFactory:
     """Factory for creating RoadTrafficState objects and dispatching strategies.
 
-    Encapsulates creation logic and validation, including boundary condition
-    handling (multiplier clamped to 0.01-1.0 to prevent division by zero).
+    Encapsulates creation logic and validation with multiplier clamped
+    to 0.0-1.0.
 
     Also serves as the single dispatch point for point generation strategies,
     mapping event_type strings to PointGenerationStrategy instances.
@@ -117,8 +117,7 @@ class TrafficStateFactory:
         if traffic_points is None:
             traffic_points = []
 
-        # Boundary condition: clamp to prevent division by zero
-        clamped = max(0.01, min(1.0, multiplier))
+        clamped = max(0.0, min(1.0, multiplier))
 
         return RoadTrafficState(
             multiplier=clamped,

@@ -55,9 +55,9 @@ class TestTrafficStateFactory:
     @pytest.mark.parametrize(
         "input_mult,expected_mult",
         [
-            (0.0, 0.01),
-            (-0.5, 0.01),
-            (-100.0, 0.01),
+            (0.0, 0.0),
+            (-0.5, 0.0),
+            (-100.0, 0.0),
             (1.5, 1.0),
             (100.0, 1.0),
             (0.01, 0.01),

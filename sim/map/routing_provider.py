@@ -387,3 +387,32 @@ class RoutingProvider(ABC):
             True if successful, False otherwise.
         """
         raise NotImplementedError("Traffic updates not supported by this adapter")
+
+    def set_edge_ignored(self, edge: EdgeIdentifier, ignored: bool = True) -> bool:
+        """Mark an edge as ignored/preferred for avoidance in routing.
+
+        Adapters may implement this by directly excluding edges from pathfinding,
+        or by applying a very large dynamic weight.
+
+        Args:
+            edge: EdgeIdentifier specifying which edge to update.
+            ignored: True to avoid/ignore the edge, False to un-ignore it.
+
+        Returns:
+            True if successful, False otherwise.
+        """
+        raise NotImplementedError("Edge ignore not supported by this adapter")
+
+    def set_edges_ignored(
+        self, edges: List[EdgeIdentifier], ignored: bool = True
+    ) -> bool:
+        """Batch mark edges as ignored/preferred for avoidance in routing.
+
+        Args:
+            edges: Edges to update.
+            ignored: True to avoid/ignore edges, False to un-ignore.
+
+        Returns:
+            True if successful, False otherwise.
+        """
+        raise NotImplementedError("Edge ignore not supported by this adapter")

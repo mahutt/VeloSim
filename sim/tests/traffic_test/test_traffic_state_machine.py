@@ -321,7 +321,8 @@ class TestSynchronization:
         tc._traffic_events = [event]
         env.process(tc._run_traffic_events())
 
-        env.run(until=5)
+        gps_sync_delay = provider.get_gps_sync_delay()
+        env.run(until=gps_sync_delay + 1)
 
         assert event.state == TrafficEventState.APPLIED
         assert len(event.affected_roads) == 0
@@ -567,6 +568,95 @@ class TestRoadLifecycleDuringApplied:
 
         # Road should be removed from affected_roads (Allocated -> Unallocated)
         assert road not in event.affected_roads
+
+
+class TestZeroWeightEvents:
+    def test_zero_weight_marks_positions_occupied_and_tracks_linestrings(self) -> None:
+        env = simpy.Environment()
+        rc = _create_mock_route_controller()
+        registry = PositionRegistry()
+
+        p0 = Position([0.0, 0.0])
+        p1 = Position([1.0, 1.0])
+        p2 = Position([2.0, 2.0])
+        positions = [p0, p1, p2]
+
+        route_result = _build_route_result(positions)
+        provider = MockRoutingProvider(route_result)
+
+        segment_key: SegmentKey = ((0.0, 0.0), (2.0, 2.0))
+        event = _make_event(segment_key, tick_start=0, duration=20, weight=0.0)
+
+        road = _make_road(1, positions)
+        registry.register_road(road, positions)
+
+        tc = TrafficController(
+            rc, env=env, routing_provider=provider, registry=registry
+        )
+        tc._traffic_events = [event]
+        env.process(tc._run_traffic_events())
+
+        gps_sync_delay = provider.get_gps_sync_delay()
+        env.run(until=gps_sync_delay + 1)
+
+        mid_state = event.state
+        assert mid_state == TrafficEventState.APPLIED
+        assert all(pos.occupied for pos in positions)
+        assert tc.get_zero_weight_event_linestrings() == [
+            [p0.get_position(), p1.get_position(), p2.get_position()]
+        ]
+
+        # Zero-weight events should not inject finite traffic ranges.
+        assert road.traffic_multiplier == 1.0
+
+        env.run(until=40)
+        final_state = event.state
+        assert final_state == TrafficEventState.DONE
+        assert tc.get_zero_weight_event_linestrings() == []
+        assert all(not pos.occupied for pos in positions)
+
+    def test_zero_weight_releases_positions_when_unallocated_before_expiry(
+        self,
+    ) -> None:
+        """Zero-weight occupancy is released even if roads deallocate before expiry."""
+        env = simpy.Environment()
+        rc = _create_mock_route_controller()
+        registry = PositionRegistry()
+
+        p0 = Position([0.0, 0.0])
+        p1 = Position([1.0, 1.0])
+        p2 = Position([2.0, 2.0])
+        positions = [p0, p1, p2]
+
+        route_result = _build_route_result(positions)
+        provider = MockRoutingProvider(route_result)
+
+        segment_key: SegmentKey = ((0.0, 0.0), (2.0, 2.0))
+        event = _make_event(segment_key, tick_start=0, duration=50, weight=0.0)
+
+        road = _make_road(1, positions)
+        registry.register_road(road, positions)
+
+        tc = TrafficController(
+            rc, env=env, routing_provider=provider, registry=registry
+        )
+        tc._traffic_events = [event]
+        env.process(tc._run_traffic_events())
+
+        gps_sync_delay = provider.get_gps_sync_delay()
+        env.run(until=gps_sync_delay + 5)
+        assert TrafficEventState(event.state) == TrafficEventState.APPLIED
+        assert all(pos.occupied for pos in positions)
+
+        # Become unallocated mid-lifecycle.
+        _simulate_road_deallocation(rc, road)
+        registry.unregister_road(road)
+        assert not registry.is_event_allocated(event)
+
+        env.run(until=50 + gps_sync_delay + 10)
+        assert TrafficEventState(event.state) == TrafficEventState.DONE
+        assert tc.get_zero_weight_event_linestrings() == []
+        assert all(not pos.occupied for pos in positions)
 
 
 # ---------------------------------------------------------------------------

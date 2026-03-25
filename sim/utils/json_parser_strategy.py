@@ -914,6 +914,7 @@ class _ScenarioValidator:
             "high_congestion",
             "medium_congestion",
             "low_congestion",
+            "stop_events_test",
             "default",
             "no_traffic",
         }

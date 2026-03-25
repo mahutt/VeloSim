@@ -26,8 +26,11 @@ SOFTWARE.
 class Position:
     """Geographical position with longitude and latitude coordinates."""
 
-    def __init__(self, position: list[float]) -> None:  # [longitude, latitude]
+    def __init__(
+        self, position: list[float], occupied: bool = False
+    ) -> None:  # [longitude, latitude]
         self.position = position
+        self.occupied = occupied
 
     def get_position(self) -> list[float]:
         """Get the position coordinates.
