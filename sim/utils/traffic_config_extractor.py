@@ -22,8 +22,12 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 """
 
+import re
 from typing import Any, Dict, Optional
 from sim.entities.map_payload import TrafficConfig
+
+
+TRAFFIC_TEMPLATE_KEY_PATTERN = re.compile(r"^[a-z0-9_-]{1,32}$")
 
 
 def extract_traffic_config(
@@ -45,33 +49,24 @@ def extract_traffic_config(
         TrafficConfig if traffic configuration is present, None otherwise.
 
     Raises:
-        ValueError: If traffic_level is invalid.
+        ValueError: If traffic_level is not a valid template key.
     """
-    supported_templates = {
-        "high_congestion",
-        "medium_congestion",
-        "low_congestion",
-        "stop_events_test",
-        "default",
-        "no_traffic",
-    }
-
     traffic_raw = scenario_content.get("traffic", None)
     if traffic_raw is not None and isinstance(traffic_raw, dict):
         # Support template-based traffic (traffic_level)
-        traffic_level = traffic_raw.get("traffic_level", "default")
+        traffic_level = str(traffic_raw.get("traffic_level", "default"))
         gps_sync_delay = traffic_raw.get("gps_sync_delay", 10)
-
-        # Validate traffic_level if specified
-        if traffic_level not in supported_templates:
-            raise ValueError(
-                f"Unsupported traffic_level '{traffic_level}'. "
-                f"Supported: {', '.join(supported_templates)}"
-            )
 
         # Don't create config for "no_traffic"
         if traffic_level == "no_traffic":
             return None
+
+        # Validate template key format for DB-backed lookup.
+        if not TRAFFIC_TEMPLATE_KEY_PATTERN.fullmatch(traffic_level):
+            raise ValueError(
+                "traffic_level must be lowercase alphanumeric with "
+                f"underscores/hyphens (1-32 chars), got '{traffic_level}'"
+            )
 
         return TrafficConfig(
             traffic_level=traffic_level,
@@ -84,6 +79,7 @@ def extract_traffic_config(
     # we should still create a config (backwards compat for older scenarios)
     if traffic_csv_data:
         return TrafficConfig(
+            traffic_level="default",
             traffic_csv_data=traffic_csv_data,
             sim_start_time=str(scenario_content.get("start_time", "day1:00:00")),
             sim_end_time=str(scenario_content.get("end_time", "day1:00:00")),

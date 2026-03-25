@@ -44,7 +44,10 @@ from sim.entities.shift import Shift
 from sim.entities.position import Position
 from sim.entities.map_payload import MapPayload
 from sim.utils.base_parse_strategy import BaseParseStrategy
-from sim.utils.traffic_config_extractor import extract_traffic_config
+from sim.utils.traffic_config_extractor import (
+    TRAFFIC_TEMPLATE_KEY_PATTERN,
+    extract_traffic_config,
+)
 
 
 # ==============================================================================
@@ -910,25 +913,20 @@ class _ScenarioValidator:
         Returns:
             List of validation errors related to traffic configuration.
         """
-        supported_templates = {
-            "high_congestion",
-            "medium_congestion",
-            "low_congestion",
-            "stop_events_test",
-            "default",
-            "no_traffic",
-        }
         traffic_raw = content.get("traffic", None)
         if traffic_raw is None or not isinstance(traffic_raw, dict):
             return []
-        traffic_level = traffic_raw.get("traffic_level", "default")
-        if traffic_level not in supported_templates:
+        traffic_level = str(traffic_raw.get("traffic_level", "default"))
+        if traffic_level == "no_traffic":
+            return []
+
+        if not TRAFFIC_TEMPLATE_KEY_PATTERN.fullmatch(traffic_level):
             return [
                 {
                     "field": "traffic_level",
                     "message": (
-                        f"Unsupported traffic_level '{traffic_level}'. "
-                        f"Supported: {', '.join(sorted(supported_templates))}"
+                        "traffic_level must match ^[a-z0-9_-]{1,32}$ "
+                        f"(got '{traffic_level}')"
                     ),
                 }
             ]

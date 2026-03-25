@@ -306,7 +306,7 @@ class TrafficParser:
                 resolved path escapes the datasets directory.
         """
         if level == "default":
-            filename = "traffic.csv"
+            filename = "default.csv"
         elif level in self.TEMPLATES:
             filename = f"{level}.csv"
         else:

@@ -93,6 +93,7 @@ from back.services.driver_service import driver_service
 from back.crud.sim_frame import sim_frame_crud
 from back.crud.sim_keyframe import sim_keyframe_crud
 from back.crud.sim_instance import sim_instance_crud
+from back.crud.traffic_template import traffic_template_crud
 from back.crud.user import user_crud
 from back.schemas import PlaybackSpeedBase, PlaybackSpeedResponse
 from back.schemas.sim_instance import (
@@ -218,9 +219,18 @@ def initialize_simulation(
         json_parser = JsonParseStrategy(scenario_json=scenario, json_string=json_string)
         scenario_params = json_parser.parse()
 
-        # Templates are used for traffic, no need to read files
-        # Traffic CSV data persistence happens during restore/branch operations
+        # Resolve traffic template content from DB and attach in-memory CSV so
+        # runtime never needs to read template files from disk.
         traffic_csv_data = None
+        if (
+            scenario_params.map_payload is not None
+            and scenario_params.map_payload.traffic is not None
+        ):
+            traffic_level = scenario_params.map_payload.traffic.traffic_level
+            if traffic_level != "no_traffic":
+                template = traffic_template_crud.get_by_key(db, traffic_level)
+                traffic_csv_data = template.content
+                scenario_params.map_payload.traffic.traffic_csv_data = traffic_csv_data
 
         # Initialize simulation
         result = simulation_service.initialize_simulation(

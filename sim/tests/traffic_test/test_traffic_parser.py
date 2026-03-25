@@ -626,7 +626,7 @@ class TestTrafficParser:
 
             assert parser._path is not None
             actual_path = parser._path.as_posix()
-            expected_path = "sim/traffic/traffic_datasets/traffic.csv"
+            expected_path = "sim/traffic/traffic_datasets/default.csv"
             assert expected_path in actual_path
 
     def test_valid_template_path_from_level_mapping(self) -> None:

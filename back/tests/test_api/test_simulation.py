@@ -298,6 +298,28 @@ def cleanup_active_simulations() -> Generator[None, None, None]:
     simulation_service.active_simulations = {}
 
 
+@pytest.fixture(autouse=True)
+def mock_default_traffic_template(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Avoid hard dependency on DB fixtures for template lookup in initialize tests."""
+
+    template = MagicMock()
+    template.key = "default"
+    template.content = (
+        "TYPE,start_time,segment_key,duration,weight\n"
+        'local_traffic,08:00,"((-73.5731,45.5013),(-73.5610,45.5070))",60,0.5'
+    )
+
+    def _get_by_key(_: Session, key: str) -> MagicMock:
+        if key == "no_traffic":
+            return template
+        return template
+
+    monkeypatch.setattr(
+        "back.api.v1.simulation.traffic_template_crud.get_by_key",
+        _get_by_key,
+    )
+
+
 class FrameData(TypedDict):
     seq: int
     timestamp: int
@@ -338,6 +360,66 @@ class TestSimulationAPI:
         assert data["db_id"] == 42
         assert data["status"] == "initialized"
         mock_init.assert_called_once()
+
+    @patch("back.api.v1.simulation.traffic_template_crud.get_by_key")
+    @patch("back.services.simulation_service.simulation_service.initialize_simulation")
+    def test_initialize_simulation_resolves_template_and_persists_csv(
+        self,
+        mock_init: MagicMock,
+        mock_get_template: MagicMock,
+        authenticated_client: TestClient,
+    ) -> None:
+        template = MagicMock()
+        template.content = (
+            "TYPE,start_time,segment_key,duration,weight\n"
+            'local_traffic,08:00,"((-73.5731,45.5013),(-73.5610,45.5070))",60,0.5'
+        )
+        mock_get_template.return_value = template
+
+        mock_init.return_value = SimulationResponse(
+            sim_id="sim123",
+            db_id=42,
+            status="initialized",
+        )
+
+        response = authenticated_client.post(
+            "/api/v1/simulation/initialize",
+            json={
+                "content": {**SCENARIO_CONTENT, "traffic": {"traffic_level": "default"}}
+            },
+        )
+
+        assert response.status_code == 200
+        mock_get_template.assert_called_once()
+        assert mock_init.call_args.kwargs["traffic_csv_data"] == template.content
+
+    @patch("back.api.v1.simulation.traffic_template_crud.get_by_key")
+    @patch("back.services.simulation_service.simulation_service.initialize_simulation")
+    def test_initialize_simulation_no_traffic_skips_template_lookup(
+        self,
+        mock_init: MagicMock,
+        mock_get_template: MagicMock,
+        authenticated_client: TestClient,
+    ) -> None:
+        mock_init.return_value = SimulationResponse(
+            sim_id="sim123",
+            db_id=42,
+            status="initialized",
+        )
+
+        response = authenticated_client.post(
+            "/api/v1/simulation/initialize",
+            json={
+                "content": {
+                    **SCENARIO_CONTENT,
+                    "traffic": {"traffic_level": "no_traffic"},
+                }
+            },
+        )
+
+        assert response.status_code == 200
+        mock_get_template.assert_not_called()
+        assert mock_init.call_args.kwargs["traffic_csv_data"] is None
 
     @patch("back.services.simulation_service.simulation_service.initialize_simulation")
     def test_initialize_simulation_permission_error(

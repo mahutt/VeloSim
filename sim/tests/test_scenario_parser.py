@@ -523,13 +523,13 @@ def test_json_parse_strategy_no_traffic_overrides_to_none() -> None:
     assert params.map_payload is None
 
 
-def test_json_parse_strategy_invalid_traffic_level_raises_error() -> None:
-    """Test that an invalid traffic_level raises ScenarioParseError on parse."""
+def test_json_parse_strategy_invalid_traffic_level_format_raises_error() -> None:
+    """Test that an invalid traffic_level key format raises ScenarioParseError."""
     scenario_json = {
         "start_time": "day1:08:00",
         "end_time": "day1:12:00",
         "vehicle_battery_capacity": 999,
-        "traffic": {"traffic_level": "rando"},
+        "traffic": {"traffic_level": "Invalid Key!"},
         "stations": [
             {
                 "name": "Station 1",
@@ -555,17 +555,16 @@ def test_json_parse_strategy_invalid_traffic_level_raises_error() -> None:
         strategy.parse()
 
     assert "traffic_level" in str(exc_info.value)
-    assert "rando" in str(exc_info.value)
+    assert "Invalid Key!" in str(exc_info.value)
 
 
-def test_validate_catches_invalid_traffic_level_before_save() -> None:
-    """Test that validate() catches invalid traffic_level so bad scenarios
-    cannot be saved to the database."""
+def test_validate_catches_invalid_traffic_level_format_before_save() -> None:
+    """Test that validate() catches bad traffic_level key formats."""
     scenario_json = {
         "start_time": "day1:08:00",
         "end_time": "day1:12:00",
         "vehicle_battery_capacity": 999,
-        "traffic": {"traffic_level": "rando"},
+        "traffic": {"traffic_level": "Invalid Key!"},
         "stations": [
             {
                 "name": "Station 1",
@@ -590,11 +589,11 @@ def test_validate_catches_invalid_traffic_level_before_save() -> None:
 
     assert len(errors) > 0
     assert any(e.get("field") == "traffic_level" for e in errors)
-    assert any("rando" in e.get("message", "") for e in errors)
+    assert any("Invalid Key!" in e.get("message", "") for e in errors)
 
 
 def test_validate_accepts_valid_traffic_levels() -> None:
-    """Test that all supported traffic levels pass validation."""
+    """Test that valid DB-backed template keys pass validation."""
     supported = [
         "high_congestion",
         "medium_congestion",
@@ -602,6 +601,7 @@ def test_validate_accepts_valid_traffic_levels() -> None:
         "stop_events_test",
         "default",
         "no_traffic",
+        "custom_key_01",
     ]
     base_scenario = {
         "start_time": "day1:08:00",
