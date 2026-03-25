@@ -26,12 +26,13 @@ from sim.entities.map_payload import MapPayload
 from sim.entities.position import Position
 from sim.entities.route import Route
 from sim.map.routing_provider import RoutingProvider
-from sim.osm.osrm_adapter import OSRMAdapter
+from sim.osm.graphhopper_adapter import GraphHopperAdapter
 from sim.map.route_controller import RouteController
 from sim.traffic.traffic_controller import TrafficController
 from sim.map.position_registry import PositionRegistry
 from typing import Optional
 import json
+import os
 from pathlib import Path
 
 
@@ -51,14 +52,21 @@ class MapController:
         Sets up the routing provider for routing operations and initializes
         the RouteController for road/route management.
 
+        GraphHopper profile is controlled by GRAPHHOPPER_COSTING environment
+        variable (default: "car"). Options: car, bike, foot, etc.
+
         Args:
             map_payload: Optional MapPayload containing traffic
                 configuration and other map-related settings.
         """
-        # Initialize the routing provider (using OSRM adapter by default)
+        # Initialize the routing provider
         self.map_payload = map_payload
         sim_id = map_payload.sim_id if map_payload else ""
-        self.routing_provider: RoutingProvider = OSRMAdapter(sim_id=sim_id)
+        graphhopper_profile = os.getenv("GRAPHHOPPER_COSTING", "car")
+        self.routing_provider: RoutingProvider = GraphHopperAdapter(
+            sim_id=sim_id,
+            profile=graphhopper_profile,
+        )
 
         # Load config once for all routes
         config_path = Path(__file__).parent.parent / "config.json"

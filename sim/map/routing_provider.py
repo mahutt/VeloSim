@@ -194,12 +194,11 @@ class EdgeIdentifier:
 @dataclass
 class TrafficUpdate:
     """
-    Traffic update for a single directed edge.
+    Traffic update for a road segment.
 
-    Direction is implicit in the EdgeIdentifier:
-        edge.start_position -> edge.end_position defines the direction.
-        To update both directions, submit two TrafficUpdate objects with
-        swapped positions.
+    Traffic factors are applied bidirectionally. A single TrafficUpdate
+    affects both A→B and B→A directions of travel between the edge's
+    start and end positions.
 
     speed_factor semantics:
         0.0 = blocked/standstill (no traffic can pass)
@@ -209,8 +208,8 @@ class TrafficUpdate:
     Example usage (future):
         from sim.entities.position import Position
 
-        # Block a road segment (A -> B direction)
-        update_forward = TrafficUpdate(
+        # Block a road segment (applies to both A → B and B → A)
+        update = TrafficUpdate(
             edge=EdgeIdentifier(
                 start_position=Position([-73.5673, 45.5017]),  # Point A
                 end_position=Position([-73.5680, 45.5020])     # Point B
@@ -218,18 +217,13 @@ class TrafficUpdate:
             speed_factor=0.0
         )
 
-        # To block both directions, submit two updates:
-        update_backward = TrafficUpdate(
-            edge=EdgeIdentifier(
-                start_position=Position([-73.5680, 45.5020]),  # Point B
-                end_position=Position([-73.5673, 45.5017])     # Point A
-            ),
-            speed_factor=0.0
-        )
+        # This single update applies bidirectionally:
+        # - A → B direction: speed_factor = 0.0
+        # - B → A direction: speed_factor = 0.0
     """
 
     edge: EdgeIdentifier
-    """Identifier for the directed edge to update."""
+    """Identifier for the road segment (applied bidirectionally)."""
 
     speed_factor: float
     """Speed multiplier from 0.0 (blocked) to 1.0 (free flow)."""
@@ -249,9 +243,8 @@ class RoutingProvider(ABC):
     snapping, as well as optional methods for traffic data management.
 
     Implementations:
-        - OSRMAdapter: Wraps OSRM routing engine
-        - ValhallaAdapter: Wraps Valhalla routing engine
         - GraphHopperAdapter: Wraps GraphHopper routing engine
+        - ValhallaAdapter: Wraps Valhalla routing engine
         - pgRoutingAdapter: Wraps pgRouting (PostgreSQL-based)
     """
 
@@ -344,7 +337,6 @@ class RoutingProvider(ABC):
 
         Note:
             Implementation varies by adapter:
-                - OSRM: Requires data rebuild (not runtime)
                 - GraphHopper: Adds to custom model rules
                 - Valhalla: Updates traffic.tar file
                 - pgRouting: SQL UPDATE on cost column

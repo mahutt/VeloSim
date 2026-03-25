@@ -57,12 +57,12 @@ class TestMapControllerInitialization:
 
     def test_initialization_creates_routing_provider(self) -> None:
         """Test that initialization creates a routing provider."""
-        with patch("sim.map.map_controller.OSRMAdapter") as mock_adapter_class:
+        with patch("sim.map.map_controller.GraphHopperAdapter") as mock_adapter_class:
             mock_adapter_class.return_value = Mock()
 
             mc = MapController()
 
-            mock_adapter_class.assert_called_once_with(sim_id="")
+            mock_adapter_class.assert_called_once_with(sim_id="", profile="car")
             assert hasattr(mc, "routing_provider")
             assert hasattr(mc, "route_controller")
 
@@ -75,7 +75,8 @@ class TestMapControllerGetRoute:
     ) -> None:
         """Test that get_route delegates entirely to RouteController."""
         with patch(
-            "sim.map.map_controller.OSRMAdapter", return_value=mock_routing_provider
+            "sim.map.map_controller.GraphHopperAdapter",
+            return_value=mock_routing_provider,
         ):
             with patch("sim.map.map_controller.RouteController") as mock_rc_class:
                 mock_route = Mock(spec=Route)
@@ -100,7 +101,8 @@ class TestMapControllerGetRoute:
     ) -> None:
         """Test that get_route returns exactly what RouteController returns."""
         with patch(
-            "sim.map.map_controller.OSRMAdapter", return_value=mock_routing_provider
+            "sim.map.map_controller.GraphHopperAdapter",
+            return_value=mock_routing_provider,
         ):
             with patch("sim.map.map_controller.RouteController") as mock_rc_class:
                 mock_route = Mock(spec=Route)
@@ -123,7 +125,8 @@ class TestMapControllerGetRoute:
     ) -> None:
         """Test that get_route propagates ValueError from RouteController."""
         with patch(
-            "sim.map.map_controller.OSRMAdapter", return_value=mock_routing_provider
+            "sim.map.map_controller.GraphHopperAdapter",
+            return_value=mock_routing_provider,
         ):
             with patch("sim.map.map_controller.RouteController") as mock_rc_class:
                 mock_route_controller = Mock()
@@ -146,7 +149,8 @@ class TestMapControllerRouteController:
     def test_route_controller_initialized(self, mock_routing_provider: Mock) -> None:
         """Test that RouteController is initialized with MapController."""
         with patch(
-            "sim.map.map_controller.OSRMAdapter", return_value=mock_routing_provider
+            "sim.map.map_controller.GraphHopperAdapter",
+            return_value=mock_routing_provider,
         ):
             with patch("sim.map.map_controller.RouteController") as mock_rc_class:
                 mock_rc = Mock()

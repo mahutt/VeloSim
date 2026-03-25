@@ -62,11 +62,11 @@ VeloSim is an open-source network simulation platform that enables job dispatche
 **Quick start with npm:**
 
 ```bash
-# Start everything (PostgreSQL, OSRM, Backend, Frontend)
+# Start everything (PostgreSQL, GraphHopper, Backend, Frontend)
 npm run dev
 
 # Or start individual components:
-npm run dev:services    # Start Docker services (PostgreSQL + OSRM)
+npm run dev:services    # Start Docker services (PostgreSQL + GraphHopper)
 npm run dev:backend     # Start backend API
 npm run dev:frontend    # Start frontend
 ```
@@ -88,7 +88,7 @@ docker-compose down
 | Frontend    | 5173                      | 3000            |
 | Backend API | 8000                      | 8000            |
 | PostgreSQL  | 5433                      | 5432 (internal) |
-| OSRM        | 5001                      | 5000 (internal) |
+| GraphHopper | 8989                      | 8989 (internal) |
 | Grafana     | N/A                       | 3001            |
 
 > **Note:** `npm run setup` installs Python dependencies locally for IDE autocomplete and running linters/tests. When using Docker Compose, dependencies are automatically installed in containers.

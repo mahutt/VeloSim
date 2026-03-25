@@ -11,9 +11,6 @@ volumes:
   postgres_data:
     name: "{{ app_name }}_postgres_data"
     driver: local
-  osrm_data:
-    name: "{{ app_name }}_osrm_data"
-    driver: local
 
 services:
   # PostgreSQL Database
@@ -44,33 +41,17 @@ services:
         max-size: "10m"
         max-file: "3"
 
-  # OSRM Routing Server
-  osrm:
-    image: ghcr.io/project-osrm/osrm-backend:v6.0.0
-    container_name: velosim-osrm
-    restart: unless-stopped
-    ports:
-      - "127.0.0.1:5001:5000"
-    volumes:
-      - {{ app_dir }}/osrm-data:/data:ro
-    command: osrm-routed --algorithm mld /data/montreal.osrm
-    networks:
-      - velosim-net
-    logging:
-      driver: json-file
-      options:
-        max-size: "10m"
-        max-file: "3"
-
   # GraphHopper Routing Server
   graphhopper:
     image: israelhikingmap/graphhopper:10.2
     container_name: velosim-graphhopper
-    restart: unless-stopped
     command: >-
-      --input /data/montreal-latest.osm.pbf
+      --input /graphhopper/data/montreal-latest.osm.pbf
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8989:8989"
     volumes:
-      - {{ app_dir }}/graphhopper-data:/data
+      - {{ app_dir }}/graphhopper-data:/graphhopper/data
     environment:
       - JAVA_OPTS={{ graphhopper_java_opts | default('-Xmx2g -Xms2g') }}
     healthcheck:
@@ -86,6 +67,11 @@ services:
       options:
         max-size: "10m"
         max-file: "3"
+    deploy:
+      resources:
+        limits:
+          memory: 3g
+          cpus: '2'
 
   # Backend API
   backend:
@@ -102,15 +88,12 @@ services:
       - {{ app_dir }}/.env.prod:/app/.env:ro
     environment:
       - DATABASE_URL=postgresql://{{ postgres_user }}:{{ postgres_password }}@postgres:5432/{{ postgres_db }}
-      - OSRM_URL=http://osrm:5000
       - GRAPHHOPPER_URL=http://graphhopper:8989
     env_file:
       - {{ app_dir }}/.env.prod
     depends_on:
       postgres:
         condition: service_healthy
-      osrm:
-        condition: service_started
       graphhopper:
         condition: service_healthy
     networks:

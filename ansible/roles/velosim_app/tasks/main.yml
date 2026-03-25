@@ -11,7 +11,6 @@
   loop:
     - "{{ app_dir }}"
     - "{{ app_dir }}/scripts"
-    - "{{ app_dir }}/osrm-data"
     - "{{ app_dir }}/graphhopper-data"
     - "{{ app_dir }}/logs"
     - "{{ app_dir }}/backups"
@@ -206,29 +205,28 @@
     mode: '0644'
   notify: restart velosim
 
-- name: Copy OSRM data preparation script
+- name: Copy GraphHopper data preparation script
   ansible.builtin.template:
-    src: prepare-osrm-data.sh.j2
-    dest: "{{ app_dir }}/scripts/prepare-osrm-data.sh"
+    src: prepare-graphhopper-data.sh.j2
+    dest: "{{ app_dir }}/scripts/prepare-graphhopper-data.sh"
     owner: "{{ app_user }}"
     group: "{{ app_user }}"
     mode: '0755'
 
-- name: Prepare OSRM data if not exists
-  ansible.builtin.command: "{{ app_dir }}/scripts/prepare-osrm-data.sh"
+- name: Prepare GraphHopper data if not exists
+  ansible.builtin.command: "{{ app_dir }}/scripts/prepare-graphhopper-data.sh"
   become_user: "{{ app_user }}"
   args:
-    creates: "{{ app_dir }}/osrm-data/montreal.osrm"
-  when: setup_osrm_data | default(false)
-  ignore_errors: true
-  register: osrm_result
+    creates: "{{ app_dir }}/graphhopper-data/montreal-latest.osm.pbf"
+  when: setup_graphhopper_data | default(false)
+  register: graphhopper_result
 
-- name: Display OSRM preparation result
+- name: Display GraphHopper preparation result
   ansible.builtin.debug:
     msg: |
-      OSRM Data Preparation: {{ 'Completed' if osrm_result.rc == 0 else 'Failed or Skipped' }}
-      {% if not (setup_osrm_data | default(false)) %}
-      To enable OSRM data setup, set setup_osrm_data: true in group_vars
+      GraphHopper Data Preparation: {{ 'Completed' if graphhopper_result.rc == 0 else 'Failed or Skipped' }}
+      {% if not (setup_graphhopper_data | default(false)) %}
+      To enable GraphHopper data setup, set setup_graphhopper_data: true in group_vars
       {% endif %}
 
 - name: Copy GraphHopper data preparation script
@@ -450,8 +448,7 @@
          sudo docker logs velosim-backend
          sudo docker logs velosim-frontend
          sudo docker logs velosim-postgres
-         sudo docker logs velosim-osrm
-        sudo docker logs velosim-graphhopper
+         sudo docker logs velosim-graphhopper
 
       3. Check if services are building:
          sudo docker compose -f {{ app_dir }}/docker-compose.prod.yml build --progress=plain

@@ -2,38 +2,56 @@
 
 This directory contains the VeloSim simulation engine that powers the bike-sharing network simulations.
 
-## OSRM Configuration
+## Routing Configuration
 
-The simulation engine uses OSRM (Open Source Routing Machine) for routing calculations.
+The simulation engine uses GraphHopper for traffic-aware routing with per-request custom-model speed adjustments.
 
-### Environment Variable
+### Environment Variables
 
-Set the OSRM server URL:
+Set the GraphHopper server URL:
 
 ```bash
-export OSRM_URL=http://localhost:5001
+export GRAPHHOPPER_URL=http://localhost:8989
+export GRAPHHOPPER_TIMEOUT=20
 ```
 
-Or add it to your `.env` file in the project root:
+Or add to your `.env` file:
 
 ```bash
-OSRM_URL=http://localhost:5001
+GRAPHHOPPER_URL=http://localhost:8989
+GRAPHHOPPER_TIMEOUT=20
 DATABASE_URL=postgresql://velosim:velosim@localhost:5433/velosim
 ```
 
-### Running Local OSRM Server
+**Configuration Options:**
+
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `GRAPHHOPPER_URL` | GraphHopper server URL | `http://localhost:8989` |
+| `GRAPHHOPPER_TIMEOUT` | Request timeout in seconds (for long routes or slow networks) | `20` |
+
+### Running Local GraphHopper Server
 
 ```bash
 # Start with npm (recommended)
 npm run dev:services
 
-# Or use docker-compose directly
-docker-compose up -d osrm postgres
+# Or prepare data and start GraphHopper (first time)
+npm run graphhopper:prepare
+
+# Start existing GraphHopper instance
+npm run graphhopper:up
+
+# View logs
+npm run graphhopper:logs
+
+# Stop GraphHopper
+npm run graphhopper:down
 ```
 
 ## Testing
 
-Run the routing test script to verify OSRM connectivity:
+Run the routing test script to verify GraphHopper connectivity:
 
 ```bash
 npm run routingTest

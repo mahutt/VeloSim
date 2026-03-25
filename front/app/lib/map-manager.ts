@@ -274,7 +274,7 @@ export default class MapManager {
       }
 
       // Store route geometry if provided (sent in key frames or when route changes)
-      // This is the raw OSRM linestring, not the interpolated points
+      // This is the raw routing linestring, not the interpolated points
       if (resource.route?.coordinates) {
         this.routes.set(resource.id, resource.route);
       } else if (resource.route === null) {

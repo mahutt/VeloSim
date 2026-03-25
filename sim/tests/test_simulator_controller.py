@@ -162,13 +162,15 @@ def simulator_controller(
     fake_time: MockClock,
     monkeypatch: Any,
 ) -> SimulatorController:
-    # Set OSRM URL environment variable to avoid ValueError
-    monkeypatch.setenv("OSRM_URL", "http://localhost:5000")
+    # Set GraphHopper URL environment variable to avoid ValueError
+    monkeypatch.setenv("GRAPHHOPPER_URL", "http://localhost:8989")
 
-    # Mock OSRMConnection initialization to avoid file I/O
+    # Mock GraphHopperConnection initialization to avoid file I/O
     with (
         patch(
-            "sim.osm.osrm_connection.OSRMConnection._verify_osrm_connection",
+            "sim.osm.graphhopper_connection"
+            ".GraphHopperConnection"
+            "._verify_graphhopper_connection",
             return_value=True,
         ),
     ):
@@ -827,7 +829,7 @@ def test_start_simulation(
         mock_thread = Mock()
         mock_thread_class.return_value = mock_thread
 
-        # Patch heavy routing (OSRM doesn't have build_ch_network)
+        # Patch heavy routing
         with patch.object(
             simulator_controller.map_controller,
             "get_route",
@@ -858,14 +860,16 @@ def test_custom_keyframe_frequency(
     monkeypatch: Any,
 ) -> None:
     """Test that custom keyframe frequency is properly set."""
-    # Set OSRM URL environment variable
-    monkeypatch.setenv("OSRM_URL", "http://localhost:5000")
+    # Set GraphHopper URL environment variable
+    monkeypatch.setenv("GRAPHHOPPER_URL", "http://localhost:8989")
 
     params = InputParameter()
     params.set_key_frame_freq(30)  # Custom frequency
 
     with patch(
-        "sim.osm.osrm_connection.OSRMConnection._verify_osrm_connection",
+        "sim.osm.graphhopper_connection"
+        ".GraphHopperConnection"
+        "._verify_graphhopper_connection",
         return_value=True,
     ):
         controller = SimulatorController(
@@ -887,11 +891,13 @@ def test_strict_mode_initialization(
     monkeypatch: Any,
 ) -> None:
     """Test that strict mode is properly passed to RealTimeDriver."""
-    # Set OSRM URL environment variable
-    monkeypatch.setenv("OSRM_URL", "http://localhost:5000")
+    # Set GraphHopper URL environment variable
+    monkeypatch.setenv("GRAPHHOPPER_URL", "http://localhost:8989")
 
     with patch(
-        "sim.osm.osrm_connection.OSRMConnection._verify_osrm_connection",
+        "sim.osm.graphhopper_connection"
+        ".GraphHopperConnection"
+        "._verify_graphhopper_connection",
         return_value=True,
     ):
         controller = SimulatorController(

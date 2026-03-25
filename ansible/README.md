@@ -116,7 +116,7 @@ The playbook automatically:
 - **Frontend**: React app served via Nginx
 - **Backend**: FastAPI served via Docker
 - **Database**: PostgreSQL in Docker container
-- **Routing**: OSRM server for routing calculations
+- **Routing**: GraphHopper server for routing calculations
 - **Proxy**: Nginx reverse proxy with SSL termination
 - **Monitoring**: Optional Grafana dashboard
 
@@ -166,7 +166,7 @@ After deployment, the server will have:
 ├── source/                 # Git repository
 ├── docker-compose.prod.yml # Production Docker Compose
 ├── .env.prod              # Environment variables
-├── osrm-data/             # OSRM routing data
+├── graphhopper-data/       # GraphHopper routing data
 ├── logs/                  # Application logs
 ├── backups/               # Automated backups
 │   ├── postgresql/        # Database backups
