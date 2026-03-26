@@ -41,4 +41,20 @@ class BatchAssignResult(TypedDict):
     error: Optional[str]
 
 
-__all__ = ["BatchAssignResult"]
+class BatchUnassignResult(TypedDict):
+    """Result schema for a single item in a batch task unassignment.
+
+    Fields:
+        task_id: The task identifier that was (attempted) unassigned.
+        driver_id: The previously assigned driver identifier when available.
+        success: True when unassignment succeeded, False otherwise.
+        error: Optional error message when ``success`` is False.
+    """
+
+    task_id: int
+    driver_id: Optional[int]
+    success: bool
+    error: Optional[str]
+
+
+__all__ = ["BatchAssignResult", "BatchUnassignResult"]

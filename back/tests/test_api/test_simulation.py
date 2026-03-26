@@ -48,6 +48,8 @@ from back.schemas import (
     DriverTaskUnassignRequest,
     DriverTaskBatchAssignResponse,
     DriverTaskBatchAssignItem,
+    DriverTaskBatchUnassignResponse,
+    DriverTaskBatchUnassignItem,
 )
 from back.schemas.playback_speed import PlaybackSpeedResponse, SimulationPlaybackStatus
 from back.services.simulation_service import simulation_service
@@ -1037,6 +1039,84 @@ class TestSimulationAPI:
         assert resp.status_code == 200
         data = resp.json()
         assert "items" in data
+
+    @patch("back.api.v1.simulation.driver_service.batch_unassign")
+    def test_batch_unassign_endpoint(
+        self,
+        mock_batch_unassign: MagicMock,
+        authenticated_client: TestClient,
+        active_sim_id: str,
+    ) -> None:
+        """POST /simulation/{sim_id}/drivers/unassign/batch returns per-item results."""
+        mock_batch_unassign.return_value = DriverTaskBatchUnassignResponse(
+            items=[
+                DriverTaskBatchUnassignItem(
+                    task_id=10, driver_id=1, success=True, error=None
+                ),
+                DriverTaskBatchUnassignItem(
+                    task_id=20, driver_id=2, success=True, error=None
+                ),
+            ]
+        )
+
+        payload = {"task_ids": [10, 20]}
+
+        resp = authenticated_client.post(
+            f"/api/v1/simulation/{active_sim_id}/drivers/unassign/batch", json=payload
+        )
+        assert resp.status_code == 200
+        data = resp.json()
+        assert "items" in data
+        assert len(data["items"]) == len(payload["task_ids"])
+
+    @patch("back.api.v1.simulation.driver_service.batch_unassign")
+    def test_batch_unassign_endpoint_partial_failure(
+        self,
+        mock_batch_unassign: MagicMock,
+        authenticated_client: TestClient,
+        active_sim_id: str,
+    ) -> None:
+        """Batch unassign endpoint surfaces best-effort partial results."""
+        mock_batch_unassign.return_value = DriverTaskBatchUnassignResponse(
+            items=[
+                DriverTaskBatchUnassignItem(
+                    task_id=10, driver_id=1, success=True, error=None
+                ),
+                DriverTaskBatchUnassignItem(
+                    task_id=999,
+                    driver_id=None,
+                    success=False,
+                    error="Could not find task in sim with id: 999",
+                ),
+            ]
+        )
+
+        payload = {"task_ids": [10, 999]}
+
+        resp = authenticated_client.post(
+            f"/api/v1/simulation/{active_sim_id}/drivers/unassign/batch", json=payload
+        )
+        assert resp.status_code == 200
+        data = resp.json()
+        assert len(data["items"]) == 2
+        assert data["items"][0]["success"] is True
+        assert data["items"][1]["success"] is False
+
+    @patch("back.api.v1.simulation.driver_service.batch_unassign")
+    def test_batch_unassign_endpoint_permission_error(
+        self,
+        mock_batch_unassign: MagicMock,
+        authenticated_client: TestClient,
+        active_sim_id: str,
+    ) -> None:
+        """Batch unassign endpoint returns 403 on permission failures."""
+        mock_batch_unassign.side_effect = VelosimPermissionError("No permission")
+
+        resp = authenticated_client.post(
+            f"/api/v1/simulation/{active_sim_id}/drivers/unassign/batch",
+            json={"task_ids": [10]},
+        )
+        assert resp.status_code == 403
 
     def test_websocket_subscriber_on_frame(self) -> None:
         """Test that WebSocketSubscriber schedules frames correctly."""

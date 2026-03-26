@@ -39,6 +39,8 @@ from back.schemas import (
     DriverTaskReorderResponse,
     DriverTaskBatchAssignResponse,
     DriverTaskBatchAssignRequest,
+    DriverTaskBatchUnassignRequest,
+    DriverTaskBatchUnassignResponse,
 )
 from back.exceptions import VelosimPermissionError, ItemNotFoundError
 from sim.simulator import Simulator
@@ -531,3 +533,105 @@ class TestDriverService:
         with patch.object(simulation_service, "active_simulations", {}):
             with pytest.raises(ItemNotFoundError):
                 driver_service.batch_assign(db_session, sim_id, requesting_user, bulk)
+
+    def test_batch_unassign_success(
+        self,
+        db_session: Session,
+        sim_id: str,
+        requesting_user: int,
+        patch_active_simulations: Dict[str, Any],
+    ) -> None:
+        """All unassignments succeed and return per-item success entries."""
+        simulator = patch_active_simulations["simulator"]
+        simulator.batch_unassign_tasks_from_drivers.return_value = [
+            {"task_id": 10, "driver_id": 1, "success": True, "error": None},
+            {"task_id": 20, "driver_id": 2, "success": True, "error": None},
+        ]
+
+        bulk = DriverTaskBatchUnassignRequest(task_ids=[10, 20])
+        resp = driver_service.batch_unassign(db_session, sim_id, requesting_user, bulk)
+
+        assert isinstance(resp, DriverTaskBatchUnassignResponse)
+        assert len(resp.items) == 2
+        assert [item.success for item in resp.items] == [True, True]
+        assert [item.driver_id for item in resp.items] == [1, 2]
+        simulator.batch_unassign_tasks_from_drivers.assert_called_once_with(
+            sim_id=sim_id, task_ids=[10, 20]
+        )
+
+    def test_batch_unassign_partial_failure(
+        self,
+        db_session: Session,
+        sim_id: str,
+        requesting_user: int,
+        patch_active_simulations: Dict[str, Any],
+    ) -> None:
+        """Best-effort mode reports failures without raising for entire batch."""
+        simulator = patch_active_simulations["simulator"]
+        simulator.batch_unassign_tasks_from_drivers.return_value = [
+            {"task_id": 10, "driver_id": 1, "success": True, "error": None},
+            {
+                "task_id": 20,
+                "driver_id": None,
+                "success": False,
+                "error": "Task 20 is not assigned to any driver",
+            },
+        ]
+
+        bulk = DriverTaskBatchUnassignRequest(task_ids=[10, 20])
+        resp = driver_service.batch_unassign(db_session, sim_id, requesting_user, bulk)
+
+        assert len(resp.items) == 2
+        assert resp.items[0].success is True
+        assert resp.items[0].driver_id == 1
+        assert resp.items[1].success is False
+        assert resp.items[1].driver_id is None
+        assert "not assigned to any driver" in (resp.items[1].error or "")
+
+    def test_batch_unassign_result_passthrough(
+        self,
+        db_session: Session,
+        sim_id: str,
+        requesting_user: int,
+        patch_active_simulations: Dict[str, Any],
+    ) -> None:
+        """Service maps simulator batch-unassign result fields as-is."""
+        simulator = patch_active_simulations["simulator"]
+        simulator.batch_unassign_tasks_from_drivers.return_value = [
+            {
+                "task_id": 10,
+                "driver_id": 1,
+                "success": False,
+                "error": "Some simulator failure",
+            }
+        ]
+
+        bulk = DriverTaskBatchUnassignRequest(task_ids=[10])
+        resp = driver_service.batch_unassign(db_session, sim_id, requesting_user, bulk)
+
+        assert len(resp.items) == 1
+        assert resp.items[0].success is False
+        assert resp.items[0].driver_id == 1
+        assert resp.items[0].error == "Some simulator failure"
+
+    def test_batch_unassign_permission_denied(
+        self,
+        db_session: Session,
+        sim_id: str,
+        requesting_user: int,
+    ) -> None:
+        bulk = DriverTaskBatchUnassignRequest(task_ids=[10])
+        with patch.object(simulation_service, "verify_access", return_value=False):
+            with pytest.raises(VelosimPermissionError):
+                driver_service.batch_unassign(db_session, sim_id, requesting_user, bulk)
+
+    def test_batch_unassign_simulation_not_found(
+        self,
+        db_session: Session,
+        sim_id: str,
+        requesting_user: int,
+    ) -> None:
+        bulk = DriverTaskBatchUnassignRequest(task_ids=[10])
+        with patch.object(simulation_service, "active_simulations", {}):
+            with pytest.raises(ItemNotFoundError):
+                driver_service.batch_unassign(db_session, sim_id, requesting_user, bulk)

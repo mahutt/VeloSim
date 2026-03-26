@@ -57,6 +57,8 @@ from back.schemas import (
     DriverTaskReorderResponse,
     DriverTaskBatchAssignRequest,
     DriverTaskBatchAssignResponse,
+    DriverTaskBatchUnassignRequest,
+    DriverTaskBatchUnassignResponse,
 )
 from back.schemas.sim_keyframe import (
     SimKeyframeListResponse,
@@ -700,6 +702,49 @@ def batch_assign_tasks_to_driver(
 
 
 @router.post(
+    "/{sim_id}/drivers/unassign/batch",
+    status_code=200,
+    response_model=DriverTaskBatchUnassignResponse,
+)
+def batch_unassign_tasks_from_drivers(
+    sim_id: str,
+    bulk_request: DriverTaskBatchUnassignRequest,
+    requesting_user: int = Depends(get_user_id),
+    db: Session = Depends(get_db),
+) -> DriverTaskBatchUnassignResponse:
+    """Unassign many tasks from their currently assigned drivers.
+
+    For each task in the request:
+    - If task is missing: returns failure for that task
+    - If task is already unassigned: returns success (no-op) for that task
+    - Otherwise: attempts unassign using simulator logic
+
+    Each operation is attempted independently and the response indicates
+    per-item success or failure. No rollback is performed.
+
+    Args:
+        sim_id: ID of the simulation
+        bulk_request: Batch request containing `task_ids`
+        requesting_user: ID of the authenticated user
+        db: Database session dependency
+
+    Returns:
+        DriverTaskBatchUnassignResponse: Per-item unassignment results.
+    """
+    try:
+        result = driver_service.batch_unassign(
+            db=db,
+            sim_id=sim_id,
+            requesting_user=requesting_user,
+            batch_request=bulk_request,
+        )
+        return result
+    except RuntimeError as err:
+        logger.exception("Unexpected error: %s", err)
+        raise UnexpectedError() from err
+
+
+@router.post(
     "/{sim_id}/drivers/unassign",
     status_code=200,
     response_model=DriverTaskUnassignResponse,
@@ -711,6 +756,10 @@ def unassign_task_from_driver(
     db: Session = Depends(get_db),
 ) -> DriverTaskUnassignResponse:
     """Unassign a task from a driver in a running simulation.
+
+    This endpoint is strict (non-idempotent): it returns an error when
+    the task is already unassigned, assigned to a different driver, or
+    currently in service and therefore not unassignable.
 
     Args:
         sim_id: ID of the simulation
