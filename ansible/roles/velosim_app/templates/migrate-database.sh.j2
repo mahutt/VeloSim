@@ -14,6 +14,8 @@ ENV_FILE="{{ app_dir }}/.env.prod"
 MODE="${1:-full}"
 BACKUP_DIR="{{ app_dir }}/backups/postgresql"
 ALLOW_EMPTY_DATABASE_DEPLOY="{{ (allow_empty_database_deploy | default(false)) | string | lower }}"
+TRAFFIC_DATASETS_DIR="$APP_DIR/source/sim/traffic/traffic_datasets"
+TRAFFIC_ARCHIVE="$TRAFFIC_DATASETS_DIR/traffic.tar.gz"
 
 echo "=== VeloSim Database Migration ==="
 echo "Working directory: $APP_DIR"
@@ -26,6 +28,19 @@ cd "$APP_DIR"
 echo "Cleaning up any macOS resource fork files..."
 find "$APP_DIR/source" -name "._*" -type f -delete 2>/dev/null || true
 find "$APP_DIR/source" -name ".DS_Store" -type f -delete 2>/dev/null || true
+
+# Extract packaged traffic templates when archive is available.
+# Do not fail migration if extraction cannot run.
+if [ -f "$TRAFFIC_ARCHIVE" ]; then
+    echo "Extracting packaged traffic templates from $TRAFFIC_ARCHIVE..."
+    if tar -xzf "$TRAFFIC_ARCHIVE" -C "$TRAFFIC_DATASETS_DIR"; then
+        echo "✓ Traffic templates extracted successfully"
+    else
+        echo "⚠️ Failed to extract traffic templates archive, continuing without extraction"
+    fi
+else
+    echo "No packaged traffic template archive found at $TRAFFIC_ARCHIVE, continuing"
+fi
 
 # Ensure PostgreSQL is running (does not stop existing containers)
 echo "Ensuring PostgreSQL container is running..."
