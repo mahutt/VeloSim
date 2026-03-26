@@ -25,14 +25,22 @@
 import { TaskItem } from '~/components/task/task-item';
 import { useSimulation } from '~/providers/simulation-provider';
 import { useTaskMassSelect } from '~/hooks/use-task-mass-select';
+import { useAutoScroll } from '~/hooks/use-auto-scroll';
 import type { PopulatedStation } from './selected-item-bar';
 import { ScrollArea } from '~/components/ui/scroll-area';
 
 export function StationTasks({ station }: { station: PopulatedStation }) {
   const { engine } = useSimulation();
   const taskIds = station.tasks.map((task) => task.id);
-  const { selectedTaskIds, handleTaskSelect, selectForDrag } =
-    useTaskMassSelect(taskIds, station.id);
+  const {
+    selectedTaskIds,
+    isDragSelecting,
+    handleTaskSelect,
+    selectForDrag,
+    startDragSelect,
+    dragSelectEnter,
+  } = useTaskMassSelect(taskIds, station.id);
+  const { containerRef, handleMouseMove } = useAutoScroll(isDragSelecting);
 
   return (
     <>
@@ -42,31 +50,46 @@ export function StationTasks({ station }: { station: PopulatedStation }) {
           : `Tasks (${station.tasks.length})`}
       </p>
       <ScrollArea className="mx-2">
-        <div className="max-h-50 px-3 space-y-1">
+        <div
+          ref={containerRef}
+          onMouseMove={handleMouseMove}
+          className="max-h-50 px-3 space-y-1"
+        >
           {station.tasks.map((task, index) => {
             const assignedDriverId = task.assignedDriverId;
 
             return (
-              <TaskItem
+              <div
                 key={task.id}
-                task={task}
-                stationName={station.name}
-                isSelected={selectedTaskIds.includes(task.id)}
-                onSelect={(event) => handleTaskSelect(task.id, index, event)}
-                onDragStart={() => selectForDrag(task.id, index)}
-                getDragTaskIds={() =>
-                  selectedTaskIds.includes(task.id)
-                    ? selectedTaskIds
-                    : [task.id]
-                }
-                onUnassign={
-                  assignedDriverId
-                    ? () => {
-                        engine.requestUnassignment(assignedDriverId, task.id);
-                      }
-                    : undefined
-                }
-              />
+                onContextMenu={(e) => e.preventDefault()}
+                onMouseDown={(e) => {
+                  if (e.button === 2) {
+                    e.preventDefault();
+                    startDragSelect(task.id, e.ctrlKey || e.metaKey);
+                  }
+                }}
+                onMouseEnter={() => dragSelectEnter(task.id)}
+              >
+                <TaskItem
+                  task={task}
+                  stationName={station.name}
+                  isSelected={selectedTaskIds.includes(task.id)}
+                  onSelect={(event) => handleTaskSelect(task.id, index, event)}
+                  onDragStart={() => selectForDrag(task.id)}
+                  getDragTaskIds={() =>
+                    selectedTaskIds.includes(task.id)
+                      ? selectedTaskIds
+                      : [task.id]
+                  }
+                  onUnassign={
+                    assignedDriverId
+                      ? () => {
+                          engine.requestUnassignment(assignedDriverId, task.id);
+                        }
+                      : undefined
+                  }
+                />
+              </div>
             );
           })}
         </div>

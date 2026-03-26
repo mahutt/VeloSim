@@ -32,12 +32,46 @@ import {
 
 export function useTaskMassSelect(taskIds: number[], reset: number | string) {
   const [selectedTaskIds, setSelectedTaskIds] = useState<number[]>([]);
-  const lastSelectedTaskRef = useRef<number | null>(null);
+  // Tracks selection order so deselecting the anchor rolls back to the previous one
+  const anchorStackRef = useRef<number[]>([]);
+  const shiftBaseRef = useRef<Set<number>>(new Set());
+  const isShiftSequenceRef = useRef(false);
+  const isDragSelectingRef = useRef(false);
+  const dragSelectStartRef = useRef<number | null>(null);
+  const dragBaseSelectionRef = useRef<Set<number>>(new Set());
+
+  const anchor = () =>
+    anchorStackRef.current[anchorStackRef.current.length - 1] ?? null;
+
+  const pushAnchor = (taskId: number) => {
+    anchorStackRef.current = [
+      ...anchorStackRef.current.filter((id) => id !== taskId),
+      taskId,
+    ];
+  };
+
+  const removeAnchor = (taskId: number) => {
+    anchorStackRef.current = anchorStackRef.current.filter(
+      (id) => id !== taskId
+    );
+  };
+
+  const resetAnchor = (taskId: number | null = null) => {
+    anchorStackRef.current = taskId !== null ? [taskId] : [];
+  };
 
   useEffect(() => {
     setSelectedTaskIds([]);
-    lastSelectedTaskRef.current = null;
+    resetAnchor();
   }, [reset]);
+
+  useEffect(() => {
+    const endDragSelect = () => {
+      isDragSelectingRef.current = false;
+    };
+    window.addEventListener('mouseup', endDragSelect);
+    return () => window.removeEventListener('mouseup', endDragSelect);
+  }, []);
 
   const updateSelection = useCallback(
     (nextIds: Set<number>) => {
@@ -49,51 +83,118 @@ export function useTaskMassSelect(taskIds: number[], reset: number | string) {
 
   const handleTaskSelect = useCallback(
     (taskId: number, taskIndex: number, event: MouseEvent<HTMLDivElement>) => {
-      if (event.shiftKey && lastSelectedTaskRef.current !== null) {
-        const start = Math.min(lastSelectedTaskRef.current, taskIndex);
-        const end = Math.max(lastSelectedTaskRef.current, taskIndex);
-        const rangeIds = taskIds.slice(start, end + 1);
-        updateSelection(new Set(rangeIds));
+      if (event.shiftKey && anchor() !== null) {
+        const currentAnchor = anchor()!;
+        const lastIndex = taskIds.indexOf(currentAnchor);
+        if (lastIndex !== -1) {
+          if (!isShiftSequenceRef.current) {
+            shiftBaseRef.current = new Set(selectedTaskIds);
+            isShiftSequenceRef.current = true;
+          }
+          const start = Math.min(lastIndex, taskIndex);
+          const end = Math.max(lastIndex, taskIndex);
+          const rangeIds = taskIds.slice(start, end + 1);
+          updateSelection(new Set([...shiftBaseRef.current, ...rangeIds]));
+        }
         return;
       }
+
+      isShiftSequenceRef.current = false;
 
       if (event.metaKey || event.ctrlKey) {
         const nextIds = new Set(selectedTaskIds);
         if (nextIds.has(taskId)) {
           nextIds.delete(taskId);
+          removeAnchor(taskId);
         } else {
           nextIds.add(taskId);
+          pushAnchor(taskId);
         }
         updateSelection(nextIds);
-        lastSelectedTaskRef.current = taskIndex;
         return;
       }
 
       if (selectedTaskIds.length === 1 && selectedTaskIds[0] === taskId) {
         updateSelection(new Set());
-        lastSelectedTaskRef.current = null;
+        resetAnchor();
         return;
       }
 
       updateSelection(new Set([taskId]));
-      lastSelectedTaskRef.current = taskIndex;
+      resetAnchor(taskId);
     },
     [selectedTaskIds, taskIds, updateSelection]
   );
 
   const selectForDrag = useCallback(
-    (taskId: number, taskIndex: number) => {
+    (taskId: number) => {
+      isShiftSequenceRef.current = false;
       if (!selectedTaskIds.includes(taskId)) {
         updateSelection(new Set([taskId]));
-        lastSelectedTaskRef.current = taskIndex;
+        resetAnchor(taskId);
       }
     },
     [selectedTaskIds, updateSelection]
   );
 
+  const startDragSelect = useCallback(
+    (taskId: number, ctrlKey: boolean) => {
+      isShiftSequenceRef.current = false;
+      isDragSelectingRef.current = true;
+      dragSelectStartRef.current = taskId;
+      if (ctrlKey) {
+        dragBaseSelectionRef.current = new Set(selectedTaskIds);
+        const toggled = new Set(selectedTaskIds);
+        if (toggled.has(taskId)) {
+          toggled.delete(taskId);
+        } else {
+          toggled.add(taskId);
+        }
+        updateSelection(toggled);
+      } else {
+        dragBaseSelectionRef.current = new Set();
+        updateSelection(new Set([taskId]));
+      }
+      resetAnchor(taskId);
+    },
+    [selectedTaskIds, updateSelection]
+  );
+
+  const dragSelectEnter = useCallback(
+    (taskId: number) => {
+      if (!isDragSelectingRef.current || dragSelectStartRef.current === null)
+        return;
+      const startIndex = taskIds.indexOf(dragSelectStartRef.current);
+      const currentIndex = taskIds.indexOf(taskId);
+      if (startIndex === -1 || currentIndex === -1) return;
+      const start = Math.min(startIndex, currentIndex);
+      const end = Math.max(startIndex, currentIndex);
+      const rangeIds = taskIds.slice(start, end + 1);
+      const result = new Set(dragBaseSelectionRef.current);
+      for (const id of rangeIds) {
+        if (result.has(id)) {
+          result.delete(id);
+        } else {
+          result.add(id);
+        }
+      }
+      updateSelection(result);
+    },
+    [taskIds, updateSelection]
+  );
+
+  const clearSelection = useCallback(() => {
+    updateSelection(new Set());
+    resetAnchor();
+  }, [updateSelection]);
+
   return {
     selectedTaskIds,
+    isDragSelecting: isDragSelectingRef,
     handleTaskSelect,
     selectForDrag,
+    startDragSelect,
+    dragSelectEnter,
+    clearSelection,
   };
 }

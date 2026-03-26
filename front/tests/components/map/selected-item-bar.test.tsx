@@ -480,6 +480,46 @@ describe('SelectedItemBar', () => {
       expect(setDataMock).toHaveBeenCalledWith('taskIds', expect.any(String));
     });
 
+    it('should start drag select on right-click (mousedown button=2) on a station task', () => {
+      vi.mocked(useSimulation).mockReturnValue(
+        makeSimulationContext({
+          state: makeReactiveSimulationState({
+            selectedItems: [
+              makeSelectedItem({
+                type: SelectedItemType.Station,
+                value: makePopulatedStation({
+                  id: 1,
+                  name: 'Test Station',
+                  tasks: [
+                    makeStationTask({ id: 1 }),
+                    makeStationTask({ id: 2 }),
+                    makeStationTask({ id: 3 }),
+                  ],
+                }),
+              }),
+            ],
+          }),
+          engine: mockSimulationEngine as SimulationEngine,
+        })
+      );
+
+      render(
+        <FeatureToggleProvider>
+          <SelectedItemBar />
+        </FeatureToggleProvider>
+      );
+
+      const taskItems = screen.getAllByText(/^Task #/);
+      // The wrapper div containing the task item (one level up from [data-slot="item"])
+      const firstWrapper = taskItems[0].closest('[data-slot="item"]')!
+        .parentElement as HTMLElement;
+
+      fireEvent.mouseDown(firstWrapper, { button: 2 });
+
+      // After right-click drag start, task 1 should be selected
+      expect(screen.getByText('Tasks (1/3 selected)')).toBeInTheDocument();
+    });
+
     it('should call requestUnassignment when unassign button is clicked', async () => {
       const user = userEvent.setup();
       vi.mocked(useSimulation).mockReturnValue(
@@ -613,6 +653,94 @@ describe('SelectedItemBar', () => {
 
       // getDragTaskIds should have been invoked and setData called with the resulting task ids
       expect(setDataMock).toHaveBeenCalledWith('taskIds', expect.any(String));
+    });
+
+    it('should reorder correctly when dragging a task upward', async () => {
+      vi.mocked(useSimulation).mockReturnValue(
+        makeSimulationContext({
+          state: makeReactiveSimulationState({
+            selectedItems: [
+              makeSelectedItem({
+                type: SelectedItemType.Driver,
+                value: makePopulatedDriver({
+                  id: 1,
+                  name: 'Driver 1',
+                  tasks: [
+                    makeStationTask({ id: 1 }),
+                    makeStationTask({ id: 2 }),
+                    makeStationTask({ id: 3 }),
+                  ],
+                }),
+              }),
+            ],
+          }),
+          engine: mockSimulationEngine as SimulationEngine,
+        })
+      );
+
+      render(
+        <FeatureToggleProvider>
+          <SelectedItemBar />
+        </FeatureToggleProvider>
+      );
+
+      const taskElements = screen
+        .getAllByText(/^Task #/)
+        .map((el) => el.closest('[data-slot="item"]'))
+        .filter(Boolean) as HTMLElement[];
+      const taskWrappers = taskElements.map(
+        (el) => el.parentElement as HTMLElement
+      );
+
+      // Drag task 3 (index 2) and drop on task 1 (index 0) — dragging upward
+      fireEvent.dragStart(taskElements[2]);
+      fireEvent.drop(taskWrappers[0]);
+
+      // task 3 inserts before task 1: [3, 1, 2]
+      expect(mockSimulationEngine.reorderTasks).toHaveBeenCalledWith(
+        1,
+        [3, 1, 2],
+        true
+      );
+    });
+
+    it('should start drag select on right-click (mousedown button=2) on a driver task', () => {
+      vi.mocked(useSimulation).mockReturnValue(
+        makeSimulationContext({
+          state: makeReactiveSimulationState({
+            selectedItems: [
+              makeSelectedItem({
+                type: SelectedItemType.Driver,
+                value: makePopulatedDriver({
+                  id: 1,
+                  name: 'Driver 1',
+                  tasks: [
+                    makeStationTask({ id: 1 }),
+                    makeStationTask({ id: 2 }),
+                    makeStationTask({ id: 3 }),
+                  ],
+                }),
+              }),
+            ],
+          }),
+          engine: mockSimulationEngine as SimulationEngine,
+        })
+      );
+
+      render(
+        <FeatureToggleProvider>
+          <SelectedItemBar />
+        </FeatureToggleProvider>
+      );
+
+      const taskItems = screen.getAllByText(/^Task #/);
+      const firstWrapper = taskItems[0].closest('[data-slot="item"]')!
+        .parentElement as HTMLElement;
+
+      fireEvent.mouseDown(firstWrapper, { button: 2 });
+
+      // After right-click drag start, task 1 should be selected
+      expect(screen.getByText('Tasks (1/3 selected)')).toBeInTheDocument();
     });
 
     it('should call requestUnassignment when driver task unassign is clicked', async () => {

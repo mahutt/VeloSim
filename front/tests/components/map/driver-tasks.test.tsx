@@ -198,4 +198,133 @@ describe('DriverTasks', () => {
 
     expect(mockSimulationEngine.reorderTasks).not.toHaveBeenCalled();
   });
+
+  describe('non-contiguous multi-group reorder', () => {
+    const stationNames: Record<number, string> = {
+      1: 'Station A',
+      2: 'Station B',
+      3: 'Station C',
+      4: 'Station D',
+      5: 'Station E',
+    };
+
+    async function setupCollapsedWithFiveGroups() {
+      const user = userEvent.setup();
+
+      setupDriverTasks({
+        driver: makePopulatedDriver({
+          id: 20,
+          tasks: [
+            makeStationTask({ id: 10, stationId: 1 }),
+            makeStationTask({ id: 20, stationId: 2 }),
+            makeStationTask({ id: 30, stationId: 3 }),
+            makeStationTask({ id: 40, stationId: 4 }),
+            makeStationTask({ id: 50, stationId: 5 }),
+          ],
+        }),
+        stationNames,
+      });
+
+      await user.click(
+        screen.getByRole('button', { name: 'Collapse task list' })
+      );
+
+      return user;
+    }
+
+    function getGroupElements() {
+      return [
+        'Station A',
+        'Station B',
+        'Station C',
+        'Station D',
+        'Station E',
+      ].map((name) => {
+        const draggable = screen
+          .getByText(name)
+          .closest('[draggable="true"]') as HTMLElement;
+        const wrapper = draggable.parentElement as HTMLElement;
+        return { draggable, wrapper };
+      });
+    }
+
+    it('moves groups at indices 1 and 3 forward past the last group', async () => {
+      await setupCollapsedWithFiveGroups();
+      const groups = getGroupElements();
+
+      // Ctrl+click group B (index 1) then Ctrl+click group D (index 3)
+      fireEvent.click(groups[1].wrapper, { ctrlKey: true });
+      fireEvent.click(groups[3].wrapper, { ctrlKey: true });
+
+      // Drag group B (sourceIndex=1) → drop on group E (targetIndex=4)
+      fireEvent.dragStart(groups[1].draggable, {
+        dataTransfer: { effectAllowed: '', dropEffect: '' },
+      });
+      fireEvent.dragOver(groups[4].wrapper, {
+        dataTransfer: { dropEffect: '' },
+      });
+      fireEvent.drop(groups[4].wrapper);
+
+      // Expected: A, C, E, B, D → [10, 30, 50, 20, 40]
+      await waitFor(() => {
+        expect(mockSimulationEngine.reorderTasks).toHaveBeenCalledWith(
+          20,
+          [10, 30, 50, 20, 40],
+          true
+        );
+      });
+    });
+
+    it('moves groups at indices 1 and 3 backward before the first group', async () => {
+      await setupCollapsedWithFiveGroups();
+      const groups = getGroupElements();
+
+      fireEvent.click(groups[1].wrapper, { ctrlKey: true });
+      fireEvent.click(groups[3].wrapper, { ctrlKey: true });
+
+      // Drag group D (sourceIndex=3) → drop on group A (targetIndex=0)
+      fireEvent.dragStart(groups[3].draggable, {
+        dataTransfer: { effectAllowed: '', dropEffect: '' },
+      });
+      fireEvent.dragOver(groups[0].wrapper, {
+        dataTransfer: { dropEffect: '' },
+      });
+      fireEvent.drop(groups[0].wrapper);
+
+      // Expected: B, D, A, C, E → [20, 40, 10, 30, 50]
+      await waitFor(() => {
+        expect(mockSimulationEngine.reorderTasks).toHaveBeenCalledWith(
+          20,
+          [20, 40, 10, 30, 50],
+          true
+        );
+      });
+    });
+
+    it('moves groups at indices 1 and 3 to a position between them', async () => {
+      await setupCollapsedWithFiveGroups();
+      const groups = getGroupElements();
+
+      fireEvent.click(groups[1].wrapper, { ctrlKey: true });
+      fireEvent.click(groups[3].wrapper, { ctrlKey: true });
+
+      // Drag group B (sourceIndex=1) → drop on group C (targetIndex=2, between the selections)
+      fireEvent.dragStart(groups[1].draggable, {
+        dataTransfer: { effectAllowed: '', dropEffect: '' },
+      });
+      fireEvent.dragOver(groups[2].wrapper, {
+        dataTransfer: { dropEffect: '' },
+      });
+      fireEvent.drop(groups[2].wrapper);
+
+      // Expected: A, C, B, D, E → [10, 30, 20, 40, 50]
+      await waitFor(() => {
+        expect(mockSimulationEngine.reorderTasks).toHaveBeenCalledWith(
+          20,
+          [10, 30, 20, 40, 50],
+          true
+        );
+      });
+    });
+  });
 });
