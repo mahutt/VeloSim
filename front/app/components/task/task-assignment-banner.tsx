@@ -78,6 +78,10 @@ export function TaskAssignmentBanner() {
   const remainingBatteryCount = pendingAssignment.driverBatteryCount;
   const prevDriverName =
     (pendingAssignment as ReassignTaskAction).prevDriverName ?? undefined;
+  const unassignStationName =
+    pendingAssignment.action === TaskAction.Unassign
+      ? pendingAssignment.stationName
+      : undefined;
 
   const renderMessage = () => {
     if (!count) return null;
@@ -122,10 +126,15 @@ export function TaskAssignmentBanner() {
 
     // Unassign
     if (action === TaskAction.Unassign) {
-      return formatTranslation(t.map.assignment.unassignSingle, {
-        taskId: firstTaskId,
-        driver: driverName,
-      });
+      if (isMulti) {
+        return unassignStationName
+          ? `Un-assign ${count} tasks at ${unassignStationName} from ${driverName}?`
+          : `Un-assign ${count} tasks from ${driverName}?`;
+      }
+
+      return unassignStationName
+        ? `Un-assign task #${firstTaskId} at ${unassignStationName} from ${driverName}?`
+        : `Un-assign task #${firstTaskId} from ${driverName}?`;
     }
 
     // Reassign from a single known driver

@@ -24,6 +24,7 @@
 
 import { useState } from 'react';
 import { ChevronDown, ChevronUp } from 'lucide-react';
+import { X } from 'lucide-react';
 import { useSimulation } from '~/providers/simulation-provider';
 import { type StationTask } from '~/types';
 import { TaskItem } from '../task/task-item';
@@ -117,6 +118,7 @@ function DriverTaskGroupItem({
   onContextMenu,
   onMouseDown,
   onMouseEnter,
+  onUnassign,
 }: {
   group: DriverTaskStationGroup;
   index: number;
@@ -132,6 +134,7 @@ function DriverTaskGroupItem({
   onContextMenu: (e: React.MouseEvent) => void;
   onMouseDown: (e: React.MouseEvent) => void;
   onMouseEnter: () => void;
+  onUnassign: () => void;
 }) {
   const { t } = usePreferences();
 
@@ -163,7 +166,7 @@ function DriverTaskGroupItem({
       >
         <Tooltip>
           <TooltipTrigger asChild>
-            <span className="block text-sm font-medium text-foreground min-w-0 max-w-40 truncate">
+            <span className="block text-sm font-medium text-foreground min-w-0 max-w-32 truncate">
               {group.stationName}
             </span>
           </TooltipTrigger>
@@ -177,6 +180,19 @@ function DriverTaskGroupItem({
             ? t.map.labels.taskSingular
             : t.map.labels.taskPlural}
         </span>
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          onClick={(event) => {
+            event.stopPropagation();
+            onUnassign();
+          }}
+          className="h-6 w-6"
+          aria-label={`Unassign ${group.tasks.length} ${group.tasks.length === 1 ? 'task' : 'tasks'} at ${group.stationName}`}
+        >
+          <X className="h-4 w-4" />
+        </Button>
       </div>
     </div>
   );
@@ -189,6 +205,7 @@ function DriverTasksCollapsed({
   startDragSelect,
   dragSelectEnter,
   onReorder,
+  onUnassign,
 }: {
   groupedTasks: DriverTaskStationGroup[];
   selectedTaskIds: number[];
@@ -200,6 +217,7 @@ function DriverTasksCollapsed({
   startDragSelect: (taskId: number, ctrlKey: boolean) => void;
   dragSelectEnter: (taskId: number) => void;
   onReorder: (taskIds: number[]) => Promise<void>;
+  onUnassign: (taskIds: number[], stationName: string) => void;
 }) {
   const selectedGroupIndices = new Set(
     groupedTasks
@@ -307,6 +325,12 @@ function DriverTasksCollapsed({
           }}
           onMouseEnter={() =>
             dragSelectEnter(group.tasks[group.tasks.length - 1].id)
+          }
+          onUnassign={() =>
+            onUnassign(
+              group.tasks.map((task) => task.id),
+              group.stationName
+            )
           }
         />
       ))}
@@ -502,6 +526,9 @@ export function DriverTasks({ driver }: { driver: PopulatedDriver }) {
               startDragSelect={startDragSelect}
               dragSelectEnter={dragSelectEnter}
               onReorder={(ids) => engine.reorderTasks(driver.id, ids, true)}
+              onUnassign={(taskIds, stationName) =>
+                engine.requestUnassignment(driver.id, taskIds, stationName)
+              }
             />
           ) : (
             <DriverTasksExpanded
@@ -514,7 +541,7 @@ export function DriverTasks({ driver }: { driver: PopulatedDriver }) {
               dragSelectEnter={dragSelectEnter}
               onReorder={(ids) => engine.reorderTasks(driver.id, ids, true)}
               onUnassign={(taskId) =>
-                engine.requestUnassignment(driver.id, taskId)
+                engine.requestUnassignment(driver.id, [taskId])
               }
             />
           )}

@@ -323,4 +323,26 @@ describe('DriverTasks', () => {
       });
     });
   });
+
+  it('requests unassignment from collapsed view', async () => {
+    const user = userEvent.setup();
+
+    setupDriverTasks({
+      driver: makePopulatedDriver({
+        id: 15,
+        tasks: [makeStationTask({ id: 44, stationId: 3 })],
+      }),
+      stationNames: { 3: 'Station C' },
+    });
+
+    await user.click(
+      screen.getByRole('button', { name: 'Unassign 1 task at Station C' })
+    );
+
+    expect(mockSimulationEngine.requestUnassignment).toHaveBeenCalledWith(
+      15,
+      [44],
+      'Station C'
+    );
+  });
 });
