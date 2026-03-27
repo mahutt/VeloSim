@@ -128,13 +128,39 @@ export function TaskAssignmentBanner() {
     if (action === TaskAction.Unassign) {
       if (isMulti) {
         return unassignStationName
-          ? `Un-assign ${count} tasks at ${unassignStationName} from ${driverName}?`
-          : `Un-assign ${count} tasks from ${driverName}?`;
+          ? formatTranslation(
+              t.taskAssignmentBanner.unassign.multi.withStation,
+              {
+                count,
+                stationName: unassignStationName,
+                driverName,
+              }
+            )
+          : formatTranslation(
+              t.taskAssignmentBanner.unassign.multi.withoutStation,
+              {
+                count,
+                driverName,
+              }
+            );
       }
 
       return unassignStationName
-        ? `Un-assign task #${firstTaskId} at ${unassignStationName} from ${driverName}?`
-        : `Un-assign task #${firstTaskId} from ${driverName}?`;
+        ? formatTranslation(
+            t.taskAssignmentBanner.unassign.single.withStation,
+            {
+              taskId: firstTaskId,
+              stationName: unassignStationName,
+              driverName,
+            }
+          )
+        : formatTranslation(
+            t.taskAssignmentBanner.unassign.single.withoutStation,
+            {
+              taskId: firstTaskId,
+              driverName,
+            }
+          );
     }
 
     // Reassign from a single known driver

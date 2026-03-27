@@ -231,6 +231,20 @@ export const EN_TRANSLATIONS = {
       assignSingleTo: 'Assign task #{{taskId}} to {{to}}?',
     },
   },
+  taskAssignmentBanner: {
+    unassign: {
+      single: {
+        withStation:
+          'Un-assign task #{{taskId}} at {{stationName}} from {{driverName}}?',
+        withoutStation: 'Un-assign task #{{taskId}} from {{driverName}}?',
+      },
+      multi: {
+        withStation:
+          'Un-assign {{count}} tasks at {{stationName}} from {{driverName}}?',
+        withoutStation: 'Un-assign {{count}} tasks from {{driverName}}?',
+      },
+    },
+  },
   driverStateBadge: {
     offShift: {
       label: 'Off shift',
@@ -673,6 +687,22 @@ export const FR_TRANSLATIONS = {
       reassignMultiTo: 'Réassigner {{count}} tâches à {{to}}?',
       assignMultiTo: 'Assigner {{count}} tâches à {{to}}?',
       assignSingleTo: 'Assigner la tâche #{{taskId}} à {{to}}?',
+    },
+  },
+  taskAssignmentBanner: {
+    unassign: {
+      single: {
+        withStation:
+          'Retirer la tâche #{{taskId}} à la station {{stationName}} assignée à {{driverName}}?',
+        withoutStation:
+          'Retirer la tâche #{{taskId}} assignée à {{driverName}} ?',
+      },
+      multi: {
+        withStation:
+          'Retirer les {{count}} tâches à la station {{stationName}} assignées à {{driverName}} ?',
+        withoutStation:
+          'Retirer les {{count}} tâches assignées à {{driverName}} ?',
+      },
     },
   },
   driverStateBadge: {
