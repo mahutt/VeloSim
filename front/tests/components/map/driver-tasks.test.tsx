@@ -225,10 +225,6 @@ describe('DriverTasks', () => {
         stationNames,
       });
 
-      await user.click(
-        screen.getByRole('button', { name: 'Collapse task list' })
-      );
-
       return user;
     }
 

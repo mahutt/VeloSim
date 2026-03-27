@@ -509,7 +509,7 @@ describe('SelectedItemBar', () => {
         </FeatureToggleProvider>
       );
 
-      const taskItems = screen.getAllByText(/^Task #/);
+      const taskItems = screen.getAllByText(/^#/);
       // The wrapper div containing the task item (one level up from [data-slot="item"])
       const firstWrapper = taskItems[0].closest('[data-slot="item"]')!
         .parentElement as HTMLElement;
@@ -684,8 +684,14 @@ describe('SelectedItemBar', () => {
         </FeatureToggleProvider>
       );
 
+      // This test is intended to act on the expanded task view
+      const collapseToggle = screen.getByRole('button', {
+        name: 'Expand task list',
+      });
+      fireEvent.click(collapseToggle);
+
       const taskElements = screen
-        .getAllByText(/^Task #/)
+        .getAllByText(/^#/)
         .map((el) => el.closest('[data-slot="item"]'))
         .filter(Boolean) as HTMLElement[];
       const taskWrappers = taskElements.map(
@@ -733,7 +739,13 @@ describe('SelectedItemBar', () => {
         </FeatureToggleProvider>
       );
 
-      const taskItems = screen.getAllByText(/^Task #/);
+      // This test is intended to act on the expanded task view
+      const collapseToggle = screen.getByRole('button', {
+        name: 'Expand task list',
+      });
+      fireEvent.click(collapseToggle);
+
+      const taskItems = screen.getAllByText(/^#/);
       const firstWrapper = taskItems[0].closest('[data-slot="item"]')!
         .parentElement as HTMLElement;
 
