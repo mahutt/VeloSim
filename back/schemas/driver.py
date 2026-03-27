@@ -157,3 +157,40 @@ class DriverTaskBatchAssignResponse(BaseModel):
     """
 
     items: List[DriverTaskBatchAssignItem]
+
+
+class DriverTaskBatchUnassignRequest(BaseModel):
+    """Request schema for batch unassigning many tasks from their current drivers."""
+
+    task_ids: List[int] = Field(
+        ...,
+        min_length=1,
+        max_length=50,
+        description="List of 1 or more task IDs to unassign",
+    )
+
+    @model_validator(mode="after")
+    def _validate_unique_task_ids(self) -> "DriverTaskBatchUnassignRequest":
+        """Delegate uniqueness check to shared validator utilities."""
+        validate_unique_task_ids(self.task_ids)
+        return self
+
+
+class DriverTaskBatchUnassignItem(BaseModel):
+    """Single result item for a batch unassign operation."""
+
+    task_id: int
+    driver_id: int | None = Field(
+        None,
+        description="Resolved current driver for the task; null when not available",
+    )
+    success: bool = Field(
+        ..., description="True when unassignment succeeded, false otherwise"
+    )
+    error: str | None = Field(None, description="Optional error message for failures")
+
+
+class DriverTaskBatchUnassignResponse(BaseModel):
+    """Response containing per-item results for a batch unassign operation."""
+
+    items: List[DriverTaskBatchUnassignItem]

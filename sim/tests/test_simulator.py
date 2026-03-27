@@ -617,6 +617,32 @@ def test_simulator_wrapper_delegates_and_returns(sim: Simulator) -> None:
     assert all("task_id" in r and "driver_id" in r and "success" in r for r in results)
 
 
+def test_simulator_wrapper_batch_unassign_delegates_and_returns(sim: Simulator) -> None:
+    """Simulator.batch_unassign_tasks_from_drivers delegates to controller."""
+    from unittest.mock import Mock
+
+    mock_controller = Mock()
+    mock_controller.batch_unassign_tasks_from_drivers.return_value = [
+        {"task_id": 1, "driver_id": 1, "success": True, "error": None},
+        {
+            "task_id": 2,
+            "driver_id": None,
+            "success": False,
+            "error": "Task 2 is not assigned to any driver",
+        },
+    ]
+
+    with patch.object(
+        sim, "get_sim_by_id", return_value={"sim_controller": mock_controller}
+    ):
+        results = sim.batch_unassign_tasks_from_drivers("fake-sim", [1, 2])
+
+    mock_controller.batch_unassign_tasks_from_drivers.assert_called_once_with([1, 2])
+    assert isinstance(results, list)
+    assert len(results) == 2
+    assert all("task_id" in r and "success" in r and "driver_id" in r for r in results)
+
+
 @patch("builtins.print")
 def test_assign_task_to_driver_fail(
     mock_print: MagicMock, sim: Simulator, input_params: InputParameter

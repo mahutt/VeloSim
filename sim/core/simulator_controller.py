@@ -25,7 +25,7 @@ SOFTWARE.
 from sim.core.real_time_driver import RealTimeDriver
 import threading
 from typing import Callable, Optional, Dict
-from sim.core.types import BatchAssignResult
+from sim.core.types import BatchAssignResult, BatchUnassignResult
 from sim.core.simulation_environment import SimulationEnvironment
 from sim.entities.station import Station
 from sim.core.frame_emitter import FrameEmitter
@@ -407,6 +407,74 @@ class SimulatorController:
                 )
         return results
 
+    def batch_unassign_tasks_from_drivers(
+        self, task_ids: list[int]
+    ) -> list[BatchUnassignResult]:
+        """Best-effort unassign many tasks from their currently assigned drivers.
+
+        For each task in ``task_ids``:
+        - If task doesn't exist → fail that item
+        - If task is already unassigned → success (no-op)
+        - Otherwise -> attempt unassign from its current driver
+
+        Each unassignment is attempted independently; no rollback is performed.
+
+        Args:
+            task_ids: List of task IDs to unassign.
+
+        Returns:
+            list[dict]: Per-item result dicts with keys ``task_id``,
+            ``driver_id`` (int|None), ``success`` (bool), and ``error`` (str|None).
+        """
+        results: list[BatchUnassignResult] = []
+        for task_id in task_ids:
+            resolved_driver_id: int | None = None
+            try:
+                found_task = self.get_task_by_id(task_id)
+                if found_task is None:
+                    raise Exception(f"Could not find task in sim with id: {task_id}")
+
+                assigned_driver = found_task.get_assigned_driver()
+                if assigned_driver is None:
+                    # The already unassigned task is a successful no-op.
+                    results.append(
+                        {
+                            "task_id": task_id,
+                            "driver_id": None,
+                            "success": True,
+                            "error": None,
+                        }
+                    )
+                    continue
+
+                resolved_driver_id = assigned_driver.id
+                self.unassign_task_from_driver(task_id, resolved_driver_id)
+
+                results.append(
+                    {
+                        "task_id": task_id,
+                        "driver_id": resolved_driver_id,
+                        "success": True,
+                        "error": None,
+                    }
+                )
+            except Exception as e:
+                logger.warning(
+                    "Batch unassign failed for task %s (driver %s): %s",
+                    task_id,
+                    resolved_driver_id,
+                    e,
+                )
+                results.append(
+                    {
+                        "task_id": task_id,
+                        "driver_id": resolved_driver_id,
+                        "success": False,
+                        "error": str(e),
+                    }
+                )
+        return results
+
     def unassign_task_from_driver(self, task_id: int, driver_id: int) -> None:
         """Unassign a task from a driver.
 
@@ -418,13 +486,34 @@ class SimulatorController:
             None
 
         Raises:
-            Exception: If task or driver not found.
+            Exception: If task or driver not found, task is already unassigned,
+                task is assigned to a different driver, task is IN_SERVICE,
+                or the lower-level unassign operation makes no effective change.
         """
         found_task = self.get_task_by_id(task_id)
         found_driver = self.get_driver_by_id(driver_id)
 
         if found_task and found_driver:
+            assigned_driver = found_task.get_assigned_driver()
+            if assigned_driver is None:
+                raise Exception(f"Task {task_id} is not assigned to any driver")
+            if assigned_driver.id != driver_id:
+                raise Exception(
+                    f"Task {task_id} is assigned to driver {assigned_driver.id}, "
+                    f"not {driver_id}"
+                )
+            if found_task.get_state() == State.IN_SERVICE:
+                raise Exception(
+                    f"Task {task_id} is currently in service and cannot be unassigned"
+                )
+
             found_driver.unassign_task(found_task)
+
+            # Guard against silent no-op behaviour in Task entity methods.
+            if found_task.get_assigned_driver() is not None:
+                raise Exception(
+                    f"Task {task_id} could not be unassigned from driver {driver_id}"
+                )
         elif found_task is None:
             raise Exception(f"Could not find task in sim with id: {task_id}")
         else:

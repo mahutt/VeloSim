@@ -35,6 +35,9 @@ from .driver import (
     DriverTaskBatchAssignItem,
     DriverTaskBatchAssignRequest,
     DriverTaskBatchAssignResponse,
+    DriverTaskBatchUnassignItem,
+    DriverTaskBatchUnassignRequest,
+    DriverTaskBatchUnassignResponse,
 )
 from .sim_instance import (
     SimInstanceBase,
@@ -96,6 +99,9 @@ __all__ = [
     "DriverTaskBatchAssignItem",
     "DriverTaskBatchAssignRequest",
     "DriverTaskBatchAssignResponse",
+    "DriverTaskBatchUnassignItem",
+    "DriverTaskBatchUnassignRequest",
+    "DriverTaskBatchUnassignResponse",
     "SimInstanceBase",
     "SimInstanceCreate",
     "SimInstanceResponse",

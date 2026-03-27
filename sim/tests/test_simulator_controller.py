@@ -539,6 +539,76 @@ def test_controller_batch_assign_mixed_fresh_and_reassign(
     assert all(r["success"] is True for r in results)
 
 
+def test_controller_batch_unassign_success(
+    simulator_controller: SimulatorController,
+) -> None:
+    """Batch unassign succeeds when tasks are assigned and not in-service."""
+    mock_task_1 = Mock()
+    mock_task_1.get_state.return_value = State.ASSIGNED
+    mock_task_1.get_assigned_driver.return_value = Mock(id=1)
+
+    mock_task_2 = Mock()
+    mock_task_2.get_state.return_value = State.IN_PROGRESS
+    mock_task_2.get_assigned_driver.return_value = Mock(id=2)
+
+    with (
+        patch.object(
+            simulator_controller,
+            "get_task_by_id",
+            side_effect=lambda tid: {1: mock_task_1, 2: mock_task_2}.get(tid),
+        ),
+        patch.object(
+            simulator_controller, "unassign_task_from_driver", return_value=None
+        ) as mock_unassign,
+    ):
+        results = simulator_controller.batch_unassign_tasks_from_drivers([1, 2])
+        mock_unassign.assert_any_call(1, 1)
+        mock_unassign.assert_any_call(2, 2)
+
+    assert len(results) == 2
+    assert all(r["success"] is True for r in results)
+
+
+def test_controller_batch_unassign_in_service_returns_failure(
+    simulator_controller: SimulatorController,
+) -> None:
+    """IN_SERVICE tasks are rejected and reported as failures."""
+    mock_task = Mock()
+    mock_task.get_state.return_value = State.IN_SERVICE
+    mock_task.get_assigned_driver.return_value = Mock(id=1)
+
+    with patch.object(simulator_controller, "get_task_by_id", return_value=mock_task):
+        results = simulator_controller.batch_unassign_tasks_from_drivers([1])
+
+    assert len(results) == 1
+    assert results[0]["success"] is False
+    assert results[0]["driver_id"] == 1
+    assert "currently in service" in (results[0]["error"] or "")
+
+
+def test_controller_batch_unassign_missing_or_unassigned_failure(
+    simulator_controller: SimulatorController,
+) -> None:
+    """Missing tasks fail; already-unassigned tasks are successful no-ops."""
+    mock_task = Mock()
+    mock_task.get_state.return_value = State.OPEN
+    mock_task.get_assigned_driver.return_value = None
+
+    with patch.object(
+        simulator_controller,
+        "get_task_by_id",
+        side_effect=lambda tid: None if tid == 999 else mock_task,
+    ):
+        results = simulator_controller.batch_unassign_tasks_from_drivers([999, 1])
+
+    assert len(results) == 2
+    assert results[0]["success"] is False
+    assert "Could not find task" in (results[0]["error"] or "")
+    assert results[1]["success"] is True
+    assert results[1]["driver_id"] is None
+    assert results[1]["error"] is None
+
+
 def test_key_frame_includes_new_tasks_and_clears_popups(
     env: simpy.Environment,
     simulator_controller: SimulatorController,
@@ -687,6 +757,7 @@ def test_unassign_task_from_driver_success(
     # Arrange
     task_id = 1
     driver_id = 1
+    simulator_controller.assign_task_to_driver(task_id, driver_id)
 
     # Act
     simulator_controller.unassign_task_from_driver(task_id, driver_id)
@@ -728,6 +799,44 @@ def test_unassign_task_from_driver_with_bad_driver_id(
         Exception, match=f"Could not find driver in sim with id: {driver_id}"
     ):
         simulator_controller.unassign_task_from_driver(task_id, driver_id)
+
+
+def test_unassign_task_from_driver_already_unassigned_raises(
+    simulator_controller: SimulatorController,
+) -> None:
+    """Single-task unassign should fail when task has no assigned driver."""
+    mock_task = Mock()
+    mock_task.get_assigned_driver.return_value = None
+    mock_driver = Mock()
+
+    with (
+        patch.object(simulator_controller, "get_task_by_id", return_value=mock_task),
+        patch.object(
+            simulator_controller, "get_driver_by_id", return_value=mock_driver
+        ),
+    ):
+        with pytest.raises(Exception, match="not assigned to any driver"):
+            simulator_controller.unassign_task_from_driver(task_id=1, driver_id=1)
+
+
+def test_unassign_task_from_driver_in_service_raises(
+    simulator_controller: SimulatorController,
+) -> None:
+    """Single-task unassign should fail for IN_SERVICE tasks."""
+    assigned_driver = Mock(id=1)
+    mock_task = Mock()
+    mock_task.get_assigned_driver.return_value = assigned_driver
+    mock_task.get_state.return_value = State.IN_SERVICE
+    mock_driver = Mock()
+
+    with (
+        patch.object(simulator_controller, "get_task_by_id", return_value=mock_task),
+        patch.object(
+            simulator_controller, "get_driver_by_id", return_value=mock_driver
+        ),
+    ):
+        with pytest.raises(Exception, match="currently in service"):
+            simulator_controller.unassign_task_from_driver(task_id=1, driver_id=1)
 
 
 def test_reassign_task_success(

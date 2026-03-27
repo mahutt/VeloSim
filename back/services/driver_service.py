@@ -39,6 +39,9 @@ from back.schemas import (
     DriverTaskBatchAssignResponse,
     DriverTaskBatchAssignItem,
     DriverTaskBatchAssignRequest,
+    DriverTaskBatchUnassignRequest,
+    DriverTaskBatchUnassignResponse,
+    DriverTaskBatchUnassignItem,
 )
 from sqlalchemy.orm import Session
 
@@ -133,6 +136,10 @@ class DriverService:
     ) -> DriverTaskUnassignResponse:
         """
         Unassign a task from a driver in a running simulation instance.
+
+        This operation is strict (non-idempotent): it fails when the task is
+        already unassigned, assigned to a different driver, or currently in
+        service and therefore not unassignable.
 
         Note:
             This method operates on runtime simulation objects (in-memory IDs).
@@ -378,6 +385,89 @@ class DriverService:
             requesting_user,
         )
         return DriverTaskBatchAssignResponse(items=items)
+
+    def batch_unassign(
+        self,
+        db: Session,
+        sim_id: str,
+        requesting_user: int,
+        batch_request: DriverTaskBatchUnassignRequest,
+    ) -> DriverTaskBatchUnassignResponse:
+        """Batch unassign many tasks from their currently assigned drivers.
+
+        For each task in the request:
+        - If task is already unassigned: returns success (no-op)
+        - Resolves current assigned driver from simulator state
+        - Unassigns task from that driver
+
+        Each unassignment is attempted independently and the response contains
+        per-item success/failure details. No rollback is performed.
+
+        Args:
+            db: Database session
+            sim_id: UUID of the active in-memory simulation
+            requesting_user: Database ID of the user performing the action
+            batch_request: Request containing `task_ids` to unassign
+
+        Returns:
+            DriverTaskBatchUnassignResponse: Per-item unassignment results.
+
+        Raises:
+            VelosimPermissionError: If the user cannot access this simulation.
+            ItemNotFoundError: If the simulation is not found.
+            RuntimeError: If simulator-level setup for batch unassign fails.
+        """
+
+        if not simulation_service.verify_access(db, sim_id, requesting_user):
+            raise VelosimPermissionError("Unauthorized to access this simulation")
+
+        sim_data = simulation_service.active_simulations.get(sim_id)
+        if not sim_data:
+            raise ItemNotFoundError(sim_id, "Simulation not found")
+
+        simulator = simulation_service.simulator
+        if simulator is None:
+            raise RuntimeError(f"Simulator for simulation {sim_id} not found")
+
+        items: list[DriverTaskBatchUnassignItem] = []
+        task_ids = list(batch_request.task_ids)
+
+        try:
+            batch_results = simulator.batch_unassign_tasks_from_drivers(
+                sim_id=sim_id,
+                task_ids=task_ids,
+            )
+        except Exception as err:
+            raise RuntimeError(f"Simulator batch unassign failed: {err}") from err
+
+        for r in batch_results:
+            tsk_val = r.get("task_id")
+            if tsk_val is None:
+                raise RuntimeError("Simulator returned malformed batch unassign item")
+            task_id_int = int(tsk_val)
+
+            drv_val = r.get("driver_id")
+            driver_id_int = int(drv_val) if drv_val is not None else None
+
+            success_bool = bool(r.get("success"))
+            err_val = r.get("error")
+
+            items.append(
+                DriverTaskBatchUnassignItem(
+                    task_id=task_id_int,
+                    driver_id=driver_id_int,
+                    success=success_bool,
+                    error=(err_val if err_val is not None else None),
+                )
+            )
+
+        logger.info(
+            "Batch unassign: sim_id=%s, task_ids=%s, user_id=%s",
+            sim_id,
+            task_ids,
+            requesting_user,
+        )
+        return DriverTaskBatchUnassignResponse(items=items)
 
     def reorder_tasks(
         self,
