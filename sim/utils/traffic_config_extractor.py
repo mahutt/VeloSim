@@ -57,9 +57,14 @@ def extract_traffic_config(
         traffic_level = str(traffic_raw.get("traffic_level", "default"))
         gps_sync_delay = traffic_raw.get("gps_sync_delay", 10)
 
-        # Don't create config for "no_traffic"
+        # Get global field if exists
+        global_field = traffic_raw.get("global", [])
+
+        # Don't create config for "no_traffic" and global field empty
         if traffic_level == "no_traffic":
-            return None
+            if not global_field:
+                return None
+            traffic_level = None
 
         # Validate template key format for DB-backed lookup.
         if not TRAFFIC_TEMPLATE_KEY_PATTERN.fullmatch(traffic_level):
@@ -71,6 +76,7 @@ def extract_traffic_config(
         return TrafficConfig(
             traffic_level=traffic_level,
             traffic_csv_data=traffic_csv_data,
+            global_schedule=global_field,
             sim_start_time=str(scenario_content.get("start_time", "day1:00:00")),
             sim_end_time=str(scenario_content.get("end_time", "day1:00:00")),
             gps_sync_delay=gps_sync_delay,

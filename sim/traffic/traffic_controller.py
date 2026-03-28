@@ -110,6 +110,10 @@ class TrafficController:
         if self._env and self._traffic_events:
             self._env.process(self._run_traffic_events())
 
+        # Start SimPy processes for global multipliers if available
+        if self._env and traffic_config and traffic_config.global_schedule:
+            self._env.process(self._setup_global_traffic_schedules())
+
         if traffic_config:
             self.gps_sync_delay = traffic_config.gps_sync_delay
         else:
@@ -260,6 +264,46 @@ class TrafficController:
 
         self._check_for_similar_event(event)
         self._delete_event(event)
+
+    def _setup_global_traffic_schedules(self) -> Generator[simpy.Event, None, None]:
+        """Spawns processes for every entry in the global multiplier list."""
+        assert self._env is not None
+        if self.traffic_config and self.traffic_config.global_schedule:
+            for event in self.traffic_config.global_schedule:
+                start_tick = event["start_time"]
+                end_tick = event["end_time"]
+                multiplier = event["multiplier"]
+
+                # Schedule start of the global multiplier event
+                self._env.process(self._apply_global_multiplier(start_tick, multiplier))
+
+                # Schedule reset to 1.0 (free flow)
+                self._env.process(self._apply_global_multiplier(end_tick, 1.0))
+
+            yield self._env.timeout(0)
+
+    def _apply_global_multiplier(
+        self, tick: int, multiplier: float
+    ) -> Generator[simpy.Event, None, None]:
+        """
+        Applies global multiplier to all roads at scheduled tick and
+        notifies all routes.
+        """
+        assert self._env is not None
+        delay = max(0, tick - self._env.now)
+        yield self._env.timeout(delay)
+
+        # Update all Roads' global traffic multiplier class variable
+        Road.global_traffic_multiplier = multiplier
+        logger.info(
+            f"Global traffic multiplier updated to {multiplier} at "
+            f"tick {int(self._env.now)}"
+        )
+
+        # Notify all active roads to recalculate routes
+        for road in self._route_controller.get_all_active_roads():
+            road.invalidate_traffic_cache()
+            self._notify_routes_for_road(road)
 
     # =========================================================================
     # Synchronization Subprocess

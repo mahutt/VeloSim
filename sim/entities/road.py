@@ -53,6 +53,9 @@ class Road:
     same road infrastructure.
     """
 
+    # Class variable for global traffic multiplier (defaults to 1)
+    global_traffic_multiplier = 1.0
+
     def __init__(
         self,
         road_id: int,
@@ -197,8 +200,11 @@ class Road:
             Speed multiplier (0.01 to 1.0), 1.0 means free flow (no traffic)
         """
         if not self._traffic_ranges:
-            return 1.0
-        return min(r.multiplier for r in self._traffic_ranges.values())
+            return self.global_traffic_multiplier
+
+        local_min = min(r.multiplier for r in self._traffic_ranges.values())
+
+        return local_min * self.global_traffic_multiplier
 
     @property
     def congestion_level(self) -> CongestionLevel:
@@ -273,7 +279,7 @@ class Road:
             Traffic-adjusted points if traffic ranges exist,
             otherwise default pointcollection
         """
-        if self._traffic_ranges:
+        if self._traffic_ranges or Road.global_traffic_multiplier < 1.0:
             if self._traffic_pointcollection is None:
                 if self._point_strategy is not None:
                     context = RoadPointContext(
@@ -299,7 +305,7 @@ class Road:
             None
         """
         self._traffic_ranges.clear()
-        self._traffic_pointcollection = None
+        self.invalidate_traffic_cache()
 
     def set_point_strategy(self, strategy: Optional[PointGenerationStrategy]) -> None:
         """Set or clear the point generation strategy.
@@ -314,7 +320,15 @@ class Road:
             None.
         """
         self._point_strategy = strategy
-        self._traffic_pointcollection = None  # Invalidate cache
+        self.invalidate_traffic_cache()  # Invalidate cache
+
+    def invalidate_traffic_cache(self) -> None:
+        """Force re-generation of movement points on next access
+
+        Returns:
+            None
+        """
+        self._traffic_pointcollection = None
 
     def apply_traffic_for_overlap(
         self,
@@ -387,14 +401,14 @@ class Road:
             geom_start_index=min_geom_idx,
             geom_end_index=max_geom_idx,
         )
-        self._traffic_pointcollection = None
+        self.invalidate_traffic_cache()
         return True
 
     def get_multiplier_at_index(self, index: int) -> float:
         """Get effective multiplier at a node index.
 
         Checks all traffic ranges. If index falls within multiple ranges,
-        returns the minimum multiplier (most restrictive).
+        returns the minimum multiplier (most restrictive) * global multiplier.
 
         Args:
             index: Node index to check
@@ -402,11 +416,13 @@ class Road:
         Returns:
             Multiplier (0.01-1.0), 1.0 if no traffic at index
         """
-        min_mult = 1.0
+        local_min = 1.0
         for r in self._traffic_ranges.values():
             if r.start_index <= index <= r.end_index:
-                min_mult = min(min_mult, r.multiplier)
-        return min_mult
+                local_min = min(local_min, r.multiplier)
+
+        # Compounds most restrictive local traffic with global mult
+        return local_min * self.global_traffic_multiplier
 
     def remove_traffic(self, segment_key: SegmentKey) -> bool:
         """Remove traffic for a specific segment_key.
@@ -419,7 +435,7 @@ class Road:
         """
         if segment_key in self._traffic_ranges:
             del self._traffic_ranges[segment_key]
-            self._traffic_pointcollection = None  # Invalidate cache
+            self.invalidate_traffic_cache()  # Invalidate cache
             return True
         return False
 
@@ -438,9 +454,15 @@ class Road:
             self._traffic_ranges.values(), key=lambda x: x.geom_start_index
         )
 
+        if not sorted_ranges and Road.global_traffic_multiplier < 1.0:
+            level = multiplier_to_congestion_level(Road.global_traffic_multiplier)
+            if level != CongestionLevel.FREE_FLOW:
+                return [(0, len(self.pointcollection) - 1, level)]
+
         ranges: list[tuple[int, int, CongestionLevel]] = []
         for tr in sorted_ranges:
-            level = multiplier_to_congestion_level(tr.multiplier)
+            effective_multiplier = tr.multiplier * Road.global_traffic_multiplier
+            level = multiplier_to_congestion_level(effective_multiplier)
             if level != CongestionLevel.FREE_FLOW:
                 ranges.append((tr.geom_start_index, tr.geom_end_index, level))
         return ranges
