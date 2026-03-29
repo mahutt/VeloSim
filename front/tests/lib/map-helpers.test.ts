@@ -120,7 +120,7 @@ test('initializeMapSources adds all required sources', () => {
 test('setMapLayers adds expected number of layers', () => {
   MockMap.createRandomInstance();
   setMapLayers(MockMap.instance! as unknown as mapboxgl.Map);
-  expect(MockMap.instance?.addLayer).toHaveBeenCalledTimes(9);
+  expect(MockMap.instance?.addLayer).toHaveBeenCalledTimes(12);
 });
 
 test('loadMapImages handles image loading with async callbacks', async () => {

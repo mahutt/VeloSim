@@ -22,6 +22,7 @@
  * SOFTWARE.
  */
 
+import type { BBox } from 'geojson';
 import type { ExpressionSpecification } from 'mapbox-gl';
 import { UILanguage } from '~/types';
 
@@ -42,6 +43,11 @@ const MONTREAL_BOUNDS = {
   LON_MIN: -74.26,
   LON_MAX: -73.22,
 } as const;
+
+/**
+ * Global geographical bounds for cluster querying
+ */
+const GLOBAL_BOUNDS: BBox = [-180, -90, 180, 90] as const;
 
 /**
  * Regex pattern for validating scheduled task format: dayN:HH:MM
@@ -119,6 +125,7 @@ export {
   USER_PREFERENCES_STORAGE_KEY,
   DEFAULT_UI_LANGUAGE,
   MONTREAL_BOUNDS,
+  GLOBAL_BOUNDS,
   SCHEDULED_TASK_PATTERN,
   SIMULATION_FRAMES_PER_KEY_FRAME,
   FREE_FLOW_COLOR,

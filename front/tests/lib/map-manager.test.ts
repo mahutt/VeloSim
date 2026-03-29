@@ -38,6 +38,7 @@ import type SimulationStateManager from '~/lib/simulation-state-manager';
 import { makeDriver, makePayload, makeStation } from 'tests/test-helpers';
 import type { Position, Route } from '~/types';
 import { SelectedItemType } from '~/components/map/selected-item-bar';
+import { featureCollection } from '@turf/helpers';
 
 const raf = vi.fn();
 const caf = vi.fn();
@@ -97,6 +98,7 @@ const {
   mockClearRouteDisplay,
   mockAdaptHeadquartersToGeoJSON,
   mockAdaptStationsToGeoJSON,
+  mockAdaptClustersToGeoJSON,
   mockAdaptResourcesToGeoJSON,
   mockComputeBearing,
 } = vi.hoisted(() => {
@@ -108,6 +110,7 @@ const {
     mockClearRouteDisplay: vi.fn(),
     mockAdaptHeadquartersToGeoJSON: vi.fn().mockReturnValue({}),
     mockAdaptStationsToGeoJSON: vi.fn().mockReturnValue({}),
+    mockAdaptClustersToGeoJSON: vi.fn().mockReturnValue({}),
     mockAdaptResourcesToGeoJSON: vi.fn().mockReturnValue({}),
     mockComputeBearing: vi.fn(),
   };
@@ -136,6 +139,7 @@ vi.mock('~/lib/geojson-adapters', () => {
   return {
     adaptHeadquartersToGeoJSON: mockAdaptHeadquartersToGeoJSON,
     adaptStationsToGeoJSON: mockAdaptStationsToGeoJSON,
+    adaptClustersToGeoJSON: mockAdaptClustersToGeoJSON,
     adaptResourcesToGeoJSON: mockAdaptResourcesToGeoJSON,
   };
 });
@@ -163,6 +167,8 @@ const mockMap = {
   getSource: () => ({
     setData: vi.fn(),
   }),
+  getZoom: vi.fn(() => 10),
+  on: vi.fn(),
 } as unknown as MapboxGLMap;
 
 function makeManager() {
@@ -733,7 +739,7 @@ describe('MapManager', () => {
 
     test('updates stations when provided', () => {
       const stations = [makeStation({ id: 1 })];
-      const geojson = { type: 'FeatureCollection' };
+      const geojson = featureCollection([]);
       mockAdaptStationsToGeoJSON.mockReturnValue(geojson);
       manager.updateMapSources(false, [], stations, new Map(), new Map(), null);
 
@@ -844,13 +850,19 @@ describe('MapManager', () => {
     });
 
     test('passes multi-selected station ids when a station is selected', () => {
-      const station = makeStation({ id: 7 });
+      const station = makeStation({ id: 7, taskIds: [1] });
       (mockSimulationStateManager.getSelectedItems as Mock).mockReturnValue([
-        { type: SelectedItemType.Station, value: { id: station.id } },
+        {
+          type: SelectedItemType.Station,
+          value: station,
+        },
       ]);
       (
         mockSimulationStateManager.getMultiSelectedStationIds as Mock
       ).mockReturnValue(new Set([7]));
+      (mockAdaptStationsToGeoJSON as Mock).mockReturnValue(
+        featureCollection([])
+      );
 
       const stations = [station];
       manager.updateMapSources(false, [], stations, new Map(), new Map(), null);

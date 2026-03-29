@@ -35,6 +35,7 @@ import {
   adaptHeadquartersToGeoJSON,
   adaptStationsToGeoJSON,
   adaptResourcesToGeoJSON,
+  adaptClustersToGeoJSON,
 } from './geojson-adapters';
 import {
   setMapSource,
@@ -59,6 +60,10 @@ import type SimulationStateManager from './simulation-state-manager';
 import { updateDriverPositions } from './animation-helpers';
 import { toast } from 'sonner';
 import { log, LogContext, LogLevel } from './logger';
+import { featureCollection } from '@turf/helpers';
+import type { Feature, Point } from 'geojson';
+import { GLOBAL_BOUNDS } from '~/constants';
+import Supercluster from 'supercluster';
 
 export default class MapManager {
   private map: MapboxGLMap;
@@ -78,6 +83,10 @@ export default class MapManager {
   private routes: Map<number, Route>;
   private lastDriverUpdates: Map<number, number>;
   private animationFrame: number;
+
+  // for clustering
+  private supercluster: Supercluster;
+  private quantizedZoom: number;
 
   constructor(
     map: MapboxGLMap,
@@ -100,6 +109,29 @@ export default class MapManager {
     this.routes = new Map();
     this.lastDriverUpdates = new Map();
     this.animationFrame = 0;
+
+    this.supercluster = new Supercluster({
+      maxZoom: 13,
+      minZoom: 11,
+      map: (props) => ({
+        taskCount: props!.taskCount,
+        stationIds: [props!.id],
+      }),
+      reduce: (accumulated, props) => {
+        accumulated!.taskCount += props!.taskCount;
+        accumulated!.stationIds = accumulated!.stationIds.concat(
+          props!.stationIds
+        );
+      },
+    });
+    this.quantizedZoom = Math.floor(this.map.getZoom());
+
+    map.on('zoom', () => {
+      const newQuantizedZoom = Math.floor(map.getZoom());
+      if (this.quantizedZoom === newQuantizedZoom) return;
+      this.quantizedZoom = newQuantizedZoom;
+      this.updateStationAndClusterSources();
+    });
 
     setupMapClickHandlers(map, (item, modifiers) => {
       if (!item) {
@@ -353,12 +385,13 @@ export default class MapManager {
     // Update stations
     if (stations.length > 0) {
       const geojson = adaptStationsToGeoJSON(
-        stations,
+        stations.filter((s) => s.taskIds.length > 0),
         this.state.getMultiSelectedStationIds(),
         this.hoveredStationId,
         this.state.getPartialAssignmentStationIds()
       );
-      setMapSource(MapSource.Stations, geojson, map);
+      this.supercluster.load(geojson.features);
+      this.updateStationAndClusterSources();
     }
 
     // Derive selected resource (driver) ID from selection state
@@ -442,5 +475,36 @@ export default class MapManager {
     this.hoverDebounceTimeout = setTimeout(() => {
       this.state.setMapShouldRefresh(true);
     }, 16); // ~60fps
+  }
+
+  private updateStationAndClusterSources() {
+    const clusters: Feature<Point>[] = [];
+    const stations: Feature<Point>[] = [];
+
+    for (const feature of this.supercluster.getClusters(
+      GLOBAL_BOUNDS,
+      this.map.getZoom()
+    )) {
+      (feature.properties?.cluster_id ? clusters : stations).push(feature);
+    }
+
+    setMapSource(MapSource.Stations, featureCollection(stations), this.map);
+
+    clusters.forEach((c) => {
+      const stationPoints = (c.properties!.stationIds as number[]).map(
+        (stationId: number) => this.state.getStation(stationId)!.position
+      );
+      c.properties!.stationPoints = stationPoints;
+    });
+    setMapSource(
+      MapSource.Clusters,
+      adaptClustersToGeoJSON(clusters),
+      this.map
+    );
+    setMapSource(
+      MapSource.ClusterCentroids,
+      featureCollection(clusters),
+      this.map
+    );
   }
 }
