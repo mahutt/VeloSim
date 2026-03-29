@@ -26,7 +26,13 @@ import { featureCollection, lineString, point } from '@turf/helpers';
 import nearestPointOnLine from '@turf/nearest-point-on-line';
 import { distance } from '@turf/distance';
 import { circle } from '@turf/circle';
-import type { Feature, FeatureCollection, Point, Polygon } from 'geojson';
+import type {
+  Feature,
+  FeatureCollection,
+  LineString,
+  Point,
+  Polygon,
+} from 'geojson';
 import {
   FREE_FLOW_COLOR,
   MODERATE_COLOR,
@@ -48,23 +54,13 @@ import type { AnyProps } from 'supercluster';
 
 export function adaptHeadquartersToGeoJSON(
   headquarters: Headquarters
-): GeoJSON.FeatureCollection {
-  return {
-    type: 'FeatureCollection',
-    features: [
-      {
-        type: 'Feature',
-        properties: {
-          id: 'headquarters',
-          name: 'Headquarters',
-        },
-        geometry: {
-          type: 'Point',
-          coordinates: headquarters.position,
-        },
-      },
-    ],
-  };
+): FeatureCollection<Point> {
+  return featureCollection([
+    point(headquarters.position, {
+      id: 'headquarters',
+      name: 'Headquarters',
+    }),
+  ]);
 }
 
 export function adaptStationsToGeoJSON(
@@ -74,11 +70,9 @@ export function adaptStationsToGeoJSON(
   taskHoveredStationId: number | null,
   partiallyAssignedStationIds: ReadonlySet<number> = new Set<number>()
 ): FeatureCollection<Point, AnyProps> {
-  return {
-    type: 'FeatureCollection',
-    features: stations.map((station) => ({
-      type: 'Feature',
-      properties: {
+  return featureCollection(
+    stations.map((station) =>
+      point(station.position, {
         id: station.id,
         name: station.name,
         taskCount: station.taskIds.length,
@@ -86,13 +80,9 @@ export function adaptStationsToGeoJSON(
         hasPartialAssignment: partiallyAssignedStationIds.has(station.id),
         hover: station.id === hoveredStationId,
         taskHover: station.id === taskHoveredStationId,
-      },
-      geometry: {
-        type: 'Point',
-        coordinates: station.position,
-      },
-    })),
-  };
+      })
+    )
+  );
 }
 
 export function adaptClustersToGeoJSON(
@@ -122,25 +112,19 @@ export function adaptResourcesToGeoJSON(
   selectedId: number | null,
   hoveredId: number | null,
   bearings: Map<number, number>
-): GeoJSON.FeatureCollection {
-  return {
-    type: 'FeatureCollection',
-    features: resources.map((resource) => ({
-      type: 'Feature',
-      properties: {
+): FeatureCollection<Point> {
+  return featureCollection(
+    resources.map((resource) =>
+      point(resource.position, {
         id: resource.id,
         name: resource.name,
         state: resource.state,
         selected: resource.id === selectedId,
         hover: resource.id === hoveredId,
         bearing: bearings.get(resource.id) ?? 0,
-      },
-      geometry: {
-        type: 'Point',
-        coordinates: resource.position,
-      },
-    })),
-  };
+      })
+    )
+  );
 }
 
 /**
@@ -152,20 +136,16 @@ function splitByTraffic(
   globalOffset: number,
   trafficRanges: TrafficRange[],
   segmentLabel: string
-): GeoJSON.Feature[] {
+): Feature<LineString>[] {
   if (coords.length < 2) return [];
 
   if (trafficRanges.length === 0) {
     return [
-      {
-        type: 'Feature',
-        properties: {
-          segmentLabel,
-          color: FREE_FLOW_COLOR,
-          opacity: FREE_FLOW_OPACITY,
-        },
-        geometry: { type: 'LineString', coordinates: coords },
-      },
+      lineString(coords, {
+        segmentLabel,
+        color: FREE_FLOW_COLOR,
+        opacity: FREE_FLOW_OPACITY,
+      }),
     ];
   }
 
@@ -189,7 +169,7 @@ function splitByTraffic(
     .filter((r) => r.start < len && r.end >= 0 && r.end > r.start)
     .sort((a, b) => a.start - b.start);
 
-  const features: GeoJSON.Feature[] = [];
+  const features: Feature<LineString>[] = [];
   let cursor = 0;
 
   for (const range of localRanges) {
@@ -220,7 +200,7 @@ function splitByTraffic(
 
 /** Push a LineString feature from coords[startIdx..endIdx]. Defaults to free-flow style. */
 function addSegment(
-  features: GeoJSON.Feature[],
+  features: Feature<LineString>[],
   coords: Position[],
   startIdx: number,
   endIdx: number,
@@ -230,19 +210,15 @@ function addSegment(
 ) {
   const slice = coords.slice(startIdx, endIdx + 1);
   if (slice.length < 2) return;
-  features.push({
-    type: 'Feature',
-    properties: { segmentLabel, color, opacity },
-    geometry: { type: 'LineString', coordinates: slice },
-  });
+  features.push(lineString(slice, { segmentLabel, color, opacity }));
 }
 
 export function adaptRouteToGeoJSON(
   route: Route,
   position: Position
 ): {
-  nextTask: GeoJSON.FeatureCollection;
-  futureTasks: GeoJSON.FeatureCollection;
+  nextTask: FeatureCollection<LineString>;
+  futureTasks: FeatureCollection<LineString>;
 } {
   const { coordinates, nextStopIndex, trafficRanges } = route;
   if (
@@ -251,8 +227,8 @@ export function adaptRouteToGeoJSON(
     nextStopIndex > coordinates.length - 1
   ) {
     return {
-      nextTask: EMPTY_FEATURE_COLLECTION,
-      futureTasks: EMPTY_FEATURE_COLLECTION,
+      nextTask: EMPTY_FEATURE_COLLECTION as FeatureCollection<LineString>,
+      futureTasks: EMPTY_FEATURE_COLLECTION as FeatureCollection<LineString>,
     };
   }
 
@@ -296,7 +272,7 @@ export function adaptRouteToGeoJSON(
       : [];
 
   return {
-    nextTask: { type: 'FeatureCollection', features: nextTaskFeatures },
-    futureTasks: { type: 'FeatureCollection', features: futureTaskFeatures },
+    nextTask: featureCollection(nextTaskFeatures),
+    futureTasks: featureCollection(futureTaskFeatures),
   };
 }

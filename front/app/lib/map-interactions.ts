@@ -62,7 +62,8 @@ type ItemHoverCallback = (
 
 export function setupMapClickHandlers(
   map: MapboxMap,
-  onItemSelect: ItemSelectCallback
+  onItemSelect: ItemSelectCallback,
+  onClusterClick: (clusterId: number) => void
 ) {
   map.on('click', (e: MapMouseEvent) => {
     const modifiers = {
@@ -78,6 +79,13 @@ export function setupMapClickHandlers(
     }
 
     const feature = features[0];
+
+    // Handle the case that the feature is a cluster
+    if (typeof feature.properties?.cluster_id === 'number') {
+      onClusterClick(feature.properties.cluster_id);
+      return;
+    }
+    // Can now assume the feature represents a discrete entity
 
     if (!feature.properties || !feature.properties.id) {
       throw new Error('Clicked feature has no id property');

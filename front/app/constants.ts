@@ -22,7 +22,7 @@
  * SOFTWARE.
  */
 
-import type { BBox } from 'geojson';
+import type { BBox, FeatureCollection } from 'geojson';
 import type { ExpressionSpecification } from 'mapbox-gl';
 import { UILanguage } from '~/types';
 
@@ -84,7 +84,7 @@ const ROUTE_LINE_WIDTH: ExpressionSpecification =
 /**
  * Empty feature collection, usually used for clearing Mapbox map sources
  */
-export const EMPTY_FEATURE_COLLECTION: GeoJSON.FeatureCollection = {
+export const EMPTY_FEATURE_COLLECTION: FeatureCollection = {
   type: 'FeatureCollection',
   features: [],
 };
