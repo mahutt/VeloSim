@@ -30,10 +30,7 @@ import usePreferences from '~/hooks/use-preferences';
 import type { GetSimulationReportResponse } from '~/types';
 import {
   DEFAULT_SIMULATION_REPORT,
-  SIMULATION_REPORT_METRIC_KEYS,
-  SIMULATION_REPORT_SUMMARY_LEGEND_SELECTORS,
   downloadSimulationReportCsv,
-  formatSimulationReportMetricValue,
   getSimulationReport,
 } from '~/utils/simulation-report';
 import { Button } from '../ui/button';
@@ -44,6 +41,10 @@ import {
   DialogHeader,
   DialogTitle,
 } from '../ui/dialog';
+import { formatDistance, formatDuration } from '~/lib/utils';
+
+const FALLBACK_DISPLAY = '--';
+const SEPARATOR = ' / ';
 
 export function ReportSummaryCell({ simId }: { simId: string }) {
   const { t } = usePreferences();
@@ -82,9 +83,19 @@ export function ReportSummaryCell({ simId }: { simId: string }) {
 
   return (
     <span className="text-sm">
-      {SIMULATION_REPORT_METRIC_KEYS.map((key) =>
-        formatSimulationReportMetricValue(report[key])
-      ).join(' / ')}
+      {report.servicingToDrivingRatio?.toFixed(1) ?? FALLBACK_DISPLAY}
+      {SEPARATOR}
+      {report.vehicleUtilizationRatio?.toFixed(1) ?? FALLBACK_DISPLAY}
+      {SEPARATOR}
+      {report.averageTasksServicedPerShift?.toFixed(1) ?? FALLBACK_DISPLAY}
+      {SEPARATOR}
+      {report.averageTaskResponseTime !== null
+        ? formatDuration(report.averageTaskResponseTime)
+        : FALLBACK_DISPLAY}
+      {SEPARATOR}
+      {report.vehicleDistanceTraveled !== null
+        ? formatDistance(report.vehicleDistanceTraveled)
+        : FALLBACK_DISPLAY}
     </span>
   );
 }
@@ -177,12 +188,31 @@ export function ReportCell({
 
           {!loadingPreview && report && (
             <div className="space-y-3 text-sm">
-              {SIMULATION_REPORT_METRIC_KEYS.map((key, index) => (
-                <div key={key}>
-                  {SIMULATION_REPORT_SUMMARY_LEGEND_SELECTORS[index](t)}:{' '}
-                  {formatSimulationReportMetricValue(report[key])}
-                </div>
-              ))}
+              <div>
+                {t.simulations.report.legend.servicingToDrivingRatio}:{' '}
+                {report.servicingToDrivingRatio?.toFixed(2) ?? FALLBACK_DISPLAY}
+              </div>
+              <div>
+                {t.simulations.report.legend.vehicleUtilizationRatio}:{' '}
+                {report.vehicleUtilizationRatio?.toFixed(2) ?? FALLBACK_DISPLAY}
+              </div>
+              <div>
+                {t.simulations.report.legend.averageTasksServicedPerShift}:{' '}
+                {report.averageTasksServicedPerShift?.toFixed(2) ??
+                  FALLBACK_DISPLAY}
+              </div>
+              <div>
+                {t.simulations.report.legend.averageTaskResponseTime}:{' '}
+                {report.averageTaskResponseTime !== null
+                  ? formatDuration(report.averageTaskResponseTime)
+                  : FALLBACK_DISPLAY}
+              </div>
+              <div>
+                {t.simulations.report.legend.totalVehicleDistanceTravelled}:{' '}
+                {report.vehicleDistanceTraveled !== null
+                  ? formatDistance(report.vehicleDistanceTraveled)
+                  : FALLBACK_DISPLAY}
+              </div>
             </div>
           )}
         </DialogContent>

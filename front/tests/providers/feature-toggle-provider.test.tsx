@@ -45,7 +45,9 @@ function TestConsumer() {
   return (
     <div>
       <div data-testid="sidebar-flag">{String(flags.sidebar)}</div>
-      <div data-testid="simulations-flag">{String(flags.simulationsPage)}</div>
+      <div data-testid="simulation-scrubber-flag">
+        {String(flags.simulationScrubber)}
+      </div>
       <div data-testid="sidebar-enabled">{String(isEnabled('sidebar'))}</div>
       <button
         onClick={() => setOverride({ sidebar: false })}
@@ -82,8 +84,8 @@ describe('FeatureToggleProvider', () => {
       expect(screen.getByTestId('sidebar-flag')).toHaveTextContent(
         String(DEFAULT_FLAGS.sidebar)
       );
-      expect(screen.getByTestId('simulations-flag')).toHaveTextContent(
-        String(DEFAULT_FLAGS.simulationsPage)
+      expect(screen.getByTestId('simulation-scrubber-flag')).toHaveTextContent(
+        String(DEFAULT_FLAGS.simulationScrubber)
       );
     });
   });
@@ -117,9 +119,9 @@ describe('FeatureToggleProvider', () => {
 
     await waitFor(() => {
       expect(screen.getByTestId('sidebar-flag')).toHaveTextContent('false');
-      // simulationsPage should still be default since not overridden
-      expect(screen.getByTestId('simulations-flag')).toHaveTextContent(
-        String(DEFAULT_FLAGS.simulationsPage)
+      // simulationScrubber should still be default since not overridden
+      expect(screen.getByTestId('simulation-scrubber-flag')).toHaveTextContent(
+        String(DEFAULT_FLAGS.simulationScrubber)
       );
     });
   });
@@ -157,7 +159,7 @@ describe('FeatureToggleProvider', () => {
     // set initial override
     sessionStorage.setItem(
       FEATURE_FLAGS_KEY,
-      JSON.stringify({ simulationsPage: false })
+      JSON.stringify({ simulationScrubber: false })
     );
 
     render(
@@ -167,7 +169,9 @@ describe('FeatureToggleProvider', () => {
     );
 
     await waitFor(() => {
-      expect(screen.getByTestId('simulations-flag')).toHaveTextContent('false');
+      expect(screen.getByTestId('simulation-scrubber-flag')).toHaveTextContent(
+        'false'
+      );
     });
 
     // add another override
@@ -181,7 +185,7 @@ describe('FeatureToggleProvider', () => {
 
     const stored = sessionStorage.getItem(FEATURE_FLAGS_KEY);
     const parsed = JSON.parse(stored!);
-    expect(parsed.simulationsPage).toBe(false);
+    expect(parsed.simulationScrubber).toBe(false);
     expect(parsed.sidebar).toBe(false);
   });
 

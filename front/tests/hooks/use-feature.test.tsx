@@ -88,16 +88,6 @@ describe('useFeature', () => {
     });
   });
 
-  test('returns value for simulationsPage flag', async () => {
-    const { result } = renderHook(() => useFeature('simulationsPage'), {
-      wrapper: createWrapper(),
-    });
-
-    await waitFor(() => {
-      expect(result.current).toBe(DEFAULT_FLAGS.simulationsPage);
-    });
-  });
-
   test('updates when flags change', async () => {
     const { result, rerender } = renderHook(() => useFeature('sidebar'), {
       wrapper: createWrapper(),
@@ -128,7 +118,7 @@ describe('useFeature', () => {
   });
 
   test('handles all feature flag types', async () => {
-    const flags = ['sidebar', 'simulationsPage'] as const;
+    const flags = ['sidebar', 'simulationScrubber'] as const;
 
     for (const flag of flags) {
       const { result } = renderHook(() => useFeature(flag), {
