@@ -464,10 +464,6 @@ export default class MapManager {
     }
   }
 
-  public setHoveredStationId(stationId: number | null) {
-    this.updateHoverState(stationId, null);
-  }
-
   public setTaskHoveredStationId(stationId: number | null) {
     this.taskHoveredStationId = stationId;
     this.state.setMapShouldRefresh(true);

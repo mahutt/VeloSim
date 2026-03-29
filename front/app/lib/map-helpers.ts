@@ -283,12 +283,7 @@ export function setMapLayers(map: mapboxgl.Map) {
       ],
     },
     maxzoom: 13,
-    filter: [
-      'any',
-      ['>', ['get', 'taskCount'], 0],
-      ['boolean', ['get', 'taskHover'], false],
-      ['boolean', ['get', 'selected'], false],
-    ],
+    filter: TASK_HOVERED_OR_STATION_SELECTED,
   });
 
   // ring for stations that have partial assignment
@@ -321,11 +316,7 @@ export function setMapLayers(map: mapboxgl.Map) {
       ],
     },
     minzoom: 13,
-    filter: [
-      'all',
-      ['>', ['get', 'taskCount'], 0],
-      ['==', ['get', 'hasPartialAssignment'], true],
-    ],
+    filter: ['==', ['get', 'hasPartialAssignment'], true],
   });
 
   // Add layers for stations (filtered to only show stations with taskCount > 0)
@@ -351,15 +342,10 @@ export function setMapLayers(map: mapboxgl.Map) {
       ],
     },
     minzoom: 13,
-    filter: [
-      'any',
-      ['>', ['get', 'taskCount'], 0],
-      ['boolean', ['get', 'taskHover'], false],
-      ['boolean', ['get', 'selected'], false],
-    ],
+    filter: TASK_HOVERED_OR_STATION_SELECTED,
   });
 
-  // task count labels for stations (filtered to only show stations with taskCount > 0)
+  // task count labels for stations
   map.addLayer({
     id: MapLayer.StationTaskCounts,
     type: 'symbol',
@@ -408,7 +394,6 @@ export function setMapLayers(map: mapboxgl.Map) {
       'text-halo-width': 0,
     },
     minzoom: 13,
-    filter: ['>', ['get', 'taskCount'], 0],
   });
 
   map.addLayer({
