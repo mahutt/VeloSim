@@ -64,6 +64,7 @@ class SimInstanceResponse(SimInstanceBase):
     date_updated: datetime
     uuid: UUID4
     completed: bool = Field(default=False)
+    completion_percentage: int = Field(default=0)
 
     model_config = ConfigDict(from_attributes=True)
 

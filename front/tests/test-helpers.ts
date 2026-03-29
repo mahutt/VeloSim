@@ -268,6 +268,7 @@ export function makeSimulation(
     resource_count: overrides.resource_count ?? 99,
     station_count: overrides.station_count ?? 99,
     task_count: overrides.task_count ?? 99,
+    completion_percentage: overrides.completion_percentage ?? 0,
   };
 }
 

@@ -591,6 +591,61 @@ class SimulationService:
         )
         return simulations, total
 
+    def compute_completion_percentage(
+        self,
+        db: Session,
+        sim: SimInstance,
+        latest_seconds: float | None = None,
+    ) -> int:
+        """Compute the completion percentage (0–100) for a simulation.
+
+        Rules:
+        - completed=True -> 100%
+        - active sim -> current clock seconds / sim_time * 100
+        - inactive, non-completed sim -> latest persisted frame seconds / sim_time * 100
+        - sim_time unavailable or zero -> 0
+
+        Args:
+            db: Database session.
+            sim: The SimInstance to compute percentage for.
+            latest_seconds: Optional pre-fetched latest sim seconds (avoids a DB query).
+
+        Returns:
+            int: Completion percentage clamped to [0, 100].
+        """
+        if sim.completed:
+            return 100
+
+        sim_uuid = str(sim.uuid)
+        sim_time: int | None = None
+        current_sim_seconds: float | None = None
+
+        if sim_uuid in self.active_simulations:
+            active_data = self.active_simulations[sim_uuid]
+            sim_time = active_data.get("sim_time")
+            sim_info = self.simulator.get_sim_by_id(sim_uuid)
+            if sim_info:
+                current_sim_seconds = sim_info["sim_controller"].clock.sim_time_seconds
+
+        if current_sim_seconds is None:
+            if latest_seconds is not None:
+                current_sim_seconds = latest_seconds
+            else:
+                current_sim_seconds = sim_frame_crud.get_latest_sim_seconds(db, sim.id)
+
+        if sim_time is None and isinstance(sim.scenario_payload, dict):
+            end_time_str = sim.scenario_payload.get("end_time")
+            if isinstance(end_time_str, str):
+                try:
+                    sim_time = ReplayParser._time_str_to_seconds(end_time_str)
+                except (ValueError, TypeError):
+                    pass
+
+        if not sim_time or sim_time <= 0 or current_sim_seconds is None:
+            return 0
+
+        return min(100, max(0, int((current_sim_seconds / sim_time) * 100)))
+
     def get_simulation_status(
         self, db: Session, sim_id: str, requesting_user: int
     ) -> str:

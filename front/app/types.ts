@@ -264,6 +264,7 @@ export interface Simulation {
   name: string;
   user_id: number;
   completed: boolean;
+  completion_percentage: number;
   date_created: string;
   date_updated: string;
   resource_count: number;

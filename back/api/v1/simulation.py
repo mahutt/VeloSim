@@ -90,6 +90,7 @@ from back.exceptions import (
     VelosimPermissionError,
 )
 from back.services.driver_service import driver_service
+from back.crud.sim_frame import sim_frame_crud
 from back.crud.sim_keyframe import sim_keyframe_crud
 from back.crud.sim_instance import sim_instance_crud
 from back.crud.user import user_crud
@@ -309,8 +310,21 @@ def list_my_simulations(
     total_pages = math.ceil(total / limit) if total > 0 else 0
     page = (skip // limit) + 1
 
+    sim_ids = [sim.id for sim in sims]
+    latest_seconds_map = sim_frame_crud.get_latest_sim_seconds_bulk(db, sim_ids)
+
+    sim_responses = []
+    for sim in sims:
+        pct = simulation_service.compute_completion_percentage(
+            db, sim, latest_seconds=latest_seconds_map.get(sim.id, 0.0)
+        )
+        response = SimInstanceResponse.model_validate(sim).model_copy(
+            update={"completion_percentage": pct}
+        )
+        sim_responses.append(response)
+
     return SimulationListResponse(
-        simulations=[SimInstanceResponse.model_validate(sim) for sim in sims],
+        simulations=sim_responses,
         total=total,
         page=page,
         per_page=limit,
@@ -345,8 +359,21 @@ def list_all_simulations(
     total_pages = math.ceil(total / limit) if total > 0 else 0
     page = (skip // limit) + 1
 
+    sim_ids = [sim.id for sim in sims]
+    latest_seconds_map = sim_frame_crud.get_latest_sim_seconds_bulk(db, sim_ids)
+
+    sim_responses = []
+    for sim in sims:
+        pct = simulation_service.compute_completion_percentage(
+            db, sim, latest_seconds=latest_seconds_map.get(sim.id, 0.0)
+        )
+        response = SimInstanceResponse.model_validate(sim).model_copy(
+            update={"completion_percentage": pct}
+        )
+        sim_responses.append(response)
+
     return SimulationListResponse(
-        simulations=[SimInstanceResponse.model_validate(sim) for sim in sims],
+        simulations=sim_responses,
         total=total,
         page=page,
         per_page=limit,

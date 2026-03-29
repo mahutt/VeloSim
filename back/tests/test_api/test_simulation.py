@@ -4435,6 +4435,8 @@ class TestInitializeSimulationName:
         assert response.status_code == 200
 
 
+@patch("back.crud.sim_frame.SimFrameCRUD.get_latest_sim_seconds", return_value=None)
+@patch("back.crud.sim_frame.SimFrameCRUD.get_latest_sim_seconds_bulk", return_value={})
 class TestSimulationListNameDisplay:
     """Tests verifying that the simulation list always returns a non-null name."""
 
@@ -4442,7 +4444,11 @@ class TestSimulationListNameDisplay:
         "back.services.simulation_service.simulation_service.get_all_user_simulations"
     )
     def test_list_returns_explicit_name(
-        self, mock_list: MagicMock, authenticated_client: TestClient
+        self,
+        mock_list: MagicMock,
+        mock_bulk: MagicMock,
+        mock_single: MagicMock,
+        authenticated_client: TestClient,
     ) -> None:
         """Sims with an explicit name should return it in the list."""
         sim = make_sim_instance(id=1)
@@ -4458,7 +4464,11 @@ class TestSimulationListNameDisplay:
         "back.services.simulation_service.simulation_service.get_all_user_simulations"
     )
     def test_list_returns_fallback_name_when_null(
-        self, mock_list: MagicMock, authenticated_client: TestClient
+        self,
+        mock_list: MagicMock,
+        mock_bulk: MagicMock,
+        mock_single: MagicMock,
+        authenticated_client: TestClient,
     ) -> None:
         """Sims with NULL name should get a fallback 'Simulation {id}'."""
         sim = make_sim_instance(id=99)
@@ -4475,7 +4485,11 @@ class TestSimulationListNameDisplay:
         "back.services.simulation_service.simulation_service.get_all_user_simulations"
     )
     def test_list_derives_name_from_scenario_payload(
-        self, mock_list: MagicMock, authenticated_client: TestClient
+        self,
+        mock_list: MagicMock,
+        mock_bulk: MagicMock,
+        mock_single: MagicMock,
+        authenticated_client: TestClient,
     ) -> None:
         """Sims with NULL name but a scenario_payload with 'name' key
         should derive the sim name from the scenario name."""
@@ -4495,7 +4509,11 @@ class TestSimulationListNameDisplay:
         "back.services.simulation_service.simulation_service.get_all_user_simulations"
     )
     def test_list_name_never_null(
-        self, mock_list: MagicMock, authenticated_client: TestClient
+        self,
+        mock_list: MagicMock,
+        mock_bulk: MagicMock,
+        mock_single: MagicMock,
+        authenticated_client: TestClient,
     ) -> None:
         """The 'name' field must never be null/None in the response."""
         sim = make_sim_instance(id=77)

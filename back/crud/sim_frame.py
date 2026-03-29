@@ -329,5 +329,55 @@ class SimFrameCRUD:
         # rowcount is available but not in typing stubs
         return result.rowcount  # type: ignore[attr-defined,no-any-return]
 
+    def get_latest_sim_seconds(
+        self, db: Session, sim_instance_id: int
+    ) -> Optional[float]:
+        """Return the highest sim_seconds_elapsed persisted for a simulation instance.
+
+        Used to estimate progress for inactive simulations.
+
+        Args:
+            db: Database session.
+            sim_instance_id: The simulation instance ID.
+
+        Returns:
+            float: The highest sim_seconds_elapsed, or None if no frames exist.
+        """
+        result: float | None = (
+            db.query(func.max(SimFrame.sim_seconds_elapsed))
+            .filter(SimFrame.sim_instance_id == sim_instance_id)
+            .scalar()
+        )
+        return result
+
+    def get_latest_sim_seconds_bulk(
+        self, db: Session, sim_instance_ids: list[int]
+    ) -> dict[int, float]:
+        """Return the highest sim_seconds_elapsed for multiple simulation instances.
+
+        Fetches results in a single query instead of one per simulation.
+
+        Args:
+            db: Database session.
+            sim_instance_ids: List of simulation instance IDs.
+
+        Returns:
+            dict mapping sim_instance_id to max sim_seconds_elapsed.
+        """
+        if not sim_instance_ids:
+            return {}
+
+        rows = (
+            db.query(
+                SimFrame.sim_instance_id,
+                func.max(SimFrame.sim_seconds_elapsed).label("max_seconds"),
+            )
+            .filter(SimFrame.sim_instance_id.in_(sim_instance_ids))
+            .group_by(SimFrame.sim_instance_id)
+            .all()
+        )
+
+        return {row.sim_instance_id: row.max_seconds for row in rows}
+
 
 sim_frame_crud = SimFrameCRUD()
