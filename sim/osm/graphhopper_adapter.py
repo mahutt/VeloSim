@@ -408,12 +408,37 @@ class GraphHopperAdapter(RoutingProvider):
             for segment in result.segments
         ]
 
+        # Detect stop signs using OSM PBF spatial index
+        from sim.osm.stop_sign_index import get_stop_sign_index
+
+        osm_stop_sign_coordinates = get_stop_sign_index().find_near_route(
+            result.coordinates
+        )
+
+        # Combine OSM-detected stops with any provider-specific stops
+        combined_stop_signs = [
+            *osm_stop_sign_coordinates,
+            *result.stop_sign_coordinates,
+        ]
+
+        # Deduplicate stop sign coordinates
+        unique_stops: list[list[float]] = []
+        seen: set[tuple[float, float]] = set()
+        for coord in combined_stop_signs:
+            key = (float(coord[0]), float(coord[1]))
+            if key not in seen:
+                seen.add(key)
+                unique_stops.append([key[0], key[1]])
+
+        stop_sign_positions = [Position([c[0], c[1]]) for c in unique_stops]
+
         return RouteResult(
             coordinates=coordinates,
             distance=result.distance,
             duration=result.duration,
             steps=steps,
             segments=segments,
+            stop_sign_positions=stop_sign_positions,
         )
 
     @staticmethod

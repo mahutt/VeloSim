@@ -157,6 +157,11 @@ class Route:
         # using ratio-based mapping to preserve progress percentage.
         # Reset to None when transitioning to a new road.
         self._last_point_count: int | None = None
+        self._pending_stop_dwell: Position | None = None
+        self._visited_stop_points: set[tuple[int, float, float]] = set()
+        self._last_stop_position: tuple[float, float] | None = (
+            None  # Track last stop location globally
+        )
 
         # Store routing provider for recalculation
         self.routing_provider = routing_provider
@@ -183,6 +188,7 @@ class Route:
         self.distance = route_data.distance
         self.duration = route_data.duration
         self.steps = route_data.steps
+        self.stop_sign_positions = list(getattr(route_data, "stop_sign_positions", []))
 
         # Store start/end positions for recalculation
         self.start_position = route_data.start_position
@@ -421,6 +427,35 @@ class Route:
             List of [lon, lat] coordinate pairs from routing provider.
         """
         return [pos.get_position() for pos in self.coordinates]
+
+    def get_stop_sign_coordinates(self) -> list[list[float]]:
+        """Return unique stop-sign coordinates associated with this route.
+
+        Returns:
+            list[list[float]]: Unique stop-sign coordinates as [lon, lat].
+        """
+        unique_coords: list[list[float]] = []
+        seen: set[tuple[float, float]] = set()
+
+        for stop_sign in self.stop_sign_positions:
+            coord = stop_sign.get_position()
+            key = (coord[0], coord[1])
+            if key in seen:
+                continue
+            seen.add(key)
+            unique_coords.append(coord)
+
+        if self.route_controller is not None:
+            for road in self.roads:
+                for stop_sign in self.route_controller.get_stop_signs_for_road(road):
+                    coord = stop_sign.get_position()
+                    key = (coord[0], coord[1])
+                    if key in seen:
+                        continue
+                    seen.add(key)
+                    unique_coords.append(coord)
+
+        return unique_coords
 
     @property
     def has_traffic_changed(self) -> bool:
@@ -777,6 +812,15 @@ class Route:
         if self.is_finished:
             return None
 
+        # If the previous tick reached a stop-sign point, dwell for one tick.
+        if (
+            self._pending_stop_dwell is not None
+            and self._last_returned_position is not None
+        ):
+            dwell_pos = self._pending_stop_dwell
+            self._pending_stop_dwell = None
+            return dwell_pos
+
         # If we are transition, use next transition position
         if self._transition_buffer:
             next_transition_pos = self._transition_buffer[0]
@@ -904,6 +948,76 @@ class Route:
                 point_to_return = self._get_wait_position(candidate_point)
                 # Don't increment current_point_index, instead retry next tick
             else:
+                # Stop-sign behavior: when first reaching a stop-sign point on a road,
+                # schedule a one-tick dwell after returning that point.
+                if self.route_controller is not None and hasattr(
+                    self.route_controller, "is_stop_sign_at_position"
+                ):
+                    matched_sign: Position | None = None
+                    if hasattr(
+                        self.route_controller, "get_matching_stop_sign_at_position"
+                    ):
+                        raw_match = (
+                            self.route_controller.get_matching_stop_sign_at_position(
+                                current_road, candidate_point
+                            )
+                        )
+                        if isinstance(raw_match, Position):
+                            matched_sign = raw_match
+
+                    is_stop_sign = matched_sign is not None
+                    if matched_sign is None:
+                        is_stop_sign = self.route_controller.is_stop_sign_at_position(
+                            current_road, candidate_point
+                        )
+                    if matched_sign is not None:
+                        sign_lon, sign_lat = matched_sign.get_position()
+                        stop_key = (
+                            current_road.id,
+                            round(sign_lon, 7),
+                            round(sign_lat, 7),
+                        )
+                    else:
+                        cand_lon, cand_lat = candidate_point.get_position()
+                        stop_key = (
+                            current_road.id,
+                            round(cand_lon, 7),
+                            round(cand_lat, 7),
+                        )
+                    if (
+                        stop_key not in self._visited_stop_points
+                        and is_stop_sign is True
+                    ):
+                        CLUSTER_TOL_DEGREES = 0.00015
+                        skip_duplicate = False
+
+                        if self._last_stop_position is not None:
+                            if matched_sign is not None:
+                                curr_lon, curr_lat = matched_sign.get_position()
+                            else:
+                                curr_lon, curr_lat = candidate_point.get_position()
+
+                            last_lon, last_lat = self._last_stop_position
+                            dx = curr_lon - last_lon
+                            dy = curr_lat - last_lat
+                            dist_sq = (dx * dx) + (dy * dy)
+                            cluster_tol_sq = CLUSTER_TOL_DEGREES * CLUSTER_TOL_DEGREES
+
+                            if dist_sq <= cluster_tol_sq:
+                                skip_duplicate = True
+
+                        if not skip_duplicate:
+                            self._visited_stop_points.add(stop_key)
+                            self._pending_stop_dwell = candidate_point
+
+                            # Track this stop location for future duplicate checking
+                            if matched_sign is not None:
+                                sign_lon, sign_lat = matched_sign.get_position()
+                                self._last_stop_position = (sign_lon, sign_lat)
+                            else:
+                                point_lon, point_lat = candidate_point.get_position()
+                                self._last_stop_position = (point_lon, point_lat)
+
                 # Next position on the road is available. The vehicle can
                 # proceed with normal traversal
                 if (

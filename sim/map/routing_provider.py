@@ -23,7 +23,7 @@ SOFTWARE.
 """
 
 from abc import ABC, abstractmethod
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import List, Optional, Tuple, TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -125,6 +125,9 @@ class RouteResult:
 
     segments: List[RouteSegment]
     """Node-to-node segments (finest granularity)."""
+
+    stop_sign_positions: List["Position"] = field(default_factory=list)
+    """Stop-sign positions detected along this route."""
 
     @property
     def start_position(self) -> "Position":

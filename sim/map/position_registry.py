@@ -189,6 +189,37 @@ class PositionRegistry:
         """
         return self._geom_to_roads.get(pos, set()).copy()
 
+    def find_roads_near_position(
+        self, pos: Position, tolerance_degrees: float = 0.00012
+    ) -> Set[Road]:
+        """Find roads whose geometry contains a point near the given position.
+
+        Args:
+            pos: The position to query.
+            tolerance_degrees: Max distance in degrees for a geometry point to
+                be considered a match.
+
+        Returns:
+            Set of roads with at least one geometry point within tolerance.
+        """
+        if tolerance_degrees < 0:
+            return set()
+
+        target_lon, target_lat = pos.get_position()
+        tol_sq = tolerance_degrees * tolerance_degrees
+
+        roads: Set[Road] = set()
+        for road, positions in self._road_positions.items():
+            for road_pos in positions:
+                lon, lat = road_pos.get_position()
+                dx = lon - target_lon
+                dy = lat - target_lat
+                if (dx * dx) + (dy * dy) <= tol_sq:
+                    roads.add(road)
+                    break
+
+        return roads
+
     def get_overlap_positions(self, road: Road, event: TrafficEvent) -> Set[Position]:
         """Get the set of positions shared between a road and an event.
 

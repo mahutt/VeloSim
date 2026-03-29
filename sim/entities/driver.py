@@ -722,6 +722,15 @@ class Driver:
         return {
             "coordinates": combined_raw_coordinates,
             "nextStopIndex": len(self.routes[0].get_raw_coordinates()) - 1,
+            "stopSignPositions": [
+                coord
+                for route in self.routes
+                for coord in (
+                    route.get_stop_sign_coordinates()
+                    if hasattr(route, "get_stop_sign_coordinates")
+                    else []
+                )
+            ],
         }
 
     @property
