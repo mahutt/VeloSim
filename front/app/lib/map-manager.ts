@@ -86,6 +86,7 @@ export default class MapManager {
   private animationFrame: number;
 
   // for clustering
+  private clusters: Map<number, Feature<Point>>;
   private supercluster: Supercluster;
   private quantizedZoom: number;
 
@@ -112,6 +113,7 @@ export default class MapManager {
     this.lastDriverUpdates = new Map();
     this.animationFrame = 0;
 
+    this.clusters = new Map();
     this.supercluster = new Supercluster({
       maxZoom: 13,
       minZoom: 11,
@@ -135,45 +137,49 @@ export default class MapManager {
       this.updateStationAndClusterSources();
     });
 
-    setupMapClickHandlers(map, (item, modifiers) => {
-      if (!item) {
+    setupMapClickHandlers(
+      map,
+      (item, modifiers) => {
+        if (!item) {
+          this.state.clearSelection();
+          return;
+        }
+
+        // Ctrl+click on a station toggles multi-selection
+        if (modifiers!.ctrlKey && item.type === SelectedItemType.Station) {
+          // If a single station was selected, promote it into the multi-selection
+          const selectedItems = this.state.getSelectedItems();
+          if (
+            selectedItems.length === 1 &&
+            selectedItems[0].type === SelectedItemType.Station
+          ) {
+            const singleStationId = selectedItems[0].value.id;
+            this.state.clearSelection();
+            if (!this.state.getMultiSelectedStationIds().has(singleStationId)) {
+              this.state.addSelectedStation(singleStationId);
+            }
+          }
+          this.state.toggleSelectedStation(item.id);
+
+          // If only 1 station left, demote back to single selection
+          const remaining = this.state.getMultiSelectedStationIds();
+          if (remaining.size <= 1) {
+            const lastId = remaining.values().next().value;
+            this.state.clearSelection();
+            if (remaining.size === 1 && lastId !== undefined) {
+              selectItem(SelectedItemType.Station, lastId);
+            }
+          }
+          return;
+        }
+
+        // Regular click clears multi-selection and selects single item
         this.state.clearSelection();
-        return;
-      }
-
-      // Ctrl+click on a station toggles multi-selection
-      if (modifiers!.ctrlKey && item.type === SelectedItemType.Station) {
-        // If a single station was selected, promote it into the multi-selection
-        const selectedItems = this.state.getSelectedItems();
-        if (
-          selectedItems.length === 1 &&
-          selectedItems[0].type === SelectedItemType.Station
-        ) {
-          const singleStationId = selectedItems[0].value.id;
-          this.state.clearSelection();
-          if (!this.state.getMultiSelectedStationIds().has(singleStationId)) {
-            this.state.addSelectedStation(singleStationId);
-          }
-        }
-        this.state.toggleSelectedStation(item.id);
-
-        // If only 1 station left, demote back to single selection
-        const remaining = this.state.getMultiSelectedStationIds();
-        if (remaining.size <= 1) {
-          const lastId = remaining.values().next().value;
-          this.state.clearSelection();
-          if (remaining.size === 1 && lastId !== undefined) {
-            selectItem(SelectedItemType.Station, lastId);
-          }
-        }
-        return;
-      }
-
-      // Regular click clears multi-selection and selects single item
-      this.state.clearSelection();
-      const { type, id } = item;
-      selectItem(type, id);
-    });
+        const { type, id } = item;
+        selectItem(type, id);
+      },
+      this.onClusterClick.bind(this)
+    );
 
     setupMapHoverHandlers(map, (item) => {
       if (!item) {
@@ -495,6 +501,9 @@ export default class MapManager {
     )) {
       (feature.properties?.cluster_id ? clusters : stations).push(feature);
     }
+    clusters.forEach((c) =>
+      this.clusters.set(c.properties!.cluster_id as number, c)
+    );
 
     setMapSource(MapSource.Stations, featureCollection(stations), this.map);
 
@@ -514,5 +523,18 @@ export default class MapManager {
       featureCollection(clusters),
       this.map
     );
+  }
+
+  private onClusterClick(clusterId: number) {
+    const cluster = this.clusters.get(clusterId);
+    if (!cluster) return;
+    const targetZoom = this.supercluster.getClusterExpansionZoom(clusterId);
+    this.map.easeTo({
+      center: {
+        lng: cluster.geometry.coordinates[0],
+        lat: cluster.geometry.coordinates[1],
+      },
+      zoom: targetZoom,
+    });
   }
 }

@@ -44,7 +44,8 @@ test('setupMapClickHandlers registers event listeners', () => {
   } as unknown as MapboxMap;
 
   const onItemSelect = vi.fn();
-  setupMapClickHandlers(mockMap, onItemSelect);
+  const onClusterClick = vi.fn();
+  setupMapClickHandlers(mockMap, onItemSelect, onClusterClick);
 
   // Should register 1 click + 2 cursor listeners per map layer
   expect(mockMap.on).toHaveBeenCalledTimes(
@@ -100,7 +101,8 @@ test('clicking station calls onItemSelect with wrapped station data', () => {
   } as unknown as MapboxMap;
 
   const onItemSelect = vi.fn();
-  setupMapClickHandlers(mockMap, onItemSelect);
+  const onClusterClick = vi.fn();
+  setupMapClickHandlers(mockMap, onItemSelect, onClusterClick);
 
   handlers['click']({ point: { x: 100, y: 100 } });
 
@@ -141,7 +143,8 @@ test('clicking resource calls onItemSelect with wrapped resource data', () => {
   } as unknown as MapboxMap;
 
   const onItemSelect = vi.fn();
-  setupMapClickHandlers(mockMap, onItemSelect);
+  const onClusterClick = vi.fn();
+  setupMapClickHandlers(mockMap, onItemSelect, onClusterClick);
 
   handlers['click']({ point: { x: 100, y: 100 } });
 
@@ -182,7 +185,8 @@ test('clicking station with missing properties throws', () => {
   } as unknown as MapboxMap;
 
   const onItemSelect = vi.fn();
-  setupMapClickHandlers(mockMap, onItemSelect);
+  const onClusterClick = vi.fn();
+  setupMapClickHandlers(mockMap, onItemSelect, onClusterClick);
 
   expect(() => {
     handlers['click']({ point: { x: 100, y: 100 } });
@@ -216,7 +220,8 @@ test('clicking resource with missing properties throws', () => {
   } as unknown as MapboxMap;
 
   const onItemSelect = vi.fn();
-  setupMapClickHandlers(mockMap, onItemSelect);
+  const onClusterClick = vi.fn();
+  setupMapClickHandlers(mockMap, onItemSelect, onClusterClick);
 
   expect(() => {
     handlers['click']({ point: { x: 100, y: 100 } });
@@ -244,7 +249,8 @@ test('clicking empty map area deselects item', () => {
   } as unknown as MapboxMap;
 
   const onItemSelect = vi.fn();
-  setupMapClickHandlers(mockMap, onItemSelect);
+  const onClusterClick = vi.fn();
+  setupMapClickHandlers(mockMap, onItemSelect, onClusterClick);
 
   handlers['click']({ point: { x: 100, y: 100 } });
 
@@ -277,7 +283,8 @@ test('mouseenter and mouseleave change cursor for all layers', () => {
   } as unknown as MapboxMap;
 
   const onItemSelect = vi.fn();
-  setupMapClickHandlers(mockMap, onItemSelect);
+  const onClusterClick = vi.fn();
+  setupMapClickHandlers(mockMap, onItemSelect, onClusterClick);
 
   handlers['mouseenter-stations']();
   expect(canvas.style.cursor).toBe('pointer');
@@ -319,7 +326,8 @@ test('clicking station task count layer calls onItemSelect with station data', (
   } as unknown as MapboxMap;
 
   const onItemSelect = vi.fn();
-  setupMapClickHandlers(mockMap, onItemSelect);
+  const onClusterClick = vi.fn();
+  setupMapClickHandlers(mockMap, onItemSelect, onClusterClick);
 
   handlers['click']({ point: { x: 100, y: 100 } });
 
@@ -360,7 +368,8 @@ test('clicking feature with missing layer throws', () => {
   } as unknown as MapboxMap;
 
   const onItemSelect = vi.fn();
-  setupMapClickHandlers(mockMap, onItemSelect);
+  const onClusterClick = vi.fn();
+  setupMapClickHandlers(mockMap, onItemSelect, onClusterClick);
 
   expect(() => {
     handlers['click']({ point: { x: 100, y: 100 } });
@@ -394,7 +403,8 @@ test('clicking feature with unrecognized layer throws', () => {
   } as unknown as MapboxMap;
 
   const onItemSelect = vi.fn();
-  setupMapClickHandlers(mockMap, onItemSelect);
+  const onClusterClick = vi.fn();
+  setupMapClickHandlers(mockMap, onItemSelect, onClusterClick);
 
   expect(() => {
     handlers['click']({ point: { x: 100, y: 100 } });
@@ -428,7 +438,8 @@ test('clicking station-circle layer selects the station', () => {
   } as unknown as MapboxMap;
 
   const onItemSelect = vi.fn();
-  setupMapClickHandlers(mockMap, onItemSelect);
+  const onClusterClick = vi.fn();
+  setupMapClickHandlers(mockMap, onItemSelect, onClusterClick);
 
   handlers['click']({ point: { x: 100, y: 100 } });
 
@@ -464,7 +475,8 @@ test('mouseenter and mouseleave for station-task-counts layer', () => {
   } as unknown as MapboxMap;
 
   const onItemSelect = vi.fn();
-  setupMapClickHandlers(mockMap, onItemSelect);
+  const onClusterClick = vi.fn();
+  setupMapClickHandlers(mockMap, onItemSelect, onClusterClick);
 
   handlers['mouseenter-station-task-counts']();
   expect(canvas.style.cursor).toBe('pointer');
@@ -1895,7 +1907,8 @@ describe('setupMapClickHandlers with modifiers', () => {
     ]);
 
     const onItemSelect = vi.fn();
-    setupMapClickHandlers(mockMap, onItemSelect);
+    const onClusterClick = vi.fn();
+    setupMapClickHandlers(mockMap, onItemSelect, onClusterClick);
 
     handlers['click']({
       point: { x: 100, y: 100 },
@@ -1918,7 +1931,8 @@ describe('setupMapClickHandlers with modifiers', () => {
     ]);
 
     const onItemSelect = vi.fn();
-    setupMapClickHandlers(mockMap, onItemSelect);
+    const onClusterClick = vi.fn();
+    setupMapClickHandlers(mockMap, onItemSelect, onClusterClick);
 
     handlers['click']({
       point: { x: 100, y: 100 },
@@ -1935,7 +1949,8 @@ describe('setupMapClickHandlers with modifiers', () => {
     const { mockMap, handlers } = createMockMap([]);
 
     const onItemSelect = vi.fn();
-    setupMapClickHandlers(mockMap, onItemSelect);
+    const onClusterClick = vi.fn();
+    setupMapClickHandlers(mockMap, onItemSelect, onClusterClick);
 
     handlers['click']({
       point: { x: 100, y: 100 },
@@ -1943,6 +1958,25 @@ describe('setupMapClickHandlers with modifiers', () => {
     });
 
     expect(onItemSelect).toHaveBeenCalledWith(null, { ctrlKey: true });
+  });
+
+  test('clicking a cluster triggers onClusterClick', () => {
+    const { mockMap, handlers } = createMockMap([
+      {
+        properties: { cluster_id: 123 },
+      },
+    ]);
+
+    const onItemSelect = vi.fn();
+    const onClusterClick = vi.fn();
+    setupMapClickHandlers(mockMap, onItemSelect, onClusterClick);
+
+    handlers['click']({
+      point: { x: 100, y: 100 },
+      originalEvent: { ctrlKey: true, metaKey: false },
+    });
+
+    expect(onClusterClick).toHaveBeenCalledWith(123);
   });
 });
 
