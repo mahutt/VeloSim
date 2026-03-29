@@ -46,6 +46,8 @@ import { adaptRouteToGeoJSON } from './geojson-adapters';
 export enum MapSource {
   Headquarters = 'headquarters',
   Stations = 'stations',
+  Clusters = 'clusters',
+  ClusterCentroids = 'cluster-centroids',
   Resources = 'resources',
   RouteNextTask = 'route-next-task',
   RouteFutureTasks = 'route-future-tasks',
@@ -58,6 +60,9 @@ export enum MapLayer {
   StationCircle = 'station-circle',
   StationRing = 'station-ring',
   StationTaskCounts = 'station-task-counts',
+  ClusterFills = 'cluster-fills',
+  ClusterOutlines = 'cluster-outlines',
+  ClusterTaskCounts = 'cluster-task-counts',
   Resources = 'resources',
   RouteNextTask = 'route-next-task',
   RouteFutureTasks = 'route-future-tasks',
@@ -378,6 +383,68 @@ export function setMapLayers(map: mapboxgl.Map) {
     },
     minzoom: 13,
     filter: ['>', ['get', 'taskCount'], 0],
+  });
+
+  map.addLayer({
+    id: MapLayer.ClusterFills,
+    type: 'fill',
+    source: MapSource.Clusters,
+    paint: {
+      'fill-color': [
+        'step',
+        ['get', 'taskCount'],
+        STATION_COLOR_LOW,
+        STATION_TASK_COUNT_MEDIUM_THRESHOLD,
+        STATION_COLOR_MEDIUM,
+        STATION_TASK_COUNT_HIGH_THRESHOLD,
+        STATION_COLOR_HIGH,
+      ],
+      'fill-opacity': 0.2,
+    },
+  });
+
+  map.addLayer({
+    id: MapLayer.ClusterOutlines,
+    type: 'line',
+    source: MapSource.Clusters,
+    paint: {
+      'line-color': [
+        'step',
+        ['get', 'taskCount'],
+        STATION_COLOR_LOW,
+        STATION_TASK_COUNT_MEDIUM_THRESHOLD,
+        STATION_COLOR_MEDIUM,
+        STATION_TASK_COUNT_HIGH_THRESHOLD,
+        STATION_COLOR_HIGH,
+      ],
+      'line-width': 2,
+    },
+  });
+
+  map.addLayer({
+    id: MapLayer.ClusterTaskCounts,
+    type: 'symbol',
+    source: MapSource.ClusterCentroids,
+    layout: {
+      'text-field': ['get', 'taskCount'],
+      'text-font': ['Open Sans Bold', 'Arial Unicode MS Bold'],
+      'text-size': ['interpolate', ['linear'], ['zoom'], 8, 13, 17, 23],
+      'text-anchor': 'center',
+      'text-allow-overlap': true,
+    },
+    paint: {
+      'text-color': [
+        'step',
+        ['get', 'taskCount'],
+        STATION_COLOR_LOW,
+        STATION_TASK_COUNT_MEDIUM_THRESHOLD,
+        STATION_COLOR_MEDIUM,
+        STATION_TASK_COUNT_HIGH_THRESHOLD,
+        STATION_COLOR_HIGH,
+      ],
+      'text-halo-color': 'rgba(0, 0, 0, 0)',
+      'text-halo-width': 0,
+    },
   });
 
   // Add layer for headquarters

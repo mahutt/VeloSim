@@ -22,8 +22,11 @@
  * SOFTWARE.
  */
 
-import { lineString, point } from '@turf/helpers';
+import { featureCollection, lineString, point } from '@turf/helpers';
 import nearestPointOnLine from '@turf/nearest-point-on-line';
+import { distance } from '@turf/distance';
+import { circle } from '@turf/circle';
+import type { Feature, FeatureCollection, Point, Polygon } from 'geojson';
 import {
   FREE_FLOW_COLOR,
   MODERATE_COLOR,
@@ -41,6 +44,7 @@ import type {
   TrafficRange,
   Route,
 } from '~/types';
+import type { AnyProps } from 'supercluster';
 
 export function adaptHeadquartersToGeoJSON(
   headquarters: Headquarters
@@ -68,7 +72,7 @@ export function adaptStationsToGeoJSON(
   selectedStationIds: Set<number>,
   hoveredStationId: number | null,
   partiallyAssignedStationIds: ReadonlySet<number> = new Set<number>()
-): GeoJSON.FeatureCollection {
+): FeatureCollection<Point, AnyProps> {
   return {
     type: 'FeatureCollection',
     features: stations.map((station) => ({
@@ -87,6 +91,28 @@ export function adaptStationsToGeoJSON(
       },
     })),
   };
+}
+
+export function adaptClustersToGeoJSON(
+  clusters: Feature<Point>[]
+): FeatureCollection<Polygon> {
+  const features: Feature<Polygon>[] = [];
+  for (const cluster of clusters) {
+    const center = point(cluster.geometry.coordinates);
+    const stationPoints = cluster.properties!.stationPoints as Position[];
+    const radius = Math.max(
+      ...stationPoints.map((p) =>
+        distance(center, point(p), { units: 'kilometers' })
+      )
+    );
+    const feature = circle(center, radius, {
+      steps: 64,
+      units: 'kilometers',
+      properties: cluster.properties,
+    });
+    features.push(feature);
+  }
+  return featureCollection(features);
 }
 
 export function adaptResourcesToGeoJSON(
