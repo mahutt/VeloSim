@@ -561,7 +561,7 @@ describe('SelectedItemBar', () => {
 
       expect(mockSimulationEngine.requestUnassignment).toHaveBeenCalledWith(
         5,
-        10
+        [10]
       );
     });
   });
@@ -791,7 +791,7 @@ describe('SelectedItemBar', () => {
 
       expect(mockSimulationEngine.requestUnassignment).toHaveBeenCalledWith(
         3,
-        10
+        [10]
       );
     });
 

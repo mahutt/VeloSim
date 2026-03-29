@@ -92,7 +92,9 @@ export function StationTasks({ station }: { station: PopulatedStation }) {
                   onUnassign={
                     assignedDriverId
                       ? () => {
-                          engine.requestUnassignment(assignedDriverId, task.id);
+                          engine.requestUnassignment(assignedDriverId, [
+                            task.id,
+                          ]);
                         }
                       : undefined
                   }

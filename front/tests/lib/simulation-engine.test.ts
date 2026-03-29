@@ -339,7 +339,7 @@ describe('SimulationEngine', () => {
       const vehicle = makeVehicle({ id: 1 });
       (mockSimulationStateManager.getDriver as Mock).mockReturnValue(driver);
       (mockSimulationStateManager.getVehicle as Mock).mockReturnValue(vehicle);
-      engine.requestUnassignment(1, 1);
+      engine.requestUnassignment(1, [1]);
       expect(
         mockSimulationStateManager.setPendingAssignment
       ).toHaveBeenCalledWith(
@@ -409,7 +409,7 @@ describe('SimulationEngine', () => {
       ).toHaveBeenCalledWith(null);
     });
 
-    it('calls unassignTask when action is Unassign', async () => {
+    it('calls unassignTasks batch endpoint when action is Unassign', async () => {
       const driverId = 1;
       const taskId = 42;
       (mockSimulationStateManager.getPendingAssignment as Mock).mockReturnValue(
@@ -426,13 +426,17 @@ describe('SimulationEngine', () => {
       const task = makeStationTask({ id: taskId });
       (mockSimulationStateManager.getDriver as Mock).mockReturnValue(driver);
       (mockSimulationStateManager.getTask as Mock).mockReturnValue(task);
-      (api.post as Mock).mockResolvedValue({ data: {} });
+      (api.post as Mock).mockResolvedValue({
+        data: {
+          items: [{ task_id: taskId, driver_id: driverId, success: true }],
+        },
+      });
 
       await engine.confirmAssignment();
 
       expect(api.post).toHaveBeenCalledWith(
-        `/simulation/test_simulation/drivers/unassign`,
-        { task_id: taskId, driver_id: driverId }
+        `/simulation/test_simulation/drivers/unassign/batch`,
+        { task_ids: [taskId] }
       );
     });
 

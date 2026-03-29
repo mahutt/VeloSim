@@ -33,6 +33,7 @@ import {
   type BackendPayload,
   type BatchAssignTasksToDriverResponse,
   type BatchAssignTasksToDriverResponseItem,
+  type BatchUnassignTasksFromDriverResponse,
   type Driver,
   type Station,
   type StationTask,
@@ -208,31 +209,62 @@ export default class SimulationEngine {
     }
   }
 
-  private async unassignTask(driverId: number, taskId: number): Promise<void> {
+  private async unassignTasks(
+    driverId: number,
+    taskIds: number[]
+  ): Promise<void> {
+    if (taskIds.length === 0) return;
+
     const driver = this.state.getDriver(driverId);
-    const task = this.state.getTask(taskId);
+
     if (!driver) throw new Error(`Driver #${driverId} not found.`);
-    if (!task) throw new Error(`Task #${taskId} not found.`);
+    let items: BatchUnassignTasksFromDriverResponse['items'] = [];
 
     try {
-      const payload = { task_id: taskId, driver_id: driverId };
-      await api.post(
-        `/simulation/${this.simulationId}/drivers/unassign`,
-        payload
+      const response = await api.post<BatchUnassignTasksFromDriverResponse>(
+        `/simulation/${this.simulationId}/drivers/unassign/batch`,
+        { task_ids: taskIds }
       );
+      items = response.data.items;
+    } catch (error) {
+      toast.error(`Batch unassignment failed. (${taskIds.length} tasks)`);
+      throw error;
+    }
 
+    const successfullyUnassignedTaskIds = items
+      .filter((i) => i.success)
+      .map((i) => i.task_id);
+
+    for (const id of successfullyUnassignedTaskIds) {
+      const task = this.state.getTask(id)!;
       this.state.setTask({
         ...task,
         state: TaskState.Open,
         assignedDriverId: null,
       });
-      this.state.setDriver({
-        ...driver,
-        taskIds: driver.taskIds.filter((t) => t !== taskId),
-      });
-    } catch (error) {
-      toast.error(`Failed to unassign task ${taskId}.`);
-      throw error;
+    }
+
+    this.state.setDriver({
+      ...driver,
+      taskIds: driver.taskIds.filter(
+        (id) => !successfullyUnassignedTaskIds.includes(id)
+      ),
+    });
+
+    const totalItemsCount = items.length;
+    const successfulItemsCount = successfullyUnassignedTaskIds.length;
+    const failedItemsCount = totalItemsCount - successfulItemsCount;
+
+    if (failedItemsCount === totalItemsCount) {
+      if (totalItemsCount === 1) {
+        toast.error(`Failed to unassign task ${taskIds[0]}.`);
+      } else {
+        toast.error(`Failed to unassign all ${totalItemsCount} tasks.`);
+      }
+    } else if (failedItemsCount > 0) {
+      toast.error(
+        `Unassigned ${successfulItemsCount} of ${totalItemsCount} tasks. ${failedItemsCount} failed.`
+      );
     }
   }
 
@@ -456,16 +488,21 @@ export default class SimulationEngine {
     }
   }
 
-  public requestUnassignment(driverId: number, taskId: number) {
+  public requestUnassignment(
+    driverId: number,
+    taskIds: number[],
+    stationName?: string
+  ) {
     const targetDriver = this.state.getDriver(driverId)!; // assume the driver exists
     if (!targetDriver.vehicleId) return; // validate the driver is part of a resource
     const targetDriverVehicle = this.state.getVehicle(targetDriver.vehicleId)!; // assume the vehicle exists
     this.state.setPendingAssignment({
       action: TaskAction.Unassign,
-      taskIds: [taskId],
+      taskIds,
       driverId: targetDriver.id,
       driverName: targetDriver.name,
       driverBatteryCount: targetDriverVehicle.batteryCount,
+      stationName,
     });
   }
 
@@ -489,9 +526,9 @@ export default class SimulationEngine {
 
     try {
       if (pendingAssignment.action === TaskAction.Unassign) {
-        await this.unassignTask(
+        await this.unassignTasks(
           pendingAssignment.driverId,
-          pendingAssignment.taskIds[0]
+          pendingAssignment.taskIds
         );
       } else {
         await this.assignTasks(

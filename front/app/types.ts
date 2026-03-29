@@ -118,6 +118,17 @@ export interface BatchAssignTasksToDriverResponseItem {
   success: boolean;
 }
 
+export interface BatchUnassignTasksFromDriverResponse {
+  items: BatchUnassignTasksFromDriverResponseItem[];
+}
+
+export interface BatchUnassignTasksFromDriverResponseItem {
+  task_id: number;
+  driver_id: number | null;
+  success: boolean;
+  error?: string | null;
+}
+
 export interface GetSimulationReportResponse {
   servicingToDrivingRatio: number | null;
   vehicleUtilizationRatio: number | null;
@@ -314,6 +325,7 @@ export interface ReassignTaskAction extends AbstractTaskAssignment {
 
 export interface UnassignTaskAction extends AbstractTaskAssignment {
   action: TaskAction.Unassign;
+  stationName?: string;
 }
 
 export type PendingAssignment =
