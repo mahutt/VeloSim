@@ -549,6 +549,14 @@ export default class SimulationEngine {
     this.state.setPendingAssignment(null);
   }
 
+  public setHoveredStationId(stationId: number | null): void {
+    this.mapManager.setHoveredStationId(stationId);
+  }
+
+  public setTaskHoveredStationId(stationId: number | null): void {
+    this.mapManager.setTaskHoveredStationId(stationId);
+  }
+
   public destroy(): void {
     this.mapManager.cleanup();
     this.serverFrameSource.stop();

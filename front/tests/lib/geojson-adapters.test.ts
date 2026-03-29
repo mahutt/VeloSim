@@ -49,7 +49,7 @@ describe('adaptStationsToGeoJSON', () => {
       },
     ];
 
-    const result = adaptStationsToGeoJSON(stations, new Set(), null);
+    const result = adaptStationsToGeoJSON(stations, new Set(), null, null);
 
     expect(result).toEqual({
       type: 'FeatureCollection',
@@ -61,6 +61,7 @@ describe('adaptStationsToGeoJSON', () => {
             name: 'Central Station',
             taskCount: 0,
             hover: false,
+            taskHover: false,
             hasPartialAssignment: false,
             selected: false,
           },
@@ -76,6 +77,7 @@ describe('adaptStationsToGeoJSON', () => {
             name: 'Park Station',
             taskCount: 0,
             hover: false,
+            taskHover: false,
             hasPartialAssignment: false,
             selected: false,
           },
@@ -90,7 +92,7 @@ describe('adaptStationsToGeoJSON', () => {
 
   it('should return an empty FeatureCollection when given an empty array', () => {
     const stations: Station[] = [];
-    const result = adaptStationsToGeoJSON(stations, new Set(), null);
+    const result = adaptStationsToGeoJSON(stations, new Set(), null, null);
 
     expect(result).toEqual({
       type: 'FeatureCollection',
@@ -106,7 +108,12 @@ describe('adaptStationsToGeoJSON', () => {
     ];
 
     const multiSelectedIds = new Set([1, 3]);
-    const result = adaptStationsToGeoJSON(stations, multiSelectedIds, null);
+    const result = adaptStationsToGeoJSON(
+      stations,
+      multiSelectedIds,
+      null,
+      null
+    );
 
     expect(result.features[0].properties?.selected).toBe(true);
     expect(result.features[1].properties?.selected).toBe(false);
@@ -119,7 +126,12 @@ describe('adaptStationsToGeoJSON', () => {
       { id: 2, name: 'Station B', position: [-73.9, 40.8], taskIds: [] },
     ];
 
-    const result = adaptStationsToGeoJSON(stations, new Set([1, 2]), null);
+    const result = adaptStationsToGeoJSON(
+      stations,
+      new Set([1, 2]),
+      null,
+      null
+    );
 
     expect(result.features[0].properties?.selected).toBe(true);
     expect(result.features[1].properties?.selected).toBe(true);
@@ -375,19 +387,19 @@ describe('adaptStationsToGeoJSON — selection and hover', () => {
   ];
 
   it('should set selected flag for the matching station', () => {
-    const result = adaptStationsToGeoJSON(stations, new Set([2]), null);
+    const result = adaptStationsToGeoJSON(stations, new Set([2]), null, null);
     expect(result.features[0].properties?.selected).toBe(false);
     expect(result.features[1].properties?.selected).toBe(true);
   });
 
   it('should set hover flag for the matching station', () => {
-    const result = adaptStationsToGeoJSON(stations, new Set(), 1);
+    const result = adaptStationsToGeoJSON(stations, new Set(), 1, null);
     expect(result.features[0].properties?.hover).toBe(true);
     expect(result.features[1].properties?.hover).toBe(false);
   });
 
   it('should include the correct taskCount', () => {
-    const result = adaptStationsToGeoJSON(stations, new Set(), null);
+    const result = adaptStationsToGeoJSON(stations, new Set(), null, null);
     expect(result.features[0].properties?.taskCount).toBe(2);
     expect(result.features[1].properties?.taskCount).toBe(1);
   });

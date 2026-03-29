@@ -118,6 +118,8 @@ function DriverTaskGroupItem({
   onContextMenu,
   onMouseDown,
   onMouseEnter,
+  onMouseEnterGroup,
+  onMouseLeaveGroup,
   onUnassign,
 }: {
   group: DriverTaskStationGroup;
@@ -134,6 +136,8 @@ function DriverTaskGroupItem({
   onContextMenu: (e: React.MouseEvent) => void;
   onMouseDown: (e: React.MouseEvent) => void;
   onMouseEnter: () => void;
+  onMouseEnterGroup: () => void;
+  onMouseLeaveGroup: () => void;
   onUnassign: () => void;
 }) {
   const { t } = usePreferences();
@@ -146,7 +150,11 @@ function DriverTaskGroupItem({
       onClick={onClick}
       onContextMenu={onContextMenu}
       onMouseDown={onMouseDown}
-      onMouseEnter={onMouseEnter}
+      onMouseEnter={() => {
+        onMouseEnter();
+        onMouseEnterGroup();
+      }}
+      onMouseLeave={onMouseLeaveGroup}
       className={
         showDropIndicator
           ? isDraggingDown
@@ -206,6 +214,8 @@ function DriverTasksCollapsed({
   dragSelectEnter,
   onReorder,
   onUnassign,
+  onStationHover,
+  onStationLeave,
 }: {
   groupedTasks: DriverTaskStationGroup[];
   selectedTaskIds: number[];
@@ -218,6 +228,8 @@ function DriverTasksCollapsed({
   dragSelectEnter: (taskId: number) => void;
   onReorder: (taskIds: number[]) => Promise<void>;
   onUnassign: (taskIds: number[], stationName: string) => void;
+  onStationHover: (stationId: number) => void;
+  onStationLeave: () => void;
 }) {
   const selectedGroupIndices = new Set(
     groupedTasks
@@ -326,6 +338,8 @@ function DriverTasksCollapsed({
           onMouseEnter={() =>
             dragSelectEnter(group.tasks[group.tasks.length - 1].id)
           }
+          onMouseEnterGroup={() => onStationHover(group.stationId)}
+          onMouseLeaveGroup={onStationLeave}
           onUnassign={() =>
             onUnassign(
               group.tasks.map((task) => task.id),
@@ -517,6 +531,7 @@ export function DriverTasks({ driver }: { driver: PopulatedDriver }) {
           ref={containerRef}
           onMouseMove={handleMouseMove}
           className="max-h-50 px-3 space-y-1"
+          onMouseLeave={() => engine.setTaskHoveredStationId(null)}
         >
           {isCollapsed ? (
             <DriverTasksCollapsed
@@ -529,6 +544,10 @@ export function DriverTasks({ driver }: { driver: PopulatedDriver }) {
               onUnassign={(taskIds, stationName) =>
                 engine.requestUnassignment(driver.id, taskIds, stationName)
               }
+              onStationHover={(stationId) =>
+                engine.setTaskHoveredStationId(stationId)
+              }
+              onStationLeave={() => engine.setTaskHoveredStationId(null)}
             />
           ) : (
             <DriverTasksExpanded

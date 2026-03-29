@@ -71,6 +71,7 @@ export default class MapManager {
 
   // locals
   private hoveredStationId: number | null;
+  private taskHoveredStationId: number | null;
   private hoveredResourceId: number | null;
   private hoverDebounceTimeout: NodeJS.Timeout | null;
   private hoverLocked: boolean;
@@ -98,6 +99,7 @@ export default class MapManager {
     this.state = state;
 
     this.hoveredStationId = null;
+    this.taskHoveredStationId = null;
     this.hoveredResourceId = null;
     this.hoverDebounceTimeout = null;
     this.hoverLocked = false;
@@ -388,6 +390,7 @@ export default class MapManager {
         stations.filter((s) => s.taskIds.length > 0),
         this.state.getMultiSelectedStationIds(),
         this.hoveredStationId,
+        this.taskHoveredStationId,
         this.state.getPartialAssignmentStationIds()
       );
       this.supercluster.load(geojson.features);
@@ -459,6 +462,15 @@ export default class MapManager {
     } else {
       clearRouteDisplay(map);
     }
+  }
+
+  public setHoveredStationId(stationId: number | null) {
+    this.updateHoverState(stationId, null);
+  }
+
+  public setTaskHoveredStationId(stationId: number | null) {
+    this.taskHoveredStationId = stationId;
+    this.state.setMapShouldRefresh(true);
   }
 
   private updateHoverState(stationId: number | null, driverId: number | null) {

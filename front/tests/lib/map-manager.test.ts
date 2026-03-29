@@ -871,6 +871,7 @@ describe('MapManager', () => {
         stations,
         new Set([7]),
         null,
+        null,
         new Set()
       );
     });
