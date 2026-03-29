@@ -85,10 +85,14 @@ services:
     volumes:
       - {{ app_dir }}/logs:/app/logs
       - {{ app_dir }}/grafana_logging:/app/grafana_logging
+      - {{ app_dir }}/graphhopper-data:/app/graphhopper-data
       - {{ app_dir }}/.env.prod:/app/.env:ro
     environment:
       - DATABASE_URL=postgresql://{{ postgres_user }}:{{ postgres_password }}@postgres:5432/{{ postgres_db }}
       - GRAPHHOPPER_URL=http://graphhopper:8989
+      - OSM_PBF_PATH=/app/graphhopper-data/montreal-latest.osm.pbf
+      - STOP_SIGN_PBF_PATH=/app/graphhopper-data/montreal-latest.osm.pbf
+      - TRAFFIC_LIGHT_PBF_PATH=/app/graphhopper-data/montreal-latest.osm.pbf
     env_file:
       - {{ app_dir }}/.env.prod
     depends_on:

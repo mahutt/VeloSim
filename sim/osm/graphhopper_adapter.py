@@ -410,6 +410,7 @@ class GraphHopperAdapter(RoutingProvider):
 
         # Detect stop signs using OSM PBF spatial index
         from sim.osm.stop_sign_index import get_stop_sign_index
+        from sim.osm.traffic_light_index import get_traffic_light_index
 
         osm_stop_sign_coordinates = get_stop_sign_index().find_near_route(
             result.coordinates
@@ -430,7 +431,28 @@ class GraphHopperAdapter(RoutingProvider):
                 seen.add(key)
                 unique_stops.append([key[0], key[1]])
 
+        osm_traffic_light_coordinates = get_traffic_light_index().find_near_route(
+            result.coordinates
+        )
+
+        provider_traffic_lights = getattr(result, "traffic_light_coordinates", [])
+        combined_traffic_lights = [
+            *osm_traffic_light_coordinates,
+            *provider_traffic_lights,
+        ]
+
+        unique_traffic_lights: list[list[float]] = []
+        seen_traffic_lights: set[tuple[float, float]] = set()
+        for coord in combined_traffic_lights:
+            key = (float(coord[0]), float(coord[1]))
+            if key not in seen_traffic_lights:
+                seen_traffic_lights.add(key)
+                unique_traffic_lights.append([key[0], key[1]])
+
         stop_sign_positions = [Position([c[0], c[1]]) for c in unique_stops]
+        traffic_light_positions = [
+            Position([c[0], c[1]]) for c in unique_traffic_lights
+        ]
 
         return RouteResult(
             coordinates=coordinates,
@@ -439,6 +461,7 @@ class GraphHopperAdapter(RoutingProvider):
             steps=steps,
             segments=segments,
             stop_sign_positions=stop_sign_positions,
+            traffic_light_positions=traffic_light_positions,
         )
 
     @staticmethod

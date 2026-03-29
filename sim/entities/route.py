@@ -23,7 +23,7 @@ SOFTWARE.
 """
 
 import math
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING, Iterable, Optional
 from sim.entities.map_payload import MapPayload
 from sim.entities.position import Position
 from sim.entities.road import Road
@@ -50,6 +50,7 @@ class Route:
 
     _route_counter = 0  # Unique ID generation.
     TRANSITION_THRESHOLD = 100  # 100 meters
+    TRAFFIC_LIGHT_INTERSECTION_COOLDOWN_DEGREES = 0.0001131370849898476
 
     @staticmethod
     def map_index_forward(current_idx: int, old_count: int, new_count: int) -> int:
@@ -158,10 +159,13 @@ class Route:
         # Reset to None when transitioning to a new road.
         self._last_point_count: int | None = None
         self._pending_stop_dwell: Position | None = None
+        self._pending_red_light_wait: tuple[Road, Position] | None = None
         self._visited_stop_points: set[tuple[int, float, float]] = set()
-        self._last_stop_position: tuple[float, float] | None = (
-            None  # Track last stop location globally
-        )
+        self._last_stop_position: tuple[float, float] | None = None
+        self._approached_stop_points: set[tuple[int, float, float]] = set()
+        self._visited_traffic_light_points: set[tuple[int, float, float]] = set()
+        self._last_traffic_light_position: tuple[float, float] | None = None
+        self._traversal_tick: int = 0
 
         # Store routing provider for recalculation
         self.routing_provider = routing_provider
@@ -189,6 +193,9 @@ class Route:
         self.duration = route_data.duration
         self.steps = route_data.steps
         self.stop_sign_positions = list(getattr(route_data, "stop_sign_positions", []))
+        self.traffic_light_positions = list(
+            getattr(route_data, "traffic_light_positions", [])
+        )
 
         # Store start/end positions for recalculation
         self.start_position = route_data.start_position
@@ -344,6 +351,15 @@ class Route:
 
         return current_road.active_pointcollection[self.current_point_index]
 
+    @staticmethod
+    def _build_midpoint(a: Position, b: Position) -> Position | None:
+        """Return a midpoint position between two distinct points."""
+        a_lon, a_lat = a.get_position()
+        b_lon, b_lat = b.get_position()
+        if a_lon == b_lon and a_lat == b_lat:
+            return None
+        return Position([(a_lon + b_lon) / 2.0, (a_lat + b_lat) / 2.0])
+
     def _get_wait_position(self, blocked_position: Position) -> Position:
         """Return the position to hold while blocked without advancing.
 
@@ -428,6 +444,36 @@ class Route:
         """
         return [pos.get_position() for pos in self.coordinates]
 
+    @staticmethod
+    def _append_unique_position(
+        unique_coords: list[list[float]],
+        seen: set[tuple[float, float]],
+        position: Position,
+    ) -> None:
+        """Append a position's coordinates once based on lon/lat identity."""
+        lon, lat = position.get_position()
+        key = (lon, lat)
+        if key in seen:
+            return
+        seen.add(key)
+        unique_coords.append([lon, lat])
+
+    def _iter_all_stop_sign_positions(self) -> Iterable[Position]:
+        """Yield stop-sign positions from route-local and controller mappings."""
+        yield from self.stop_sign_positions
+        if self.route_controller is None:
+            return
+        for road in self.roads:
+            yield from self.route_controller.get_stop_signs_for_road(road)
+
+    def _iter_all_traffic_light_positions(self) -> Iterable[Position]:
+        """Yield traffic-light positions from route-local and controller mappings."""
+        yield from self.traffic_light_positions
+        if self.route_controller is None:
+            return
+        for road in self.roads:
+            yield from self.route_controller.get_traffic_lights_for_road(road)
+
     def get_stop_sign_coordinates(self) -> list[list[float]]:
         """Return unique stop-sign coordinates associated with this route.
 
@@ -437,25 +483,65 @@ class Route:
         unique_coords: list[list[float]] = []
         seen: set[tuple[float, float]] = set()
 
-        for stop_sign in self.stop_sign_positions:
-            coord = stop_sign.get_position()
-            key = (coord[0], coord[1])
-            if key in seen:
-                continue
-            seen.add(key)
-            unique_coords.append(coord)
+        for stop_sign in self._iter_all_stop_sign_positions():
+            self._append_unique_position(unique_coords, seen, stop_sign)
+
+        return unique_coords
+
+    def get_traffic_light_coordinates(self) -> list[list[float]]:
+        """Return unique traffic-light coordinates associated with this route.
+
+        Returns:
+            list[list[float]]: Unique traffic-light coordinates as [lon, lat].
+        """
+        unique_coords: list[list[float]] = []
+        seen: set[tuple[float, float]] = set()
+
+        for traffic_light in self._iter_all_traffic_light_positions():
+            self._append_unique_position(unique_coords, seen, traffic_light)
+
+        return unique_coords
+
+    def get_traffic_light_signals(
+        self, simulation_tick: int | None = None
+    ) -> list[dict[str, object]]:
+        """Return unique traffic-light signal entries with current state.
+
+        Args:
+            simulation_tick: Optional simulation tick used for signal state
+                resolution. Defaults to 0 when omitted.
+
+        Returns:
+            list[dict[str, object]]: Unique signal entries as objects with
+                `position` and `state` keys.
+        """
+        tick = max(int(simulation_tick), 0) if simulation_tick is not None else 0
+        signals_by_key: dict[tuple[float, float], str] = {}
 
         if self.route_controller is not None:
             for road in self.roads:
-                for stop_sign in self.route_controller.get_stop_signs_for_road(road):
-                    coord = stop_sign.get_position()
-                    key = (coord[0], coord[1])
-                    if key in seen:
-                        continue
-                    seen.add(key)
-                    unique_coords.append(coord)
+                for (
+                    light,
+                    state,
+                ) in self.route_controller.get_traffic_light_signals_for_road(
+                    road, tick
+                ):
+                    coord = light.get_position()
+                    key = (round(coord[0], 7), round(coord[1], 7))
+                    state_value = (
+                        str(state.value) if hasattr(state, "value") else str(state)
+                    )
+                    existing_state = signals_by_key.get(key)
+                    # Prefer red if multiple route legs map the same marker.
+                    if existing_state == "red" or state_value == "red":
+                        signals_by_key[key] = "red"
+                    else:
+                        signals_by_key[key] = "green"
 
-        return unique_coords
+        return [
+            {"position": [lon, lat], "state": state}
+            for (lon, lat), state in signals_by_key.items()
+        ]
 
     @property
     def has_traffic_changed(self) -> bool:
@@ -796,7 +882,7 @@ class Route:
         self.current_point_index = best_point_idx
         self._last_point_count = len(road.active_pointcollection)
 
-    def next(self) -> Position | None:
+    def next(self, simulation_tick: int | None = None) -> Position | None:
         """Return the next position in the route traversal.
 
         Call once per simulation tick to advance the driver along the route.
@@ -806,19 +892,42 @@ class Route:
             using ratio-based mapping to preserve progress percentage.
             Formula: new_idx = ceil(current_idx / (old_count-1) * (new_count-1))
 
+        Args:
+            simulation_tick: Optional simulation tick used to evaluate
+                time-dependent traffic-light state.
+
         Returns:
             Position: Next position in traversal, or None if route is finished.
         """
         if self.is_finished:
             return None
 
-        # If the previous tick reached a stop-sign point, dwell for one tick.
+        self._traversal_tick += 1
+        effective_tick = (
+            max(int(simulation_tick), 0)
+            if simulation_tick is not None
+            else self._traversal_tick
+        )
+
         if (
-            self._pending_stop_dwell is not None
+            self._pending_red_light_wait is not None
             and self._last_returned_position is not None
+            and self.route_controller is not None
+            and hasattr(self.route_controller, "is_red_traffic_light_at_position")
         ):
+            wait_road, wait_pos = self._pending_red_light_wait
+            raw_is_red = self.route_controller.is_red_traffic_light_at_position(
+                wait_road, wait_pos, effective_tick
+            )
+            if isinstance(raw_is_red, bool) and raw_is_red:
+                return wait_pos
+            self._pending_red_light_wait = None
+
+        # If the previous tick reached a stop-sign point, dwell for one tick.
+        if self._pending_stop_dwell is not None:
             dwell_pos = self._pending_stop_dwell
             self._pending_stop_dwell = None
+            self._last_returned_position = dwell_pos
             return dwell_pos
 
         # If we are transition, use next transition position
@@ -949,7 +1058,8 @@ class Route:
                 # Don't increment current_point_index, instead retry next tick
             else:
                 # Stop-sign behavior: when first reaching a stop-sign point on a road,
-                # schedule a one-tick dwell after returning that point.
+                # insert one approach midpoint tick before the sign to smooth
+                # deceleration, then dwell at the sign on arrival tick.
                 if self.route_controller is not None and hasattr(
                     self.route_controller, "is_stop_sign_at_position"
                 ):
@@ -965,71 +1075,142 @@ class Route:
                         if isinstance(raw_match, Position):
                             matched_sign = raw_match
 
-                    is_stop_sign = matched_sign is not None
                     if matched_sign is None:
-                        is_stop_sign = self.route_controller.is_stop_sign_at_position(
-                            current_road, candidate_point
+                        raw_is_stop_sign = (
+                            self.route_controller.is_stop_sign_at_position(
+                                current_road, candidate_point
+                            )
                         )
-                    if matched_sign is not None:
-                        sign_lon, sign_lat = matched_sign.get_position()
-                        stop_key = (
-                            current_road.id,
-                            round(sign_lon, 7),
-                            round(sign_lat, 7),
+                        is_stop_sign = (
+                            isinstance(raw_is_stop_sign, bool) and raw_is_stop_sign
                         )
+                        stop_position = candidate_point
                     else:
-                        cand_lon, cand_lat = candidate_point.get_position()
-                        stop_key = (
-                            current_road.id,
-                            round(cand_lon, 7),
-                            round(cand_lat, 7),
-                        )
-                    if (
-                        stop_key not in self._visited_stop_points
-                        and is_stop_sign is True
-                    ):
+                        is_stop_sign = True
+                        stop_position = matched_sign
+
+                    stop_lon, stop_lat = stop_position.get_position()
+                    stop_key = (
+                        current_road.id,
+                        round(stop_lon, 7),
+                        round(stop_lat, 7),
+                    )
+                    if stop_key not in self._visited_stop_points and is_stop_sign:
                         CLUSTER_TOL_DEGREES = 0.00015
                         skip_duplicate = False
 
                         if self._last_stop_position is not None:
-                            if matched_sign is not None:
-                                curr_lon, curr_lat = matched_sign.get_position()
-                            else:
-                                curr_lon, curr_lat = candidate_point.get_position()
+                            curr_lon, curr_lat = stop_position.get_position()
 
                             last_lon, last_lat = self._last_stop_position
                             dx = curr_lon - last_lon
                             dy = curr_lat - last_lat
                             dist_sq = (dx * dx) + (dy * dy)
                             cluster_tol_sq = CLUSTER_TOL_DEGREES * CLUSTER_TOL_DEGREES
-
                             if dist_sq <= cluster_tol_sq:
                                 skip_duplicate = True
 
                         if not skip_duplicate:
+                            # On the first encounter, emit an intermediate position
+                            # between the previous point and the stop-sign point.
+                            if (
+                                stop_key not in self._approached_stop_points
+                                and self._last_returned_position is not None
+                            ):
+                                approach_point = Route._build_midpoint(
+                                    self._last_returned_position, candidate_point
+                                )
+                                if approach_point is not None:
+                                    self._approached_stop_points.add(stop_key)
+                                    point_to_return = approach_point
+                                    self._last_returned_position = approach_point
+                                    continue
+
                             self._visited_stop_points.add(stop_key)
                             self._pending_stop_dwell = candidate_point
+                            self._last_stop_position = (stop_lon, stop_lat)
 
-                            # Track this stop location for future duplicate checking
-                            if matched_sign is not None:
-                                sign_lon, sign_lat = matched_sign.get_position()
-                                self._last_stop_position = (sign_lon, sign_lat)
-                            else:
-                                point_lon, point_lat = candidate_point.get_position()
-                                self._last_stop_position = (point_lon, point_lat)
+                # Traffic-light behavior: on first encounter, wait while red.
+                if self.route_controller is not None and hasattr(
+                    self.route_controller, "is_red_traffic_light_at_position"
+                ):
+                    matched_light: Position | None = None
+                    if hasattr(
+                        self.route_controller,
+                        "get_matching_traffic_light_at_position",
+                    ):
+                        matcher = getattr(
+                            self.route_controller,
+                            "get_matching_traffic_light_at_position",
+                        )
+                        raw_match = matcher(current_road, candidate_point)
+                        if isinstance(raw_match, Position):
+                            matched_light = raw_match
 
-                # Next position on the road is available. The vehicle can
-                # proceed with normal traversal
+                    should_check_light = matched_light is not None
+                    if not should_check_light and hasattr(
+                        self.route_controller, "has_traffic_light_for_road"
+                    ):
+                        raw_has_lights = (
+                            self.route_controller.has_traffic_light_for_road(
+                                current_road
+                            )
+                        )
+                        should_check_light = (
+                            isinstance(raw_has_lights, bool) and raw_has_lights
+                        )
+
+                    if should_check_light:
+                        light_position = matched_light or candidate_point
+                        light_lon, light_lat = light_position.get_position()
+                        light_key = (
+                            current_road.id,
+                            round(light_lon, 7),
+                            round(light_lat, 7),
+                        )
+
+                        if light_key not in self._visited_traffic_light_points:
+                            curr_light_lon, curr_light_lat = light_lon, light_lat
+
+                            skip_nearby_intersection_light = False
+                            if self._last_traffic_light_position is not None:
+                                last_light_lon, last_light_lat = (
+                                    self._last_traffic_light_position
+                                )
+                                dx = curr_light_lon - last_light_lon
+                                dy = curr_light_lat - last_light_lat
+                                dist_sq = (dx * dx) + (dy * dy)
+                                cooldown_tol_sq = (
+                                    Route.TRAFFIC_LIGHT_INTERSECTION_COOLDOWN_DEGREES
+                                    * Route.TRAFFIC_LIGHT_INTERSECTION_COOLDOWN_DEGREES
+                                )
+                                if dist_sq <= cooldown_tol_sq:
+                                    skip_nearby_intersection_light = True
+
+                            raw_is_red = (
+                                self.route_controller.is_red_traffic_light_at_position(
+                                    current_road, candidate_point, effective_tick
+                                )
+                            )
+                            is_red = isinstance(raw_is_red, bool) and raw_is_red
+                            self._visited_traffic_light_points.add(light_key)
+                            if not skip_nearby_intersection_light and is_red:
+                                self._pending_red_light_wait = (
+                                    current_road,
+                                    candidate_point,
+                                )
+                            if not skip_nearby_intersection_light:
+                                self._last_traffic_light_position = (
+                                    curr_light_lon,
+                                    curr_light_lat,
+                                )
+
                 if (
                     self._last_returned_position is None
                     or candidate_point != self._last_returned_position
                 ):
                     point_to_return = candidate_point
                     self._last_returned_position = candidate_point
-                else:
-                    # Duplicate check: same position as last returned
-                    # If we were blocked here before, increment to move forward
-                    pass
 
                 # Advance index for next call
                 self.current_point_index += 1

@@ -129,6 +129,9 @@ class RouteResult:
     stop_sign_positions: List["Position"] = field(default_factory=list)
     """Stop-sign positions detected along this route."""
 
+    traffic_light_positions: List["Position"] = field(default_factory=list)
+    """Traffic-light positions detected along this route."""
+
     @property
     def start_position(self) -> "Position":
         """

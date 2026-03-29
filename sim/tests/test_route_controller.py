@@ -707,6 +707,38 @@ class TestRouteControllerRouteCreation:
         assert controller.has_stop_sign_for_road(road)
         assert controller.is_stop_sign_at_position(road, road_endpoint)
 
+    def test_create_route_registers_traffic_lights_for_road(self) -> None:
+        """Traffic lights from route metadata should be associated to roads."""
+        mock_map_controller = Mock()
+        controller = RouteController(mock_map_controller, PositionRegistry())
+
+        mock_routing_provider = Mock()
+        traffic_light_pos = Position([1.0, 1.0])
+
+        route_result = RouteResult(
+            coordinates=[Position([0.0, 0.0]), Position([1.0, 1.0])],
+            distance=100.0,
+            duration=10.0,
+            steps=[
+                RouteStep(
+                    name="Test Road",
+                    distance=100.0,
+                    duration=10.0,
+                    geometry=[Position([0.0, 0.0]), traffic_light_pos],
+                )
+            ],
+            segments=[],
+            traffic_light_positions=[traffic_light_pos],
+        )
+
+        route = controller.create_route(route_result, mock_routing_provider, {})
+
+        assert route.roads
+        road = route.roads[0]
+        assert controller.has_traffic_light_for_road(road)
+        lights = controller.get_traffic_lights_for_road(road)
+        assert any(p.get_position() == traffic_light_pos.get_position() for p in lights)
+
     def test_clusters_nearby_stop_signs_on_same_road(self) -> None:
         """Very close stop signs on the same approach should produce one stop event."""
         mock_map_controller = Mock()

@@ -745,12 +745,13 @@ class SimulatorController:
                     "serviceChainStationId": driver.service_chain_station_id,
                 }
 
-                # Include route in key frames (for replayability) or when route changes
-                # Only include route field when there's something to communicate:
-                # - Key frames: always include (coordinates or null)
-                # - Diff frames: only include if route_changed
-                if is_key or driver.route_changed or driver.traffic_changed:
-                    route_json = driver.get_route_json()
+                # Include full route in key frames and on route/traffic changes.
+                include_full_route = (
+                    is_key or driver.route_changed or driver.traffic_changed
+                )
+
+                if include_full_route:
+                    route_json = driver.get_route_json(int(self.sim_env.now))
 
                     # Build trafficRanges and nest inside route
                     traffic_ranges: list = []
@@ -769,31 +770,7 @@ class SimulatorController:
                             traffic_ranges if driver.routes else None
                         )
 
-                        if driver.route_changed or driver.traffic_changed:
-                            coordinates = route_json.get("coordinates", [])
-                            stop_sign_positions = route_json.get(
-                                "stopSignPositions", []
-                            )
-                            route_start = coordinates[0] if coordinates else None
-                            route_end = coordinates[-1] if coordinates else None
-                            logger.info(
-                                (
-                                    "Driver %s route payload: coords=%s "
-                                    "stopSignPositions=%s start=%s end=%s "
-                                    "key=%s route_changed=%s traffic_changed=%s"
-                                ),
-                                driver.id,
-                                len(coordinates),
-                                len(stop_sign_positions),
-                                route_start,
-                                route_end,
-                                is_key,
-                                driver.route_changed,
-                                driver.traffic_changed,
-                            )
-
                     driver_data["route"] = route_json
-
                 drivers.append(driver_data)
 
         vehicles = []
