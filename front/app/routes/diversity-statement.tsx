@@ -212,15 +212,15 @@ export default function DiversityStatement() {
         className="w-full"
       >
         <TabsList className="overflow-x-auto">
-          <TabsTrigger value="en">English</TabsTrigger>
-          <TabsTrigger value="fr">Français</TabsTrigger>
+          <TabsTrigger value="en">{t.diversity.englishTab}</TabsTrigger>
+          <TabsTrigger value="fr">{t.diversity.frenchTab}</TabsTrigger>
         </TabsList>
 
         <TabsContent value="en">
           <Card className="mt-4">
             <CardHeader>
               <h2 className="text-xl font-semibold break-words">
-                Our Commitment
+                {t.diversity.commitmentTitleEn}
               </h2>
             </CardHeader>
             <CardContent>{configContent.en}</CardContent>
@@ -231,7 +231,7 @@ export default function DiversityStatement() {
           <Card className="mt-4">
             <CardHeader>
               <h2 className="text-xl font-semibold break-words">
-                Notre Engagement
+                {t.diversity.commitmentTitleFr}
               </h2>
             </CardHeader>
             <CardContent>{configContent.fr}</CardContent>

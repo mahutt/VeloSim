@@ -37,6 +37,7 @@ import { Label } from '~/components/ui/label';
 import { log, LogContext, LogLevel } from '~/lib/logger';
 import { MONTREAL_BOUNDS, SCHEDULED_TASK_PATTERN } from '~/constants';
 import usePreferences from '~/hooks/use-preferences';
+import { formatTranslation } from '~/lib/i18n';
 
 interface AddStationDialogProps {
   open: boolean;
@@ -79,27 +80,40 @@ export default function AddStationDialog({
     const newErrors: Record<string, string> = {};
 
     if (!name.trim()) {
-      newErrors.name = 'Station name is required';
+      newErrors.name = t.scenario.validation.station.nameRequired;
     }
 
     const lat = parseFloat(latitude);
     if (!latitude || isNaN(lat)) {
-      newErrors.latitude = 'Valid latitude is required';
+      newErrors.latitude = t.scenario.validation.station.latitudeRequired;
     } else if (lat < MONTREAL_BOUNDS.LAT_MIN || lat > MONTREAL_BOUNDS.LAT_MAX) {
-      newErrors.latitude = `must be between ${MONTREAL_BOUNDS.LAT_MIN} and ${MONTREAL_BOUNDS.LAT_MAX}`;
+      newErrors.latitude = formatTranslation(
+        t.scenario.validation.station.latitudeRange,
+        {
+          min: MONTREAL_BOUNDS.LAT_MIN,
+          max: MONTREAL_BOUNDS.LAT_MAX,
+        }
+      );
     }
 
     const lon = parseFloat(longitude);
     if (!longitude || isNaN(lon)) {
-      newErrors.longitude = 'Valid longitude is required';
+      newErrors.longitude = t.scenario.validation.station.longitudeRequired;
     } else if (lon < MONTREAL_BOUNDS.LON_MIN || lon > MONTREAL_BOUNDS.LON_MAX) {
-      newErrors.longitude = `must be between ${MONTREAL_BOUNDS.LON_MIN} and ${MONTREAL_BOUNDS.LON_MAX}`;
+      newErrors.longitude = formatTranslation(
+        t.scenario.validation.station.longitudeRange,
+        {
+          min: MONTREAL_BOUNDS.LON_MIN,
+          max: MONTREAL_BOUNDS.LON_MAX,
+        }
+      );
     }
 
     if (initialTaskCount.trim()) {
       const taskCount = parseInt(initialTaskCount, 10);
       if (isNaN(taskCount) || taskCount < 0) {
-        newErrors.initialTaskCount = 'Must be a non-negative number';
+        newErrors.initialTaskCount =
+          t.scenario.validation.station.initialTaskNonNegative;
       }
     }
 
@@ -111,7 +125,12 @@ export default function AddStationDialog({
 
       for (const task of tasks) {
         if (!SCHEDULED_TASK_PATTERN.test(task)) {
-          newErrors.scheduledTasks = `Invalid format: "${task}". Must be dayN:HH:MM (e.g., day1:09:30)`;
+          newErrors.scheduledTasks = formatTranslation(
+            t.scenario.validation.station.scheduledTaskFormat,
+            {
+              task,
+            }
+          );
           break;
         }
       }

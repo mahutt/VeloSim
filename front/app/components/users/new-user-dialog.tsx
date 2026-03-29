@@ -44,21 +44,31 @@ import {
   FieldGroup,
   FieldLabel,
 } from '~/components/ui/field';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Alert, AlertTitle } from '~/components/ui/alert';
 import { AlertCircleIcon, CheckCircle2Icon, Loader2 } from 'lucide-react';
 import { Checkbox } from '~/components/ui/checkbox';
 import axios from 'axios';
+import usePreferences from '~/hooks/use-preferences';
+import type { TranslationSchema } from '~/lib/i18n';
 
-const newUserFormSchema = z.object({
-  username: z
-    .string()
-    .min(1, 'Username must be at least 1 character.')
-    .max(100, 'Username must be at most 100 characters.'),
-  password: z.string().min(1, 'Password must be at least 1 character.'),
-  is_admin: z.boolean(),
-  is_enabled: z.boolean(),
-});
+type NewUserFormValues = {
+  username: string;
+  password: string;
+  is_admin: boolean;
+  is_enabled: boolean;
+};
+
+const createNewUserFormSchema = (t: TranslationSchema) =>
+  z.object({
+    username: z
+      .string()
+      .min(1, t.users.validation.usernameMin)
+      .max(100, t.users.validation.usernameMax),
+    password: z.string().min(1, t.users.validation.passwordMin),
+    is_admin: z.boolean(),
+    is_enabled: z.boolean(),
+  });
 
 export default function NewUserDialog({
   open,
@@ -69,7 +79,12 @@ export default function NewUserDialog({
   onOpenChange: (open: boolean) => void;
   onAddUser: (u: User) => void;
 }) {
-  const [message, setMessage] = useState<string | null>(null);
+  const { t } = usePreferences();
+  const [message, setMessage] = useState<{
+    type: 'success' | 'error';
+    text: string;
+  } | null>(null);
+  const newUserFormSchema = useMemo(() => createNewUserFormSchema(t), [t]);
 
   const formId = `form-new-user`;
   const usernameFieldId = `${formId}-username`;
@@ -77,7 +92,7 @@ export default function NewUserDialog({
   const isAdminFieldId = `${formId}-is-admin`;
   const isEnabledFieldId = `${formId}-is-enabled`;
 
-  const newUserForm = useForm<z.infer<typeof newUserFormSchema>>({
+  const newUserForm = useForm<NewUserFormValues>({
     resolver: zodResolver(newUserFormSchema),
     defaultValues: {
       username: '',
@@ -88,19 +103,19 @@ export default function NewUserDialog({
   });
   const { isSubmitting } = newUserForm.formState;
 
-  async function onSubmit(data: z.infer<typeof newUserFormSchema>) {
+  async function onSubmit(data: NewUserFormValues) {
     setMessage(null);
     try {
       const response = await api.post<User>(`/users/create`, data);
       onAddUser(response.data);
-      setMessage(newUserFormMessage.Success);
+      setMessage({ type: 'success', text: t.users.dialog.success });
       newUserForm.reset();
     } catch (e) {
       console.error('New user error', e);
       if (axios.isAxiosError(e) && e.response?.data?.detail) {
-        setMessage(e.response.data.detail);
+        setMessage({ type: 'error', text: e.response.data.detail });
       } else {
-        setMessage(newUserFormMessage.GenericError);
+        setMessage({ type: 'error', text: t.users.dialog.genericError });
       }
     }
   }
@@ -117,9 +132,9 @@ export default function NewUserDialog({
       <form id={formId} onSubmit={newUserForm.handleSubmit(onSubmit)}>
         <DialogContent className="sm:max-w-[425px]">
           <DialogHeader>
-            <DialogTitle>Create new user</DialogTitle>
+            <DialogTitle>{t.users.dialog.createTitle}</DialogTitle>
             <DialogDescription>
-              Create a new user by filling out the form below.
+              {t.users.dialog.createDescription}
               <br />
             </DialogDescription>
           </DialogHeader>
@@ -130,12 +145,14 @@ export default function NewUserDialog({
               control={newUserForm.control}
               render={({ field, fieldState }) => (
                 <Field data-invalid={fieldState.invalid}>
-                  <FieldLabel htmlFor={usernameFieldId}>Username</FieldLabel>
+                  <FieldLabel htmlFor={usernameFieldId}>
+                    {t.users.dialog.usernameLabel}
+                  </FieldLabel>
                   <Input
                     {...field}
                     id={usernameFieldId}
                     aria-invalid={fieldState.invalid}
-                    placeholder="Username"
+                    placeholder={t.users.dialog.usernamePlaceholder}
                     autoComplete="off"
                     disabled={isSubmitting}
                   />
@@ -150,12 +167,14 @@ export default function NewUserDialog({
               control={newUserForm.control}
               render={({ field, fieldState }) => (
                 <Field data-invalid={fieldState.invalid}>
-                  <FieldLabel htmlFor={passwordFieldId}>Password</FieldLabel>
+                  <FieldLabel htmlFor={passwordFieldId}>
+                    {t.users.dialog.passwordLabel}
+                  </FieldLabel>
                   <Input
                     {...field}
                     id={passwordFieldId}
                     aria-invalid={fieldState.invalid}
-                    placeholder="Password"
+                    placeholder={t.users.dialog.passwordPlaceholder}
                     autoComplete="off"
                     type="password"
                     disabled={isSubmitting}
@@ -181,7 +200,9 @@ export default function NewUserDialog({
                     aria-invalid={fieldState.invalid}
                     disabled={isSubmitting}
                   />
-                  <FieldLabel htmlFor={isAdminFieldId}>Admin</FieldLabel>
+                  <FieldLabel htmlFor={isAdminFieldId}>
+                    {t.users.dialog.adminLabel}
+                  </FieldLabel>
                   {fieldState.invalid && (
                     <FieldError errors={[fieldState.error]} />
                   )}
@@ -203,7 +224,9 @@ export default function NewUserDialog({
                     aria-invalid={fieldState.invalid}
                     disabled={isSubmitting}
                   />
-                  <FieldLabel htmlFor={isEnabledFieldId}>Enabled</FieldLabel>
+                  <FieldLabel htmlFor={isEnabledFieldId}>
+                    {t.users.dialog.enabledLabel}
+                  </FieldLabel>
 
                   {fieldState.invalid && (
                     <FieldError errors={[fieldState.error]} />
@@ -215,12 +238,12 @@ export default function NewUserDialog({
           <DialogFooter>
             <DialogClose asChild>
               <Button variant="outline" disabled={isSubmitting}>
-                Close
+                {t.users.dialog.close}
               </Button>
             </DialogClose>
             <Button type="submit" form={formId} disabled={isSubmitting}>
               {isSubmitting && <Loader2 className="animate-spin" />}
-              Create
+              {t.users.dialog.create}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -229,17 +252,16 @@ export default function NewUserDialog({
   );
 }
 
-enum newUserFormMessage {
-  Success = 'User created successfully',
-  GenericError = 'Something went wrong',
-}
-
-function NewUserFormAlert({ message }: { message: string }) {
-  const success = message === newUserFormMessage.Success;
+function NewUserFormAlert({
+  message,
+}: {
+  message: { type: 'success' | 'error'; text: string };
+}) {
+  const success = message.type === 'success';
   return (
     <Alert variant={success ? 'default' : 'destructive'}>
       {success ? <CheckCircle2Icon /> : <AlertCircleIcon />}
-      <AlertTitle>{message}</AlertTitle>
+      <AlertTitle>{message.text}</AlertTitle>
     </Alert>
   );
 }

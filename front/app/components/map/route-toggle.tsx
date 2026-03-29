@@ -31,9 +31,11 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '~/components/ui/dropdown-menu';
+import usePreferences from '~/hooks/use-preferences';
 
 export default function RouteToggle() {
   const { state, engine } = useSimulation();
+  const { t } = usePreferences();
   const { showAllRoutes } = state;
 
   return (
@@ -58,7 +60,7 @@ export default function RouteToggle() {
             aria-checked={showAllRoutes}
             aria-label="Show all vehicle routes"
           >
-            <span>Show All Routes</span>
+            <span>{t.map.labels.showAllRoutes}</span>
             <div
               className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${
                 showAllRoutes ? 'bg-primary' : 'bg-input'

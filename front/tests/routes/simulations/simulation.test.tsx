@@ -151,7 +151,7 @@ test('simulation page renders loader while simulation engine is loading', async 
   expect(screen.queryByText('Playback Controls')).not.toBeInTheDocument();
   expect(screen.queryByText('Selected Item Bar')).not.toBeInTheDocument();
   // assert loader is shown
-  expect(screen.queryByText('Loading')).toBeInTheDocument();
+  expect(screen.getByText(/loading/i)).toBeInTheDocument();
 });
 
 test('simulation page renders nothing if sim_id is missing', async () => {

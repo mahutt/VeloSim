@@ -35,6 +35,8 @@ import { Button } from '../ui/button';
 import DriverStateBadge from './driver-state-badge';
 import { StationTasks } from './station-tasks';
 import { DriverTasks } from './driver-tasks';
+import usePreferences from '~/hooks/use-preferences';
+import { formatTranslation } from '~/lib/i18n';
 
 export enum SelectedItemType {
   Station = 'station',
@@ -64,6 +66,7 @@ export type SelectedItem =
 
 export default function SelectedItemBar() {
   const { state, engine } = useSimulation();
+  const { t } = usePreferences();
   const { selectedItems } = state;
 
   if (selectedItems.length === 0) return null;
@@ -84,7 +87,10 @@ export default function SelectedItemBar() {
         <div className="px-5 flex flex-row justify-between items-start gap-1">
           <div className="flex flex-col min-w-0">
             <span className="text-xl font-bold">
-              {stations.length} Stations ({totalTasks} tasks)
+              {formatTranslation(t.map.labels.stationsCount, {
+                count: stations.length,
+                tasks: totalTasks,
+              })}
             </span>
           </div>
           <Button
@@ -108,7 +114,7 @@ export default function SelectedItemBar() {
                   {station.name}
                 </span>
                 <span className="text-xs text-muted-foreground whitespace-nowrap shrink-0">
-                  ({station.tasks.length} tasks)
+                  ({station.tasks.length} {t.map.labels.taskPlural})
                 </span>
               </div>
             ))}
@@ -133,14 +139,18 @@ export default function SelectedItemBar() {
           {selectedItem.type === SelectedItemType.Driver && (
             <div className="flex flex-row gap-2">
               <span className="text-muted-foreground text-sm font-normal">
-                Driver #{selectedItem.value.id}
+                {formatTranslation(t.map.labels.driverId, {
+                  id: selectedItem.value.id,
+                })}
               </span>
               <DriverStateBadge state={selectedItem.value.state} />
             </div>
           )}
           {selectedItem.type === SelectedItemType.Station && (
             <span className="text-muted-foreground text-sm font-normal">
-              Station #{selectedItem.value.id}
+              {formatTranslation(t.map.labels.stationId, {
+                id: selectedItem.value.id,
+              })}
             </span>
           )}
         </div>
@@ -162,7 +172,9 @@ export default function SelectedItemBar() {
           )}
         </>
       ) : (
-        <p className="text-sm text-muted-foreground px-5">No tasks</p>
+        <p className="text-sm text-muted-foreground px-5">
+          {t.map.labels.noTasks}
+        </p>
       )}
     </div>
   );

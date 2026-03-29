@@ -39,6 +39,7 @@ import SimulationClock from '~/components/map/clock';
 import HQWidget from '~/components/simulation/hq-widget';
 import Scrubber from '~/components/map/scrubber';
 import useFeature from '~/hooks/use-feature';
+import usePreferences from '~/hooks/use-preferences';
 import { TaskAssignmentBanner } from '~/components/task/task-assignment-banner';
 import ReportingWidget from '~/components/simulation/reporting-widget';
 
@@ -71,6 +72,7 @@ function MapReadyGate({ simulationId }: { simulationId: string }) {
 
 function SimulationContent() {
   const { state } = useSimulation();
+  const { t } = usePreferences();
   const { isLoading, currentDay } = state;
   const showScrubber = useFeature('simulationScrubber');
 
@@ -80,7 +82,7 @@ function SimulationContent() {
         <div className="absolute inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm">
           <div className="flex flex-col items-center gap-4">
             <Loader2 className="h-12 w-12 animate-spin text-primary" />
-            <p className="text-lg text-muted-foreground">Loading</p>
+            <p className="text-lg text-muted-foreground">{t.common.loading}</p>
           </div>
         </div>
       )}

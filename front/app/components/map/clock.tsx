@@ -23,14 +23,18 @@
  */
 
 import { useSimulation } from '~/providers/simulation-provider';
+import usePreferences from '~/hooks/use-preferences';
 
 export default function Clock() {
   const { state } = useSimulation();
+  const { t } = usePreferences();
   const { formattedSimTime, currentDay } = state;
   return (
     <div className="bg-background border shadow-sm rounded-md h-10 px-3 flex items-center">
       <div className="flex items-center gap-1 font-mono text-sm">
-        <span className="font-medium text-foreground">Day {currentDay}</span>
+        <span className="font-medium text-foreground">
+          {t.map.labels.day} {currentDay}
+        </span>
         <span className="text-xs font-bold text-foreground/50">—</span>
         <span className="font-medium text-foreground">{formattedSimTime}</span>
       </div>

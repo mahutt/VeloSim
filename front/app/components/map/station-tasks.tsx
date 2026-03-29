@@ -28,9 +28,12 @@ import { useTaskMassSelect } from '~/hooks/use-task-mass-select';
 import { useAutoScroll } from '~/hooks/use-auto-scroll';
 import type { PopulatedStation } from './selected-item-bar';
 import { ScrollArea } from '~/components/ui/scroll-area';
+import usePreferences from '~/hooks/use-preferences';
+import { formatTranslation } from '~/lib/i18n';
 
 export function StationTasks({ station }: { station: PopulatedStation }) {
   const { engine } = useSimulation();
+  const { t } = usePreferences();
   const taskIds = station.tasks.map((task) => task.id);
   const {
     selectedTaskIds,
@@ -46,8 +49,13 @@ export function StationTasks({ station }: { station: PopulatedStation }) {
     <>
       <p className="px-5 text-sm text-muted-foreground">
         {selectedTaskIds.length > 0
-          ? `Tasks (${selectedTaskIds.length}/${station.tasks.length} selected)`
-          : `Tasks (${station.tasks.length})`}
+          ? formatTranslation(t.map.labels.tasksSelectedCount, {
+              selected: selectedTaskIds.length,
+              total: station.tasks.length,
+            })
+          : formatTranslation(t.map.labels.tasksCount, {
+              count: station.tasks.length,
+            })}
       </p>
       <ScrollArea className="mx-2">
         <div

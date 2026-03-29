@@ -32,6 +32,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '~/components/ui/dialog';
+import usePreferences from '~/hooks/use-preferences';
 
 export default function ErrorDialog({
   open,
@@ -46,6 +47,8 @@ export default function ErrorDialog({
   message: string;
   retryCallback?: () => void;
 }) {
+  const { t } = usePreferences();
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent data-testid="error-dialog">
@@ -65,7 +68,7 @@ export default function ErrorDialog({
                 onOpenChange(false);
               }}
             >
-              Close
+              {t.common.close}
             </Button>
           </DialogClose>
           {retryCallback && (
@@ -76,7 +79,7 @@ export default function ErrorDialog({
                 retryCallback();
               }}
             >
-              Retry
+              {t.common.retry}
             </Button>
           )}
         </DialogFooter>
