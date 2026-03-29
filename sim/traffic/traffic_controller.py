@@ -114,6 +114,7 @@ class TrafficController:
         if self._env and traffic_config and traffic_config.global_schedule:
             self._env.process(self._setup_global_traffic_schedules())
 
+        self._current_global_multiplier = 1.0
         if traffic_config:
             self.gps_sync_delay = traffic_config.gps_sync_delay
         else:
@@ -128,11 +129,31 @@ class TrafficController:
 
         If registry exists, checks for active traffic events that intersect
         the new road and applies their traffic. Otherwise uses legacy path.
+        Sets current global multiplier to it if any.
 
         Args:
             road: The newly created road.
         """
+        self.sync_road_state(road)
+
+    def sync_road_state(self, road: Road) -> None:
+        """Updates a road's state to match current conditions.
+
+        Args:
+            road: The road to update
+
+        Returns:
+            None
+        """
+        # Apply current global multiplier to road
+        if self._current_global_multiplier != 1.0:
+            road.set_global_traffic_multiplier(self._current_global_multiplier)
+
         self._handle_road_created_for_active_events(road)
+
+        # To ensure the global multiplier on the road is affecting routes
+        if road.traffic_multiplier != 1.0:
+            self._notify_routes_for_road(road)
 
     def _handle_road_created_for_active_events(self, road: Road) -> None:
         """Apply traffic from any active events that intersect this new road.
@@ -277,8 +298,10 @@ class TrafficController:
                 # Schedule start of the global multiplier event
                 self._env.process(self._apply_global_multiplier(start_tick, multiplier))
 
-                # Schedule reset to 1.0 (free flow)
-                self._env.process(self._apply_global_multiplier(end_tick, 1.0))
+                # Schedule reset to 1.0 (free flow) before the end_tick to ensure no
+                # overlap with a new event starting at end_tick
+                reset_tick = max(start_tick, end_tick - 1)
+                self._env.process(self._apply_global_multiplier(reset_tick, 1.0))
 
             yield self._env.timeout(0)
 
@@ -293,8 +316,8 @@ class TrafficController:
         delay = max(0, tick - self._env.now)
         yield self._env.timeout(delay)
 
-        # Update all Roads' global traffic multiplier class variable
-        Road.global_traffic_multiplier = multiplier
+        # Store the new multiplier for future roads
+        self._current_global_multiplier = multiplier
         logger.info(
             f"Global traffic multiplier updated to {multiplier} at "
             f"tick {int(self._env.now)}"
@@ -302,7 +325,7 @@ class TrafficController:
 
         # Notify all active roads to recalculate routes
         for road in self._route_controller.get_all_active_roads():
-            road.invalidate_traffic_cache()
+            road.set_global_traffic_multiplier(multiplier)
             self._notify_routes_for_road(road)
 
     # =========================================================================

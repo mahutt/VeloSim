@@ -964,8 +964,7 @@ class _ScenarioValidator:
                     if line_num:
                         error_dict["line"] = line_num
                     errors.append(error_dict)
-
-                if multiplier <= 0 or multiplier > 1.0:
+                elif multiplier <= 0 or multiplier > 1.0:
                     field_path = f"traffic.global[{idx}].multiplier"
                     error_dict = {
                         "field": field_path,

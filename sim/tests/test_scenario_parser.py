@@ -635,6 +635,303 @@ def test_validate_accepts_valid_traffic_levels() -> None:
         ), f"Unexpected error for level '{level}': {traffic_errors}"
 
 
+def test_validate_catches_missing_field_in_global() -> None:
+    """Test that validate() catches missing fields in a global entry"""
+    scenario_json = {
+        "start_time": "day1:08:00",
+        "end_time": "day1:12:00",
+        "vehicle_battery_capacity": 999,
+        "traffic": {"global": [{"multiplier": 0.3, "start_time": "day1:08:00"}]},
+        "stations": [
+            {
+                "name": "Station 1",
+                "initial_task_count": 1,
+                "scheduled_tasks": [],
+                "position": [-73.5, 45.5],
+            }
+        ],
+        "drivers": [
+            {
+                "name": "Driver 1",
+                "shift": {"start_time": "day1:08:00", "end_time": "day1:12:00"},
+            }
+        ],
+        "vehicles": [
+            {"name": "Vehicle 1", "position": [-73.561, 45.507], "battery_count": 10}
+        ],
+    }
+
+    strategy = JsonParseStrategy(scenario_json=scenario_json)
+    errors = strategy.validate()
+
+    assert len(errors) > 0
+    assert any(e.get("field") == "traffic.global[0]" for e in errors)
+    assert any("Missing required field(s)" in e.get("message", "") for e in errors)
+
+
+def test_validate_catches_invalid_multiplier_type_in_global() -> None:
+    """Test that validate() catches an invalid multiplier type in a global entry"""
+    scenario_json = {
+        "start_time": "day1:08:00",
+        "end_time": "day1:12:00",
+        "vehicle_battery_capacity": 999,
+        "traffic": {
+            "global": [
+                {
+                    "multiplier": "0.5",
+                    "start_time": "day1:08:00",
+                    "end_time": "day1:10:00",
+                }
+            ]
+        },
+        "stations": [
+            {
+                "name": "Station 1",
+                "initial_task_count": 1,
+                "scheduled_tasks": [],
+                "position": [-73.5, 45.5],
+            }
+        ],
+        "drivers": [
+            {
+                "name": "Driver 1",
+                "shift": {"start_time": "day1:08:00", "end_time": "day1:12:00"},
+            }
+        ],
+        "vehicles": [
+            {"name": "Vehicle 1", "position": [-73.561, 45.507], "battery_count": 10}
+        ],
+    }
+
+    strategy = JsonParseStrategy(scenario_json=scenario_json)
+    errors = strategy.validate()
+
+    assert len(errors) > 0
+    assert any(e.get("field") == "traffic.global[0].multiplier" for e in errors)
+    assert any(
+        "multiplier should be an integer or float" in e.get("message", "")
+        for e in errors
+    )
+
+
+def test_validate_ensures_global_multiplier_in_range() -> None:
+    """Test that validate() catches global multipliers not in range in a global entry"""
+    scenario_json = {
+        "start_time": "day1:08:00",
+        "end_time": "day1:12:00",
+        "vehicle_battery_capacity": 999,
+        "traffic": {
+            "global": [
+                {
+                    "multiplier": 4.3,
+                    "start_time": "day1:08:00",
+                    "end_time": "day1:10:00",
+                }
+            ]
+        },
+        "stations": [
+            {
+                "name": "Station 1",
+                "initial_task_count": 1,
+                "scheduled_tasks": [],
+                "position": [-73.5, 45.5],
+            }
+        ],
+        "drivers": [
+            {
+                "name": "Driver 1",
+                "shift": {"start_time": "day1:08:00", "end_time": "day1:12:00"},
+            }
+        ],
+        "vehicles": [
+            {"name": "Vehicle 1", "position": [-73.561, 45.507], "battery_count": 10}
+        ],
+    }
+
+    strategy = JsonParseStrategy(scenario_json=scenario_json)
+    errors = strategy.validate()
+
+    assert len(errors) > 0
+    assert any(
+        "multiplier should be between 0.1 and 1.0" in e.get("message", "")
+        for e in errors
+    )
+
+
+def test_validate_catches_invalid_time_sequence_in_global() -> None:
+    """Test that validate() catches invalid time sequences in a global entry"""
+    scenario_json = {
+        "start_time": "day1:08:00",
+        "end_time": "day1:12:00",
+        "vehicle_battery_capacity": 999,
+        "traffic": {
+            "global": [
+                {
+                    "multiplier": 0.3,
+                    "start_time": "day1:08:00",
+                    "end_time": "day1:06:00",
+                }
+            ]
+        },
+        "stations": [
+            {
+                "name": "Station 1",
+                "initial_task_count": 1,
+                "scheduled_tasks": [],
+                "position": [-73.5, 45.5],
+            }
+        ],
+        "drivers": [
+            {
+                "name": "Driver 1",
+                "shift": {"start_time": "day1:08:00", "end_time": "day1:12:00"},
+            }
+        ],
+        "vehicles": [
+            {"name": "Vehicle 1", "position": [-73.561, 45.507], "battery_count": 10}
+        ],
+    }
+
+    strategy = JsonParseStrategy(scenario_json=scenario_json)
+    errors = strategy.validate()
+
+    assert len(errors) > 0
+    assert any(e.get("field") == "traffic.global[0].end_time" for e in errors)
+    assert any(
+        "end_time must be after start_time" in e.get("message", "") for e in errors
+    )
+
+
+def test_validate_catches_overlaps_in_global() -> None:
+    """Test that validate() catches overlaps in a global entries"""
+    scenario_json = {
+        "start_time": "day1:08:00",
+        "end_time": "day1:12:00",
+        "vehicle_battery_capacity": 999,
+        "traffic": {
+            "global": [
+                {
+                    "multiplier": 0.3,
+                    "start_time": "day1:08:00",
+                    "end_time": "day1:10:00",
+                },
+                {
+                    "multiplier": 0.6,
+                    "start_time": "day1:09:00",
+                    "end_time": "day1:12:00",
+                },
+            ]
+        },
+        "stations": [
+            {
+                "name": "Station 1",
+                "initial_task_count": 1,
+                "scheduled_tasks": [],
+                "position": [-73.5, 45.5],
+            }
+        ],
+        "drivers": [
+            {
+                "name": "Driver 1",
+                "shift": {"start_time": "day1:08:00", "end_time": "day1:12:00"},
+            }
+        ],
+        "vehicles": [
+            {"name": "Vehicle 1", "position": [-73.561, 45.507], "battery_count": 10}
+        ],
+    }
+
+    strategy = JsonParseStrategy(scenario_json=scenario_json)
+    errors = strategy.validate()
+
+    assert len(errors) > 0
+    assert any("traffic.global[1]" in e["field"] for e in errors)
+    assert any("overlaps with another entry" in e.get("message", "") for e in errors)
+
+
+def test_validate_catches_invalid_time_format_in_global() -> None:
+    """Test that validate() catches invalid time formats in a global entries"""
+    scenario_json = {
+        "start_time": "day1:08:00",
+        "end_time": "day1:12:00",
+        "vehicle_battery_capacity": 999,
+        "traffic": {
+            "global": [
+                {"multiplier": 0.3, "start_time": "day1:08:00", "end_time": "10:00"}
+            ]
+        },
+        "stations": [
+            {
+                "name": "Station 1",
+                "initial_task_count": 1,
+                "scheduled_tasks": [],
+                "position": [-73.5, 45.5],
+            }
+        ],
+        "drivers": [
+            {
+                "name": "Driver 1",
+                "shift": {"start_time": "day1:08:00", "end_time": "day1:12:00"},
+            }
+        ],
+        "vehicles": [
+            {"name": "Vehicle 1", "position": [-73.561, 45.507], "battery_count": 10}
+        ],
+    }
+
+    strategy = JsonParseStrategy(scenario_json=scenario_json)
+    errors = strategy.validate()
+
+    assert len(errors) > 0
+    assert any("traffic.global[0].end_time" in e["field"] for e in errors)
+    assert any("Invalid time format" in e.get("message", "") for e in errors)
+
+
+def test_validate_global_field_success() -> None:
+    """Test validation of valid global field"""
+    scenario_json = {
+        "start_time": "day1:08:00",
+        "end_time": "day1:12:00",
+        "vehicle_battery_capacity": 999,
+        "traffic": {
+            "global": [
+                {
+                    "multiplier": 0.3,
+                    "start_time": "day1:08:00",
+                    "end_time": "day1:10:00",
+                },
+                {
+                    "multiplier": 0.6,
+                    "start_time": "day1:11:00",
+                    "end_time": "day1:14:00",
+                },
+            ]
+        },
+        "stations": [
+            {
+                "name": "Station 1",
+                "initial_task_count": 1,
+                "scheduled_tasks": [],
+                "position": [-73.5, 45.5],
+            }
+        ],
+        "drivers": [
+            {
+                "name": "Driver 1",
+                "shift": {"start_time": "day1:08:00", "end_time": "day1:12:00"},
+            }
+        ],
+        "vehicles": [
+            {"name": "Vehicle 1", "position": [-73.561, 45.507], "battery_count": 10}
+        ],
+    }
+
+    strategy = JsonParseStrategy(scenario_json=scenario_json)
+    errors = strategy.validate()
+
+    assert len(errors) == 0, f"Expected no errors, but found {errors}"
+
+
 def test_scenario_parser_delegates_to_strategy() -> None:
     fake_input_param = InputParameter({}, {}, {})
 
