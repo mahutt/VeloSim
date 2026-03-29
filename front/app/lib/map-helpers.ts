@@ -73,9 +73,17 @@ export function isMapLayer(value: string): value is MapLayer {
   return (Object.values(MapLayer) as string[]).includes(value);
 }
 
-const IS_HOVERED_OR_SELECTED: ExpressionSpecification = [
+const TASK_HOVERED_OR_STATION_SELECTED: ExpressionSpecification = [
+  'any',
+  ['boolean', ['get', 'taskHover'], false],
+  ['boolean', ['get', 'selected'], false],
+];
+
+// station is active when hovered on the map, hovered from task list or when selected
+const STATION_IS_ACTIVE: ExpressionSpecification = [
   'any',
   ['boolean', ['get', 'hover'], false],
+  ['boolean', ['get', 'taskHover'], false],
   ['boolean', ['get', 'selected'], false],
 ];
 
@@ -85,9 +93,9 @@ function stationRadius(base: number, active: number): ExpressionSpecification {
     ['linear'],
     ['zoom'],
     13,
-    ['case', IS_HOVERED_OR_SELECTED, active, base],
+    ['case', STATION_IS_ACTIVE, active, base],
     17,
-    ['case', IS_HOVERED_OR_SELECTED, active + 4, base + 4],
+    ['case', STATION_IS_ACTIVE, active + 4, base + 4],
   ];
 }
 
@@ -275,7 +283,7 @@ export function setMapLayers(map: mapboxgl.Map) {
       ],
     },
     maxzoom: 13,
-    filter: ['>', ['get', 'taskCount'], 0],
+    filter: TASK_HOVERED_OR_STATION_SELECTED,
   });
 
   // ring for stations that have partial assignment
@@ -308,11 +316,7 @@ export function setMapLayers(map: mapboxgl.Map) {
       ],
     },
     minzoom: 13,
-    filter: [
-      'all',
-      ['>', ['get', 'taskCount'], 0],
-      ['==', ['get', 'hasPartialAssignment'], true],
-    ],
+    filter: ['==', ['get', 'hasPartialAssignment'], true],
   });
 
   // Add layers for stations (filtered to only show stations with taskCount > 0)
@@ -324,7 +328,7 @@ export function setMapLayers(map: mapboxgl.Map) {
       'circle-radius': stationRadius(11, 12),
       'circle-color': [
         'case',
-        ['boolean', ['get', 'selected'], false],
+        TASK_HOVERED_OR_STATION_SELECTED,
         [
           'step',
           ['get', 'taskCount'],
@@ -338,10 +342,10 @@ export function setMapLayers(map: mapboxgl.Map) {
       ],
     },
     minzoom: 13,
-    filter: ['>', ['get', 'taskCount'], 0],
+    filter: TASK_HOVERED_OR_STATION_SELECTED,
   });
 
-  // task count labels for stations (filtered to only show stations with taskCount > 0)
+  // task count labels for stations
   map.addLayer({
     id: MapLayer.StationTaskCounts,
     type: 'symbol',
@@ -349,14 +353,22 @@ export function setMapLayers(map: mapboxgl.Map) {
     layout: {
       'text-field': ['get', 'taskCount'],
       'text-font': ['Open Sans Bold', 'Arial Unicode MS Bold'],
-      'text-size': ['interpolate', ['linear'], ['zoom'], 8, 13, 17, 23],
+      'text-size': [
+        'interpolate',
+        ['linear'],
+        ['zoom'],
+        8,
+        ['case', STATION_IS_ACTIVE, 15, 13],
+        17,
+        ['case', STATION_IS_ACTIVE, 25, 23],
+      ],
       'text-anchor': 'center',
       'text-allow-overlap': true,
     },
     paint: {
       'text-color': [
         'case',
-        ['boolean', ['get', 'selected'], false],
+        TASK_HOVERED_OR_STATION_SELECTED,
         '#ffffff',
         ['boolean', ['get', 'hover'], false],
         [
@@ -382,7 +394,6 @@ export function setMapLayers(map: mapboxgl.Map) {
       'text-halo-width': 0,
     },
     minzoom: 13,
-    filter: ['>', ['get', 'taskCount'], 0],
   });
 
   map.addLayer({

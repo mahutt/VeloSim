@@ -71,6 +71,7 @@ export function adaptStationsToGeoJSON(
   stations: Station[],
   selectedStationIds: Set<number>,
   hoveredStationId: number | null,
+  taskHoveredStationId: number | null,
   partiallyAssignedStationIds: ReadonlySet<number> = new Set<number>()
 ): FeatureCollection<Point, AnyProps> {
   return {
@@ -84,6 +85,7 @@ export function adaptStationsToGeoJSON(
         selected: selectedStationIds.has(station.id),
         hasPartialAssignment: partiallyAssignedStationIds.has(station.id),
         hover: station.id === hoveredStationId,
+        taskHover: station.id === taskHoveredStationId,
       },
       geometry: {
         type: 'Point',

@@ -137,6 +137,7 @@ function DriverTaskGroupItem({
   onUnassign: () => void;
 }) {
   const { t } = usePreferences();
+  const { engine } = useSimulation();
 
   return (
     <div
@@ -146,7 +147,13 @@ function DriverTaskGroupItem({
       onClick={onClick}
       onContextMenu={onContextMenu}
       onMouseDown={onMouseDown}
-      onMouseEnter={onMouseEnter}
+      onMouseEnter={() => {
+        onMouseEnter();
+        engine.setTaskHoveredStationId(group.stationId);
+      }}
+      onMouseLeave={() => {
+        engine.setTaskHoveredStationId(null);
+      }}
       className={
         showDropIndicator
           ? isDraggingDown
@@ -517,6 +524,7 @@ export function DriverTasks({ driver }: { driver: PopulatedDriver }) {
           ref={containerRef}
           onMouseMove={handleMouseMove}
           className="max-h-50 px-3 space-y-1"
+          onMouseLeave={() => engine.setTaskHoveredStationId(null)}
         >
           {isCollapsed ? (
             <DriverTasksCollapsed
