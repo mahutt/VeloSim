@@ -29,7 +29,6 @@ import {
   DEFAULT_SIMULATION_REPORT,
   SIMULATION_REPORT_METRIC_KEYS,
   SIMULATION_REPORT_SUMMARY_LEGEND,
-  formatSimulationReportMetricValue,
   getSimulationReport,
   downloadSimulationReportCsv,
 } from '~/utils/simulation-report';
@@ -38,28 +37,6 @@ vi.mock('~/api');
 
 beforeEach(() => {
   vi.resetAllMocks();
-});
-
-describe('formatSimulationReportMetricValue', () => {
-  it('returns "--" for null', () => {
-    expect(formatSimulationReportMetricValue(null)).toBe('--');
-  });
-
-  it('trims trailing .00 from whole numbers', () => {
-    expect(formatSimulationReportMetricValue(3)).toBe('3');
-    expect(formatSimulationReportMetricValue(0)).toBe('0');
-    expect(formatSimulationReportMetricValue(100)).toBe('100');
-  });
-
-  it('trims trailing zero when only one decimal place is significant', () => {
-    expect(formatSimulationReportMetricValue(1.5)).toBe('1.5');
-    expect(formatSimulationReportMetricValue(0.8)).toBe('0.8');
-  });
-
-  it('keeps both decimal places when both are significant', () => {
-    expect(formatSimulationReportMetricValue(1.23)).toBe('1.23');
-    expect(formatSimulationReportMetricValue(0.45)).toBe('0.45');
-  });
 });
 
 describe('DEFAULT_SIMULATION_REPORT', () => {

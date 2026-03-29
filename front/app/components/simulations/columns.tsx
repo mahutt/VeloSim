@@ -53,9 +53,14 @@ export const getColumns = (t: TranslationSchema): ColumnDef<Simulation>[] => [
         <ReportSummaryLegendTooltip />
       </div>
     ),
-    cell: ({ row }) => {
-      return <ReportSummaryCell simId={row.original.uuid} />;
-    },
+    cell: ({ row }) => <ReportSummaryCell simId={row.original.uuid} />,
+  },
+  {
+    id: 'report',
+    header: t.simulations.column.report,
+    cell: ({ row }) => (
+      <ReportCell simId={row.original.uuid} simName={row.original.name} />
+    ),
   },
   {
     id: 'playback',
@@ -66,15 +71,6 @@ export const getColumns = (t: TranslationSchema): ColumnDef<Simulation>[] => [
           simId={row.original.uuid}
           isCompleted={row.original.completed}
         />
-      );
-    },
-  },
-  {
-    id: 'report',
-    header: t.simulations.column.report,
-    cell: ({ row }) => {
-      return (
-        <ReportCell simId={row.original.uuid} simName={row.original.name} />
       );
     },
   },

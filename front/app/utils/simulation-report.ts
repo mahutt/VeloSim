@@ -92,26 +92,6 @@ const simulationReportRequestCache = new Map<
 >();
 
 /**
- * Formats nullable numeric metrics for UI display.
- *
- * Rules:
- * - `null` => `--`
- * - numbers are shown with up to 2 decimals (trimmed trailing zeros)
- */
-export function formatSimulationReportMetricValue(
-  value: number | null
-): string {
-  if (value === null) {
-    return '--';
-  }
-
-  return value
-    .toFixed(2)
-    .replace(/\.00$/, '')
-    .replace(/(\.\d)0$/, '$1');
-}
-
-/**
  * Fetches simulation report data from `GET /simulation/{simId}/report`.
  *
  * API contract notes:
