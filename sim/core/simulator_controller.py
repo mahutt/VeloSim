@@ -755,8 +755,16 @@ class SimulatorController:
 
                     # Build trafficRanges and nest inside route
                     traffic_ranges: list = []
+                    routes_coord = []
                     coord_offset = 0
                     for route in driver.routes:
+                        routes_coord.append(
+                            [
+                                route.coordinates[0].get_position(),
+                                route.coordinates[-1].get_position(),
+                            ]
+                        )
+
                         for triple in route.get_traffic_triples():
                             traffic_ranges.append(
                                 triple.to_json_with_offset(coord_offset)
@@ -770,7 +778,11 @@ class SimulatorController:
                             traffic_ranges if driver.routes else None
                         )
 
-                    driver_data["route"] = route_json
+                    driver_data["route"] = (
+                        route_json  # Combination of all routes for front end
+                    )
+                    driver_data["routes"] = routes_coord
+
                 drivers.append(driver_data)
 
         vehicles = []
@@ -787,6 +799,16 @@ class SimulatorController:
                         ),
                     }
                 )
+
+        report_snapshot = {
+            "total_driving_time": self.sim_env.report.total_driving_time,
+            "total_servicing_time": self.sim_env.report.total_servicing_time,
+            "tasks_completed_per_shift": self.sim_env.report.tasks_completed_per_shift,
+            "response_times": self.sim_env.report.response_times,
+            "vehicle_idle_time": self.sim_env.report.vehicle_idle_time,
+            "vehicle_active_time": self.sim_env.report.vehicle_active_time,
+            "completed_vehicle_distance": self.sim_env.report.get_vehicle_distance_traveled(),  # noqa: E501
+        }
 
         current_reporting = {
             "servicingToDrivingRatio": round(
@@ -825,6 +847,7 @@ class SimulatorController:
                 "realTimeFactor": self.real_time_driver.real_time_factor,
                 "pausedByUser": paused_by_user,
             },
+            "reportingSnapshot": report_snapshot,
             "reporting": current_reporting,
         }
 

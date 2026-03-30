@@ -23,7 +23,7 @@ SOFTWARE.
 """
 
 from dataclasses import dataclass
-from sim.map.map_controller import MapController
+from sim.core.simulation_report import SimulationReport
 from sim.entities.input_parameter import InputParameter
 
 
@@ -34,8 +34,8 @@ class SimulationRuntimeState:
     """
 
     input_parameters: InputParameter
-    map_controller: MapController
     current_time_seconds: int
+    sim_report: SimulationReport
     was_running: bool = True
     real_time_factor: float = 1.0
     paused_by_user: bool = False

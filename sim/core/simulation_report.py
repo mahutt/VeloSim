@@ -39,14 +39,14 @@ class SimulationReport:
     """
 
     def __init__(self) -> None:
-        self.total_driving_time = 0
-        self.total_servicing_time = 0
+        self.total_driving_time: float = 0.0
+        self.total_servicing_time: float = 0.0
         self.tasks_completed_per_shift: list[int] = []
         self.response_times: list[float] = []
-        self.vehicle_idle_time = 0
-        self.vehicle_active_time = 0
+        self.vehicle_idle_time: float = 0.0
+        self.vehicle_active_time: float = 0.0
         self._active_vehicle_routes: set["Route"] = set()
-        self._completed_vehicle_distance = 0.0
+        self._completed_vehicle_distance: float = 0.0
 
     def reset(self) -> None:
         """Reset all metrics to zero.
@@ -223,3 +223,60 @@ class SimulationReport:
             route.get_distance_traveled() for route in self._active_vehicle_routes
         )
         return self._completed_vehicle_distance + active_distance
+
+    def set_active_routes(self, routes: set["Route"]) -> None:
+        """Sets active simulation routes
+
+        Args:
+            routes which are the current active routes of a simulation
+
+        Returns:
+            None
+
+        """
+        self._active_vehicle_routes = routes
+
+    def restore_state(
+        self,
+        total_driving_time: float,
+        total_servicing_time: float,
+        tasks_completed_per_shift: list[int],
+        response_times: list[float],
+        vehicle_idle_time: float,
+        vehicle_active_time: float,
+        completed_vehicle_distance: float,
+    ) -> None:
+        """Restore simulation report metrics from a persisted snapshot.
+
+        This method rehydrates all tracked metrics to their previously
+        saved values when resuming a simulation. It restores both
+        time-based metrics and aggregate statistics but does not
+        restore active routes, which must be set separately after
+        route reconstruction.
+
+        Args:
+            total_driving_time (float): Total accumulated driving time.
+            total_servicing_time (float): Total accumulated servicing time.
+            tasks_completed_per_shift (list[int]):
+            Number of tasks completed per driver shift.
+            response_times (list[float]): Recorded
+            response times for completed tasks.
+            vehicle_idle_time (float): Total time vehicles spent idle.
+            vehicle_active_time (float): Total time vehicles
+            were active.completed_vehicle_distance
+            (float): Total distance traveled by
+            completed routes.
+
+        Returns:
+            None
+        """
+
+        self.total_driving_time = total_driving_time
+        self.total_servicing_time = total_servicing_time
+        self.tasks_completed_per_shift = tasks_completed_per_shift
+        self.response_times = response_times
+        self.vehicle_idle_time = vehicle_idle_time
+        self.vehicle_active_time = vehicle_active_time
+
+        # internal fields (kept encapsulated here)
+        self._completed_vehicle_distance = completed_vehicle_distance
