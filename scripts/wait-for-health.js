@@ -42,7 +42,7 @@ if (!containerName) {
 function getContainerHealth(name) {
     try {
         const result = execSync(
-            `docker inspect --format='{{.State.Health.Status}}' ${name}`,
+            `docker inspect --format={{.State.Health.Status}} ${name}`,
             { encoding: 'utf-8', stdio: ['pipe', 'pipe', 'ignore'] }
         );
         return result.trim();
@@ -55,7 +55,7 @@ function getContainerHealth(name) {
 function isContainerRunning(name) {
     try {
         const result = execSync(
-            `docker inspect --format='{{.State.Status}}' ${name}`,
+            `docker inspect --format={{.State.Status}} ${name}`,
             { encoding: 'utf-8', stdio: ['pipe', 'pipe', 'ignore'] }
         );
         return result.trim() === 'running';

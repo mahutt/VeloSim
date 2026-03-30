@@ -88,8 +88,10 @@ class Settings(BaseSettings):
     ALLOWED_ORIGINS: List[str] = [
         "http://localhost:3000",  # React Dev Server
         "http://localhost:5173",  # Vite Dev Server
+        "http://localhost:5174",  # Vite Dev Server (alternate port)
         "http://127.0.0.1:3000",
         "http://127.0.0.1:5173",
+        "http://127.0.0.1:5174",
     ]
 
     @field_validator("ALLOWED_ORIGINS", mode="before")

@@ -185,6 +185,14 @@ ${mapboxToken ? `MAPBOX_ACCESS_TOKEN=${mapboxToken}` : '# MAPBOX_ACCESS_TOKEN=yo
 # ============================================================================
 # JWT secret for authentication (auto-generated)
 VELOSIM_JWT_SECRET=${jwtSecret}
+
+# ============================================================================
+# Logging (OPTIONAL)
+# ============================================================================
+# Disable Loki log push for local development (Loki is not started by dev:services)
+# On Windows, leaving this enabled causes the backend to hang on every request
+# because DNS resolution for the Docker-internal hostname blocks the event loop.
+LOG_TO_LOKI=false
 `;
 
   // Write .env file

@@ -59,6 +59,11 @@ VeloSim is an open-source network simulation platform that enables job dispatche
 > - Windows: `.venv\Scripts\activate`
 > - macOS/Linux: `source .venv/bin/activate`
 
+> **Windows users:** Ensure your `.env` file includes `LOG_TO_LOKI=false`. The Loki
+> container is not started by `dev:services`, and on Windows, failed DNS resolution
+> for the Docker-internal Loki hostname blocks the backend event loop, causing
+> requests to hang for minutes.
+
 **Quick start with npm:**
 
 ```bash
