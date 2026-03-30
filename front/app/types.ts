@@ -102,6 +102,15 @@ export interface ScenarioListResponse extends PaginatedResponse {
   scenarios: Scenario[];
 }
 
+export interface TrafficTemplateListResponse extends PaginatedResponse {
+  templates: TrafficTemplate[];
+}
+
+export interface TrafficTemplateValidationResponse {
+  valid: boolean;
+  errors: string[];
+}
+
 export interface InitializeSimulationResponse {
   sim_id: string;
   db_id: number;
@@ -230,6 +239,30 @@ export interface Scenario {
   date_created: string;
   date_updated: string;
   content_size?: number;
+}
+
+export interface TrafficTemplate {
+  id: number;
+  key: string;
+  content: string;
+  description: string | null;
+  date_created: string;
+  date_updated: string;
+}
+
+export interface TrafficTemplateCreateRequest {
+  key: string;
+  content: string;
+  description?: string | null;
+}
+
+export interface TrafficTemplateUpdateRequest {
+  content?: string | null;
+  description?: string | null;
+}
+
+export interface TrafficTemplateValidationRequest {
+  content: string;
 }
 
 // v2 scenario content station definition

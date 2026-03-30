@@ -22,7 +22,7 @@
  * SOFTWARE.
  */
 
-import { Users2 } from 'lucide-react';
+import { TrafficCone, Users2 } from 'lucide-react';
 import { Link } from 'react-router';
 import {
   SidebarGroup,
@@ -39,6 +39,11 @@ const adminNavItems = [
     name: (t: TranslationSchema) => t.nav.users,
     url: '/users',
     icon: Users2,
+  },
+  {
+    name: (t: TranslationSchema) => t.nav.trafficTemplates,
+    url: '/traffic-templates',
+    icon: TrafficCone,
   },
 ] satisfies Array<{
   name: (t: TranslationSchema) => string;

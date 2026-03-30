@@ -40,6 +40,7 @@ export default [
 
     // Admin pages
     route('users', 'routes/users.tsx'),
+    route('traffic-templates', 'routes/traffic-templates.tsx'),
   ]),
   layout('./layouts/unauthenticated.tsx', [route('login', 'routes/login.tsx')]),
 
