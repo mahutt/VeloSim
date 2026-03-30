@@ -33,3 +33,11 @@ class TestPosition:
 
     def test_position_creation(self, default_position: Position) -> None:
         assert default_position.get_position() == [-73.5673, 45.5017]
+
+    def test_position_defaults_to_unoccupied(self) -> None:
+        position = Position([-73.5673, 45.5017])
+        assert position.occupied is False
+
+    def test_position_can_be_initialized_as_occupied(self) -> None:
+        position = Position([-73.5673, 45.5017], occupied=True)
+        assert position.occupied is True

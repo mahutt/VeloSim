@@ -319,6 +319,43 @@ class TestGetOverlapPositions:
         assert overlap == {p1, p2}
 
 
+class TestPositionOccupancy:
+    def test_occupy_and_release_positions(self) -> None:
+        registry = PositionRegistry()
+        pos = Position([1.0, 1.0])
+
+        registry.occupy_positions([pos])
+        assert pos.occupied is True
+
+        registry.release_positions([pos])
+        assert pos.occupied is False
+
+    def test_occupancy_reference_counting(self) -> None:
+        registry = PositionRegistry()
+        pos = Position([1.0, 1.0])
+
+        registry.occupy_positions([pos])
+        registry.occupy_positions([Position([1.0, 1.0])])
+
+        registry.release_positions([Position([1.0, 1.0])])
+        assert pos.occupied is True
+
+        registry.release_positions([pos])
+        assert pos.occupied is False
+
+    def test_register_road_inherits_existing_occupancy(self) -> None:
+        registry = PositionRegistry()
+        occupied_pos = Position([1.0, 1.0])
+        registry.occupy_positions([occupied_pos])
+
+        road_pos = Position([1.0, 1.0])
+        road = _make_road(1, [road_pos, Position([2.0, 2.0])])
+        assert road.geometry is not None
+        registry.register_road(road, road.geometry)
+
+        assert road_pos.occupied is True
+
+
 # ---------------------------------------------------------------------------
 # Test: is_event_allocated
 # ---------------------------------------------------------------------------

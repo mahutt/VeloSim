@@ -50,6 +50,9 @@ class PositionRegistry:
         self._road_positions: Dict[Road, Set[Position]] = {}
         self._event_positions: Dict[TrafficEvent, Set[Position]] = {}
 
+        # Reference-counted occupied positions keyed by coordinate equality.
+        self._occupied_counts: Dict[Position, int] = {}
+
     def register_road(self, road: Road, geometry: List[Position]) -> None:
         """Register a road's geometry positions in the index.
 
@@ -75,6 +78,7 @@ class PositionRegistry:
                 self._geom_to_roads[pos] = set()
             self._geom_to_roads[pos].add(road)
             positions.add(pos)
+            self._apply_occupancy_to_position(pos)
 
         self._road_positions[road] = positions
 
@@ -119,6 +123,7 @@ class PositionRegistry:
                 self._geom_to_events[pos] = set()
             self._geom_to_events[pos].add(event)
             positions.add(pos)
+            self._apply_occupancy_to_position(pos)
 
         self._event_positions[event] = positions
 
@@ -208,3 +213,49 @@ class PositionRegistry:
             True if at least one road shares a geometry position with the event.
         """
         return len(self.find_roads_for_event(event)) > 0
+
+    def occupy_positions(self, positions: List[Position]) -> None:
+        """Mark positions as occupied using reference counting.
+
+        Args:
+            positions: Positions to mark as occupied.
+
+        Returns:
+            None.
+        """
+        for pos in positions:
+            self._occupied_counts[pos] = self._occupied_counts.get(pos, 0) + 1
+            self._apply_occupancy_to_position(pos)
+
+    def release_positions(self, positions: List[Position]) -> None:
+        """Release occupied positions using reference counting.
+
+        Args:
+            positions: Positions to release.
+
+        Returns:
+            None.
+        """
+        for pos in positions:
+            count = self._occupied_counts.get(pos, 0)
+            if count <= 1:
+                self._occupied_counts.pop(pos, None)
+            else:
+                self._occupied_counts[pos] = count - 1
+            self._apply_occupancy_to_position(pos)
+
+    def _apply_occupancy_to_position(self, pos: Position) -> None:
+        """Propagate occupancy state to all known instances of a position."""
+        occupied = self._occupied_counts.get(pos, 0) > 0
+
+        pos.occupied = occupied
+
+        for road in self._geom_to_roads.get(pos, set()):
+            for road_pos in self._road_positions.get(road, set()):
+                if road_pos == pos:
+                    road_pos.occupied = occupied
+
+        for event in self._geom_to_events.get(pos, set()):
+            for event_pos in self._event_positions.get(event, set()):
+                if event_pos == pos:
+                    event_pos.occupied = occupied

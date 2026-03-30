@@ -134,3 +134,17 @@ class TestExtractTrafficConfig:
         config = extract_traffic_config(scenario_content)
 
         assert config is None
+
+    def test_extract_accepts_stop_events_test_template(self) -> None:
+        """Test that stop_events_test template is accepted."""
+        scenario_content = {
+            "start_time": "day1:08:00",
+            "end_time": "day1:17:00",
+            "traffic": {"traffic_level": "stop_events_test"},
+        }
+
+        config = extract_traffic_config(scenario_content)
+
+        assert config is not None
+        assert isinstance(config, TrafficConfig)
+        assert config.traffic_level == "stop_events_test"

@@ -599,6 +599,7 @@ def test_validate_accepts_valid_traffic_levels() -> None:
         "high_congestion",
         "medium_congestion",
         "low_congestion",
+        "stop_events_test",
         "default",
         "no_traffic",
     ]

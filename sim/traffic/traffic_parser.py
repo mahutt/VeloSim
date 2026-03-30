@@ -62,7 +62,12 @@ class TrafficParser:
 
     SUPPORTED_TYPES = {"local_traffic"}
     REQUIRED_COLUMNS = {"TYPE", "start_time", "segment_key", "duration", "weight"}
-    TEMPLATES = {"high_congestion", "medium_congestion", "low_congestion"}
+    TEMPLATES = {
+        "high_congestion",
+        "medium_congestion",
+        "low_congestion",
+        "stop_events_test",
+    }
 
     def __init__(self, traffic_config: TrafficConfig) -> None:
         """Initialize the parser with a traffic configuration.

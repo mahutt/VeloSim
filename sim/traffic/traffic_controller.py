@@ -85,6 +85,7 @@ class TrafficController:
         self.traffic_config = traffic_config
 
         self._active_traffic: Dict[SegmentKey, RoadTrafficState] = {}
+        self._active_zero_weight_segments: Dict[SegmentKey, List[Position]] = {}
         self._traffic_events: List[TrafficEvent] = []
 
         # Sync resource serializes event processing through synchronization
@@ -146,11 +147,17 @@ class TrafficController:
             ):
                 overlap = self._registry.get_overlap_positions(road, event)
                 if overlap:
-                    road.apply_traffic_for_overlap(
-                        list(overlap), event.weight, event.segment_key
-                    )
-                    strategy = TrafficStateFactory.get_strategy(event.event_type)
-                    road.set_point_strategy(strategy)
+                    if event.weight == 0.0:
+                        # Zero-weight events are already occupancy-tracked
+                        # for their full geometry; road registration will
+                        # inherit occupied flags from the registry.
+                        pass
+                    else:
+                        road.apply_traffic_for_overlap(
+                            list(overlap), event.weight, event.segment_key
+                        )
+                        strategy = TrafficStateFactory.get_strategy(event.event_type)
+                        road.set_point_strategy(strategy)
                     event.affected_roads.add(road)
                     self._notify_routes_for_road(road)
                     logger.debug(f"Applied event '{event.name}' to new road {road.id}")
@@ -281,13 +288,16 @@ class TrafficController:
         )
 
         if is_apply:
+            if event.weight == 0.0:
+                self._set_traffic_in_simulation(event)
             if is_allocated:
                 # [Triggered && Allocated]: Sim -> Delay -> RoutingProvider
                 # Traffic affects the road immediately (car slows down),
                 # but route notification is delayed until after GPS_SYNC_DELAY
                 # so the driver visually slows before traffic colors appear.
                 # This mirrors the removal path (overlay persists through delay).
-                self._set_traffic_in_simulation(event)
+                if event.weight != 0.0:
+                    self._set_traffic_in_simulation(event)
                 yield self._env.timeout(self.gps_sync_delay)
                 self._set_traffic_in_routing_provider(event)
                 for road in event.affected_roads:
@@ -300,9 +310,12 @@ class TrafficController:
                 )
                 self._set_traffic_in_routing_provider(event)
         else:
+            if event.weight == 0.0:
+                self._reset_traffic_in_simulation(event)
             if is_allocated:
                 # [Expired && Allocated]: Sim -> Delay -> RoutingProvider
-                self._reset_traffic_in_simulation(event)
+                if event.weight != 0.0:
+                    self._reset_traffic_in_simulation(event)
                 yield self._env.timeout(self.gps_sync_delay)
                 self._reset_traffic_in_routing_provider(event)
             else:
@@ -364,6 +377,18 @@ class TrafficController:
         Args:
             event: The traffic event to apply.
         """
+        if event.weight == 0.0:
+            occupied_positions = event.route_geometry or []
+            self._registry.occupy_positions(occupied_positions)
+            self._active_zero_weight_segments[event.segment_key] = list(
+                occupied_positions
+            )
+            logger.debug(
+                f"Event '{event.name}': marked {len(occupied_positions)} "
+                f"occupied position(s)"
+            )
+            return
+
         strategy = TrafficStateFactory.get_strategy(event.event_type)
 
         affected_roads = self._registry.find_roads_for_event(event)
@@ -377,7 +402,7 @@ class TrafficController:
                     event.affected_roads.add(road)
 
         # Store in _active_traffic so future roads also get this traffic
-        clamped = max(0.01, event.weight)
+        clamped = max(0.0, event.weight)
         state = TrafficStateFactory.create(
             multiplier=clamped,
             traffic_points=[],
@@ -403,10 +428,16 @@ class TrafficController:
         actual road conditions and GPS/map data. Routes are notified
         later when the event reaches DONE state.
         """
-        for road in event.affected_roads:
-            road.remove_traffic(event.segment_key)
-            if not road._traffic_ranges:
-                road.set_point_strategy(None)
+        if event.weight == 0.0:
+            occupied_positions = self._active_zero_weight_segments.pop(
+                event.segment_key, []
+            )
+            self._registry.release_positions(occupied_positions)
+        else:
+            for road in event.affected_roads:
+                road.remove_traffic(event.segment_key)
+                if not road._traffic_ranges:
+                    road.set_point_strategy(None)
 
         self._active_traffic.pop(event.segment_key, None)
         event.affected_roads.clear()
@@ -523,13 +554,13 @@ class TrafficController:
 
         Args:
             segment_key: Geometry-based segment identifier.
-            multiplier: Speed factor (0.01-1.0), 1.0 = free flow.
+            multiplier: Speed factor (0.0-1.0), 1.0 = free flow.
             source: Optional source identifier for tracking.
 
         Returns:
             True if traffic was applied to at least one active road.
         """
-        clamped = max(0.01, min(1.0, multiplier))
+        clamped = max(0.0, min(1.0, multiplier))
 
         state = TrafficStateFactory.create(
             multiplier=clamped,
@@ -607,6 +638,19 @@ class TrafficController:
         """
         return self._traffic_events
 
+    def get_zero_weight_event_linestrings(self) -> List[List[List[float]]]:
+        """Return route geometries for active zero-weight events.
+
+        Returns:
+            A list of linestring coordinate lists. Each linestring is a list
+            of [longitude, latitude] pairs.
+        """
+        linestrings: List[List[List[float]]] = []
+        for geometry in self._active_zero_weight_segments.values():
+            if geometry:
+                linestrings.append([pos.get_position() for pos in geometry])
+        return linestrings
+
     def cleanup(self) -> None:
         """Clean up TrafficController resources.
 
@@ -617,4 +661,7 @@ class TrafficController:
         """
         self._route_controller.unregister_on_road_created(self._on_road_created)
         self._route_controller.unregister_on_road_deallocated(self._on_road_deallocated)
+        for geometry in self._active_zero_weight_segments.values():
+            self._registry.release_positions(geometry)
+        self._active_zero_weight_segments.clear()
         self._active_traffic.clear()

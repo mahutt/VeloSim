@@ -246,8 +246,8 @@ class TestTrafficControllerSetTraffic:
     @pytest.mark.parametrize(
         "input_mult,expected_mult",
         [
-            (0.0, 0.01),
-            (-0.5, 0.01),
+            (0.0, 0.0),
+            (-0.5, 0.0),
             (1.5, 1.0),
             (0.5, 0.5),
         ],
@@ -268,6 +268,13 @@ class TestTrafficControllerSetTraffic:
 
         state = controller._active_traffic[sample_segment_key]
         assert state.multiplier == expected_mult
+
+    def test_get_zero_weight_event_linestrings_defaults_empty(
+        self, mock_route_controller: Mock
+    ) -> None:
+        controller = TrafficController(mock_route_controller, PositionRegistry())
+
+        assert controller.get_zero_weight_event_linestrings() == []
 
 
 class TestTrafficControllerClearTraffic:
