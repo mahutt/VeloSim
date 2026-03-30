@@ -106,6 +106,35 @@ describe('DriverTasks', () => {
     ).toBeInTheDocument();
   });
 
+  it('sets hovered station on task hover in expanded mode', async () => {
+    const user = userEvent.setup();
+
+    setupDriverTasks({
+      driver: makePopulatedDriver({
+        id: 2,
+        tasks: [makeStationTask({ id: 101, stationId: 42 })],
+      }),
+      stationNames: { 50: 'Station Z' },
+    });
+
+    await user.click(
+      screen.getByRole('button', {
+        name: 'Expand task list',
+      })
+    );
+
+    const taskDraggable = screen
+      .getByText(/^#\s*101$/)
+      .closest('[draggable="true"]') as HTMLElement;
+    const taskWrapper = taskDraggable.parentElement as HTMLElement;
+
+    fireEvent.mouseEnter(taskWrapper);
+
+    expect(mockSimulationEngine.setTaskHoveredStationId).toHaveBeenCalledWith(
+      42
+    );
+  });
+
   it('groups contiguous station runs in collapsed mode', () => {
     setupDriverTasks({
       driver: makePopulatedDriver({

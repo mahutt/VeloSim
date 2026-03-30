@@ -370,6 +370,7 @@ function DriverTasksExpanded({
   onReorder: (taskIds: number[]) => Promise<void>;
   onUnassign: (taskId: number) => void;
 }) {
+  const { engine } = useSimulation();
   const [dropTargetIndex, setDropTargetIndex] = useState<number | null>(null);
   const [draggedTaskId, setDraggedTaskId] = useState<number | null>(null);
 
@@ -444,7 +445,11 @@ function DriverTasksExpanded({
               startDragSelect(task.id, e.ctrlKey || e.metaKey);
             }
           }}
-          onMouseEnter={() => dragSelectEnter(task.id)}
+          onMouseEnter={() => {
+            dragSelectEnter(task.id);
+            engine.setTaskHoveredStationId(task.stationId);
+          }}
+          onMouseLeave={() => engine.setTaskHoveredStationId(null)}
           className={
             dropTargetIndex === index && index !== draggedIndex
               ? index > draggedIndex
