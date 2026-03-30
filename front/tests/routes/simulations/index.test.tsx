@@ -76,7 +76,11 @@ test('simulations page shows list of simulations when data is available', async 
   vi.mocked(api.get).mockResolvedValueOnce({
     data: {
       simulations: [
-        makeSimulation({ id: 1001, name: 'Test Simulation 1' }),
+        makeSimulation({
+          id: 1001,
+          name: 'Test Simulation 1',
+          completion_percentage: 75,
+        }),
         makeSimulation({ id: 1002, name: 'Test Simulation 2' }),
       ],
       total: 2,
@@ -97,6 +101,7 @@ test('simulations page shows list of simulations when data is available', async 
 
   expect(await screen.findByText('1001')).toBeInTheDocument();
   expect(await screen.findByText('1002')).toBeInTheDocument();
+  expect(await screen.findByText('75%')).toBeInTheDocument();
 });
 
 test('simulations page shows empty state when no simulations are available', async () => {

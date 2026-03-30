@@ -46,6 +46,11 @@ export const getColumns = (t: TranslationSchema): ColumnDef<Simulation>[] => [
     },
   },
   {
+    accessorKey: 'completion_percentage',
+    header: t.simulations.column.completion,
+    cell: ({ row }) => <span>{`${row.original.completion_percentage}%`}</span>,
+  },
+  {
     id: 'reportSummary',
     header: () => (
       <div className="flex items-center gap-1">
