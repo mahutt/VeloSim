@@ -120,6 +120,7 @@ export const mockSimulationEngine: Partial<SimulationEngine> = {
   hasStarted: vi.fn().mockReturnValue(false),
   setPaused: vi.fn(),
   setSpeed: vi.fn(),
+  setTaskHoveredStationId: vi.fn(),
   selectItem: vi.fn(),
   clearSelection: vi.fn(),
   confirmAssignment: vi.fn(),
