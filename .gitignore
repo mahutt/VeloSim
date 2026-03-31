@@ -177,7 +177,8 @@ front/.env.production.local
 
 # Simulator
 sim/osm/OSMData
-sim/traffic/traffic_datasets
+sim/traffic/traffic_datasets/*
+!sim/traffic/traffic_datasets/traffic.tar.gz
 sim/traffic/montreal_data
 
 # Routing data files (large binary files, regenerate locally)

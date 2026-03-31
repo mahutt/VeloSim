@@ -86,6 +86,17 @@ from .sim_frame import (
 from .sim_state import (
     SimStateResponse,
 )
+from .traffic_template import (
+    TrafficTemplateBase,
+    TrafficTemplateCreate,
+    TrafficTemplateCreateRequest,
+    TrafficTemplateUpdate,
+    TrafficTemplateUpdateRequest,
+    TrafficTemplateResponse,
+    TrafficTemplateListResponse,
+    TrafficTemplateValidationRequest,
+    TrafficTemplateValidationResponse,
+)
 
 __all__ = [
     "DriverTaskAssignRequest",
@@ -134,6 +145,15 @@ __all__ = [
     "SimulationState",
     "SeekResponse",
     "SimStateResponse",
+    "TrafficTemplateBase",
+    "TrafficTemplateCreate",
+    "TrafficTemplateCreateRequest",
+    "TrafficTemplateUpdate",
+    "TrafficTemplateUpdateRequest",
+    "TrafficTemplateResponse",
+    "TrafficTemplateListResponse",
+    "TrafficTemplateValidationRequest",
+    "TrafficTemplateValidationResponse",
     "TaskItem",
     "TaskStation",
     "TaskListResponse",

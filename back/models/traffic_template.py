@@ -22,25 +22,32 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 """
 
-# Import all models here to ensure they are registered with SQLAlchemy
-from .task_status import TaskStatus
-from .station_task_type import StationTaskType
-from .user import User
-from .sim_instance import SimInstance
-from .scenario import Scenario
-from .sim_frame import SimFrame
-from .traffic_template import TrafficTemplate
+from typing import Optional
+from sqlalchemy import DateTime, String, Text, func
+from sqlalchemy.orm import Mapped, mapped_column
 
-# Note: SimKeyframe model has been replaced by SimFrame.
-# The sim_keyframes table will be migrated to sim_frames.
-# Do not import SimKeyframe - it causes relationship conflicts.
+from back.database.session import Base
 
-__all__ = [
-    "TaskStatus",
-    "StationTaskType",
-    "User",
-    "SimInstance",
-    "Scenario",
-    "SimFrame",
-    "TrafficTemplate",
-]
+
+class TrafficTemplate(Base):
+    """Persisted traffic CSV template selected by a stable, user-defined key."""
+
+    __tablename__ = "traffic_templates"
+
+    id: Mapped[int] = mapped_column(primary_key=True, index=True)
+
+    # User-defined stable key (username-like), immutable after creation.
+    key: Mapped[str] = mapped_column(String(32), nullable=False, unique=True)
+
+    content: Mapped[str] = mapped_column(Text, nullable=False)
+    description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+
+    date_created: Mapped[DateTime] = mapped_column(
+        DateTime, nullable=False, server_default=func.now()
+    )
+    date_updated: Mapped[DateTime] = mapped_column(
+        DateTime, nullable=False, server_default=func.now(), onupdate=func.now()
+    )
+
+    def __repr__(self) -> str:
+        return f"<TrafficTemplate(id={self.id}, key='{self.key}')>"

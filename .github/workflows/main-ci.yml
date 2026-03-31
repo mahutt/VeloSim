@@ -99,13 +99,13 @@ jobs:
           }
           echo "npm run traffic-csv completed successfully"
 
-      - name: Retrieve traffic templates (npm run traffic-templates)
+      - name: Extract packaged traffic templates (npm run traffic-templates)
         if: steps.traffic-cache.outputs.cache-hit != 'true'
         run: |
-          echo "Cache miss: Retrieving templates from drive..."
+          echo "Cache miss: Extracting templates from packaged archive..."
           npm run traffic-templates || {
             echo "ERROR: npm run traffic-templates failed"
-            echo "Generation of traffic templates might have an issue that needs to be fixed"
+            echo "Traffic template extraction failed"
             exit 1
           }
           echo "npm run traffic-templates completed successfully"
