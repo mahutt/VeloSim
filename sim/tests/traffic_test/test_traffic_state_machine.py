@@ -221,14 +221,12 @@ class TestEventLifecycle:
         # Run past sync delay: tick_start(10) + GPS_SYNC_DELAY(10) + 1
         gps_sync_delay = provider.get_gps_sync_delay()
         env.run(until=10 + gps_sync_delay + 1)
-        current = event.state
-        assert current == TrafficEventState.APPLIED
+        assert event.state == TrafficEventState.APPLIED
 
         # Run until expiry: tick + duration + GPS_SYNC_DELAY + 1
         gps_sync_delay = provider.get_gps_sync_delay()
         env.run(until=10 + 50 + gps_sync_delay + 1)
-        current = event.state
-        assert current == TrafficEventState.DONE
+        assert event.state == TrafficEventState.DONE  # type: ignore[comparison-overlap]
 
     def test_full_lifecycle_unallocated(self) -> None:
         """Event with no matching roads — only routing provider is updated."""

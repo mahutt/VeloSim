@@ -22,8 +22,15 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 """
 
+from sim.behaviour.resource_behaviour.resource_choose_next_task_strategy import (
+    DriverChooseNextTaskStrategy,
+)
 from sim.behaviour.sim_behaviour import SimBehaviour
+from sim.behaviour.station_behaviour.strategies.task_popup_strategy import (
+    TaskPopupStrategy,
+)
 from sim.entities.station import Station
+from typing import cast
 
 
 class _StubTPU:
@@ -42,11 +49,11 @@ class _StubRCNT:
 
 def test_sim_behaviour_setters_assign_strategies() -> None:
     beh = SimBehaviour()
-    tpu = _StubTPU()
-    rcnt = _StubRCNT()
+    tpu = cast(TaskPopupStrategy, _StubTPU())
+    rcnt = cast(DriverChooseNextTaskStrategy, _StubRCNT())
 
-    beh.set_TPU_strategy(tpu)  # type: ignore[arg-type]
-    beh.set_RCNT_strategy(rcnt)  # type: ignore[arg-type]
+    beh.set_TPU_strategy(tpu)
+    beh.set_RCNT_strategy(rcnt)
 
-    assert beh.TPU_strategy is tpu  # type: ignore[comparison-overlap]
-    assert beh.RCNT_strategy is rcnt  # type: ignore[comparison-overlap]
+    assert beh.TPU_strategy is tpu
+    assert beh.RCNT_strategy is rcnt
