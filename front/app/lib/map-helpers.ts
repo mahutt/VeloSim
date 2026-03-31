@@ -410,7 +410,7 @@ export function setMapLayers(map: mapboxgl.Map) {
         STATION_TASK_COUNT_HIGH_THRESHOLD,
         STATION_COLOR_HIGH,
       ],
-      'fill-opacity': 0.2,
+      'fill-opacity': ['case', ['boolean', ['get', 'hover'], false], 0.1, 0.2],
     },
   });
 
@@ -429,6 +429,7 @@ export function setMapLayers(map: mapboxgl.Map) {
         STATION_COLOR_HIGH,
       ],
       'line-width': 2,
+      'line-opacity': ['case', ['boolean', ['get', 'hover'], false], 0.5, 1],
     },
   });
 
@@ -455,6 +456,7 @@ export function setMapLayers(map: mapboxgl.Map) {
       ],
       'text-halo-color': 'rgba(0, 0, 0, 0)',
       'text-halo-width': 0,
+      'text-opacity': ['case', ['boolean', ['get', 'hover'], false], 0.5, 1],
     },
   });
 

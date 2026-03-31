@@ -36,6 +36,7 @@ import {
   adaptStationsToGeoJSON,
   adaptResourcesToGeoJSON,
   adaptClustersToGeoJSON,
+  adaptClusterCentroidsToGeoJSON,
 } from './geojson-adapters';
 import {
   setMapSource,
@@ -73,6 +74,7 @@ export default class MapManager {
   private hoveredStationId: number | null;
   private taskHoveredStationId: number | null;
   private hoveredResourceId: number | null;
+  private hoveredClusterId: number | null;
   private hoverDebounceTimeout: NodeJS.Timeout | null;
   private hoverLocked: boolean;
 
@@ -102,6 +104,7 @@ export default class MapManager {
     this.hoveredStationId = null;
     this.taskHoveredStationId = null;
     this.hoveredResourceId = null;
+    this.hoveredClusterId = null;
     this.hoverDebounceTimeout = null;
     this.hoverLocked = false;
 
@@ -183,14 +186,14 @@ export default class MapManager {
 
     setupMapHoverHandlers(map, (item) => {
       if (!item) {
-        this.updateHoverState(null, null);
+        this.updateHoverState(null, null, null);
         return;
       }
       const { type, id } = item;
       if (type === SelectedItemType.Station) {
-        this.updateHoverState(id, null);
+        this.updateHoverState(id, null, null);
       } else if (type === SelectedItemType.Driver) {
-        this.updateHoverState(null, id);
+        this.updateHoverState(null, id, null);
       }
     });
 
@@ -259,13 +262,13 @@ export default class MapManager {
           context: LogContext.StationDragDrop,
         });
       },
-      (stationId) => {
-        if (stationId !== null) {
-          this.updateHoverState(stationId, null);
+      (stationId, clusterId) => {
+        if (stationId !== null || clusterId !== null) {
+          this.updateHoverState(stationId, null, clusterId);
           this.hoverLocked = true;
         } else {
           this.hoverLocked = false;
-          this.updateHoverState(null, null);
+          this.updateHoverState(null, null, null);
         }
       },
       () => Array.from(this.state.getMultiSelectedStationIds()),
@@ -475,12 +478,17 @@ export default class MapManager {
     this.state.setMapShouldRefresh(true);
   }
 
-  private updateHoverState(stationId: number | null, driverId: number | null) {
+  private updateHoverState(
+    stationId: number | null,
+    driverId: number | null,
+    clusterId: number | null
+  ) {
     if (this.hoverLocked) {
       return;
     }
     this.hoveredStationId = stationId;
     this.hoveredResourceId = driverId;
+    this.hoveredClusterId = clusterId;
 
     if (this.hoverDebounceTimeout) {
       clearTimeout(this.hoverDebounceTimeout);
@@ -515,12 +523,12 @@ export default class MapManager {
     });
     setMapSource(
       MapSource.Clusters,
-      adaptClustersToGeoJSON(clusters),
+      adaptClustersToGeoJSON(clusters, this.hoveredClusterId),
       this.map
     );
     setMapSource(
       MapSource.ClusterCentroids,
-      featureCollection(clusters),
+      adaptClusterCentroidsToGeoJSON(clusters, this.hoveredClusterId),
       this.map
     );
   }

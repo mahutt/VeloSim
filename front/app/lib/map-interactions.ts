@@ -377,7 +377,7 @@ export function setupBoxSelectHandlers(
 export function setupStationDragHandlers(
   map: MapboxMap,
   onDrop: StationDragDropCallback,
-  onHighlight: (stationId: number | null) => void,
+  onHighlight: (stationId: number | null, clusterId: number | null) => void,
   getMultiSelectedStationIds: () => number[],
   onDragStart: (stationId: number, draggedStationIds: number[]) => void,
   getTaskCountForStation: (stationId: number) => number
@@ -412,7 +412,7 @@ export function setupStationDragHandlers(
     dragLabel = '';
     removeDomGhost(domGhost);
     domGhost = null;
-    onHighlight(null);
+    onHighlight(null, null);
     if (wasDragPanEnabled !== null) {
       if (wasDragPanEnabled) {
         map.dragPan.enable();
@@ -438,6 +438,7 @@ export function setupStationDragHandlers(
 
     let dragCount: number | null = null;
     if (feature.properties?.cluster_id) {
+      onHighlight(null, feature.properties.cluster_id);
       dragCount = feature.properties.taskCount as number;
       draggedStationIds = JSON.parse(feature.properties.stationIds) as number[];
     } else {
@@ -455,7 +456,7 @@ export function setupStationDragHandlers(
         draggedStationIds = [stationId];
       }
 
-      onHighlight(stationId);
+      onHighlight(stationId, null);
       dragCount = draggedStationIds.reduce((sum, draggedId) => {
         const count = getTaskCountForStation(draggedId);
         return sum + (Number.isFinite(count) ? Math.max(0, count) : 0);
