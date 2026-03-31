@@ -111,6 +111,7 @@ const {
     mockAdaptHeadquartersToGeoJSON: vi.fn().mockReturnValue({}),
     mockAdaptStationsToGeoJSON: vi.fn().mockReturnValue({}),
     mockAdaptClustersToGeoJSON: vi.fn().mockReturnValue({}),
+    mockAdaptClusterCentroidsToGeoJSON: vi.fn().mockReturnValue({}),
     mockAdaptResourcesToGeoJSON: vi.fn().mockReturnValue({}),
     mockComputeBearing: vi.fn(),
   };
@@ -140,6 +141,7 @@ vi.mock('~/lib/geojson-adapters', () => {
     adaptHeadquartersToGeoJSON: mockAdaptHeadquartersToGeoJSON,
     adaptStationsToGeoJSON: mockAdaptStationsToGeoJSON,
     adaptClustersToGeoJSON: mockAdaptClustersToGeoJSON,
+    adaptClusterCentroidsToGeoJSON: mockAdaptClustersToGeoJSON,
     adaptResourcesToGeoJSON: mockAdaptResourcesToGeoJSON,
   };
 });
@@ -702,11 +704,11 @@ describe('MapManager', () => {
     test('drag hover callback locks and unlocks hover', () => {
       const dragHoverHandler = getStationDragHoverHandler();
 
-      dragHoverHandler(5);
+      dragHoverHandler(5, null);
       expect(manager['hoverLocked']).toBe(true);
       expect(manager['hoveredStationId']).toBe(5);
 
-      dragHoverHandler(null);
+      dragHoverHandler(null, null);
       expect(manager['hoverLocked']).toBe(false);
     });
 

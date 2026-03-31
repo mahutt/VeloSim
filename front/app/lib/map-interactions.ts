@@ -377,7 +377,7 @@ export function setupBoxSelectHandlers(
 export function setupStationDragHandlers(
   map: MapboxMap,
   onDrop: StationDragDropCallback,
-  onHighlight: (stationId: number | null) => void,
+  onHighlight: (stationId: number | null, clusterId: number | null) => void,
   getMultiSelectedStationIds: () => number[],
   onDragStart: (stationId: number, draggedStationIds: number[]) => void,
   getTaskCountForStation: (stationId: number) => number
@@ -392,11 +392,14 @@ export function setupStationDragHandlers(
   let domGhost: HTMLElement | null = null;
   let dragLabel = '';
 
-  const stationLayers = [
+  const draggableLayers = [
     MapLayer.Stations,
     MapLayer.StationCircle,
     MapLayer.StationRing,
     MapLayer.StationTaskCounts,
+    MapLayer.ClusterFills,
+    MapLayer.ClusterOutlines,
+    MapLayer.ClusterTaskCounts,
   ];
 
   function cleanup() {
@@ -409,7 +412,7 @@ export function setupStationDragHandlers(
     dragLabel = '';
     removeDomGhost(domGhost);
     domGhost = null;
-    onHighlight(null);
+    onHighlight(null, null);
     if (wasDragPanEnabled !== null) {
       if (wasDragPanEnabled) {
         map.dragPan.enable();
@@ -427,30 +430,39 @@ export function setupStationDragHandlers(
     if (e.originalEvent?.button === 2) return;
 
     const features = map.queryRenderedFeatures(e.point, {
-      layers: stationLayers,
+      layers: draggableLayers,
     });
     if (!features || features.length === 0) return;
 
     const feature = features[0];
-    const id = feature.properties?.id;
-    if (id === undefined) return;
 
-    stationId = Number(id);
-
-    // Determine which stations to drag: if the clicked station is part of
-    // multi-selection, drag all selected stations; otherwise just this one.
-    const multiIds = getMultiSelectedStationIds();
-    if (multiIds.length > 1 && multiIds.includes(stationId)) {
-      draggedStationIds = multiIds;
+    let dragCount: number | null = null;
+    if (feature.properties?.cluster_id) {
+      onHighlight(null, feature.properties.cluster_id);
+      dragCount = feature.properties.taskCount as number;
+      draggedStationIds = JSON.parse(feature.properties.stationIds) as number[];
     } else {
-      draggedStationIds = [stationId];
+      const id = feature.properties?.id;
+      if (id === undefined) return;
+
+      stationId = Number(id);
+
+      // Determine which stations to drag: if the clicked station is part of
+      // multi-selection, drag all selected stations; otherwise just this one.
+      const multiIds = getMultiSelectedStationIds();
+      if (multiIds.length > 1 && multiIds.includes(stationId)) {
+        draggedStationIds = multiIds;
+      } else {
+        draggedStationIds = [stationId];
+      }
+
+      onHighlight(stationId, null);
+      dragCount = draggedStationIds.reduce((sum, draggedId) => {
+        const count = getTaskCountForStation(draggedId);
+        return sum + (Number.isFinite(count) ? Math.max(0, count) : 0);
+      }, 0);
     }
 
-    onHighlight(stationId);
-    const dragCount = draggedStationIds.reduce((sum, draggedId) => {
-      const count = getTaskCountForStation(draggedId);
-      return sum + (Number.isFinite(count) ? Math.max(0, count) : 0);
-    }, 0);
     dragLabel = `${dragCount} ${dragCount === 1 ? 'task' : 'tasks'}`;
     startPoint = { x: e.point.x, y: e.point.y };
     dragging = true;
@@ -541,7 +553,7 @@ export function setupStationDragHandlers(
   }
 
   // Bind handlers to station layers for mousedown, and globally for move/up
-  stationLayers.forEach((layer) => {
+  draggableLayers.forEach((layer) => {
     map.on('mousedown', layer, onMouseDown);
   });
   map.on('mousemove', onMouseMove);
@@ -568,7 +580,7 @@ export function setupStationDragHandlers(
   window.addEventListener('mousemove', onWindowMouseMove);
 
   return () => {
-    stationLayers.forEach((layer) => {
+    draggableLayers.forEach((layer) => {
       map.off('mousedown', layer, onMouseDown);
     });
     map.off('mousemove', onMouseMove);

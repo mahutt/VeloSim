@@ -1103,7 +1103,7 @@ describe('setupStationDragHandlers', () => {
 
     mapHandlers[`mousedown-${MapLayer.Stations}`](mouseDownEvent);
 
-    expect(onHighlight).toHaveBeenCalledWith(42);
+    expect(onHighlight).toHaveBeenCalledWith(42, null);
     expect(mockMap.dragPan.isEnabled).not.toHaveBeenCalled();
     expect(mockMap.dragPan.disable).not.toHaveBeenCalled();
 
@@ -1365,7 +1365,7 @@ describe('setupStationDragHandlers', () => {
     // dragPan should be re-enabled (it was enabled before)
     expect(mockMap.dragPan.enable).toHaveBeenCalled();
     // onHighlight(null) called during cleanup
-    expect(onHighlight).toHaveBeenCalledWith(null);
+    expect(onHighlight).toHaveBeenCalledWith(null, null);
     // DOM ghost removed
     expect(
       document.querySelector('[data-testid="station-drag-ghost"]')
@@ -1441,7 +1441,7 @@ describe('setupStationDragHandlers', () => {
     } as unknown as MouseEvent);
 
     // Should cancel: onHighlight(null), DOM ghost removed, dragPan restored
-    expect(onHighlight).toHaveBeenCalledWith(null);
+    expect(onHighlight).toHaveBeenCalledWith(null, null);
     expect(
       document.querySelector('[data-testid="station-drag-ghost"]')
     ).toBeNull();
@@ -1674,7 +1674,7 @@ describe('setupStationDragHandlers', () => {
       point: { x: 100, y: 100 },
       preventDefault: vi.fn(),
     });
-    expect(onHighlight).toHaveBeenCalledWith(42);
+    expect(onHighlight).toHaveBeenCalledWith(42, null);
 
     // 2. mousemove exceeds threshold
     (
@@ -1708,7 +1708,7 @@ describe('setupStationDragHandlers', () => {
     expect(onDrop).toHaveBeenCalledWith([42], 99);
 
     // 6. cleanup effects
-    expect(onHighlight).toHaveBeenCalledWith(null);
+    expect(onHighlight).toHaveBeenCalledWith(null, null);
     expect(mockMap.dragPan.enable).toHaveBeenCalled();
     expect(canvas.style.cursor).toBe('');
   });

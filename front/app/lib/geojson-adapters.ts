@@ -86,7 +86,8 @@ export function adaptStationsToGeoJSON(
 }
 
 export function adaptClustersToGeoJSON(
-  clusters: Feature<Point>[]
+  clusters: Feature<Point>[],
+  hoveredId: number | null
 ): FeatureCollection<Polygon> {
   const features: Feature<Polygon>[] = [];
   for (const cluster of clusters) {
@@ -100,11 +101,27 @@ export function adaptClustersToGeoJSON(
     const feature = circle(center, radius, {
       steps: 64,
       units: 'kilometers',
-      properties: cluster.properties,
+      properties: {
+        ...cluster.properties,
+        hover: cluster.properties!.cluster_id === hoveredId,
+      },
     });
     features.push(feature);
   }
   return featureCollection(features);
+}
+
+export function adaptClusterCentroidsToGeoJSON(
+  centroids: Feature<Point>[],
+  hoveredId: number | null
+): FeatureCollection<Point> {
+  return featureCollection(
+    centroids.map((c) => {
+      const clusterId = c.properties!.cluster_id;
+      c.properties!.hover = clusterId === hoveredId;
+      return c;
+    })
+  );
 }
 
 export function adaptResourcesToGeoJSON(
