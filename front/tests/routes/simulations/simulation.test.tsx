@@ -171,14 +171,14 @@ test('simulation page renders nothing if sim_id is missing', async () => {
 
 describe('getContainerWidth', () => {
   it('returns correct width for single digit day', () => {
-    expect(getContainerWidth(5)).toBe('w-[260px]');
+    expect(getContainerWidth(5)).toBe('w-[268px]');
   });
 
   it('returns correct width for double digit day', () => {
-    expect(getContainerWidth(15)).toBe('w-[268px]');
+    expect(getContainerWidth(15)).toBe('w-[276px]');
   });
 
   it('returns correct width for triple digit day', () => {
-    expect(getContainerWidth(150)).toBe('w-[277px]');
+    expect(getContainerWidth(150)).toBe('w-[285px]');
   });
 });
