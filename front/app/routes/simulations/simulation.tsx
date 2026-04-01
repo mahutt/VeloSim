@@ -118,7 +118,7 @@ function SimulationContent() {
 
 // Dynamic width based on day digit count
 export function getContainerWidth(currentDay: number) {
-  if (currentDay >= 100) return 'w-[277px]';
-  if (currentDay >= 10) return 'w-[268px]';
-  return 'w-[260px]';
+  if (currentDay >= 100) return 'w-[285px]';
+  if (currentDay >= 10) return 'w-[276px]';
+  return 'w-[268px]';
 }
