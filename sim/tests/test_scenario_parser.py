@@ -644,7 +644,9 @@ def test_scenario_parser_delegates_to_strategy() -> None:
 
         def parse(self, scenario_json: dict) -> InputParameter:
             self.called = True
-            assert scenario_json == "input"  # type: ignore[comparison-overlap]
+            from typing import Any, cast
+
+            assert cast(Any, scenario_json) == "input"
             return fake_input_param
 
     mock_strategy = MockStrategy()
