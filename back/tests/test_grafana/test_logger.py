@@ -24,10 +24,28 @@ SOFTWARE.
 
 import json
 import logging
+import logging.handlers
+from collections.abc import Generator
 from unittest.mock import MagicMock, patch
 
+import pytest
 
 from grafana_logging.logger import LokiHandler, VeloSimLogger, get_logger
+
+
+@pytest.fixture(autouse=True)
+def reset_logger_state() -> Generator[None, None, None]:
+    """Ensure logger singleton state does not leak between tests."""
+    VeloSimLogger._loggers.clear()
+    VeloSimLogger._stop_loki_listener()
+    VeloSimLogger._loki_queue = None
+    VeloSimLogger._loki_queue_handler = None
+    VeloSimLogger._loki_queue_listener = None
+    yield
+    VeloSimLogger._stop_loki_listener()
+    VeloSimLogger._loki_queue = None
+    VeloSimLogger._loki_queue_handler = None
+    VeloSimLogger._loki_queue_listener = None
 
 
 def test_get_logger_creates_logger() -> None:
@@ -118,6 +136,32 @@ def test_logger_no_propagation() -> None:
     logger = get_logger("test_no_propagate")
 
     assert logger.propagate is False
+
+
+def test_setup_handlers_uses_async_queue_for_loki() -> None:
+    """Loki handler should be queued to avoid request-thread blocking."""
+    with (
+        patch("grafana_logging.logger.LOG_TO_LOKI", True),
+        patch("grafana_logging.logger.LOG_TO_LOKI_ASYNC", True),
+        patch("grafana_logging.logger.LOG_TO_CONSOLE", False),
+    ):
+        handlers = VeloSimLogger._setup_handlers()
+
+    assert len(handlers) == 1
+    assert isinstance(handlers[0], logging.handlers.QueueHandler)
+
+
+def test_setup_handlers_can_use_sync_loki_when_disabled() -> None:
+    """Synchronous Loki mode remains available via env configuration."""
+    with (
+        patch("grafana_logging.logger.LOG_TO_LOKI", True),
+        patch("grafana_logging.logger.LOG_TO_LOKI_ASYNC", False),
+        patch("grafana_logging.logger.LOG_TO_CONSOLE", False),
+    ):
+        handlers = VeloSimLogger._setup_handlers()
+
+    assert len(handlers) == 1
+    assert isinstance(handlers[0], LokiHandler)
 
 
 # =============================================================================
