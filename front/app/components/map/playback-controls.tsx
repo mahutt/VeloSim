@@ -39,7 +39,7 @@ export default function PlaybackControls() {
   const [loading, setLoading] = useState<boolean>(false);
 
   return (
-    <div className="bg-background border rounded-md shadow-sm overflow-hidden h-10">
+    <div className="pointer-events-auto bg-background border rounded-md shadow-sm overflow-hidden h-10">
       <div
         className="grid h-full"
         style={{ gridTemplateColumns: '1fr 1px 1fr' }}

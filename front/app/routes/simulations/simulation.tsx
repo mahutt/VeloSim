@@ -94,15 +94,17 @@ function SimulationContent() {
           </div>
           {/* max-h-[calc(100vh-2.5rem) is set so that the Mapbox & OSM copyright notices aren't blocked. */}
           <div
-            className={`${getContainerWidth(currentDay)} absolute top-4 right-4 flex flex-col gap-2 max-h-[calc(100vh-2.5rem)]`}
+            className={`${getContainerWidth(currentDay)} pointer-events-none absolute top-4 right-4 flex flex-col justify-between gap-2 h-[calc(100vh-2.5rem)]`}
           >
-            <div className="w-full flex justify-between gap-2 items-center">
-              <SimulationClock />
-              <PlaybackControls />
-              <RouteToggle />
+            <div className="flex flex-col gap-2 min-h-0">
+              <div className="w-full flex justify-between gap-2 items-center">
+                <SimulationClock />
+                <PlaybackControls />
+                <RouteToggle />
+              </div>
+              <ResourceBar />
+              <HQWidget />
             </div>
-            <ResourceBar />
-            <HQWidget />
             <ReportingWidget />
           </div>
           {showScrubber && (

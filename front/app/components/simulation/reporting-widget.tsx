@@ -47,7 +47,7 @@ export default function ReportingWidget() {
   const { reporting } = state;
   const [open, setOpen] = useState(false);
   return (
-    <div className="w-full bg-gray-50 border shadow rounded-lg">
+    <div className="pointer-events-auto w-full bg-gray-50 border shadow rounded-lg">
       {/* header */}
       <button
         className={
