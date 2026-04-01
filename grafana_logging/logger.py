@@ -24,17 +24,23 @@ SOFTWARE.
 
 import json
 import logging
+import logging.handlers
 import os
 import sys
 import time
 import urllib.request
+import atexit
+import threading
+from queue import Full, Queue
 from typing import Any, Dict, List, Optional
 
 # Configuration
 DEFAULT_LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO").upper()
 LOG_TO_CONSOLE = os.getenv("LOG_TO_CONSOLE", "true").lower() == "true"
 LOG_TO_LOKI = os.getenv("LOG_TO_LOKI", "true").lower() == "true"
+LOG_TO_LOKI_ASYNC = os.getenv("LOG_TO_LOKI_ASYNC", "true").lower() == "true"
 LOKI_URL = os.getenv("LOKI_URL", "http://velosim-loki:3100/loki/api/v1/push")
+LOKI_QUEUE_SIZE = int(os.getenv("LOKI_QUEUE_SIZE", "10000"))
 
 # Console log format
 CONSOLE_LOG_FORMAT = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
@@ -141,6 +147,17 @@ class LokiHandler(logging.Handler):
             pass
 
 
+class NonBlockingQueueHandler(logging.handlers.QueueHandler):
+    """Queue handler that never blocks application threads."""
+
+    def enqueue(self, record: logging.LogRecord) -> None:
+        try:
+            self.queue.put_nowait(record)
+        except Full:
+            # Drop records when queue is saturated to protect request latency.
+            pass
+
+
 class VeloSimLogger:
     """
     Centralized logging utility for VeloSim.
@@ -157,11 +174,56 @@ class VeloSimLogger:
 
     Environment variables:
         LOG_TO_LOKI: Enable Loki HTTP push (default: true)
+        LOG_TO_LOKI_ASYNC: Enable asynchronous Loki push queue (default: true)
+        LOKI_QUEUE_SIZE: Max buffered records in async mode (default: 10000)
         LOG_TO_CONSOLE: Enable console logging (default: true)
         LOKI_URL: Loki push API URL (default: http://velosim-loki:3100/loki/api/v1/push)
     """
 
     _loggers: Dict[str, logging.Logger] = {}
+    _loki_queue: Optional[Queue[Any]] = None
+    _loki_queue_handler: Optional[logging.Handler] = None
+    _loki_queue_listener: Optional[logging.handlers.QueueListener] = None
+    _loki_lock = threading.Lock()
+
+    @classmethod
+    def _build_loki_handler(cls) -> LokiHandler:
+        loki_handler = LokiHandler(url=LOKI_URL)
+        loki_handler.setLevel(logging.DEBUG)
+        loki_formatter = logging.Formatter("%(asctime)s - %(message)s", DATE_FORMAT)
+        loki_handler.setFormatter(loki_formatter)
+        return loki_handler
+
+    @classmethod
+    def _stop_loki_listener(cls) -> None:
+        if cls._loki_queue_listener is None:
+            return
+        try:
+            cls._loki_queue_listener.stop()
+        except Exception:
+            pass
+
+    @classmethod
+    def _get_async_loki_handler(cls) -> logging.Handler:
+        with cls._loki_lock:
+            if cls._loki_queue_handler is not None:
+                return cls._loki_queue_handler
+
+            cls._loki_queue = Queue(maxsize=max(1, LOKI_QUEUE_SIZE))
+            loki_handler = cls._build_loki_handler()
+
+            cls._loki_queue_listener = logging.handlers.QueueListener(
+                cls._loki_queue,
+                loki_handler,
+                respect_handler_level=True,
+            )
+            cls._loki_queue_listener.start()
+            atexit.register(cls._stop_loki_listener)
+
+            queue_handler = NonBlockingQueueHandler(cls._loki_queue)
+            queue_handler.setLevel(logging.DEBUG)
+            cls._loki_queue_handler = queue_handler
+            return cls._loki_queue_handler
 
     @classmethod
     def _setup_handlers(cls) -> List[logging.Handler]:
@@ -170,13 +232,10 @@ class VeloSimLogger:
 
         # Loki handler - send logs directly to Loki via HTTP
         if LOG_TO_LOKI:
-            loki_handler = LokiHandler(url=LOKI_URL)
-            loki_handler.setLevel(logging.DEBUG)
-            loki_formatter = logging.Formatter(
-                "%(asctime)s - %(message)s", DATE_FORMAT
-            )
-            loki_handler.setFormatter(loki_formatter)
-            handlers.append(loki_handler)
+            if LOG_TO_LOKI_ASYNC:
+                handlers.append(cls._get_async_loki_handler())
+            else:
+                handlers.append(cls._build_loki_handler())
 
         # Console handler - with timestamp for local debugging
         if LOG_TO_CONSOLE:
