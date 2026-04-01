@@ -338,6 +338,30 @@ class Route:
 
         return current_road.active_pointcollection[self.current_point_index]
 
+    def _get_wait_position(self, blocked_position: Position) -> Position:
+        """Return the position to hold while blocked without advancing.
+
+        Prefers the last emitted position. Falls back to the current route
+        position when available. If neither exists, uses the blocked position
+        as a safe fallback.
+
+        Args:
+            blocked_position: The blocked point that triggered waiting.
+
+        Returns:
+            Position to return while waiting.
+        """
+        if self._last_returned_position is not None:
+            return self._last_returned_position
+
+        current_position = self._get_current_position()
+        if current_position is not None:
+            self._last_returned_position = current_position
+            return current_position
+
+        self._last_returned_position = blocked_position
+        return blocked_position
+
     def _get_all_points(self) -> list[Position]:
         """
         Gathers all the positions in the route per road, and returns it.
@@ -755,6 +779,13 @@ class Route:
 
         # If we are transition, use next transition position
         if self._transition_buffer:
+            next_transition_pos = self._transition_buffer[0]
+
+            # Keep wait semantics consistent with normal traversal: if the next
+            # transition point is occupied, do not consume the buffer point.
+            if next_transition_pos.occupied:
+                return self._get_wait_position(next_transition_pos)
+
             pos = self._transition_buffer.pop(0)
             self._last_returned_position = pos
 
@@ -795,6 +826,10 @@ class Route:
                 v0, vf, dist_to_event, distance_offset=current_distance_on_road
             )
             if self._transition_buffer:
+                first_transition_pos = self._transition_buffer[0]
+                if first_transition_pos.occupied:
+                    return self._get_wait_position(first_transition_pos)
+
                 pos = self._transition_buffer.pop(0)
                 self._last_returned_position = pos
                 # Sync if last point in the buffer
@@ -859,17 +894,30 @@ class Route:
                 continue
 
             # --- Normal Position Return ---
-            # Return the current point (skip if duplicate of last returned).
+            # Get the position we're attempting to move to
             candidate_point = active_points[self.current_point_index]
 
-            if (
-                self._last_returned_position is None
-                or candidate_point != self._last_returned_position
-            ):
-                point_to_return = candidate_point
-                self._last_returned_position = candidate_point
+            # Check if the next position is occupied, which could be blocked by
+            # traffic (or some other road event.)
+            if candidate_point.occupied:
+                # The next position is occupied, so the vehicle must wait.
+                point_to_return = self._get_wait_position(candidate_point)
+                # Don't increment current_point_index, instead retry next tick
+            else:
+                # Next position on the road is available. The vehicle can
+                # proceed with normal traversal
+                if (
+                    self._last_returned_position is None
+                    or candidate_point != self._last_returned_position
+                ):
+                    point_to_return = candidate_point
+                    self._last_returned_position = candidate_point
+                else:
+                    # Duplicate check: same position as last returned
+                    # If we were blocked here before, increment to move forward
+                    pass
 
-            # Advance index for next call
-            self.current_point_index += 1
+                # Advance index for next call
+                self.current_point_index += 1
 
         return point_to_return
