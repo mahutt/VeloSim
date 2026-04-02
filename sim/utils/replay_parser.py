@@ -235,6 +235,7 @@ class ReplayParser:
                 raise ValueError(f"Unknown task state: {state_str}")
 
             task.set_state(cls.STATE_MAP[state_str])
+            task.service_time_remaining = t.get("serviceTimeRemaining")
             tasks_by_id[task.id] = task
             input_param.add_task(task)
 
@@ -275,6 +276,8 @@ class ReplayParser:
                 if state_key not in cls.DRIVER_STATE_MAP:
                     raise ValueError(f"Unknown driver state: {state_str}")
                 driver.set_state(cls.DRIVER_STATE_MAP[state_key])
+
+            driver.service_chain_station_id = d.get("serviceChainStationId")
 
         # Construct Replay State
 

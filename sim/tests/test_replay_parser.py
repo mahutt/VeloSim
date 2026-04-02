@@ -131,6 +131,63 @@ def test_replay_parser_extracts_playback_state_fields(
     assert state.paused_by_user is True
 
 
+def test_replay_parser_restores_service_context(
+    mock_map_controller: MagicMock,
+) -> None:
+    from sim.utils.replay_parser import ReplayParser
+
+    scenario_json = {
+        "start_time": "08:00",
+        "end_time": "10:00",
+    }
+
+    keyframe_json = {
+        "clock": {
+            "simSecondsPassed": 1800,
+            "startTime": 0,
+        },
+        "stations": [{"id": 1, "name": "Station A", "position": [0.0, 0.0]}],
+        "vehicles": [{"id": 100, "batteryCount": 5}],
+        "drivers": [
+            {
+                "id": 10,
+                "name": "alfa",
+                "position": [0.0, 0.0],
+                "state": "servicing_station",
+                "vehicleId": 100,
+                "taskIds": [500],
+                "route": None,
+                "serviceChainStationId": 1,
+                "shift": {
+                    "startTime": 0,
+                    "endTime": 7200,
+                    "lunchBreak": None,
+                },
+            }
+        ],
+        "tasks": [
+            {
+                "id": 500,
+                "stationId": 1,
+                "state": "inservice",
+                "assignedDriverId": 10,
+                "serviceTimeRemaining": 37,
+            }
+        ],
+    }
+
+    state = ReplayParser.parse(
+        scenario_json=scenario_json,
+        keyframe_json=keyframe_json,
+    )
+
+    driver = next(iter(state.input_parameters.driver_entities.values()))
+    task = next(iter(state.input_parameters.task_entities.values()))
+
+    assert driver.service_chain_station_id == 1
+    assert task.service_time_remaining == 37
+
+
 def test_replay_parser_playback_fields_fallback_defaults(
     mock_map_controller: MagicMock,
 ) -> None:
