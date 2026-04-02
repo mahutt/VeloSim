@@ -27,4 +27,4 @@ from sim.behaviour.default.default_TST_strategy import DefaultTSTStrategy
 
 def test_default_tst_strategy_returns_default_time() -> None:
     strat = DefaultTSTStrategy()
-    assert strat.get_task_servicing_time() == 240
+    assert strat.get_task_servicing_time() == 30

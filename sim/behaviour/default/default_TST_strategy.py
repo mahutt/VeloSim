@@ -46,4 +46,4 @@ class DefaultTSTStrategy(TaskServicingTimeStrategy):
             Integer corresponding to the default time taken to the time
             required to service a task
         """
-        return 240
+        return 30
