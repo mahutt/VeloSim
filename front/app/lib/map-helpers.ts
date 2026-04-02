@@ -283,7 +283,6 @@ export function setMapLayers(map: mapboxgl.Map) {
       ],
     },
     maxzoom: 13,
-    filter: TASK_HOVERED_OR_STATION_SELECTED,
   });
 
   // ring for stations that have partial assignment
