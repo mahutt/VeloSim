@@ -30,7 +30,7 @@ export default function Clock() {
   const { t } = usePreferences();
   const { formattedSimTime, currentDay } = state;
   return (
-    <div className="bg-background border shadow-sm rounded-md h-10 px-3 flex items-center">
+    <div className="pointer-events-auto bg-background border shadow-sm rounded-md h-10 px-3 flex items-center">
       <div className="flex items-center gap-1 font-mono text-sm">
         <span className="font-medium text-foreground">
           {t.map.labels.day} {currentDay}

@@ -44,7 +44,7 @@ export default function RouteToggle() {
         <Button
           variant="outline"
           size="icon"
-          className="h-10 w-10"
+          className="pointer-events-auto h-10 w-10"
           aria-label="Toggle display options"
           aria-expanded={false}
         >

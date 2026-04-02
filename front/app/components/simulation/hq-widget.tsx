@@ -64,7 +64,7 @@ export default function HQWidget() {
       : t.simulation.hqWidget.vehicleSingular;
 
   return (
-    <div className="w-full bg-gray-50 border shadow rounded-lg">
+    <div className="pointer-events-auto w-full bg-gray-50 border shadow rounded-lg">
       {/* header */}
       <button
         className={`${!entities ? 'text-muted-foreground' : ''} w-full flex flex-row items-center gap-2 hover:bg-gray-100 p-2 rounded-lg`}
