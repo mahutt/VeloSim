@@ -123,10 +123,22 @@ class TrafficTemplateResponse(BaseModel):
     date_updated: datetime
 
 
-class TrafficTemplateListResponse(BaseModel):
-    """Paginated traffic template response schema."""
+class TrafficTemplateSummaryResponse(BaseModel):
+    """Traffic template metadata response schema used for list endpoints."""
 
-    templates: List[TrafficTemplateResponse]
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    key: str
+    description: Optional[str] = None
+    date_created: datetime
+    date_updated: datetime
+
+
+class TrafficTemplateListResponse(BaseModel):
+    """Paginated traffic template summary response schema."""
+
+    templates: List[TrafficTemplateSummaryResponse]
     total: int
     page: int
     per_page: int

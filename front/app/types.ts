@@ -102,10 +102,6 @@ export interface ScenarioListResponse extends PaginatedResponse {
   scenarios: Scenario[];
 }
 
-export interface TrafficTemplateListResponse extends PaginatedResponse {
-  templates: TrafficTemplate[];
-}
-
 export interface TrafficTemplateValidationResponse {
   valid: boolean;
   errors: string[];
@@ -241,6 +237,7 @@ export interface Scenario {
   content_size?: number;
 }
 
+// Full template payload used when reading or downloading CSV content
 export interface TrafficTemplate {
   id: number;
   key: string;
@@ -248,6 +245,19 @@ export interface TrafficTemplate {
   description: string | null;
   date_created: string;
   date_updated: string;
+}
+
+// Lightweight template metadata used for list views (no CSV content)
+export interface TrafficTemplateSummary {
+  id: number;
+  key: string;
+  description: string | null;
+  date_created: string;
+  date_updated: string;
+}
+
+export interface TrafficTemplateListResponse extends PaginatedResponse {
+  templates: TrafficTemplateSummary[];
 }
 
 export interface TrafficTemplateCreateRequest {

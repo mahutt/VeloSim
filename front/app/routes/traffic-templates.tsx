@@ -55,6 +55,7 @@ import type {
   TrafficTemplate,
   TrafficTemplateCreateRequest,
   TrafficTemplateListResponse,
+  TrafficTemplateSummary,
   TrafficTemplateUpdateRequest,
   TrafficTemplateValidationResponse,
 } from '~/types';
@@ -62,7 +63,7 @@ import type {
 const KEY_PATTERN = /^[a-z0-9_-]{1,32}$/;
 const PAGE_SIZE = 10;
 
-type TrafficTemplateRow = TrafficTemplate & {
+type TrafficTemplateRow = TrafficTemplateSummary & {
   updatedDisplay: string;
   searchText: string;
 };
@@ -142,8 +143,8 @@ function formatTemplateTimestamp(timestamp: string): string {
   }).format(date);
 }
 
-async function fetchAllTemplates(): Promise<TrafficTemplate[]> {
-  const templates: TrafficTemplate[] = [];
+async function fetchAllTemplates(): Promise<TrafficTemplateSummary[]> {
+  const templates: TrafficTemplateSummary[] = [];
   let page = 1;
   const perPage = 20;
   let totalPages = 1;
@@ -159,6 +160,13 @@ async function fetchAllTemplates(): Promise<TrafficTemplate[]> {
   }
 
   return templates;
+}
+
+async function fetchTemplateByKey(key: string): Promise<TrafficTemplate> {
+  const response = await api.get<TrafficTemplate>(
+    `/trafficTemplates/${encodeURIComponent(key)}`
+  );
+  return response.data;
 }
 
 export default function TrafficTemplates() {
@@ -186,16 +194,17 @@ export default function TrafficTemplates() {
   );
 
   const [editDialogOpen, setEditDialogOpen] = useState(false);
-  const [editTarget, setEditTarget] = useState<TrafficTemplate | null>(null);
+  const [editTarget, setEditTarget] = useState<TrafficTemplateSummary | null>(
+    null
+  );
   const [editDescription, setEditDescription] = useState('');
   const [editFile, setEditFile] = useState<File | null>(null);
   const [editSubmitting, setEditSubmitting] = useState(false);
   const [editInlineError, setEditInlineError] = useState<string | null>(null);
 
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
-  const [deleteTarget, setDeleteTarget] = useState<TrafficTemplate | null>(
-    null
-  );
+  const [deleteTarget, setDeleteTarget] =
+    useState<TrafficTemplateSummary | null>(null);
   const [deleteSubmitting, setDeleteSubmitting] = useState(false);
 
   const sortedTemplates = useMemo(
@@ -395,7 +404,7 @@ export default function TrafficTemplates() {
     }
   };
 
-  const openEditDialog = (template: TrafficTemplate) => {
+  const openEditDialog = (template: TrafficTemplateSummary) => {
     setEditTarget(template);
     setEditDescription(template.description ?? '');
     setEditFile(null);
@@ -448,7 +457,7 @@ export default function TrafficTemplates() {
     }
   };
 
-  const openDeleteDialog = (template: TrafficTemplate) => {
+  const openDeleteDialog = (template: TrafficTemplateSummary) => {
     setDeleteTarget(template);
     setDeleteDialogOpen(true);
   };
@@ -474,9 +483,10 @@ export default function TrafficTemplates() {
     }
   };
 
-  const downloadTemplate = (template: TrafficTemplate) => {
+  const downloadTemplate = async (template: TrafficTemplateSummary) => {
     try {
-      const blob = new Blob([template.content], {
+      const fullTemplate = await fetchTemplateByKey(template.key);
+      const blob = new Blob([fullTemplate.content], {
         type: 'text/csv;charset=utf-8;',
       });
       const url = URL.createObjectURL(blob);

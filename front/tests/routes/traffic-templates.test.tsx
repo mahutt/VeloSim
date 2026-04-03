@@ -58,7 +58,6 @@ test('renders loaded templates', async () => {
         {
           id: 1,
           key: 'high_congestion',
-          content: 'TYPE,start_time,segment_key,name,duration,weight',
           description: 'High congestion profile',
           date_created: '2026-03-29T00:00:00Z',
           date_updated: '2026-03-29T00:00:00Z',
@@ -105,7 +104,6 @@ test('creates a template from CSV upload', async () => {
           {
             id: 2,
             key: 'new_template',
-            content: 'TYPE,start_time,segment_key,name,duration,weight',
             description: 'Uploaded template',
             date_created: '2026-03-29T00:00:00Z',
             date_updated: '2026-03-29T00:00:00Z',
@@ -173,4 +171,79 @@ test('creates a template from CSV upload', async () => {
       description: undefined,
     });
   });
+});
+
+test('downloads template by fetching content on demand', async () => {
+  const user = userEvent.setup();
+
+  vi.mocked(api.get)
+    .mockResolvedValueOnce({
+      data: {
+        templates: [
+          {
+            id: 1,
+            key: 'high_congestion',
+            description: 'High congestion profile',
+            date_created: '2026-03-29T00:00:00Z',
+            date_updated: '2026-03-29T00:00:00Z',
+          },
+        ],
+        total: 1,
+        page: 1,
+        per_page: 20,
+        total_pages: 1,
+      },
+    })
+    .mockResolvedValueOnce({
+      data: {
+        id: 1,
+        key: 'high_congestion',
+        content: 'TYPE,start_time,segment_key,name,duration,weight',
+        description: 'High congestion profile',
+        date_created: '2026-03-29T00:00:00Z',
+        date_updated: '2026-03-29T00:00:00Z',
+      },
+    });
+
+  const createObjectURLSpy = vi
+    .spyOn(URL, 'createObjectURL')
+    .mockReturnValue('blob:download');
+  const revokeObjectURLSpy = vi
+    .spyOn(URL, 'revokeObjectURL')
+    .mockImplementation(() => undefined);
+
+  const appendChildSpy = vi.spyOn(document.body, 'appendChild');
+  const removeChildSpy = vi.spyOn(document.body, 'removeChild');
+  const clickSpy = vi
+    .spyOn(HTMLAnchorElement.prototype, 'click')
+    .mockImplementation(() => undefined);
+
+  const Stub = createRoutesStub([
+    {
+      path: '/traffic-templates',
+      Component: TrafficTemplates,
+    },
+  ]);
+
+  render(<Stub initialEntries={['/traffic-templates']} />);
+
+  await screen.findByText('high_congestion');
+  await user.click(screen.getByTestId('template-actions-high_congestion'));
+  await user.click(screen.getByRole('menuitem', { name: /Download/i }));
+
+  await waitFor(() => {
+    expect(api.get).toHaveBeenCalledWith('/trafficTemplates/high_congestion');
+  });
+
+  expect(createObjectURLSpy).toHaveBeenCalledOnce();
+  expect(revokeObjectURLSpy).toHaveBeenCalledOnce();
+  expect(appendChildSpy).toHaveBeenCalled();
+  expect(removeChildSpy).toHaveBeenCalled();
+  expect(clickSpy).toHaveBeenCalledOnce();
+
+  clickSpy.mockRestore();
+  appendChildSpy.mockRestore();
+  removeChildSpy.mockRestore();
+  createObjectURLSpy.mockRestore();
+  revokeObjectURLSpy.mockRestore();
 });

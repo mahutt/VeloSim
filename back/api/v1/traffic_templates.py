@@ -43,6 +43,7 @@ from back.schemas.traffic_template import (
     TrafficTemplateCreateRequest,
     TrafficTemplateListResponse,
     TrafficTemplateResponse,
+    TrafficTemplateSummaryResponse,
     TrafficTemplateUpdate,
     TrafficTemplateUpdateRequest,
     TrafficTemplateValidationRequest,
@@ -137,7 +138,7 @@ def get_traffic_templates(
     requesting_user: int = Depends(get_user_id),
     db: Session = Depends(get_db),
 ) -> TrafficTemplateListResponse:
-    """List all traffic templates with pagination.
+    """List traffic template summaries with pagination.
 
     Args:
         skip: Number of records to skip.
@@ -146,7 +147,7 @@ def get_traffic_templates(
         db: Active database session.
 
     Returns:
-        Paginated traffic template list response.
+        Paginated traffic template summary list response.
     """
 
     templates, total = traffic_template_crud.get_all(db, skip=skip, limit=limit)
@@ -154,7 +155,7 @@ def get_traffic_templates(
     page = (skip // limit) + 1
 
     return TrafficTemplateListResponse(
-        templates=[TrafficTemplateResponse.model_validate(t) for t in templates],
+        templates=[TrafficTemplateSummaryResponse.model_validate(t) for t in templates],
         total=total,
         page=page,
         per_page=limit,

@@ -41,9 +41,9 @@ import {
   TableRow,
 } from '~/components/ui/table';
 import usePreferences from '~/hooks/use-preferences';
-import type { TrafficTemplate } from '~/types';
+import type { TrafficTemplateSummary } from '~/types';
 
-type TrafficTemplateWithDisplay = TrafficTemplate & {
+type TrafficTemplateWithDisplay = TrafficTemplateSummary & {
   updatedDisplay: string;
 };
 
@@ -53,9 +53,9 @@ interface DataTableProps {
   onSearchChange: (query: string) => void;
   onUploadClick: () => void;
   onUploadFileSelected: (file: File | null) => void;
-  onEditClick: (template: TrafficTemplate) => void;
-  onDownloadClick: (template: TrafficTemplate) => void;
-  onDeleteClick: (template: TrafficTemplate) => void;
+  onEditClick: (template: TrafficTemplateSummary) => void;
+  onDownloadClick: (template: TrafficTemplateSummary) => void;
+  onDeleteClick: (template: TrafficTemplateSummary) => void;
   pageIndex: number;
   totalPages: number;
   onPreviousPage: () => void;
