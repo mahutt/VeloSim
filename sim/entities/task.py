@@ -55,6 +55,9 @@ class Task(ABC):
         self.has_updated = False
         self.state = State.OPEN
         self.spawn_time = spawn_time
+        # Replay/resume uses this for in-service tasks to continue with the
+        # same remaining duration instead of restarting.
+        self.service_time_remaining: Optional[int] = None
 
     def _spawn_after_delay(self, delay: float) -> Generator[simpy.Event, None, None]:
         """Internal generator that spawns a task after a specified delay.
@@ -210,6 +213,7 @@ class Task(ABC):
             "assigned_driver_id": (
                 self.assigned_driver.id if self.assigned_driver is not None else None
             ),
+            "service_time_remaining": self.service_time_remaining,
         }
 
     def __eq__(self, other: object) -> bool:

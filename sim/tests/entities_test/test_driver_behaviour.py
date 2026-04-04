@@ -29,6 +29,7 @@ from sim.entities.position import Position
 from sim.entities.task import Task
 from sim.entities.station import Station
 from sim.entities.task_state import State
+from sim.behaviour.default.default_TST_strategy import DefaultTSTStrategy
 from sim.behaviour.sim_behaviour import SimBehaviour
 from sim.entities.vehicle import Vehicle
 from sim.entities.shift import Shift
@@ -429,3 +430,73 @@ def test_driver_run_handles_none_station_on_task() -> None:
 
     # Task should not be dispatched since station is None
     assert task in driver.task_list
+
+
+def test_service_task_uses_persisted_remaining_time_on_resume() -> None:
+    env = SimulationEnvironment()
+    Driver.env = env
+    station = Station(1, "Station1", Position([0.0, 0.0]))
+    driver = Driver(driver_id=1, position=station.get_position(), shift=DEFAULT_SHIFT)
+    vehicle = Vehicle(vehicle_id=1, battery_count=10)
+    driver.set_vehicle(vehicle)
+
+    task = FakeTask(task_id=1, station=station)
+    task.set_state(State.IN_SERVICE)
+    task.set_assigned_driver(driver)
+    task.service_time_remaining = 2
+    driver.task_list.append(task)
+
+    mock_behaviour = Mock(spec=SimBehaviour)
+    mock_behaviour.TST_strategy = Mock()
+    mock_behaviour.TST_strategy.get_task_servicing_time.return_value = 240
+    driver.set_behaviour(mock_behaviour)
+
+    env.process(driver.service_task(task))
+    env.run(until=3)
+
+    assert task.get_state() == State.CLOSED
+    mock_behaviour.TST_strategy.get_task_servicing_time.assert_not_called()
+
+
+def test_service_task_marks_station_for_immediate_followup_discount() -> None:
+    env = SimulationEnvironment()
+    Driver.env = env
+    station = Station(1, "Station1", Position([0.0, 0.0]))
+    driver = Driver(driver_id=1, position=station.get_position(), shift=DEFAULT_SHIFT)
+    vehicle = Vehicle(vehicle_id=1, battery_count=10)
+    driver.set_vehicle(vehicle)
+
+    first_task = FakeTask(task_id=1, station=station)
+    first_task.set_state(State.IN_SERVICE)
+    first_task.set_assigned_driver(driver)
+    first_task.service_time_remaining = 0
+    driver.task_list.append(first_task)
+
+    mock_behaviour = Mock(spec=SimBehaviour)
+    mock_behaviour.TST_strategy = DefaultTSTStrategy()
+    driver.set_behaviour(mock_behaviour)
+
+    env.process(driver.service_task(first_task))
+    env.run(until=1)
+
+    followup_task = FakeTask(task_id=2, station=station)
+    assert driver.should_reduce_service_time(followup_task) is True
+
+
+def test_traveling_away_breaks_same_station_service_chain() -> None:
+    env = SimulationEnvironment()
+    Driver.env = env
+    station = Station(1, "Station1", Position([0.0, 0.0]))
+    driver = Driver(driver_id=1, position=station.get_position(), shift=DEFAULT_SHIFT)
+    driver.service_chain_station_id = station.id
+    driver.state = DriverState.ON_ROUTE
+
+    next_position = Position([0.1, 0.1])
+    mock_route = Mock()
+    mock_route.next.side_effect = [next_position, None]
+    driver.routes = [mock_route]
+
+    env.process(driver.travel_to_next_stop())
+    env.run(until=3)
+
+    assert driver.service_chain_station_id is None

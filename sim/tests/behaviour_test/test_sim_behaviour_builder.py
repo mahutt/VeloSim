@@ -22,6 +22,8 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 """
 
+from __future__ import annotations
+
 from sim.behaviour.sim_behaviour_builder import SimBehaviourBuilder
 from sim.behaviour.sim_behaviour import SimBehaviour
 from sim.behaviour.resource_behaviour.resource_choose_next_task_strategy import (
@@ -36,6 +38,8 @@ from sim.behaviour.resource_behaviour.task_servicing_time_strategy import (
 from sim.behaviour.default.default_TPU_strategy import DefaultTPUStrategy
 from sim.behaviour.default.default_RCNT_strategy import DefaultRCNTStrategy
 from sim.behaviour.default.default_TST_strategy import DefaultTSTStrategy
+from sim.entities.driver import Driver
+from sim.entities.task import Task
 
 
 # Stub strategies for testing
@@ -50,7 +54,11 @@ class StubTPUStrategy(TaskPopupStrategy):
 
 
 class StubTSTStrategy(TaskServicingTimeStrategy):
-    def get_task_servicing_time(self):  # type: ignore[no-untyped-def]
+    def get_task_servicing_time(
+        self,
+        driver: Driver | None = None,
+        task: Task | None = None,
+    ) -> int:
         return 240
 
 

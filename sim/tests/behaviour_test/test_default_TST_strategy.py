@@ -23,8 +23,28 @@ SOFTWARE.
 """
 
 from sim.behaviour.default.default_TST_strategy import DefaultTSTStrategy
+from sim.entities.battery_swap_task import BatterySwapTask
+from sim.entities.driver import Driver
+from sim.entities.position import Position
+from sim.entities.shift import Shift
+from sim.entities.station import Station
 
 
 def test_default_tst_strategy_returns_default_time() -> None:
     strat = DefaultTSTStrategy()
-    assert strat.get_task_servicing_time() == 30
+    assert strat.get_task_servicing_time() == 240
+
+
+def test_default_tst_strategy_halves_time_for_same_station_followup() -> None:
+    station = Station(1, "A", Position([0.0, 0.0]))
+    driver = Driver(
+        driver_id=1,
+        position=station.get_position(),
+        shift=Shift(0.0, 24.0 * 60 * 60, None, 0.0),
+    )
+    driver.service_chain_station_id = station.id
+    task = BatterySwapTask(1, station)
+
+    strat = DefaultTSTStrategy()
+
+    assert strat.get_task_servicing_time(driver, task) == 120

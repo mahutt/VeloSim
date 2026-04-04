@@ -22,18 +22,30 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 """
 
+from __future__ import annotations
+
 from abc import ABC, abstractmethod
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from sim.entities.driver import Driver
+    from sim.entities.task import Task
 
 
 class TaskServicingTimeStrategy(ABC):
     """Abstract base class for getting task servicing time."""
 
     @abstractmethod
-    def get_task_servicing_time(self) -> int:
+    def get_task_servicing_time(
+        self,
+        driver: "Driver" | None = None,
+        task: "Task" | None = None,
+    ) -> int:
         """Get the time required to service a task
 
         Args:
-            None
+            driver: Optional driver performing the service.
+            task: Optional task being serviced.
 
         Returns:
             Integer corresponding to the time taken to the time

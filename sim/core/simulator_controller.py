@@ -689,6 +689,7 @@ class SimulatorController:
                     "assignedDriverId": (
                         assigned_driver.id if assigned_driver is not None else None
                     ),
+                    "serviceTimeRemaining": task.service_time_remaining,
                 }
             )
 
@@ -742,6 +743,7 @@ class SimulatorController:
                     "vehicleId": (
                         current_vehicle.id if current_vehicle is not None else None
                     ),
+                    "serviceChainStationId": driver.service_chain_station_id,
                 }
 
                 # Include route in key frames (for replayability) or when route changes

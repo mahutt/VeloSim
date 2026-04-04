@@ -22,9 +22,16 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 """
 
+from __future__ import annotations
+
 from sim.behaviour.resource_behaviour.task_servicing_time_strategy import (
     TaskServicingTimeStrategy,
 )
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from sim.entities.driver import Driver
+    from sim.entities.task import Task
 
 
 class DefaultTSTStrategy(TaskServicingTimeStrategy):
@@ -36,14 +43,27 @@ class DefaultTSTStrategy(TaskServicingTimeStrategy):
     servicing duration.
     """
 
-    def get_task_servicing_time(self) -> int:
+    DEFAULT_SERVICE_TIME = 240
+
+    def get_task_servicing_time(
+        self,
+        driver: "Driver" | None = None,
+        task: "Task" | None = None,
+    ) -> int:
         """Flat default time required to service a task
 
         Args:
-            None
+            driver: Optional driver performing the service.
+            task: Optional task being serviced.
 
         Returns:
             Integer corresponding to the default time taken to the time
             required to service a task
         """
-        return 30
+        if (
+            driver is not None
+            and task is not None
+            and driver.should_reduce_service_time(task)
+        ):
+            return self.DEFAULT_SERVICE_TIME // 2
+        return self.DEFAULT_SERVICE_TIME

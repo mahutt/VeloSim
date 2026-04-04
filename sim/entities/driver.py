@@ -128,6 +128,7 @@ class Driver:
         self.has_updated = False  # flag to track if a driver was updated
         self.state: DriverState | None = None  # Overwritten by sim controller if needed
         self.routes = []
+        self.service_chain_station_id: int | None = None
 
     def get_position(self) -> "Position":
         """Get the current position of the driver.
@@ -393,6 +394,9 @@ class Driver:
                 while another task is in progress.
         """
         if task in self.task_list and task.is_assigned():
+            station = task.get_station()
+            if station is None or self.service_chain_station_id != station.id:
+                self.service_chain_station_id = None
             task_in_progress = self.get_in_progress_task()
             if task_in_progress is None:
                 task.set_state(State.IN_PROGRESS)
@@ -423,17 +427,22 @@ class Driver:
             and self.vehicle is not None
             and self.vehicle.get_battery_count() != 0
         ):
-            task_servicing_time = (
-                self.sim_behaviour.TST_strategy.get_task_servicing_time()
-            )
+            if task.service_time_remaining is None:
+                task.service_time_remaining = (
+                    self.sim_behaviour.TST_strategy.get_task_servicing_time(self, task)
+                )
 
-            for _ in range(task_servicing_time):
+            while task.service_time_remaining > 0:
                 yield self.env.timeout(1)
                 self.env.report.increment_servicing_time()
+                task.service_time_remaining -= 1
 
             self.task_list.remove(task)
             battery_count = self.vehicle.use_battery()
             task.set_state(State.CLOSED)
+            task.service_time_remaining = None
+            station = task.get_station()
+            self.service_chain_station_id = station.id if station is not None else None
 
             # increment completed task count for reporting.
             self.vehicle.tasks_completed += 1
@@ -490,6 +499,25 @@ class Driver:
                 SCHEDULED and CLOSED tasks).
         """
         return len(self.get_visible_task_list())
+
+    def should_reduce_service_time(self, task: "Task") -> bool:
+        """Return whether task qualifies for same-station reduced service time.
+
+        Args:
+            task: The task being considered for servicing.
+
+        Returns:
+            True if the driver is still in the current uninterrupted service
+            chain for the task's station, False otherwise.
+        """
+        station = task.get_station()
+        if station is None or self.service_chain_station_id is None:
+            return False
+
+        return (
+            station.id == self.service_chain_station_id
+            and self.position.close_enough(station.get_position())
+        )
 
     def clear_update(self) -> None:
         """Clear the update flag for this driver.
@@ -639,6 +667,9 @@ class Driver:
         next_position = self.current_route.next()
         try:
             while next_position:
+                if self.service_chain_station_id is not None:
+                    # Any actual travel breaks the same-station service chain
+                    self.service_chain_station_id = None
                 # Handle case where driver is on_route but in_progress task
                 # got unassigned or reordered
                 if (
