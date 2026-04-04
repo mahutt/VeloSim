@@ -201,7 +201,7 @@ def test_simulator_controller_initialization(
     assert len(simulator_controller.task_entities) == 2
 
     # Check keyframe frequency
-    assert simulator_controller.keyframe_freq == 60  # default value
+    assert simulator_controller.keyframe_freq == 20  # default value
 
     # Check frame counter initialization
     assert simulator_controller.frame_counter == 0
@@ -356,15 +356,13 @@ def test_emit_frame_without_provided_frame_diff_frame(
     simulator_controller: SimulatorController, frame_emitter: FrameEmitter
 ) -> None:
     """Test emit_frame without provided frame creates diff frame when
-    frameCounter is not multiple of keyframeFreq."""
+    sim time in seconds is not multiple of keyframeFreq."""
     subscriber = FakeSubscriber()
     frame_emitter.attach(subscriber)
 
-    # Set frame counter to non-multiple of keyframe frequency
-    simulator_controller.frame_counter = 30  # Should create diff frame
-
     # Mark some entities as updated (using ID keys instead of indices)
     simulator_controller.station_entities[1].has_updated = True
+    simulator_controller.clock.sim_time_seconds = 1  # Should create diff frame
     simulator_controller.sim_time = 3600
 
     simulator_controller.emit_frame()

@@ -78,7 +78,7 @@ class SimulatorController:
         real_time_factor = input_parameters.get_real_time_factor()
         keyframe_freq = input_parameters.get_key_frame_freq()
         if keyframe_freq is None:
-            keyframe_freq = 60
+            keyframe_freq = 20
 
         self.real_time_driver = RealTimeDriver(
             sim_env, lag_reporter, real_time_factor, strict
@@ -611,9 +611,8 @@ class SimulatorController:
         # specified for key frames
         if not frame:
             is_key = (
-                self.frame_counter % self.keyframe_freq == 0
-                or self.frame_counter == self.sim_time
-                or self.frame_counter == 0
+                self.clock.sim_time_seconds % self.keyframe_freq == 0
+                or self.clock.sim_time_seconds == self.sim_time
             )
             frame = self.create_frame(is_key=is_key)
         self.frame_emitter.notify(frame=frame)
