@@ -30,6 +30,8 @@ from shapely.geometry import LineString
 from sim.entities.map_payload import MapPayload
 from sim.entities.road import Road
 from sim.entities.position import Position
+from sim.map.stop_light_controller import StopLightController, TrafficLightState
+from sim.map.stop_sign_controller import StopSignController
 from sim.map.routing_provider import RoutingProvider, RouteResult, SegmentKey
 
 if TYPE_CHECKING:
@@ -62,6 +64,8 @@ class RouteController:
         registry: "PositionRegistry",
         report: "SimulationReport | None" = None,
         map_payload: "MapPayload | None" = None,
+        stop_sign_controller: "StopSignController | None" = None,
+        stop_light_controller: "StopLightController | None" = None,
     ) -> None:
         """
         Initialize the RouteController.
@@ -79,6 +83,12 @@ class RouteController:
         self._registry = registry
         self._report = report
         self._map_payload = map_payload
+        self._stop_sign_controller = stop_sign_controller or StopSignController(
+            registry
+        )
+        self._stop_light_controller = stop_light_controller or StopLightController(
+            registry
+        )
         self._distance_fallback_logged = False
 
         if self._report is None:
@@ -186,6 +196,16 @@ class RouteController:
         self.routes.add(route)
         if self._report is not None:
             self._report.register_vehicle_route(route)
+
+        # Register stop-sign metadata for roads created in this route.
+        if route_result.stop_sign_positions:
+            self._stop_sign_controller.register_stop_signs(
+                route_result.stop_sign_positions
+            )
+        if route_result.traffic_light_positions:
+            self._stop_light_controller.register_traffic_lights(
+                route_result.traffic_light_positions
+            )
 
         # Register road-to-route mappings
         for road in roads:
@@ -441,6 +461,17 @@ class RouteController:
             route.distance = route_result.distance
             route.duration = route_result.duration
             route.steps = route_result.steps
+            route.stop_sign_positions = list(route_result.stop_sign_positions)
+            route.traffic_light_positions = list(route_result.traffic_light_positions)
+
+            if route_result.stop_sign_positions:
+                self._stop_sign_controller.register_stop_signs(
+                    route_result.stop_sign_positions
+                )
+            if route_result.traffic_light_positions:
+                self._stop_light_controller.register_traffic_lights(
+                    route_result.traffic_light_positions
+                )
 
             # Re-register route and road mappings
             self.routes.add(route)
@@ -460,6 +491,10 @@ class RouteController:
         """Remove a road from all tracking structures when no routes reference it."""
         segment_key = road.segment_key
 
+        # Remove any stop-sign associations for the road before dropping references.
+        self._stop_sign_controller.unregister_road(road)
+        self._stop_light_controller.unregister_road(road)
+
         # Notify callbacks before unregistering from registry — callbacks
         # (e.g. TrafficController) need registry lookups to find events
         # that intersect this road for cleanup (clearOrphans).
@@ -473,6 +508,138 @@ class RouteController:
         self.segment_key_to_road.pop(segment_key, None)
         self.road_id_to_road.pop(road.id, None)
         logger.debug(f"Deallocated road {road.id} (segment_key={segment_key})")
+
+    def has_stop_sign_for_road(self, road: Road) -> bool:
+        """Return whether a road has one or more registered stop signs.
+
+        Args:
+            road: Road to check.
+
+        Returns:
+            bool: True when at least one stop sign is mapped to the road.
+        """
+        return self._stop_sign_controller.has_stop_sign(road)
+
+    def get_stop_signs_for_road(self, road: Road) -> List[Position]:
+        """Return stop-sign positions associated with a road.
+
+        Args:
+            road: Road whose stop signs should be returned.
+
+        Returns:
+            List[Position]: Stop-sign positions registered for the road.
+        """
+        return self._stop_sign_controller.get_stop_signs_for_road(road)
+
+    def is_stop_sign_at_position(self, road: Road, position: Position) -> bool:
+        """Return whether a road-position pair maps to a registered stop sign.
+
+        Args:
+            road: Road to inspect.
+            position: Position candidate on the road.
+
+        Returns:
+            bool: True when the position matches a registered stop-sign trigger.
+        """
+        return self._stop_sign_controller.is_stop_sign_at_position(road, position)
+
+    def get_matching_stop_sign_at_position(
+        self, road: Road, position: Position
+    ) -> Position | None:
+        """Return the specific stop-sign matched for a road-position pair.
+
+        Args:
+            road: Road to inspect.
+            position: Position candidate on the road.
+
+        Returns:
+            Position | None: Matched stop-sign position, or None if no match.
+        """
+        return self._stop_sign_controller.get_matching_stop_sign_at_position(
+            road, position
+        )
+
+    def has_traffic_light_for_road(self, road: Road) -> bool:
+        """Return whether a road has one or more registered traffic lights.
+
+        Args:
+            road: Road to inspect.
+
+        Returns:
+            bool: True when at least one traffic light is mapped to the road.
+        """
+        return self._stop_light_controller.has_traffic_light(road)
+
+    def get_traffic_lights_for_road(self, road: Road) -> List[Position]:
+        """Return traffic-light positions associated with a road.
+
+        Args:
+            road: Road whose traffic lights should be returned.
+
+        Returns:
+            List[Position]: Traffic-light positions registered for the road.
+        """
+        return self._stop_light_controller.get_traffic_lights_for_road(road)
+
+    def get_matching_traffic_light_at_position(
+        self, road: Road, position: Position
+    ) -> Position | None:
+        """Return the specific traffic-light matched for a road-position pair.
+
+        Args:
+            road: Road to inspect.
+            position: Position candidate on the road.
+
+        Returns:
+            Position | None: Matched traffic-light position, or None if no match.
+        """
+        return self._stop_light_controller.get_matching_traffic_light_at_position(
+            road, position
+        )
+
+    def is_red_traffic_light_at_position(
+        self, road: Road, position: Position, simulation_tick: int
+    ) -> bool:
+        """Return True if a road-position pair maps to a red traffic light.
+
+        Args:
+            road: Road to inspect.
+            position: Position candidate on the road.
+            simulation_tick: Current simulation tick.
+
+        Returns:
+            bool: True when the matched traffic light is red.
+        """
+        return self._stop_light_controller.is_red_light_at_position(
+            road, position, simulation_tick
+        )
+
+    def get_traffic_light_next_transition_tick(self, simulation_tick: int) -> int:
+        """Return next global state transition tick for the light controller.
+
+        Args:
+            simulation_tick: Current simulation tick.
+
+        Returns:
+            int: Next tick when state changes.
+        """
+        return self._stop_light_controller.get_next_transition_tick(simulation_tick)
+
+    def get_traffic_light_signals_for_road(
+        self, road: Road, simulation_tick: int
+    ) -> List[tuple[Position, TrafficLightState]]:
+        """Return traffic lights and current state for a road.
+
+        Args:
+            road: Road to inspect.
+            simulation_tick: Current simulation tick.
+
+        Returns:
+            List[tuple[Position, TrafficLightState]]: Traffic-light/state pairs.
+        """
+        return self._stop_light_controller.get_light_signals_for_road(
+            road, simulation_tick
+        )
 
     def register_on_road_created(self, callback: Callable[[Road], None]) -> None:
         """Register a callback to be notified when a road is created.

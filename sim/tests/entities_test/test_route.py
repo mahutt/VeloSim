@@ -2357,6 +2357,298 @@ class TestMapIndexForward:
         # 78% through (index 7 of 10), maps to index 3 of 4 (100% - ceil)
         assert Route.map_index_forward(7, 10, 4) == 3
 
+
+class TestRouteStopSignBehavior:
+    """Tests for stop-sign dwell behavior during route traversal."""
+
+    def test_route_decelerates_before_stop_sign_and_dwells_once(
+        self, mock_routing_provider: Mock, test_config: dict
+    ) -> None:
+        points = [
+            Position([0.0, 0.0]),
+            Position([0.0, 0.001]),
+            Position([0.0, 0.002]),
+        ]
+        step = RouteStep(
+            name="Stop Road",
+            distance=100.0,
+            duration=10.0,
+            geometry=points,
+            speed=10.0,
+        )
+        route_result = RouteResult(
+            coordinates=points,
+            distance=100.0,
+            duration=10.0,
+            steps=[step],
+            segments=[],
+        )
+        roads = build_roads_from_route_result(route_result)
+
+        mock_route_controller = Mock()
+        mock_route_controller.is_stop_sign_at_position.side_effect = (
+            lambda road, position: position.get_position() == points[1].get_position()
+        )
+
+        route = Route(
+            route_result,
+            mock_routing_provider,
+            test_config,
+            roads=roads,
+            route_controller=mock_route_controller,
+        )
+
+        p1 = route.next()
+        p2 = route.next()  # deceleration approach point
+        p3 = route.next()  # arrival at stop sign
+        p4 = route.next()  # one-tick dwell at stop sign
+        p5 = route.next()
+
+        assert p1 is not None and p1.get_position() == points[0].get_position()
+        assert p2 is not None and p2.get_position() == [0.0, 0.0005]
+        assert p3 is not None and p3.get_position() == points[1].get_position()
+        assert p4 is not None and p4.get_position() == points[1].get_position()
+        assert p5 is not None and p5.get_position() == points[2].get_position()
+
+    def test_route_no_dwell_when_no_stop_sign(
+        self, mock_routing_provider: Mock, test_config: dict
+    ) -> None:
+        points = [
+            Position([0.0, 0.0]),
+            Position([0.0, 0.001]),
+            Position([0.0, 0.002]),
+        ]
+        step = RouteStep(
+            name="Normal Road",
+            distance=100.0,
+            duration=10.0,
+            geometry=points,
+            speed=10.0,
+        )
+        route_result = RouteResult(
+            coordinates=points,
+            distance=100.0,
+            duration=10.0,
+            steps=[step],
+            segments=[],
+        )
+        roads = build_roads_from_route_result(route_result)
+
+        mock_route_controller = Mock()
+        mock_route_controller.is_stop_sign_at_position.return_value = False
+
+        route = Route(
+            route_result,
+            mock_routing_provider,
+            test_config,
+            roads=roads,
+            route_controller=mock_route_controller,
+        )
+
+        p1 = route.next()
+        p2 = route.next()
+        p3 = route.next()
+
+        assert p1 is not None and p1.get_position() == points[0].get_position()
+        assert p2 is not None and p2.get_position() == points[1].get_position()
+        assert p3 is not None and p3.get_position() == points[2].get_position()
+
+    def test_route_dedupes_same_stop_sign_across_adjacent_points(
+        self, mock_routing_provider: Mock, test_config: dict
+    ) -> None:
+        points = [
+            Position([0.0, 0.0]),
+            Position([0.0, 0.001]),
+            Position([0.0, 0.002]),
+            Position([0.0, 0.003]),
+        ]
+        step = RouteStep(
+            name="Stop Road",
+            distance=120.0,
+            duration=12.0,
+            geometry=points,
+            speed=10.0,
+        )
+        route_result = RouteResult(
+            coordinates=points,
+            distance=120.0,
+            duration=12.0,
+            steps=[step],
+            segments=[],
+        )
+        roads = build_roads_from_route_result(route_result)
+
+        mock_route_controller = Mock()
+        same_sign = Position([0.0, 0.0015])
+        mock_route_controller.get_matching_stop_sign_at_position.side_effect = (
+            lambda road, position: (
+                same_sign
+                if position.get_position()
+                in (points[1].get_position(), points[2].get_position())
+                else None
+            )
+        )
+        mock_route_controller.is_stop_sign_at_position.return_value = False
+
+        route = Route(
+            route_result,
+            mock_routing_provider,
+            test_config,
+            roads=roads,
+            route_controller=mock_route_controller,
+        )
+
+        p1 = route.next()
+        p2 = route.next()  # deceleration approach point
+        p3 = route.next()  # arrival at the first mapped stop-sign point
+        p4 = route.next()  # one-tick dwell at the sign
+        p5 = route.next()
+        p6 = route.next()
+        p7 = route.next()
+
+        assert p1 is not None and p1.get_position() == points[0].get_position()
+        assert p2 is not None and p2.get_position() == [0.0, 0.0005]
+        assert p3 is not None and p3.get_position() == points[1].get_position()
+        assert p4 is not None and p4.get_position() == points[1].get_position()
+        assert p5 is not None and p5.get_position() == points[2].get_position()
+        assert p6 is not None and p6.get_position() == points[3].get_position()
+        assert p7 is None
+
+    def test_route_waits_at_red_light_until_green(
+        self, mock_routing_provider: Mock, test_config: dict
+    ) -> None:
+        points = [
+            Position([0.0, 0.0]),
+            Position([0.0, 0.001]),
+            Position([0.0, 0.002]),
+        ]
+        step = RouteStep(
+            name="Signal Road",
+            distance=100.0,
+            duration=10.0,
+            geometry=points,
+            speed=10.0,
+        )
+        route_result = RouteResult(
+            coordinates=points,
+            distance=100.0,
+            duration=10.0,
+            steps=[step],
+            segments=[],
+        )
+        roads = build_roads_from_route_result(route_result)
+
+        mock_route_controller = Mock()
+        signal_pos = Position([0.0, 0.001])
+        mock_route_controller.get_matching_traffic_light_at_position.side_effect = (
+            lambda road, position: (
+                signal_pos
+                if position.get_position() == points[1].get_position()
+                else None
+            )
+        )
+
+        state_by_tick = {
+            2: True,  # red on first encounter
+            3: True,  # still red during wait
+            4: False,  # turns green
+        }
+        mock_route_controller.is_red_traffic_light_at_position.side_effect = (
+            lambda road, position, tick: state_by_tick.get(tick, False)
+        )
+
+        route = Route(
+            route_result,
+            mock_routing_provider,
+            test_config,
+            roads=roads,
+            route_controller=mock_route_controller,
+        )
+
+        p1 = route.next()
+        p2 = route.next()
+        p3 = route.next()  # red light wait
+        p4 = route.next()  # green -> continue
+
+        assert p1 is not None and p1.get_position() == points[0].get_position()
+        assert p2 is not None and p2.get_position() == points[1].get_position()
+        assert p3 is not None and p3.get_position() == points[1].get_position()
+        assert p4 is not None and p4.get_position() == points[2].get_position()
+
+    def test_route_skips_restop_for_nearby_intersection_traffic_light(
+        self, mock_routing_provider: Mock, test_config: dict
+    ) -> None:
+        points = [
+            Position([0.0, 0.0]),
+            Position([0.0, 0.00100]),
+            Position([0.0, 0.00108]),
+            Position([0.0, 0.00200]),
+        ]
+        step = RouteStep(
+            name="Signal Cluster Road",
+            distance=120.0,
+            duration=12.0,
+            geometry=points,
+            speed=10.0,
+        )
+        route_result = RouteResult(
+            coordinates=points,
+            distance=120.0,
+            duration=12.0,
+            steps=[step],
+            segments=[],
+        )
+        roads = build_roads_from_route_result(route_result)
+
+        mock_route_controller = Mock()
+        first_light = Position([0.0, 0.00100])
+        second_light = Position([0.0, 0.00108])
+
+        def match_light(_road, position):
+            pos = position.get_position()
+            if pos == points[1].get_position():
+                return first_light
+            if pos == points[2].get_position():
+                return second_light
+            return None
+
+        mock_route_controller.get_matching_traffic_light_at_position.side_effect = (
+            match_light
+        )
+
+        def is_red(_road, position, tick):
+            # First light is red on first encounter/wait tick, then turns green.
+            if position.get_position() == points[1].get_position():
+                return tick in (2, 3)
+            # Second nearby light remains red, but should be skipped due to cooldown.
+            if position.get_position() == points[2].get_position():
+                return True
+            return False
+
+        mock_route_controller.is_red_traffic_light_at_position.side_effect = is_red
+
+        route = Route(
+            route_result,
+            mock_routing_provider,
+            test_config,
+            roads=roads,
+            route_controller=mock_route_controller,
+        )
+
+        p1 = route.next()
+        p2 = route.next()
+        p3 = route.next()  # one red-light wait on first signal
+        p4 = route.next()  # first turns green; progresses onto second (no re-stop)
+        p5 = route.next()
+        p6 = route.next()
+
+        assert p1 is not None and p1.get_position() == points[0].get_position()
+        assert p2 is not None and p2.get_position() == points[1].get_position()
+        assert p3 is not None and p3.get_position() == points[1].get_position()
+        assert p4 is not None and p4.get_position() == points[2].get_position()
+        assert p5 is not None and p5.get_position() == points[3].get_position()
+        assert p6 is None
+
     def test_exact_progress_mapping(self):
         """Test mapping when progress is exactly representable."""
         # 50% through (index 4 of 9), maps to index 2 of 5 (50% exactly)

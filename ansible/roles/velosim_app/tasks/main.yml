@@ -406,6 +406,36 @@
   register: container_status
   become_user: "{{ app_user }}"
 
+- name: Check if GraphHopper PBF exists for control-index prewarm
+  ansible.builtin.stat:
+    path: "{{ app_dir }}/graphhopper-data/montreal-latest.osm.pbf"
+  register: graphhopper_pbf_file
+
+- name: Prewarm OSM control indexes in backend container
+  ansible.builtin.command: >-
+    docker compose --project-name "{{ app_name }}" -f "{{ app_dir }}/docker-compose.prod.yml"
+    exec -T backend python /app/scripts/prewarm_control_indexes.py
+  become_user: "{{ app_user }}"
+  args:
+    chdir: "{{ app_dir }}"
+  register: prewarm_result
+  when: graphhopper_pbf_file.stat.exists
+
+- name: Skip control-index prewarm when GraphHopper PBF is missing
+  ansible.builtin.debug:
+    msg: "Skipping control-index prewarm because {{ app_dir }}/graphhopper-data/montreal-latest.osm.pbf is missing."
+  when: not graphhopper_pbf_file.stat.exists
+
+- name: Display control-index prewarm result
+  ansible.builtin.debug:
+    msg: |
+      OSM control-index prewarm completed.
+      {{ prewarm_result.stdout | default('') }}
+      {% if prewarm_result.stderr %}
+      Errors: {{ prewarm_result.stderr }}
+      {% endif %}
+  when: graphhopper_pbf_file.stat.exists
+
 - name: Display container status
   ansible.builtin.debug:
     msg: |

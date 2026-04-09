@@ -664,7 +664,7 @@ class Driver:
             return
 
         self.current_route = self.routes[0]
-        next_position = self.current_route.next()
+        next_position = self.current_route.next(int(self.env.now))
         try:
             while next_position:
                 if self.service_chain_station_id is not None:
@@ -689,15 +689,19 @@ class Driver:
                 # increment driving time after timeout elapses.
                 self.env.report.increment_driving_time()
 
-                next_position = self.current_route.next()
+                next_position = self.current_route.next(int(self.env.now))
             self.routes.pop(0)  # Remove the completed route
         # Allows a traveling drivers to be interrupted by other simpy entities
         except simpy.Interrupt:
             # TODO Implement interrupt logic
             self.compute_routes()
 
-    def get_route_json(self) -> dict | None:
+    def get_route_json(self, simulation_tick: int | None = None) -> dict | None:
         """Get the current route for the driver in JSON format.
+
+        Args:
+            simulation_tick: Optional simulation tick used to derive dynamic
+                traffic-light signal states.
 
         Returns:
             Current route geometry as a dictionary, or None if no route is set.
@@ -722,6 +726,24 @@ class Driver:
         return {
             "coordinates": combined_raw_coordinates,
             "nextStopIndex": len(self.routes[0].get_raw_coordinates()) - 1,
+            "stopSignPositions": [
+                coord
+                for route in self.routes
+                for coord in (
+                    route.get_stop_sign_coordinates()
+                    if hasattr(route, "get_stop_sign_coordinates")
+                    else []
+                )
+            ],
+            "trafficLightPositions": [
+                coord
+                for route in self.routes
+                for coord in (
+                    route.get_traffic_light_coordinates()
+                    if hasattr(route, "get_traffic_light_coordinates")
+                    else []
+                )
+            ],
         }
 
     @property

@@ -745,12 +745,13 @@ class SimulatorController:
                     "serviceChainStationId": driver.service_chain_station_id,
                 }
 
-                # Include route in key frames (for replayability) or when route changes
-                # Only include route field when there's something to communicate:
-                # - Key frames: always include (coordinates or null)
-                # - Diff frames: only include if route_changed
-                if is_key or driver.route_changed or driver.traffic_changed:
-                    route_json = driver.get_route_json()
+                # Include full route in key frames and on route/traffic changes.
+                include_full_route = (
+                    is_key or driver.route_changed or driver.traffic_changed
+                )
+
+                if include_full_route:
+                    route_json = driver.get_route_json(int(self.sim_env.now))
 
                     # Build trafficRanges and nest inside route
                     traffic_ranges: list = []
@@ -770,7 +771,6 @@ class SimulatorController:
                         )
 
                     driver_data["route"] = route_json
-
                 drivers.append(driver_data)
 
         vehicles = []

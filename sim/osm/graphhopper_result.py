@@ -72,6 +72,8 @@ class GraphHopperResult:
         duration: Total duration in seconds
         instructions: List of turn-by-turn instructions
         segments: Route broken into segments
+        stop_sign_coordinates: List of stop sign coordinates as [lon, lat]
+        traffic_light_coordinates: List of traffic light coordinates as [lon, lat]
     """
 
     coordinates: List[List[float]]
@@ -79,6 +81,8 @@ class GraphHopperResult:
     duration: float
     instructions: List[GraphHopperInstruction]
     segments: List[GraphHopperSegment] = field(default_factory=list)
+    stop_sign_coordinates: List[List[float]] = field(default_factory=list)
+    traffic_light_coordinates: List[List[float]] = field(default_factory=list)
 
     @classmethod
     def from_graphhopper_response(cls, response: Dict[str, Any]) -> "GraphHopperResult":
