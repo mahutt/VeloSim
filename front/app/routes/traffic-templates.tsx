@@ -73,7 +73,23 @@ export function meta() {
 }
 
 function isCsvFile(file: File): boolean {
-  return file.name.toLowerCase().endsWith('.csv');
+  const hasCsvExtension = file.name.toLowerCase().endsWith('.csv');
+  if (!hasCsvExtension) {
+    return false;
+  }
+
+  // Some browsers/platforms provide an empty MIME type for local files.
+  if (!file.type) {
+    return true;
+  }
+
+  const normalizedType = file.type.toLowerCase();
+  return (
+    normalizedType === 'text/csv' ||
+    normalizedType === 'application/csv' ||
+    normalizedType === 'application/vnd.ms-excel' ||
+    normalizedType === 'text/plain'
+  );
 }
 
 function templateKeyFromFile(fileName: string): string {

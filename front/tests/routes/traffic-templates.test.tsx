@@ -173,6 +173,184 @@ test('creates a template from CSV upload', async () => {
   });
 });
 
+test('rejects upload when extension is .csv but MIME type is invalid', async () => {
+  vi.mocked(api.get).mockResolvedValueOnce({
+    data: {
+      templates: [],
+      total: 0,
+      page: 1,
+      per_page: 20,
+      total_pages: 0,
+    },
+  });
+
+  const Stub = createRoutesStub([
+    {
+      path: '/traffic-templates',
+      Component: TrafficTemplates,
+    },
+  ]);
+
+  const { container } = render(
+    <Stub initialEntries={['/traffic-templates']} />
+  );
+
+  await screen.findByText('No traffic templates found.');
+
+  const renamedNonCsvFile = new File(['not,csv'], 'renamed.csv', {
+    type: 'image/png',
+  });
+
+  const fileInputs = container.querySelectorAll('input[type="file"]');
+  fireEvent.change(fileInputs[0], { target: { files: [renamedNonCsvFile] } });
+
+  expect(
+    await screen.findByText('Please import a .csv file.')
+  ).toBeInTheDocument();
+  expect(api.post).not.toHaveBeenCalled();
+});
+
+test('accepts .csv upload when MIME type is empty', async () => {
+  const user = userEvent.setup();
+
+  vi.mocked(api.get)
+    .mockResolvedValueOnce({
+      data: {
+        templates: [],
+        total: 0,
+        page: 1,
+        per_page: 20,
+        total_pages: 0,
+      },
+    })
+    .mockResolvedValueOnce({
+      data: {
+        templates: [
+          {
+            id: 2,
+            key: 'empty_mime_template',
+            description: 'Uploaded template',
+            date_created: '2026-03-29T00:00:00Z',
+            date_updated: '2026-03-29T00:00:00Z',
+          },
+        ],
+        total: 1,
+        page: 1,
+        per_page: 20,
+        total_pages: 1,
+      },
+    });
+
+  vi.mocked(api.post)
+    .mockResolvedValueOnce({
+      data: {
+        valid: true,
+        errors: [],
+      },
+    })
+    .mockResolvedValueOnce({
+      data: {
+        key: 'empty_mime_template',
+      },
+    });
+
+  const Stub = createRoutesStub([
+    {
+      path: '/traffic-templates',
+      Component: TrafficTemplates,
+    },
+  ]);
+
+  const { container } = render(
+    <Stub initialEntries={['/traffic-templates']} />
+  );
+
+  await screen.findByText('No traffic templates found.');
+
+  const csvFileWithEmptyMime = new File(
+    [
+      'TYPE,start_time,segment_key,name,duration,weight\nlocal_traffic,08:00,"((0,0),(1,1))",x,60,0.8',
+    ],
+    'empty_mime_template.csv',
+    { type: '' }
+  );
+
+  const fileInputs = container.querySelectorAll('input[type="file"]');
+  fireEvent.change(fileInputs[0], {
+    target: { files: [csvFileWithEmptyMime] },
+  });
+
+  const keyInput = await screen.findByLabelText('Template key');
+  fireEvent.change(keyInput, { target: { value: 'empty_mime_template' } });
+
+  await user.click(screen.getByRole('button', { name: 'Upload template' }));
+
+  await waitFor(() => {
+    expect(api.post).toHaveBeenCalledWith('/trafficTemplates/validate', {
+      content: expect.stringContaining('TYPE,start_time,segment_key'),
+    });
+  });
+
+  await waitFor(() => {
+    expect(api.post).toHaveBeenCalledWith('/trafficTemplates', {
+      key: 'empty_mime_template',
+      content: expect.stringContaining('TYPE,start_time,segment_key'),
+      description: undefined,
+    });
+  });
+});
+
+test('rejects edit file replacement when extension is .csv but MIME type is invalid', async () => {
+  const user = userEvent.setup();
+
+  vi.mocked(api.get).mockResolvedValueOnce({
+    data: {
+      templates: [
+        {
+          id: 1,
+          key: 'high_congestion',
+          description: 'High congestion profile',
+          date_created: '2026-03-29T00:00:00Z',
+          date_updated: '2026-03-29T00:00:00Z',
+        },
+      ],
+      total: 1,
+      page: 1,
+      per_page: 20,
+      total_pages: 1,
+    },
+  });
+
+  const Stub = createRoutesStub([
+    {
+      path: '/traffic-templates',
+      Component: TrafficTemplates,
+    },
+  ]);
+
+  const { container } = render(
+    <Stub initialEntries={['/traffic-templates']} />
+  );
+
+  await screen.findByText('high_congestion');
+  await user.click(screen.getByTestId('template-actions-high_congestion'));
+  await user.click(screen.getByRole('menuitem', { name: /Edit/i }));
+
+  const renamedNonCsvFile = new File(['not,csv'], 'renamed.csv', {
+    type: 'image/png',
+  });
+
+  const fileInputs = container.querySelectorAll('input[type="file"]');
+  fireEvent.change(fileInputs[1], { target: { files: [renamedNonCsvFile] } });
+
+  await user.click(screen.getByRole('button', { name: /Update/i }));
+
+  expect(
+    await screen.findByText('Please import a .csv file.')
+  ).toBeInTheDocument();
+  expect(api.put).not.toHaveBeenCalled();
+});
+
 test('downloads template by fetching content on demand', async () => {
   const user = userEvent.setup();
 
