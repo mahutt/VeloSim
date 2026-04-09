@@ -230,6 +230,18 @@ export const EN_TRANSLATIONS = {
       reassignMultiTo: 'Re-assign {{count}} tasks to {{to}}?',
       assignMultiTo: 'Assign {{count}} tasks to {{to}}?',
       assignSingleTo: 'Assign task #{{taskId}} to {{to}}?',
+      errors: {
+        batchAssignmentFailed: 'Batch assignment failed. ({{count}} tasks)',
+        failedToAssignAllSingular: 'Failed to assign all {{count}} task.',
+        failedToAssignAllPlural: 'Failed to assign all {{count}} tasks.',
+        assignedPartial:
+          'Assigned {{success}} of {{total}} tasks. {{failed}} failed.',
+        batchUnassignmentFailed: 'Batch unassignment failed. ({{count}} tasks)',
+        failedToUnassignSingle: 'Failed to unassign task {{taskId}}.',
+        failedToUnassignAll: 'Failed to unassign all {{count}} tasks.',
+        unassignedPartial:
+          'Unassigned {{success}} of {{total}} tasks. {{failed}} failed.',
+      },
     },
   },
   taskAssignmentBanner: {
@@ -689,6 +701,23 @@ export const FR_TRANSLATIONS = {
       reassignMultiTo: 'Réassigner {{count}} tâches à {{to}}?',
       assignMultiTo: 'Assigner {{count}} tâches à {{to}}?',
       assignSingleTo: 'Assigner la tâche #{{taskId}} à {{to}}?',
+      errors: {
+        batchAssignmentFailed:
+          "Échec de l'assignation en lot. ({{count}} tâches)",
+        failedToAssignAllSingular:
+          "Échec de l'assignation de la tâche {{count}}.",
+        failedToAssignAllPlural: "Échec de l'assignation des {{count}} tâches.",
+        assignedPartial:
+          '{{success}} tâches assignées sur {{total}}. {{failed}} en échec.',
+        batchUnassignmentFailed:
+          'Échec de la désassignation en lot. ({{count}} tâches)',
+        failedToUnassignSingle:
+          'Échec de la désassignation de la tâche {{taskId}}.',
+        failedToUnassignAll:
+          'Échec de la désassignation de toutes les {{count}} tâches.',
+        unassignedPartial:
+          '{{success}} tâches désassignées sur {{total}}. {{failed}} en échec.',
+      },
     },
   },
   taskAssignmentBanner: {

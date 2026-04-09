@@ -30,7 +30,6 @@ const APP_NAME = 'VeloSim';
 const GBFS_STATION_INFORMATION_URL = `https://gbfs.velobixi.com/gbfs/2-2/en/station_information.json`;
 const GBFS_STATION_INFORMATION_STORAGE_KEY = 'gbfs_station_information';
 const TOKEN_STORAGE_KEY = 'access_token';
-const UI_LANGUAGE_STORAGE_KEY = 'ui_language';
 const USER_PREFERENCES_STORAGE_KEY = 'user_preferences';
 const DEFAULT_UI_LANGUAGE = UILanguage.English;
 
@@ -121,7 +120,6 @@ export {
   GBFS_STATION_INFORMATION_URL,
   GBFS_STATION_INFORMATION_STORAGE_KEY,
   TOKEN_STORAGE_KEY,
-  UI_LANGUAGE_STORAGE_KEY,
   USER_PREFERENCES_STORAGE_KEY,
   DEFAULT_UI_LANGUAGE,
   MONTREAL_BOUNDS,

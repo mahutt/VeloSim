@@ -49,6 +49,8 @@ import {
   formatSecondsToHHMM,
 } from '~/utils/clock-utils';
 import { toast } from 'sonner';
+import { formatTranslation } from '~/lib/i18n';
+import { getRuntimeTranslationTable } from '~/lib/runtime-translations';
 import { logMissingEntityError } from '~/utils/simulation-error-utils';
 
 export default class SimulationEngine {
@@ -162,7 +164,12 @@ export default class SimulationEngine {
       );
       items = response.data.items;
     } catch (error) {
-      toast.error(`Batch assignment failed. (${taskIds.length} tasks)`);
+      const t = getRuntimeTranslationTable();
+      toast.error(
+        formatTranslation(t.map.assignment.errors.batchAssignmentFailed, {
+          count: taskIds.length,
+        })
+      );
       throw error;
     }
 
@@ -199,12 +206,23 @@ export default class SimulationEngine {
     const failedItemsCount = items.length - successfulItemsCount;
 
     if (failedItemsCount === totalItemsCount) {
+      const t = getRuntimeTranslationTable();
       toast.error(
-        `Failed to assign all ${totalItemsCount} task${totalItemsCount === 1 ? '' : 's'}.`
+        formatTranslation(
+          totalItemsCount === 1
+            ? t.map.assignment.errors.failedToAssignAllSingular
+            : t.map.assignment.errors.failedToAssignAllPlural,
+          { count: totalItemsCount }
+        )
       );
     } else if (failedItemsCount > 0) {
+      const t = getRuntimeTranslationTable();
       toast.error(
-        `Assigned ${successfulItemsCount} of ${totalItemsCount} tasks. ${failedItemsCount} failed.`
+        formatTranslation(t.map.assignment.errors.assignedPartial, {
+          success: successfulItemsCount,
+          total: totalItemsCount,
+          failed: failedItemsCount,
+        })
       );
     }
   }
@@ -227,7 +245,12 @@ export default class SimulationEngine {
       );
       items = response.data.items;
     } catch (error) {
-      toast.error(`Batch unassignment failed. (${taskIds.length} tasks)`);
+      const t = getRuntimeTranslationTable();
+      toast.error(
+        formatTranslation(t.map.assignment.errors.batchUnassignmentFailed, {
+          count: taskIds.length,
+        })
+      );
       throw error;
     }
 
@@ -256,14 +279,28 @@ export default class SimulationEngine {
     const failedItemsCount = totalItemsCount - successfulItemsCount;
 
     if (failedItemsCount === totalItemsCount) {
+      const t = getRuntimeTranslationTable();
       if (totalItemsCount === 1) {
-        toast.error(`Failed to unassign task ${taskIds[0]}.`);
+        toast.error(
+          formatTranslation(t.map.assignment.errors.failedToUnassignSingle, {
+            taskId: taskIds[0],
+          })
+        );
       } else {
-        toast.error(`Failed to unassign all ${totalItemsCount} tasks.`);
+        toast.error(
+          formatTranslation(t.map.assignment.errors.failedToUnassignAll, {
+            count: totalItemsCount,
+          })
+        );
       }
     } else if (failedItemsCount > 0) {
+      const t = getRuntimeTranslationTable();
       toast.error(
-        `Unassigned ${successfulItemsCount} of ${totalItemsCount} tasks. ${failedItemsCount} failed.`
+        formatTranslation(t.map.assignment.errors.unassignedPartial, {
+          success: successfulItemsCount,
+          total: totalItemsCount,
+          failed: failedItemsCount,
+        })
       );
     }
   }
