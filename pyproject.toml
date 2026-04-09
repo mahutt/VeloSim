@@ -36,6 +36,7 @@ dependencies = [
     "requests>=2.31.0",
     "pandas>=2.0.0",
     "gdown>=5.2.0",
+    "osmium>=3.7.0",
     "shapely>=2.0.0",
     "openpyxl>=3.1.0",
     "tqdm>=4.60.0",
@@ -174,6 +175,7 @@ module = [
     "requests.*",
     "pandas.*",
     "shapely.*",
+    "osmium.*",
     "prometheus_client.*",
     "opentelemetry.*"
 ]
