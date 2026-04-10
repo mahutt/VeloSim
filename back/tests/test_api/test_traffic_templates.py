@@ -74,6 +74,7 @@ class TestTrafficTemplatesAPI:
         assert data["total"] == 1
         assert len(data["templates"]) == 1
         assert data["templates"][0]["key"] == "default"
+        assert "content" not in data["templates"][0]
 
     @patch("back.api.v1.traffic_templates.user_crud.get")
     def test_admin_required_for_create(
