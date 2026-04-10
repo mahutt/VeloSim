@@ -27,7 +27,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 from threading import Lock
-from typing import Dict, List, Literal, Set, Tuple, TypedDict
+from typing import Dict, List, Literal, Set, Tuple, TypedDict, cast
 
 from grafana_logging.logger import get_logger
 
@@ -49,7 +49,7 @@ class ControlCacheEntry(TypedDict):
 class OSMControlIndexStore:
     """Shared cache for control-point extraction from OSM PBF files.
 
-    Loads stop signs and traffic lights in one pyrosm scan, then serves either
+    Loads stop signs and traffic lights in one osmium scan, then serves either
     set by control type. Cache key is the resolved PBF path.
     """
 
@@ -147,41 +147,44 @@ class OSMControlIndexStore:
         return cached[control_kind]
 
     def _load_from_pbf(self, pbf_path: Path) -> Dict[ControlKind, List[List[float]]]:
-        from pyrosm import OSM  # type: ignore[import-not-found]
+        import osmium
 
-        osm = OSM(str(pbf_path))
-        gdf = osm.get_data_by_custom_criteria(
-            custom_filter={"highway": ["stop", "traffic_signals"]},
-            filter_type="keep",
-            keep_nodes=True,
-            keep_ways=False,
-            keep_relations=False,
-        )
+        class _ControlHandler(osmium.SimpleHandler):
+            """Collect stop and traffic-signal node coordinates from an OSM file."""
 
-        points: Dict[ControlKind, Set[Tuple[float, float]]] = {
-            "stop": set(),
-            "traffic_signals": set(),
-        }
+            def __init__(self) -> None:
+                super().__init__()
+                self.points: Dict[ControlKind, Set[Tuple[float, float]]] = {
+                    "stop": set(),
+                    "traffic_signals": set(),
+                }
 
-        if gdf is None or len(gdf) == 0:
+            def node(self, n: osmium.osm.Node) -> None:
+                """Handle each node and store coordinates for supported controls.
+
+                Args:
+                    n: Current OSM node emitted by osmium during PBF scan.
+
+                Returns:
+                    None. Coordinates are accumulated in ``self.points``.
+                """
+                highway = n.tags.get("highway")
+                if highway in ("stop", "traffic_signals") and n.location.valid():
+                    control_kind = cast(ControlKind, highway)
+                    self.points[control_kind].add((n.location.lon, n.location.lat))
+
+        handler = _ControlHandler()
+        handler.apply_file(str(pbf_path))
+
+        if not any(handler.points.values()):
             logger.warning("No stop/traffic-signal nodes found in %s", pbf_path)
             return {"stop": [], "traffic_signals": []}
 
-        for _, row in gdf.iterrows():
-            highway = row.get("highway")
-            lon = row.get("lon")
-            lat = row.get("lat")
-
-            if highway not in points:
-                continue
-            if lon is None or lat is None:
-                continue
-
-            points[highway].add((float(lon), float(lat)))
-
         return {
-            "stop": [[lon, lat] for lon, lat in points["stop"]],
-            "traffic_signals": [[lon, lat] for lon, lat in points["traffic_signals"]],
+            "stop": [[lon, lat] for lon, lat in handler.points["stop"]],
+            "traffic_signals": [
+                [lon, lat] for lon, lat in handler.points["traffic_signals"]
+            ],
         }
 
 
