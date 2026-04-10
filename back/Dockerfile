@@ -9,7 +9,8 @@ WORKDIR /app
 # Configuring Backend Container
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
-    postgresql-client && \
+    postgresql-client \
+    libexpat1 && \
     rm -rf /var/lib/apt/lists/*
 
 # Copy pyproject.toml and the source code needed for installation
