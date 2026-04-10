@@ -65,6 +65,7 @@ export const SimulationProvider = ({
     ...DEFAULT_REACTIVE_SIMULATION_STATE,
   });
   const engineRef = useRef<SimulationEngine | null>(null);
+
   if (!engineRef.current) {
     engineRef.current = new SimulationEngine(
       simulationId,

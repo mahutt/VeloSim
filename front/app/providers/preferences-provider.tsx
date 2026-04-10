@@ -38,6 +38,7 @@ import {
   FR_TRANSLATIONS,
   type TranslationSchema,
 } from '~/lib/i18n';
+import { isUiLanguage } from '~/lib/ui-language';
 import {
   UILanguage,
   type UserPreferences,
@@ -46,10 +47,6 @@ import {
 
 const DEFAULT_PREFERENCES: UserPreferences = {
   language: DEFAULT_UI_LANGUAGE,
-};
-
-const isUiLanguage = (value: unknown): value is UILanguage => {
-  return Object.values(UILanguage).includes(value as UILanguage);
 };
 
 const getStoredPreferences = (): UserPreferences => {
