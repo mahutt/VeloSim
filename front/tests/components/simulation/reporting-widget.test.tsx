@@ -87,7 +87,7 @@ describe('ReportingWidget', () => {
     expect(screen.getByText('999m')).toBeInTheDocument();
   });
 
-  it('toggles details section when header is clicked', () => {
+  it('expands details while hovered and collapses when hover ends', () => {
     mockUseSimulation.mockReturnValue({
       state: {
         reporting: {
@@ -102,16 +102,14 @@ describe('ReportingWidget', () => {
 
     const { container } = render(<ReportingWidget />);
 
-    const button = container.querySelector('button');
-    expect(button).not.toBeNull();
-
-    const detailsContainer = button?.nextElementSibling;
+    const widget = container.firstElementChild as HTMLDivElement;
+    const detailsContainer = widget.lastElementChild;
     expect(detailsContainer).toHaveClass('h-0');
 
-    fireEvent.click(button as HTMLButtonElement);
-    expect(detailsContainer).toHaveClass('h-32');
+    fireEvent.mouseEnter(widget);
+    expect(detailsContainer).toHaveClass('h-36');
 
-    fireEvent.click(button as HTMLButtonElement);
+    fireEvent.mouseLeave(widget);
     expect(detailsContainer).toHaveClass('h-0');
   });
 });

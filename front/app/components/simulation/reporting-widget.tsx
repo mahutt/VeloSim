@@ -22,7 +22,7 @@
  * SOFTWARE.
  */
 
-import { ChevronLeft, Gauge } from 'lucide-react';
+import { Gauge } from 'lucide-react';
 import { useState } from 'react';
 import usePreferences from '~/hooks/use-preferences';
 import { formatDistance, formatDuration } from '~/lib/utils';
@@ -45,28 +45,26 @@ export default function ReportingWidget() {
   const { t } = usePreferences();
   const { state } = useSimulation();
   const { reporting } = state;
-  const [open, setOpen] = useState(false);
+  const [isHovered, setIsHovered] = useState(false);
+
   return (
-    <div className="pointer-events-auto w-full bg-gray-50 border shadow rounded-lg">
+    <div
+      className={`pointer-events-auto w-full bg-gray-50 border shadow rounded-lg transition-all duration-200 self-end ${isHovered ? 'md:w-max' : 'md:w-full'} [interpolate-size:allow-keywords]`}
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => setIsHovered(false)}
+    >
       {/* header */}
-      <button
-        className={
-          'w-full flex flex-row items-center gap-2 hover:bg-gray-100 p-2 rounded-lg'
-        }
-        onClick={() => setOpen((prev) => !prev)}
-      >
+      <div className="w-full flex flex-row items-center gap-2 p-2">
         <Gauge size={20} />
-        <p className="flex-1 text-left text-muted-foreground">
+        <p className="flex-1 text-left text-muted-foreground whitespace-nowrap">
           {summarize(reporting)}
         </p>
-        <ChevronLeft
-          size={20}
-          className={`transition-transform duration-200 ${open ? '-rotate-90' : 'rotate-0'}`}
-        />
-      </button>
+      </div>
       {/* body */}
-      <div className={`${open ? 'h-32' : 'h-0'} duration-200 overflow-hidden`}>
-        <div className="overflow-y-auto h-32">
+      <div
+        className={`${isHovered ? 'h-36' : 'h-0'} duration-200 overflow-hidden bg-white border-t rounded-b-lg`}
+      >
+        <div className="overflow-y-auto">
           <ReportingMetricRow
             label={t.simulations.report.legend.servicingToDrivingRatio}
             value={reporting.servicingToDrivingRatio.toFixed(1)}
@@ -101,9 +99,9 @@ function ReportingMetricRow({
   value: string;
 }) {
   return (
-    <div className="flex flex-row items-center gap-1 px-3 py-1 text-sm font-mono">
+    <div className="flex flex-row items-center gap-1 px-3 py-1 text-sm font-mono whitespace-nowrap">
       <span>{label}</span>
-      <span className="ml-auto">{value}</span>
+      <span className="ml-auto pl-4">{value}</span>
     </div>
   );
 }
