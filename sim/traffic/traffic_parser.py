@@ -92,6 +92,7 @@ class TrafficParser:
         if self._csv_data is None:
             # No in-memory data, so use template
             traffic_level = traffic_config.traffic_level
+            assert traffic_level is not None
             template_path = self._template_path_from_level(traffic_level)
             self._path = Path(template_path)
             if not self._path.exists():

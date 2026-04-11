@@ -23,7 +23,7 @@ SOFTWARE.
 """
 
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Any, Optional
+from typing import TYPE_CHECKING, Any, Dict, List, Optional
 from grafana_logging.logger import get_logger
 
 if TYPE_CHECKING:
@@ -39,14 +39,16 @@ class TrafficConfig:
     """Configuration for traffic event loading.
 
     Attributes:
-        traffic_level: Desired traffic level template to use.
+        traffic_level: Optional desired traffic level template to use.
         traffic_csv_data: Optional in-memory CSV content (for resume scenarios).
+        global_schedule: Optional list of global multiplier schedules.
         sim_start_time: Start time of simulation.
         sim_end_time: End time of simulation.
     """
 
-    traffic_level: str = "default"
+    traffic_level: Optional[str] = "default"
     traffic_csv_data: Optional[str] = None
+    global_schedule: List[Dict[str, Any]] = field(default_factory=list)
     sim_start_time: str = field(default="day1:00:00")
     sim_end_time: str = field(default="day1:00:00")
     gps_sync_delay: int = 10

@@ -913,15 +913,14 @@ class _ScenarioValidator:
         Returns:
             List of validation errors related to traffic configuration.
         """
+        errors: List[Dict[str, Any]] = []
         traffic_raw = content.get("traffic", None)
         if traffic_raw is None or not isinstance(traffic_raw, dict):
-            return []
+            return errors
         traffic_level = str(traffic_raw.get("traffic_level", "default"))
-        if traffic_level == "no_traffic":
-            return []
 
         if not TRAFFIC_TEMPLATE_KEY_PATTERN.fullmatch(traffic_level):
-            return [
+            errors.append(
                 {
                     "field": "traffic_level",
                     "message": (
@@ -929,8 +928,115 @@ class _ScenarioValidator:
                         f"(got '{traffic_level}')"
                     ),
                 }
-            ]
-        return []
+            )
+        # Validate global field if exists
+        global_field = traffic_raw.get("global", [])
+        if global_field is not None and isinstance(global_field, list):
+            valid_intervals = []  # for overlap check
+            for idx, entry in enumerate(global_field):
+                # Validate all keys are present
+                required_keys = ["multiplier", "start_time", "end_time"]
+                missing = [key for key in required_keys if key not in entry]
+                if missing:
+                    field_path = f"traffic.global[{idx}]"
+                    error_dict: Dict[str, Any] = {
+                        "field": field_path,
+                        "message": (f"Missing required field(s): {', '.join(missing)}"),
+                    }
+                    line_num = self._get_line_number(field_path)
+                    if line_num:
+                        error_dict["line"] = line_num
+                    errors.append(error_dict)
+                    continue
+
+                # Validate multplier field
+                multiplier = entry.get("multiplier")
+                if not isinstance(multiplier, (int, float)):
+                    field_path = f"traffic.global[{idx}].multiplier"
+                    error_dict = {
+                        "field": field_path,
+                        "message": (
+                            f"multiplier should be an integer or float. "
+                            f"Got {multiplier}"
+                        ),
+                    }
+                    line_num = self._get_line_number(field_path)
+                    if line_num:
+                        error_dict["line"] = line_num
+                    errors.append(error_dict)
+                elif multiplier <= 0 or multiplier > 1.0:
+                    field_path = f"traffic.global[{idx}].multiplier"
+                    error_dict = {
+                        "field": field_path,
+                        "message": (
+                            f"multiplier should be between 0.1 and 1.0 inclusive. "
+                            f"Got {multiplier}"
+                        ),
+                    }
+                    line_num = self._get_line_number(field_path)
+                    if line_num:
+                        error_dict["line"] = line_num
+                    errors.append(error_dict)
+
+                # Validate start_time and end_time fields
+                time_error = False
+                for time_key in ["start_time", "end_time"]:
+                    time_value = entry.get(time_key)
+                    try:
+                        _validate_day_time_format(time_value)
+                    except ValueError as e:
+                        time_error = True
+                        field_path = f"traffic.global[{idx}].{time_key}"
+                        error_dict = {"field": field_path, "message": str(e)}
+                        line_num = self._get_line_number(field_path)
+                        if line_num:
+                            error_dict["line"] = line_num
+                        errors.append(error_dict)
+
+                if not time_error:
+                    start_str = entry.get("start_time")
+                    end_str = entry.get("end_time")
+                    start_s = _to_seconds(start_str)
+                    end_s = _to_seconds(end_str)
+
+                    if end_s <= start_s:
+                        field_path = f"traffic.global[{idx}].end_time"
+                        error_dict = {
+                            "field": field_path,
+                            "message": "end_time must be after start_time",
+                        }
+                        line_num = self._get_line_number(field_path)
+                        if line_num:
+                            error_dict["line"] = line_num
+                        errors.append(error_dict)
+                    else:
+                        valid_intervals.append((start_s, end_s, idx))
+
+            # Overlap check
+            if not errors and len(valid_intervals) > 1:
+                valid_intervals.sort(key=lambda x: x[0])
+                for i in range(len(valid_intervals) - 1):
+                    current_start, current_end, current_idx = valid_intervals[i]
+                    next_start, next_end, next_idx = valid_intervals[i + 1]
+
+                    if next_start < current_end:
+                        field_path = f"traffic.global[{next_idx}]"
+                        error_dict = {
+                            "field": field_path,
+                            "message": (
+                                f"Global traffic entry overlaps with another entry. "
+                                f"Please make sure their schedules do not overlap. "
+                                f"Entry [{next_idx}] starts at "
+                                f"{global_field[next_idx]['start_time']}, but entry "
+                                f"[{current_idx}] ends at "
+                                f"{global_field[current_idx]['end_time']}"
+                            ),
+                        }
+                        line_num = self._get_line_number(field_path)
+                        if line_num:
+                            error_dict["line"] = line_num
+                        errors.append(error_dict)
+        return errors
 
     def validate_all(self, scenario_content: Dict[str, Any]) -> List[Dict[str, Any]]:
         """Validate all aspects of scenario content.
@@ -1140,6 +1246,14 @@ class JsonParseStrategy(BaseParseStrategy):
         try:
             traffic_config = extract_traffic_config(content_with_traffic)
             if traffic_config is not None:
+                # Convert global schedule times to seconds
+                for entry in traffic_config.global_schedule:
+                    entry["start_time"] = (
+                        self._time_to_seconds(entry["start_time"]) - start_time
+                    )
+                    entry["end_time"] = (
+                        self._time_to_seconds(entry["end_time"]) - start_time
+                    )
                 map_payload = MapPayload(traffic=traffic_config)
         except ValueError as e:
             raise ScenarioParseError(

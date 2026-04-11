@@ -54,23 +54,30 @@ def extract_traffic_config(
     traffic_raw = scenario_content.get("traffic", None)
     if traffic_raw is not None and isinstance(traffic_raw, dict):
         # Support template-based traffic (traffic_level)
-        traffic_level = str(traffic_raw.get("traffic_level", "default"))
+        raw_level = str(traffic_raw.get("traffic_level", "default"))
         gps_sync_delay = traffic_raw.get("gps_sync_delay", 10)
 
-        # Don't create config for "no_traffic"
-        if traffic_level == "no_traffic":
-            return None
+        # Get global field if exists
+        global_field = traffic_raw.get("global", [])
 
         # Validate template key format for DB-backed lookup.
-        if not TRAFFIC_TEMPLATE_KEY_PATTERN.fullmatch(traffic_level):
+        if not TRAFFIC_TEMPLATE_KEY_PATTERN.fullmatch(raw_level):
             raise ValueError(
                 "traffic_level must be lowercase alphanumeric with "
-                f"underscores/hyphens (1-32 chars), got '{traffic_level}'"
+                f"underscores/hyphens (1-32 chars), got '{raw_level}'"
             )
+        traffic_level: Optional[str] = raw_level
+
+        # Don't create config for "no_traffic" and global field empty
+        if traffic_level == "no_traffic":
+            if not global_field:
+                return None
+            traffic_level = None
 
         return TrafficConfig(
             traffic_level=traffic_level,
             traffic_csv_data=traffic_csv_data,
+            global_schedule=global_field,
             sim_start_time=str(scenario_content.get("start_time", "day1:00:00")),
             sim_end_time=str(scenario_content.get("end_time", "day1:00:00")),
             gps_sync_delay=gps_sync_delay,

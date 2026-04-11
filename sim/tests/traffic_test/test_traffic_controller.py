@@ -23,9 +23,10 @@ SOFTWARE.
 """
 
 from typing import Callable, Dict, Set
-from unittest.mock import Mock
+from unittest.mock import Mock, patch
 
 import pytest
+import simpy
 
 from sim.entities.position import Position
 from sim.entities.road import Road
@@ -588,3 +589,63 @@ class TestTrafficControllerNewRoadTrafficApplication:
         # Both traffic states should be stored
         assert segment_key1 in controller._active_traffic
         assert segment_key2 in controller._active_traffic
+
+
+class TestTrafficControllerGlobalMultiplier:
+    """Tests for applying global traffic to all roads"""
+
+    """
+    @pytest.fixture(autouse=True)
+    def reset_road_multiplier(self):  # type: ignore[no-untyped-def]
+        #Cleanup fixture to ensure Road state is reset between tests.
+        yield
+        Road.global_traffic_multiplier = 1.0
+    """
+
+    def test_setup_global_traffic_schedules(self) -> None:
+        """Tests that processes are scheduled"""
+        mock_route_controller = create_mock_route_controller()
+        controller = TrafficController(mock_route_controller, PositionRegistry())
+
+        schedule = [{"start_time": 10, "end_time": 20, "multiplier": 0.4}]
+        mock_config = Mock()
+        mock_config.global_schedule = schedule
+        controller.traffic_config = mock_config
+
+        env = simpy.Environment()
+        controller._env = env
+
+        with patch.object(controller, "_apply_global_multiplier") as mock_apply:
+            gen = controller._setup_global_traffic_schedules()
+            env.process(gen)
+            env.run(until=1)
+
+            assert mock_apply.call_count == 2
+            assert mock_apply.call_args_list[0].args == (10, 0.4)
+            assert mock_apply.call_args_list[1].args == (19, 1.0)
+
+    def test_apply_global_multiplier(self) -> None:
+        """Tests that global multiplier is applied after delay"""
+        env = simpy.Environment()
+        mock_route_controller = create_mock_route_controller()
+        controller = TrafficController(mock_route_controller, PositionRegistry())
+        controller._env = env
+
+        mock_road = Mock()
+        mock_route_controller.get_all_active_roads.return_value = [mock_road]
+
+        with patch.object(controller, "_notify_routes_for_road") as mock_method:
+            target_tick = 15
+            new_multiplier = 0.4
+
+            gen = controller._apply_global_multiplier(target_tick, new_multiplier)
+            env.process(gen)
+
+            # Before event, multiplier did not change
+            env.run(until=14)
+            assert controller._current_global_multiplier != new_multiplier
+
+            # Reached timeout
+            env.run(until=16)
+            assert controller._current_global_multiplier == new_multiplier
+            mock_method.assert_called_once_with(mock_road)

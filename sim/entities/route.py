@@ -825,10 +825,16 @@ class Route:
             road = self.roads[road_idx]
             points = road.active_pointcollection
 
+            if not points:
+                continue
+
             # On the current road, only search forward from current position
             # to prevent backward mapping. On subsequent roads, search all.
+            # If current_point_index is out of bounds, cap it at last valid index
             search_start = (
-                self.current_point_index if road_idx == self.current_road_index else 0
+                min(self.current_point_index, len(points) - 1)
+                if road_idx == self.current_road_index
+                else 0
             )
             local_idx = self.find_nearest_index(points, final_pos, min_idx=search_start)
 
@@ -850,6 +856,12 @@ class Route:
         # guarantees normal traversal resumes at or past the curve endpoint.
         road = self.roads[best_road_idx]
         active_pts = road.active_pointcollection
+
+        if not active_pts:
+            self.current_road_index = best_road_idx
+            self.current_point_index = 0
+            return
+
         synced_dist = road.get_distance_at_index(best_point_idx)
         if self._last_returned_position is not None and best_point_idx + 1 < len(
             active_pts
