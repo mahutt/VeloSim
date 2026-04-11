@@ -57,7 +57,7 @@ export function ReportSummaryCell({ simId }: { simId: string }) {
 
     const fetchReport = async () => {
       try {
-        const data = await getSimulationReport(simId);
+        const data = await getSimulationReport(simId, { forceRefresh: true });
         if (isMounted) {
           setReport(data);
         }

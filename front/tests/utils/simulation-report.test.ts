@@ -99,6 +99,25 @@ describe('getSimulationReport', () => {
     expect(cached.servicingToDrivingRatio).toBe(0.5);
   });
 
+  it('bypasses cache when forceRefresh is enabled and updates cached value', async () => {
+    vi.mocked(api.get)
+      .mockResolvedValueOnce({ data: { servicingToDrivingRatio: 0.5 } })
+      .mockResolvedValueOnce({ data: { servicingToDrivingRatio: 0.9 } });
+
+    const initial = await getSimulationReport('sim-refresh-1');
+    expect(initial.servicingToDrivingRatio).toBe(0.5);
+
+    const refreshed = await getSimulationReport('sim-refresh-1', {
+      forceRefresh: true,
+    });
+    expect(refreshed.servicingToDrivingRatio).toBe(0.9);
+
+    vi.mocked(api.get).mockClear();
+    const cachedAfterRefresh = await getSimulationReport('sim-refresh-1');
+    expect(api.get).not.toHaveBeenCalled();
+    expect(cachedAfterRefresh.servicingToDrivingRatio).toBe(0.9);
+  });
+
   it('deduplicates concurrent in-flight requests for the same simulation', async () => {
     let resolve!: (v: unknown) => void;
     vi.mocked(api.get).mockReturnValueOnce(
