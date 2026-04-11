@@ -227,7 +227,7 @@ def initialize_simulation(
             and scenario_params.map_payload.traffic is not None
         ):
             traffic_level = scenario_params.map_payload.traffic.traffic_level
-            if traffic_level != "no_traffic":
+            if traffic_level is not None and traffic_level != "no_traffic":
                 template = traffic_template_crud.get_by_key(db, traffic_level)
                 traffic_csv_data = template.content
                 scenario_params.map_payload.traffic.traffic_csv_data = traffic_csv_data
