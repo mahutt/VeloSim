@@ -164,6 +164,7 @@ export default function ScenarioTextArea({
         <Button
           onClick={onStart}
           className="w-full sm:w-auto whitespace-nowrap"
+          disabled={!scenarioData.trim()}
         >
           {t.scenario.startSimulation}
         </Button>
