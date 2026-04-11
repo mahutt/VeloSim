@@ -118,6 +118,30 @@ describe('ScenarioTextArea', () => {
     expect(onStart).toHaveBeenCalled();
   });
 
+  it('disables Start Simulation button when scenario content is empty', () => {
+    setup({ scenarioData: '' });
+    const startButton = screen.getByRole('button', {
+      name: /start simulation/i,
+    });
+    expect(startButton).toBeDisabled();
+  });
+
+  it('disables Start Simulation button when scenario content is just whitespace', () => {
+    setup({ scenarioData: '   \n  \t  ' });
+    const startButton = screen.getByRole('button', {
+      name: /start simulation/i,
+    });
+    expect(startButton).toBeDisabled();
+  });
+
+  it('enables Start Simulation button when scenario content is not empty', () => {
+    setup({ scenarioData: '{"test":"test"}' });
+    const startButton = screen.getByRole('button', {
+      name: /start simulation/i,
+    });
+    expect(startButton).not.toBeDisabled();
+  });
+
   it('displays line numbers', () => {
     setup({ scenarioData: 'line1\nline2\nline3' });
 
