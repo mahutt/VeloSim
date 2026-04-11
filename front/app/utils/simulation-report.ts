@@ -84,6 +84,10 @@ export const SIMULATION_REPORT_SUMMARY_LEGEND = [
   'Total Vehicle Distance Travelled',
 ] as const;
 
+type GetSimulationReportOptions = {
+  forceRefresh?: boolean;
+};
+
 // Module-scoped memoization caches (lifespan = page session).
 const simulationReportCache = new Map<string, GetSimulationReportResponse>();
 const simulationReportRequestCache = new Map<
@@ -104,16 +108,20 @@ const simulationReportRequestCache = new Map<
  * - no explicit invalidation; data is assumed stable enough for this page session
  */
 export async function getSimulationReport(
-  simId: string
+  simId: string,
+  options?: GetSimulationReportOptions
 ): Promise<GetSimulationReportResponse> {
-  const cached = simulationReportCache.get(simId);
-  if (cached) {
-    return cached;
-  }
+  const forceRefresh = options?.forceRefresh === true;
+  if (!forceRefresh) {
+    const cached = simulationReportCache.get(simId);
+    if (cached) {
+      return cached;
+    }
 
-  const pendingRequest = simulationReportRequestCache.get(simId);
-  if (pendingRequest) {
-    return pendingRequest;
+    const pendingRequest = simulationReportRequestCache.get(simId);
+    if (pendingRequest) {
+      return pendingRequest;
+    }
   }
 
   const request = api
@@ -124,7 +132,9 @@ export async function getSimulationReport(
       return report;
     })
     .finally(() => {
-      simulationReportRequestCache.delete(simId);
+      if (simulationReportRequestCache.get(simId) === request) {
+        simulationReportRequestCache.delete(simId);
+      }
     });
 
   simulationReportRequestCache.set(simId, request);
