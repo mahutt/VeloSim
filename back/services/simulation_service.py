@@ -45,6 +45,8 @@ from back.schemas.sim_frame import (
     SimFrameResponse,
 )
 from sim.core.simulation_environment import SimulationEnvironment
+from sim.entities.map_payload import MapPayload
+from sim.map.map_controller import MapController
 from sim.simulator import Simulator
 from sim.entities.input_parameter import InputParameter
 from back.crud import sim_instance_crud, user_crud, sim_frame_crud
@@ -61,6 +63,7 @@ from back.services.simulation_data_service import SimulationDataService
 
 
 from sim.utils.replay_parser import ReplayParser
+from sim.utils.traffic_config_extractor import extract_traffic_config
 
 logger = get_logger(__name__)
 
@@ -270,8 +273,28 @@ class SimulationService:
         frame_subscriber.start()
 
         env = SimulationEnvironment()
+        env.set_simulation_report(resume_state.sim_report)
 
         env.run(until=current_sim_time)
+
+        traffic_payload = extract_traffic_config(scenario)
+
+        map_payload = MapPayload(
+            traffic=traffic_payload if traffic_payload else None,
+            env=env,
+            report=env.report,
+            sim_id=sim_id,
+        )
+
+        map_controller = MapController(map_payload)
+
+        drivers = list(input_params.driver_entities.values())
+
+        ReplayParser.restore_routes(drivers, keyframe, map_controller)
+
+        # We need routes to be restored before calling this in replay parser.
+        active_routes = ReplayParser.get_active_routes(drivers)
+        env.report.set_active_routes(active_routes)
 
         restore_sim_id = sim.initialize(
             input_params,

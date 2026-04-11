@@ -58,3 +58,15 @@ class SimulationEnvironment(simpy.Environment):
             Headquarters: The headquarters of the simulation.
         """
         return self.hq
+
+    def set_simulation_report(self, report: SimulationReport) -> None:
+        """Sets the simulation report
+
+         Args:
+            report (SimulationReport): The report to set
+
+        Returns:
+            None
+        """
+
+        self.report = report

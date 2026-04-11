@@ -23,9 +23,11 @@ SOFTWARE.
 """
 
 from typing import Any, Optional
+from sim.core.simulation_report import SimulationReport
 from sim.entities.battery_swap_task import BatterySwapTask
 from sim.entities.input_parameter import InputParameter
 from sim.entities.position import Position
+from sim.entities.route import Route
 from sim.entities.shift import Shift
 from sim.entities.simulation_replay_state import SimulationRuntimeState
 from sim.entities.station import Station
@@ -165,41 +167,7 @@ class ReplayParser:
 
         # Drivers
 
-        map_controller = MapController()
-
         for d in keyframe_json["drivers"]:
-            route = None
-            route_data = d.get("route")
-
-            if route_data:
-                coordinates = route_data.get("coordinates")
-
-                if not isinstance(coordinates, list) or len(coordinates) < 2:
-                    logger.warning(
-                        "Invalid route coordinates for driver %s: %s",
-                        d["id"],
-                        coordinates,
-                    )
-                else:
-                    start_coord = coordinates[0]
-                    end_coord = coordinates[-1]
-
-                    if not (
-                        cls._is_valid_coordinate_pair(start_coord)
-                        and cls._is_valid_coordinate_pair(end_coord)
-                    ):
-                        logger.warning(
-                            "Malformed route coordinates for "
-                            "driver %s: start=%s end=%s",
-                            d["id"],
-                            start_coord,
-                            end_coord,
-                        )
-                    else:
-                        start = Position(start_coord)
-                        end = Position(end_coord)
-
-                        route = map_controller.get_route(a=start, b=end)
 
             shift_data = d.get("shift")
 
@@ -213,12 +181,11 @@ class ReplayParser:
             driver = Driver(
                 driver_id=d["id"],
                 position=Position(d["position"]),
-                route=route,
+                routes=[],
                 shift=shift,
                 name=d["name"],
             )
 
-            driver.set_map_controller(map_controller)
             drivers_by_id[driver.id] = driver
             input_param.add_driver(driver)
 
@@ -281,13 +248,173 @@ class ReplayParser:
 
         # Construct Replay State
 
+        report_snapshot = keyframe_json.get("reportingSnapshot")
+
+        sim_report = SimulationReport()
+
+        snapshot = report_snapshot or {}
+
+        sim_report.restore_state(
+            total_driving_time=float(snapshot.get("total_driving_time", 0)),
+            total_servicing_time=float(snapshot.get("total_servicing_time", 0)),
+            tasks_completed_per_shift=snapshot.get("tasks_completed_per_shift", []),
+            response_times=snapshot.get("response_times", []),
+            vehicle_idle_time=float(snapshot.get("vehicle_idle_time", 0)),
+            vehicle_active_time=float(snapshot.get("vehicle_active_time", 0)),
+            completed_vehicle_distance=float(
+                snapshot.get("completed_vehicle_distance", 0.0)
+            ),
+        )
         replay_state = SimulationRuntimeState(
             input_param,
-            map_controller,
             current_time_seconds,
             was_running=was_running,
             real_time_factor=real_time_factor,
             paused_by_user=paused_by_user,
+            sim_report=sim_report,
         )
 
         return replay_state
+
+    @staticmethod
+    def restore_routes(
+        drivers: list[Driver],
+        keyframe_json: dict[str, Any],
+        map_controller: MapController,
+    ) -> None:
+        """Reconstruct and assign routes to drivers from
+        persisted keyframe data.
+
+        This method parses serialized route coordinate
+        data from the keyframe
+        and regenerates corresponding Route objects
+        using the provided
+        MapController. It restores each driver's route
+        sequence and assigns
+        the necessary dependencies for route
+        execution.
+
+        For the first route, the driver's current
+        position is used as the
+        starting point to ensure continuity from the
+        last persisted state.
+        Subsequent routes use the stored coordinates
+        directly.
+
+        Invalid or malformed route data is skipped with
+        appropriate logging.
+
+        Args:
+            drivers (list[Driver]): The list of
+            active driver entities to restore routes for.
+            keyframe_json (dict[str, Any]): The persisted
+            simulation snapshot containing driver route data.
+            map_controller (MapController): The map controller
+            used to generate Route objects.
+
+        Returns:
+            None
+        """
+
+        driver_lookup = {driver.id: driver for driver in drivers}
+
+        for d in keyframe_json.get("drivers", []):
+            driver_id = d.get("id")
+
+            driver = driver_lookup.get(driver_id)
+            if not driver:
+                logger.warning("Driver %s not found in active drivers", driver_id)
+                continue
+
+            route_data = d.get("routes", [])
+
+            if not isinstance(route_data, list):
+                logger.warning("Invalid routes format for driver %s", driver_id)
+                continue
+
+            routes: list[Route] = []
+
+            first_route = True
+
+            for route_load in route_data:
+
+                if not isinstance(route_load, list) or len(route_load) != 2:
+                    logger.warning(
+                        "Invalid route coordinates for driver %s: %s",
+                        driver_id,
+                        route_load,
+                    )
+                    continue
+
+                # This ensures for the first route
+                # the driver spawns at his last saved position.
+                if first_route == True:
+                    start = driver.get_position()
+                    first_route = False
+                else:
+                    start = Position(route_load[0])
+
+                end = Position(route_load[1])
+
+                try:
+                    generated_route = map_controller.get_route(a=start, b=end)
+
+                    routes.append(generated_route)
+
+                except Exception as e:
+                    logger.error(
+                        "Exception generating route for driver %s: %s - skipping",
+                        driver_id,
+                        e,
+                    )
+                    continue
+
+            if routes:
+                driver.set_routes(routes)
+                driver.set_map_controller(map_controller)
+            else:
+                logger.warning(
+                    "No routes restored for driver %s.",
+                    driver_id,
+                )
+
+    @staticmethod
+    def get_active_routes(drivers: list[Driver]) -> set[Route]:
+        """Extract the set of active (in-progress) routes from drivers.
+
+        This method iterates through all drivers and collects their current
+        active routes, excluding:
+        - Drivers without a current route
+        - Invalid route types (e.g., incorrectly assigned lists)
+        - Routes that have already been completed
+
+        The resulting set is used for real-time distance tracking and
+        reporting within the simulation.
+
+        Args:
+            drivers (list[Driver]): The list of driver entities to inspect.
+
+        Returns:
+            set[Route]: A set of active routes currently being followed by drivers.
+        """
+        active_routes: set[Route] = set()
+
+        for driver in drivers:
+            current_route = driver.current_route
+
+            # Skip if no current route
+            if current_route is None:
+                continue
+
+            # Safety check (in case bad data slipped through)
+            if isinstance(current_route, list):
+                continue
+
+            # Skip finished routes
+            if current_route.is_finished:
+                continue
+
+            # Add valid active route
+            active_routes.add(current_route)
+
+        return active_routes

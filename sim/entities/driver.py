@@ -107,17 +107,24 @@ class Driver:
         task_list: list["Task"] | None = None,
         vehicle: Optional["Vehicle"] = None,
         name: str | None = None,
-        route: Optional["Route"] = None,
+        routes: list[Route] | None = None,
     ) -> None:
         self.id = driver_id
         self.name = name if name is not None else f"Driver {driver_id}"
         self.position = position
-        self.current_route = route
         self.vehicle = vehicle
         self.route_changed = False  # flag to track if route geometry needs to be sent
         self.shift = shift
         # Parse shift into sim shift time
         self.lunch_location: Optional[Position] = None
+
+        if routes is None:
+            routes = []
+
+        if len(routes) == 0:
+            self.current_route = None
+        else:
+            self.current_route = routes[0]
 
         if task_list is not None:
             self.task_list = task_list
@@ -127,8 +134,8 @@ class Driver:
             self.task_list = []
         self.has_updated = False  # flag to track if a driver was updated
         self.state: DriverState | None = None  # Overwritten by sim controller if needed
-        self.routes = []
         self.service_chain_station_id: int | None = None
+        self.routes = routes
 
     def get_position(self) -> "Position":
         """Get the current position of the driver.
@@ -158,6 +165,20 @@ class Driver:
         """
         self.state = state
         self.has_updated = True
+
+    def set_routes(self, routes: list[Route]) -> None:
+        """Set the driver's routes
+
+        Args:
+            routes: All routes possesed by the driver
+
+        Returns:
+            None
+        """
+
+        self.routes = routes
+        self.current_route = routes[0] if routes else None
+        self.route_changed = True
 
     def get_vehicle(self) -> Optional["Vehicle"]:
         """Get the drivers current vehicle.
