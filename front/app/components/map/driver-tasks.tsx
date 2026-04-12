@@ -291,41 +291,40 @@ function DriverTasksCollapsed({
   const [draggedGroupIndex, setDraggedGroupIndex] = useState<number | null>(
     null
   );
-  const inProgressGroupIndex =
+  const inServiceGroupIndex =
     inProgressTaskId === null
       ? -1
       : groupedTasks.findIndex((group) =>
-          group.tasks.some((task) => task.id === inProgressTaskId)
+          group.tasks.some((task) => task.state === TaskState.InService)
         );
 
-  const wouldMoveInProgressGroup = (
+  const wouldMoveInServiceGroup = (
     sourceIndex: number,
     targetIndex: number
   ) => {
-    if (inProgressGroupIndex === -1 || sourceIndex === targetIndex)
-      return false;
+    if (inServiceGroupIndex === -1 || sourceIndex === targetIndex) return false;
 
     const movingIndices = selectedGroupIndices.has(sourceIndex)
       ? [...selectedGroupIndices].sort((a, b) => a - b)
       : [sourceIndex];
 
     if (movingIndices.some((i) => i === targetIndex)) return false;
-    if (movingIndices.includes(inProgressGroupIndex)) return true;
+    if (movingIndices.includes(inServiceGroupIndex)) return true;
 
-    const removedBeforeInProgress = movingIndices.filter(
-      (index) => index < inProgressGroupIndex
+    const movedGroupsBeforeInService = movingIndices.filter(
+      (index) => index < inServiceGroupIndex
     ).length;
-    const inProgressIndexAfterRemoval =
-      inProgressGroupIndex - removedBeforeInProgress;
+    const inServiceIndexAfterRemoval =
+      inServiceGroupIndex - movedGroupsBeforeInService;
     const adjustedTarget =
       targetIndex - movingIndices.filter((index) => index < targetIndex).length;
     const insertAt =
       sourceIndex < targetIndex ? adjustedTarget + 1 : adjustedTarget;
-    const inProgressFinalIndex =
-      inProgressIndexAfterRemoval +
-      (insertAt <= inProgressIndexAfterRemoval ? movingIndices.length : 0);
+    const inServiceFinalIndex =
+      inServiceIndexAfterRemoval +
+      (insertAt <= inServiceIndexAfterRemoval ? movingIndices.length : 0);
 
-    return inProgressFinalIndex !== inProgressGroupIndex;
+    return inServiceFinalIndex !== inServiceGroupIndex;
   };
 
   const handleDragStart = (
@@ -351,11 +350,6 @@ function DriverTasksCollapsed({
       e.dataTransfer.dropEffect = 'none';
       return;
     }
-    if (wouldMoveInProgressGroup(draggedGroupIndex, targetIndex)) {
-      e.dataTransfer.dropEffect = 'none';
-      if (dropTargetIndex !== null) setDropTargetIndex(null);
-      return;
-    }
     e.dataTransfer.dropEffect = 'move';
     if (dropTargetIndex !== targetIndex) setDropTargetIndex(targetIndex);
   };
@@ -375,7 +369,7 @@ function DriverTasksCollapsed({
       : [sourceIndex];
 
     if (movingIndices.some((i) => i === targetIndex)) return;
-    if (wouldMoveInProgressGroup(sourceIndex, targetIndex)) return;
+    if (wouldMoveInServiceGroup(sourceIndex, targetIndex)) return;
 
     const movingSet = new Set(movingIndices);
     const movedGroups = movingIndices.map((i) => {
@@ -481,7 +475,6 @@ function DriverTasksExpanded({
   const { engine } = useSimulation();
   const [dropTargetIndex, setDropTargetIndex] = useState<number | null>(null);
   const [draggedTaskId, setDraggedTaskId] = useState<number | null>(null);
-
   const draggedIndex = draggedTaskId
     ? driver.tasks.findIndex((t) => t.id === draggedTaskId)
     : -1;
@@ -491,7 +484,16 @@ function DriverTasksExpanded({
     setDraggedTaskId(taskId);
   };
 
-  const handleDragOver = (e: React.DragEvent, targetIndex: number) => {
+  const handleDragOver = (
+    e: React.DragEvent,
+    targetIndex: number,
+    task: StationTask
+  ) => {
+    if (task.state === TaskState.InService) {
+      e.preventDefault();
+      e.dataTransfer.dropEffect = 'none';
+      return;
+    }
     e.preventDefault();
     if (!draggedTaskId) {
       e.dataTransfer.dropEffect = 'none';
@@ -543,7 +545,7 @@ function DriverTasksExpanded({
       {driver.tasks.map((task, index) => (
         <div
           key={task.id}
-          onDragOver={(e) => handleDragOver(e, index)}
+          onDragOver={(e) => handleDragOver(e, index, task)}
           onDrop={(e) => handleDrop(e, index)}
           onDragEnd={handleDragEnd}
           onContextMenu={(e) => e.preventDefault()}

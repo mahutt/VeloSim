@@ -23,7 +23,13 @@
  */
 
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import {
+  createEvent,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { DriverTasks } from '~/components/map/driver-tasks';
 import { useSimulation } from '~/providers/simulation-provider';
@@ -246,40 +252,6 @@ describe('DriverTasks', () => {
     expect(mockSimulationEngine.reorderTasks).not.toHaveBeenCalled();
   });
 
-  it('blocks collapsed reordering when it would move the in-progress station group', () => {
-    const inProgressTask = makeStationTask({ id: 2, stationId: 2 });
-
-    setupDriverTasks({
-      driver: makePopulatedDriver({
-        id: 14,
-        tasks: [
-          makeStationTask({ id: 1, stationId: 1 }),
-          inProgressTask,
-          makeStationTask({ id: 3, stationId: 3 }),
-        ],
-        inProgressTask,
-      }),
-      stationNames: { 1: 'Station A', 2: 'Station B', 3: 'Station C' },
-    });
-
-    const stationADraggable = screen
-      .getByText('Station A')
-      .closest('[draggable="true"]') as HTMLElement;
-    const stationCWrapper = screen
-      .getByText('Station C')
-      .closest('[draggable="true"]')?.parentElement as HTMLElement;
-
-    fireEvent.dragStart(stationADraggable, {
-      dataTransfer: { effectAllowed: '', dropEffect: '' },
-    });
-    fireEvent.dragOver(stationCWrapper, {
-      dataTransfer: { dropEffect: '' },
-    });
-    fireEvent.drop(stationCWrapper);
-
-    expect(mockSimulationEngine.reorderTasks).not.toHaveBeenCalled();
-  });
-
   it('renders servicing collapsed groups as disabled and non-interactive', async () => {
     const user = userEvent.setup();
 
@@ -321,6 +293,184 @@ describe('DriverTasks', () => {
     fireEvent.drop(stationBWrapper);
 
     expect(mockSimulationEngine.reorderTasks).not.toHaveBeenCalled();
+  });
+
+  it('blocks collapsed reordering when it would move an in-service station group', () => {
+    const inServiceTask = makeStationTask({
+      id: 2,
+      stationId: 2,
+      state: TaskState.InService,
+    });
+
+    setupDriverTasks({
+      driver: makePopulatedDriver({
+        id: 14,
+        tasks: [
+          makeStationTask({ id: 1, stationId: 1 }),
+          inServiceTask,
+          makeStationTask({ id: 3, stationId: 3 }),
+        ],
+        inProgressTask: inServiceTask,
+      }),
+      stationNames: { 1: 'Station A', 2: 'Station B', 3: 'Station C' },
+    });
+
+    const stationADraggable = screen
+      .getByText('Station A')
+      .closest('[draggable="true"]') as HTMLElement;
+    const stationCWrapper = screen
+      .getByText('Station C')
+      .closest('[draggable="true"]')?.parentElement as HTMLElement;
+    const dataTransfer = createMockDataTransfer();
+
+    fireEvent.dragStart(stationADraggable, { dataTransfer });
+    fireEvent.dragOver(stationCWrapper, { dataTransfer });
+    fireEvent.drop(stationCWrapper, { dataTransfer });
+
+    expect(mockSimulationEngine.reorderTasks).not.toHaveBeenCalled();
+  });
+
+  it('allows collapsed reordering when it would not move an in-service station group', () => {
+    const inServiceTask = makeStationTask({
+      id: 1,
+      stationId: 1,
+      state: TaskState.InService,
+    });
+
+    setupDriverTasks({
+      driver: makePopulatedDriver({
+        id: 14,
+        tasks: [
+          inServiceTask,
+          makeStationTask({ id: 2, stationId: 2 }),
+          makeStationTask({ id: 3, stationId: 3 }),
+        ],
+        inProgressTask: inServiceTask,
+      }),
+      stationNames: { 1: 'Station A', 2: 'Station B', 3: 'Station C' },
+    });
+
+    const stationBDraggable = screen
+      .getByText('Station B')
+      .closest('[draggable="true"]') as HTMLElement;
+    const stationCWrapper = screen
+      .getByText('Station C')
+      .closest('[draggable="true"]')?.parentElement as HTMLElement;
+    const dataTransfer = createMockDataTransfer();
+
+    fireEvent.dragStart(stationBDraggable, { dataTransfer });
+    fireEvent.dragOver(stationCWrapper, { dataTransfer });
+    fireEvent.drop(stationCWrapper, { dataTransfer });
+
+    expect(mockSimulationEngine.reorderTasks).toHaveBeenCalled();
+  });
+
+  it('starts collapsed drag selection on right mouse down', () => {
+    setupDriverTasks({
+      driver: makePopulatedDriver({
+        id: 17,
+        tasks: [
+          makeStationTask({ id: 1, stationId: 1 }),
+          makeStationTask({ id: 2, stationId: 2 }),
+        ],
+      }),
+      stationNames: { 1: 'Station A', 2: 'Station B' },
+    });
+
+    const stationAWrapper = screen
+      .getByText('Station A')
+      .closest('[draggable="true"]')?.parentElement as HTMLElement;
+
+    fireEvent.mouseDown(stationAWrapper, { button: 2, ctrlKey: true });
+
+    expect(mockSimulationEngine.setTaskHoveredStationId).not.toHaveBeenCalled();
+  });
+
+  it('prevents expanded reorder drag-over on an in-service task', async () => {
+    const user = userEvent.setup();
+
+    setupDriverTasks({
+      driver: makePopulatedDriver({
+        id: 18,
+        tasks: [
+          makeStationTask({ id: 1, stationId: 1 }),
+          makeStationTask({
+            id: 2,
+            stationId: 2,
+            state: TaskState.InService,
+          }),
+        ],
+      }),
+      stationNames: { 1: 'Station A', 2: 'Station B' },
+    });
+
+    await user.click(
+      screen.getByRole('button', {
+        name: 'Expand task list',
+      })
+    );
+
+    const task1Draggable = screen
+      .getByText('#1')
+      .closest('[draggable="true"]') as HTMLElement;
+    const task2Draggable = screen
+      .getByText('#2')
+      .closest('[draggable="false"]') as HTMLElement;
+    const task2Wrapper = task2Draggable.parentElement as HTMLElement;
+    const dataTransfer = createMockDataTransfer();
+
+    fireEvent.dragStart(task1Draggable, { dataTransfer });
+    const dragOverEvent = createEvent.dragOver(task2Wrapper);
+    Object.defineProperty(dragOverEvent, 'dataTransfer', {
+      value: dataTransfer,
+    });
+    fireEvent(task2Wrapper, dragOverEvent);
+
+    expect(dragOverEvent.defaultPrevented).toBe(true);
+    expect(mockSimulationEngine.reorderTasks).not.toHaveBeenCalled();
+  });
+
+  it('reorders a single expanded task when the dragged task is not already selected', async () => {
+    const user = userEvent.setup();
+
+    setupDriverTasks({
+      driver: makePopulatedDriver({
+        id: 19,
+        tasks: [
+          makeStationTask({ id: 1, stationId: 1 }),
+          makeStationTask({ id: 2, stationId: 2 }),
+          makeStationTask({ id: 3, stationId: 3 }),
+        ],
+      }),
+      stationNames: { 1: 'Station A', 2: 'Station B', 3: 'Station C' },
+    });
+
+    await user.click(
+      screen.getByRole('button', {
+        name: 'Expand task list',
+      })
+    );
+
+    const task1Draggable = screen
+      .getByText('#1')
+      .closest('[draggable="true"]') as HTMLElement;
+    const task3Draggable = screen
+      .getByText('#3')
+      .closest('[draggable="true"]') as HTMLElement;
+    const task3Wrapper = task3Draggable.parentElement as HTMLElement;
+    const dataTransfer = createMockDataTransfer();
+
+    fireEvent.dragStart(task1Draggable, { dataTransfer });
+    fireEvent.dragOver(task3Wrapper, { dataTransfer });
+    fireEvent.drop(task3Wrapper, { dataTransfer });
+
+    await waitFor(() => {
+      expect(mockSimulationEngine.reorderTasks).toHaveBeenCalledWith(
+        19,
+        [2, 3, 1],
+        true
+      );
+    });
   });
 
   describe('non-contiguous multi-group reorder', () => {
