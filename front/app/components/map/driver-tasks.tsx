@@ -26,7 +26,7 @@ import { useState } from 'react';
 import { ChevronDown, ChevronUp } from 'lucide-react';
 import { X } from 'lucide-react';
 import { useSimulation } from '~/providers/simulation-provider';
-import { type StationTask } from '~/types';
+import { TaskState, type StationTask } from '~/types';
 import { TaskItem } from '../task/task-item';
 import { Button } from '~/components/ui/button';
 import {
@@ -111,6 +111,7 @@ function DriverTaskGroupItem({
   isDraggingDown,
   isDraggedGroup,
   isSelected,
+  isServicing,
   onDragStart,
   onDragOver,
   onDrop,
@@ -127,6 +128,7 @@ function DriverTaskGroupItem({
   isDraggingDown: boolean;
   isDraggedGroup: boolean;
   isSelected: boolean;
+  isServicing: boolean;
   onDragStart: (e: React.DragEvent<HTMLDivElement>, index: number) => void;
   onDragOver: (e: React.DragEvent<HTMLDivElement>, index: number) => void;
   onDrop: (e: React.DragEvent<HTMLDivElement>, index: number) => void;
@@ -142,13 +144,48 @@ function DriverTaskGroupItem({
 
   return (
     <div
-      onDragOver={(e) => onDragOver(e, index)}
-      onDrop={(e) => onDrop(e, index)}
+      onDragOver={(e) => {
+        if (isServicing) {
+          e.preventDefault();
+          e.dataTransfer.dropEffect = 'none';
+          return;
+        }
+        onDragOver(e, index);
+      }}
+      onDrop={(e) => {
+        if (isServicing) {
+          e.preventDefault();
+          return;
+        }
+        onDrop(e, index);
+      }}
       onDragEnd={onDragEnd}
-      onClick={onClick}
-      onContextMenu={onContextMenu}
-      onMouseDown={onMouseDown}
+      onClick={(e) => {
+        if (isServicing) {
+          e.preventDefault();
+          e.stopPropagation();
+          return;
+        }
+        onClick(e);
+      }}
+      onContextMenu={(e) => {
+        if (isServicing) {
+          e.preventDefault();
+          e.stopPropagation();
+          return;
+        }
+        onContextMenu(e);
+      }}
+      onMouseDown={(e) => {
+        if (isServicing) {
+          e.preventDefault();
+          e.stopPropagation();
+          return;
+        }
+        onMouseDown(e);
+      }}
       onMouseEnter={() => {
+        if (isServicing) return;
         onMouseEnter();
         engine.setTaskHoveredStationId(group.stationId);
       }}
@@ -164,10 +201,20 @@ function DriverTaskGroupItem({
       }
     >
       <div
-        draggable
-        onDragStart={(e) => onDragStart(e, index)}
-        className={`rounded-lg px-3 py-2 border h-10 text-sm flex items-center gap-2 w-full min-w-0 overflow-hidden cursor-grab active:cursor-grabbing active:opacity-50 ${
-          isDraggedGroup || isSelected
+        draggable={!isServicing}
+        onDragStart={(e) => {
+          if (isServicing) {
+            e.preventDefault();
+            return;
+          }
+          onDragStart(e, index);
+        }}
+        className={`rounded-lg px-3 py-2 border h-10 text-sm flex items-center gap-2 w-full min-w-0 overflow-hidden ${
+          isServicing
+            ? 'cursor-default opacity-50'
+            : 'cursor-grab active:cursor-grabbing active:opacity-50'
+        } ${
+          !isServicing && (isDraggedGroup || isSelected)
             ? 'border-blue-500 bg-blue-50'
             : 'border-gray-200 bg-white'
         }`}
@@ -188,19 +235,22 @@ function DriverTaskGroupItem({
             ? t.map.labels.taskSingular
             : t.map.labels.taskPlural}
         </span>
-        <Button
-          type="button"
-          variant="ghost"
-          size="icon"
-          onClick={(event) => {
-            event.stopPropagation();
-            onUnassign();
-          }}
-          className="h-6 w-6"
-          aria-label={`Unassign ${group.tasks.length} ${group.tasks.length === 1 ? 'task' : 'tasks'} at ${group.stationName}`}
-        >
-          <X className="h-4 w-4" />
-        </Button>
+
+        {!isServicing && (
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            onClick={(event) => {
+              event.stopPropagation();
+              onUnassign();
+            }}
+            className="h-6 w-6"
+            aria-label={`Unassign ${group.tasks.length} ${group.tasks.length === 1 ? 'task' : 'tasks'} at ${group.stationName}`}
+          >
+            <X className="h-4 w-4" />
+          </Button>
+        )}
       </div>
     </div>
   );
@@ -208,6 +258,7 @@ function DriverTaskGroupItem({
 
 function DriverTasksCollapsed({
   groupedTasks,
+  inProgressTaskId,
   selectedTaskIds,
   handleTaskSelect,
   startDragSelect,
@@ -216,6 +267,7 @@ function DriverTasksCollapsed({
   onUnassign,
 }: {
   groupedTasks: DriverTaskStationGroup[];
+  inProgressTaskId: number | null;
   selectedTaskIds: number[];
   handleTaskSelect: (
     taskId: number,
@@ -239,6 +291,41 @@ function DriverTasksCollapsed({
   const [draggedGroupIndex, setDraggedGroupIndex] = useState<number | null>(
     null
   );
+  const inServiceGroupIndex =
+    inProgressTaskId === null
+      ? -1
+      : groupedTasks.findIndex((group) =>
+          group.tasks.some((task) => task.state === TaskState.InService)
+        );
+
+  const wouldMoveInServiceGroup = (
+    sourceIndex: number,
+    targetIndex: number
+  ) => {
+    if (inServiceGroupIndex === -1 || sourceIndex === targetIndex) return false;
+
+    const movingIndices = selectedGroupIndices.has(sourceIndex)
+      ? [...selectedGroupIndices].sort((a, b) => a - b)
+      : [sourceIndex];
+
+    if (movingIndices.some((i) => i === targetIndex)) return false;
+    if (movingIndices.includes(inServiceGroupIndex)) return true;
+
+    const movedGroupsBeforeInService = movingIndices.filter(
+      (index) => index < inServiceGroupIndex
+    ).length;
+    const inServiceIndexAfterRemoval =
+      inServiceGroupIndex - movedGroupsBeforeInService;
+    const adjustedTarget =
+      targetIndex - movingIndices.filter((index) => index < targetIndex).length;
+    const insertAt =
+      sourceIndex < targetIndex ? adjustedTarget + 1 : adjustedTarget;
+    const inServiceFinalIndex =
+      inServiceIndexAfterRemoval +
+      (insertAt <= inServiceIndexAfterRemoval ? movingIndices.length : 0);
+
+    return inServiceFinalIndex !== inServiceGroupIndex;
+  };
 
   const handleDragStart = (
     e: React.DragEvent<HTMLDivElement>,
@@ -282,6 +369,7 @@ function DriverTasksCollapsed({
       : [sourceIndex];
 
     if (movingIndices.some((i) => i === targetIndex)) return;
+    if (wouldMoveInServiceGroup(sourceIndex, targetIndex)) return;
 
     const movingSet = new Set(movingIndices);
     const movedGroups = movingIndices.map((i) => {
@@ -323,6 +411,9 @@ function DriverTasksCollapsed({
           }
           isDraggedGroup={draggedGroupIndex === index}
           isSelected={selectedGroupIndices.has(index)}
+          isServicing={group.tasks.some(
+            (task) => task.state === TaskState.InService
+          )}
           onDragStart={handleDragStart}
           onDragOver={handleDragOver}
           onDrop={handleDrop}
@@ -384,7 +475,6 @@ function DriverTasksExpanded({
   const { engine } = useSimulation();
   const [dropTargetIndex, setDropTargetIndex] = useState<number | null>(null);
   const [draggedTaskId, setDraggedTaskId] = useState<number | null>(null);
-
   const draggedIndex = draggedTaskId
     ? driver.tasks.findIndex((t) => t.id === draggedTaskId)
     : -1;
@@ -394,7 +484,16 @@ function DriverTasksExpanded({
     setDraggedTaskId(taskId);
   };
 
-  const handleDragOver = (e: React.DragEvent, targetIndex: number) => {
+  const handleDragOver = (
+    e: React.DragEvent,
+    targetIndex: number,
+    task: StationTask
+  ) => {
+    if (task.state === TaskState.InService) {
+      e.preventDefault();
+      e.dataTransfer.dropEffect = 'none';
+      return;
+    }
     e.preventDefault();
     if (!draggedTaskId) {
       e.dataTransfer.dropEffect = 'none';
@@ -446,7 +545,7 @@ function DriverTasksExpanded({
       {driver.tasks.map((task, index) => (
         <div
           key={task.id}
-          onDragOver={(e) => handleDragOver(e, index)}
+          onDragOver={(e) => handleDragOver(e, index, task)}
           onDrop={(e) => handleDrop(e, index)}
           onDragEnd={handleDragEnd}
           onContextMenu={(e) => e.preventDefault()}
@@ -543,6 +642,7 @@ export function DriverTasks({ driver }: { driver: PopulatedDriver }) {
           {isCollapsed ? (
             <DriverTasksCollapsed
               groupedTasks={groupedTasks}
+              inProgressTaskId={driver.inProgressTask?.id ?? null}
               selectedTaskIds={selectedTaskIds}
               handleTaskSelect={handleTaskSelect}
               startDragSelect={startDragSelect}
