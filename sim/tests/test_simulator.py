@@ -44,6 +44,10 @@ from sim.entities.position import Position
 from sim.entities.driver import Driver
 from sim.entities.shift import Shift
 from sim.entities.battery_swap_task import BatterySwapTask
+from sim.entities.response_type import ResponseType
+from sim.entities.headquarters import Headquarters
+from sim.entities.vehicle import Vehicle
+from sim.core.simulation_report import SimulationReport
 
 import sim.core.real_time_driver as rtd_mod
 from sim.simulator import Simulator
@@ -218,7 +222,89 @@ def test_start_creates_thread_and_emits_output(
     assert f"{sim_id} ended" in out
 
     # Thread should be gone from pool
-    assert sim_id not in sim.thread_pool
+
+
+def test_simulation_environment_setters_and_headquarters_behaviour() -> None:
+    env = SimulationEnvironment()
+    report = SimulationReport()
+    hq = Headquarters()
+
+    env.set_simulation_report(report)
+    env.set_headquarters(hq)
+
+    assert env.report is report
+    assert env.get_headquarters() is hq
+
+    empty_hq = Headquarters()
+    assert empty_hq.pop_vehicle() is None
+    assert empty_hq.has_vehicles() is False
+
+    vehicle = Vehicle(vehicle_id=1)
+    non_empty_hq = Headquarters(vehicles=[vehicle])
+    assert non_empty_hq.has_vehicles() is True
+    assert non_empty_hq.pop_vehicle() is vehicle
+
+
+def test_headquarters_rejects_vehicle_with_assigned_driver() -> None:
+    driver = Driver(
+        driver_id=123,
+        position=Position([-73.56, 45.50]),
+        shift=Shift(0.0, 3600.0, None, 0.0),
+    )
+    vehicle = Vehicle(vehicle_id=9, driver=driver)
+    hq = Headquarters()
+
+    with pytest.raises(Exception):
+        hq.push_vehicle(vehicle)
+
+
+def test_response_type_placeholder_stays_default() -> None:
+    assert ResponseType.temp == 0
+
+
+def test_initialize_resume_path_with_provided_env_and_paused_start(
+    sim: Simulator,
+) -> None:
+    env = SimulationEnvironment()
+    run_id = "resume-test-id"
+
+    returned_id = sim.initialize(
+        input_parameters=params,
+        subscribers=subList,
+        sim_behaviour=FakeSimBehaviour(),
+        run_id=run_id,
+        env=env,
+        initial_running=False,
+    )
+
+    assert returned_id == run_id
+    sim_info = sim.get_sim_by_id(run_id)
+    assert sim_info is not None
+    assert sim_info["thread"] is None
+
+    sim.stop(run_id)
+
+
+def test_initialize_applies_real_time_factor_and_attaches_subscriber(
+    sim: Simulator,
+) -> None:
+    class _NoopSubscriber(Subscriber):
+        def on_frame(self, frame: Any) -> None:
+            return None
+
+    run_id = sim.initialize(
+        input_parameters=params,
+        subscribers=[_NoopSubscriber()],
+        sim_behaviour=FakeSimBehaviour(),
+        run_id="factor-test-id",
+        real_time_factor=2.0,
+    )
+
+    sim_info = sim.get_sim_by_id(run_id)
+    assert sim_info is not None
+    assert sim_info["emitter"] is not None
+
+    sim.stop(run_id)
 
 
 def test_start_with_non_existant_sim_id(

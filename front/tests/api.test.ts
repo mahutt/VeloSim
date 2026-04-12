@@ -22,7 +22,7 @@
  * SOFTWARE.
  */
 
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import api from '../app/api';
 import { TOKEN_STORAGE_KEY } from '../app/constants';
 import type { AxiosRequestHeaders, InternalAxiosRequestConfig } from 'axios';
@@ -81,5 +81,18 @@ describe('API Configuration', () => {
     await expect(interceptors.handlers[0]?.rejected(error)).rejects.toThrow(
       'Test error'
     );
+  });
+
+  it('should use backend URL from environment when provided', async () => {
+    vi.resetModules();
+    vi.stubEnv('VITE_BACKEND_URL', 'http://localhost:8000');
+
+    const { default: apiWithBackendUrl } = await import('../app/api');
+
+    expect(apiWithBackendUrl.defaults.baseURL).toBe(
+      'http://localhost:8000/api/v1'
+    );
+
+    vi.unstubAllEnvs();
   });
 });

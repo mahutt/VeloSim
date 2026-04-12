@@ -48,10 +48,10 @@ export default defineConfig(({ mode }) => {
         reporter: ['text', 'json', 'html'],
         reportsDirectory: './coverage',
         thresholds: {
-          lines: 70,
-          functions: 70,
-          branches: 70,
-          statements: 70,
+          lines: 90,
+          functions: 90,
+          branches: 90,
+          statements: 90,
         },
         include: ['app/**'],
         exclude: [

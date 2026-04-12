@@ -24,12 +24,14 @@ SOFTWARE.
 
 import pytest
 import simpy
+from typing import cast
 from sim.core.simulation_environment import SimulationEnvironment
 from sim.entities.battery_swap_task import BatterySwapTask, State
 from sim.entities.station import Station
 from sim.entities.position import Position
 from sim.entities.driver import Driver
 from sim.entities.shift import Shift
+from sim.entities.task import Task
 
 # from sim.entities.task import Task, State
 
@@ -205,3 +207,39 @@ class TestBatterySwapTask:
         assert isinstance(task_dict, dict)
         assert task_dict["id"] == 1
         assert task_dict["state"] == "open"
+
+    def test_spawn_after_delay_sets_state_and_update_flags(
+        self, simpy_env: simpy.Environment, default_station: Station
+    ) -> None:
+        # Arrange
+        task = BatterySwapTask(1, default_station)
+        Driver.env = cast(SimulationEnvironment, simpy_env)
+        driver = Driver(1, Position([-73.5673, 45.5017]), self.DEFAULT_SHIFT)
+        task.set_assigned_driver(driver)
+        task.set_state(State.SCHEDULED)
+        task.env = simpy_env
+
+        # Reset flags to verify _spawn_after_delay updates them.
+        task.has_updated = False
+        default_station.has_updated = False
+        driver.has_updated = False
+
+        # Act
+        simpy_env.process(task._spawn_after_delay(5))
+        simpy_env.run(until=6)
+
+        # Assert
+        assert task.get_state() == State.OPEN
+        assert task.has_updated is True
+        assert default_station.has_updated is True
+        assert driver.has_updated is True
+
+    def test_clear_update_resets_has_updated_flag(
+        self, simpy_env: simpy.Environment
+    ) -> None:
+        task = BatterySwapTask(1)
+        task.has_updated = True
+
+        Task.clear_update(task)
+
+        assert task.has_updated is False

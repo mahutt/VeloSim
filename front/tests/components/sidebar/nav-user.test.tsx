@@ -24,12 +24,23 @@
 
 import { describe, it, expect, vi, type Mock } from 'vitest';
 import { render, screen } from '@testing-library/react';
+import { AppSidebar } from '~/components/sidebar/app-sidebar';
 import { NavUser } from '~/components/sidebar/nav-user';
 import { SidebarProvider } from '~/components/ui/sidebar';
 import useAuth from '~/hooks/use-auth';
+import { useFeature } from '~/hooks/use-feature';
 
 vi.mock('~/hooks/use-auth', () => ({
   default: vi.fn(),
+}));
+vi.mock('~/hooks/use-feature', () => ({
+  useFeature: vi.fn(),
+}));
+vi.mock('~/components/sidebar/nav-main', () => ({
+  NavMain: () => <div>nav-main</div>,
+}));
+vi.mock('~/components/sidebar/nav-admin', () => ({
+  NavAdmin: () => <div>nav-admin</div>,
 }));
 
 describe('NavUser', () => {
@@ -75,5 +86,52 @@ describe('NavUser', () => {
     );
     // Elements of the role 'list' indicate that NavUser rendered something
     expect(screen.queryByRole('list')).not.toBeInTheDocument();
+  });
+
+  it('AppSidebar returns nothing when sidebar feature is disabled', () => {
+    (useFeature as Mock).mockReturnValue(false);
+    (useAuth as Mock).mockReturnValue({ user: null, logout: vi.fn() });
+
+    render(
+      <SidebarProvider>
+        <AppSidebar />
+      </SidebarProvider>
+    );
+
+    expect(screen.queryByText('nav-main')).not.toBeInTheDocument();
+    expect(screen.queryByText('nav-admin')).not.toBeInTheDocument();
+  });
+
+  it('AppSidebar hides admin section for non-admin users', () => {
+    (useFeature as Mock).mockReturnValue(true);
+    (useAuth as Mock).mockReturnValue({
+      user: { username: 'Regular', is_admin: false },
+      logout: vi.fn(),
+    });
+
+    render(
+      <SidebarProvider>
+        <AppSidebar />
+      </SidebarProvider>
+    );
+
+    expect(screen.getByText('nav-main')).toBeInTheDocument();
+    expect(screen.queryByText('nav-admin')).not.toBeInTheDocument();
+  });
+
+  it('AppSidebar shows admin section for admin users', () => {
+    (useFeature as Mock).mockReturnValue(true);
+    (useAuth as Mock).mockReturnValue({
+      user: { username: 'Admin', is_admin: true },
+      logout: vi.fn(),
+    });
+
+    render(
+      <SidebarProvider>
+        <AppSidebar />
+      </SidebarProvider>
+    );
+
+    expect(screen.getByText('nav-admin')).toBeInTheDocument();
   });
 });

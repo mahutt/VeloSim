@@ -22,8 +22,11 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 """
 
-import pytest
+from typing import Any
 from unittest.mock import Mock
+from types import SimpleNamespace
+
+import pytest
 
 from back.services.simulation_data_service import SimulationDataService
 from back.models.sim_instance import SimInstance
@@ -85,3 +88,156 @@ class TestSimulationDataService:
             ItemNotFoundError, match="Simulation instance sim-123 not found"
         ):
             service.get_traffic_csv_data(mock_db, "sim-123")
+
+    def test_get_scenario_returns_payload(
+        self, service: SimulationDataService, mock_db: Mock
+    ) -> None:
+        payload: dict[str, Any] = {"stations": [], "drivers": []}
+        mock_sim = Mock(spec=SimInstance)
+        mock_sim.scenario_payload = payload
+        mock_db.query.return_value.filter.return_value.first.return_value = mock_sim
+
+        result = service.get_scenario(mock_db, "sim-1")
+
+        assert result == payload
+
+    def test_get_scenario_raises_when_sim_missing(
+        self, service: SimulationDataService, mock_db: Mock
+    ) -> None:
+        mock_db.query.return_value.filter.return_value.first.return_value = None
+
+        with pytest.raises(
+            ItemNotFoundError, match="Simulation instance sim-1 not found"
+        ):
+            service.get_scenario(mock_db, "sim-1")
+
+    def test_get_scenario_raises_when_payload_missing(
+        self, service: SimulationDataService, mock_db: Mock
+    ) -> None:
+        mock_sim = Mock(spec=SimInstance)
+        mock_sim.scenario_payload = None
+        mock_db.query.return_value.filter.return_value.first.return_value = mock_sim
+
+        with pytest.raises(
+            ItemNotFoundError, match="No scenario payload found for simulation sim-1"
+        ):
+            service.get_scenario(mock_db, "sim-1")
+
+    def test_get_keyframes_from_tick_returns_frame_data(
+        self,
+        service: SimulationDataService,
+        mock_db: Mock,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        keyframe = SimpleNamespace(frame_data={"seq": 5})
+        monkeypatch.setattr(
+            (
+                "back.services.simulation_data_service."
+                "sim_keyframe_crud.get_keyframe_at_tick"
+            ),
+            lambda db, sim_id, tick: keyframe,
+        )
+
+        result = service.get_keyframes_from_tick(mock_db, "sim-1", 12.0)
+
+        assert result == {"seq": 5}
+
+    def test_get_keyframes_from_tick_raises_when_missing(
+        self,
+        service: SimulationDataService,
+        mock_db: Mock,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        monkeypatch.setattr(
+            (
+                "back.services.simulation_data_service."
+                "sim_keyframe_crud.get_keyframe_at_tick"
+            ),
+            lambda db, sim_id, tick: None,
+        )
+
+        with pytest.raises(
+            ItemNotFoundError, match="No keyframe found at or before tick"
+        ):
+            service.get_keyframes_from_tick(mock_db, "sim-1", 9.0)
+
+    def test_get_last_persisted_keyframe_returns_frame_data(
+        self,
+        service: SimulationDataService,
+        mock_db: Mock,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        mock_sim = Mock(spec=SimInstance)
+        mock_sim.id = 101
+        mock_db.query.return_value.filter.return_value.first.return_value = mock_sim
+        monkeypatch.setattr(
+            "back.services.simulation_data_service.sim_keyframe_crud.get_last_keyframe",
+            lambda db, sim_instance_id: SimpleNamespace(frame_data={"last": True}),
+        )
+
+        result = service.get_last_persisted_keyframe(mock_db, "sim-1")
+
+        assert result == {"last": True}
+
+    def test_get_last_persisted_keyframe_raises_when_sim_missing(
+        self, service: SimulationDataService, mock_db: Mock
+    ) -> None:
+        mock_db.query.return_value.filter.return_value.first.return_value = None
+
+        with pytest.raises(
+            ItemNotFoundError, match="Simulation instance with UUID sim-1 not found"
+        ):
+            service.get_last_persisted_keyframe(mock_db, "sim-1")
+
+    def test_get_last_persisted_keyframe_raises_when_keyframe_missing(
+        self,
+        service: SimulationDataService,
+        mock_db: Mock,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        mock_sim = Mock(spec=SimInstance)
+        mock_sim.id = 101
+        mock_db.query.return_value.filter.return_value.first.return_value = mock_sim
+        monkeypatch.setattr(
+            "back.services.simulation_data_service.sim_keyframe_crud.get_last_keyframe",
+            lambda db, sim_instance_id: None,
+        )
+
+        with pytest.raises(
+            ItemNotFoundError, match="No keyframe found for simulation sim-1"
+        ):
+            service.get_last_persisted_keyframe(mock_db, "sim-1")
+
+    def test_get_last_persisted_keyframe_by_id_returns_frame_data(
+        self,
+        service: SimulationDataService,
+        mock_db: Mock,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        monkeypatch.setattr(
+            "back.services.simulation_data_service.sim_keyframe_crud.get_last_keyframe",
+            lambda db, sim_instance_id: SimpleNamespace(
+                frame_data={"id": sim_instance_id}
+            ),
+        )
+
+        result = service.get_last_persisted_keyframe_by_id(mock_db, 77)
+
+        assert result == {"id": 77}
+
+    def test_get_last_persisted_keyframe_by_id_raises_when_missing(
+        self,
+        service: SimulationDataService,
+        mock_db: Mock,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        monkeypatch.setattr(
+            "back.services.simulation_data_service.sim_keyframe_crud.get_last_keyframe",
+            lambda db, sim_instance_id: None,
+        )
+
+        with pytest.raises(
+            ItemNotFoundError,
+            match="No keyframe found for simulation instance 77",
+        ):
+            service.get_last_persisted_keyframe_by_id(mock_db, 77)

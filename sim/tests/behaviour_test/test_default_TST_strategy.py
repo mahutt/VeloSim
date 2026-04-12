@@ -22,12 +22,26 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 """
 
+import pytest
+
 from sim.behaviour.default.default_TST_strategy import DefaultTSTStrategy
+from sim.behaviour.resource_behaviour.task_servicing_time_strategy import (
+    TaskServicingTimeStrategy,
+)
 from sim.entities.battery_swap_task import BatterySwapTask
 from sim.entities.driver import Driver
 from sim.entities.position import Position
 from sim.entities.shift import Shift
 from sim.entities.station import Station
+
+
+class _BaseTSTCaller(TaskServicingTimeStrategy):
+    def get_task_servicing_time(
+        self,
+        driver: object = None,
+        task: object = None,
+    ) -> int:
+        return 0
 
 
 def test_default_tst_strategy_returns_default_time() -> None:
@@ -48,3 +62,12 @@ def test_default_tst_strategy_halves_time_for_same_station_followup() -> None:
     strat = DefaultTSTStrategy()
 
     assert strat.get_task_servicing_time(driver, task) == 120
+
+
+def test_task_servicing_time_strategy_base_raises() -> None:
+    with pytest.raises(NotImplementedError):
+        TaskServicingTimeStrategy.get_task_servicing_time(
+            _BaseTSTCaller(),
+            driver=None,
+            task=None,
+        )

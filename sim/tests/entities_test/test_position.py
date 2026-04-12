@@ -41,3 +41,25 @@ class TestPosition:
     def test_position_can_be_initialized_as_occupied(self) -> None:
         position = Position([-73.5673, 45.5017], occupied=True)
         assert position.occupied is True
+
+    def test_position_equality_and_hash(self) -> None:
+        p1 = Position([-73.5673, 45.5017])
+        p2 = Position([-73.5673, 45.5017])
+        p3 = Position([-73.5674, 45.5017])
+
+        assert p1 == p2
+        assert p1 != p3
+        assert isinstance(hash(p1), int)
+
+    def test_position_comparison_with_non_position(self) -> None:
+        p = Position([-73.5673, 45.5017])
+        assert (p == object()) is False
+        assert p.close_enough(object()) is False
+
+    def test_close_enough_threshold_behavior(self) -> None:
+        base = Position([-73.5673, 45.5017])
+        close = Position([-73.5679, 45.5022])
+        far = Position([-73.5690, 45.5030])
+
+        assert base.close_enough(close) is True
+        assert base.close_enough(far) is False

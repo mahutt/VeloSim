@@ -24,6 +24,7 @@ SOFTWARE.
 
 import pytest
 import time
+from typing import Any
 from sim.core.simulation_environment import SimulationEnvironment
 from sim.entities.vehicle import Vehicle
 from sim.entities.driver import Driver
@@ -182,6 +183,72 @@ class TestVehicle:
         vehicle.has_updated = True
         vehicle.clear_update()
         assert vehicle.has_updated == False
+
+    def test_set_driver_raises_when_vehicle_already_has_different_driver(
+        self, default_position: Position, default_shift: Shift
+    ) -> None:
+        driver_a = Driver(11, default_position, default_shift)
+        driver_b = Driver(12, default_position, default_shift)
+        vehicle = Vehicle(99, driver=driver_a, battery_count=1)
+
+        with pytest.raises(Exception, match="already assigned to driver"):
+            vehicle.set_driver(driver_b)
+
+    def test_set_driver_raises_when_driver_already_has_different_vehicle(
+        self, default_position: Position, default_shift: Shift
+    ) -> None:
+        driver = Driver(20, default_position, default_shift)
+        other_vehicle = Vehicle(200, battery_count=1)
+        target_vehicle = Vehicle(201, battery_count=1)
+
+        driver.set_vehicle(other_vehicle)
+
+        with pytest.raises(Exception, match="already assigned to vehicle"):
+            target_vehicle.set_driver(driver)
+
+    def test_use_battery_raises_when_empty(self) -> None:
+        vehicle = Vehicle(55, battery_count=0)
+
+        with pytest.raises(Exception, match="has none available"):
+            vehicle.use_battery()
+
+    def test_set_driver_conflict_with_existing_vehicle_driver_uses_first_guard(
+        self,
+    ) -> None:
+        class _DriverStub:
+            def __init__(self, driver_id: int) -> None:
+                self.id = driver_id
+
+            def get_vehicle(self) -> None:
+                return None
+
+        existing_driver = _DriverStub(1)
+        new_driver = _DriverStub(2)
+        vehicle = Vehicle(300, driver=existing_driver)  # type: ignore[arg-type]
+
+        with pytest.raises(Exception, match="already assigned to driver"):
+            vehicle.set_driver(new_driver)  # type: ignore[arg-type]
+
+    def test_set_driver_conflict_with_driver_existing_vehicle_uses_second_guard(
+        self,
+    ) -> None:
+        class _VehicleStub:
+            def __init__(self, vehicle_id: int) -> None:
+                self.id = vehicle_id
+
+        class _DriverStub:
+            def __init__(self, driver_id: int, current_vehicle_id: int) -> None:
+                self.id = driver_id
+                self._vehicle = _VehicleStub(current_vehicle_id)
+
+            def get_vehicle(self) -> Any:
+                return self._vehicle
+
+        vehicle = Vehicle(400)
+        driver = _DriverStub(driver_id=10, current_vehicle_id=999)
+
+        with pytest.raises(Exception, match="already assigned to vehicle"):
+            vehicle.set_driver(driver)  # type: ignore[arg-type]
 
     def test_records_utilization_above_one(
         self,

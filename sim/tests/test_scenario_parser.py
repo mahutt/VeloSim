@@ -31,12 +31,33 @@ from sim.entities.vehicle import Vehicle
 from sim.utils.scenario_parser import ScenarioParser
 
 
+class _EchoParserA(BaseParseStrategy):
+    def parse(self, scenario_json: dict) -> InputParameter:
+        return InputParameter(sim_time=int(scenario_json.get("x", 0)))
+
+
+class _EchoParserB(BaseParseStrategy):
+    def parse(self, scenario_json: dict) -> InputParameter:
+        return InputParameter(sim_time=int(scenario_json.get("x", 0)) + 1)
+
+
 def test_base_parse_strategy_is_abstract() -> None:
     class DummyStrategy(BaseParseStrategy):
         pass
 
     with pytest.raises(TypeError):
         DummyStrategy()  # type: ignore[abstract]
+
+
+def test_scenario_parser_set_strategy_switches_parser() -> None:
+    parser = ScenarioParser(_EchoParserA())
+
+    first = parser.parse({"x": 1})
+    parser.setStrategy(_EchoParserB())
+    second = parser.parse({"x": 1})
+
+    assert first.sim_time == 1
+    assert second.sim_time == 2
 
 
 def test_json_parse_strategy_valid_input() -> None:

@@ -23,10 +23,22 @@ SOFTWARE.
 """
 
 import time
+from typing import cast
+
 import pytest
 import simpy
 from sim.behaviour.default.default_TPU_strategy import DefaultTPUStrategy
+from sim.behaviour.station_behaviour.strategies.task_popup_strategy import (
+    TaskPopupStrategy,
+)
+from sim.entities.battery_swap_task import BatterySwapTask
+from sim.entities.station import Station
 from sim.entities.task_state import State
+
+
+class _BaseTaskPopupCaller(TaskPopupStrategy):
+    def check_for_new_task(self, station: Station) -> list[BatterySwapTask]:
+        return []
 
 
 class MockClock:
@@ -285,3 +297,11 @@ class TestDefaultTPUStrategy:
 
         assert strategy.get_station_scheduled_tasks() == {}
         assert strategy.get_scheduled_tasks() == set()
+
+
+def test_task_popup_strategy_base_raises_not_implemented() -> None:
+    with pytest.raises(NotImplementedError):
+        TaskPopupStrategy.check_for_new_task(
+            _BaseTaskPopupCaller(),
+            cast(Station, object()),
+        )

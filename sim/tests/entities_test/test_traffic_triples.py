@@ -35,6 +35,7 @@ from sim.entities.traffic_data import (
     CongestionLevel,
     TrafficTriple,
 )
+from sim.entities.traffic_event import TrafficEvent
 from sim.map.routing_provider import RouteResult, SegmentKey
 
 
@@ -139,6 +140,26 @@ class TestTrafficTriple:
             "endCoordinateIndex": 3,
             "congestionLevel": "moderate",
         }
+
+    def test_traffic_event_hash_and_equality_contract(self) -> None:
+        event_a = TrafficEvent(
+            event_type="local_traffic",
+            tick_start=10,
+            segment_key=((0.0, 0.0), (1.0, 1.0)),
+            duration=5,
+            weight=0.5,
+        )
+        event_b = TrafficEvent(
+            event_type="local_traffic",
+            tick_start=10,
+            segment_key=((0.0, 0.0), (1.0, 1.0)),
+            duration=5,
+            weight=0.8,
+        )
+
+        assert event_a == event_b
+        assert isinstance(hash(event_a), int)
+        assert (event_a == object()) is False
 
 
 # ── Road.get_traffic_geometry_ranges() Tests ─────────────────────────

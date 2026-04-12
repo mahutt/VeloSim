@@ -273,6 +273,39 @@ def test_unregister_vehicle_route_preserves_completed_distance() -> None:
     assert metrics.get_vehicle_distance_traveled() == pytest.approx(321.0)
 
 
+def test_unregister_vehicle_route_ignores_untracked_route() -> None:
+    metrics = SimulationReport()
+    route = Mock()
+    route.get_distance_traveled.return_value = 77.0
+
+    # Should not raise and should not change distance if route was never registered.
+    metrics.unregister_vehicle_route(route)
+
+    assert metrics.get_vehicle_distance_traveled() == 0.0
+
+
+def test_restore_state_rehydrates_metrics() -> None:
+    metrics = SimulationReport()
+
+    metrics.restore_state(
+        total_driving_time=12.0,
+        total_servicing_time=6.0,
+        tasks_completed_per_shift=[2, 4],
+        response_times=[10.0, 20.0],
+        vehicle_idle_time=5.0,
+        vehicle_active_time=15.0,
+        completed_vehicle_distance=42.5,
+    )
+
+    assert metrics.total_driving_time == 12.0
+    assert metrics.total_servicing_time == 6.0
+    assert metrics.tasks_completed_per_shift == [2, 4]
+    assert metrics.response_times == [10.0, 20.0]
+    assert metrics.vehicle_idle_time == 5.0
+    assert metrics.vehicle_active_time == 15.0
+    assert metrics.get_vehicle_distance_traveled() == pytest.approx(42.5)
+
+
 def test_add_task_count_for_shift_allows_zero() -> None:
     """
     add_task_count_for_shift should correctly store zero

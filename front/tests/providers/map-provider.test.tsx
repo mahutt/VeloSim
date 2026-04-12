@@ -190,3 +190,50 @@ test('useMap throws error when used outside MapProvider', () => {
     renderHook(() => useMap());
   }).toThrow('useMap must be used within a MapProvider');
 });
+
+test('map provider removes map instance on unmount when container exists', () => {
+  const TestMapContainer = () => {
+    const { mapContainerRef } = useMap();
+    return <div ref={mapContainerRef} />;
+  };
+
+  const { unmount } = render(
+    <MapProvider>
+      <TestMapContainer />
+    </MapProvider>
+  );
+
+  const map = MockMap.instance!;
+  const removeSpy = vi.spyOn(map, 'remove');
+
+  act(() => {
+    unmount();
+  });
+
+  expect(removeSpy).toHaveBeenCalledOnce();
+});
+
+test('map error callback uses fallback message when event has no message', () => {
+  const TestMapContainer = () => {
+    const { mapContainerRef } = useMap();
+    return <div ref={mapContainerRef} />;
+  };
+
+  render(
+    <MapProvider>
+      <TestMapContainer />
+    </MapProvider>
+  );
+
+  const map = MockMap.instance!;
+
+  act(() => {
+    map.callBacks.error({ error: {} });
+  });
+
+  expect(logSimulationError).toHaveBeenCalledWith(
+    'Unknown map error',
+    LogContext.MapLoading,
+    expect.objectContaining({ errorType: 'MAP_LOAD_FAILED' })
+  );
+});

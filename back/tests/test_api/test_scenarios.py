@@ -23,15 +23,25 @@ SOFTWARE.
 """
 
 import pytest
+import sim.utils.json_parser_strategy as parser_mod
 from datetime import datetime, timezone
 from unittest.mock import patch, MagicMock
+from fastapi import HTTPException
 from fastapi.testclient import TestClient
-from typing import Generator, Dict, Any
+from typing import Generator, Dict, Any, cast
 
 from back.main import app
 from back.auth.dependency import get_user_id
+from back.api.v1 import scenarios as scenarios_api
+from back.services import scenario_validation_service as svc
+from back.schemas.scenario import ScenarioCreateRequest, ScenarioUpdateRequest
 from back.schemas.scenario import ScenarioResponse, ScenarioListResponse
-from back.exceptions import ItemNotFoundError, VelosimPermissionError, BadRequestError
+from back.exceptions import (
+    ItemNotFoundError,
+    VelosimPermissionError,
+    BadRequestError,
+    UnexpectedError,
+)
 
 
 @pytest.fixture
@@ -75,6 +85,117 @@ def test_scenario() -> ScenarioResponse:
 
 class TestScenariosAPI:
     """Test the scenarios API endpoints."""
+
+    def test_create_scenario_duplicate_name_direct_branch(self) -> None:
+        request = ScenarioCreateRequest(
+            name="Duplicate",
+            content={"stations": []},
+            description=None,
+            allow_duplicate_name=False,
+        )
+
+        with patch.object(
+            scenarios_api.scenario_crud, "get_by_name_and_user"
+        ) as mock_get:
+            mock_get.return_value = object()
+            with pytest.raises(BadRequestError):
+                scenarios_api.create_scenario(
+                    request=request,
+                    requesting_user=1,
+                    db=MagicMock(),
+                    raw_body=b'{"content":{}}',
+                )
+
+    def test_create_scenario_validation_error_direct_branch(self) -> None:
+        request = ScenarioCreateRequest(
+            name="Invalid",
+            content={"stations": []},
+            description=None,
+            allow_duplicate_name=True,
+        )
+
+        with (
+            patch.object(
+                scenarios_api.scenario_crud, "get_by_name_and_user", return_value=None
+            ),
+            patch("back.api.v1.scenarios.JsonParseStrategy") as mock_parser_cls,
+        ):
+            mock_parser = MagicMock()
+            mock_parser.validate.return_value = [{"line": 2, "message": "bad"}]
+            mock_parser_cls.return_value = mock_parser
+
+            with pytest.raises(HTTPException) as exc_info:
+                scenarios_api.create_scenario(
+                    request=request,
+                    requesting_user=1,
+                    db=MagicMock(),
+                    raw_body=b'{"content":{}}',
+                )
+
+        assert exc_info.value.status_code == 400
+        detail = cast(dict[str, Any], exc_info.value.detail)
+        assert detail["message"] == "Invalid scenario content"
+
+    def test_update_scenario_validation_error_direct_branch(self) -> None:
+        request = ScenarioUpdateRequest(
+            name=None,
+            content={"stations": []},
+            description=None,
+        )
+
+        with patch("back.api.v1.scenarios.JsonParseStrategy") as mock_parser_cls:
+            mock_parser = MagicMock()
+            mock_parser.validate.return_value = [{"line": 1, "message": "bad content"}]
+            mock_parser_cls.return_value = mock_parser
+
+            with pytest.raises(HTTPException) as exc_info:
+                scenarios_api.update_scenario(
+                    scenario_id=7,
+                    request=request,
+                    requesting_user=1,
+                    db=MagicMock(),
+                    raw_body=b'{"content":{}}',
+                )
+
+        assert exc_info.value.status_code == 400
+
+    def test_update_scenario_unexpected_error_maps_to_unexpected_error(
+        self,
+    ) -> None:
+        request = ScenarioUpdateRequest(
+            name=None,
+            content=None,
+            description="desc",
+        )
+
+        with patch.object(
+            scenarios_api.scenario_crud,
+            "update",
+            side_effect=RuntimeError("db down"),
+        ):
+            with pytest.raises(UnexpectedError):
+                scenarios_api.update_scenario(
+                    scenario_id=1,
+                    request=request,
+                    requesting_user=1,
+                    db=MagicMock(),
+                    raw_body=b"{}",
+                )
+
+    def test_delete_scenario_unexpected_error_maps_to_unexpected_error(
+        self,
+    ) -> None:
+        with patch.object(
+            scenarios_api.scenario_crud,
+            "delete",
+            side_effect=RuntimeError("db down"),
+        ):
+            with pytest.raises(UnexpectedError):
+                scenarios_api.delete_scenario(
+                    scenario_id=1,
+                    requesting_user=1,
+                    db=MagicMock(),
+                )
 
     @patch("back.crud.scenario.scenario_crud.get_by_user")
     def test_get_scenarios_empty(
@@ -181,6 +302,13 @@ class TestScenariosAPI:
         """Test unauthenticated request returns 401."""
         response = client.get("/api/v1/scenarios/1")
         assert response.status_code == 401
+
+
+class TestScenarioCrudAndValidationService:
+    def test_scenario_validation_service_re_exports_types(self) -> None:
+        assert svc.JsonParseStrategy is parser_mod.JsonParseStrategy
+        assert svc.ScenarioParseError is parser_mod.ScenarioParseError
+        assert set(svc.__all__) == {"JsonParseStrategy", "ScenarioParseError"}
 
     # ==================== CREATE SCENARIO TESTS ====================
 
