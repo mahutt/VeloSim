@@ -33,6 +33,7 @@ import {
   TooltipTrigger,
 } from '~/components/ui/tooltip';
 import usePreferences from '~/hooks/use-preferences';
+import { setTaskDragDataAndPreview } from '~/lib/task-drag';
 
 export function TaskItem({
   task,
@@ -68,30 +69,9 @@ export function TaskItem({
 
   const handleDragStart = (e: React.DragEvent<HTMLDivElement>) => {
     onDragStart?.(e);
-    e.dataTransfer.effectAllowed = 'move';
     const draggedTaskIds = getDragTaskIds?.() ?? [task.id];
 
-    e.dataTransfer.setData('taskIds', JSON.stringify(draggedTaskIds));
-
-    // custom preview for multiple tasks dragging
-    if (draggedTaskIds.length > 1) {
-      const dragPreview = document.createElement('div');
-      dragPreview.className = 'px-2 bg-blue-500 text-white rounded-lg';
-      const taskLabel =
-        draggedTaskIds.length === 1
-          ? t.map.labels.taskSingular
-          : t.map.labels.taskPlural;
-      dragPreview.textContent = `${draggedTaskIds.length} ${taskLabel}`;
-      dragPreview.style.position = 'absolute';
-      document.body.appendChild(dragPreview);
-      e.dataTransfer.setDragImage(dragPreview, 0, 0);
-
-      requestAnimationFrame(() => {
-        if (document.body.contains(dragPreview)) {
-          document.body.removeChild(dragPreview);
-        }
-      });
-    }
+    setTaskDragDataAndPreview(e, draggedTaskIds, t.map.labels.taskPlural);
   };
 
   return (

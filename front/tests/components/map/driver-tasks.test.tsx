@@ -45,6 +45,20 @@ describe('DriverTasks', () => {
     vi.clearAllMocks();
   });
 
+  function createMockDataTransfer() {
+    const store = new Map<string, string>();
+
+    return {
+      effectAllowed: '',
+      dropEffect: '',
+      setData: vi.fn((key: string, value: string) => {
+        store.set(key, value);
+      }),
+      getData: vi.fn((key: string) => store.get(key) ?? ''),
+      setDragImage: vi.fn(),
+    };
+  }
+
   function setupDriverTasks({
     driver,
     stationNames,
@@ -186,13 +200,15 @@ describe('DriverTasks', () => {
       .getByText('Station B')
       .closest('[draggable="true"]')?.parentElement as HTMLElement;
 
+    const dataTransfer = createMockDataTransfer();
+
     fireEvent.dragStart(stationADraggable, {
-      dataTransfer: { effectAllowed: '', dropEffect: '' },
+      dataTransfer,
     });
     fireEvent.dragOver(stationBWrapper, {
-      dataTransfer: { dropEffect: '' },
+      dataTransfer,
     });
-    fireEvent.drop(stationBWrapper);
+    fireEvent.drop(stationBWrapper, { dataTransfer });
 
     await waitFor(() => {
       expect(mockSimulationEngine.reorderTasks).toHaveBeenCalledWith(
@@ -219,11 +235,12 @@ describe('DriverTasks', () => {
       .getByText('Station A')
       .closest('[draggable="true"]') as HTMLElement;
     const stationAWrapper = stationADraggable.parentElement as HTMLElement;
+    const dataTransfer = createMockDataTransfer();
 
     fireEvent.dragStart(stationADraggable, {
-      dataTransfer: { effectAllowed: '', dropEffect: '' },
+      dataTransfer,
     });
-    fireEvent.drop(stationAWrapper);
+    fireEvent.drop(stationAWrapper, { dataTransfer });
 
     expect(mockSimulationEngine.reorderTasks).not.toHaveBeenCalled();
   });
@@ -276,6 +293,7 @@ describe('DriverTasks', () => {
     it('moves groups at indices 1 and 3 forward past the last group', async () => {
       await setupCollapsedWithFiveGroups();
       const groups = getGroupElements();
+      const dataTransfer = createMockDataTransfer();
 
       // Ctrl+click group B (index 1) then Ctrl+click group D (index 3)
       fireEvent.click(groups[1].wrapper, { ctrlKey: true });
@@ -283,12 +301,12 @@ describe('DriverTasks', () => {
 
       // Drag group B (sourceIndex=1) → drop on group E (targetIndex=4)
       fireEvent.dragStart(groups[1].draggable, {
-        dataTransfer: { effectAllowed: '', dropEffect: '' },
+        dataTransfer,
       });
       fireEvent.dragOver(groups[4].wrapper, {
-        dataTransfer: { dropEffect: '' },
+        dataTransfer,
       });
-      fireEvent.drop(groups[4].wrapper);
+      fireEvent.drop(groups[4].wrapper, { dataTransfer });
 
       // Expected: A, C, E, B, D → [10, 30, 50, 20, 40]
       await waitFor(() => {
@@ -303,18 +321,19 @@ describe('DriverTasks', () => {
     it('moves groups at indices 1 and 3 backward before the first group', async () => {
       await setupCollapsedWithFiveGroups();
       const groups = getGroupElements();
+      const dataTransfer = createMockDataTransfer();
 
       fireEvent.click(groups[1].wrapper, { ctrlKey: true });
       fireEvent.click(groups[3].wrapper, { ctrlKey: true });
 
       // Drag group D (sourceIndex=3) → drop on group A (targetIndex=0)
       fireEvent.dragStart(groups[3].draggable, {
-        dataTransfer: { effectAllowed: '', dropEffect: '' },
+        dataTransfer,
       });
       fireEvent.dragOver(groups[0].wrapper, {
-        dataTransfer: { dropEffect: '' },
+        dataTransfer,
       });
-      fireEvent.drop(groups[0].wrapper);
+      fireEvent.drop(groups[0].wrapper, { dataTransfer });
 
       // Expected: B, D, A, C, E → [20, 40, 10, 30, 50]
       await waitFor(() => {
@@ -329,18 +348,19 @@ describe('DriverTasks', () => {
     it('moves groups at indices 1 and 3 to a position between them', async () => {
       await setupCollapsedWithFiveGroups();
       const groups = getGroupElements();
+      const dataTransfer = createMockDataTransfer();
 
       fireEvent.click(groups[1].wrapper, { ctrlKey: true });
       fireEvent.click(groups[3].wrapper, { ctrlKey: true });
 
       // Drag group B (sourceIndex=1) → drop on group C (targetIndex=2, between the selections)
       fireEvent.dragStart(groups[1].draggable, {
-        dataTransfer: { effectAllowed: '', dropEffect: '' },
+        dataTransfer,
       });
       fireEvent.dragOver(groups[2].wrapper, {
-        dataTransfer: { dropEffect: '' },
+        dataTransfer,
       });
-      fireEvent.drop(groups[2].wrapper);
+      fireEvent.drop(groups[2].wrapper, { dataTransfer });
 
       // Expected: A, C, B, D, E → [10, 30, 20, 40, 50]
       await waitFor(() => {

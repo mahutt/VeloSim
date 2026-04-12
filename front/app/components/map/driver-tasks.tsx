@@ -40,6 +40,7 @@ import type { PopulatedDriver } from './selected-item-bar';
 import { ScrollArea } from '~/components/ui/scroll-area';
 import usePreferences from '~/hooks/use-preferences';
 import { formatTranslation } from '~/lib/i18n';
+import { setTaskDragDataAndPreview } from '~/lib/task-drag';
 
 interface DriverTaskStationGroup {
   stationId: number;
@@ -226,6 +227,7 @@ function DriverTasksCollapsed({
   onReorder: (taskIds: number[]) => Promise<void>;
   onUnassign: (taskIds: number[], stationName: string) => void;
 }) {
+  const { t } = usePreferences();
   const selectedGroupIndices = new Set(
     groupedTasks
       .map((g, i) =>
@@ -242,7 +244,16 @@ function DriverTasksCollapsed({
     e: React.DragEvent<HTMLDivElement>,
     groupIndex: number
   ) => {
-    e.dataTransfer.effectAllowed = 'move';
+    const draggedGroup = groupedTasks[groupIndex];
+    if (!draggedGroup) return;
+
+    const groupsToMove = selectedGroupIndices.has(groupIndex)
+      ? groupedTasks.filter((_, i) => selectedGroupIndices.has(i))
+      : [draggedGroup];
+
+    const dragTaskIds = groupsToMove.flatMap((g) => g.tasks.map((t) => t.id));
+    setTaskDragDataAndPreview(e, dragTaskIds, t.map.labels.taskPlural);
+
     setDraggedGroupIndex(groupIndex);
   };
 
