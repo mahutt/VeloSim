@@ -35,6 +35,7 @@ import {
 } from 'tests/test-helpers';
 import { mockSimulationEngine } from 'tests/mocks';
 import type SimulationEngine from '~/lib/simulation-engine';
+import { TaskState } from '~/types';
 
 vi.mock('~/providers/simulation-provider', () => ({
   useSimulation: vi.fn(),
@@ -241,6 +242,83 @@ describe('DriverTasks', () => {
       dataTransfer,
     });
     fireEvent.drop(stationAWrapper, { dataTransfer });
+
+    expect(mockSimulationEngine.reorderTasks).not.toHaveBeenCalled();
+  });
+
+  it('blocks collapsed reordering when it would move the in-progress station group', () => {
+    const inProgressTask = makeStationTask({ id: 2, stationId: 2 });
+
+    setupDriverTasks({
+      driver: makePopulatedDriver({
+        id: 14,
+        tasks: [
+          makeStationTask({ id: 1, stationId: 1 }),
+          inProgressTask,
+          makeStationTask({ id: 3, stationId: 3 }),
+        ],
+        inProgressTask,
+      }),
+      stationNames: { 1: 'Station A', 2: 'Station B', 3: 'Station C' },
+    });
+
+    const stationADraggable = screen
+      .getByText('Station A')
+      .closest('[draggable="true"]') as HTMLElement;
+    const stationCWrapper = screen
+      .getByText('Station C')
+      .closest('[draggable="true"]')?.parentElement as HTMLElement;
+
+    fireEvent.dragStart(stationADraggable, {
+      dataTransfer: { effectAllowed: '', dropEffect: '' },
+    });
+    fireEvent.dragOver(stationCWrapper, {
+      dataTransfer: { dropEffect: '' },
+    });
+    fireEvent.drop(stationCWrapper);
+
+    expect(mockSimulationEngine.reorderTasks).not.toHaveBeenCalled();
+  });
+
+  it('renders servicing collapsed groups as disabled and non-interactive', async () => {
+    const user = userEvent.setup();
+
+    setupDriverTasks({
+      driver: makePopulatedDriver({
+        id: 16,
+        tasks: [
+          makeStationTask({ id: 1, stationId: 1 }),
+          makeStationTask({
+            id: 2,
+            stationId: 2,
+            state: TaskState.InService,
+          }),
+        ],
+      }),
+      stationNames: { 1: 'Station A', 2: 'Station B' },
+    });
+
+    const stationBDraggable = screen
+      .getByText('Station B')
+      .closest('[draggable="false"]') as HTMLElement;
+    const stationBWrapper = stationBDraggable.parentElement as HTMLElement;
+
+    expect(stationBDraggable).toHaveClass('opacity-50');
+
+    await user.click(stationBWrapper);
+
+    expect(mockSimulationEngine.reorderTasks).not.toHaveBeenCalled();
+
+    const stationADraggable = screen
+      .getByText('Station A')
+      .closest('[draggable="true"]') as HTMLElement;
+    fireEvent.dragStart(stationADraggable, {
+      dataTransfer: { effectAllowed: '', dropEffect: '' },
+    });
+    fireEvent.dragOver(stationBWrapper, {
+      dataTransfer: { dropEffect: '' },
+    });
+    fireEvent.drop(stationBWrapper);
 
     expect(mockSimulationEngine.reorderTasks).not.toHaveBeenCalled();
   });
