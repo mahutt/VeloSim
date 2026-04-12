@@ -120,9 +120,9 @@ describe('SelectedItemBar', () => {
     );
 
     expect(screen.getByText('Driver 5')).toBeInTheDocument();
-    expect(screen.getByText('Tasks (3)')).toBeInTheDocument();
+    expect(screen.getByText('Itinerary (3 tasks)')).toBeInTheDocument();
     expect(screen.getByText(/Station\s*#1/)).toBeInTheDocument();
-    expect(screen.getByText(/3\s*tasks/)).toBeInTheDocument();
+    expect(screen.getAllByText(/3\s*tasks/)).toHaveLength(2); // One in the itinerary label, one in the task list
   });
 
   it('should call clearSelection when close button is clicked', async () => {
