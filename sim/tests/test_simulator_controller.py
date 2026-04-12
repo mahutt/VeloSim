@@ -723,7 +723,7 @@ def test_assign_task_to_driver_with_bad_task_id(
 ) -> None:
     """Test assign_task_to_driver functionality with an invalid task_id."""
     # Arrange
-    task_id = 6  # Non-existant id
+    task_id = 6  # Non-existent id
     driver_id = 1
 
     # Act and Assert
@@ -739,7 +739,7 @@ def test_assign_task_to_driver_with_bad_driver_id(
     """Test assign_task_to_driver functionality with an invalid driver_id."""
     # Arrange
     task_id = 1
-    driver_id = 6  # Non-existant id
+    driver_id = 6  # Non-existent id
 
     # Act and Assert
     with pytest.raises(
@@ -774,7 +774,7 @@ def test_unassign_task_from_driver_with_bad_task_id(
 ) -> None:
     """Test unassign_task_from_driver functionality with an invalid task_id."""
     # Arrange
-    task_id = 6  # Non-existant id
+    task_id = 6  # Non-existent id
     driver_id = 1
 
     # Act and Assert
@@ -790,7 +790,7 @@ def test_unassign_task_from_driver_with_bad_driver_id(
     """Test unassign_task_from_driver functionality with an invalid driver_id."""
     # Arrange
     task_id = 1
-    driver_id = 6  # Non-existant id
+    driver_id = 6  # Non-existent id
 
     # Act and Assert
     with pytest.raises(

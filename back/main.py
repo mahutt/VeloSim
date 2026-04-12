@@ -147,11 +147,11 @@ async def login_for_access_token(
     multipart form data and not JSON. Doing it this way means it is compatible with many
     existing OAuth2 libraries and the built-in authentication features of Swagger.
     However, nothing stops us from also implementing a JSON endpoint for this if it is
-    neccesary.
+    necessary.
 
     We only use usernames/passwords for authentication, however, we support passing
     these in either the username or client id field, and password or client secret field
-    again for maximum compatibility with differenc scenarios.
+    again for maximum compatibility with different scenarios.
 
     Args:
         form_data: OAuth2 password request form containing

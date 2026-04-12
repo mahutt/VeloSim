@@ -47,7 +47,7 @@ def env_flag(name: str) -> bool:
 
 
 def compose_database_url_from_env(default: str) -> str:
-    """Compose the database URL from its individual components. This is neccesary when
+    """Compose the database URL from its individual components. This is necessary when
     some parts of the URLs are kept as secrets in cloud environments.
 
     Args:
