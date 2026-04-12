@@ -39,7 +39,7 @@ import { useAutoScroll } from '~/hooks/use-auto-scroll';
 import type { PopulatedDriver } from './selected-item-bar';
 import { ScrollArea } from '~/components/ui/scroll-area';
 import usePreferences from '~/hooks/use-preferences';
-import { formatTranslation } from '~/lib/i18n';
+import { formatTranslation, type TranslationSchema } from '~/lib/i18n';
 import { setTaskDragDataAndPreview } from '~/lib/task-drag';
 
 interface DriverTaskStationGroup {
@@ -518,14 +518,12 @@ export function DriverTasks({ driver }: { driver: PopulatedDriver }) {
     <>
       <div className="px-5 flex items-center justify-between gap-2">
         <p className="text-sm text-muted-foreground">
-          {selectedTaskIds.length > 0
-            ? formatTranslation(t.map.labels.tasksSelectedCount, {
-                selected: selectedTaskIds.length,
-                total: driver.tasks.length,
-              })
-            : formatTranslation(t.map.labels.tasksCount, {
-                count: driver.tasks.length,
-              })}
+          {GenerateTaskListLabel(
+            isCollapsed,
+            selectedTaskIds.length,
+            driver.tasks.length,
+            t
+          )}
         </p>
         <CollapseToggle
           isCollapsed={isCollapsed}
@@ -573,4 +571,31 @@ export function DriverTasks({ driver }: { driver: PopulatedDriver }) {
       </ScrollArea>
     </>
   );
+}
+
+export function GenerateTaskListLabel(
+  collapsed: boolean,
+  selectedCount: number,
+  totalCount: number,
+  t: TranslationSchema
+) {
+  if (!collapsed) {
+    return selectedCount > 0
+      ? formatTranslation(t.map.labels.tasksSelectedCount, {
+          selected: selectedCount,
+          total: totalCount,
+        })
+      : formatTranslation(t.map.labels.tasksCount, {
+          count: totalCount,
+        });
+  }
+
+  // Assume collapsed state
+  const singular = totalCount === 1;
+  if (selectedCount === 0) {
+    return `${t.map.labels.itinerary} (${totalCount} ${singular ? t.map.labels.taskSingular : t.map.labels.taskPlural})`;
+  }
+
+  // Assume collapsed state with selection
+  return `${t.map.labels.itinerary} (${selectedCount}/${totalCount} ${t.map.labels.taskPlural})`;
 }
