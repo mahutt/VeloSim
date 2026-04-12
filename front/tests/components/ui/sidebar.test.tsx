@@ -106,4 +106,31 @@ describe('Sidebar', () => {
     expect(screen.getByPlaceholderText('Search...')).toBeInTheDocument();
     expect(screen.getByText('Footer')).toBeInTheDocument();
   });
+
+  it('renders non-collapsible sidebar variant', () => {
+    const { container } = render(
+      <SidebarProvider>
+        <Sidebar collapsible="none">
+          <SidebarContent>
+            <SidebarMenu>
+              <SidebarMenuItem>
+                <SidebarMenuButton>Static Sidebar</SidebarMenuButton>
+              </SidebarMenuItem>
+            </SidebarMenu>
+          </SidebarContent>
+        </Sidebar>
+      </SidebarProvider>
+    );
+
+    expect(screen.getByText('Static Sidebar')).toBeInTheDocument();
+    expect(
+      container.querySelector('[data-slot="sidebar"]')
+    ).toBeInTheDocument();
+  });
+
+  it('throws when sidebar is used outside provider', () => {
+    expect(() => render(<Sidebar />)).toThrow(
+      'useSidebar must be used within a SidebarProvider.'
+    );
+  });
 });

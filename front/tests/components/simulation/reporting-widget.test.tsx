@@ -26,19 +26,166 @@ import { fireEvent, render, screen } from '@testing-library/react';
 import { vi, describe, it, expect, afterEach } from 'vitest';
 
 const mockUseSimulation = vi.fn();
+const mockUsePreferences = vi.fn();
 
 vi.mock('~/providers/simulation-provider', () => ({
   useSimulation: () => mockUseSimulation(),
 }));
+vi.mock('~/hooks/use-preferences', () => ({
+  default: () => mockUsePreferences(),
+}));
 
 import ReportingWidget from '~/components/simulation/reporting-widget';
+import HQWidget from '~/components/simulation/hq-widget';
 
 describe('ReportingWidget', () => {
   afterEach(() => {
     mockUseSimulation.mockReset();
+    mockUsePreferences.mockReset();
+  });
+
+  it('renders HQWidget all-quiet state and toggles open', () => {
+    mockUsePreferences.mockReturnValue({
+      t: {
+        simulation: {
+          hqWidget: {
+            allQuiet: 'All quiet at HQ',
+            atHQ: 'at HQ',
+            noPendingShifts: 'No pending shifts',
+            driverSingular: 'driver',
+            driverPlural: 'drivers',
+            vehicleSingular: 'vehicle',
+            vehiclePlural: 'vehicles',
+          },
+        },
+        simulations: {
+          report: {
+            legend: {
+              servicingToDrivingRatio: 'Servicing to Driving Ratio',
+              vehicleUtilizationRatio: 'Vehicle Utilization Ratio',
+              averageTasksServicedPerShift: 'Average Tasks Serviced Per Shift',
+              averageTaskResponseTime: 'Average Task Response Time',
+              totalVehicleDistanceTravelled: 'Total Vehicle Distance Travelled',
+            },
+          },
+        },
+      },
+    });
+    mockUseSimulation.mockReturnValue({
+      state: {
+        HQWidgetState: {
+          entities: null,
+          driversAtHQ: [],
+          driversPendingShift: [],
+        },
+        reporting: {
+          servicingToDrivingRatio: 1,
+          vehicleUtilizationRatio: 1,
+          averageTasksServicedPerShift: 1,
+          averageTaskResponseTime: 1,
+          vehicleDistanceTraveled: 1,
+        },
+      },
+    });
+
+    render(<HQWidget />);
+    expect(screen.getByText('All quiet at HQ')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button'));
+    expect(screen.getByText('No pending shifts')).toBeInTheDocument();
+  });
+
+  it('renders HQWidget driver and vehicle entity labels and driver rows', () => {
+    mockUsePreferences.mockReturnValue({
+      t: {
+        simulation: {
+          hqWidget: {
+            allQuiet: 'All quiet at HQ',
+            atHQ: 'at HQ',
+            noPendingShifts: 'No pending shifts',
+            driverSingular: 'driver',
+            driverPlural: 'drivers',
+            vehicleSingular: 'vehicle',
+            vehiclePlural: 'vehicles',
+          },
+        },
+        simulations: {
+          report: {
+            legend: {
+              servicingToDrivingRatio: 'Servicing to Driving Ratio',
+              vehicleUtilizationRatio: 'Vehicle Utilization Ratio',
+              averageTasksServicedPerShift: 'Average Tasks Serviced Per Shift',
+              averageTaskResponseTime: 'Average Task Response Time',
+              totalVehicleDistanceTravelled: 'Total Vehicle Distance Travelled',
+            },
+          },
+        },
+      },
+    });
+
+    mockUseSimulation.mockReturnValue({
+      state: {
+        HQWidgetState: {
+          entities: { type: 'driver', count: 2 },
+          driversAtHQ: [
+            { id: 1, name: 'Driver A', minutesTillShift: -5 },
+            { id: 2, name: 'Driver B', minutesTillShift: 10 },
+          ],
+          driversPendingShift: [],
+        },
+        reporting: {
+          servicingToDrivingRatio: 1,
+          vehicleUtilizationRatio: 1,
+          averageTasksServicedPerShift: 1,
+          averageTaskResponseTime: 1,
+          vehicleDistanceTraveled: 1,
+        },
+      },
+    });
+    const { rerender } = render(<HQWidget />);
+    expect(screen.getByText('2 drivers at HQ')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button'));
+    expect(screen.getByText('Driver A')).toBeInTheDocument();
+    expect(screen.getByText('-0:05')).toBeInTheDocument();
+    expect(screen.getByText('0:10')).toBeInTheDocument();
+
+    mockUseSimulation.mockReturnValueOnce({
+      state: {
+        HQWidgetState: {
+          entities: { type: 'vehicle', count: 1 },
+          driversAtHQ: [],
+          driversPendingShift: [],
+        },
+        reporting: {
+          servicingToDrivingRatio: 1,
+          vehicleUtilizationRatio: 1,
+          averageTasksServicedPerShift: 1,
+          averageTaskResponseTime: 1,
+          vehicleDistanceTraveled: 1,
+        },
+      },
+    });
+    rerender(<HQWidget />);
+    expect(screen.getByText('1 vehicle at HQ')).toBeInTheDocument();
   });
 
   it('displays a compact summary in the header', () => {
+    mockUsePreferences.mockReturnValue({
+      t: {
+        simulations: {
+          report: {
+            legend: {
+              servicingToDrivingRatio: 'Servicing to Driving Ratio',
+              vehicleUtilizationRatio: 'Vehicle Utilization Ratio',
+              averageTasksServicedPerShift: 'Average Tasks Serviced Per Shift',
+              averageTaskResponseTime: 'Average Task Response Time',
+              totalVehicleDistanceTravelled: 'Total Vehicle Distance Travelled',
+            },
+          },
+        },
+      },
+    });
     mockUseSimulation.mockReturnValue({
       state: {
         reporting: {
@@ -57,6 +204,21 @@ describe('ReportingWidget', () => {
   });
 
   it('displays each reporting metric with formatted values', () => {
+    mockUsePreferences.mockReturnValue({
+      t: {
+        simulations: {
+          report: {
+            legend: {
+              servicingToDrivingRatio: 'Servicing to Driving Ratio',
+              vehicleUtilizationRatio: 'Vehicle Utilization Ratio',
+              averageTasksServicedPerShift: 'Average Tasks Serviced Per Shift',
+              averageTaskResponseTime: 'Average Task Response Time',
+              totalVehicleDistanceTravelled: 'Total Vehicle Distance Travelled',
+            },
+          },
+        },
+      },
+    });
     mockUseSimulation.mockReturnValue({
       state: {
         reporting: {
@@ -88,6 +250,21 @@ describe('ReportingWidget', () => {
   });
 
   it('expands details while hovered and collapses when hover ends', () => {
+    mockUsePreferences.mockReturnValue({
+      t: {
+        simulations: {
+          report: {
+            legend: {
+              servicingToDrivingRatio: 'Servicing to Driving Ratio',
+              vehicleUtilizationRatio: 'Vehicle Utilization Ratio',
+              averageTasksServicedPerShift: 'Average Tasks Serviced Per Shift',
+              averageTaskResponseTime: 'Average Task Response Time',
+              totalVehicleDistanceTravelled: 'Total Vehicle Distance Travelled',
+            },
+          },
+        },
+      },
+    });
     mockUseSimulation.mockReturnValue({
       state: {
         reporting: {

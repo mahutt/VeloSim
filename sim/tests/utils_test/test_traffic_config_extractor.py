@@ -22,6 +22,8 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 """
 
+import pytest
+
 from sim.utils.traffic_config_extractor import extract_traffic_config
 from sim.entities.map_payload import TrafficConfig
 
@@ -148,3 +150,46 @@ class TestExtractTrafficConfig:
         assert config is not None
         assert isinstance(config, TrafficConfig)
         assert config.traffic_level == "stop_events_test"
+
+    def test_no_traffic_level_without_global_returns_none(self) -> None:
+        scenario_content = {
+            "start_time": "day1:08:00",
+            "end_time": "day1:17:00",
+            "traffic": {"traffic_level": "no_traffic", "global": []},
+        }
+
+        config = extract_traffic_config(scenario_content)
+
+        assert config is None
+
+    def test_invalid_traffic_level_key_raises_value_error(self) -> None:
+        scenario_content = {
+            "start_time": "day1:08:00",
+            "end_time": "day1:17:00",
+            "traffic": {"traffic_level": "Invalid Key!"},
+        }
+
+        with pytest.raises(ValueError):
+            extract_traffic_config(scenario_content)
+
+    def test_no_traffic_with_global_schedule_keeps_config(self) -> None:
+        scenario_content = {
+            "start_time": "day1:08:00",
+            "end_time": "day1:17:00",
+            "traffic": {
+                "traffic_level": "no_traffic",
+                "global": [
+                    {
+                        "multiplier": 0.9,
+                        "start_time": "day1:08:00",
+                        "end_time": "day1:09:00",
+                    }
+                ],
+            },
+        }
+
+        config = extract_traffic_config(scenario_content)
+
+        assert config is not None
+        assert config.traffic_level is None
+        assert len(config.global_schedule) == 1

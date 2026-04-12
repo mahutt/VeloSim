@@ -23,9 +23,19 @@ SOFTWARE.
 """
 
 import pytest
+from typing import cast
 
 from sim.behaviour.default.default_RCNT_strategy import DefaultRCNTStrategy
+from sim.behaviour.resource_behaviour.resource_choose_next_task_strategy import (
+    DriverChooseNextTaskStrategy,
+)
+from sim.entities.driver import Driver
 from typing import Any
+
+
+class _BaseRCNTCaller(DriverChooseNextTaskStrategy):
+    def select_next_task(self, driver: Any) -> Any:
+        return driver
 
 
 class _FakeDriver:
@@ -51,3 +61,11 @@ def test_default_rcnt_strategy_raises_on_empty_list() -> None:
 
     with pytest.raises(IndexError):
         _ = strat.select_next_task(driver)  # type: ignore[arg-type]
+
+
+def test_driver_choose_next_task_strategy_base_raises() -> None:
+    with pytest.raises(NotImplementedError):
+        DriverChooseNextTaskStrategy.select_next_task(
+            _BaseRCNTCaller(),
+            cast(Driver, object()),
+        )

@@ -30,7 +30,15 @@ import pytest
 from fastapi.testclient import TestClient
 
 from back.auth.dependency import get_user_id
+from back.crud.traffic_template import TrafficTemplateCRUD
 from back.main import app
+from back.schemas.traffic_template import TrafficTemplateUpdateRequest
+from back.schemas.utils.validators import (
+    validate_latitude,
+    validate_longitude,
+    validate_unique_task_ids,
+)
+from sim.traffic.traffic_parser import TrafficParseError
 
 
 VALID_TRAFFIC_CSV = (
@@ -345,3 +353,170 @@ class TestTrafficTemplatesAPI:
 
         response = authenticated_client.delete("/api/v1/trafficTemplates/default")
         assert response.status_code == 403
+
+
+def test_validate_longitude_bounds_and_cast() -> None:
+    assert validate_longitude(180) == 180.0
+    assert validate_longitude(-180) == -180.0
+
+    with pytest.raises(ValueError, match="Longitude must be between -180 and 180"):
+        validate_longitude(181)
+
+
+def test_validate_latitude_bounds_and_cast() -> None:
+    assert validate_latitude(90) == 90.0
+    assert validate_latitude(-90) == -90.0
+
+    with pytest.raises(ValueError, match="Latitude must be between -90 and 90"):
+        validate_latitude(-91)
+
+
+def test_validate_unique_task_ids_cases() -> None:
+    assert validate_unique_task_ids(None) == []
+    assert validate_unique_task_ids((1, 2, 3)) == [1, 2, 3]
+
+    with pytest.raises(ValueError, match="Duplicate task_id"):
+        validate_unique_task_ids([1, 2, 1])
+
+    with pytest.raises(ValueError, match="task_ids must be a list of integers"):
+        validate_unique_task_ids(5)
+
+
+def test_traffic_template_update_requires_at_least_one_field() -> None:
+    with pytest.raises(Exception):
+        TrafficTemplateUpdateRequest(content=None, description=None)
+
+
+@patch("back.api.v1.traffic_templates.user_crud.get")
+@patch("back.api.v1.traffic_templates.TrafficParser.parse")
+def test_validate_template_parse_error_returns_invalid_payload(
+    mock_parse: MagicMock,
+    mock_get_user: MagicMock,
+    authenticated_client: TestClient,
+) -> None:
+    admin = MagicMock(is_admin=True, is_enabled=True)
+    mock_get_user.return_value = admin
+    mock_parse.side_effect = TrafficParseError(["bad header"])
+
+    response = authenticated_client.post(
+        "/api/v1/trafficTemplates/validate",
+        json={"content": VALID_TRAFFIC_CSV},
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["valid"] is False
+    assert "bad header" in payload["errors"][0]
+
+
+@patch("back.api.v1.traffic_templates.user_crud.get")
+@patch("back.api.v1.traffic_templates.traffic_template_crud.get_optional_by_key")
+@patch("back.api.v1.traffic_templates.traffic_template_crud.create")
+@patch("back.api.v1.traffic_templates.TrafficParser.parse")
+def test_create_template_parse_error_returns_400(
+    mock_parse: MagicMock,
+    mock_create: MagicMock,
+    mock_get_optional: MagicMock,
+    mock_get_user: MagicMock,
+    authenticated_client: TestClient,
+) -> None:
+    admin = MagicMock(is_admin=True, is_enabled=True)
+    mock_get_user.return_value = admin
+    mock_get_optional.return_value = None
+    mock_create.return_value = None
+    mock_parse.side_effect = TrafficParseError(["bad row"])
+
+    response = authenticated_client.post(
+        "/api/v1/trafficTemplates/",
+        json={"key": "default", "content": VALID_TRAFFIC_CSV},
+    )
+
+    assert response.status_code == 400
+    assert "Invalid traffic template content" in response.json()["detail"]
+
+
+@patch("back.api.v1.traffic_templates.user_crud.get")
+@patch("back.api.v1.traffic_templates.traffic_template_crud.update")
+@patch("back.api.v1.traffic_templates.TrafficParser.parse")
+def test_update_template_parse_error_returns_400(
+    mock_parse: MagicMock,
+    mock_update: MagicMock,
+    mock_get_user: MagicMock,
+    authenticated_client: TestClient,
+) -> None:
+    admin = MagicMock(is_admin=True, is_enabled=True)
+    mock_get_user.return_value = admin
+    mock_update.return_value = None
+    mock_parse.side_effect = TrafficParseError(["invalid duration"])
+
+    response = authenticated_client.put(
+        "/api/v1/trafficTemplates/default",
+        json={"content": VALID_TRAFFIC_CSV},
+    )
+
+    assert response.status_code == 400
+    assert "Invalid traffic template content" in response.json()["detail"]
+
+
+def test_traffic_template_crud_create_update_delete_paths() -> None:
+    crud = TrafficTemplateCRUD()
+    mock_db = MagicMock()
+
+    template_data = MagicMock()
+    template_data.key = "default"
+    template_data.content = VALID_TRAFFIC_CSV
+    template_data.description = "desc"
+
+    created = crud.create(mock_db, template_data)
+    assert created.key == "default"
+    mock_db.add.assert_called_once()
+    mock_db.commit.assert_called_once()
+    mock_db.refresh.assert_called_once()
+
+    template = MagicMock()
+    query = MagicMock()
+    query.filter.return_value.first.return_value = template
+    mock_db.query.return_value = query
+    assert crud.get_by_key(mock_db, "default") is template
+
+    update_data = MagicMock()
+    update_data.model_dump.return_value = {"description": "updated"}
+    updated = crud.update(mock_db, "default", update_data)
+    assert updated is template
+    assert template.description == "updated"
+
+    crud.delete(mock_db, "default")
+    mock_db.delete.assert_called_with(template)
+
+
+def test_traffic_template_crud_error_branches() -> None:
+    crud = TrafficTemplateCRUD()
+    mock_db = MagicMock()
+
+    invalid = MagicMock()
+    invalid.key = ""
+    invalid.content = "x"
+    invalid.description = None
+    with pytest.raises(Exception):
+        crud.create(mock_db, invalid)
+
+    query = MagicMock()
+    query.filter.return_value.first.return_value = None
+    mock_db.query.return_value = query
+    with pytest.raises(Exception):
+        crud.get_by_key(mock_db, "missing")
+
+    mock_db.query.return_value = query
+    assert crud.get_optional_by_key(mock_db, "missing") is None
+
+    count_query = MagicMock()
+    count_query.scalar.return_value = 0
+    data_query = MagicMock()
+    ordered = data_query.order_by.return_value
+    offsetted = ordered.offset.return_value
+    limited = offsetted.limit.return_value
+    limited.all.return_value = []
+    mock_db.query.side_effect = [count_query, data_query]
+    rows, total = crud.get_all(mock_db, skip=0, limit=5)
+    assert rows == []
+    assert total == 0

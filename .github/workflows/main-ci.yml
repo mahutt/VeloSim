@@ -131,7 +131,7 @@ jobs:
         env:
           DATABASE_URL: postgresql://velosim_test:velosim_test@localhost:5432/velosim_test
         run: |
-          pytest back --cov=back --cov-report=term-missing --cov-report=xml --cov-fail-under=70
+          pytest back --cov=back --cov-report=term-missing --cov-report=xml --cov-fail-under=90
 
       - name: Check for model-migration mismatches
         env:
@@ -197,7 +197,7 @@ jobs:
 
       - name: Run tests with pytest
         run: |
-          pytest sim --cov=sim --cov-report=term-missing --cov-report=xml --cov-fail-under=70
+          pytest sim --cov=sim --cov-report=term-missing --cov-report=xml --cov-fail-under=90
 
       - name: Upload simulation coverage to Codecov
         uses: codecov/codecov-action@v5.5.1

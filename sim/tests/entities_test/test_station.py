@@ -24,6 +24,8 @@ SOFTWARE.
 
 import pytest
 import simpy
+from types import SimpleNamespace
+from typing import Any, cast
 from sim.entities.station import Station
 from sim.entities.position import Position
 from sim.entities.battery_swap_task import BatterySwapTask
@@ -141,6 +143,7 @@ class TestStation:
         tasks: list[Task] = [task, task2, task3, task4, task5]
         station_with_tasks = Station(2, "Busy Station", default_position, tasks)
         assert station_with_tasks.get_task_count() == 5
+        assert station_with_tasks.get_visible_task_count() == 5
 
         station.add_task(task)
         station.add_task(task2)
@@ -157,3 +160,56 @@ class TestStation:
         returned_position = station.get_position()
         assert returned_position == default_position
         assert returned_position.get_position() == [-73.5673, 45.5017]
+
+    def test_add_pop_up_task_marks_station_updated(
+        self, default_position: Position
+    ) -> None:
+        station = Station(1, "Pop-up Station", default_position)
+        task = BatterySwapTask(99)
+
+        station.add_pop_up_task(task)
+
+        assert station.pop_up_tasks == [task]
+        assert station.has_updated is True
+
+    def test_set_behaviour_and_check_for_new_task(
+        self, default_position: Position
+    ) -> None:
+        station = Station(1, "Behaviour Station", default_position)
+        new_task = BatterySwapTask(10)
+        behaviour = SimpleNamespace(
+            TPU_strategy=SimpleNamespace(check_for_new_task=lambda _s: [new_task])
+        )
+
+        station.set_behaviour(cast(Any, behaviour))
+        station.check_for_new_task()
+
+        assert new_task in station.tasks
+        assert new_task in station.pop_up_tasks
+
+    def test_clear_update_resets_station_flag(self, default_position: Position) -> None:
+        station = Station(1, "Reset Station", default_position)
+        station.has_updated = True
+
+        station.clear_update()
+
+        assert station.has_updated is False
+
+    def test_station_run_process_executes_ticks(
+        self, simpy_env: simpy.Environment, default_position: Position
+    ) -> None:
+        station = Station(1, "Runner Station", default_position)
+        station.env = simpy_env
+        station.set_behaviour(
+            cast(
+                Any,
+                SimpleNamespace(
+                    TPU_strategy=SimpleNamespace(check_for_new_task=lambda _: [])
+                ),
+            )
+        )
+
+        simpy_env.process(station.run())
+        simpy_env.run(until=3)
+
+        assert simpy_env.now == 3

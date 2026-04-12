@@ -28,7 +28,13 @@ from fastapi.testclient import TestClient
 from typing import Generator
 from back.main import app
 from back.auth.dependency import get_user_id
-from back.schemas.frontend_log import FrontendLogEntry
+from back.models.scenario import Scenario
+from back.models.sim_frame import SimFrame
+from back.models.sim_instance import SimInstance
+from back.models.sim_keyframe import SimKeyframe
+from back.models.task_status import TaskStatus
+from back.models.user import User
+from back.schemas.frontend_log import FrontendLogEntry, FrontendLogResponse
 from back.services.frontend_log_service import frontend_log_service
 from back.api.v1.logs import _rate_limit_store, MAX_LOGS_PER_MINUTE
 
@@ -268,3 +274,52 @@ class TestFrontendLogEndpoint:
         )
         assert response.status_code == 201
         assert response.json()["success"] is True
+
+
+def test_model_repr_helpers_cover_string_paths() -> None:
+    user = User(id=1, username="u", password_hash="x", is_admin=True, is_enabled=True)
+    scenario = Scenario(id=1, name="s", content={}, user_id=1)
+    sim_instance = SimInstance(id=1, user_id=1, name="demo")
+    keyframe = SimKeyframe(
+        id=1,
+        sim_instance_id=1,
+        sim_seconds_elapsed=1.0,
+        frame_data={},
+    )
+    frame = SimFrame(
+        id=1,
+        sim_instance_id=1,
+        seq_number=1,
+        sim_seconds_elapsed=0.5,
+        frame_data={},
+        is_key=False,
+    )
+
+    assert "User" in repr(user)
+    assert "Scenario" in repr(scenario)
+    assert "SimInstance" in repr(sim_instance)
+    assert "SimKeyframe" in repr(keyframe)
+    assert frame.__tablename__ == "sim_frames"
+
+
+def test_task_status_open_property_branches() -> None:
+    assert TaskStatus.OPEN.is_open is True
+    assert TaskStatus.CLOSED.is_open is False
+
+
+def test_frontend_log_entry_rejects_blank_message_and_response_defaults() -> None:
+    with pytest.raises(Exception):
+        FrontendLogEntry(
+            message="   ",
+            timestamp="2026-01-01T00:00:00Z",
+            stack=None,
+            context=None,
+            userAgent=None,
+            url=None,
+            entityType=None,
+            entityId=None,
+            errorType=None,
+        )
+
+    resp = FrontendLogResponse(success=True)
+    assert resp.message == "Log recorded"
