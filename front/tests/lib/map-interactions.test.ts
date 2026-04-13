@@ -34,6 +34,8 @@ import type { StationDragDropCallback } from '~/lib/map-interactions';
 import type { Map as MapboxMap } from 'mapbox-gl';
 import { MapLayer, MapSource } from '~/lib/map-helpers';
 import { SelectedItemType } from '~/components/map/selected-item-bar';
+import { mockSimulationStateManager } from 'tests/mocks';
+import type SimulationStateManager from '~/lib/simulation-state-manager';
 // setupMapHoverHandlers imported above
 
 test('setupMapClickHandlers registers event listeners', () => {
@@ -993,6 +995,7 @@ describe('setupStationDragHandlers', () => {
   ) {
     return setupStationDragHandlers(
       map,
+      mockSimulationStateManager as SimulationStateManager,
       onDrop,
       onHighlight,
       getMultiSelectedStationIds,

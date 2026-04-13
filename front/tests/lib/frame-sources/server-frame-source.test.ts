@@ -161,17 +161,6 @@ describe('ServerFrameSource', () => {
       expect(mockOnFrame).toHaveBeenCalledWith(payload);
     });
 
-    it('should handle payload as string', () => {
-      frameSource.start();
-
-      const payload = createMockPayload();
-      mockWebSocket.onmessage({
-        data: JSON.stringify({ seq: 1, payload: JSON.stringify(payload) }),
-      });
-
-      expect(mockOnFrame).toHaveBeenCalledWith(payload);
-    });
-
     it('should handle parse errors', () => {
       frameSource.start();
 

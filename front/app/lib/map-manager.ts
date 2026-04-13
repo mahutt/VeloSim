@@ -215,6 +215,7 @@ export default class MapManager {
 
     setupStationDragHandlers(
       map,
+      state,
       (stationIds, driverId) => {
         const driver = this.state.getDriver(driverId);
         if (!driver) {

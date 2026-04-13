@@ -141,6 +141,32 @@ export interface GetSimulationReportResponse {
   averageTaskResponseTime: number | null;
   vehicleDistanceTraveled: number | null;
 }
+export interface SeekFrame {
+  sim_instance_id: number;
+  seq_number: number;
+  sim_seconds_elapsed: number;
+  frame_data: BackendPayload;
+  is_key: boolean;
+  id: number;
+  created_at: string;
+}
+
+export interface SeekResponse {
+  position: {
+    sim_id: string;
+    target_sim_seconds: number;
+  };
+  frames: {
+    initial_frames: SeekFrame[];
+    future_frames: SeekFrame[];
+    has_more_frames: boolean;
+  };
+  state: {
+    current_sim_seconds: number;
+    is_at_live_edge: boolean;
+    playback_speed: number;
+  };
+}
 
 // GBFS Response Types
 
@@ -323,6 +349,14 @@ export interface SimulationReport {
   vehicleDistanceTraveled: number;
 }
 
+export interface PayloadClock {
+  simSecondsPassed: number;
+  simMinutesPassed: number;
+  realSecondsPassed: number;
+  realMinutesPassed: number;
+  startTime: number;
+}
+
 export interface BackendPayload {
   simId: string;
   headquarters: Headquarters;
@@ -330,13 +364,7 @@ export interface BackendPayload {
   stations: Station[];
   drivers: Driver[];
   vehicles: Vehicle[];
-  clock: {
-    simSecondsPassed: number;
-    simMinutesPassed: number;
-    realSecondsPassed: number;
-    realMinutesPassed: number;
-    startTime: number;
-  };
+  clock: PayloadClock;
   reporting: SimulationReport;
 }
 

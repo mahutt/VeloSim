@@ -140,7 +140,7 @@ function DriverTaskGroupItem({
   onUnassign: () => void;
 }) {
   const { t } = usePreferences();
-  const { engine } = useSimulation();
+  const { engine, state } = useSimulation();
 
   return (
     <div
@@ -192,13 +192,13 @@ function DriverTaskGroupItem({
       onMouseLeave={() => {
         engine.setTaskHoveredStationId(null);
       }}
-      className={
+      className={`${state.blockAssignments ? 'pointer-events-none opacity-50 ' : ''}${
         showDropIndicator
           ? isDraggingDown
             ? 'border-b-2 border-blue-500 pb-1'
             : 'border-t-2 border-blue-500 pt-1'
           : ''
-      }
+      }`}
     >
       <div
         draggable={!isServicing}

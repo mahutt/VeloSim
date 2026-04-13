@@ -210,35 +210,36 @@ describe('SimulationEngine', () => {
   });
 
   describe('scrub', () => {
-    it('calls localFrameSource.getMaxFrame when scrubbing to end', () => {
-      (
-        mockSimulationStateManager.getSimulationSecondsPassed as Mock
-      ).mockReturnValue(1000);
+    it('calls localFrameSource.getFrame without buffering if the frame is available', async () => {
+      (mockLocalFrameSource.hasFrame as Mock).mockReturnValueOnce(true);
+      (mockLocalFrameSource.getFrame as Mock).mockReturnValueOnce(
+        makePayload()
+      );
       engine.scrub(1000);
-      expect(mockLocalFrameSource.getMaxFrame).toHaveBeenCalled();
-    });
-    it('calls localFrameSource.getFrame when scrubbing to a past time', () => {
-      (
-        mockSimulationStateManager.getSimulationSecondsPassed as Mock
-      ).mockReturnValue(1000);
-      engine.scrub(500);
-      expect(mockLocalFrameSource.getFrame).toHaveBeenCalledWith(500);
+      expect(mockLocalFrameSource.getFrame).toHaveBeenCalledWith(1000);
+      expect(mockSimulationStateManager.setIsBuffering).not.toHaveBeenCalled();
     });
   });
 
   describe('commitScrub', () => {
-    it('switches to local mode when scrubbing to past', () => {
+    it('switches to local mode when scrubbing to past', async () => {
+      (mockLocalFrameSource.getFrame as Mock).mockResolvedValueOnce(
+        makePayload()
+      );
       (
         mockSimulationStateManager.getSimulationSecondsPassed as Mock
       ).mockReturnValue(1000);
-      engine.commitScrub(500);
+      await engine.commitScrub(500);
       expect(engine['mode']).toBe(SimulationMode.Local);
     });
-    it('switches to server mode when scrubbing to end', () => {
+    it('switches to server mode when scrubbing to end', async () => {
+      (mockLocalFrameSource.getFrame as Mock).mockResolvedValueOnce(
+        makePayload()
+      );
       (
         mockSimulationStateManager.getSimulationSecondsPassed as Mock
       ).mockReturnValue(1000);
-      engine.commitScrub(1000);
+      await engine.commitScrub(1000);
       expect(engine['mode']).toBe(SimulationMode.Server);
     });
   });

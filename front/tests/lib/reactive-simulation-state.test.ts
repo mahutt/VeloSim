@@ -48,6 +48,7 @@ describe('areReactiveSimulationStatesEqual', () => {
   it('returns true for a deep clone of a non-trivial state', () => {
     const a: ReactiveSimulationState = {
       isLoading: false,
+      isBuffering: false,
       formattedSimTime: '08:30',
       currentDay: 2,
       paused: true,

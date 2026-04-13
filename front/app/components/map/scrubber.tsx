@@ -42,12 +42,10 @@ export default function Scrubber() {
   const [open, setOpen] = useState(false);
 
   const handleChange = (value: number[]) => {
-    console.log('Slider value changed to: ', value);
     engine.scrub(value[0]);
   };
 
   const handleCommit = () => {
-    console.log('Slider value committed: ', scrubSimulationSecond);
     engine.commitScrub(scrubSimulationSecond);
   };
 
@@ -63,7 +61,8 @@ export default function Scrubber() {
         onLostPointerCapture={handleCommit}
         min={0}
         max={simulationSecondsPassed}
-        // The backend emits a keyframe on every 20th frame, so we set the step to that to ensure the scrubber snaps to keyframes.
+        // We set the step so that scrubbing always lands
+        // on a keyframe for efficient rendering on scrub
         step={SIMULATION_FRAMES_PER_KEY_FRAME}
         className={
           'z-10 relative flex w-full touch-none items-center select-none data-[disabled]:opacity-50 data-[orientation=vertical]:h-full data-[orientation=vertical]:min-h-44 data-[orientation=vertical]:w-auto data-[orientation=vertical]:flex-col'

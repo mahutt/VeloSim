@@ -34,6 +34,9 @@ export interface ReactiveSimulationState {
   // loader
   isLoading: boolean;
 
+  // buffer overlay
+  isBuffering: boolean;
+
   // selected item bar
   selectedItems: SelectedItem[];
   blockAssignments: boolean;
@@ -71,6 +74,7 @@ export interface ReactiveSimulationState {
 export const DEFAULT_REACTIVE_SIMULATION_STATE: ReactiveSimulationState = {
   isLoading: true,
   selectedItems: [],
+  isBuffering: false,
   blockAssignments: false,
   pendingAssignment: null,
   pendingAssignmentLoading: false,
@@ -104,6 +108,7 @@ export function areReactiveSimulationStatesEqual(
   return (
     a.isLoading === b.isLoading &&
     areSelectedItemsEqual(a.selectedItems, b.selectedItems) &&
+    a.isBuffering === b.isBuffering &&
     a.blockAssignments === b.blockAssignments &&
     arePendingAssignmentsEqual(a.pendingAssignment, b.pendingAssignment) &&
     a.pendingAssignmentLoading === b.pendingAssignmentLoading &&

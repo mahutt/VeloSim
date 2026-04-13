@@ -41,8 +41,11 @@ import {
   type BackendPayload,
   type Driver,
   type Headquarters,
+  type PayloadClock,
   type PendingAssignment,
   type Route,
+  type SeekFrame,
+  type SeekResponse,
   type Simulation,
   type Station,
   type StationTask,
@@ -50,6 +53,18 @@ import {
 } from '~/types';
 import type { ResourceItemElement } from '~/components/resource/resource-item';
 import type { HQWidgetProps } from '~/components/simulation/hq-widget';
+
+export function makePayloadClock(
+  overrides: Partial<PayloadClock> = {}
+): PayloadClock {
+  return {
+    simSecondsPassed: overrides.simSecondsPassed ?? 0,
+    simMinutesPassed: overrides.simSecondsPassed ?? 0,
+    realSecondsPassed: overrides.simSecondsPassed ?? 0,
+    realMinutesPassed: overrides.simSecondsPassed ?? 0,
+    startTime: overrides.simSecondsPassed ?? 0,
+  };
+}
 
 export function makePayload(
   overrides: Partial<BackendPayload> = {}
@@ -63,13 +78,7 @@ export function makePayload(
     stations: overrides.stations ?? [],
     drivers: overrides.drivers ?? [],
     vehicles: overrides.vehicles ?? [],
-    clock: overrides.clock ?? {
-      simSecondsPassed: 0,
-      simMinutesPassed: 0,
-      realSecondsPassed: 0,
-      realMinutesPassed: 0,
-      startTime: Date.now(),
-    },
+    clock: overrides.clock ?? makePayloadClock(),
     reporting: overrides.reporting ?? {
       servicingToDrivingRatio: 0,
       vehicleUtilizationRatio: 0,
@@ -277,5 +286,40 @@ export function makeRoute(overrides: Partial<Route> = {}): Route {
     coordinates: overrides.coordinates ?? [],
     nextStopIndex: overrides.nextStopIndex ?? 0,
     trafficRanges: overrides.trafficRanges ?? [],
+  };
+}
+
+export function makeSeekResponse(
+  overrides: Partial<SeekResponse> = {}
+): SeekResponse {
+  const sim_id =
+    overrides.position?.sim_id ?? `${Math.floor(Math.random() * 10000)}`;
+  return {
+    position: {
+      sim_id: overrides.position?.sim_id ?? sim_id,
+      target_sim_seconds: overrides.position?.target_sim_seconds ?? 0,
+    },
+    frames: {
+      initial_frames: overrides.frames?.initial_frames ?? [],
+      future_frames: overrides.frames?.future_frames ?? [],
+      has_more_frames: overrides.frames?.has_more_frames ?? false,
+    },
+    state: {
+      current_sim_seconds: overrides.state?.current_sim_seconds ?? 0,
+      is_at_live_edge: overrides.state?.is_at_live_edge ?? false,
+      playback_speed: overrides.state?.playback_speed ?? 0,
+    },
+  };
+}
+
+export function makeSeekFrame(overrides: Partial<SeekFrame> = {}): SeekFrame {
+  return {
+    sim_instance_id: overrides.sim_instance_id ?? 0,
+    seq_number: overrides.seq_number ?? 0,
+    sim_seconds_elapsed: overrides.sim_seconds_elapsed ?? 0,
+    frame_data: overrides.frame_data ?? makePayload(),
+    is_key: overrides.is_key ?? false,
+    id: overrides.id ?? 0,
+    created_at: overrides.created_at ?? '2024-02-02T12:00:00Z',
   };
 }
