@@ -39,7 +39,7 @@ def test_initial_state() -> None:
 
     assert metrics.total_driving_time == 0
     assert metrics.total_servicing_time == 0
-    assert metrics.tasks_completed_per_shift == []
+    assert metrics.tasks_completed_per_shift == 0
     assert metrics.get_vehicle_distance_traveled() == 0.0
 
 
@@ -76,62 +76,47 @@ def test_increment_servicing_time() -> None:
     assert metrics.total_driving_time == 0
 
 
-def test_add_task_count_for_shift_single_entry() -> None:
+def test_increment_task_completed() -> None:
     """
-    add_task_count_for_shift should store a single task count.
+    increment_task_completed should increase tasks_completed_per_shift.
 
     Returns:
         None
     """
     metrics = SimulationReport()
 
-    metrics.add_task_count_for_shift(5)
+    metrics.increment_task_completed()
+    metrics.increment_task_completed()
+    metrics.increment_task_completed()
 
-    assert metrics.tasks_completed_per_shift == [5]
-
-
-def test_add_task_count_for_shift_multiple_entries() -> None:
-    """
-    add_task_count_for_shift should store multiple task counts in order.
-
-    Returns:
-        None
-    """
-    metrics = SimulationReport()
-
-    metrics.add_task_count_for_shift(3)
-    metrics.add_task_count_for_shift(7)
-    metrics.add_task_count_for_shift(2)
-
-    assert metrics.tasks_completed_per_shift == [3, 7, 2]
+    assert metrics.tasks_completed_per_shift == 3
 
 
 def test_get_average_tasks_per_shift_normal_case() -> None:
     """
-    get_average_tasks_per_shift should return correct average.
+    get_average_tasks_per_shift should return total tasks / active drivers.
 
     Returns:
         None
     """
     metrics = SimulationReport()
 
-    metrics.add_task_count_for_shift(4)
-    metrics.add_task_count_for_shift(6)
-    metrics.add_task_count_for_shift(10)
+    for _ in range(20):
+        metrics.increment_task_completed()
 
-    assert metrics.get_average_tasks_per_shift() == pytest.approx(20 / 3)
+    assert metrics.get_average_tasks_per_shift(4) == pytest.approx(5.0)
 
 
-def test_get_average_tasks_per_shift_empty() -> None:
+def test_get_average_tasks_per_shift_no_active_drivers() -> None:
     """
-    get_average_tasks_per_shift should return 0.0 when list is empty.
+    get_average_tasks_per_shift should return 0.0 when no active drivers.
 
     Returns:
         None
     """
     metrics = SimulationReport()
 
-    assert metrics.get_average_tasks_per_shift() == 0.0
+    assert metrics.get_average_tasks_per_shift(0) == 0.0
 
 
 def test_get_servicing_to_driving_ratio_normal_case() -> None:
@@ -178,14 +163,14 @@ def test_reset_clears_all_metrics() -> None:
 
     metrics.increment_driving_time()
     metrics.increment_servicing_time()
-    metrics.add_task_count_for_shift(5)
-    metrics.add_task_count_for_shift(8)
+    metrics.increment_task_completed()
+    metrics.increment_task_completed()
 
     metrics.reset()
 
     assert metrics.total_driving_time == 0
     assert metrics.total_servicing_time == 0
-    assert metrics.tasks_completed_per_shift == []
+    assert metrics.tasks_completed_per_shift == 0
 
 
 def test_reset_on_fresh_instance() -> None:
@@ -201,7 +186,7 @@ def test_reset_on_fresh_instance() -> None:
 
     assert metrics.total_driving_time == 0
     assert metrics.total_servicing_time == 0
-    assert metrics.tasks_completed_per_shift == []
+    assert metrics.tasks_completed_per_shift == 0
 
 
 def test_get_average_service_time_for_tasks_normal_case() -> None:
@@ -290,7 +275,7 @@ def test_restore_state_rehydrates_metrics() -> None:
     metrics.restore_state(
         total_driving_time=12.0,
         total_servicing_time=6.0,
-        tasks_completed_per_shift=[2, 4],
+        tasks_completed_per_shift=6,
         response_times=[10.0, 20.0],
         vehicle_idle_time=5.0,
         vehicle_active_time=15.0,
@@ -299,40 +284,26 @@ def test_restore_state_rehydrates_metrics() -> None:
 
     assert metrics.total_driving_time == 12.0
     assert metrics.total_servicing_time == 6.0
-    assert metrics.tasks_completed_per_shift == [2, 4]
+    assert metrics.tasks_completed_per_shift == 6
     assert metrics.response_times == [10.0, 20.0]
     assert metrics.vehicle_idle_time == 5.0
     assert metrics.vehicle_active_time == 15.0
     assert metrics.get_vehicle_distance_traveled() == pytest.approx(42.5)
 
 
-def test_add_task_count_for_shift_allows_zero() -> None:
+def test_increment_task_completed_large_count() -> None:
     """
-    add_task_count_for_shift should correctly store zero
-    as a valid shift task count.
+    increment_task_completed should handle many increments correctly.
 
     Returns:
         None
     """
     metrics = SimulationReport()
 
-    metrics.add_task_count_for_shift(0)
+    for _ in range(1000):
+        metrics.increment_task_completed()
 
-    assert metrics.tasks_completed_per_shift == [0]
-
-
-def test_add_task_count_for_shift_large_value() -> None:
-    """
-    add_task_count_for_shift should handle large task counts.
-
-    Returns:
-        None
-    """
-    metrics = SimulationReport()
-
-    metrics.add_task_count_for_shift(1000)
-
-    assert metrics.tasks_completed_per_shift == [1000]
+    assert metrics.tasks_completed_per_shift == 1000
 
 
 def test_increment_vehicle_idle_time() -> None:

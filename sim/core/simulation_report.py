@@ -41,7 +41,7 @@ class SimulationReport:
     def __init__(self) -> None:
         self.total_driving_time: float = 0.0
         self.total_servicing_time: float = 0.0
-        self.tasks_completed_per_shift: list[int] = []
+        self.tasks_completed_per_shift: int = 0
         self.response_times: list[float] = []
         self.vehicle_idle_time: float = 0.0
         self.vehicle_active_time: float = 0.0
@@ -56,7 +56,7 @@ class SimulationReport:
         """
         self.total_driving_time = 0
         self.total_servicing_time = 0
-        self.tasks_completed_per_shift = []
+        self.tasks_completed_per_shift = 0
         self.response_times = []
         self.vehicle_idle_time = 0
         self.vehicle_active_time = 0
@@ -98,17 +98,14 @@ class SimulationReport:
         """
         self.vehicle_active_time += 1
 
-    def add_task_count_for_shift(self, task_count: int) -> None:
+    def increment_task_completed(self) -> None:
         """
-        Adds task count for a driver's shift.
-
-        Args:
-            task_count (int): Number of tasks completed during the shift.
+        Increment the total number of tasks completed.
 
         Returns:
             None
         """
-        self.tasks_completed_per_shift.append(task_count)
+        self.tasks_completed_per_shift += 1
 
     def add_service_time(self, service_time: float) -> None:
         """
@@ -175,16 +172,20 @@ class SimulationReport:
 
         return self.total_servicing_time / self.total_driving_time
 
-    def get_average_tasks_per_shift(self) -> float:
+    def get_average_tasks_per_shift(self, active_driver_count: int) -> float:
         """
-        Retrieves the average task per shift
+        Computes average tasks completed per active driver.
+
+        Args:
+            active_driver_count (int): Number of drivers currently active on the map.
+
         Returns:
-            float: average task per shift.
+            float: average tasks per active driver, or 0.0 if no active drivers.
         """
-        if len(self.tasks_completed_per_shift) == 0:
+        if active_driver_count == 0:
             return 0.0
 
-        return sum(self.tasks_completed_per_shift) / len(self.tasks_completed_per_shift)
+        return self.tasks_completed_per_shift / active_driver_count
 
     def get_vehicle_utilization_ratio(self) -> float:
         """
@@ -240,7 +241,7 @@ class SimulationReport:
         self,
         total_driving_time: float,
         total_servicing_time: float,
-        tasks_completed_per_shift: list[int],
+        tasks_completed_per_shift: int,
         response_times: list[float],
         vehicle_idle_time: float,
         vehicle_active_time: float,
@@ -257,8 +258,7 @@ class SimulationReport:
         Args:
             total_driving_time (float): Total accumulated driving time.
             total_servicing_time (float): Total accumulated servicing time.
-            tasks_completed_per_shift (list[int]):
-            Number of tasks completed per driver shift.
+            tasks_completed_per_shift (int): Total tasks completed.
             response_times (list[float]): Recorded
             response times for completed tasks.
             vehicle_idle_time (float): Total time vehicles spent idle.

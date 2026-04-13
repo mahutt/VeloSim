@@ -42,6 +42,19 @@ from grafana_logging.logger import get_logger
 logger = get_logger(__name__)
 
 
+def _coerce_tasks_completed(value: object) -> int:
+    """Convert tasks_completed_per_shift from any persisted format to int.
+
+    Old keyframes stored this as a list[int] (per-shift counts).
+    New keyframes store it as a plain int (running total).
+    """
+    if isinstance(value, int):
+        return value
+    if isinstance(value, list):
+        return sum(int(v) for v in value)
+    return 0
+
+
 class ReplayParser:
     """
     Reconstructs InputParameter from Scenario + Keyframe DTOs.
@@ -257,7 +270,9 @@ class ReplayParser:
         sim_report.restore_state(
             total_driving_time=float(snapshot.get("total_driving_time", 0)),
             total_servicing_time=float(snapshot.get("total_servicing_time", 0)),
-            tasks_completed_per_shift=snapshot.get("tasks_completed_per_shift", []),
+            tasks_completed_per_shift=_coerce_tasks_completed(
+                snapshot.get("tasks_completed_per_shift", 0)
+            ),
             response_times=snapshot.get("response_times", []),
             vehicle_idle_time=float(snapshot.get("vehicle_idle_time", 0)),
             vehicle_active_time=float(snapshot.get("vehicle_active_time", 0)),

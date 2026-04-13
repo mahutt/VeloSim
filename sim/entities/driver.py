@@ -467,6 +467,7 @@ class Driver:
 
             # increment completed task count for reporting.
             self.vehicle.tasks_completed += 1
+            self.env.report.increment_task_completed()
 
             # Get service time and add it to reporting.
             spawn_time = getattr(task, "spawn_time", 0)
@@ -1029,7 +1030,6 @@ class Driver:
                 self.unassign_task(task)
 
             if self.vehicle is not None:
-                self.env.report.add_task_count_for_shift(self.vehicle.tasks_completed)
                 self.vehicle.tasks_completed = 0
             self.unassign_vehicle()
             self.set_state(DriverState.OFF_SHIFT)

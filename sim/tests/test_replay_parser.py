@@ -453,7 +453,7 @@ def test_replay_parser_restores_simulation_report() -> None:
         "reportingSnapshot": {
             "total_driving_time": 100,
             "total_servicing_time": 50,
-            "tasks_completed_per_shift": [1, 2],
+            "tasks_completed_per_shift": 3,
             "response_times": [10.5],
             "vehicle_idle_time": 20,
             "vehicle_active_time": 80,
@@ -466,11 +466,65 @@ def test_replay_parser_restores_simulation_report() -> None:
 
     assert report.total_driving_time == 100
     assert report.total_servicing_time == 50
-    assert report.tasks_completed_per_shift == [1, 2]
+    assert report.tasks_completed_per_shift == 3
     assert report.response_times == [10.5]
     assert report.vehicle_idle_time == 20
     assert report.vehicle_active_time == 80
     assert report._completed_vehicle_distance == 123.4
+
+
+def test_replay_parser_restores_simulation_report_legacy_list_format() -> None:
+    """Old keyframes stored tasks_completed_per_shift as list[int]; should be summed."""
+
+    scenario_json = {"start_time": "08:00", "end_time": "10:00"}
+
+    keyframe_json = {
+        "clock": {"simSecondsPassed": 0, "startTime": 0},
+        "stations": [],
+        "vehicles": [],
+        "drivers": [],
+        "tasks": [],
+        "reportingSnapshot": {
+            "total_driving_time": 0,
+            "total_servicing_time": 0,
+            "tasks_completed_per_shift": [2, 4],
+            "response_times": [],
+            "vehicle_idle_time": 0,
+            "vehicle_active_time": 0,
+            "completed_vehicle_distance": 0,
+        },
+    }
+
+    state = ReplayParser.parse(scenario_json, keyframe_json)
+
+    assert state.sim_report.tasks_completed_per_shift == 6
+
+
+def test_replay_parser_restores_simulation_report_invalid_format() -> None:
+    """Invalid tasks_completed_per_shift value should fall back to 0."""
+
+    scenario_json = {"start_time": "08:00", "end_time": "10:00"}
+
+    keyframe_json = {
+        "clock": {"simSecondsPassed": 0, "startTime": 0},
+        "stations": [],
+        "vehicles": [],
+        "drivers": [],
+        "tasks": [],
+        "reportingSnapshot": {
+            "total_driving_time": 0,
+            "total_servicing_time": 0,
+            "tasks_completed_per_shift": "invalid",
+            "response_times": [],
+            "vehicle_idle_time": 0,
+            "vehicle_active_time": 0,
+            "completed_vehicle_distance": 0,
+        },
+    }
+
+    state = ReplayParser.parse(scenario_json, keyframe_json)
+
+    assert state.sim_report.tasks_completed_per_shift == 0
 
 
 def test_replay_parser_active_routes_empty_when_no_routes() -> None:

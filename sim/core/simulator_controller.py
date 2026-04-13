@@ -31,7 +31,7 @@ from sim.entities.station import Station
 from sim.core.frame_emitter import FrameEmitter
 from sim.entities.task_state import State
 from sim.entities.frame import Frame
-from sim.entities.driver import Driver
+from sim.entities.driver import Driver, DriverState
 from sim.entities.vehicle import Vehicle
 from sim.entities.shift import Shift
 from sim.entities.clock import Clock
@@ -810,6 +810,12 @@ class SimulatorController:
             "completed_vehicle_distance": self.sim_env.report.get_vehicle_distance_traveled(),  # noqa: E501
         }
 
+        active_driver_count = sum(
+            1
+            for driver in self.driver_entities.values()
+            if driver.state not in (DriverState.OFF_SHIFT, DriverState.PENDING_SHIFT)
+        )
+
         current_reporting = {
             "servicingToDrivingRatio": round(
                 self.sim_env.report.get_servicing_to_driving_ratio(), 4
@@ -818,7 +824,8 @@ class SimulatorController:
                 self.sim_env.report.get_vehicle_utilization_ratio(), 4
             ),
             "averageTasksServicedPerShift": round(
-                self.sim_env.report.get_average_tasks_per_shift(), 4
+                self.sim_env.report.get_average_tasks_per_shift(active_driver_count),
+                4,
             ),
             "averageTaskResponseTime": round(
                 self.sim_env.report.get_average_service_time_for_tasks(), 4
