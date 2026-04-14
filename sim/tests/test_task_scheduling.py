@@ -442,13 +442,6 @@ def test_zero_dispatch_delay_keeps_task_assigned(
     assert task.get_state() == State.ASSIGNED
 
 
-def test_spawn_time_tracking(env: simpy.Environment, station: Station) -> None:
-    # Test that spawn_time is correctly tracked for tasks.
-    # TODO: spawn_time needs to be set when task is added to simulation
-    # since tasks no longer have env at construction time
-    pytest.skip("spawn_time tracking needs to be implemented in prep_entities")
-
-
 def test_task_state_string_conversions(
     env: simpy.Environment, station: Station
 ) -> None:

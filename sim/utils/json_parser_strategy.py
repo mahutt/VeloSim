@@ -1335,8 +1335,6 @@ class JsonParseStrategy(BaseParseStrategy):
 
             drivers[did] = Driver(
                 driver_id=did,
-                # TODO: make driver position snap to road
-                # next to HQ, instead of HQ itself
                 position=Headquarters.position,
                 task_list=[],
                 vehicle=None,

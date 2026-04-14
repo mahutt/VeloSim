@@ -715,7 +715,6 @@ class Driver:
             self.routes.pop(0)  # Remove the completed route
         # Allows a traveling drivers to be interrupted by other simpy entities
         except simpy.Interrupt:
-            # TODO Implement interrupt logic
             self.compute_routes()
 
     def get_route_json(self, simulation_tick: int | None = None) -> dict | None:
