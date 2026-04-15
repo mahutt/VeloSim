@@ -77,17 +77,6 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-traffic-
 
-      - name: Fetch default traffic csv (npm run traffic-csv)
-        if: steps.traffic-cache.outputs.cache-hit != 'true'
-        run: |
-          echo "Cache miss: Fetching traffic from drive..."
-          npm run traffic-csv || {
-            echo "ERROR: npm run traffic-csv failed"
-            echo "Traffic csv process might have an issue that needs to be fixed"
-            exit 1
-          }
-          echo "npm run traffic-csv completed successfully"
-
       - name: Extract packaged traffic templates (npm run traffic-templates)
         if: steps.traffic-cache.outputs.cache-hit != 'true'
         run: |

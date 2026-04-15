@@ -28,7 +28,6 @@
     "graphhopper:ps": "docker-compose -f docker-compose.graphhopper.yml ps",
     "graphhopper:benchmark": "node scripts/run-python.js scripts/benchmark_routing_graphhopper.py",
     "routingTest": "node scripts/run-python.js scripts/routingTest.py",
-    "traffic-csv": "node scripts/run-python.js scripts/traffic_to_csv.py",
     "dev:backend": "node scripts/run-python.js -m uvicorn back.main:app --reload --host 0.0.0.0 --port 8000",
     "dev:backend:debug": "node scripts/run-python.js -m debugpy --listen 5678 --wait-for-client -m uvicorn back.main:app --reload --host 0.0.0.0 --port 8000",
     "traffic-templates": "node scripts/run-python.js scripts/extract_traffic_templates.py",
