@@ -1,0 +1,80 @@
+---
+# VeloSim Production Variables
+# Copy this file and update values for your deployment.
+# See ansible/README.md for full documentation.
+
+# SSL Configuration
+# Set ssl_enabled to true once your domain DNS is pointing at the server
+# and you have a valid domain_name configured.
+ssl_enabled: false
+certbot_email: "admin@yourdomain.com"
+domain_name: "yourdomain.com"
+
+# Application Configuration
+app_name: "velosim"
+app_user: "velosim"
+app_dir: "/opt/velosim"
+app_start_timeout_seconds: 720
+
+# GraphHopper Configuration
+setup_graphhopper_data: true
+graphhopper_java_opts: "-Xmx2g -Xms2g"
+
+# Database Configuration
+postgres_version: "16"
+postgres_db: "velosim"
+postgres_user: "velosim"
+# postgres_password comes from _postgres_password in deploy.yml (POSTGRES_PASSWORD env var)
+postgres_password: "{{ _postgres_password }}"
+
+# Mapbox token comes from _vite_mapbox_token in deploy.yml (VITE_MAPBOX_ACCESS_TOKEN env var)
+# Leave VITE_MAPBOX_ACCESS_TOKEN secret unset to disable map functionality.
+vite_mapbox_token: "{{ _vite_mapbox_token }}"
+
+# Ansible Deployment User Configuration
+# This is the SSH public key for the user that GitHub Actions uses to deploy.
+# Generate with: ssh-keygen -t ed25519 -C "deploy@github-actions" -f ansible_deploy_key
+# Add the private key to GitHub Secrets as DEPLOY_SSH_KEY.
+ansible_deploy_user: "github"
+ansible_deploy_user_pubkey: "ssh-ed25519 AAAAC3... your-deploy-public-key-here"
+
+# Server Users
+# These users will be created on the server with SSH access via their GitHub SSH keys.
+# Remove or replace with your own team's GitHub usernames.
+velosim_users:
+  - username: "admin"
+    github_username: "your-github-username"
+    sudo: true
+
+# SSH Configuration
+ssh_port: 22
+ssh_client_alive_interval: 300
+ssh_client_alive_count_max: 2
+
+# UFW Firewall Configuration
+ufw_rules:
+  - rule: allow
+    port: 22
+    proto: tcp
+    comment: "SSH access"
+  - rule: allow
+    port: 80
+    proto: tcp
+    comment: "HTTP web traffic"
+  - rule: allow
+    port: 443
+    proto: tcp
+    comment: "HTTPS web traffic"
+
+# Docker Configuration
+docker_compose_version: "2.29.0"
+
+# Nginx Configuration
+nginx_client_max_body_size: "64M"
+nginx_worker_processes: "auto"
+nginx_worker_connections: 1024
+
+# Backup Configuration
+backup_retention_days: 60
+backup_schedule_hour: 2
+backup_schedule_minute: 0

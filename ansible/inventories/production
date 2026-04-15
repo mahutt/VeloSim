@@ -1,5 +1,5 @@
 [velosim_servers]
-for ansible_host=velosim.app
+velosim-prod ansible_host=YOUR_SERVER_IP
 
 [velosim_servers:vars]
-ansible_port=2222
+ansible_port=22

@@ -189,6 +189,37 @@ Local HTML coverage reports:
 - **Python**: `coverage_html/index.html`
 - **Frontend**: `front/coverage/index.html`
 
+## 🚢 Deploying to Production
+
+VeloSim deploys via Ansible to any Ubuntu 24.04 server.
+
+**Prerequisites:** A server with SSH access and an SSH key pair for GitHub Actions.
+
+```bash
+# 1. Generate a deploy key
+ssh-keygen -t ed25519 -C "deploy@github-actions" -f ansible_deploy_key
+
+# 2. Configure your deployment
+cp ansible/group_vars/all.yml.example ansible/group_vars/all.yml  # edit with your values
+# Update ansible/inventories/production with your server IP
+
+# 3. Add GitHub Secrets:
+#    DEPLOY_SSH_KEY      — contents of ansible_deploy_key (private)
+#    DEPLOY_HOST         — your server IP or hostname
+#    DEPLOY_HOST_KEY     — from: ssh-keyscan -t ed25519 YOUR_SERVER_IP
+#    DEPLOY_USER         — deploy user (default: github)
+#    POSTGRES_PASSWORD   — database password
+#    DOMAIN_NAME         — your domain (e.g. yourdomain.com)
+#    VITE_MAPBOX_ACCESS_TOKEN — optional, for map features
+
+# 4. Run initial provisioning (sets up server from scratch)
+cd ansible && ansible-playbook -i inventories/production deploy.yml -u root
+
+# Subsequent deploys run automatically on push to main, or manually via GitHub Actions.
+```
+
+See [`ansible/README.md`](ansible/README.md) for full details including backup, SSL, and recovery.
+
 ## 📄 License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
