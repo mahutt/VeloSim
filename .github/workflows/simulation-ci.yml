@@ -7,6 +7,8 @@ jobs:
   # Simulation Tests
   simulation-tests:
     runs-on: ubuntu-latest
+    env:
+      CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
 
     steps:
       - uses: actions/checkout@v4
@@ -39,11 +41,10 @@ jobs:
           pytest sim --cov=sim --cov-report=term-missing --cov-report=xml --cov-fail-under=90
 
       - name: Upload coverage to Codecov
+        if: ${{ env.CODECOV_TOKEN != '' }}
         uses: codecov/codecov-action@v5.5.1
         with:
           files: ./coverage.xml
           flags: simulation
           name: simulation-coverage
           fail_ci_if_error: false
-        env:
-          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}

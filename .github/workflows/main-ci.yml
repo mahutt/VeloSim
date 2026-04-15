@@ -10,6 +10,8 @@ jobs:
   backend-tests:
     name: Backend Tests
     runs-on: ubuntu-latest
+    env:
+      CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
 
     services:
       postgres:
@@ -142,19 +144,20 @@ jobs:
           alembic check || echo "⚠️ Warning: Model changes detected that don't have migrations!"
 
       - name: Upload backend coverage to Codecov
+        if: ${{ env.CODECOV_TOKEN != '' }}
         uses: codecov/codecov-action@v5.5.1
         with:
           files: ./coverage.xml
           flags: backend
           name: backend-coverage
           fail_ci_if_error: false
-        env:
-          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
 
   # Simulation Tests
   simulation-tests:
     name: Simulation Tests
     runs-on: ubuntu-latest
+    env:
+      CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
 
     steps:
       - name: Checkout code
@@ -200,19 +203,20 @@ jobs:
           pytest sim --cov=sim --cov-report=term-missing --cov-report=xml --cov-fail-under=90
 
       - name: Upload simulation coverage to Codecov
+        if: ${{ env.CODECOV_TOKEN != '' }}
         uses: codecov/codecov-action@v5.5.1
         with:
           files: ./coverage.xml
           flags: simulation
           name: simulation-coverage
           fail_ci_if_error: false
-        env:
-          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
 
   # Frontend Tests
   frontend-tests:
     name: Frontend Tests
     runs-on: ubuntu-latest
+    env:
+      CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
 
     steps:
       - name: Checkout code
@@ -246,14 +250,13 @@ jobs:
         run: npm run coverage
 
       - name: Upload frontend coverage to Codecov
+        if: ${{ env.CODECOV_TOKEN != '' }}
         uses: codecov/codecov-action@v5.5.1
         with:
           files: ./front/coverage/coverage-final.json
           flags: frontend
           name: frontend-coverage
           fail_ci_if_error: false
-        env:
-          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
 
   # Frontend Build
   frontend-build:
