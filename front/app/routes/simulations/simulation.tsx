@@ -34,7 +34,7 @@ import ResourceBar from '~/components/resource/resource-bar';
 import { useParams } from 'react-router';
 import { Loader2 } from 'lucide-react';
 import PlaybackControls from '~/components/map/playback-controls';
-import RouteToggle from '~/components/map/route-toggle';
+import SimulationOptions from '~/components/map/simulation-options';
 import SimulationClock from '~/components/map/clock';
 import HQWidget from '~/components/simulation/hq-widget';
 import Scrubber from '~/components/map/scrubber';
@@ -102,7 +102,7 @@ function SimulationContent() {
               <div className="w-full flex justify-between gap-2 items-center">
                 <SimulationClock />
                 <PlaybackControls />
-                <RouteToggle />
+                <SimulationOptions />
               </div>
               <ResourceBar />
               <HQWidget />

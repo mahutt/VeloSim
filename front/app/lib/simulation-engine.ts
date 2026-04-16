@@ -339,6 +339,10 @@ export default class SimulationEngine {
     this.state.setShowAllRoutes(!this.state.getShowAllRoutes());
   }
 
+  public toggleClusterStations(): void {
+    this.state.setClusterStations(!this.state.getClusterStations());
+  }
+
   public async setSpeed(nonZeroSpeed: NonZeroSpeed): Promise<void> {
     const prevNonZeroSpeed = this.state.getNonZeroSpeed();
     try {

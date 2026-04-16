@@ -92,6 +92,7 @@ vi.mock('~/lib/animation-helpers', () => {
 
 const {
   mockSetMapSource,
+  mockClearMapSource,
   mockUpdateAllRoutesDisplay,
   mockClearAllRoutesDisplay,
   mockUpdateRouteDisplay,
@@ -104,6 +105,7 @@ const {
 } = vi.hoisted(() => {
   return {
     mockSetMapSource: vi.fn(),
+    mockClearMapSource: vi.fn(),
     mockUpdateAllRoutesDisplay: vi.fn(),
     mockClearAllRoutesDisplay: vi.fn(),
     mockUpdateRouteDisplay: vi.fn(),
@@ -119,6 +121,7 @@ const {
 vi.mock('~/lib/map-helpers', () => {
   return {
     setMapSource: mockSetMapSource,
+    clearMapSource: mockClearMapSource,
     MapSource: {
       Headquarters: 'headquarters',
       Stations: 'stations',

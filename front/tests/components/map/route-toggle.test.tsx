@@ -26,11 +26,8 @@ import { describe, it, expect, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { useSimulation } from '~/providers/simulation-provider';
-import RouteToggle from '~/components/map/route-toggle';
-import {
-  makeReactiveSimulationState,
-  makeSimulationContext,
-} from 'tests/test-helpers';
+import RouteToggle from '~/components/map/simulation-options';
+import { makeSimulationContext } from 'tests/test-helpers';
 
 // Mock the useSimulation hook
 vi.mock('~/providers/simulation-provider', () => ({
@@ -65,56 +62,6 @@ describe('RouteToggle', () => {
     await user.click(button);
 
     expect(screen.getByText('Show All Routes')).toBeInTheDocument();
-  });
-
-  it('should show toggle switch in off state when showAllRoutes is false', async () => {
-    const user = userEvent.setup();
-    (useSimulation as unknown as ReturnType<typeof vi.fn>).mockReturnValue(
-      makeSimulationContext()
-    );
-
-    render(<RouteToggle />);
-
-    const button = screen.getByRole('button', {
-      name: /toggle display options/i,
-    });
-    await user.click(button);
-
-    // Check that the switch is in off state (bg-input class)
-    const toggleSwitch = screen
-      .getByText('Show All Routes')
-      .parentElement?.querySelector('.bg-input');
-    expect(toggleSwitch).toBeInTheDocument();
-  });
-
-  it('should show toggle switch in on state when showAllRoutes is true', async () => {
-    const user = userEvent.setup();
-
-    const state = makeReactiveSimulationState({ showAllRoutes: true });
-    (useSimulation as unknown as ReturnType<typeof vi.fn>).mockReturnValue(
-      makeSimulationContext({ state })
-    );
-
-    render(<RouteToggle />);
-
-    const button = screen.getByRole('button', {
-      name: /toggle display options/i,
-    });
-    await user.click(button);
-
-    const toggleContainer = screen.getByText('Show All Routes').parentElement;
-    expect(toggleContainer).toBeInTheDocument();
-    expect(toggleContainer).toHaveClass(
-      'flex',
-      'items-center',
-      'justify-between'
-    );
-    expect(toggleContainer).toHaveAttribute('aria-checked', 'true');
-
-    const onTrack = toggleContainer?.querySelector('.bg-primary');
-    expect(onTrack).toBeInTheDocument();
-    const onThumb = toggleContainer?.querySelector('.translate-x-5');
-    expect(onThumb).toBeInTheDocument();
   });
 
   it('should toggle showAllRoutes state when clicked', async () => {

@@ -47,6 +47,7 @@ import {
   updateRouteDisplay,
   clearRouteDisplay,
   computeBearing,
+  clearMapSource,
 } from './map-helpers';
 import {
   setupMapClickHandlers,
@@ -137,6 +138,7 @@ export default class MapManager {
       const newQuantizedZoom = Math.floor(map.getZoom());
       if (this.quantizedZoom === newQuantizedZoom) return;
       this.quantizedZoom = newQuantizedZoom;
+      if (!this.state.getClusterStations()) return;
       this.updateStationAndClusterSources();
     });
 
@@ -404,7 +406,13 @@ export default class MapManager {
         this.state.getPartialAssignmentStationIds()
       );
       this.supercluster.load(geojson.features);
-      this.updateStationAndClusterSources();
+      if (this.state.getClusterStations()) {
+        this.updateStationAndClusterSources();
+      } else {
+        setMapSource(MapSource.Stations, geojson, map);
+        clearMapSource(MapSource.Clusters, map);
+        clearMapSource(MapSource.ClusterCentroids, map);
+      }
     }
 
     // Derive selected resource (driver) ID from selection state

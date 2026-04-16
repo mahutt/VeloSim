@@ -112,6 +112,9 @@ export interface SimulationStateManagerInterface {
   getShowAllRoutes: () => boolean;
   setShowAllRoutes: (show: boolean) => void;
 
+  getClusterStations: () => boolean;
+  setClusterStations: (cluster: boolean) => void;
+
   getStartTime: () => number;
   setStartTime: (startTime: number) => void;
 
@@ -457,6 +460,17 @@ export default class SimulationStateManager implements SimulationStateManagerInt
   public setShowAllRoutes(showAllRoutes: boolean) {
     if (this.reactiveState.showAllRoutes !== showAllRoutes) {
       this.updateReactiveState({ showAllRoutes });
+      this.setMapShouldRefresh(true);
+    }
+  }
+
+  public getClusterStations() {
+    return this.reactiveState.clusterStations;
+  }
+
+  public setClusterStations(clusterStations: boolean) {
+    if (this.reactiveState.clusterStations !== clusterStations) {
+      this.updateReactiveState({ clusterStations });
       this.setMapShouldRefresh(true);
     }
   }
