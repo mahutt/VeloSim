@@ -197,6 +197,9 @@ export const mockSimulationStateManager: Partial<SimulationStateManager> = {
   getShowAllRoutes: vi.fn(),
   setShowAllRoutes: vi.fn(),
 
+  getClusterStations: vi.fn(),
+  setClusterStations: vi.fn(),
+
   getStartTime: vi.fn(),
   setStartTime: vi.fn(),
 

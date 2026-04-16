@@ -231,6 +231,14 @@ describe('SimulationStateManager', () => {
     expect(setState.mock.calls.length).toBe(callsBefore);
   });
 
+  // clusterStations no-op when unchanged
+  it('setClusterStations is a no-op when value is unchanged', () => {
+    manager.setClusterStations(true);
+    const callsBefore = setState.mock.calls.length;
+    manager.setClusterStations(true);
+    expect(setState.mock.calls.length).toBe(callsBefore);
+  });
+
   // Reactive state pass-throughs
   it.each([
     [
@@ -261,6 +269,12 @@ describe('SimulationStateManager', () => {
       'showAllRoutes',
       (m: SimulationStateManager) => m.setShowAllRoutes(true),
       (m: SimulationStateManager) => m.getShowAllRoutes(),
+      true,
+    ],
+    [
+      'clusterStations',
+      (m: SimulationStateManager) => m.setClusterStations(true),
+      (m: SimulationStateManager) => m.getClusterStations(),
       true,
     ],
     [

@@ -272,6 +272,7 @@ export const EN_TRANSLATIONS = {
     labels: {
       day: 'Day',
       showAllRoutes: 'Show All Routes',
+      clusterStations: 'Cluster Nearby Stations',
       tasksCount: 'Tasks ({{count}})',
       tasksSelectedCount: 'Tasks ({{selected}}/{{total}} selected)',
       itinerary: 'Itinerary',
@@ -825,6 +826,7 @@ export const FR_TRANSLATIONS = {
     labels: {
       day: 'Jour',
       showAllRoutes: 'Afficher tous les trajets',
+      clusterStations: 'Regrouper les stations',
       tasksCount: 'Tâches ({{count}})',
       tasksSelectedCount: 'Tâches ({{selected}}/{{total}} sélectionnées)',
       itinerary: 'Itinéraire',

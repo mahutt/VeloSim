@@ -54,6 +54,7 @@ describe('areReactiveSimulationStatesEqual', () => {
       paused: true,
       nonZeroSpeed: 2,
       showAllRoutes: true,
+      clusterStations: false,
       simulationSecondsPassed: 900,
       scrubSimulationSecond: 450,
       startTime: 100,

@@ -544,6 +544,10 @@ export function setMapSource(
   (map.getSource(source) as mapboxgl.GeoJSONSource).setData(data);
 }
 
+export function clearMapSource(source: MapSource, map: mapboxgl.Map) {
+  setMapSource(source, EMPTY_FEATURE_COLLECTION, map);
+}
+
 /**
  * Render provided route on the provided Mapbox map instance
  * @param route - Route object containing coordinates, nextStopIndex, and optional trafficRanges
@@ -564,8 +568,8 @@ export function updateRouteDisplay(
  * Clear route visualization
  */
 export function clearRouteDisplay(map: mapboxgl.Map) {
-  setMapSource(MapSource.RouteNextTask, EMPTY_FEATURE_COLLECTION, map);
-  setMapSource(MapSource.RouteFutureTasks, EMPTY_FEATURE_COLLECTION, map);
+  clearMapSource(MapSource.RouteNextTask, map);
+  clearMapSource(MapSource.RouteFutureTasks, map);
 }
 
 /**
@@ -619,7 +623,7 @@ export function updateAllRoutesDisplay(
  * @param map - Mapbox map instance
  */
 export function clearAllRoutesDisplay(map: mapboxgl.Map) {
-  setMapSource(MapSource.AllRoutesNextTask, EMPTY_FEATURE_COLLECTION, map);
+  clearMapSource(MapSource.AllRoutesNextTask, map);
 }
 
 /**

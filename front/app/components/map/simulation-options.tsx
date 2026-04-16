@@ -32,11 +32,12 @@ import {
   DropdownMenuTrigger,
 } from '~/components/ui/dropdown-menu';
 import usePreferences from '~/hooks/use-preferences';
+import { Switch } from '../ui/switch';
 
-export default function RouteToggle() {
+export default function SimulationOptions() {
   const { state, engine } = useSimulation();
   const { t } = usePreferences();
-  const { showAllRoutes } = state;
+  const { showAllRoutes, clusterStations } = state;
 
   return (
     <DropdownMenu>
@@ -61,18 +62,19 @@ export default function RouteToggle() {
             aria-label="Show all vehicle routes"
           >
             <span>{t.map.labels.showAllRoutes}</span>
-            <div
-              className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${
-                showAllRoutes ? 'bg-primary' : 'bg-input'
-              }`}
-              aria-hidden="true"
-            >
-              <span
-                className={`inline-block h-4 w-4 transform rounded-full bg-background transition-transform ${
-                  showAllRoutes ? 'translate-x-5' : 'translate-x-0.5'
-                }`}
-              />
-            </div>
+            <Switch checked={showAllRoutes} />
+          </div>
+        </DropdownMenuItem>
+        <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
+          <div
+            className="flex items-center justify-between w-full cursor-pointer"
+            onClick={() => engine.toggleClusterStations()}
+            role="switch"
+            aria-checked={clusterStations}
+            aria-label="Cluster nearby stations"
+          >
+            <span>{t.map.labels.clusterStations}</span>
+            <Switch checked={clusterStations} />
           </div>
         </DropdownMenuItem>
       </DropdownMenuContent>

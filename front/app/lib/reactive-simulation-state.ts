@@ -55,6 +55,7 @@ export interface ReactiveSimulationState {
 
   // options
   showAllRoutes: boolean;
+  clusterStations: boolean;
 
   // resource bar
   resourceBarElement: ResourceBarElement;
@@ -83,6 +84,7 @@ export const DEFAULT_REACTIVE_SIMULATION_STATE: ReactiveSimulationState = {
   nonZeroSpeed: 1,
   paused: false,
   showAllRoutes: false,
+  clusterStations: false,
   resourceBarElement: [],
   HQWidgetState: {
     entities: null,
@@ -117,6 +119,7 @@ export function areReactiveSimulationStatesEqual(
     a.nonZeroSpeed === b.nonZeroSpeed &&
     a.paused === b.paused &&
     a.showAllRoutes === b.showAllRoutes &&
+    a.clusterStations === b.clusterStations &&
     areResourceBarElementsEqual(a.resourceBarElement, b.resourceBarElement) &&
     areHQWidgetStatesEqual(a.HQWidgetState, b.HQWidgetState) &&
     a.startTime === b.startTime &&
