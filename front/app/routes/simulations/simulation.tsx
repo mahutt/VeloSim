@@ -91,15 +91,21 @@ function SimulationContent() {
   return (
     <>
       <BufferOverlay />
-      <TaskAssignmentBanner />
       {/* pb-6 is so that the Mapbox & OSM copyright notices aren't blocked */}
       <div className="pointer-events-none absolute inset-0 px-4 pt-4 pb-6 flex flex-row gap-4">
         {/* mt-6 is to give space to the sidebar toggle */}
         <div className="mt-6 w-72">
           <SelectedItemBar />
         </div>
-        <div className="flex-1 flex flex-row justify-center items-end w-2xl max-w-full z-30">
-          {showScrubber && <Scrubber />}
+        <div className="flex-1 min-w-0 flex flex-col justify-between items-center">
+          <div>
+            <TaskAssignmentBanner />
+          </div>
+          {showScrubber && (
+            <div className="w-2xl max-w-full z-30">
+              <Scrubber />
+            </div>
+          )}
         </div>
         <div
           className={`${getContainerWidth(currentDay)} flex flex-col justify-between gap-2`}
