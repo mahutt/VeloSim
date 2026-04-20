@@ -49,7 +49,7 @@ export default function ReportingWidget() {
 
   return (
     <div
-      className={`pointer-events-auto w-full bg-gray-50 border shadow rounded-lg transition-all duration-200 self-end ${isHovered ? 'md:w-max' : 'md:w-full'} [interpolate-size:allow-keywords]`}
+      className={`pointer-events-auto w-full bg-gray-50 border shadow rounded-lg transition-all duration-200 self-end ${isHovered ? 'md:w-max z-40' : 'md:w-full'} [interpolate-size:allow-keywords]`}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
     >

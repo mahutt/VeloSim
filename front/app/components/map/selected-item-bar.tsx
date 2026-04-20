@@ -83,7 +83,7 @@ export default function SelectedItemBar() {
     const totalTasks = stations.reduce((sum, s) => sum + s.tasks.length, 0);
 
     return (
-      <div className="bg-gray-50 flex flex-col gap-2 rounded-lg border py-4 shadow-sm w-full min-w-0">
+      <div className="pointer-events-auto bg-gray-50 flex flex-col gap-2 rounded-lg border py-4 shadow-sm w-full min-w-0">
         <div className="px-5 flex flex-row justify-between items-start gap-1">
           <div className="flex flex-col min-w-0">
             <span className="text-xl font-bold">
@@ -132,7 +132,7 @@ export default function SelectedItemBar() {
   };
 
   return (
-    <div className="bg-gray-50 flex flex-col gap-2 rounded-lg border py-4 shadow-sm">
+    <div className="pointer-events-auto bg-gray-50 flex flex-col gap-2 rounded-lg border py-4 shadow-sm">
       <div className="px-5 flex flex-row justify-between items-start gap-1">
         <div className="flex flex-col">
           <span className="text-xl font-bold">{selectedItem.value.name}</span>

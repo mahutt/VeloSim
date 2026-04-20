@@ -219,7 +219,7 @@ export function TaskAssignmentBanner() {
   };
 
   return (
-    <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50">
+    <div className="fixed top-4 left-1/2 -translate-x-1/2 z-20">
       <div className="bg-white border rounded-lg shadow-lg p-4">
         <div className="flex items-center gap-2 mb-3 justify-center">
           <AlertCircle className="h-5 w-5 text-amber-500" />

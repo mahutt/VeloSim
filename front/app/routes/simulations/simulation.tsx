@@ -91,29 +91,30 @@ function SimulationContent() {
         <>
           <BufferOverlay />
           <TaskAssignmentBanner />
-          <div className="absolute top-12 left-4 z-10 w-72">
-            <SelectedItemBar />
-          </div>
-          {/* max-h-[calc(100vh-2.5rem) is set so that the Mapbox & OSM copyright notices aren't blocked. */}
-          <div
-            className={`${getContainerWidth(currentDay)} pointer-events-none absolute top-4 right-4 flex flex-col justify-between gap-2 h-[calc(100vh-2.5rem)]`}
-          >
-            <div className="flex flex-col gap-2 min-h-0">
-              <div className="w-full flex justify-between gap-2 items-center">
-                <SimulationClock />
-                <PlaybackControls />
-                <SimulationOptions />
+          {/* pb-6 is so that the Mapbox & OSM copyright notices aren't blocked */}
+          <div className="pointer-events-none absolute inset-0 px-4 pt-4 pb-6 flex flex-row gap-4">
+            {/* mt-6 is to give space to the sidebar toggle */}
+            <div className="mt-6 w-72">
+              <SelectedItemBar />
+            </div>
+            <div className="flex-1 flex flex-row justify-center items-end w-2xl max-w-full z-30">
+              {showScrubber && <Scrubber />}
+            </div>
+            <div
+              className={`${getContainerWidth(currentDay)} flex flex-col justify-between gap-2`}
+            >
+              <div className="flex flex-col gap-2 min-h-0">
+                <div className="w-full flex justify-between gap-2 items-center">
+                  <SimulationClock />
+                  <PlaybackControls />
+                  <SimulationOptions />
+                </div>
+                <ResourceBar />
+                <HQWidget />
               </div>
-              <ResourceBar />
-              <HQWidget />
+              <ReportingWidget />
             </div>
-            <ReportingWidget />
           </div>
-          {showScrubber && (
-            <div className="z-60 absolute bottom-10 left-1/2 -translate-x-1/2 w-2xl max-w-full px-2">
-              <Scrubber />
-            </div>
-          )}
         </>
       )}
     </>
