@@ -33,12 +33,16 @@ import { formatTranslation } from '~/lib/i18n';
 export function TaskAssignmentBanner() {
   const { state, engine } = useSimulation();
   const { t } = usePreferences();
-  const { pendingAssignment, pendingAssignmentLoading: isLoading } = state;
+  const {
+    blockAssignments,
+    pendingAssignment,
+    pendingAssignmentLoading: isLoading,
+  } = state;
 
   const [loadingAction, setLoadingAction] = useState<
     'all' | 'remaining' | null
   >(null);
-  if (!pendingAssignment) return null;
+  if (blockAssignments || !pendingAssignment) return null;
 
   const taskIds = pendingAssignment.taskIds;
   const count = taskIds.length;
@@ -219,69 +223,65 @@ export function TaskAssignmentBanner() {
   };
 
   return (
-    <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50">
-      <div className="bg-white border rounded-lg shadow-lg p-4">
-        <div className="flex items-center gap-2 mb-3 justify-center">
-          <AlertCircle className="h-5 w-5 text-amber-500" />
-          <div className="text-sm">{renderMessage()}</div>
-        </div>
-        <div className="flex gap-2 justify-center">
+    <div className="bg-white border rounded-lg shadow-lg p-4">
+      <div className="flex items-center gap-2 mb-3 justify-center">
+        <AlertCircle className="h-5 w-5 text-amber-500" />
+        <div className="text-sm">{renderMessage()}</div>
+      </div>
+      <div className="flex gap-2 justify-center">
+        <Button
+          onClick={() => engine.cancelAssignment()}
+          size="sm"
+          variant="outline"
+          disabled={isLoading}
+          aria-busy={isLoading}
+        >
+          {t.common.cancel}
+        </Button>
+        {hasMixedTasks ? (
+          <>
+            <Button
+              onClick={() => {
+                setLoadingAction('remaining');
+                engine.confirmAssignment(true);
+              }}
+              size="sm"
+              disabled={isLoading}
+              aria-busy={isLoading && loadingAction === 'remaining'}
+              className="bg-blue-500 hover:bg-blue-400 text-white"
+            >
+              {isLoading && loadingAction === 'remaining'
+                ? t.map.assignment.assigning
+                : formatTranslation(t.map.assignment.remaining, {
+                    count: unassignedCount,
+                  })}
+            </Button>
+            <Button
+              onClick={() => {
+                setLoadingAction('all');
+                engine.confirmAssignment();
+              }}
+              size="sm"
+              disabled={isLoading}
+              aria-busy={isLoading && loadingAction === 'all'}
+            >
+              {isLoading && loadingAction === 'all'
+                ? t.map.assignment.assigning
+                : formatTranslation(t.map.assignment.all, {
+                    count: taskIds.length,
+                  })}
+            </Button>
+          </>
+        ) : (
           <Button
-            onClick={() => engine.cancelAssignment()}
+            onClick={() => engine.confirmAssignment()}
             size="sm"
-            variant="outline"
             disabled={isLoading}
             aria-busy={isLoading}
           >
-            {t.common.cancel}
+            {isLoading ? t.map.assignment.confirming : t.map.assignment.confirm}
           </Button>
-          {hasMixedTasks ? (
-            <>
-              <Button
-                onClick={() => {
-                  setLoadingAction('remaining');
-                  engine.confirmAssignment(true);
-                }}
-                size="sm"
-                disabled={isLoading}
-                aria-busy={isLoading && loadingAction === 'remaining'}
-                className="bg-blue-500 hover:bg-blue-400 text-white"
-              >
-                {isLoading && loadingAction === 'remaining'
-                  ? t.map.assignment.assigning
-                  : formatTranslation(t.map.assignment.remaining, {
-                      count: unassignedCount,
-                    })}
-              </Button>
-              <Button
-                onClick={() => {
-                  setLoadingAction('all');
-                  engine.confirmAssignment();
-                }}
-                size="sm"
-                disabled={isLoading}
-                aria-busy={isLoading && loadingAction === 'all'}
-              >
-                {isLoading && loadingAction === 'all'
-                  ? t.map.assignment.assigning
-                  : formatTranslation(t.map.assignment.all, {
-                      count: taskIds.length,
-                    })}
-              </Button>
-            </>
-          ) : (
-            <Button
-              onClick={() => engine.confirmAssignment()}
-              size="sm"
-              disabled={isLoading}
-              aria-busy={isLoading}
-            >
-              {isLoading
-                ? t.map.assignment.confirming
-                : t.map.assignment.confirm}
-            </Button>
-          )}
-        </div>
+        )}
       </div>
     </div>
   );

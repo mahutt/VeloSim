@@ -50,7 +50,7 @@ export default function Scrubber() {
   };
 
   return (
-    <div className="w-full max-w-2xl p-2 rounded-full bg-background border shadow-sm">
+    <div className="pointer-events-auto w-full max-w-2xl p-2 rounded-full bg-background border shadow-sm">
       <SliderPrimitive.Root
         data-slot="slider"
         value={[scrubSimulationSecond]}

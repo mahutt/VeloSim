@@ -31,7 +31,7 @@ export default function BufferOverlay() {
   if (!state.isBuffering) return null;
 
   return (
-    <div className="absolute inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm">
+    <div className="absolute inset-0 z-20 flex items-center justify-center bg-background/80 backdrop-blur-sm">
       <div className="flex flex-col items-center gap-4">
         <Loader2
           data-testid="buffer-loader"
