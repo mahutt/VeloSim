@@ -77,46 +77,45 @@ function SimulationContent() {
   const { isLoading, currentDay } = state;
   const showScrubber = useFeature('simulationScrubber');
 
+  if (isLoading) {
+    return (
+      <div className="absolute inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm">
+        <div className="flex flex-col items-center gap-4">
+          <Loader2 className="h-12 w-12 animate-spin text-primary" />
+          <p className="text-lg text-muted-foreground">{t.common.loading}</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <>
-      {isLoading && (
-        <div className="absolute inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm">
-          <div className="flex flex-col items-center gap-4">
-            <Loader2 className="h-12 w-12 animate-spin text-primary" />
-            <p className="text-lg text-muted-foreground">{t.common.loading}</p>
-          </div>
+      <BufferOverlay />
+      <TaskAssignmentBanner />
+      {/* pb-6 is so that the Mapbox & OSM copyright notices aren't blocked */}
+      <div className="pointer-events-none absolute inset-0 px-4 pt-4 pb-6 flex flex-row gap-4">
+        {/* mt-6 is to give space to the sidebar toggle */}
+        <div className="mt-6 w-72">
+          <SelectedItemBar />
         </div>
-      )}
-      {!isLoading && (
-        <>
-          <BufferOverlay />
-          <TaskAssignmentBanner />
-          {/* pb-6 is so that the Mapbox & OSM copyright notices aren't blocked */}
-          <div className="pointer-events-none absolute inset-0 px-4 pt-4 pb-6 flex flex-row gap-4">
-            {/* mt-6 is to give space to the sidebar toggle */}
-            <div className="mt-6 w-72">
-              <SelectedItemBar />
+        <div className="flex-1 flex flex-row justify-center items-end w-2xl max-w-full z-30">
+          {showScrubber && <Scrubber />}
+        </div>
+        <div
+          className={`${getContainerWidth(currentDay)} flex flex-col justify-between gap-2`}
+        >
+          <div className="flex flex-col gap-2 min-h-0">
+            <div className="w-full flex justify-between gap-2 items-center">
+              <SimulationClock />
+              <PlaybackControls />
+              <SimulationOptions />
             </div>
-            <div className="flex-1 flex flex-row justify-center items-end w-2xl max-w-full z-30">
-              {showScrubber && <Scrubber />}
-            </div>
-            <div
-              className={`${getContainerWidth(currentDay)} flex flex-col justify-between gap-2`}
-            >
-              <div className="flex flex-col gap-2 min-h-0">
-                <div className="w-full flex justify-between gap-2 items-center">
-                  <SimulationClock />
-                  <PlaybackControls />
-                  <SimulationOptions />
-                </div>
-                <ResourceBar />
-                <HQWidget />
-              </div>
-              <ReportingWidget />
-            </div>
+            <ResourceBar />
+            <HQWidget />
           </div>
-        </>
-      )}
+          <ReportingWidget />
+        </div>
+      </div>
     </>
   );
 }
