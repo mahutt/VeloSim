@@ -36,8 +36,10 @@ import {
 } from '~/components/ui/tooltip';
 import { useTaskMassSelect } from '~/hooks/use-task-mass-select';
 import { useAutoScroll } from '~/hooks/use-auto-scroll';
-import type { PopulatedDriver } from './selected-item-bar';
-import { ScrollArea } from '~/components/ui/scroll-area';
+import {
+  SelectedItemBarScrollArea,
+  type PopulatedDriver,
+} from './selected-item-bar';
 import usePreferences from '~/hooks/use-preferences';
 import { formatTranslation, type TranslationSchema } from '~/lib/i18n';
 import { setTaskDragDataAndPreview } from '~/lib/task-drag';
@@ -632,11 +634,11 @@ export function DriverTasks({ driver }: { driver: PopulatedDriver }) {
           }}
         />
       </div>
-      <ScrollArea className="mx-2">
+      <SelectedItemBarScrollArea>
         <div
           ref={containerRef}
           onMouseMove={handleMouseMove}
-          className="max-h-50 px-3 space-y-1"
+          className="px-3 space-y-1"
           onMouseLeave={() => engine.setTaskHoveredStationId(null)}
         >
           {isCollapsed ? (
@@ -668,7 +670,7 @@ export function DriverTasks({ driver }: { driver: PopulatedDriver }) {
             />
           )}
         </div>
-      </ScrollArea>
+      </SelectedItemBarScrollArea>
     </>
   );
 }
