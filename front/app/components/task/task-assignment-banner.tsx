@@ -223,7 +223,7 @@ export function TaskAssignmentBanner() {
   };
 
   return (
-    <div className="bg-white border rounded-lg shadow-lg p-4">
+    <div className="pointer-events-auto bg-white border rounded-lg shadow-lg p-4 h-full">
       <div className="flex items-center gap-2 mb-3 justify-center">
         <AlertCircle className="h-5 w-5 text-amber-500" />
         <div className="text-sm">{renderMessage()}</div>
