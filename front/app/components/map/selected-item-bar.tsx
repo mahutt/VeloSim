@@ -83,7 +83,7 @@ export default function SelectedItemBar() {
     const totalTasks = stations.reduce((sum, s) => sum + s.tasks.length, 0);
 
     return (
-      <div className="pointer-events-auto bg-gray-50 flex flex-col gap-2 rounded-lg border py-4 shadow-sm w-full min-w-0">
+      <SelectedItemBarContainer>
         <div className="px-5 flex flex-row justify-between items-start gap-1">
           <div className="flex flex-col min-w-0">
             <span className="text-xl font-bold">
@@ -102,8 +102,8 @@ export default function SelectedItemBar() {
             <X className="h-4 w-4" />
           </Button>
         </div>
-        <ScrollArea className="mx-2">
-          <div className="max-h-50 px-3 space-y-1">
+        <SelectedItemBarScrollArea>
+          <div className="px-3 space-y-1">
             {stations.map((station) => (
               <div
                 key={station.id}
@@ -119,8 +119,8 @@ export default function SelectedItemBar() {
               </div>
             ))}
           </div>
-        </ScrollArea>
-      </div>
+        </SelectedItemBarScrollArea>
+      </SelectedItemBarContainer>
     );
   }
 
@@ -132,7 +132,7 @@ export default function SelectedItemBar() {
   };
 
   return (
-    <div className="pointer-events-auto bg-gray-50 flex flex-col gap-2 rounded-lg border py-4 shadow-sm">
+    <SelectedItemBarContainer>
       <div className="px-5 flex flex-row justify-between items-start gap-1">
         <div className="flex flex-col">
           <span className="text-xl font-bold">{selectedItem.value.name}</span>
@@ -163,19 +163,35 @@ export default function SelectedItemBar() {
           <X className="h-4 w-4" />
         </Button>
       </div>
-      {selectedItem.value.tasks.length > 0 ? (
-        <>
-          {selectedItem.type === SelectedItemType.Station ? (
-            <StationTasks station={selectedItem.value} />
-          ) : (
-            <DriverTasks driver={selectedItem.value} />
-          )}
-        </>
-      ) : (
+      {selectedItem.value.tasks.length === 0 ? (
         <p className="text-sm text-muted-foreground px-5">
           {t.map.labels.noTasks}
         </p>
+      ) : selectedItem.type === SelectedItemType.Station ? (
+        <StationTasks station={selectedItem.value} />
+      ) : (
+        <DriverTasks driver={selectedItem.value} />
       )}
+    </SelectedItemBarContainer>
+  );
+}
+
+export function SelectedItemBarContainer({
+  children,
+}: {
+  children?: React.ReactNode;
+}) {
+  return (
+    <div className="pointer-events-auto bg-gray-50 flex flex-col gap-2 rounded-lg border py-4 shadow-sm min-h-0">
+      {children}
     </div>
   );
+}
+
+export function SelectedItemBarScrollArea({
+  children,
+}: {
+  children?: React.ReactNode;
+}) {
+  return <ScrollArea className="mx-2 min-h-0 flex-1">{children}</ScrollArea>;
 }

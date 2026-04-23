@@ -26,8 +26,10 @@ import { TaskItem } from '~/components/task/task-item';
 import { useSimulation } from '~/providers/simulation-provider';
 import { useTaskMassSelect } from '~/hooks/use-task-mass-select';
 import { useAutoScroll } from '~/hooks/use-auto-scroll';
-import type { PopulatedStation } from './selected-item-bar';
-import { ScrollArea } from '~/components/ui/scroll-area';
+import {
+  SelectedItemBarScrollArea,
+  type PopulatedStation,
+} from './selected-item-bar';
 import usePreferences from '~/hooks/use-preferences';
 import { formatTranslation } from '~/lib/i18n';
 
@@ -57,11 +59,11 @@ export function StationTasks({ station }: { station: PopulatedStation }) {
               count: station.tasks.length,
             })}
       </p>
-      <ScrollArea className="mx-2">
+      <SelectedItemBarScrollArea>
         <div
           ref={containerRef}
           onMouseMove={handleMouseMove}
-          className="max-h-50 px-3 space-y-1"
+          className="px-3 space-y-1"
         >
           {station.tasks.map((task, index) => {
             const assignedDriverId = task.assignedDriverId;
@@ -103,7 +105,7 @@ export function StationTasks({ station }: { station: PopulatedStation }) {
             );
           })}
         </div>
-      </ScrollArea>
+      </SelectedItemBarScrollArea>
     </>
   );
 }

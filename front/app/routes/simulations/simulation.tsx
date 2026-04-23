@@ -91,10 +91,10 @@ function SimulationContent() {
   return (
     <>
       <BufferOverlay />
-      {/* pb-6 is so that the Mapbox & OSM copyright notices aren't blocked */}
-      <div className="pointer-events-none absolute inset-0 px-4 pt-4 pb-6 flex flex-row gap-4">
-        {/* mt-6 is to give space to the sidebar toggle */}
-        <div className="mt-6 w-72">
+      {/* pb-8 is so that the Mapbox & OSM copyright notices aren't blocked */}
+      <div className="pointer-events-none absolute inset-0 px-4 pt-4 pb-8 flex flex-row gap-4">
+        {/* mt-6 is to give space to the sidebar toggle, flex-col is required for dynamic selected item bar height */}
+        <div className="mt-6 w-72 flex flex-col">
           <SelectedItemBar />
         </div>
         <div className="flex-1 min-w-0 flex flex-col justify-between items-center">
