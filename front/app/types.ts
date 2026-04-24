@@ -355,6 +355,7 @@ export interface PayloadClock {
   realSecondsPassed: number;
   realMinutesPassed: number;
   startTime: number;
+  running: boolean;
 }
 
 export interface BackendPayload {

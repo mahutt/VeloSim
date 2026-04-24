@@ -442,6 +442,7 @@ export default class SimulationStateManager implements SimulationStateManagerInt
   }
 
   public setPaused(paused: boolean) {
+    if (this.reactiveState.paused === paused) return;
     this.updateReactiveState({ paused });
   }
 

@@ -26,7 +26,7 @@
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
-import { makePayload } from 'tests/test-helpers';
+import { makePayload, makePayloadClock } from 'tests/test-helpers';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import ServerFrameSource from '~/lib/frame-sources/server-frame-source';
 
@@ -57,13 +57,13 @@ describe('ServerFrameSource', () => {
   const createMockPayload = () =>
     makePayload({
       simId: 'test-sim',
-      clock: {
+      clock: makePayloadClock({
         startTime: 0,
         simSecondsPassed: 10,
         simMinutesPassed: 0.167,
         realSecondsPassed: 10,
         realMinutesPassed: 0.167,
-      },
+      }),
     });
 
   beforeEach(() => {
