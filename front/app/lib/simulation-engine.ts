@@ -87,7 +87,12 @@ export default class SimulationEngine {
         this.state.setStartTime(frame.clock.startTime);
         this.state.setSimulationSecondsPassed(frame.clock.simSecondsPassed);
         this.localFrameSource.saveFrame(frame);
-        if (this.mode === SimulationMode.Server) this.handleFrame(frame);
+        if (this.mode === SimulationMode.Local) return;
+        // If server isn't running but client thinks it is,
+        // then we sync.
+        if (!frame.clock.running && !this.state.getPaused())
+          this.setPaused(true);
+        this.handleFrame(frame);
       },
       toast.error
     );

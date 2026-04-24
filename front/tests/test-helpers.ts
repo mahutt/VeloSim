@@ -63,6 +63,7 @@ export function makePayloadClock(
     realSecondsPassed: overrides.simSecondsPassed ?? 0,
     realMinutesPassed: overrides.simSecondsPassed ?? 0,
     startTime: overrides.simSecondsPassed ?? 0,
+    running: true,
   };
 }
 

@@ -56,13 +56,13 @@ describe('LocalFrameSource', () => {
   const createMockFrame = (simSecondsPassed: number): BackendPayload =>
     makePayload({
       simId: 'test-sim',
-      clock: {
+      clock: makePayloadClock({
         startTime: 0,
         simSecondsPassed,
         simMinutesPassed: simSecondsPassed / 60,
         realSecondsPassed: simSecondsPassed,
         realMinutesPassed: simSecondsPassed / 60,
-      },
+      }),
     });
 
   beforeEach(() => {
